@@ -1,0 +1,288 @@
+// Weather.cpp
+// This file manages the retrieval of Weather related information and adjustment of durations
+//   from Weather Underground
+// Author: Richard Zimmerman
+// Copyright (c) 2013 Richard Zimmerman
+//
+// Sep 6, 2014
+// Modified by Ray Wang to fit OpenSprinkler 
+
+#include "weather.h"
+#include "OpenSprinklerGen2.h"
+#include <string.h>
+#include <stdlib.h>
+
+extern OpenSprinkler os; // OpenSprinkler object
+extern char tmp_buffer[];
+
+// The weather function calls getweather.py on remote server to retrieve weather data
+// the default script is WEATHER_SCRIPT_HOST/scripts/getweather.py
+static char website[] PROGMEM = WEATHER_SCRIPT_HOST ;
+
+WeatherVals weather;
+
+void getweather_callback(byte status, word off, word len) {
+  char *p = (char*)Ethernet::buffer + off;
+  
+  /* scan the buffer until the first & symbol */
+  while(*p && *p!='&') {
+    p++;
+  }
+  int v;
+  if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, "sunrise")) {
+    v = atoi(tmp_buffer);
+    DEBUG_PRINT(v/60);
+    DEBUG_PRINT(":");
+    DEBUG_PRINTLN(v%60);
+  }
+  if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, "sunset")) {
+    v = atoi(tmp_buffer);
+    DEBUG_PRINT(v/60);
+    DEBUG_PRINT(":");
+    DEBUG_PRINTLN(v%60);
+  }
+  if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, "scale")) {
+    v = atoi(tmp_buffer);
+    DEBUG_PRINT("Scale:");
+    DEBUG_PRINTLN(v);
+  }
+  /*if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, "err")) {
+    DEBUG_PRINTLN(tmp_buffer);
+  }*/
+}
+
+
+void GetWeather() {
+  // check if we've already done dns lookup
+  if(ether.hisip[0] == 0) {
+    ether.dnsLookup(website);
+  }
+
+  String str = "";
+  str += os.options[OPTION_USE_WEATHER].value;
+  str += ".py?loc=";
+  
+  // fill in location data, API key
+  os.eeprom_string_get(ADDR_EEPROM_LOCATION, tmp_buffer);
+  str += tmp_buffer;
+
+  str += "&key=";
+  os.eeprom_string_get(ADDR_EEPROM_WEATHER_KEY, tmp_buffer);
+  str += tmp_buffer;
+
+  str += "&tz=";
+  str += (int)os.options[OPTION_TIMEZONE].value;
+  str.toCharArray(tmp_buffer, TMP_BUFFER_SIZE);
+  DEBUG_PRINTLN(tmp_buffer);
+  ether.browseUrl(PSTR("/scripts/weather"), tmp_buffer, website, getweather_callback);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/*
+#define FIND_QUOTE1     0
+#define PARSING_KEY     1
+#define FIND_QUOTE2     2
+#define PARSING_VALUE   3
+#define PARSING_QVALUE  4
+#define ERROR           5
+
+
+int Weather::GetScale(const IPAddress & ip, const char * key, uint32_t zip, const char * pws, bool usePws) const
+{
+	ReturnVals vals = GetVals(ip, key, zip, pws, usePws);
+	return GetScale(vals);
+}
+
+int Weather::GetScale(const ReturnVals & vals) const
+{
+	if (!vals.valid)
+		return 100;
+	const int humid_factor = 30 - (vals.maxhumidity + vals.minhumidity) / 2;
+	const int temp_factor = (vals.meantempi - 70) * 4;
+	const int rain_factor = (vals.precipi + vals.precip_today) * -2;
+	const int adj = min(max(0, 100+humid_factor+temp_factor+rain_factor), 200);
+	trace(F("Adjusting H(%d)T(%d)R(%d):%d\n"), humid_factor, temp_factor, rain_factor, adj);
+	return adj;
+}
+
+Weather::ReturnVals Weather::GetVals(const IPAddress & ip, const char * key, uint32_t zip, const char * pws, bool usePws) const
+{
+	ReturnVals vals = {0};
+	EthernetClient client;
+	if (client.connect(ip, 80))
+	{
+		char getstring[90];
+		trace(F("Connected\n"));
+		if (usePws)
+			snprintf(getstring, sizeof(getstring), "GET /api/%s/yesterday/conditions/q/pws:%s.json HTTP/1.0\n\n", key, pws);
+		else
+			snprintf(getstring, sizeof(getstring), "GET /api/%s/yesterday/conditions/q/%ld.json HTTP/1.0\n\n", key, (long) zip);
+		//trace(getstring);
+		client.write((uint8_t*) getstring, strlen(getstring));
+
+		ParseResponse(client, &vals);
+		client.stop();
+		if (!vals.valid)
+		{
+			if (vals.keynotfound)
+				trace("Invalid WUnderground Key\n");
+			else
+				trace("Bad WUnderground Response\n");
+		}
+	}
+	else
+	{
+		trace(F("connection failed\n"));
+		client.stop();
+	}
+	return vals;
+}
+*/
+/*
+static byte current_state;
+Weather::ReturnVals ret;
+
+
+
+
+void my_callback(byte status, word off, word len) {
+  char *p = (char*)Ethernet::buffer + off;
+
+  static char key[30], val[30];
+  static char * keyptr = key;
+  static char * valptr = val;
+  char c;
+  char *end = (char*)Ethernet::buffer + off + len;
+  
+  while (p<end && *p) {
+
+    c = *(p++);
+    switch (current_state)
+    {
+    case FIND_QUOTE1:
+      if (c == '"') {
+        current_state = PARSING_KEY;
+        keyptr = key;
+      }
+      break;
+    case PARSING_KEY:
+      if (c == '"') {
+				current_state = FIND_QUOTE2;
+				*keyptr = 0;
+			} else {
+				if ((keyptr - key) < (long)(sizeof(key) - 1)) {
+					*keyptr = c;
+					keyptr++;
+				}
+			}
+			break;
+		case FIND_QUOTE2:
+			if (c == '"') {
+				current_state = PARSING_QVALUE;
+				valptr = val;
+			} else if (c == '{') {
+				current_state = FIND_QUOTE1;
+			} else if ((c >= '0') && (c <= '9')) {
+				current_state = PARSING_VALUE;
+				valptr = val;
+				*valptr = c;
+				valptr++;
+			}
+			break;
+		case PARSING_VALUE:
+			if (((c >= '0') && (c <= '9')) || (c == '.')) {
+				*valptr = c;
+				valptr++;
+			} else {
+				current_state = FIND_QUOTE1;
+				*valptr = 0;
+				if (strcmp(key, "sunrise") == 0) {
+				  ret.valid = true;
+				  ret.keynotfound = false;
+				  ret.sunrise = ((atol(val) + (int32_t)3600/4*(int32_t)(os.options[OPTION_TIMEZONE].value-48)) % 86400L) / 60;
+				  DEBUG_PRINTLN(ret.sunrise);
+				} else if (strcmp(key, "sunset") == 0) {
+				  ret.sunset = ((atol(val) + (int32_t)3600/4*(int32_t)(os.options[OPTION_TIMEZONE].value-48)) % 86400L) / 60;
+				  DEBUG_PRINTLN(ret.sunset);
+				}				
+			}
+			break;
+		case PARSING_QVALUE:
+			if (c == '"') {
+				current_state = FIND_QUOTE1;
+				*valptr = 0;
+				
+				if (strcmp(key, "maxhumidity") == 0)
+				{
+					ret.valid = true;
+					ret.keynotfound = false;
+					ret.maxhumidity = atoi(val);
+				}
+				else if (strcmp(key, "minhumidity") == 0)
+				{
+					ret.minhumidity = atoi(val);
+				}
+				else if (strcmp(key, "meantempi") == 0)
+				{
+					ret.meantempi = atoi(val);
+				}
+				else if (strcmp(key, "precip_today_in") == 0)
+				{
+					ret.precip_today = (atof(val) * 100.0);
+				}
+				else if (strcmp(key, "precipi") == 0)
+				{
+					ret.precipi = (atof(val) * 100.0);
+				}
+				//else if (strcmp(key, "UV") == 0)
+				//{
+				//	ret.UV = (atof(val) * 10.0);
+				//}
+				else if (strcmp(key, "meanwindspdi") == 0)
+				{
+					ret.windmph = (atof(val) * 10.0);
+				}
+				else if (strcmp(key, "type") == 0)
+				{
+					if (strcmp(val, "keynotfound") == 0)
+						ret.keynotfound = true;
+				}
+				
+			}
+			else
+			{
+				if ((valptr - val) < (long)(sizeof(val) - 1)) {
+					*valptr = c;
+					valptr++;
+				}
+			}
+			break;
+		case ERROR:
+			break;
+		} // case
+	} // while (true)
+  if(len<512) {
+    ether.persistTcpConnection(false);
+  }
+}
+*/
