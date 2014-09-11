@@ -489,9 +489,10 @@ void server_json_header()
 void server_json_options_main() {
   byte oid;
   for(oid=0;oid<NUM_OPTIONS;oid++) {
-    int v=os.options[oid].value;
+    int32_t v=os.options[oid].value;
     if (oid==OPTION_MASTER_OFF_ADJ) {v-=60;}
     if (oid==OPTION_RELAY_PULSE) {v*=10;}    
+    if (oid==OPTION_STATION_DELAY_TIME) {v=water_time_decode(v);}
     bfill.emit_p(PSTR("\"$F\":$D"),
                  os.options[oid].json_str, v);
     if(oid!=NUM_OPTIONS-1)
@@ -616,9 +617,10 @@ byte server_change_options(char *p)
         os.options[oid].value = 1;  // if the bool variable is detected, set to 1
         continue;
       }
-      int v = atoi(tmp_buffer);
+      int32_t v = atol(tmp_buffer);
       if (oid==OPTION_MASTER_OFF_ADJ) {v+=60;} // master off time
       if (oid==OPTION_RELAY_PULSE) {v/=10;} // relay pulse time
+      if (oid==OPTION_STATION_DELAY_TIME) {v=water_time_encode((uint16_t)v);} // encode station delay time
       if (v>=0 && v<=os.options[oid].max) {
         os.options[oid].value = v;
       } else {

@@ -141,4 +141,6 @@ private:
   static byte button_read_busy(byte pin_butt, byte waitmode, byte butt, byte is_holding);
 };
 
+byte water_time_encode(uint16_t i);
+uint16_t water_time_decode(byte i);
 #endif

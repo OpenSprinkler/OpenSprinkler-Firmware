@@ -609,7 +609,7 @@ void schedule_all_stations(unsigned long curr_time, byte seq)
         pd.scheduled_start_time[sid] = accumulate_time;
         accumulate_time += pd.scheduled_stop_time[sid];
         pd.scheduled_stop_time[sid] = accumulate_time;
-        accumulate_time += os.options[OPTION_STATION_DELAY_TIME].value * 60; // add station delay time
+        accumulate_time += water_time_decode(os.options[OPTION_STATION_DELAY_TIME].value); // add station delay time
         os.status.program_busy = 1;  // set program busy bit
 		  }
 		}

@@ -174,7 +174,6 @@ typedef enum {
 
 #define 	wdt_reset()   __asm__ __volatile__ ("wdr")
 
-
 //#define SERIAL_DEBUG
 
 #ifdef SERIAL_DEBUG

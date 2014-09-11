@@ -20,29 +20,6 @@
   unsigned long endtime;
 };*/
 
-byte water_time_encode(uint16_t i) {
-  if (i<60) {
-    return byte(i);
-  } else if (i<10800) {
-    return byte(i/60+59);
-  } else if (i<64800) {
-    return byte(i/3600+236);
-  } else {
-    return 254;
-  }
-}
-
-uint16_t water_time_decode(byte i) {
-  uint16_t ii = i;
-  if (i<60) {
-    return ii;
-  } else if (i<239) {
-    return (ii-59)*60;
-  } else {
-    return (ii-236)*3600;
-  }  
-}
-
 #define PROGRAM_TYPE_WEEKLY   0
 #define PROGRAM_TYPE_BIWEEKLY 1
 #define PROGRAM_TYPE_MONTHLY  2

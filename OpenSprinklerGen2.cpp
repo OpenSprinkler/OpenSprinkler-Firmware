@@ -123,7 +123,7 @@ OptionStruct OpenSprinkler::options[NUM_OPTIONS] = {
   {1,   1,   _str_ar,   _json_ar},    // network auto reconnect
   {0,   MAX_EXT_BOARDS, _str_ext, _json_ext}, // number of extension board. 0: no extension boards
   {1,   1,   _str_seq,  _json_seq},   // sequential mode. 1: stations run sequentially; 0: concurrently
-  {0,   240, _str_sdt,  _json_sdt},   // station delay time (0 to 240 seconds).
+  {0,   254, _str_sdt,  _json_sdt},   // station delay time (0 to 240 seconds).
   {0,   8,   _str_mas,  _json_mas},   // index of master station. 0: no master station
   {0,   60,  _str_mton, _json_mton},  // master on time [0,60] seconds
   {60,  120, _str_mtof, _json_mtof},  // master off time [-60,60] seconds
@@ -824,6 +824,9 @@ void OpenSprinkler::lcd_print_option(int i) {
   case OPTION_RELAY_PULSE:
     lcd.print((int)options[i].value*10);
     break;
+  case OPTION_STATION_DELAY_TIME:
+    lcd.print(water_time_decode(options[i].value));
+    break;
   case OPTION_LCD_CONTRAST:
     analogWrite(PIN_LCD_CONTRAST, options[i].value);
     lcd.print((int)options[i].value);
@@ -832,6 +835,7 @@ void OpenSprinkler::lcd_print_option(int i) {
     analogWrite(PIN_LCD_BACKLIGHT, 255-options[i].value);
     lcd.print((int)options[i].value);
     break;
+
   default:
     // if this is a boolean option
     if (options[i].max==1)
@@ -844,7 +848,7 @@ void OpenSprinkler::lcd_print_option(int i) {
   else if (i==OPTION_MASTER_ON_ADJ || i==OPTION_MASTER_OFF_ADJ)
     lcd_print_pgm(PSTR(" sec"));
   else if (i==OPTION_STATION_DELAY_TIME)
-    lcd_print_pgm(PSTR(" min"));
+    lcd_print_pgm(PSTR(" sec"));
   else if (i==OPTION_RELAY_PULSE)
     lcd_print_pgm(PSTR(" ms"));
 }
@@ -994,4 +998,36 @@ byte OpenSprinkler::password_verify(char *pw) {
   }
   return (c1==c2) ? 1 : 0;
 }
+
+// encode a 16-bit unsigned water time to 8-bit byte
+/* encoding scheme:
+   byte value : water time
+     [0.. 59]  : [0..59]  (seconds)
+    [60..238]  : [1..179] (minutes), or 60 to 10740 seconds
+   [239..254]  : [3..18]  (hours),   or 10800 to 64800 seconds
+*/
+byte water_time_encode(uint16_t i) {
+  if (i<60) {
+    return byte(i);
+  } else if (i<10800) {
+    return byte(i/60+59);
+  } else if (i<64800) {
+    return byte(i/3600+236);
+  } else {
+    return 254;
+  }
+}
+
+// decode a 8-bit byte to a 16-bit unsigned water time
+uint16_t water_time_decode(byte i) {
+  uint16_t ii = i;
+  if (i<60) {
+    return ii;
+  } else if (i<239) {
+    return (ii-59)*60;
+  } else {
+    return (ii-236)*3600;
+  }  
+}
+
 
