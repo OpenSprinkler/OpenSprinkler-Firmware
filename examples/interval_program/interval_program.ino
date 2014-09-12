@@ -24,6 +24,8 @@
 #define CHECK_NETWORK_INTERVAL  30      // 30 seconds default
 // Interval for renewing DHCP
 #define DHCP_RENEW_INTERVAL     43200L  // 12 hours default
+// Interval for getting weather data
+#define CHECK_WEATHER_INTERVAL  21600L  // 6 hours default
 // LCD backlight autodimming timeout
 #define LCD_DIMMING_TIMEOUT   30        // 30 seconds default
 // Ping test time out (in milliseconds)
@@ -36,7 +38,6 @@ static int myport;
 byte Ethernet::buffer[ETHER_BUFFER_SIZE]; // Ethernet packet buffer
 char tmp_buffer[TMP_BUFFER_SIZE+1];       // scratch buffer
 BufferFiller bfill;                       // buffer filler
-unsigned long last_sync_time = 0;
 
 // ====== Object defines ======
 OpenSprinkler os; // OpenSprinkler object
@@ -315,10 +316,10 @@ void loop()
               // record lastrun log (only for non-master stations)
               if((os.status.mas != sid+1) && (curr_time>pd.scheduled_start_time[sid]))
               {
-                /*pd.lastrun.station = sid;
+                pd.lastrun.station = sid;
                 pd.lastrun.program = pd.scheduled_program_index[sid];
                 pd.lastrun.duration = curr_time - pd.scheduled_start_time[sid];
-                pd.lastrun.endtime = curr_time;*/
+                pd.lastrun.endtime = curr_time;
                 write_log(LOGDATA_STATION, curr_time);
               }      
               
@@ -438,6 +439,9 @@ void loop()
     
     // perform ntp sync
     perform_ntp_sync(curr_time);
+    
+    // check weather
+    check_weather(curr_time);
   }
 }
 
@@ -464,16 +468,26 @@ void manual_station_on(byte sid, int ontimer) {
 
 void perform_ntp_sync(time_t curr_time) {
   // do not perform sync if this option is disabled, or if network is not available, or if a program is running
-  if (os.options[OPTION_USE_NTP].value==0 || os.status.network_fails>0 || os.status.program_busy) return;   
-  // sync every 24 hour
-  if (last_sync_time == 0 || (curr_time - last_sync_time > NTP_SYNC_INTERVAL)) {
-    last_sync_time = curr_time;
+  if (!os.options[OPTION_USE_NTP].value || os.status.network_fails>0 || os.status.program_busy) return;   
+
+  if (os.ntpsync_lasttime == 0 || (curr_time - os.ntpsync_lasttime > NTP_SYNC_INTERVAL)) {
+    os.ntpsync_lasttime = curr_time;
     os.lcd_print_line_clear_pgm(PSTR("NTP Syncing..."),1);
     unsigned long t = getNtpTime();   
     if (t>0) {    
       setTime(t);
       if (os.status.has_rtc) RTC.set(t); // if rtc exists, update rtc
     }
+  }
+}
+
+void check_weather(time_t curr_time) {
+  // do not check weather if the Use Weather option is disabled, or if network is not available, or if a program is running
+  if (!os.options[OPTION_USE_WEATHER].value || os.status.network_fails>0 || os.status.program_busy) return;
+
+  if (os.checkwt_lasttime == 0 || (curr_time - os.checkwt_lasttime > CHECK_WEATHER_INTERVAL)) {
+    os.checkwt_lasttime = curr_time;
+    GetWeather();
   }
 }
 
@@ -558,10 +572,10 @@ void process_dynamic_events()
           // record lastrun log (only for non-master stations)
           if((mas != sid+1) && (curr_time>pd.scheduled_start_time[sid]))
           {
-            /*pd.lastrun.station = sid;
+            pd.lastrun.station = sid;
             pd.lastrun.program = pd.scheduled_program_index[sid];
             pd.lastrun.duration = curr_time - pd.scheduled_start_time[sid];
-            pd.lastrun.endtime = curr_time;*/
+            pd.lastrun.endtime = curr_time;
             write_log(LOGDATA_STATION, curr_time);
           }      
           
@@ -627,10 +641,13 @@ void schedule_all_stations(unsigned long curr_time, byte seq)
 	}
 }
 
-void reset_all_stations() {
-  /*os.clear_all_station_bits();
+void reset_all_stations_immediate() {
+  os.clear_all_station_bits();
   os.apply_all_station_bits();
-  pd.reset_runtime();*/
+  pd.reset_runtime();
+}
+
+void reset_all_stations() {
   // stop all running and scheduled stations
   unsigned long curr_time = now();
   for(byte sid=0;sid<os.nstations;sid++) {
@@ -666,12 +683,11 @@ void write_log(byte type, unsigned long curr_time) {
 
   switch(type) {
   case LOGDATA_STATION:
-  /*
     str += pd.lastrun.program;
     str += ",";
     str += pd.lastrun.station;
     str += ",";
-    str += pd.lastrun.duration;*/
+    str += pd.lastrun.duration;
     break;
   case LOGDATA_RAINSENSE:
     str += "0,\"rs\",";

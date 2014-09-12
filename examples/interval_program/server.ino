@@ -13,7 +13,6 @@ extern char tmp_buffer[];
 extern OpenSprinkler os;
 extern ProgramData pd;
 extern SdFat sd;
-extern unsigned long last_sync_time;
 
 static uint8_t ntpclientportL = 123; // Default NTP client port
 
@@ -220,7 +219,7 @@ byte server_json_programs(char *p)
 }
 
 // server function to accept run-once program
-#if 0
+
 byte server_change_runonce(char *p) {
   p+=3;
   //ether.urlDecode(p);
@@ -241,16 +240,13 @@ byte server_change_runonce(char *p) {
   pv+=3;
   
   // reset all stations and prepare to run one-time program
-  reset_all_stations();
+  reset_all_stations_immediate();
       
   byte sid;
   uint16_t dur;
-  unsigned char *addr = (unsigned char*)ADDR_EEPROM_RUNONCE;
   boolean match_found = false;
-  for(sid=0;sid<os.nstations;sid++, addr+=2) {
+  for(sid=0;sid<os.nstations;sid++) {
     dur=parse_listdata(&pv);
-    eeprom_write_byte(addr, (dur>>8));
-    eeprom_write_byte(addr+1, (dur&0xff));
     if (dur>0) {
       pd.scheduled_stop_time[sid] = dur;
       pd.scheduled_program_index[sid] = 254;      
@@ -259,11 +255,11 @@ byte server_change_runonce(char *p) {
   }
   if(match_found) {
     schedule_all_stations(now(), os.options[OPTION_SEQUENTIAL].value);
+    return HTML_SUCCESS;
   }
 
-  return HTML_SUCCESS;
+  return HTML_DATA_MISSING;
 }
-#endif
 
 /*=============================================
   Delete Program
@@ -400,13 +396,10 @@ byte server_change_program(char *p) {
   if (pid==-1) {
     if(!pd.add(&prog))
       return HTML_DATA_OUTOFBOUND;
-    //bfill.emit_p(PSTR("alert(\"New program added.\");"));
   } else {
     if(!pd.modify(pid, &prog))
       return HTML_DATA_OUTOFBOUND;
-    //bfill.emit_p(PSTR("alert(\"Program $D modified\");"), pid+1);
   }
-  //bfill.emit_p(PSTR("window.location=\"/vp\";</script>\n"));
   return HTML_SUCCESS;
 }
 
@@ -424,7 +417,8 @@ void server_json_controller_main()
   unsigned long curr_time = now();  
   //os.eeprom_string_get(ADDR_EEPROM_LOCATION, tmp_buffer);
   bfill.emit_p(PSTR("\"devt\":$L,\"nbrd\":$D,\"en\":$D,\"rd\":$D,\"rs\":$D,\"mm\":$D,"
-                    "\"rdst\":$L,\"loc\":\"$E\",\"wtkey\":\"$E\",\"sbits\":["),
+                    "\"rdst\":$L,\"loc\":\"$E\",\"wtkey\":\"$E\",\"sunrise\":$D,\"sunset\":$D,"
+                    "\"wtscale\":$D,\"sbits\":["),
               curr_time,
               os.nboards,
               os.status.enabled,
@@ -433,7 +427,10 @@ void server_json_controller_main()
               os.status.manual_mode,
               os.nvdata.rd_stop_time,
               ADDR_EEPROM_LOCATION,
-              ADDR_EEPROM_WEATHER_KEY);
+              ADDR_EEPROM_WEATHER_KEY,
+              os.nvdata.sunrise_time,
+              os.nvdata.sunset_time,
+              os.nvdata.weather_scale);
   // print sbits
   for(bid=0;bid<os.nboards;bid++)
     bfill.emit_p(PSTR("$D,"), os.station_bits[bid]);  
@@ -607,6 +604,7 @@ byte server_change_options(char *p)
   // temporarily save some old options values
   byte old_tz =  os.options[OPTION_TIMEZONE].value;
   byte old_ntp = os.options[OPTION_USE_NTP].value;
+  byte old_uwt = os.options[OPTION_USE_WEATHER].value;
   // !!! p and bfill share the same buffer, so don't write
   // to bfill before you are done analyzing the buffer !!!
   
@@ -638,22 +636,29 @@ byte server_change_options(char *p)
   
   if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, "loc")) {
     ether.urlDecode(tmp_buffer);
-    os.eeprom_string_set(ADDR_EEPROM_LOCATION, tmp_buffer);
+    if (strcmp_to_eeprom(tmp_buffer, ADDR_EEPROM_LOCATION)) { // if location has changed
+      os.eeprom_string_set(ADDR_EEPROM_LOCATION, tmp_buffer);
+      os.checkwt_lasttime = 0;    // immediate update weather
+    }
   }
   uint8_t keyfound = 0;
   if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, "wtkey", &keyfound)) {
     ether.urlDecode(tmp_buffer);
-    os.eeprom_string_set(ADDR_EEPROM_WEATHER_KEY, tmp_buffer);
+    if (strcmp_to_eeprom(tmp_buffer, ADDR_EEPROM_WEATHER_KEY)) {  // if weather key has changed
+      os.eeprom_string_set(ADDR_EEPROM_WEATHER_KEY, tmp_buffer);
+      os.checkwt_lasttime = 0;  // immediately update weather
+    }
   } else if (keyfound) {
     tmp_buffer[0]=0;
     os.eeprom_string_set(ADDR_EEPROM_WEATHER_KEY, tmp_buffer);
   }
-  if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, "ttt")) {
+  // if not using NTP and manually setting time
+  if (!os.options[OPTION_USE_NTP].value && ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, "ttt")) {
     unsigned long t;
     //ether.urlDecode(tmp_buffer);
     t = atol(tmp_buffer);
     // before chaging time, reset all stations
-    reset_all_stations();
+    reset_all_stations_immediate();
     setTime(t);  
     if (os.status.has_rtc) RTC.set(t); // if rtc exists, update rtc
   }
@@ -667,7 +672,12 @@ byte server_change_options(char *p)
   //bfill.emit_p(PSTR("$F<script>alert(\"Options values saved.\");$F"), htmlOkHeader, htmlReturnHome);  
   if(os.options[OPTION_TIMEZONE].value != old_tz ||
      (!old_ntp && os.options[OPTION_USE_NTP].value)) {
-    last_sync_time = 0;
+    os.ntpsync_lasttime = 0;
+    os.checkwt_lasttime = 0;
+  }
+  
+  if(os.options[OPTION_USE_WEATHER].value && os.options[OPTION_USE_WEATHER].value != old_uwt) {
+    os.checkwt_lasttime = 0;  // force weather update
   }
   return HTML_SUCCESS;
 }
@@ -894,7 +904,7 @@ prog_char _url_jc [] PROGMEM = "jc";
 
 prog_char _url_dp [] PROGMEM = "dp";
 prog_char _url_cp [] PROGMEM = "cp";
-//prog_char _url_cr [] PROGMEM = "cr";
+prog_char _url_cr [] PROGMEM = "cr";
 prog_char _url_up [] PROGMEM = "up";
 prog_char _url_jp [] PROGMEM = "jp";
 
@@ -922,7 +932,7 @@ URLStruct urls[] = {
 
   {_url_dp,server_delete_program},
   {_url_cp,server_change_program},
-  //{_url_cr,server_change_runonce},
+  {_url_cr,server_change_runonce},
   {_url_up,server_moveup_program},
   {_url_jp,server_json_programs},
   
@@ -952,6 +962,7 @@ void analyze_get_url(char *p)
 
   // the tcp packet usually starts with 'GET /' -> 5 chars    
   char *str = p+5;
+
   if(str[0]==' ') {
     //ether.urlDecode(str);
     server_home(str);  // home page handler
@@ -1027,26 +1038,6 @@ byte streamfile (char* name) { //send a file to the buffer
 // NTP Functions
 // =============
 
-/*
-unsigned long ntp_wait_response()
-{
-  uint32_t time;
-  unsigned long start = millis();
-  do {
-    ether.packetLoop(ether.packetReceive());
-    if (ether.ntpProcessAnswer(&time, ntpclientportL))
-    {
-      if ((time & 0x80000000UL) ==0){
-        time+=2085978496;
-      }else{
-        time-=2208988800UL;
-      }
-      return time + (int32_t)3600/4*(int32_t)(os.options[OPTION_TIMEZONE].value-48);
-    }
-  } while(millis() - start < 1000); // wait at most 1 seconds for ntp result
-  return 0;
-}
-*/
 
 unsigned long getNtpTime()
 {

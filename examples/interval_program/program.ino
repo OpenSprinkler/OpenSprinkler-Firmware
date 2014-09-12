@@ -13,6 +13,7 @@ byte ProgramData::nprograms = 0;
 unsigned long ProgramData::scheduled_start_time[(MAX_EXT_BOARDS+1)*8];
 unsigned long ProgramData::scheduled_stop_time[(MAX_EXT_BOARDS+1)*8];
 byte ProgramData::scheduled_program_index[(MAX_EXT_BOARDS+1)*8];
+LogStruct ProgramData::lastrun;
 
 void ProgramData::init() {
 	reset_runtime();

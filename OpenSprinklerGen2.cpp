@@ -24,6 +24,8 @@ byte OpenSprinkler::stndis_bits[MAX_EXT_BOARDS+1];
 unsigned long OpenSprinkler::rainsense_start_time;
 unsigned long OpenSprinkler::raindelay_start_time;
 unsigned long OpenSprinkler::button_lasttime;
+unsigned long OpenSprinkler::ntpsync_lasttime;
+unsigned long OpenSprinkler::checkwt_lasttime;
 extern char tmp_buffer[];
 
 // Option json names
@@ -263,6 +265,7 @@ void OpenSprinkler::begin() {
   
   nvdata.sunrise_time = 360;  // 6:00am default
   nvdata.sunset_time = 1080;  // 6:00pm default
+  nvdata.weather_scale = 100; // 100% default
   
   nboards = 1;
   nstations = 8;
@@ -983,20 +986,33 @@ void OpenSprinkler::eeprom_string_get(int start_addr, char *buf) {
 
 // verify if a string matches password
 byte OpenSprinkler::password_verify(char *pw) { 
-  byte i = 0;
+  unsigned char *addr = (unsigned char*)ADDR_EEPROM_PASSWORD;
   byte c1, c2;
   while(1) {
-    c1 = eeprom_read_byte((unsigned char*)(ADDR_EEPROM_PASSWORD+i));
-    c2 = *pw;
+    c1 = eeprom_read_byte(addr++);
+    c2 = *pw++;
     if (c1==0 || c2==0)
       break;
     if (c1!=c2) {
       return 0;
     }
-    i++;
-    pw++;
   }
   return (c1==c2) ? 1 : 0;
+}
+
+// compare a string to eeprom
+byte strcmp_to_eeprom(const char* src, int _addr) {
+  byte i=0;
+  byte c1, c2;
+  unsigned char *addr = (unsigned char*)_addr;
+  while(1) {
+    c1 = eeprom_read_byte(addr++);
+    c2 = *src++;
+    if (c1==0 || c2==0)
+      break;      
+    if (c1!=c2)  return 1;
+  }
+  return (c1==c2) ? 0 : 1;
 }
 
 // encode a 16-bit unsigned water time to 8-bit byte

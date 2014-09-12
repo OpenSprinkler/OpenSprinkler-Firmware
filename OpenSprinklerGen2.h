@@ -36,7 +36,8 @@ struct OptionStruct{
 struct NVConData {
   uint16_t sunrise_time;      // sunrise time (in minutes)
   uint16_t sunset_time;       // sunset time (in minutes)
-  uint32_t rd_stop_time; // rain delay stop time
+  uint32_t rd_stop_time;      // rain delay stop time
+  uint8_t  weather_scale;     // weather-based scaling
 };
 
 // Volatile Controller Status Bits
@@ -79,7 +80,9 @@ public:
   static unsigned long rainsense_start_time;  // time (in seconds) when rain sensor is detected on
   static unsigned long raindelay_start_time;  // time (in seconds) when rain delay is started
   static unsigned long button_lasttime;
-
+  static unsigned long ntpsync_lasttime;
+  static unsigned long checkwt_lasttime;
+  
   // ====== Member Functions ======
   // -- Setup --
   static void reboot();   // reboot the microcontroller
@@ -141,6 +144,7 @@ private:
   static byte button_read_busy(byte pin_butt, byte waitmode, byte butt, byte is_holding);
 };
 
+byte strcmp_to_eeprom(const char* src, int addr);
 byte water_time_encode(uint16_t i);
 uint16_t water_time_decode(byte i);
 #endif

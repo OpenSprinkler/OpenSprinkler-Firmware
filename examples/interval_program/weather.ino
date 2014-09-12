@@ -31,21 +31,20 @@ void getweather_callback(byte status, word off, word len) {
   int v;
   if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, "sunrise")) {
     v = atoi(tmp_buffer);
-    DEBUG_PRINT(v/60);
-    DEBUG_PRINT(":");
-    DEBUG_PRINTLN(v%60);
+    if (v>=0 && v<=1440)
+      os.nvdata.sunrise_time = v;
   }
   if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, "sunset")) {
     v = atoi(tmp_buffer);
-    DEBUG_PRINT(v/60);
-    DEBUG_PRINT(":");
-    DEBUG_PRINTLN(v%60);
+    if (v>=0 && v<=1440)
+      os.nvdata.sunset_time = v;
   }
   if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, "scale")) {
     v = atoi(tmp_buffer);
-    DEBUG_PRINT("Scale:");
-    DEBUG_PRINTLN(v);
+    if (v>=0 && v<=250)
+      os.nvdata.weather_scale = v;
   }
+  DEBUG_PRINTLN(p);
   /*if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, "err")) {
     DEBUG_PRINTLN(tmp_buffer);
   }*/

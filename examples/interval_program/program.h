@@ -13,12 +13,12 @@
 #include <OpenSprinklerGen2.h>
 
 // Log data structure
-/*struct LogStruct {
+struct LogStruct {
   byte station;
   byte program;
   unsigned int duration;
   unsigned long endtime;
-};*/
+};
 
 #define PROGRAM_TYPE_WEEKLY   0
 #define PROGRAM_TYPE_BIWEEKLY 1
@@ -86,6 +86,7 @@ public:
   static unsigned long scheduled_stop_time[]; // scheduled stop time for each station
   static byte scheduled_program_index[]; // scheduled program index
   static byte  nprograms;     // number of programs
+  static LogStruct lastrun;
   
   static void init();
   static void reset_runtime();
