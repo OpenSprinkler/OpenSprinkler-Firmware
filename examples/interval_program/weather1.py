@@ -26,12 +26,20 @@ def main():
   loc = form.getfirst('loc', '')
   key = form.getfirst('key', '')
   tz = form.getfirst('tz','')
+  of = form.getfirst('format','')
 
   if(not loc):
-    print '&err=missing_location'
+    if of=='json' or of=='JSON':
+      print '{"err":"missing_location"}'
+    else:
+      print '&err=missing_location'
     return
+
   if(not key):
-    print '&err=missing_key'
+    if of=='json' or of=='JSON':
+      print '{"err":"missing_key"}'
+    else:
+      print '&err=missing_key'
     return
  
   loc = loc.replace(' ','_')
@@ -40,11 +48,10 @@ def main():
   try:
     tz = int(tz)
   except:
-    print '&err=missing_tz'
-    return
-
-  if (tz<0) or (tz>108):
-    print '&err=tz_out_of_range'
+    if of=='json' or of=='JSON':
+      print '{"err":"missing_tz"}'
+    else:
+      print '&err=missing_tz'
     return
 
   maxh, minh, meant, pre, pre_today, h_today, sunrise, sunset = [-1, -1, -500, -1, -1, -1, -1, -1]
@@ -87,7 +94,11 @@ def main():
         sunset = safe_int(v, sunset)
 
   except:
-    print '&err=unknown'
+    if of=='json' or of=='JSON':
+      print '{"err":"unknown"}'
+    else:
+      print '&err=unknown'
+    return
 
   # calculate water time scale, per https://github.com/rszimm/sprinklers_pi/blob/master/Weather.cpp
   hf = 0
@@ -115,8 +126,11 @@ def main():
     sunrise = int(((sunrise+delta)%86400)/60)
   if (sunset >= 0):
     sunset =  int(((sunset +delta)%86400)/60)
-  
-  print '&scale=%d&sunrise=%d&sunset=%d&maxh=%d&minh=%d&meant=%d&pre=%f&prec=%f&hc=%d' % (scale, sunrise, sunset, int(maxh), int(minh), int(meant), pre, pre_today, int(h_today))
+ 
+  if of=='json' or of=='JSON':
+    print '{"scale":%d, "sunrise":%d, "sunset":%d, "maxh":%d, "minh":%d, "meant":%d, "pre":%f, "prec":%f, "hc":%d}' % (scale, sunrise, sunset, int(maxh), int(minh), int(meant), pre, pre_today, int(h_today))
+  else:
+    print '&scale=%d&sunrise=%d&sunset=%d&maxh=%d&minh=%d&meant=%d&pre=%f&prec=%f&hc=%d' % (scale, sunrise, sunset, int(maxh), int(minh), int(meant), pre, pre_today, int(h_today))
   return
 
 if __name__ == "__main__":
