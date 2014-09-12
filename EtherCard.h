@@ -504,7 +504,8 @@ public:
     *     @note   Ensure strbuf has memory allocated of at least maxlen + 1 (to accomodate result plus terminating null)
     */
     static uint8_t findKeyVal(const char *str,char *strbuf,
-                              uint8_t maxlen, const char *key);
+                              uint8_t maxlen, const char *key,
+                              uint8_t *keyfound = NULL);  // ray: added keyfound return variable
 
     /**   @brief  Decode a URL string e.g "hello%20joe" or "hello+joe" becomes "hello joe"
     *     @param  urlbuf Pointer to the null terminated URL

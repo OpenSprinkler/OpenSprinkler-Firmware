@@ -179,7 +179,10 @@ void server_json_programs_main() {
   for(pid=0;pid<pd.nprograms;pid++) {
     pd.read(pid, &prog);
     // to fix: convert interval remainder (absolute->relative)
-    if (prog.type == PROGRAM_TYPE_INTERVAL && prog.days[1] > 1)  pd.drem_to_relative(prog.days);
+
+    if (prog.type == PROGRAM_TYPE_INTERVAL && prog.days[1] > 1) {
+      pd.drem_to_relative(prog.days);
+    }
     
     byte bytedata = *(char*)(&prog);
     bfill.emit_p(PSTR("[$D,$D,$D,["), bytedata, prog.days[0], prog.days[1]);
@@ -371,10 +374,7 @@ byte server_change_program(char *p) {
   pv++; // this should be a '['
   for (i=0;i<os.nstations;i++) {
     uint16_t pre = parse_listdata(&pv);
-    DEBUG_PRINT(pre);
-    DEBUG_PRINT(",");
     prog.durations[i] = water_time_encode(pre);
-    DEBUG_PRINTLN(prog.durations[i]);
   }
   pv++; // this should be a ']'
   pv++; // this should be a ']'
@@ -390,7 +390,10 @@ byte server_change_program(char *p) {
   }
 
   // process interval day remainder (relative-> absolute)
-  if (prog.type == PROGRAM_TYPE_INTERVAL && prog.days[1] > 1)  pd.drem_to_absolute(prog.days);
+
+  if (prog.type == PROGRAM_TYPE_INTERVAL && prog.days[1] > 1) { 
+    pd.drem_to_absolute(prog.days);
+  }
       
   //bfill.emit_p(PSTR("$F<script>"), htmlOkHeader);
 
@@ -493,8 +496,13 @@ void server_json_options_main() {
     if (oid==OPTION_MASTER_OFF_ADJ) {v-=60;}
     if (oid==OPTION_RELAY_PULSE) {v*=10;}    
     if (oid==OPTION_STATION_DELAY_TIME) {v=water_time_decode(v);}
-    bfill.emit_p(PSTR("\"$F\":$D"),
-                 os.options[oid].json_str, v);
+    if (oid==OPTION_STATION_DELAY_TIME) {
+      bfill.emit_p(PSTR("\"$F\":$L"),
+                 os.options[oid].json_str, v);  // account for value possibly larger than 32767
+    } else {
+      bfill.emit_p(PSTR("\"$F\":$D"),
+                   os.options[oid].json_str, v);
+    }
     if(oid!=NUM_OPTIONS-1)
       bfill.emit_p(PSTR(","));
   }
@@ -581,7 +589,6 @@ byte server_change_scripturl(char *p)
   if(check_password(p)==false)  return HTML_UNAUTHORIZED;
   if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, "jsp")) {
     ether.urlDecode(tmp_buffer);
-    DEBUG_PRINTLN(tmp_buffer);
     os.eeprom_string_set(ADDR_EEPROM_SCRIPTURL, tmp_buffer);
   }
   //bfill.emit_p(PSTR("$F<script>alert(\"Script url saved.\");$F"), htmlOkHeader, htmlReturnHome);  
@@ -633,8 +640,12 @@ byte server_change_options(char *p)
     ether.urlDecode(tmp_buffer);
     os.eeprom_string_set(ADDR_EEPROM_LOCATION, tmp_buffer);
   }
-  if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, "wtkey")) {
+  uint8_t keyfound = 0;
+  if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, "wtkey", &keyfound)) {
     ether.urlDecode(tmp_buffer);
+    os.eeprom_string_set(ADDR_EEPROM_WEATHER_KEY, tmp_buffer);
+  } else if (keyfound) {
+    tmp_buffer[0]=0;
     os.eeprom_string_set(ADDR_EEPROM_WEATHER_KEY, tmp_buffer);
   }
   if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, "ttt")) {
