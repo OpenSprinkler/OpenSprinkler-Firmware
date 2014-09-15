@@ -7,7 +7,7 @@
 
 #include <OpenSprinklerGen2.h>
 
-// External variables defined in main pde file
+// External variables defined in main ion file
 extern BufferFiller bfill;
 extern char tmp_buffer[];
 extern OpenSprinkler os;
@@ -53,18 +53,6 @@ static prog_uchar htmlMobileHeader[] PROGMEM =
     "<meta name=\"viewport\" content=\"width=640\">\r\n"
 ;
 
-/*static prog_uchar htmlUnauthorized[] PROGMEM = 
-    "HTTP/1.0 401 Unauthorized\r\n"
-    "Content-Type: text/html\r\n"
-    "\r\n"
-    "401 Unauthorized"
-;*/
-
-/*static prog_uchar htmlReturnHome[] PROGMEM = 
-  "window.location=\"/\";</script>\n"
-;*/
-
-
 // check and verify password
 boolean check_password(char *p)
 {
@@ -100,7 +88,7 @@ void server_json_stations_main()
   server_json_stations_attrib(PSTR("masop"), os.masop_bits);
   server_json_stations_attrib(PSTR("ignore_rain"), os.ignrain_bits);
   server_json_stations_attrib(PSTR("act_relay"), os.actrelay_bits);
-  server_json_stations_attrib(PSTR("stn_dis"), os.actrelay_bits);
+  server_json_stations_attrib(PSTR("stn_dis"), os.stndis_bits);
   bfill.emit_p(PSTR("],\"maxlen\":$D}"), STATION_NAME_SIZE);
 }
 
@@ -378,7 +366,10 @@ byte server_change_program(char *p) {
   if (ether.findKeyVal(pv, tmp_buffer, TMP_BUFFER_SIZE, "name")) {
     ether.urlDecode(tmp_buffer);
     strncpy(prog.name, tmp_buffer, PROGRAM_NAME_SIZE);
-  }  
+  } else {
+    strcpy(prog.name, "Program ");
+    itoa((pid==-1)? (pd.nprograms+1): (pid+1), prog.name+8, 10); 
+  }
 
   // i should be equal to os.nstations at this point
   for(;i<MAX_NUM_STATIONS;i++) {
@@ -695,16 +686,13 @@ byte server_change_password(char *p)
         //os.password_set(tmp_buffer);
         ether.urlDecode(tmp_buffer);
         os.eeprom_string_set(ADDR_EEPROM_PASSWORD, tmp_buffer);
-        //bfill.emit_p(PSTR("$F{\"result\":$D}"), htmlJSONHeader, 1); // success
         return HTML_SUCCESS;
       } else {
-        //bfill.emit_p(PSTR("$F{\"result\":$D}"), htmlJSONHeader, 3); // password don't match
         return HTML_MISMATCH;
       }
     }
   }
-  
-  //bfill.emit_p(PSTR("$F{\"result\":$D}"), htmlJSONHeader, 2); // unauthorized
+
   return HTML_UNAUTHORIZED;
 }
 
