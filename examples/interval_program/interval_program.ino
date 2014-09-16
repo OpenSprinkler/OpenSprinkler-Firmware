@@ -253,52 +253,57 @@ void loop()
     // Check if we are cleared to schedule a new program. The conditions are:
     // 1) the controller is in program mode (manual_mode == 0), and if
     // 2) either the controller is not busy or is in concurrent mode
-    if (os.status.manual_mode==0 && (os.status.program_busy==0 || os.status.seq==0)) {
-      unsigned long curr_minute = curr_time / 60;
-      boolean match_found = false;
-      // since the granularity of start time is minute
-      // we only need to check once every minute
-      if (curr_minute != last_minute) {
-        last_minute = curr_minute;
-        // check through all programs
-        for(pid=0; pid<pd.nprograms; pid++) {
-          pd.read(pid, &prog);
-          if(prog.check_match(curr_time)) {
-            // program match found
-            // process all selected stations
-            for(bid=0; bid<os.nboards; bid++) {
-              for(s=0;s<8;s++) {
-                sid=bid*8+s;
-                // ignore master station because it's not scheduled independently
-                if (os.status.mas == sid+1)  continue;
-                // if the station is current running, skip it
-                if (os.station_bits[bid]&(1<<s)) continue;
-                
-                // if station bits match
-                //if(prog.stations[bid]&(1<<s)) {
-                // ray: modified for new program data structure
-                if (prog.durations[sid] != 0) {
-                  // initialize schedule data
-                  // store duration temporarily in stop_time variable
-                  // duration is scaled by water level
-                  pd.scheduled_stop_time[sid] = (unsigned long)water_time_decode(prog.durations[sid]) * os.options[OPTION_WATER_PERCENTAGE].value / 100;
-                  pd.scheduled_program_index[sid] = pid+1;
+    //if (os.status.manual_mode==0 && (os.status.program_busy==0 || os.status.seq==0))
+    {
+    unsigned long curr_minute = curr_time / 60;
+    boolean match_found = false;
+    // since the granularity of start time is minute
+    // we only need to check once every minute
+    if (curr_minute != last_minute) {
+      last_minute = curr_minute;
+      // check through all programs
+      for(pid=0; pid<pd.nprograms; pid++) {
+        pd.read(pid, &prog);
+        if(prog.check_match(curr_time)) {
+          // program match found
+          // process all selected stations
+          for(bid=0; bid<os.nboards; bid++) {
+            for(s=0;s<8;s++) {
+              sid=bid*8+s;
+              // ignore master station because it's not scheduled independently
+              if (os.status.mas == sid+1)  continue;
+              // if the station is current running, skip it
+              if (os.station_bits[bid]&(1<<s)) continue;
+              // if the station is disabled, skip it
+              if (os.stndis_bits[bid]&(1<<s)) continue;
+              
+              // if station has non-zero water time
+              // and if it doesn't already have a scheduled stop time
+              if (prog.durations[sid] && !pd.scheduled_stop_time[sid]) {
+                // initialize schedule data
+                // store duration temporarily in stop_time variable
+                // duration is scaled by water level
+                pd.scheduled_stop_time[sid] = (unsigned long)water_time_decode(prog.durations[sid]) * os.options[OPTION_WATER_PERCENTAGE].value / 100;
+                if (pd.scheduled_stop_time[sid]) {
+                  pd.scheduled_program_index[sid] = pid+1;  
                   match_found = true;
                 }
               }
             }
           }
         }
-        
-        // calculate start and end time
-        if (match_found) {
-          schedule_all_stations(curr_time, os.status.seq);
-        }
-      }//if_check_current_minute
+      }
+      
+      // calculate start and end time
+      if (match_found) {
+        schedule_all_stations(curr_time, os.status.seq);
+      }
+    }//if_check_current_minute
     } //if_cleared_for_scheduling
     
     // ====== Run program data ======
     // Check if a program is running currently
+    // If so, process run-time data
     if (os.status.program_busy){
       for(bid=0;bid<os.nboards; bid++) {
         bitvalue = os.station_bits[bid];
@@ -336,7 +341,6 @@ void loop()
               }
                             
               // reset program data variables
-              //pd.remaining_time[sid] = 0;
               pd.scheduled_start_time[sid] = 0;
               pd.scheduled_stop_time[sid] = 0;
               pd.scheduled_program_index[sid] = 0;            
@@ -386,15 +390,22 @@ void loop()
       // activate/deactivate valves
       os.apply_all_station_bits();
 
+      // check through run-time data
+      // calculate last_stop_time and
+      // see if any station is running or scheduled to run
       boolean program_still_busy = false;
+      pd.last_stop_time = 0;
+      unsigned long sst;
       for(sid=0;sid<os.nstations;sid++) {
         // check if any station has a non-zero and non-infinity stop time
-        if (pd.scheduled_stop_time[sid] > 0 && pd.scheduled_stop_time[sid] < ULONG_MAX) {
+        sst = pd.scheduled_stop_time[sid];
+        if (sst > 0 && sst < ULONG_MAX) {
+          pd.last_stop_time = (sst > pd.last_stop_time ) ? sst : pd.last_stop_time;
           program_still_busy = true;
-          break;
         }
       }
-      // if the program is finished, reset program busy bit
+      // if no station is running or scheduled to run
+      // reset program busy bit
       if (program_still_busy == false) {
         // turn off all stations
         os.clear_all_station_bits();
@@ -610,34 +621,45 @@ void process_dynamic_events()
 void schedule_all_stations(unsigned long curr_time, byte seq)
 {
   unsigned long accumulate_time = curr_time + 1;
+  // if we are in sequential mode, and if there are 
+  // existing running/scheduled programs
+  int16_t station_delay = water_time_decode(os.options[OPTION_STATION_DELAY_TIME].value);
+  if (seq && pd.last_stop_time > 0) {
+    accumulate_time = pd.last_stop_time + station_delay;
+  }
+
+  DEBUG_PRINT("current time:");
+  DEBUG_PRINTLN(curr_time);
+  
   byte sid;
     
-  // calculate start time of each station
-	if (seq) {
-		// in sequential mode
-	  // stations run one after another
-  	// separated by station delay time
-
-    for(sid=0;sid<os.nstations;sid++) {
-      if(pd.scheduled_stop_time[sid]) {
-        pd.scheduled_start_time[sid] = accumulate_time;
-        accumulate_time += pd.scheduled_stop_time[sid];
-        pd.scheduled_stop_time[sid] = accumulate_time;
-        accumulate_time += water_time_decode(os.options[OPTION_STATION_DELAY_TIME].value); // add station delay time
-        os.status.program_busy = 1;  // set program busy bit
-		  }
-		}
-	} else {
-		// in concurrent mode, stations are allowed to run in parallel
-    for(sid=0;sid<os.nstations;sid++) {
-      byte bid=sid/8;
-      byte s=sid%8;
-      if(pd.scheduled_stop_time[sid] && !(os.station_bits[bid]&(1<<s))) {
-        pd.scheduled_start_time[sid] = accumulate_time;
-        pd.scheduled_stop_time[sid] = accumulate_time + pd.scheduled_stop_time[sid];
-        os.status.program_busy = 1;  // set program busy bit
-      }
-    }
+  // calculate start / stop time of each station
+  for(sid=0;sid<os.nstations;sid++) {
+    byte bid=sid/8;
+    byte s=sid%8;    
+    
+    // if the station is not scheduled to run, or is already scheduled (i.e. start_time > 0) or is already running
+    // skip
+    if(!pd.scheduled_stop_time[sid] || pd.scheduled_start_time[sid] || (os.station_bits[bid]&(1<<s)))
+      continue;
+    
+    if (seq) {  // in sequential mode, stations are serialized
+      pd.scheduled_start_time[sid] = accumulate_time;
+      accumulate_time += pd.scheduled_stop_time[sid];
+      pd.scheduled_stop_time[sid] = accumulate_time;
+      accumulate_time += station_delay; // add station delay time
+      DEBUG_PRINT("[");
+      DEBUG_PRINT(sid);
+      DEBUG_PRINT(":");
+      DEBUG_PRINT(pd.scheduled_start_time[sid]);
+      DEBUG_PRINT(",");
+      DEBUG_PRINT(pd.scheduled_stop_time[sid]);
+      DEBUG_PRINTLN("]");
+	  } else {
+      pd.scheduled_start_time[sid] = accumulate_time;
+      pd.scheduled_stop_time[sid] = accumulate_time + pd.scheduled_stop_time[sid];
+  	}
+    os.status.program_busy = 1;  // set program busy bit
 	}
 }
 

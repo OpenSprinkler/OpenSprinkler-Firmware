@@ -117,11 +117,6 @@ void server_change_stations_attrib(char *p, char header, byte *attrib)
 // server function for accepting station name changes
 byte server_change_stations(char *p)
 {
-  p+=3;
-  
-  // check password
-  if(check_password(p)==false)  return HTML_UNAUTHORIZED;
-  
   byte sid;
   char tbuf2[4] = {'s', 0, 0, 0};
   // process station names
@@ -209,12 +204,6 @@ byte server_json_programs(char *p)
 // server function to accept run-once program
 
 byte server_change_runonce(char *p) {
-  p+=3;
-  //ether.urlDecode(p);
-  
-  // check password
-  if(check_password(p)==false)  return HTML_UNAUTHORIZED;
-  
   // search for the start of v=[
   char *pv;
   boolean found=false;
@@ -230,12 +219,16 @@ byte server_change_runonce(char *p) {
   // reset all stations and prepare to run one-time program
   reset_all_stations_immediate();
       
-  byte sid;
+  byte sid, bid, s;
   uint16_t dur;
   boolean match_found = false;
   for(sid=0;sid<os.nstations;sid++) {
     dur=parse_listdata(&pv);
-    if (dur>0) {
+    bid=sid/8;
+    s=sid%8;
+    // if non-zero duration is given
+    // and if the station has not been disabled
+    if (dur>0 && !(os.stndis_bits[bid]&(1<<s))) {
       pd.scheduled_stop_time[sid] = dur;
       pd.scheduled_program_index[sid] = 254;      
       match_found = true;
@@ -259,13 +252,6 @@ byte server_change_runonce(char *p) {
   pid:program index (-1 will delete all programs)
   =============================================*/
 byte server_delete_program(char *p) {
-
-  p+=3;
-  //ether.urlDecode(p);
-  
-  // check password
-  if(check_password(p)==false)  return HTML_UNAUTHORIZED;
-  
   if (!ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, "pid"))
     return HTML_DATA_MISSING;
     
@@ -300,9 +286,6 @@ uint16_t parse_listdata(char **p) {
 
 // server function to move up program
 byte server_moveup_program(char *p) {
-  p+=3;
-  if(check_password(p)==false)  return HTML_UNAUTHORIZED;
-  
   if (!ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, "pid")) {
     return HTML_DATA_MISSING;  
   }
@@ -317,12 +300,6 @@ byte server_moveup_program(char *p) {
 // server function to accept program changes
 byte server_change_program(char *p) {
 
-  p+=3;
-  //ether.urlDecode(p);
-  
-  // check password
-  if(check_password(p)==false)  return HTML_UNAUTHORIZED;
-    
   // parse program index
   if (!ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, "pid")) {
     return HTML_DATA_MISSING;
@@ -408,8 +385,7 @@ void server_json_controller_main()
   unsigned long curr_time = now();  
   //os.eeprom_string_get(ADDR_EEPROM_LOCATION, tmp_buffer);
   bfill.emit_p(PSTR("\"devt\":$L,\"nbrd\":$D,\"en\":$D,\"rd\":$D,\"rs\":$D,\"mm\":$D,"
-                    "\"rdst\":$L,\"loc\":\"$E\",\"wtkey\":\"$E\",\"sunrise\":$D,\"sunset\":$D,"
-                    "\"wtscale\":$D,\"sbits\":["),
+                    "\"rdst\":$L,\"loc\":\"$E\",\"wtkey\":\"$E\",\"sunrise\":$D,\"sunset\":$D,\"sbits\":["),
               curr_time,
               os.nboards,
               os.status.enabled,
@@ -420,8 +396,7 @@ void server_json_controller_main()
               ADDR_EEPROM_LOCATION,
               ADDR_EEPROM_WEATHER_KEY,
               os.nvdata.sunrise_time,
-              os.nvdata.sunset_time,
-              os.nvdata.weather_scale);
+              os.nvdata.sunset_time);
   // print sbits
   for(bid=0;bid<os.nboards;bid++)
     bfill.emit_p(PSTR("$D,"), os.station_bits[bid]);  
@@ -438,21 +413,6 @@ void server_json_controller_main()
   
   bfill.emit_p(PSTR("[0,0]]}"));
   
-  //bfill.emit_p(PSTR("[0,0]],\"lrun\":[$D,$D,$D,$L],\"rodur\":["),pd.lastrun.station,
-  //  pd.lastrun.program,pd.lastrun.duration,pd.lastrun.endtime);
-  
-  // output run-once timer values
-  /*
-  uint16_t dur;
-  unsigned char *addr = (unsigned char*)ADDR_EEPROM_RUNONCE;
-  for(sid=0;sid<os.nstations;sid++, addr+=2) {
-    dur=eeprom_read_byte(addr);
-    dur=(dur<<8)+eeprom_read_byte(addr+1);
-    bfill.emit_p(PSTR("$D"),dur);
-    if(sid!=os.nstations-1)
-      bfill.emit_p(PSTR(","));    
-  }
-  bfill.emit_p(PSTR("]}"));    */
 }
 
 // print home page
@@ -521,10 +481,6 @@ byte server_json_options(char *p)
   =============================================*/
 byte server_change_values(char *p)
 {
-  p+=3;
-  // if no password is attached, or password is incorrect
-  if(check_password(p)==false)  return HTML_UNAUTHORIZED;
-
   if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, "rsn")) {
     reset_all_stations();
   }
@@ -571,10 +527,6 @@ byte server_change_values(char *p)
 // server function to accept script url changes
 byte server_change_scripturl(char *p)
 {
-  p+=3;
-
-  // if no password is attached, or password is incorrect
-  if(check_password(p)==false)  return HTML_UNAUTHORIZED;
   if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, "jsp")) {
     ether.urlDecode(tmp_buffer);
     os.eeprom_string_set(ADDR_EEPROM_SCRIPTURL, tmp_buffer);
@@ -587,10 +539,6 @@ byte server_change_scripturl(char *p)
 // server function to accept option changes
 byte server_change_options(char *p)
 {
-  p+=3;
-
-  // if no password is attached, or password is incorrect
-  if(check_password(p)==false)  return HTML_UNAUTHORIZED;
 
   // temporarily save some old options values
   byte old_tz =  os.options[OPTION_TIMEZONE].value;
@@ -676,24 +624,18 @@ byte server_change_options(char *p)
 // server function to change password
 byte server_change_password(char *p)
 {
-  p+=3;
-
-  // if no password is attached, or password is incorrect
-  if(check_password(p)==true) {
-    if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, "npw")) {
-      char tbuf2[TMP_BUFFER_SIZE];
-      if (ether.findKeyVal(p, tbuf2, TMP_BUFFER_SIZE, "cpw") && strncmp(tmp_buffer, tbuf2, 16) == 0) {
-        //os.password_set(tmp_buffer);
-        ether.urlDecode(tmp_buffer);
-        os.eeprom_string_set(ADDR_EEPROM_PASSWORD, tmp_buffer);
-        return HTML_SUCCESS;
-      } else {
-        return HTML_MISMATCH;
-      }
+  if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, "npw")) {
+    char tbuf2[TMP_BUFFER_SIZE];
+    if (ether.findKeyVal(p, tbuf2, TMP_BUFFER_SIZE, "cpw") && strncmp(tmp_buffer, tbuf2, 16) == 0) {
+      //os.password_set(tmp_buffer);
+      ether.urlDecode(tmp_buffer);
+      os.eeprom_string_set(ADDR_EEPROM_PASSWORD, tmp_buffer);
+      return HTML_SUCCESS;
+    } else {
+      return HTML_MISMATCH;
     }
   }
-
-  return HTML_UNAUTHORIZED;
+  return HTML_DATA_MISSING;
 }
 
 void server_json_status_main()
@@ -867,11 +809,6 @@ byte server_json_log(char *p) {
   =============================================*/
 byte server_delete_log(char *p) {
 
-  p+=3;
-  
-  // check password
-  if(check_password(p)==false)  return HTML_UNAUTHORIZED;
-  
   if (!ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, "day"))
     return HTML_DATA_MISSING;
     
@@ -971,8 +908,23 @@ void analyze_get_url(char *p)
     for(;i<sizeof(urls)/sizeof(URLStruct);i++) {
       if(pgm_read_byte(urls[i].url)==str[0]
        &&pgm_read_byte(urls[i].url+1)==str[1]) {
-        //ether.urlDecode(str);
-        byte ret = (urls[i].handler)(str);
+  
+        // check password
+        byte ret = HTML_UNAUTHORIZED;
+
+        // for /jo page we do not check password
+        if (str[0]=='j' and str[1]=='o')  {
+          str+=3;
+          ret = (urls[i].handler)(str);
+        } else {
+          // first check password
+          str+=3;
+          if(check_password(str)==false) {
+            ret = HTML_UNAUTHORIZED;
+          } else {
+            ret = (urls[i].handler)(str);
+          }
+        }
         if (ret != HTML_OK) {
           bfill.emit_p(PSTR("$F{\"result\":$D}"), htmlJSONHeader, ret);
         }

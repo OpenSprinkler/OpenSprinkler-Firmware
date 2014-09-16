@@ -42,7 +42,8 @@ void getweather_callback(byte status, word off, word len) {
   if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, "scale")) {
     v = atoi(tmp_buffer);
     if (v>=0 && v<=250)
-      os.nvdata.weather_scale = v;
+      os.options[OPTION_WATER_PERCENTAGE].value = v;
+      os.options_save();
   }
   DEBUG_PRINTLN(p);
   /*if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, "err")) {

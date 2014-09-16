@@ -87,6 +87,7 @@ public:
   static byte scheduled_program_index[]; // scheduled program index
   static byte  nprograms;     // number of programs
   static LogStruct lastrun;
+  static unsigned long last_stop_time;
   
   static void init();
   static void reset_runtime();

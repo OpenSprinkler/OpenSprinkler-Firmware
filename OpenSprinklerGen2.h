@@ -37,7 +37,6 @@ struct NVConData {
   uint16_t sunrise_time;      // sunrise time (in minutes)
   uint16_t sunset_time;       // sunset time (in minutes)
   uint32_t rd_stop_time;      // rain delay stop time
-  uint8_t  weather_scale;     // weather-based scaling
 };
 
 // Volatile Controller Status Bits

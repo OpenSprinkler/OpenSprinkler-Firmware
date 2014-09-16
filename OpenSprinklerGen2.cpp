@@ -265,7 +265,6 @@ void OpenSprinkler::begin() {
   
   nvdata.sunrise_time = 360;  // 6:00am default
   nvdata.sunset_time = 1080;  // 6:00pm default
-  nvdata.weather_scale = 100; // 100% default
   
   nboards = 1;
   nstations = 8;
