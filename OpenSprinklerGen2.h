@@ -46,10 +46,10 @@ struct ConStatus {
   byte rain_delayed:1;      // rain delay bit (when set, rain delay is applied)
   byte rain_sensed:1;       // rain sensor bit (when set, it indicates that rain is detected)
   byte program_busy:1;      // HIGH means a program is being executed currently
-  byte manual_mode:1;       // HIGH means the controller is in manual mode
   byte has_rtc:1;           // HIGH means the controller has a DS1307 RTC
   byte has_sd:1;            // HIGH means a microSD card is detected
-  byte seq:1;
+  byte seq:1;               // HIGH means the controller is in sequential mode
+  byte dummy:1;             
   byte display_board:4;     // the board that is being displayed onto the lcd
   byte network_fails:4;     // number of network fails
   byte mas:8;               // master station index
@@ -60,7 +60,6 @@ public:
   
   // ====== Data Members ======
   static LiquidCrystal lcd;
-  //static StatusBits status, old_status;
   static NVConData nvdata;
   static ConStatus status;
   static ConStatus old_status;

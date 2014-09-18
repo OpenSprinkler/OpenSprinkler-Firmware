@@ -140,7 +140,6 @@ byte server_change_stations(char *p)
   server_change_stations_attrib(p, 'd', os.stndis_bits);
   os.station_attrib_bits_save(ADDR_EEPROM_STNDISABLE, os.stndis_bits); 
   
-  //bfill.emit_p(PSTR("$F<script>alert(\"Changes saved.\");$F"), htmlOkHeader, htmlReturnHome);
   return HTML_SUCCESS;
 }
 
@@ -160,8 +159,6 @@ void server_json_programs_main() {
   ProgramStruct prog;
   for(pid=0;pid<pd.nprograms;pid++) {
     pd.read(pid, &prog);
-    // to fix: convert interval remainder (absolute->relative)
-
     if (prog.type == PROGRAM_TYPE_INTERVAL && prog.days[1] > 1) {
       pd.drem_to_relative(prog.days);
     }
@@ -281,7 +278,7 @@ uint16_t parse_listdata(char **p) {
   }
   tmp_buffer[i]=0;
   *p = pv+1;
-  return atoi(tmp_buffer);
+  return (uint16_t)atol(tmp_buffer);
 }
 
 // server function to move up program
@@ -384,14 +381,12 @@ void server_json_controller_main()
   byte bid, sid;
   unsigned long curr_time = now();  
   //os.eeprom_string_get(ADDR_EEPROM_LOCATION, tmp_buffer);
-  bfill.emit_p(PSTR("\"devt\":$L,\"nbrd\":$D,\"en\":$D,\"rd\":$D,\"rs\":$D,\"mm\":$D,"
-                    "\"rdst\":$L,\"loc\":\"$E\",\"wtkey\":\"$E\",\"sunrise\":$D,\"sunset\":$D,\"sbits\":["),
+  bfill.emit_p(PSTR("\"devt\":$L,\"nbrd\":$D,\"en\":$D,\"rd\":$D,\"rs\":$D,\"rdst\":$L,\"loc\":\"$E\",\"wtkey\":\"$E\",\"sunrise\":$D,\"sunset\":$D,\"sbits\":["),
               curr_time,
               os.nboards,
               os.status.enabled,
               os.status.rain_delayed,
               os.status.rain_sensed,
-              os.status.manual_mode,
               os.nvdata.rd_stop_time,
               ADDR_EEPROM_LOCATION,
               ADDR_EEPROM_WEATHER_KEY,
@@ -470,13 +465,12 @@ byte server_json_options(char *p)
   Change Controller Values
   
   HTTP GET command format:
-  /cv?pw=xxx&rsn=x&rbt=x&en=x&mm=x&rd=x
+  /cv?pw=xxx&rsn=x&rbt=x&en=x&rd=x
   
   pw:  password
   rsn: reset all stations (0 or 1)
   rbt: reboot controller (0 or 1)
   en:  enable (0 or 1)
-  mm:  manual mode (0 or 1)
   rd:  rain delay hours (0 turns off rain delay)
   =============================================*/
 byte server_change_values(char *p)
@@ -498,7 +492,7 @@ byte server_change_values(char *p)
     else if (tmp_buffer[0]=='0' &&  os.status.enabled)  os.disable();
   }   
   
-  if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, "mm")) {
+  /*if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, "mm")) {
     if (tmp_buffer[0]=='1' && !os.status.manual_mode) {
       reset_all_stations();
       os.status.manual_mode = 1;
@@ -509,7 +503,7 @@ byte server_change_values(char *p)
       os.status.manual_mode = 0;
       //os.constatus_save();
     }
-  }
+  }*/
   if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, "rd")) {
     int rd = atoi(tmp_buffer);
     if (rd>0) {
@@ -657,6 +651,40 @@ byte server_json_status(char *p)
   return HTML_OK;
 }
 
+// /cm?sid=1&en=1&t=3600
+
+byte server_change_manual(char *p) {
+  int sid=-1;
+  if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, "sid")) {
+    sid=atoi(tmp_buffer);
+    if (sid<0 || sid>=os.nstations) return HTML_DATA_OUTOFBOUND;  
+  } else {
+    return HTML_DATA_MISSING;  
+  }
+  
+  byte en=0;
+  if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, "en")) {
+    en=atoi(tmp_buffer);
+  } else {
+    return HTML_DATA_MISSING;
+  }
+  
+  uint16_t timer=0;
+  if (en) { // if turning on a station, must provide timer
+    if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, "t")) {
+      timer=(uint16_t)atol(tmp_buffer);
+      if (timer==0 || timer>64800) {
+        return HTML_DATA_OUTOFBOUND;
+      }
+    } else {
+      return HTML_DATA_MISSING;
+    }
+    
+  } else {  // turn off station
+  
+  }
+  
+}
 
 /*=================================================
   Get/Set Station Bits:
@@ -672,6 +700,7 @@ byte server_json_status(char *p)
   /snx=1   -> turn on station
   /snx=1&t=xx -> turn on with timer (in seconds)
   =================================================*/
+/*
 byte server_station_bits(char *p) {
 
   p+=2;
@@ -729,6 +758,7 @@ byte server_station_bits(char *p) {
 
   return HTML_UNAUTHORIZED;
 }
+*/
 
 /*=============================================
   Print log data in json
@@ -764,8 +794,8 @@ byte server_json_log(char *p) {
   bool first = true;
   for(int i=start;i<=end;i++) {
     itoa(i, tmp_buffer, 10);
-    strcat(tmp_buffer, ".txt");
-    
+    make_logfile_name(tmp_buffer);
+
     if (!sd.exists(tmp_buffer)) continue;
     
     SdFile file;
@@ -803,6 +833,8 @@ byte server_json_log(char *p) {
   
   HTTP GET command format:
   /dl?pw=xxx&day=xxx
+  or
+  /dl?pw=xxx&day=all
   
   pw: password
   day:day (epoch time / 86400) to delete log for
@@ -811,7 +843,7 @@ byte server_delete_log(char *p) {
 
   if (!ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, "day"))
     return HTML_DATA_MISSING;
-    
+  
   delete_log(tmp_buffer);
   
   return HTML_SUCCESS;
@@ -837,8 +869,9 @@ prog_char _url_co [] PROGMEM = "co";
 prog_char _url_jo [] PROGMEM = "jo";
 prog_char _url_sp [] PROGMEM = "sp";
 
-prog_char _url_sn [] PROGMEM = "sn";
+//prog_char _url_sn [] PROGMEM = "sn";
 prog_char _url_js [] PROGMEM = "js";
+prog_char _url_cm [] PROGMEM = "cm";
 
 prog_char _url_cs [] PROGMEM = "cs";
 prog_char _url_jn [] PROGMEM = "jn";
@@ -866,9 +899,10 @@ URLStruct urls[] = {
   {_url_jo,server_json_options},
   {_url_sp,server_change_password},
 
-  {_url_sn,server_station_bits},
+  //{_url_sn,server_station_bits},
   {_url_js,server_json_status},  
-
+  {_url_cm,server_change_manual},
+  
   {_url_cs,server_change_stations},
   {_url_jn,server_json_stations},
 
@@ -877,6 +911,7 @@ URLStruct urls[] = {
 
   {_url_su,server_view_scripturl},
   {_url_cu,server_change_scripturl},
+ 
 };
 
 // analyze the current url
@@ -937,6 +972,8 @@ void analyze_get_url(char *p)
       byte k=0;  
       while (str[k]!=' ' && k<32) {tmp_buffer[k]=str[k];k++;}//search the end, indicated by space
       tmp_buffer[k]=0;
+      // change dir to root
+      sd.chdir("/");
       if (streamfile ((char *)tmp_buffer)==0) {
         // file not found
         bfill.emit_p(PSTR("$F{\"result\":$D}"), htmlJSONHeader, HTML_PAGE_NOT_FOUND);

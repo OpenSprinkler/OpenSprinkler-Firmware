@@ -60,6 +60,7 @@ void ProgramData::read(byte pid, ProgramStruct *buf) {
 // add a program
 byte ProgramData::add(ProgramStruct *buf) {
   if (0) {
+    // todo: handle SD card
   } else {
     if (nprograms >= MAX_NUMBER_PROGRAMS)  return 0;
     unsigned int addr = ADDR_PROGRAMDATA + (unsigned int)nprograms * PROGRAMSTRUCT_SIZE;
@@ -86,7 +87,6 @@ void ProgramData::moveup(byte pid) {
       eeprom_write_byte((byte *)src, eeprom_read_byte((byte *)dst));
       eeprom_write_byte((byte *)dst, tmp);
     }
-    
   }
 }
 

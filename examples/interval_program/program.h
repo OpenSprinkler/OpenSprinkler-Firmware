@@ -43,7 +43,7 @@ public:
   
   // starttime type:
   // 0: repeating (give start time, repeat every, number of repeats)
-  // 1: given start time (give arbitrary start times up to MAX_NUM_STARTTIMEs)
+  // 1: fixed start time (give arbitrary start times up to MAX_NUM_STARTTIMEs)
   byte starttime_type: 1;
 
   // misc. data
@@ -55,10 +55,18 @@ public:
   // interval: days[0] stores the interval (0 to 255), days[1] stores the starting day remainder (0 to 254)
   byte days[2];  
   
-  // when the program is a repeating type:
+  // When the program is a fixed start time type:
+  //   up to MAX_NUM_STARTTIMES fixed start times
+  // When the program is a repeating type:
   //   starttimes[0]: start time
   //   starttimes[1]: repeat count
   //   starttimes[2]: repeat every
+  // Start time structure:
+  //   if bit 15 = 1: negative, undefined
+  //   if bit 14 = 1: sunrise time +/- offset (by lowest 12 bits)
+  //   if bit 13 = 1: sunset  time +/- offset (by lowest 12 bits)
+  //      bit 12: unused, undefined
+  // else: standard start time (value between 0 to 1440, by lowest 12 bits)
   int16_t starttimes[MAX_NUM_STARTTIMES];
 
   uint8_t durations[MAX_NUM_STATIONS];  // duration / water time of each station

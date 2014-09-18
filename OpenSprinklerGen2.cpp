@@ -269,7 +269,7 @@ void OpenSprinkler::begin() {
   nboards = 1;
   nstations = 8;
   
-  // define lcd custom characters
+  // define lcd custom icons
   byte lcd_wifi_char[8] = {
     B00000,
     B10100,
@@ -376,55 +376,60 @@ void OpenSprinkler::station_attrib_bits_load(int addr, byte bits[]) {
   eeprom_read_block(bits, (unsigned char *)addr, MAX_EXT_BOARDS+1);
 }
 
-// Save ignore rain bits to eeprom
-/*
-void OpenSprinkler::ignrain_save() {
-  byte i;
-  for(i=0;i<=MAX_EXT_BOARDS;i++) {
-    eeprom_write_byte((unsigned char *)ADDR_EEPROM_IGNRAIN+i, ignrain_bits[i]);
+
+// ==================
+// String Functions
+// ==================
+void OpenSprinkler::eeprom_string_set(int start_addr, char* buf) {
+  byte i=0;
+  for (; (*buf)!=0; buf++, i++) {
+    eeprom_write_byte((unsigned char*)(start_addr+i), *(buf));
   }
+  eeprom_write_byte((unsigned char*)(start_addr+i), 0);  
 }
 
-// Load ignore rain bits from eeprom
-void OpenSprinkler::ignrain_load() {
-  byte i;
-  for(i=0;i<=MAX_EXT_BOARDS;i++) {
-    ignrain_bits[i] = eeprom_read_byte((unsigned char *)ADDR_EEPROM_IGNRAIN+i);
-  }
+void OpenSprinkler::eeprom_string_get(int start_addr, char *buf) {
+  byte c;
+  byte i = 0;
+  do {
+    c = eeprom_read_byte((unsigned char*)(start_addr+i));
+    //if (c==' ') c='+';
+    *(buf++) = c;
+    i ++;
+  } while (c != 0);
 }
 
-// Save activate relay bits to eeprom
-void OpenSprinkler::actrelay_save() {
-  byte i;
-  for(i=0;i<=MAX_EXT_BOARDS;i++) {
-    eeprom_write_byte((unsigned char *)ADDR_EEPROM_ACTRELAY+i, actrelay_bits[i]);
+
+// verify if a string matches password
+byte OpenSprinkler::password_verify(char *pw) { 
+  unsigned char *addr = (unsigned char*)ADDR_EEPROM_PASSWORD;
+  byte c1, c2;
+  while(1) {
+    c1 = eeprom_read_byte(addr++);
+    c2 = *pw++;
+    if (c1==0 || c2==0)
+      break;
+    if (c1!=c2) {
+      return 0;
+    }
   }
+  return (c1==c2) ? 1 : 0;
 }
 
-// Load activate relay bits from eeprom
-void OpenSprinkler::actrelay_load() {
-  byte i;
-  for(i=0;i<=MAX_EXT_BOARDS;i++) {
-    actrelay_bits[i] = eeprom_read_byte((unsigned char *)ADDR_EEPROM_ACTRELAY+i);
+// compare a string to eeprom
+byte strcmp_to_eeprom(const char* src, int _addr) {
+  byte i=0;
+  byte c1, c2;
+  unsigned char *addr = (unsigned char*)_addr;
+  while(1) {
+    c1 = eeprom_read_byte(addr++);
+    c2 = *src++;
+    if (c1==0 || c2==0)
+      break;      
+    if (c1!=c2)  return 1;
   }
+  return (c1==c2) ? 0 : 1;
 }
-
-// Save station master operation bits to eeprom
-void OpenSprinkler::masop_save() {
-  byte i;
-  for(i=0;i<=MAX_EXT_BOARDS;i++) {
-    eeprom_write_byte((unsigned char *)ADDR_EEPROM_MAS_OP+i, masop_bits[i]);
-  }
-}
-
-// Load station master operation bits from eeprom
-void OpenSprinkler::masop_load() {
-  byte i;
-  for(i=0;i<=MAX_EXT_BOARDS;i++) {
-    masop_bits[i] = eeprom_read_byte((unsigned char *)ADDR_EEPROM_MAS_OP+i);
-  }
-}
-*/
 
 // ==================
 // Schedule Functions
@@ -596,7 +601,7 @@ void OpenSprinkler::nvdata_load() {
   old_status = status;
 }
 
-// Save controller status data to internal eeprom
+// Save non-volatile controller status data to internal eeprom
 void OpenSprinkler::nvdata_save() {
   eeprom_write_block(&nvdata, (unsigned char*)ADDR_EEPROM_NVCONDATA, sizeof(NVConData));
 }
@@ -631,10 +636,6 @@ void OpenSprinkler::enable() {
   status.enabled = 1;
   options[OPTION_DEVICE_ENABLE].value = 1;
   options_save();
-  
-  // apply_all_station_bits();??
-  // write enable bit to eeprom
-
 }
 
 // Disable controller operation
@@ -642,31 +643,29 @@ void OpenSprinkler::disable() {
   status.enabled = 0;
   options[OPTION_DEVICE_ENABLE].value = 0;
   options_save();
-
-  //apply_all_station_bits();??
-  // write enable bit to eeprom
 }
 
 void OpenSprinkler::raindelay_start() {
   status.rain_delayed = 1;
   nvdata_save();
-
-  //apply_all_station_bits(); ??
 }
 
 void OpenSprinkler::raindelay_stop() {
   status.rain_delayed = 0;
   nvdata.rd_stop_time = 0;
   nvdata_save();
-  
-  // apply_all_station_bits(); ??
 }
 
 byte OpenSprinkler::detect_exp() {
   unsigned int v = analogRead(PIN_EXP_SENSE);
-  // ideal values: 1024, 890, 787, 706, 640, 585, 539
-  // actual threshold is taken as the midpoint between
-  // two adjacent ideal values
+  // OpenSprinkler uses voltage divider to detect expansion boards
+  // Master controller has a 1.5K pull-up;
+  // each expansion board (8 stations) has 10K pull-down connected in parallel;
+  // so the exact ADC value for n expansion boards is:
+  //    ADC = 1024 * 10 / (10 + 1.5 * n)
+  // For  0,   1,   2,   3,   4,   5 expansion boards, the ADC values are:
+  //   1024, 890, 787, 706, 640, 585
+  // Actual threshold is taken as the midpoint between, to account for errors
   byte n = 255;
   if (v > 957) { // 0
     n = 0;
@@ -961,59 +960,10 @@ void OpenSprinkler::ui_set_options(int oid)
   lcd.noBlink();
 }
 
-// ==================
-// String Functions
-// ==================
-void OpenSprinkler::eeprom_string_set(int start_addr, char* buf) {
-  byte i=0;
-  for (; (*buf)!=0; buf++, i++) {
-    eeprom_write_byte((unsigned char*)(start_addr+i), *(buf));
-  }
-  eeprom_write_byte((unsigned char*)(start_addr+i), 0);  
-}
 
-void OpenSprinkler::eeprom_string_get(int start_addr, char *buf) {
-  byte c;
-  byte i = 0;
-  do {
-    c = eeprom_read_byte((unsigned char*)(start_addr+i));
-    //if (c==' ') c='+';
-    *(buf++) = c;
-    i ++;
-  } while (c != 0);
-}
-
-// verify if a string matches password
-byte OpenSprinkler::password_verify(char *pw) { 
-  unsigned char *addr = (unsigned char*)ADDR_EEPROM_PASSWORD;
-  byte c1, c2;
-  while(1) {
-    c1 = eeprom_read_byte(addr++);
-    c2 = *pw++;
-    if (c1==0 || c2==0)
-      break;
-    if (c1!=c2) {
-      return 0;
-    }
-  }
-  return (c1==c2) ? 1 : 0;
-}
-
-// compare a string to eeprom
-byte strcmp_to_eeprom(const char* src, int _addr) {
-  byte i=0;
-  byte c1, c2;
-  unsigned char *addr = (unsigned char*)_addr;
-  while(1) {
-    c1 = eeprom_read_byte(addr++);
-    c2 = *src++;
-    if (c1==0 || c2==0)
-      break;      
-    if (c1!=c2)  return 1;
-  }
-  return (c1==c2) ? 0 : 1;
-}
-
+// ================================================
+// ====== Data Encoding / Decoding Functions ======
+// ================================================
 // encode a 16-bit unsigned water time to 8-bit byte
 /* encoding scheme:
    byte value : water time

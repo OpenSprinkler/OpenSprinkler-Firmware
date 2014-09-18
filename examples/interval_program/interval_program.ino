@@ -185,19 +185,12 @@ void loop()
   if (pos>0) {  // packet received
     analyze_get_url((char*)Ethernet::buffer+pos);
   }
-  // ======================================
-  /*
-  static unsigned long expire = millis() + 1000;
-  if (millis() > expire) {
-    GetWeather();
-    expire = millis() + 30000;
-  }*/
+  // ====== end of Process Ethernet packets
   
   wdt_reset();  // reset watchdog timer
   wdt_timeout = 0;
    
   button_poll();    // process button press
-
 
   // if 1 second has passed
   time_t curr_time = now();
@@ -208,12 +201,11 @@ void loop()
 
     // ====== Check raindelay status ======
     if (os.status.rain_delayed) {
-      if (curr_time >= os.nvdata.rd_stop_time) {
-        // raindelay time is over      
+      if (curr_time >= os.nvdata.rd_stop_time) {  // rain delay is over  
         os.raindelay_stop();
       }
     } else {
-      if (os.nvdata.rd_stop_time > curr_time) {
+      if (os.nvdata.rd_stop_time > curr_time) {   // rain delay starts now
         os.raindelay_start();
       }
     }
@@ -250,11 +242,6 @@ void loop()
     }
 
     // ====== Schedule program data ======
-    // Check if we are cleared to schedule a new program. The conditions are:
-    // 1) the controller is in program mode (manual_mode == 0), and if
-    // 2) either the controller is not busy or is in concurrent mode
-    //if (os.status.manual_mode==0 && (os.status.program_busy==0 || os.status.seq==0))
-    {
     unsigned long curr_minute = curr_time / 60;
     boolean match_found = false;
     // since the granularity of start time is minute
@@ -267,43 +254,40 @@ void loop()
         if(prog.check_match(curr_time)) {
           // program match found
           // process all selected stations
-          for(bid=0; bid<os.nboards; bid++) {
-            for(s=0;s<8;s++) {
-              sid=bid*8+s;
-              // ignore master station because it's not scheduled independently
-              if (os.status.mas == sid+1)  continue;
-              // if the station is current running, skip it
-              if (os.station_bits[bid]&(1<<s)) continue;
-              // if the station is disabled, skip it
-              if (os.stndis_bits[bid]&(1<<s)) continue;
-              
-              // if station has non-zero water time
-              // and if it doesn't already have a scheduled stop time
-              if (prog.durations[sid] && !pd.scheduled_stop_time[sid]) {
-                // initialize schedule data
-                // store duration temporarily in stop_time variable
-                // duration is scaled by water level
-                pd.scheduled_stop_time[sid] = (unsigned long)water_time_decode(prog.durations[sid]) * os.options[OPTION_WATER_PERCENTAGE].value / 100;
-                if (pd.scheduled_stop_time[sid]) {
-                  pd.scheduled_program_index[sid] = pid+1;  
-                  match_found = true;
-                }
-              }
-            }
-          }
-        }
-      }
+          for(sid=0;sid<os.nstations;sid++) {
+            bid=sid>>3;
+            s=sid%8;
+            // skip if the station is:
+            // - master station (because master cannot be scheduled independently
+            // - currently running (cannot handle overlapping schedules of the same station)
+            // - disabled
+            if ((os.status.mas==sid+1) || (os.station_bits[bid]&(1<<s)) || (os.stndis_bits[bid]&(1<<s)))
+              continue;
+            
+            // if station has non-zero water time and if it doesn't already have a scheduled stop time
+            if (prog.durations[sid] && !pd.scheduled_stop_time[sid]) {
+              // initialize schedule data by storing water time temporarily in stop_time
+              // water time is scaled by watering percentage
+              pd.scheduled_stop_time[sid] = (unsigned long)water_time_decode(prog.durations[sid])
+                                            * os.options[OPTION_WATER_PERCENTAGE].value / 100;
+              if (pd.scheduled_stop_time[sid]) {  // water time may end up being zero after scaling
+                pd.scheduled_program_index[sid] = pid+1;  
+                match_found = true;
+              }// if pd.scheduled_stop_time[sid]
+            }// if prog.durations[sid]
+          }// for sid
+        }// if check_match
+      }// for pid
       
       // calculate start and end time
       if (match_found) {
         schedule_all_stations(curr_time, os.status.seq);
       }
     }//if_check_current_minute
-    } //if_cleared_for_scheduling
     
     // ====== Run program data ======
     // Check if a program is running currently
-    // If so, process run-time data
+    // If so, do station run-time keeping
     if (os.status.program_busy){
       for(bid=0;bid<os.nboards; bid++) {
         bitvalue = os.station_bits[bid];
@@ -354,8 +338,8 @@ void loop()
               // schedule master station here if
               // 1) master station is defined
               // 2) the station is non-master and is set to activate master
-              // 3) controller is not running in manual mode AND sequential is true
-              if ((os.status.mas>0) && (os.status.mas!=sid+1) && (os.masop_bits[bid]&(1<<s)) && os.status.seq && os.status.manual_mode==0) {
+              //if ((os.status.mas>0) && (os.status.mas!=sid+1) && (os.masop_bits[bid]&(1<<s)) && os.status.seq && os.status.manual_mode==0) {
+              if ((os.status.mas>0) && (os.status.mas!=sid+1) && (os.masop_bits[bid]&(1<<s)) && os.status.seq) {
                 byte masid=os.status.mas-1;
                 // master will turn on when a station opens,
                 // adjusted by the master on and off time
@@ -418,9 +402,9 @@ void loop()
       
     }//if_some_program_is_running
 
-    // handle master station for manual or parallel mode
-    if ((os.status.mas>0) && os.status.manual_mode==1 || os.status.seq==0) {
-      // in parallel mode or manual mode
+    // handle master station for parallel mode
+    //if ((os.status.mas>0) && os.status.manual_mode==1 || os.status.seq==0) {
+    if ((os.status.mas>0) && os.status.seq==0) {
       // master will remain on until the end of program
       byte masbit = 0;
       for(sid=0;sid<os.nstations;sid++) {
@@ -456,6 +440,7 @@ void loop()
   }
 }
 
+/*
 void manual_station_off(byte sid) {
   unsigned long curr_time = now();
 
@@ -476,6 +461,7 @@ void manual_station_on(byte sid, int ontimer) {
   pd.scheduled_program_index[sid] = 99;
   os.status.program_busy = 1;
 }
+*/
 
 void perform_ntp_sync(time_t curr_time) {
   // do not perform sync if this option is disabled, or if network is not available, or if a program is running
@@ -558,7 +544,7 @@ void process_dynamic_events()
   byte mas = os.status.mas;  
   bool rain = false;
   bool en = os.status.enabled ? true : false;
-  bool mm = os.status.manual_mode ? true : false;
+  //bool mm = os.status.manual_mode ? true : false;
   if (os.status.rain_delayed || (os.options[OPTION_USE_RAINSENSOR].value && os.status.rain_sensed)) {
     rain = true;
   }
@@ -570,11 +556,11 @@ void process_dynamic_events()
     sbits = os.station_bits[bid];
     for(s=0;s<8;s++) {
       sid=bid*8+s;
-      // if the controller is in program mode (not manual mode)
-      // and this is a normal program (not a run-once program)
+      // If this is a normal program (not a run-once or test program)
       // and either the controller is disabled, or
       // if raining and ignore rain bit is cleared
-      if (!mm && (pd.scheduled_program_index[sid] != 254) &&
+      //if (!mm && (pd.scheduled_program_index[sid] != 254) &&
+      if ((pd.scheduled_program_index[sid] != 254) &&
           (!en || (rain && !(rbits&(1<<s)))) ) {
         if (sbits&(1<<s)) { // if station is currently running
           // stop the station immediately
@@ -679,23 +665,53 @@ void reset_all_stations() {
   }
 }
 
+// ================================
+// ====== LOGGING FUNCTIONS =======
+// ================================
+// Log files will be named /logs/xxxxx.txt
+const char LOG_PREFIX[] = "/logs/";
+void make_logfile_name(char *name) {
+  sd.chdir("/");
+  String str = LOG_PREFIX;
+  str += name;
+  str += ".txt";
+  str.toCharArray(tmp_buffer, TMP_BUFFER_SIZE);
+}
+
+// delete log file
+// if name is 'all', delete all logs
 void delete_log(char *name) {
   if (!os.status.has_sd) return;
 
-  strcat(name, ".txt");
-  
-  if (!sd.exists(name))  return;
-  
-  sd.remove(name);
+  if (strncmp(name, "all", 3) == 0) {
+    // delete the log folder
+    SdFile file;
+
+    if (sd.chdir(LOG_PREFIX)) {
+      sd.vwd()->rmRfStar();
+    }
+    return;
+  } else {
+    make_logfile_name(name);
+    if (!sd.exists(tmp_buffer))  return;
+    sd.remove(tmp_buffer);
+  }
 }
 
-// write lastrun record to log on SD card
+// write run record to log on SD card
 void write_log(byte type, unsigned long curr_time) {
   if (!os.status.has_sd)  return;
 
-  // file name will be xxxxx.log where xxxxx is the day in epoch time
+  // file name will be logs/xxxxx.tx where xxxxx is the day in epoch time
   ultoa(curr_time / 86400, tmp_buffer, 10);
-  strcat(tmp_buffer, ".txt");
+  make_logfile_name(tmp_buffer);
+
+  sd.chdir("/");
+  if (sd.chdir(LOG_PREFIX) == false) {
+    // create dir if it doesn't exist yet
+    if (sd.mkdir(LOG_PREFIX) == false)
+      return;    
+  }
 
   SdFile file;
   file.open(tmp_buffer, O_CREAT | O_WRITE );
@@ -719,14 +735,6 @@ void write_log(byte type, unsigned long curr_time) {
     str += "0,\"rd\",";
     str += (curr_time - os.raindelay_start_time);
     break;
-  /*case LOGDATA_MANUALMODE:
-    str += "0,\"mm\",";
-    str += os.status.manual_mode ? "1" : "0";
-    break;
-  case LOGDATA_ENABLE:
-    str += "0,\"en\",";
-    str += os.status.enabled ? "1" : "0";
-    break;*/
   }
   str += ",";
   str += curr_time;  

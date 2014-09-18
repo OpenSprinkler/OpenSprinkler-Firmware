@@ -4,7 +4,7 @@
 // Author: Richard Zimmerman
 // Copyright (c) 2013 Richard Zimmerman
 // 
-// Sep 6, 2014
+// Sep, 2014
 // Modified by Ray Wang to fit OpenSprinkler 
 
 #ifndef _WEATHER_h
