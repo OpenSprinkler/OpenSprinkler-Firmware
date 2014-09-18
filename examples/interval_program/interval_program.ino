@@ -512,13 +512,19 @@ void turn_off_station(byte sid, byte mas, unsigned long curr_time) {
   // record lastrun log (currently only for non-master stations)
   // also check if the current time is prior to scheduled start time
   // because we may be turning off a station before it has started
-  if((mas != sid+1) && (curr_time>pd.scheduled_start_time[sid])) {
+  if((mas!=sid+1) && (curr_time>pd.scheduled_start_time[sid])) {
     pd.lastrun.station = sid;
     pd.lastrun.program = pd.scheduled_program_index[sid];
     pd.lastrun.duration = curr_time - pd.scheduled_start_time[sid];
     pd.lastrun.endtime = curr_time;
     write_log(LOGDATA_STATION, curr_time);
   }      
+
+  // upon turning off station, update master station stop time
+  // because we may be manually turning station off earlier than scheduled
+  if ((mas!=sid+1) && (os.masop_bits[bid]&(1<<s)) && os.status.seq) {
+    pd.scheduled_stop_time[mas-1] = curr_time+os.options[OPTION_MASTER_OFF_ADJ].value-60;
+  }
 
   // upon turning off station, process relay
   // if the station is set to active / deactivate relay
