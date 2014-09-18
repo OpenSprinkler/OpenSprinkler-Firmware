@@ -221,8 +221,8 @@ byte server_change_runonce(char *p) {
   boolean match_found = false;
   for(sid=0;sid<os.nstations;sid++) {
     dur=parse_listdata(&pv);
-    bid=sid/8;
-    s=sid%8;
+    bid=sid>>3;
+    s=sid&0x07;
     // if non-zero duration is given
     // and if the station has not been disabled
     if (dur>0 && !(os.stndis_bits[bid]&(1<<s))) {
@@ -514,7 +514,6 @@ byte server_change_values(char *p)
     } else  return HTML_DATA_OUTOFBOUND;
   }  
  
-  //bfill.emit_p(PSTR("$F<script>$F"), htmlOkHeader, htmlReturnHome);
   return HTML_SUCCESS;
 }
 
@@ -525,7 +524,6 @@ byte server_change_scripturl(char *p)
     ether.urlDecode(tmp_buffer);
     os.eeprom_string_set(ADDR_EEPROM_SCRIPTURL, tmp_buffer);
   }
-  //bfill.emit_p(PSTR("$F<script>alert(\"Script url saved.\");$F"), htmlOkHeader, htmlReturnHome);  
   return HTML_SUCCESS;
 }  
     
@@ -596,13 +594,11 @@ byte server_change_options(char *p)
     if (os.status.has_rtc) RTC.set(t); // if rtc exists, update rtc
   }
   if (err) {
-    //bfill.emit_p(PSTR("$F<script>alert(\"Values out of bound!\");window.location=\"/vo\";</script>\n"), htmlOkHeader);
     return HTML_DATA_OUTOFBOUND;
   } 
 
   os.options_save();
   
-  //bfill.emit_p(PSTR("$F<script>alert(\"Options values saved.\");$F"), htmlOkHeader, htmlReturnHome);  
   if(os.options[OPTION_TIMEZONE].value != old_tz ||
      (!old_ntp && os.options[OPTION_USE_NTP].value)) {
     os.ntpsync_lasttime = 0;
@@ -638,7 +634,7 @@ void server_json_status_main()
   byte sid;
 
   for (sid=0;sid<os.nstations;sid++) {
-    bfill.emit_p(PSTR("$D"), (os.station_bits[(sid>>3)]>>(sid%8))&1);
+    bfill.emit_p(PSTR("$D"), (os.station_bits[(sid>>3)]>>(sid&0x07))&1);
     if(sid!=os.nstations-1) bfill.emit_p(PSTR(","));
   }
   bfill.emit_p(PSTR("],\"nstations\":$D}"), os.nstations);  
@@ -651,8 +647,8 @@ byte server_json_status(char *p)
   return HTML_OK;
 }
 
+// Test station (i.e. previously manual operation)
 // /cm?sid=1&en=1&t=3600
-
 byte server_change_manual(char *p) {
   int sid=-1;
   if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, "sid")) {
@@ -670,20 +666,40 @@ byte server_change_manual(char *p) {
   }
   
   uint16_t timer=0;
+  unsigned long curr_time = now();
   if (en) { // if turning on a station, must provide timer
     if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, "t")) {
       timer=(uint16_t)atol(tmp_buffer);
       if (timer==0 || timer>64800) {
         return HTML_DATA_OUTOFBOUND;
       }
+      // schedule manual station
+      // skip if the station is:
+      // - master station (because master cannot be scheduled independently
+      // - currently running (cannot handle overlapping schedules of the same station)
+      // - disabled      
+      byte bid = sid>>3;
+      byte s = sid&0x07;
+      if ((os.status.mas==sid+1) || (os.station_bits[bid]&(1<<s)) || (os.stndis_bits[bid]&(1<<s)))
+        return HTML_NOT_PERMITTED;
+      
+      // if the station doesn't already have a scheduled stop time
+      if (!pd.scheduled_stop_time[sid]) {
+        // initialize schedule data by storing water time temporarily in stop_time
+        // water time is scaled by watering percentage
+        pd.scheduled_stop_time[sid] = timer;
+        pd.scheduled_program_index[sid] = 99;   // testing stations are assigned program index 99
+        schedule_all_stations(curr_time, os.status.seq);
+      } else {
+        return HTML_NOT_PERMITTED;
+      }
     } else {
       return HTML_DATA_MISSING;
     }
-    
   } else {  // turn off station
-  
+    turn_off_station(sid, os.status.mas, curr_time);
   }
-  
+  return HTML_SUCCESS;
 }
 
 /*=================================================

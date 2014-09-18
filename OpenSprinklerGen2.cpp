@@ -446,7 +446,7 @@ byte OpenSprinkler::weekday_today() {
 // Set station bit
 void OpenSprinkler::set_station_bit(byte sid, byte value) {
   byte bid = (sid>>3);  // board index
-  byte s = sid % 8;     // station bit index
+  byte s = sid&0x07;     // station bit index
   if (value) {
     station_bits[bid] = station_bits[bid] | ((byte)1<<s);
   } 

@@ -256,7 +256,7 @@ void loop()
           // process all selected stations
           for(sid=0;sid<os.nstations;sid++) {
             bid=sid>>3;
-            s=sid%8;
+            s=sid&0x07;
             // skip if the station is:
             // - master station (because master cannot be scheduled independently
             // - currently running (cannot handle overlapping schedules of the same station)
@@ -294,40 +294,11 @@ void loop()
         for(s=0;s<8;s++) {
           byte sid = bid*8+s;
           
-          // check if the current station has a scheduled program
-          // this includes running stations and stations waiting to run
+          // check if this station is scheduled, either running or waiting to run
           if (pd.scheduled_program_index[sid] > 0) {
             // if so, check if we should turn it off
-            if (curr_time >= pd.scheduled_stop_time[sid])
-            {
-              os.set_station_bit(sid, 0);
-
-              // record lastrun log (only for non-master stations)
-              if((os.status.mas != sid+1) && (curr_time>pd.scheduled_start_time[sid]))
-              {
-                pd.lastrun.station = sid;
-                pd.lastrun.program = pd.scheduled_program_index[sid];
-                pd.lastrun.duration = curr_time - pd.scheduled_start_time[sid];
-                pd.lastrun.endtime = curr_time;
-                write_log(LOGDATA_STATION, curr_time);
-              }      
-              
-              // process relay if
-              // the station is set to activate relay
-              if(os.actrelay_bits[bid]&(1<<s)) {
-                // turn relay off
-                if(os.options[OPTION_RELAY_PULSE].value > 0) {
-                  // if the relay is set to pulse
-                  digitalWrite(PIN_RELAY, HIGH);
-                  delay(os.options[OPTION_RELAY_PULSE].value*10);
-                } 
-                digitalWrite(PIN_RELAY, LOW);
-              }
-                            
-              // reset program data variables
-              pd.scheduled_start_time[sid] = 0;
-              pd.scheduled_stop_time[sid] = 0;
-              pd.scheduled_program_index[sid] = 0;            
+            if (curr_time >= pd.scheduled_stop_time[sid]) {
+              turn_off_station(sid, os.status.mas, curr_time);          
             }
           }
           // if current station is not running, check if we should turn it on
@@ -338,6 +309,7 @@ void loop()
               // schedule master station here if
               // 1) master station is defined
               // 2) the station is non-master and is set to activate master
+              // 3) controller is in sequential mode (if in parallel mode, master is handled differently)
               //if ((os.status.mas>0) && (os.status.mas!=sid+1) && (os.masop_bits[bid]&(1<<s)) && os.status.seq && os.status.manual_mode==0) {
               if ((os.status.mas>0) && (os.status.mas!=sid+1) && (os.masop_bits[bid]&(1<<s)) && os.status.seq) {
                 byte masid=os.status.mas-1;
@@ -346,37 +318,33 @@ void loop()
                 pd.scheduled_start_time[masid] = pd.scheduled_start_time[sid]+os.options[OPTION_MASTER_ON_ADJ].value;
                 pd.scheduled_stop_time[masid] = pd.scheduled_stop_time[sid]+os.options[OPTION_MASTER_OFF_ADJ].value-60;
                 pd.scheduled_program_index[masid] = pd.scheduled_program_index[sid];
-                // check if we should turn master on now
-                if (curr_time >= pd.scheduled_start_time[masid] && curr_time < pd.scheduled_stop_time[masid])
-                {
+                // immediately check if we should turn on master now
+                if (curr_time >= pd.scheduled_start_time[masid] && curr_time < pd.scheduled_stop_time[masid]) {
                   os.set_station_bit(masid, 1);
                 }
               }
-              // schedule relay here if
-              // the station is set to activate relay
+              // upon turning on station, process relay
+              // if the station is set to activate / deactivate relay
               if(os.actrelay_bits[bid]&(1<<s)) {
                 // turn relay on
                 digitalWrite(PIN_RELAY, HIGH);
-                if(os.options[OPTION_RELAY_PULSE].value > 0) {
-                  // if the relay is set to pulse
+                if(os.options[OPTION_RELAY_PULSE].value > 0) {  // if relay is set to pulse
                   delay(os.options[OPTION_RELAY_PULSE].value*10);
                   digitalWrite(PIN_RELAY, LOW);
                 }
-              }
-            }
-          }
+              } // if activate relay
+            } //if curr_time > scheduled_start_time
+          } // if current station is not running
         }//end_s
       }//end_bid
       
       // process dynamic events
-      process_dynamic_events();
+      process_dynamic_events(curr_time);
       
-      // activate/deactivate valves
+      // activate / deactivate valves
       os.apply_all_station_bits();
 
-      // check through run-time data
-      // calculate last_stop_time and
-      // see if any station is running or scheduled to run
+      // check through run-time data, calculate last_stop_time,
       boolean program_still_busy = false;
       pd.last_stop_time = 0;
       unsigned long sst;
@@ -388,24 +356,23 @@ void loop()
           program_still_busy = true;
         }
       }
-      // if no station is running or scheduled to run
-      // reset program busy bit
+      // if no station has a schedule
       if (program_still_busy == false) {
         // turn off all stations
         os.clear_all_station_bits();
-        
+        // reset program busy bit
         os.status.program_busy = 0;
         
         // in case some options have changed while executing the program        
         os.status.mas = os.options[OPTION_MASTER_STATION].value; // update master station
+        os.status.seq = os.options[OPTION_SEQUENTIAL].value;
       }
-      
     }//if_some_program_is_running
 
     // handle master station for parallel mode
     //if ((os.status.mas>0) && os.status.manual_mode==1 || os.status.seq==0) {
     if ((os.status.mas>0) && os.status.seq==0) {
-      // master will remain on until the end of program
+      // master will be on / off together with stations
       byte masbit = 0;
       for(sid=0;sid<os.nstations;sid++) {
         bid = sid>>3;
@@ -420,9 +387,8 @@ void loop()
     }    
                   
     // process dynamic events
-    process_dynamic_events();
+    process_dynamic_events(curr_time);
       
-          
     // activate/deactivate valves
     os.apply_all_station_bits();
     
@@ -538,17 +504,48 @@ void check_network(time_t curr_time) {
   } 
 }
 
-void process_dynamic_events()
+void turn_off_station(byte sid, byte mas, unsigned long curr_time) {
+  byte bid = sid>>3;
+  byte s = sid&0x07;
+  os.set_station_bit(sid, 0);
+
+  // record lastrun log (currently only for non-master stations)
+  // also check if the current time is prior to scheduled start time
+  // because we may be turning off a station before it has started
+  if((mas != sid+1) && (curr_time>pd.scheduled_start_time[sid])) {
+    pd.lastrun.station = sid;
+    pd.lastrun.program = pd.scheduled_program_index[sid];
+    pd.lastrun.duration = curr_time - pd.scheduled_start_time[sid];
+    pd.lastrun.endtime = curr_time;
+    write_log(LOGDATA_STATION, curr_time);
+  }      
+
+  // upon turning off station, process relay
+  // if the station is set to active / deactivate relay
+  if(os.actrelay_bits[bid]&(1<<s)) {
+    // turn relay off
+    if(os.options[OPTION_RELAY_PULSE].value > 0) {  // if relay is set to pulse
+      digitalWrite(PIN_RELAY, HIGH);
+      delay(os.options[OPTION_RELAY_PULSE].value*10);
+    } 
+    digitalWrite(PIN_RELAY, LOW);
+  }
+
+  // reset program run-time data variables
+  pd.scheduled_start_time[sid] = 0;
+  pd.scheduled_stop_time[sid] = 0;
+  pd.scheduled_program_index[sid] = 0;  
+  
+}
+
+void process_dynamic_events(unsigned long curr_time)
 {
   // check if rain is detected
-  byte mas = os.status.mas;  
   bool rain = false;
   bool en = os.status.enabled ? true : false;
-  //bool mm = os.status.manual_mode ? true : false;
   if (os.status.rain_delayed || (os.options[OPTION_USE_RAINSENSOR].value && os.status.rain_sensed)) {
     rain = true;
   }
-  unsigned long curr_time = now();
 
   byte sid, s, bid, rbits, sbits;
   for(bid=0;bid<os.nboards;bid++) {
@@ -560,40 +557,13 @@ void process_dynamic_events()
       // and either the controller is disabled, or
       // if raining and ignore rain bit is cleared
       //if (!mm && (pd.scheduled_program_index[sid] != 254) &&
-      if ((pd.scheduled_program_index[sid] != 254) &&
+      if ((pd.scheduled_program_index[sid]<99) &&
           (!en || (rain && !(rbits&(1<<s)))) ) {
         if (sbits&(1<<s)) { // if station is currently running
-          // stop the station immediately
-          os.set_station_bit(sid, 0);
-
-          // record lastrun log (only for non-master stations)
-          if((mas != sid+1) && (curr_time>pd.scheduled_start_time[sid]))
-          {
-            pd.lastrun.station = sid;
-            pd.lastrun.program = pd.scheduled_program_index[sid];
-            pd.lastrun.duration = curr_time - pd.scheduled_start_time[sid];
-            pd.lastrun.endtime = curr_time;
-            write_log(LOGDATA_STATION, curr_time);
-          }      
-          
-          // process relay if
-          // the station is set to activate relay
-          if(os.actrelay_bits[bid]&(1<<s)) {
-            // turn relay off
-            if(os.options[OPTION_RELAY_PULSE].value > 0) {
-              // if the relay is set to pulse
-              digitalWrite(PIN_RELAY, HIGH);
-              delay(os.options[OPTION_RELAY_PULSE].value*10);
-            } 
-            digitalWrite(PIN_RELAY, LOW);
-          }
-          
-          // reset program data variables
-          //pd.remaining_time[sid] = 0;
-          pd.scheduled_start_time[sid] = 0;
-          pd.scheduled_stop_time[sid] = 0;
-          pd.scheduled_program_index[sid] = 0;               
+          turn_off_station(sid, os.status.mas, curr_time);
+                   
         } else if (pd.scheduled_program_index[sid] > 0) { // if station is currently not running but is waiting to run
+        
           // reset program data variables
           pd.scheduled_start_time[sid] = 0;
           pd.scheduled_stop_time[sid] = 0;
@@ -621,8 +591,8 @@ void schedule_all_stations(unsigned long curr_time, byte seq)
     
   // calculate start / stop time of each station
   for(sid=0;sid<os.nstations;sid++) {
-    byte bid=sid/8;
-    byte s=sid%8;    
+    byte bid=sid>>3;
+    byte s=sid&0x07;    
     
     // if the station is not scheduled to run, or is already scheduled (i.e. start_time > 0) or is already running
     // skip
