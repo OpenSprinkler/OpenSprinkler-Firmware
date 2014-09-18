@@ -597,6 +597,8 @@ void schedule_all_stations(unsigned long curr_time, byte seq)
     
   // calculate start / stop time of each station
   for(sid=0;sid<os.nstations;sid++) {
+    // skip master station because it's not scheduled independently
+    if (os.status.mas==sid+1) continue;
     byte bid=sid>>3;
     byte s=sid&0x07;    
     
