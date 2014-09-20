@@ -79,6 +79,10 @@ void GetWeather() {
 
   str += "&tz=";
   str += (int)os.options[OPTION_TIMEZONE].value;
+  
+  str += "&fwv=";
+  str += (int)os.options[OPTION_FW_VERSION].value;
+  
   str.toCharArray(tmp_buffer, TMP_BUFFER_SIZE);
   DEBUG_PRINTLN(tmp_buffer);
   ether.browseUrl(PSTR("/scripts/weather"), tmp_buffer, website, getweather_callback);

@@ -25,7 +25,7 @@
 // Interval for renewing DHCP
 #define DHCP_RENEW_INTERVAL     43200L  // 12 hours default
 // Interval for getting weather data
-#define CHECK_WEATHER_INTERVAL  21600L  // 6 hours default
+#define CHECK_WEATHER_INTERVAL  900     // 15 minutes default
 // LCD backlight autodimming timeout
 #define LCD_DIMMING_TIMEOUT   30        // 30 seconds default
 // Ping test time out (in milliseconds)
@@ -268,8 +268,12 @@ void loop()
             if (prog.durations[sid] && !pd.scheduled_stop_time[sid]) {
               // initialize schedule data by storing water time temporarily in stop_time
               // water time is scaled by watering percentage
-              pd.scheduled_stop_time[sid] = (unsigned long)water_time_decode(prog.durations[sid])
-                                            * os.options[OPTION_WATER_PERCENTAGE].value / 100;
+              unsigned long water_time = (unsigned long)water_time_decode(prog.durations[sid]);
+              // if the program is set to use weather scaling 
+              if (prog.use_weather)
+                water_time = water_time * os.options[OPTION_WATER_PERCENTAGE].value / 100;
+              pd.scheduled_stop_time[sid] = water_time;
+                                            
               if (pd.scheduled_stop_time[sid]) {  // water time may end up being zero after scaling
                 pd.scheduled_program_index[sid] = pid+1;  
                 match_found = true;
@@ -349,9 +353,10 @@ void loop()
       pd.last_stop_time = 0;
       unsigned long sst;
       for(sid=0;sid<os.nstations;sid++) {
-        // check if any station has a non-zero and non-infinity stop time
+        // check if any station has a valid stop time
+        // and the stop time must be larger than curr_time
         sst = pd.scheduled_stop_time[sid];
-        if (sst > 0 && sst < ULONG_MAX) {
+        if (sst > curr_time) {
           pd.last_stop_time = (sst > pd.last_stop_time ) ? sst : pd.last_stop_time;
           program_still_busy = true;
         }
@@ -360,6 +365,9 @@ void loop()
       if (program_still_busy == false) {
         // turn off all stations
         os.clear_all_station_bits();
+        os.apply_all_station_bits();
+        // reset runtime
+        pd.reset_runtime();
         // reset program busy bit
         os.status.program_busy = 0;
         
@@ -448,7 +456,7 @@ void check_weather(time_t curr_time) {
   // do not check weather if the Use Weather option is disabled, or if network is not available, or if a program is running
   if (!os.options[OPTION_USE_WEATHER].value || os.status.network_fails>0 || os.status.program_busy) return;
 
-  if (os.checkwt_lasttime == 0 || (curr_time - os.checkwt_lasttime > CHECK_WEATHER_INTERVAL)) {
+  if (!os.checkwt_lasttime || ((curr_time - os.checkwt_lasttime) > CHECK_WEATHER_INTERVAL)) {
     os.checkwt_lasttime = curr_time;
     GetWeather();
   }

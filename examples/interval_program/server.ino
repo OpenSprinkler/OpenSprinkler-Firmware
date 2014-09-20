@@ -183,7 +183,7 @@ void server_json_programs_main() {
       bfill.emit_p(PSTR("\"],"));
     else
       bfill.emit_p(PSTR("\"]"));
-    if (pid%4==3) { // push out a packet every 4 programs
+    if (pid%3==2) { // push out a packet every 4 programs
       ether.httpServerReply_with_flags(bfill.position(), TCP_FLAGS_ACK_V);
       bfill=ether.tcpOffset();
     } 
@@ -215,7 +215,8 @@ byte server_change_runonce(char *p) {
   
   // reset all stations and prepare to run one-time program
   reset_all_stations_immediate();
-      
+  
+  DEBUG_PRINTLN(pv);
   byte sid, bid, s;
   uint16_t dur;
   boolean match_found = false;
@@ -232,7 +233,7 @@ byte server_change_runonce(char *p) {
     }
   }
   if(match_found) {
-    schedule_all_stations(now(), os.options[OPTION_SEQUENTIAL].value);
+    schedule_all_stations(now(), os.status.seq);
     return HTML_SUCCESS;
   }
 
@@ -401,9 +402,8 @@ void server_json_controller_main()
     unsigned long rem = 0;
     if (pd.scheduled_program_index[sid] > 0) {
       rem = (curr_time >= pd.scheduled_start_time[sid]) ? (pd.scheduled_stop_time[sid]-curr_time) : (pd.scheduled_stop_time[sid]-pd.scheduled_start_time[sid]);
-      if(pd.scheduled_stop_time[sid]==ULONG_MAX-1)  rem=0;
     }
-    bfill.emit_p(PSTR("[$D,$L],"), pd.scheduled_program_index[sid], rem);
+    bfill.emit_p(PSTR("[$D,$L,$L],"), pd.scheduled_program_index[sid], rem, pd.scheduled_start_time[sid]);
   }
   
   bfill.emit_p(PSTR("[0,0]]}"));
@@ -605,7 +605,7 @@ byte server_change_options(char *p)
     os.checkwt_lasttime = 0;
   }
   
-  if(os.options[OPTION_USE_WEATHER].value && os.options[OPTION_USE_WEATHER].value != old_uwt) {
+  if(os.options[OPTION_USE_WEATHER].value) {
     os.checkwt_lasttime = 0;  // force weather update
   }
   return HTML_SUCCESS;
@@ -677,10 +677,9 @@ byte server_change_manual(char *p) {
       // skip if the station is:
       // - master station (because master cannot be scheduled independently
       // - currently running (cannot handle overlapping schedules of the same station)
-      // - disabled      
       byte bid = sid>>3;
       byte s = sid&0x07;
-      if ((os.status.mas==sid+1) || (os.station_bits[bid]&(1<<s)) || (os.stndis_bits[bid]&(1<<s)))
+      if ((os.status.mas==sid+1) || (os.station_bits[bid]&(1<<s)))   //|| (os.stndis_bits[bid]&(1<<s))
         return HTML_NOT_PERMITTED;
       
       // if the station doesn't already have a scheduled stop time

@@ -189,12 +189,21 @@ byte ProgramStruct::check_match(time_t t) {
     if (!interval) {
       return 0;
     }
-    int16_t c = (current_minute - start) / interval;
-    
+
     // check if we are on any interval match
+    int16_t c = (current_minute - start) / interval;
     if ((c * interval == (current_minute - start)) && c <= repeat) {
       return 1;
     }
+    
+    // check previous day in case the repeating start times went over night
+    // this needs to be fixed because we have to check if yesterday
+    // is a valid starting day
+    /*c = (current_minute - start + 1440) / interval;
+    if ((c * interval == (current_minute - start + 1440)) && c <= repeat) {
+      return 1;
+    }*/
+    
   } else {
     // given start time type
     for(i=0;i<MAX_NUM_STARTTIMES;i++) {
