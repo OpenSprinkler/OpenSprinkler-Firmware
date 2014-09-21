@@ -82,7 +82,7 @@ public:
 #define ADDR_PROGRAMCOUNTER        (ADDR_EEPROM_PROGRAMS+1)
 #define ADDR_PROGRAMDATA           (ADDR_EEPROM_PROGRAMS+2)
 // maximum number of programs, restricted by internal EEPROM size
-#define MAX_NUMBER_PROGRAMS  ((MAX_NUM_PROGRAM_BYTES-2)/PROGRAMSTRUCT_SIZE)
+#define MAX_NUMBER_PROGRAMS  ((MAX_PROGRAMDATA-2)/PROGRAMSTRUCT_SIZE)
 
 extern OpenSprinkler os;
 

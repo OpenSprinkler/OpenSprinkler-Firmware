@@ -27,7 +27,7 @@
 // Interval for getting weather data
 #define CHECK_WEATHER_INTERVAL  900     // 15 minutes default
 // LCD backlight autodimming timeout
-#define LCD_DIMMING_TIMEOUT   30        // 30 seconds default
+#define LCD_DIMMING_TIMEOUT      20     // 20 seconds default
 // Ping test time out (in milliseconds)
 #define PING_TIMEOUT            200     // 0.2 second default
 
@@ -48,51 +48,105 @@ SdFat sd;         // SD card object
 static char ui_anim_chars[3] = {'.', 'o', 'O'};
   
 // poll button press
-void button_poll() {
+/*
+byte button_poll() {
 
   // read button, if something is pressed, wait till release
   byte button = os.button_read(BUTTON_WAIT_HOLD);
 
-  if (!(button & BUTTON_FLAG_DOWN)) return;  // repond only to button down events
+  //if (!(button & BUTTON_FLAG_DOWN)) return;  // repond only to button down events
 
   os.button_lasttime = now();
   // button is pressed, turn on LCD right away
   analogWrite(PIN_LCD_BACKLIGHT, 255-os.options[OPTION_LCD_BACKLIGHT].value); 
-  
+        if (button & BUTTON_FLAG_HOLD) {
+        // hold button 3 -> reboot
+        os.button_read(BUTTON_WAIT_RELEASE);
+        os.reboot();
+      } 
+      else {
+
+  return button;*/
+ /*
   switch (button & BUTTON_MASK) {
-  case BUTTON_1:
-    if (button & BUTTON_FLAG_HOLD) {
-      // hold button 1 -> start operation
-      os.enable();
-    } 
-    else {
-      // click button 1 -> display ip address and port number
+
+ */
+
+#define UI_STATE_DEFAULT   0
+#define UI_STATE_DISP_IP   1
+#define UI_STATE_DISP_GW   2
+#define UI_STATE_RUNPROG   3
+
+static byte ui_state = UI_STATE_DEFAULT;
+static byte ui_state_runprog = 0;
+
+void ui_state_machine(time_t curr_time) {
+
+  if (os.button_lasttime && os.button_lasttime + LCD_DIMMING_TIMEOUT < curr_time) {
+    analogWrite(PIN_LCD_BACKLIGHT, 255-os.options[OPTION_LCD_DIMMING].value); 
+    os.button_lasttime = 0;
+    ui_state = UI_STATE_DEFAULT;  // also recover to default state
+  }
+      
+  // read button, if something is pressed, wait till release
+  byte button = os.button_read(BUTTON_WAIT_HOLD);
+
+  if (button & BUTTON_FLAG_DOWN) {   // repond only to button down events
+    os.button_lasttime = curr_time;
+    // button is pressed, turn on LCD right away
+    analogWrite(PIN_LCD_BACKLIGHT, 255-os.options[OPTION_LCD_BACKLIGHT].value); 
+  } else {
+    return;
+  }
+
+  switch(ui_state) {
+  case UI_STATE_DEFAULT:
+    switch (button & BUTTON_MASK) {
+    case BUTTON_1:  // press button 1 -> display ip address and port number
       os.lcd_print_ip(ether.myip, ether.hisport);
-      delay(DISPLAY_MSG_MS);
-    }
-    break;
-
-  case BUTTON_2:
-    if (button & BUTTON_FLAG_HOLD) {
-      // hold button 2 -> disable operation
-      os.disable();
-    } 
-    else {
-      // click button 2 -> display gateway ip address and port number
+      ui_state = UI_STATE_DISP_IP;
+      break;
+    case BUTTON_2:  // press button 2 -> display gateway ip address and port number
       os.lcd_print_ip(ether.gwip, 0);
-      delay(DISPLAY_MSG_MS);
+      ui_state = UI_STATE_DISP_GW;
+      break;
+    case BUTTON_3:
+      if (button & BUTTON_FLAG_HOLD) {  // long press button 3 -> go to main menu
+        os.lcd_print_line_clear_pgm(PSTR("Run a Program:"), 0);
+        os.lcd_print_line_clear_pgm(PSTR("Click B3 to list"), 1);
+        ui_state = UI_STATE_RUNPROG;
+      } else {  // press button 3 -> switch board display (cycle through master and all extension boards)
+        os.status.display_board = (os.status.display_board + 1) % (os.nboards);
+      }
+      break;
     }
     break;
-
-  case BUTTON_3:
-    if (button & BUTTON_FLAG_HOLD) {
-      // hold button 3 -> reboot
-      os.button_read(BUTTON_WAIT_RELEASE);
-      os.reboot();
-    } 
-    else {
-      // click button 3 -> switch board display (cycle through master and all extension boards)
-      os.status.display_board = (os.status.display_board + 1) % (os.nboards);
+  case UI_STATE_DISP_IP:
+  case UI_STATE_DISP_GW:
+    ui_state = UI_STATE_DEFAULT;
+    break;
+  case UI_STATE_RUNPROG:
+    if ((button & BUTTON_MASK)==BUTTON_3) {
+      if (button & BUTTON_FLAG_HOLD) {
+        // start
+        os.lcd_print_line_clear_pgm(PSTR("Starting Program"), 0);
+        manual_start_program(ui_state_runprog);
+        ui_state = UI_STATE_DEFAULT;
+      } else {
+        ui_state_runprog = (ui_state_runprog+1) % (pd.nprograms+1);
+        os.lcd_print_line_clear_pgm(PSTR("Hold B3 to start"), 0);
+        if(ui_state_runprog > 0) {
+          ProgramStruct prog;
+          pd.read(ui_state_runprog-1, &prog);
+          os.lcd_print_line_clear_pgm("", 1);
+          os.lcd.setCursor(0, 1);
+          os.lcd.print((int)ui_state_runprog);
+          os.lcd_print_pgm(PSTR(". "));
+          os.lcd.print(prog.name);
+        } else {
+          os.lcd_print_line_clear_pgm(PSTR("0. Test (1 min)"), 1);
+        }
+      }
     }
     break;
   }
@@ -190,14 +244,19 @@ void loop()
   wdt_reset();  // reset watchdog timer
   wdt_timeout = 0;
    
-  button_poll();    // process button press
+  //button_poll();    // process button press
+
+  time_t curr_time = now();
+  ui_state_machine(curr_time);
 
   // if 1 second has passed
-  time_t curr_time = now();
   if (last_time != curr_time) {
 
     last_time = curr_time;
-    os.lcd_print_time(0);       // print time
+
+
+    if (!ui_state)    
+      os.lcd_print_time(0);       // print time
 
     // ====== Check raindelay status ======
     if (os.status.rain_delayed) {
@@ -209,13 +268,7 @@ void loop()
         os.raindelay_start();
       }
     }
-    
-    // ====== Check LCD backlight timeout ======
-    if (os.button_lasttime != 0 && os.button_lasttime + LCD_DIMMING_TIMEOUT < curr_time) {
-      analogWrite(PIN_LCD_BACKLIGHT, 255-os.options[OPTION_LCD_DIMMING].value); 
-      os.button_lasttime = 0;
-    }
-    
+
     // ====== Check rain sensor status ======
     os.rainsensor_status();
 
@@ -401,7 +454,8 @@ void loop()
     os.apply_all_station_bits();
     
     // process LCD display
-    os.lcd_print_station(1, ui_anim_chars[curr_time%3]);
+    if (!ui_state)    
+      os.lcd_print_station(1, ui_anim_chars[curr_time%3]);
     
     // check network connection
     check_network(curr_time);
@@ -443,7 +497,9 @@ void perform_ntp_sync(time_t curr_time) {
 
   if (os.ntpsync_lasttime == 0 || (curr_time - os.ntpsync_lasttime > NTP_SYNC_INTERVAL)) {
     os.ntpsync_lasttime = curr_time;
-    os.lcd_print_line_clear_pgm(PSTR("NTP Syncing..."),1);
+    if (!ui_state) {
+      os.lcd_print_line_clear_pgm(PSTR("NTP Syncing..."),1);
+    }
     unsigned long t = getNtpTime();   
     if (t>0) {    
       setTime(t);
@@ -477,8 +533,10 @@ void check_network(time_t curr_time) {
   interval *= CHECK_NETWORK_INTERVAL;
   if (curr_time - last_check_time > interval) {
     // change LCD icon to indicate it's checking network
-    os.lcd.setCursor(15, 1);
-    os.lcd.write(4);
+    if (!ui_state) {
+      os.lcd.setCursor(15, 1);
+      os.lcd.write(4);
+    }
       
     last_check_time = curr_time;
    

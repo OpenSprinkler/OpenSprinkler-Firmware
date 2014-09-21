@@ -30,21 +30,27 @@
 /* EEPROM structure:
  * |              |     |---STRING PARAMETERS---|               |--STATION ATTRIBUTES---|            |
  * | PROGRAM_DATA | CON | PWD | LOC | URL | KEY | STATION_NAMES | MAS | IGR | ACT | DIS | OPTIONS... |
- * |   (1008)     |(16) |(24) |(32) |(72) |(32) | (6*8*16)=768  | (6) | (6) | (6) | (6) |    (46)    |
+ * |   (1000)     |(12) |(32) |(48) |(64) |(32) | (6*8*16)=768  | (6) | (6) | (6) | (6) |    (68)    |
  * |              |     |     |     |     |     |               |     |     |     |     |            |
- * 0            1008  1024   1048  1080  1152  1216            1984  1990  1996  2002 2008          2048
+ * 0            1000  1012   1044  1092  1156  1188            1956  1962  1968  1974 1980          2048
  */
 /* program data is now stored at the beginning of the EEPROM
  * so that they can be preserved across firmware upgrades,
  * unless if program data structure is changed */
-#define ADDR_EEPROM_PROGRAMS         0  // program starting address, 1012 bytes max
-#define MAX_NUM_PROGRAM_BYTES     1012
-#define ADDR_EEPROM_NVCONDATA     1012  // non-volatile controller data, 12 bytes max
-#define ADDR_EEPROM_PASSWORD      1024	// user password, 24 bytes max
-#define ADDR_EEPROM_LOCATION      1048  // location string, 32 bytes max
-#define ADDR_EEPROM_SCRIPTURL     1080	// javascript url, 72 bytes max
-#define ADDR_EEPROM_WEATHER_KEY   1152  // weather api key, 32 bytes max
-#define ADDR_EEPROM_STN_NAMES     1216  // station names
+#define MAX_PROGRAMDATA           1000  // program data, 1000 bytes max
+#define MAX_NVCONDATA               12  // non-volatile controller data, 12 bytes max
+#define MAX_USER_PASSWORD           32  // user password, 32 bytes max
+#define MAX_LOCATION                48  // location string, 48 bytes max
+#define MAX_SCRIPTURL               64  // javascript url, 64 bytes max
+#define MAX_WEATHER_KEY             32  // weather api key, 32 bytes max
+
+#define ADDR_EEPROM_PROGRAMS         0  // program starting address, 1000 bytes max
+#define ADDR_EEPROM_NVCONDATA     (ADDR_EEPROM_PROGRAMS+MAX_PROGRAMDATA)
+#define ADDR_EEPROM_PASSWORD      (ADDR_EEPROM_NVCONDATA+MAX_NVCONDATA)
+#define ADDR_EEPROM_LOCATION      (ADDR_EEPROM_PASSWORD+MAX_USER_PASSWORD)
+#define ADDR_EEPROM_SCRIPTURL     (ADDR_EEPROM_LOCATION+MAX_LOCATION)
+#define ADDR_EEPROM_WEATHER_KEY   (ADDR_EEPROM_SCRIPTURL+MAX_SCRIPTURL)
+#define ADDR_EEPROM_STN_NAMES     (ADDR_EEPROM_WEATHER_KEY+MAX_WEATHER_KEY)
 #define ADDR_EEPROM_MAS_OP        (ADDR_EEPROM_STN_NAMES+MAX_NUM_STATIONS*STATION_NAME_SIZE) // master op bits
 #define ADDR_EEPROM_IGNRAIN       (ADDR_EEPROM_MAS_OP+(MAX_EXT_BOARDS+1))  // ignore rain bits 
 #define ADDR_EEPROM_ACTRELAY      (ADDR_EEPROM_IGNRAIN+(MAX_EXT_BOARDS+1)) // activate relay bits
@@ -174,7 +180,7 @@ typedef enum {
 
 #define 	wdt_reset()   __asm__ __volatile__ ("wdr")
 
-#define SERIAL_DEBUG
+//#define SERIAL_DEBUG
 
 #ifdef SERIAL_DEBUG
 

@@ -576,7 +576,7 @@ void OpenSprinkler::options_setup() {
   	// if BUTTON_3 is pressed during startup, enter Setup option mode
     lcd_print_line_clear_pgm(PSTR("==Set Options=="), 0);
     delay(DISPLAY_MSG_MS);
-    lcd_print_line_clear_pgm(PSTR("B3:< > B1/B2:+/-"), 0);
+    lcd_print_line_clear_pgm(PSTR("B1/B2:+/-, B3:->"), 0);
     lcd_print_line_clear_pgm(PSTR("Hold B3 to save"), 1);
     do {
       button = button_read(BUTTON_WAIT_NONE);

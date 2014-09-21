@@ -198,8 +198,38 @@ byte server_json_programs(char *p)
   return HTML_OK;
 }
 
-// server function to accept run-once program
 
+// Manually start a program
+// If pid == 0, this is a test program (1 minute per station)
+// If pid > 0. run program pid-1
+void manual_start_program(byte pid) {
+  boolean match_found = false;
+  reset_all_stations_immediate();
+  ProgramStruct prog;
+  uint16_t dur;
+  byte sid, bid, s;
+  if (pid > 0) {
+    pd.read(pid-1, &prog);
+  }
+  for(sid=0;sid<os.nstations;sid++) {
+    bid=sid>>3;
+    s=sid&0x07;
+    dur = 60;
+    if(pid>0)
+      dur = water_time_decode(prog.durations[sid]);
+    if (dur>0 && !(os.stndis_bits[bid]&(1<<s))) {
+      pd.scheduled_stop_time[sid] = dur;
+      pd.scheduled_program_index[sid] = 254;      
+      match_found = true;
+    }
+  }
+  if(match_found) {
+    schedule_all_stations(now(), os.status.seq);
+  }  
+}
+
+
+// server function to accept run-once program
 byte server_change_runonce(char *p) {
   // search for the start of v=[
   char *pv;
@@ -522,6 +552,7 @@ byte server_change_scripturl(char *p)
 {
   if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, "jsp")) {
     ether.urlDecode(tmp_buffer);
+    tmp_buffer[MAX_SCRIPTURL]=0;  // make sure we don't exceed the maximum size
     os.eeprom_string_set(ADDR_EEPROM_SCRIPTURL, tmp_buffer);
   }
   return HTML_SUCCESS;
@@ -567,6 +598,7 @@ byte server_change_options(char *p)
   
   if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, "loc")) {
     ether.urlDecode(tmp_buffer);
+    tmp_buffer[MAX_LOCATION]=0;   // make sure we don't exceed the maximum size
     if (strcmp_to_eeprom(tmp_buffer, ADDR_EEPROM_LOCATION)) { // if location has changed
       os.eeprom_string_set(ADDR_EEPROM_LOCATION, tmp_buffer);
       os.checkwt_lasttime = 0;    // immediate update weather
@@ -575,6 +607,7 @@ byte server_change_options(char *p)
   uint8_t keyfound = 0;
   if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, "wtkey", &keyfound)) {
     ether.urlDecode(tmp_buffer);
+    tmp_buffer[MAX_WEATHER_KEY]=0;
     if (strcmp_to_eeprom(tmp_buffer, ADDR_EEPROM_WEATHER_KEY)) {  // if weather key has changed
       os.eeprom_string_set(ADDR_EEPROM_WEATHER_KEY, tmp_buffer);
       os.checkwt_lasttime = 0;  // immediately update weather
@@ -619,6 +652,7 @@ byte server_change_password(char *p)
     if (ether.findKeyVal(p, tbuf2, TMP_BUFFER_SIZE, "cpw") && strncmp(tmp_buffer, tbuf2, 16) == 0) {
       //os.password_set(tmp_buffer);
       ether.urlDecode(tmp_buffer);
+      tmp_buffer[MAX_USER_PASSWORD]=0;  // make sure we don't exceed the maximum size
       os.eeprom_string_set(ADDR_EEPROM_PASSWORD, tmp_buffer);
       return HTML_SUCCESS;
     } else {
@@ -962,6 +996,8 @@ void analyze_get_url(char *p)
         // check password
         byte ret = HTML_UNAUTHORIZED;
 
+        if (str[0] != 'j')
+          DEBUG_PRINTLN(str);
         // for /jo page we do not check password
         if (str[0]=='j' and str[1]=='o')  {
           str+=3;
