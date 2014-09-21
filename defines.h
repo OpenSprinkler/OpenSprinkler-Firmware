@@ -63,6 +63,7 @@
 #define DEFAULT_WEATHER_KEY     ""
 #define DEFAULT_JAVASCRIPT_URL  "http://ui.opensprinkler.com/js"
 #define WEATHER_SCRIPT_HOST     "www.rayshobby.net"
+//#define WEATHER_SCRIPT_HOST     "weather.opensprinkler.com"
 
 // macro define of each option
 // See OpenSprinkler.cpp for details on each option
@@ -171,7 +172,7 @@ typedef enum {
 #define BUTTON_WAIT_HOLD       2  // wait until button hold time expires
 
 // ====== Timing Defines ======
-#define DISPLAY_MSG_MS      2000  // message display time (milliseconds)
+#define DISPLAY_MSG_MS      3000  // message display time (milliseconds)
 
 // ====== Ethernet Defines ======
 #define ETHER_BUFFER_SIZE   900  // if buffer size is increased, you must check the total RAM consumption

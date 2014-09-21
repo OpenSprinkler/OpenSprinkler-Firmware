@@ -93,8 +93,7 @@ void ui_state_machine(time_t curr_time) {
 
   if (button & BUTTON_FLAG_DOWN) {   // repond only to button down events
     os.button_lasttime = curr_time;
-    // button is pressed, turn on LCD right away
-    analogWrite(PIN_LCD_BACKLIGHT, 255-os.options[OPTION_LCD_BACKLIGHT].value); 
+    analogWrite(PIN_LCD_BACKLIGHT, 255-os.options[OPTION_LCD_BACKLIGHT].value); // button is pressed, turn on LCD right away
   } else {
     return;
   }
@@ -102,20 +101,32 @@ void ui_state_machine(time_t curr_time) {
   switch(ui_state) {
   case UI_STATE_DEFAULT:
     switch (button & BUTTON_MASK) {
-    case BUTTON_1:  // press button 1 -> display ip address and port number
-      os.lcd_print_ip(ether.myip, ether.hisport);
-      ui_state = UI_STATE_DISP_IP;
+    case BUTTON_1:
+      if (button & BUTTON_FLAG_HOLD) {  // holding B1: stop all stations
+        if (digitalRead(PIN_BUTTON_2)==0) { // if B2 is pressed, run a short test (internal test)
+          manual_start_program(255);
+        } else {
+          reset_all_stations();
+        }
+      } else {  // clicking B1: display device IP and port
+        os.lcd_print_ip(ether.myip, ether.hisport);
+        ui_state = UI_STATE_DISP_IP;
+      }
       break;
-    case BUTTON_2:  // press button 2 -> display gateway ip address and port number
-      os.lcd_print_ip(ether.gwip, 0);
-      ui_state = UI_STATE_DISP_GW;
+    case BUTTON_2:
+      if (button & BUTTON_FLAG_HOLD) {  // holding B2: reboot
+        os.reboot();
+      } else {  // clicking B2: display gateway IP
+        os.lcd_print_ip(ether.gwip, 0);
+        ui_state = UI_STATE_DISP_GW;
+      }
       break;
     case BUTTON_3:
-      if (button & BUTTON_FLAG_HOLD) {  // long press button 3 -> go to main menu
+      if (button & BUTTON_FLAG_HOLD) {  // holding B3: go to main menu
         os.lcd_print_line_clear_pgm(PSTR("Run a Program:"), 0);
         os.lcd_print_line_clear_pgm(PSTR("Click B3 to list"), 1);
         ui_state = UI_STATE_RUNPROG;
-      } else {  // press button 3 -> switch board display (cycle through master and all extension boards)
+      } else {  // clicking B3: switch board display (cycle through master and all extension boards)
         os.status.display_board = (os.status.display_board + 1) % (os.nboards);
       }
       break;
@@ -129,7 +140,6 @@ void ui_state_machine(time_t curr_time) {
     if ((button & BUTTON_MASK)==BUTTON_3) {
       if (button & BUTTON_FLAG_HOLD) {
         // start
-        os.lcd_print_line_clear_pgm(PSTR("Starting Program"), 0);
         manual_start_program(ui_state_runprog);
         ui_state = UI_STATE_DEFAULT;
       } else {
@@ -786,6 +796,7 @@ void write_log(byte type, unsigned long curr_time) {
   str += "\r\n";
   str.toCharArray(tmp_buffer, TMP_BUFFER_SIZE);
 
+  DEBUG_PRINTLN(tmp_buffer);
   file.write(tmp_buffer);
   file.close();
 }

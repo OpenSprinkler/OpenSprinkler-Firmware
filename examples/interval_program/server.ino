@@ -201,6 +201,7 @@ byte server_json_programs(char *p)
 
 // Manually start a program
 // If pid == 0, this is a test program (1 minute per station)
+// If pid == 255, this is a short test program (2 second per station)
 // If pid > 0. run program pid-1
 void manual_start_program(byte pid) {
   boolean match_found = false;
@@ -208,14 +209,15 @@ void manual_start_program(byte pid) {
   ProgramStruct prog;
   uint16_t dur;
   byte sid, bid, s;
-  if (pid > 0) {
+  if ((pid>0)&&(pid<255)) {
     pd.read(pid-1, &prog);
   }
   for(sid=0;sid<os.nstations;sid++) {
     bid=sid>>3;
     s=sid&0x07;
     dur = 60;
-    if(pid>0)
+    if(pid==255)  dur=2;
+    else if(pid>0)
       dur = water_time_decode(prog.durations[sid]);
     if (dur>0 && !(os.stndis_bits[bid]&(1<<s))) {
       pd.scheduled_stop_time[sid] = dur;

@@ -65,25 +65,15 @@ void GetWeather() {
     ether.dnsLookup(website);
   }
 
-  String str = "";
-  str += os.options[OPTION_USE_WEATHER].value;
-  str += ".py?loc=";
+  bfill=ether.tcpOffset();
+  bfill.emit_p(PSTR("$D.py?loc=$E&key=$E&tz=$D&fwv=$D"),
+                (int) os.options[OPTION_USE_WEATHER].value,
+                ADDR_EEPROM_LOCATION,
+                ADDR_EEPROM_WEATHER_KEY,
+                (int)os.options[OPTION_TIMEZONE].value,
+                (int)os.options[OPTION_FW_VERSION].value);
   
-  // fill in location data, API key
-  os.eeprom_string_get(ADDR_EEPROM_LOCATION, tmp_buffer);
-  str += tmp_buffer;
-
-  str += "&key=";
-  os.eeprom_string_get(ADDR_EEPROM_WEATHER_KEY, tmp_buffer);
-  str += tmp_buffer;
-
-  str += "&tz=";
-  str += (int)os.options[OPTION_TIMEZONE].value;
-  
-  str += "&fwv=";
-  str += (int)os.options[OPTION_FW_VERSION].value;
-  
-  str.toCharArray(tmp_buffer, TMP_BUFFER_SIZE);
+  strcpy(tmp_buffer, (const char*)ether.tcpOffset());
   DEBUG_PRINTLN(tmp_buffer);
   ether.browseUrl(PSTR("/scripts/weather"), tmp_buffer, website, getweather_callback);
 }
