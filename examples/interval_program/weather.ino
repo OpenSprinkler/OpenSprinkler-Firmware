@@ -7,7 +7,6 @@
 // Sep 6, 2014
 // Modified by Ray Wang to fit OpenSprinkler 
 
-#include "weather.h"
 #include "OpenSprinklerGen2.h"
 #include <string.h>
 #include <stdlib.h>
@@ -19,8 +18,6 @@ extern char tmp_buffer[];
 // the default script is WEATHER_SCRIPT_HOST/scripts/getweather.py
 static char website[] PROGMEM = WEATHER_SCRIPT_HOST ;
 
-WeatherVals weather;
-
 void getweather_callback(byte status, word off, word len) {
   char *p = (char*)Ethernet::buffer + off;
   
@@ -28,12 +25,9 @@ void getweather_callback(byte status, word off, word len) {
   while(*p && *p!='&') {
     p++;
   }
+  if (*p != '&')  return;
   int v;
-
-  if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, "err")) {
-    return;
-  }
-
+  DEBUG_PRINTLN(p);
   if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, "sunrise")) {
     v = atoi(tmp_buffer);
     if (v>=0 && v<=1440) {
@@ -55,9 +49,17 @@ void getweather_callback(byte status, word off, word len) {
       os.options_save();
     }
   }
-  DEBUG_PRINTLN(p);
+  
+  if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, "tz")) {
+    v = atoi(tmp_buffer);
+    if (v>=0 && v<= 96) {
+      os.options[OPTION_TIMEZONE].value = v;
+      os.ntpsync_lasttime = 0;      
+      os.options_save();
+    }
+  }
+  os.status.wt_received = 1;
 }
-
 
 void GetWeather() {
   // check if we've already done dns lookup
@@ -66,15 +68,28 @@ void GetWeather() {
   }
 
   bfill=ether.tcpOffset();
-  bfill.emit_p(PSTR("$D.py?loc=$E&key=$E&tz=$D&fwv=$D"),
+  bfill.emit_p(PSTR("$D.py?loc=$E&key=$E&fwv=$D"),
                 (int) os.options[OPTION_USE_WEATHER].value,
                 ADDR_EEPROM_LOCATION,
                 ADDR_EEPROM_WEATHER_KEY,
-                (int)os.options[OPTION_TIMEZONE].value,
                 (int)os.options[OPTION_FW_VERSION].value);
+  // copy string to tmp_buffer, replacing all spaces with _
+  char *src = (char*)ether.tcpOffset();
+  char *dst = tmp_buffer;
+  char c;
+  do {
+    c = *src++;
+    if (c==' ') {
+      *dst++='%';
+      *dst++='2';
+      *dst++='0';
+    } else {
+      *dst++ = c;
+    }
+  } while(c);
   
-  strcpy(tmp_buffer, (const char*)ether.tcpOffset());
   DEBUG_PRINTLN(tmp_buffer);
+  os.status.wt_received = 0;
   ether.browseUrl(PSTR("/scripts/weather"), tmp_buffer, website, getweather_callback);
 }
 

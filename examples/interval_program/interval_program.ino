@@ -13,7 +13,6 @@
 #include <OpenSprinklerGen2.h>
 #include <SdFat.h>
 #include <Wire.h>
-#include "weather.h"
 #include "program.h"
 
 // NTP sync interval (in seconds)
@@ -148,7 +147,7 @@ void ui_state_machine(time_t curr_time) {
         if(ui_state_runprog > 0) {
           ProgramStruct prog;
           pd.read(ui_state_runprog-1, &prog);
-          os.lcd_print_line_clear_pgm("", 1);
+          os.lcd_print_line_clear_pgm(PSTR(" "), 1);
           os.lcd.setCursor(0, 1);
           os.lcd.print((int)ui_state_runprog);
           os.lcd_print_pgm(PSTR(". "));
@@ -520,9 +519,11 @@ void perform_ntp_sync(time_t curr_time) {
 
 void check_weather(time_t curr_time) {
   // do not check weather if the Use Weather option is disabled, or if network is not available, or if a program is running
-  if (!os.options[OPTION_USE_WEATHER].value || os.status.network_fails>0 || os.status.program_busy) return;
+  if (os.status.network_fails>0 || os.status.program_busy) return;
 
-  if (!os.checkwt_lasttime || ((curr_time - os.checkwt_lasttime) > CHECK_WEATHER_INTERVAL)) {
+  uint16_t inv = 10;
+  if (os.status.wt_received)  inv = CHECK_WEATHER_INTERVAL;
+  if (!os.checkwt_lasttime || ((curr_time - os.checkwt_lasttime) > inv)) {
     os.checkwt_lasttime = curr_time;
     GetWeather();
   }

@@ -163,8 +163,7 @@ typedef enum {
 
 // button timing values
 #define BUTTON_DELAY_MS        1  // short delay (milliseconds)
-#define BUTTON_HOLD_MS       800  // long hold expiration time (milliseconds)
-#define BUTTON_IDLE_TIMEOUT    8  // timeout if no button is pressed within certain number of seconds
+#define BUTTON_HOLD_MS      1200  // long hold expiration time (milliseconds)
 
 // button mode values
 #define BUTTON_WAIT_NONE       0  // do not wait, return value immediately
@@ -172,7 +171,7 @@ typedef enum {
 #define BUTTON_WAIT_HOLD       2  // wait until button hold time expires
 
 // ====== Timing Defines ======
-#define DISPLAY_MSG_MS      3000  // message display time (milliseconds)
+#define DISPLAY_MSG_MS      2000  // message display time (milliseconds)
 
 // ====== Ethernet Defines ======
 #define ETHER_BUFFER_SIZE   900  // if buffer size is increased, you must check the total RAM consumption

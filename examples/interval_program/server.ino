@@ -25,6 +25,7 @@ static uint8_t ntpclientportL = 123; // Default NTP client port
 #define HTML_DATA_FORMATERROR  0x12
 #define HTML_PAGE_NOT_FOUND    0x20
 #define HTML_NOT_PERMITTED     0x30
+#define HTML_REDIRECT_HOME     0xFF
 
 static prog_uchar htmlOkHeader[] PROGMEM = 
     "HTTP/1.0 200 OK\r\n"
@@ -50,7 +51,11 @@ static prog_uchar htmlJSONHeader[] PROGMEM =
 ;
 
 static prog_uchar htmlMobileHeader[] PROGMEM =
-    "<meta name=\"viewport\" content=\"width=640\">\r\n"
+    "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1.0,minimum-scale=1.0,user-scalable=no\">\r\n"
+;
+
+static prog_uchar htmlReturnHome[] PROGMEM = 
+  "<script>window.location=\"/\";</script>\n"
 ;
 
 // check and verify password
@@ -557,7 +562,7 @@ byte server_change_scripturl(char *p)
     tmp_buffer[MAX_SCRIPTURL]=0;  // make sure we don't exceed the maximum size
     os.eeprom_string_set(ADDR_EEPROM_SCRIPTURL, tmp_buffer);
   }
-  return HTML_SUCCESS;
+  return HTML_REDIRECT_HOME;
 }  
     
 
@@ -577,7 +582,7 @@ byte server_change_options(char *p)
   for (byte oid=0; oid<NUM_OPTIONS; oid++) {
     //if ((os.options[oid].flag&OPFLAG_WEB_EDIT)==0) continue;
     // skip binary options that do not appear in the UI
-    if (oid==OPTION_USE_DHCP || oid==OPTION_RESET || oid==OPTION_DEVICE_ENABLE) continue;
+    if (oid==OPTION_RESET || oid==OPTION_DEVICE_ENABLE) continue;
     if (os.options[oid].max==1)  os.options[oid].value = 0;  // set a bool variable to 0 first
     char tbuf2[5] = {'o', 0, 0, 0, 0};
     itoa(oid, tbuf2+1, 10);
@@ -998,12 +1003,23 @@ void analyze_get_url(char *p)
         // check password
         byte ret = HTML_UNAUTHORIZED;
 
-        if (str[0] != 'j')
+        if (str[0] != 'j') {
           DEBUG_PRINTLN(str);
-        // for /jo page we do not check password
-        if (str[0]=='j' and str[1]=='o')  {
+        }
+
+        if (str[0]=='s' && str[1]=='u') { // for /su do not require password
           str+=3;
           ret = (urls[i].handler)(str);
+        } else if (str[0]=='j' && str[1]=='o')  { // for /jo page we output fwv if password fails
+          str+=3;
+          if(check_password(str)==false) {
+            server_json_header();
+            bfill.emit_p(PSTR("\"$F\":$D}"),
+                   os.options[0].json_str, os.options[0].value);
+            ret = HTML_OK;
+          } else {
+            ret = (urls[i].handler)(str);
+          }
         } else {
           // first check password
           str+=3;
@@ -1013,7 +1029,13 @@ void analyze_get_url(char *p)
             ret = (urls[i].handler)(str);
           }
         }
-        if (ret != HTML_OK) {
+        switch(ret) {
+        case HTML_OK:
+          break;
+        case HTML_REDIRECT_HOME:
+          bfill.emit_p(PSTR("$F$F"), htmlOkHeader, htmlReturnHome);
+          break;
+        default:
           bfill.emit_p(PSTR("$F{\"result\":$D}"), htmlJSONHeader, ret);
         }
         break;

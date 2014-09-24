@@ -49,7 +49,7 @@ struct ConStatus {
   byte has_rtc:1;           // HIGH means the controller has a DS1307 RTC
   byte has_sd:1;            // HIGH means a microSD card is detected
   byte seq:1;               // HIGH means the controller is in sequential mode
-  byte dummy:1;             
+  byte wt_received:1;       // HIGH means weather info has been received
   byte display_board:4;     // the board that is being displayed onto the lcd
   byte network_fails:4;     // number of network fails
   byte mas:8;               // master station index
