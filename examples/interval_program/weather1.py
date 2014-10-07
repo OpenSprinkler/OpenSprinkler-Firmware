@@ -1,4 +1,4 @@
-#!/kunden/homepages/32/d389262398/htdocs/bin/python/bin/python
+#!/usr/bin/python
 import urllib, urllib2, cgi
 import json, datetime, time, sys
 import pytz
