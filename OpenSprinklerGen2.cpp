@@ -26,6 +26,8 @@ unsigned long OpenSprinkler::raindelay_start_time;
 unsigned long OpenSprinkler::button_lasttime;
 unsigned long OpenSprinkler::ntpsync_lasttime;
 unsigned long OpenSprinkler::checkwt_lasttime;
+unsigned long OpenSprinkler::network_lasttime;
+unsigned long OpenSprinkler::dhcpnew_lasttime;
 extern char tmp_buffer[];
 
 // Option json names
@@ -166,6 +168,9 @@ char* OpenSprinkler::days_str[7] = {
   str_day6
 };
 
+// ====== Ethernet defines ======
+static byte mymac[] = { 0x00,0x69,0x69,0x2D,0x31,0x00 }; // mac address
+
 // ===============
 // Setup Functions
 // ===============
@@ -174,22 +179,21 @@ char* OpenSprinkler::days_str[7] = {
 void(* resetFunc) (void) = 0;
 
 // Initialize network with the given mac address and http port
-byte OpenSprinkler::start_network(byte mymac[], int http_port) {
-
+byte OpenSprinkler::start_network() {
 
   lcd_print_line_clear_pgm(PSTR("Connecting..."), 1);
 
+  network_lasttime = now();
+  dhcpnew_lasttime = network_lasttime;
+
   mymac[5] = options[OPTION_DEVICE_ID].value;
   if(!ether.begin(ETHER_BUFFER_SIZE, mymac, PIN_ETHER_CS))  return 0;
-  ether.hisport = http_port;    
-  
+  // calculate http port number
+  ether.hisport = (int)(options[OPTION_HTTPPORT_1].value<<8) + (int)options[OPTION_HTTPPORT_0].value;
+
   if (options[OPTION_USE_DHCP].value) {
     // register with domain name "OpenSprinkler-xx" where xx is the last byte of the MAC address
     if (!ether.dhcpSetup()) return 0;
-    // if dnsip is not assigned, force using gateway ip
-    /*if (!ether.dnsip[0]) {
-      EtherCard::copyIp(EtherCard::dnsip, EtherCard::gwip);
-    }*/
   } else {
     byte staticip[] = {
       options[OPTION_STATIC_IP1].value,

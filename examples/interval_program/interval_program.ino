@@ -26,13 +26,9 @@
 // Interval for getting weather data
 #define CHECK_WEATHER_INTERVAL  900     // 15 minutes default
 // LCD backlight autodimming timeout
-#define LCD_DIMMING_TIMEOUT      20     // 20 seconds default
+#define LCD_DIMMING_TIMEOUT      15     // 15 seconds default
 // Ping test time out (in milliseconds)
 #define PING_TIMEOUT            200     // 0.2 second default
-
-// ====== Ethernet defines ======
-static byte mymac[] = { 0x00,0x69,0x69,0x2D,0x31,0x00 }; // mac address
-static int myport;
 
 byte Ethernet::buffer[ETHER_BUFFER_SIZE]; // Ethernet packet buffer
 char tmp_buffer[TMP_BUFFER_SIZE+1];       // scratch buffer
@@ -175,8 +171,6 @@ void setup() {
   os.options_setup();  // Setup options
  
   pd.init();            // ProgramData init
-  // calculate http port number
-  myport = (int)(os.options[OPTION_HTTPPORT_1].value<<8) + (int)os.options[OPTION_HTTPPORT_0].value;
 
   setSyncInterval(RTC_SYNC_INTERVAL);  // RTC sync interval
   // if rtc exists, sets it as time sync source
@@ -201,7 +195,7 @@ void setup() {
     os.status.has_sd = 1;
   }
     
-  if (os.start_network(mymac, myport)) {  // initialize network
+  if (os.start_network()) {  // initialize network
     os.status.network_fails = 0;
   } else  os.status.network_fails = 1;
 
@@ -530,26 +524,27 @@ void check_weather(time_t curr_time) {
 }
 
 void check_network(time_t curr_time) {
-  static unsigned long last_check_time = 0;
-  static unsigned long last_dhcp_time = 0;
+  if (os.status.program_busy) {return;}
 
   // do not perform network checking if the controller has just started, or if a program is running
-  if (last_check_time == 0) { last_check_time = curr_time; last_dhcp_time = curr_time;}
+  //if (os.network_lasttime == 0) { os.network_lasttime = curr_time; os.dhcpnew_lasttime = curr_time;}
+  if (!os.network_lasttime) {
+    os.start_network();
+  }
   
-  if (os.status.program_busy) {return;}
   // check network condition periodically
   // check interval depends on the fail times
   // the more time it fails, the longer the gap between two checks
   unsigned long interval = 1 << (os.status.network_fails);
   interval *= CHECK_NETWORK_INTERVAL;
-  if (curr_time - last_check_time > interval) {
+  if (curr_time - os.network_lasttime > interval) {
     // change LCD icon to indicate it's checking network
     if (!ui_state) {
       os.lcd.setCursor(15, 1);
       os.lcd.write(4);
     }
       
-    last_check_time = curr_time;
+    os.network_lasttime = curr_time;
    
     // ping gateway ip
     ether.clientIcmpRequest(ether.gwip);
@@ -571,11 +566,11 @@ void check_network(time_t curr_time) {
     }
     else os.status.network_fails=0;
     // if failed more than once, reconnect
-    if ((os.status.network_fails>2 || (curr_time - last_dhcp_time > DHCP_RENEW_INTERVAL))
+    if ((os.status.network_fails>2 || (curr_time - os.dhcpnew_lasttime > DHCP_RENEW_INTERVAL))
         &&os.options[OPTION_NETFAIL_RECONNECT].value) {
-      last_dhcp_time = curr_time;
+      os.dhcpnew_lasttime = curr_time;
       //os.lcd_print_line_clear_pgm(PSTR(""),0);
-      if (os.start_network(mymac, myport))
+      if (os.start_network())
         os.status.network_fails=0;
     }
   } 
@@ -802,7 +797,6 @@ void write_log(byte type, unsigned long curr_time) {
   str += "\r\n";
   str.toCharArray(tmp_buffer, TMP_BUFFER_SIZE);
 
-  DEBUG_PRINTLN(tmp_buffer);
   file.write(tmp_buffer);
   file.close();
 }

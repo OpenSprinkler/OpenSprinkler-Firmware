@@ -80,12 +80,14 @@ public:
   static unsigned long button_lasttime;
   static unsigned long ntpsync_lasttime;
   static unsigned long checkwt_lasttime;
+  static unsigned long network_lasttime;
+  static unsigned long dhcpnew_lasttime;
   
   // ====== Member Functions ======
   // -- Setup --
   static void reboot();   // reboot the microcontroller
   static void begin();    // initialization, must call this function before calling other functions
-  static byte start_network(byte mymac[], int http_port);  // initialize network with the given mac and port
+  static byte start_network();  // initialize network with the given mac and port
   //static void self_test(unsigned long ms);  // self-test function
   static void get_station_name(byte sid, char buf[]); // get station name
   static void set_station_name(byte sid, char buf[]); // set station name

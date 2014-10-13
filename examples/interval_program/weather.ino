@@ -53,9 +53,12 @@ void getweather_callback(byte status, word off, word len) {
   if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, "tz")) {
     v = atoi(tmp_buffer);
     if (v>=0 && v<= 96) {
-      os.options[OPTION_TIMEZONE].value = v;
-      os.ntpsync_lasttime = 0;      
-      os.options_save();
+      if (v != os.options[OPTION_TIMEZONE].value) {
+        // if timezone changed, save change and force ntp sync
+        os.options[OPTION_TIMEZONE].value = v;
+        os.ntpsync_lasttime = 0;      
+        os.options_save();
+      }
     }
   }
   os.status.wt_received = 1;

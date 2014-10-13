@@ -253,7 +253,6 @@ byte server_change_runonce(char *p) {
   // reset all stations and prepare to run one-time program
   reset_all_stations_immediate();
   
-  DEBUG_PRINTLN(pv);
   byte sid, bid, s;
   uint16_t dur;
   boolean match_found = false;
@@ -443,7 +442,7 @@ void server_json_controller_main()
     bfill.emit_p(PSTR("[$D,$L,$L],"), pd.scheduled_program_index[sid], rem, pd.scheduled_start_time[sid]);
   }
   
-  bfill.emit_p(PSTR("[0,0]]}"));
+  bfill.emit_p(PSTR("[0,0]],\"lrun\":[$D,$D,$D,$L]}"), pd.lastrun.station, pd.lastrun.program, pd.lastrun.duration, pd.lastrun.endtime);
   
 }
 
@@ -582,37 +581,46 @@ byte server_change_scripturl(char *p)
 // server function to accept option changes
 byte server_change_options(char *p)
 {
-
   // temporarily save some old options values
-  byte old_tz =  os.options[OPTION_TIMEZONE].value;
-  byte old_ntp = os.options[OPTION_USE_NTP].value;
-  byte old_uwt = os.options[OPTION_USE_WEATHER].value;
+	bool time_change = false;
+	bool weather_change = false;
+	bool network_change = false;
+  
   // !!! p and bfill share the same buffer, so don't write
   // to bfill before you are done analyzing the buffer !!!
   
   // process option values
   byte err = 0;
+  byte prev_value;
   for (byte oid=0; oid<NUM_OPTIONS; oid++) {
     //if ((os.options[oid].flag&OPFLAG_WEB_EDIT)==0) continue;
     // skip binary options that do not appear in the UI
     if (oid==OPTION_RESET || oid==OPTION_DEVICE_ENABLE) continue;
+    prev_value = os.options[oid].value;
     if (os.options[oid].max==1)  os.options[oid].value = 0;  // set a bool variable to 0 first
     char tbuf2[5] = {'o', 0, 0, 0, 0};
     itoa(oid, tbuf2+1, 10);
     if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, tbuf2)) {
       if (os.options[oid].max==1) {
         os.options[oid].value = 1;  // if the bool variable is detected, set to 1
-        continue;
-      }
-      int32_t v = atol(tmp_buffer);
-      if (oid==OPTION_MASTER_OFF_ADJ) {v+=60;} // master off time
-      if (oid==OPTION_RELAY_PULSE) {v/=10;} // relay pulse time
-      if (oid==OPTION_STATION_DELAY_TIME) {v=water_time_encode((uint16_t)v);} // encode station delay time
-      if (v>=0 && v<=os.options[oid].max) {
-        os.options[oid].value = v;
       } else {
-        err = 1;
-      }
+		    int32_t v = atol(tmp_buffer);
+		    if (oid==OPTION_MASTER_OFF_ADJ) {v+=60;} // master off time
+		    if (oid==OPTION_RELAY_PULSE) {v/=10;} // relay pulse time
+		    if (oid==OPTION_STATION_DELAY_TIME) {v=water_time_encode((uint16_t)v);} // encode station delay time
+		    if (v>=0 && v<=os.options[oid].max) {
+		      os.options[oid].value = v;
+		    } else {
+		      err = 1;
+		    }
+		  }
+    }
+    if (os.options[oid].value != prev_value) {	// if value has changed
+    	if (oid==OPTION_TIMEZONE || oid==OPTION_USE_NTP)    time_change = true;
+    	if (oid>=OPTION_NTP_IP1 && oid<=OPTION_NTP_IP4)     time_change = true;
+    	if (oid>=OPTION_USE_DHCP && oid<=OPTION_HTTPPORT_1) network_change = true;
+    	if (oid==OPTION_DEVICE_ID)  network_change = true;
+    	if (oid==OPTION_USE_WEATHER)       weather_change = true;
     }
   }
   
@@ -621,7 +629,7 @@ byte server_change_options(char *p)
     tmp_buffer[MAX_LOCATION]=0;   // make sure we don't exceed the maximum size
     if (strcmp_to_eeprom(tmp_buffer, ADDR_EEPROM_LOCATION)) { // if location has changed
       os.eeprom_string_set(ADDR_EEPROM_LOCATION, tmp_buffer);
-      os.checkwt_lasttime = 0;    // immediate update weather
+      weather_change = true;
     }
   }
   uint8_t keyfound = 0;
@@ -630,7 +638,8 @@ byte server_change_options(char *p)
     tmp_buffer[MAX_WEATHER_KEY]=0;
     if (strcmp_to_eeprom(tmp_buffer, ADDR_EEPROM_WEATHER_KEY)) {  // if weather key has changed
       os.eeprom_string_set(ADDR_EEPROM_WEATHER_KEY, tmp_buffer);
-      os.checkwt_lasttime = 0;  // immediately update weather
+      //os.checkwt_lasttime = 0;  // immediately update weather
+      weather_change = true;
     }
   } else if (keyfound) {
     tmp_buffer[0]=0;
@@ -652,14 +661,16 @@ byte server_change_options(char *p)
 
   os.options_save();
   
-  if(os.options[OPTION_TIMEZONE].value != old_tz ||
-     (!old_ntp && os.options[OPTION_USE_NTP].value)) {
+  if(time_change) {
     os.ntpsync_lasttime = 0;
-    os.checkwt_lasttime = 0;
   }
   
-  if(os.options[OPTION_USE_WEATHER].value) {
+  if(weather_change) {
     os.checkwt_lasttime = 0;  // force weather update
+  }
+  
+  if(network_change) {
+  	os.network_lasttime = 0;	// force restart network
   }
   return HTML_SUCCESS;
 }
@@ -1015,10 +1026,6 @@ void analyze_get_url(char *p)
   
         // check password
         byte ret = HTML_UNAUTHORIZED;
-
-        if (str[0] != 'j') {
-          DEBUG_PRINTLN(str);
-        }
 
         if (str[0]=='s' && str[1]=='u') { // for /su do not require password
           str+=3;
