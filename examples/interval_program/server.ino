@@ -554,12 +554,25 @@ byte server_change_values(char *p)
   return HTML_SUCCESS;
 }
 
+void string_remove_space(char *src) {
+	char *dst = src;
+	while(1) {
+		if (*src != ' ') {
+			*dst++ = *src;
+		}
+		if (*src == 0) break;
+		src++;
+	}
+}
+
 // server function to accept script url changes
 byte server_change_scripturl(char *p)
 {
   if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, "jsp")) {
     ether.urlDecode(tmp_buffer);
     tmp_buffer[MAX_SCRIPTURL]=0;  // make sure we don't exceed the maximum size
+    // trim unwanted space characters
+    string_remove_space(tmp_buffer);
     os.eeprom_string_set(ADDR_EEPROM_SCRIPTURL, tmp_buffer);
   }
   return HTML_REDIRECT_HOME;
