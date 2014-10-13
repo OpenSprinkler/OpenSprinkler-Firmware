@@ -62,8 +62,8 @@
 #define DEFAULT_LOCATION        "Boston,MA"
 #define DEFAULT_WEATHER_KEY     ""
 #define DEFAULT_JAVASCRIPT_URL  "http://ui.opensprinkler.com/js"
-#define WEATHER_SCRIPT_HOST     "www.rayshobby.net"
-//#define WEATHER_SCRIPT_HOST     "weather.opensprinkler.com"
+//#define WEATHER_SCRIPT_HOST     "www.rayshobby.net"
+#define WEATHER_SCRIPT_HOST     "weather.opensprinkler.com"
 
 // macro define of each option
 // See OpenSprinkler.cpp for details on each option

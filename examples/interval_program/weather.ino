@@ -90,7 +90,7 @@ void GetWeather() {
   
   DEBUG_PRINTLN(tmp_buffer);
   os.status.wt_received = 0;
-  ether.browseUrl(PSTR("/scripts/weather"), tmp_buffer, website, getweather_callback);
+  ether.browseUrl(PSTR("/weather"), tmp_buffer, website, getweather_callback);
 }
 
 
