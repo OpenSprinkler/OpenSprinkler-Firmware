@@ -324,7 +324,7 @@ byte server_moveup_program(char *p) {
     return HTML_DATA_MISSING;  
   }
   int pid=atoi(tmp_buffer);
-  if (!(pid>=-1 && pid< pd.nprograms)) return HTML_DATA_OUTOFBOUND;
+  if (!(pid>=1 && pid< pd.nprograms)) return HTML_DATA_OUTOFBOUND;
   
   pd.moveup(pid);
   
@@ -846,8 +846,8 @@ byte server_station_bits(char *p) {
   HTTP GET command format:
   /jl?start=xxxxx&end=xxxxx
   
-  start: start day (epoch time / 86400)
-  end:   end day (epoch time / 874000
+  start: start day (epoch time)
+  end:   end day (epoch time)
   start and end time are inclusive
   =============================================*/  
 byte server_json_log(char *p) {

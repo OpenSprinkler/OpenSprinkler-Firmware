@@ -70,30 +70,38 @@ void GetWeather() {
     ether.dnsLookup(website);
   }
 
-  bfill=ether.tcpOffset();
-  bfill.emit_p(PSTR("$D.py?loc=$E&key=$E&fwv=$D"),
+  //bfill=ether.tcpOffset();
+  BufferFiller bf = (uint8_t*)tmp_buffer;
+  bf.emit_p(PSTR("$D.py?loc=$E&key=$E&fwv=$D"),
                 (int) os.options[OPTION_USE_WEATHER].value,
                 ADDR_EEPROM_LOCATION,
                 ADDR_EEPROM_WEATHER_KEY,
                 (int)os.options[OPTION_FW_VERSION].value);
   // copy string to tmp_buffer, replacing all spaces with _
-  char *src = (char*)ether.tcpOffset();
-  char *dst = tmp_buffer;
-  char c;
-  do {
-    c = *src++;
-    if (c==' ') {
-      *dst++='%';
-      *dst++='2';
-      *dst++='0';
-    } else {
-      *dst++ = c;
-    }
-  } while(c);
+  char *src=tmp_buffer+strlen(tmp_buffer);
+  char *dst=tmp_buffer+TMP_BUFFER_SIZE-1;
   
-  DEBUG_PRINTLN(tmp_buffer);
+  char c;
+  // url encode. convert SPACE to %20
+  // copy reversely from the end because we are potentially expanding
+  // the string size 
+  DEBUG_PRINTLN((int)(*src));
+  DEBUG_PRINTLN((int)(*dst));
+  while(src!=tmp_buffer) {
+    c = *src--;
+    if(c==' ') {
+      *dst-- = '0';
+      *dst-- = '2';
+      *dst-- = '%';
+    } else {
+      *dst-- = c;
+    }
+  };
+  *dst = *src;
+  
+  DEBUG_PRINTLN(dst);
   os.status.wt_received = 0;
-  ether.browseUrl(PSTR("/weather"), tmp_buffer, website, getweather_callback);
+  ether.browseUrl(PSTR("/weather"), dst, website, getweather_callback);
 }
 
 
