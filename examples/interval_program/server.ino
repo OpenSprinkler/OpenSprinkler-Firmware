@@ -16,6 +16,7 @@ extern SdFat sd;
 
 static uint8_t ntpclientportL = 123; // Default NTP client port
 
+// Define return error code
 #define HTML_OK                0x00
 #define HTML_SUCCESS           0x01
 #define HTML_UNAUTHORIZED      0x02
@@ -58,7 +59,9 @@ static prog_uchar htmlReturnHome[] PROGMEM =
   "<script>window.location=\"/\";</script>\n"
 ;
 
-// check and verify password
+/**
+  Check and verify password
+*/
 boolean check_password(char *p)
 {
   if (os.options[OPTION_IGNORE_PASSWORD].value)  return true;
@@ -97,7 +100,9 @@ void server_json_stations_main()
   bfill.emit_p(PSTR("],\"maxlen\":$D}"), STATION_NAME_SIZE);
 }
 
-// printing station names in json
+/**
+  Output station names and attributes
+*/
 byte server_json_stations(char *p)
 {
   server_json_header();
@@ -109,7 +114,6 @@ void server_change_stations_attrib(char *p, char header, byte *attrib)
 {
   char tbuf2[3] = {0, 0, 0};
   byte bid;
-  // process station master operation bits
   tbuf2[0]=header;
   for(bid=0;bid<os.nboards;bid++) {
     itoa(bid, tbuf2+1, 10);
@@ -119,7 +123,17 @@ void server_change_stations_attrib(char *p, char header, byte *attrib)
   }
 }
 
-// server function for accepting station name changes
+/**
+  Change Station Name and Attributes
+  Command: /cs?pw=xxx&s?=x&m?=x&i?=x&a?=x&d?=x
+  
+  pw: password
+  s?: station name (? is station index, starting from 0)
+  m?: master operation bit field (? is board index, starting from 0)
+  i?: ignore rain bit field
+  a?: activate relay bit field
+  d?: disable sation bit field
+*/
 byte server_change_stations(char *p)
 {
   byte sid;
@@ -148,15 +162,15 @@ byte server_change_stations(char *p)
   return HTML_SUCCESS;
 }
 
-
-// print page to set javascript url
+/**
+  Output script url form
+*/
 byte server_view_scripturl(char *p) {
   bfill.emit_p(PSTR("$F"), htmlOkHeader);
-  bfill.emit_p(PSTR("<hr /><form name=of action=cu method=get><p><b>Script URL:</b> <input type=text size=32 maxlength=127 value=\"$E\" name=jsp></p><p>Factory default url is $S<br />If local on uSD card, use ./</p><p><b>Password:</b><input type=password size=20 name=pw><input type=submit></p><hr /></form>"), ADDR_EEPROM_SCRIPTURL, DEFAULT_JAVASCRIPT_URL);  
+  bfill.emit_p(PSTR("<hr /><form name=of action=cu method=get><p><b>Script URL:</b><input type=text size=32 maxlength=127 value=\"$E\" name=jsp></p><p>Default is $S<br />If local on uSD card, use ./</p><p><b>Password:</b><input type=password size=32 name=pw><input type=submit></p><hr /></form>"), ADDR_EEPROM_SCRIPTURL, DEFAULT_JAVASCRIPT_URL);  
   return HTML_OK;
 }
 
-// print program data in json
 void server_json_programs_main() {
   bfill.emit_p(PSTR("\"nprogs\":$D,\"nboards\":$D,\"mnp\":$D,\"mnst\":$D,\"pnsize\":$D,\"pd\":["),
                pd.nprograms, os.nboards, MAX_NUMBER_PROGRAMS, MAX_NUM_STARTTIMES, PROGRAM_NAME_SIZE);
@@ -175,7 +189,7 @@ void server_json_programs_main() {
       bfill.emit_p(PSTR("$D,"), prog.starttimes[i]);
     }
     bfill.emit_p(PSTR("$D],["), prog.starttimes[i]);  // this is the last element
-    // durations
+    // station water time
     for (i=0; i<os.nstations-1; i++) {
       bfill.emit_p(PSTR("$L,"),(unsigned long)water_time_decode(prog.durations[i]));
     }
@@ -196,6 +210,9 @@ void server_json_programs_main() {
   bfill.emit_p(PSTR("]}"));   
 }
 
+/**
+  Output program data
+*/
 byte server_json_programs(char *p) 
 {
   server_json_header();
@@ -203,40 +220,13 @@ byte server_json_programs(char *p)
   return HTML_OK;
 }
 
-
-// Manually start a program
-// If pid == 0, this is a test program (1 minute per station)
-// If pid == 255, this is a short test program (2 second per station)
-// If pid > 0. run program pid-1
-void manual_start_program(byte pid) {
-  boolean match_found = false;
-  reset_all_stations_immediate();
-  ProgramStruct prog;
-  uint16_t dur;
-  byte sid, bid, s;
-  if ((pid>0)&&(pid<255)) {
-    pd.read(pid-1, &prog);
-  }
-  for(sid=0;sid<os.nstations;sid++) {
-    bid=sid>>3;
-    s=sid&0x07;
-    dur = 60;
-    if(pid==255)  dur=2;
-    else if(pid>0)
-      dur = water_time_decode(prog.durations[sid]);
-    if (dur>0 && !(os.stndis_bits[bid]&(1<<s))) {
-      pd.scheduled_stop_time[sid] = dur;
-      pd.scheduled_program_index[sid] = 254;      
-      match_found = true;
-    }
-  }
-  if(match_found) {
-    schedule_all_stations(now(), os.status.seq);
-  }  
-}
-
-
-// server function to accept run-once program
+/**
+  Change run-once program
+  Command: /cr?pw=xxx&t=[x,x,x...]
+  
+  pw: password
+  t:  station water time
+*/
 byte server_change_runonce(char *p) {
   // search for the start of v=[
   char *pv;
@@ -276,15 +266,14 @@ byte server_change_runonce(char *p) {
   return HTML_DATA_MISSING;
 }
 
-/*=============================================
-  Delete Program
-  
-  HTTP GET command format:
-  /dp?pw=xxx&pid=xxx
-  
+
+/**
+  Delete a program
+  Command: /dp?pw=xxx&pid=xxx
+
   pw: password
   pid:program index (-1 will delete all programs)
-  =============================================*/
+*/
 byte server_delete_program(char *p) {
   if (!ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, "pid"))
     return HTML_DATA_MISSING;
@@ -301,7 +290,9 @@ byte server_delete_program(char *p) {
   return HTML_SUCCESS;
 }
 
-// parse one number from a comma separate list
+/**
+  Parse one number from a comma separate list
+*/
 uint16_t parse_listdata(char **p) {
   char* pv;
   int i=0;
@@ -318,7 +309,13 @@ uint16_t parse_listdata(char **p) {
   return (uint16_t)atol(tmp_buffer);
 }
 
-// server function to move up program
+/**
+  Move up a program
+  Command: /up?pw=xxx&pid=xxx
+  
+  pw: password
+  pid:program index
+*/
 byte server_moveup_program(char *p) {
   if (!ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, "pid")) {
     return HTML_DATA_MISSING;  
@@ -331,7 +328,17 @@ byte server_moveup_program(char *p) {
   return HTML_SUCCESS;  
 }
 
-// server function to accept program changes
+/**
+  Change a program
+  Command: /cp?pw=xxx&pid=x&v=[flag,days0,days1,[start0,start1,start2,start3],[dur0,dur1,dur2..]]&name=x
+  
+  pw:    password
+  pid:   program index
+  flag:  program flag
+  start?:up to 4 start times
+  dur?:  station water time
+  name:  program name
+*/
 byte server_change_program(char *p) {
 
   // parse program index
@@ -412,7 +419,6 @@ byte server_json_controller(char *p)
   return HTML_OK;
 }
 
-// print controller variables in json
 void server_json_controller_main()
 {
   byte bid, sid;
@@ -446,7 +452,9 @@ void server_json_controller_main()
   
 }
 
-// print home page
+/**
+  Output homepage
+*/
 byte server_home(char *p)
 {
   byte bid, sid;
@@ -467,7 +475,6 @@ void server_json_header()
   bfill.emit_p(PSTR("$F{"), htmlJSONHeader);
 }
 
-// print options in json (main)
 void server_json_options_main() {
   byte oid;
   for(oid=0;oid<NUM_OPTIONS;oid++) {
@@ -489,7 +496,10 @@ void server_json_options_main() {
   bfill.emit_p(PSTR(",\"dexp\":$D,\"mexp\":$D}"), (int)os.detect_exp(), MAX_EXT_BOARDS);
 }
 
-// printing options in json
+
+/**
+  Output options
+*/
 byte server_json_options(char *p)
 {
   server_json_header();
@@ -497,25 +507,23 @@ byte server_json_options(char *p)
   return HTML_OK;
 }
 
-/*=============================================
-  Change Controller Values
-  
-  HTTP GET command format:
-  /cv?pw=xxx&rsn=x&rbt=x&en=x&rd=x
+/**
+  Change controller variables
+  Command: /cv?pw=xxx&rsn=x&rbt=x&en=x&rd=x
   
   pw:  password
   rsn: reset all stations (0 or 1)
   rbt: reboot controller (0 or 1)
   en:  enable (0 or 1)
   rd:  rain delay hours (0 turns off rain delay)
-  =============================================*/
+*/
 byte server_change_values(char *p)
 {
   if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, "rsn")) {
     reset_all_stations();
   }
+  
 #define TIME_REBOOT_DELAY  20
-
   if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, "rbt") && atoi(tmp_buffer) > 0) {
     //bfill.emit_p(PSTR("$F<meta http-equiv=\"refresh\" content=\"$D; url=/\">"), htmlOkHeader, TIME_REBOOT_DELAY);
     bfill.emit_p(PSTR("$FRebooting..."), htmlOkHeader);
@@ -528,18 +536,6 @@ byte server_change_values(char *p)
     else if (tmp_buffer[0]=='0' &&  os.status.enabled)  os.disable();
   }   
   
-  /*if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, "mm")) {
-    if (tmp_buffer[0]=='1' && !os.status.manual_mode) {
-      reset_all_stations();
-      os.status.manual_mode = 1;
-      //os.constatus_save();
-      
-    } else if (tmp_buffer[0]=='0' &&  os.status.manual_mode) {
-      reset_all_stations();
-      os.status.manual_mode = 0;
-      //os.constatus_save();
-    }
-  }*/
   if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, "rd")) {
     int rd = atoi(tmp_buffer);
     if (rd>0) {
@@ -553,6 +549,7 @@ byte server_change_values(char *p)
   return HTML_SUCCESS;
 }
 
+// remove spaces from a string
 void string_remove_space(char *src) {
 	char *dst = src;
 	while(1) {
@@ -564,7 +561,13 @@ void string_remove_space(char *src) {
 	}
 }
 
-// server function to accept script url changes
+/**
+  Change script url
+  Command: /cu?pw=xxx&jsp=x
+  
+  pw:  password
+  jsp: Javascript path
+*/
 byte server_change_scripturl(char *p)
 {
   if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, "jsp")) {
@@ -576,9 +579,17 @@ byte server_change_scripturl(char *p)
   }
   return HTML_REDIRECT_HOME;
 }  
-    
 
-// server function to accept option changes
+/**
+  Change options
+  Command: /co?pw=xxx&o?=x&loc=x&wtkey=x&ttt=x
+  
+  pw:  password
+  o?:  option name (? is option index)
+  loc: location
+  wtkey: weather underground api key
+  ttt: manual time (applicable only if ntp=0)
+*/
 byte server_change_options(char *p)
 {
   // temporarily save some old options values
@@ -588,7 +599,6 @@ byte server_change_options(char *p)
   
   // !!! p and bfill share the same buffer, so don't write
   // to bfill before you are done analyzing the buffer !!!
-  
   // process option values
   byte err = 0;
   byte prev_value;
@@ -648,9 +658,8 @@ byte server_change_options(char *p)
   // if not using NTP and manually setting time
   if (!os.options[OPTION_USE_NTP].value && ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, "ttt")) {
     unsigned long t;
-    //ether.urlDecode(tmp_buffer);
     t = atol(tmp_buffer);
-    // before chaging time, reset all stations
+    // before chaging time, reset all stations to avoid messing up with timing
     reset_all_stations_immediate();
     setTime(t);  
     if (os.status.has_rtc) RTC.set(t); // if rtc exists, update rtc
@@ -675,7 +684,14 @@ byte server_change_options(char *p)
   return HTML_SUCCESS;
 }
 
-// server function to change password
+/**
+  Change password
+  Command: /sp?pw=xxx&npw=x&cpw=x
+  
+  pw:  password
+  npw: new password
+  cpw: confirm new password
+*/
 byte server_change_password(char *p)
 {
   if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, "npw")) {
@@ -705,6 +721,9 @@ void server_json_status_main()
   bfill.emit_p(PSTR("],\"nstations\":$D}"), os.nstations);  
 }
 
+/**
+  Output station status
+*/
 byte server_json_status(char *p)
 {
   server_json_header();
@@ -712,8 +731,15 @@ byte server_json_status(char *p)
   return HTML_OK;
 }
 
-// Test station (i.e. previously manual operation)
-// /cm?sid=1&en=1&t=3600
+/**
+  Test station (previously manual operation)
+  Command: /cm?pw=xxx&sid=x&en=x&t=x
+  
+  pw: password
+  sid:station name (starting from 0)
+  en: enable (0 or 1)
+  t:  timer (required if en=1)
+*/
 byte server_change_manual(char *p) {
   int sid=-1;
   if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, "sid")) {
@@ -766,90 +792,13 @@ byte server_change_manual(char *p) {
   return HTML_SUCCESS;
 }
 
-/*=================================================
-  Get/Set Station Bits:
+/**
+  Get log data
+  Command: /jl?start=x&end=x
   
-  HTTP GET command format:
-  /snx     -> get station bit (e.g. /sn1, /sn2 etc.)
-  /sn0     -> get all bits
-  
-  The following will only work if controller is
-  switched to manual mode:
-  
-  /snx=0   -> turn off station 
-  /snx=1   -> turn on station
-  /snx=1&t=xx -> turn on with timer (in seconds)
-  =================================================*/
-/*
-byte server_station_bits(char *p) {
-
-  p+=2;
-  int sid;
-  byte i, sidmin, sidmax;  
-
-  // parse station name
-  i=0;
-  while((*p)>='0'&&(*p)<='9'&&i<4) {
-    tmp_buffer[i++] = (*p++);
-  }
-  tmp_buffer[i]=0;
-  sid = atoi(tmp_buffer);
-  if (!(sid>=0&&sid<=os.nstations)) return HTML_DATA_OUTOFBOUND;
-  
-  // parse get/set command
-  if ((*p)=='=') {
-    if (sid==0) return HTML_DATA_FORMATERROR;
-    sid--;
-    // this is a set command
-    // can only do it when in manual mode
-    if (!os.status.manual_mode) {
-      //bfill.emit_p(PSTR("$F<script>alert(\"Station bits can only be set in manual mode.\")</script>\n"), htmlOkHeader);
-      return HTML_NOT_PERMITTED;
-    }
-    // parse value
-    p++;
-    if ((*p)=='0') {
-      manual_station_off(sid);
-    } else if ((*p)=='1') {
-      int ontimer = 0;
-      if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, "t")) {
-        ontimer = atoi(tmp_buffer);
-        if (!(ontimer>=0))  return HTML_DATA_OUTOFBOUND;
-      }
-      manual_station_on((byte)sid, ontimer);
-    } else {
-      return HTML_DATA_OUTOFBOUND;
-    }
-    return HTML_SUCCESS;
-  } else {
-    // this is a get command
-    bfill.emit_p(PSTR("$F"), htmlOkHeader);
-    if (sid==0) { // print all station bits
-      sidmin=0;sidmax=(os.nstations);
-    } else {  // print one station bit
-      sidmin=(sid-1);
-      sidmax=sid;
-    }
-    for (sid=sidmin;sid<sidmax;sid++) {
-      bfill.emit_p(PSTR("$D"), (os.station_bits[(sid>>3)]>>(sid%8))&1);
-    }
-    return HTML_OK;      
-  }
-
-  return HTML_UNAUTHORIZED;
-}
-*/
-
-/*=============================================
-  Print log data in json
-  
-  HTTP GET command format:
-  /jl?start=xxxxx&end=xxxxx
-  
-  start: start day (epoch time)
-  end:   end day (epoch time)
-  start and end time are inclusive
-  =============================================*/  
+  start: start time (epoch time)
+  end:   end time (epoch time)
+*/  
 byte server_json_log(char *p) {
 
   // if no sd card, return false
@@ -908,17 +857,15 @@ byte server_json_log(char *p) {
   return HTML_OK; 
 }
 
-/*=============================================
-  Delete Log
-  
-  HTTP GET command format:
-  /dl?pw=xxx&day=xxx
-  or
-  /dl?pw=xxx&day=all
-  
+/**
+  Delete log
+  Command: /dl?pw=xxx&day=xxx
+           /dl?pw=xxx&day=all
+ 
   pw: password
-  day:day (epoch time / 86400) to delete log for
-  =============================================*/
+  day:day (epoch time / 86400)
+  if day=all: delete all log files)
+*/
 byte server_delete_log(char *p) {
 
   if (!ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, "day"))
@@ -949,7 +896,6 @@ prog_char _url_co [] PROGMEM = "co";
 prog_char _url_jo [] PROGMEM = "jo";
 prog_char _url_sp [] PROGMEM = "sp";
 
-//prog_char _url_sn [] PROGMEM = "sn";
 prog_char _url_js [] PROGMEM = "js";
 prog_char _url_cm [] PROGMEM = "cm";
 
@@ -979,7 +925,6 @@ URLStruct urls[] = {
   {_url_jo,server_json_options},
   {_url_sp,server_change_password},
 
-  //{_url_sn,server_station_bits},
   {_url_js,server_json_status},  
   {_url_cm,server_change_manual},
   
@@ -1004,7 +949,6 @@ void analyze_get_url(char *p)
   char *str = p+5;
 
   if(str[0]==' ') {
-    //ether.urlDecode(str);
     server_home(str);  // home page handler
     ether.httpServerReply_with_flags(bfill.position(), TCP_FLAGS_ACK_V|TCP_FLAGS_FIN_V);
   } else {
@@ -1106,11 +1050,7 @@ byte streamfile (char* name) { //send a file to the buffer
   return 1;
 }
 
-// =============
-// NTP Functions
-// =============
-
-
+// NTP sync
 unsigned long getNtpTime()
 {
   byte ntpip[4] = {

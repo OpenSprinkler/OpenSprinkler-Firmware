@@ -2,13 +2,13 @@
 
 /* Program Data Structures and Functions
    Creative Commons Attribution-ShareAlike 3.0 license
-   Apr 2013 @ Rayshobby.net
+   Sep 2014 @ Rayshobby.net
 */
 
 #include <limits.h>
 #include "program.h"
 
-// Declaure static data members
+// Declare static data members
 byte ProgramData::nprograms = 0;
 unsigned long ProgramData::scheduled_start_time[(MAX_EXT_BOARDS+1)*8];
 unsigned long ProgramData::scheduled_stop_time[(MAX_EXT_BOARDS+1)*8];

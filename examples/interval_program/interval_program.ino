@@ -15,20 +15,13 @@
 #include <Wire.h>
 #include "program.h"
 
-// NTP sync interval (in seconds)
-#define NTP_SYNC_INTERVAL       86400L  // 24 hours default
-// RC sync interval (in seconds)
-#define RTC_SYNC_INTERVAL       60      // 60 seconds default
-// Interval for checking network connection (in seconds)
-#define CHECK_NETWORK_INTERVAL  30      // 30 seconds default
-// Interval for renewing DHCP
-#define DHCP_RENEW_INTERVAL     43200L  // 12 hours default
-// Interval for getting weather data
-#define CHECK_WEATHER_INTERVAL  900     // 15 minutes default
-// LCD backlight autodimming timeout
-#define LCD_DIMMING_TIMEOUT      15     // 15 seconds default
-// Ping test time out (in milliseconds)
-#define PING_TIMEOUT            200     // 0.2 second default
+#define NTP_SYNC_INTERVAL       86400L  // NYP sync interval, 24 hrs
+#define RTC_SYNC_INTERVAL       60      // RTC sync interval, 60 secs
+#define CHECK_NETWORK_INTERVAL  30      // Network checking interval, 30 secs
+#define DHCP_RENEW_INTERVAL     43200L  // DHCP renewal interval: 12 hrs
+#define CHECK_WEATHER_INTERVAL  900     // Weather check interval: 15 mins
+#define LCD_DIMMING_TIMEOUT      15     // LCD dimming timeout: 15 secs
+#define PING_TIMEOUT            200     // Ping test timeout: 200 ms
 
 byte Ethernet::buffer[ETHER_BUFFER_SIZE]; // Ethernet packet buffer
 char tmp_buffer[TMP_BUFFER_SIZE+1];       // scratch buffer
@@ -42,31 +35,6 @@ SdFat sd;         // SD card object
 // ====== UI defines ======
 static char ui_anim_chars[3] = {'.', 'o', 'O'};
   
-// poll button press
-/*
-byte button_poll() {
-
-  // read button, if something is pressed, wait till release
-  byte button = os.button_read(BUTTON_WAIT_HOLD);
-
-  //if (!(button & BUTTON_FLAG_DOWN)) return;  // repond only to button down events
-
-  os.button_lasttime = now();
-  // button is pressed, turn on LCD right away
-  analogWrite(PIN_LCD_BACKLIGHT, 255-os.options[OPTION_LCD_BACKLIGHT].value); 
-        if (button & BUTTON_FLAG_HOLD) {
-        // hold button 3 -> reboot
-        os.button_read(BUTTON_WAIT_RELEASE);
-        os.reboot();
-      } 
-      else {
-
-  return button;*/
- /*
-  switch (button & BUTTON_MASK) {
-
- */
-
 #define UI_STATE_DEFAULT   0
 #define UI_STATE_DISP_IP   1
 #define UI_STATE_DISP_GW   2
@@ -247,8 +215,6 @@ void loop()
   wdt_reset();  // reset watchdog timer
   wdt_timeout = 0;
    
-  //button_poll();    // process button press
-
   time_t curr_time = now();
   ui_state_machine(curr_time);
 
@@ -470,29 +436,6 @@ void loop()
     check_weather(curr_time);
   }
 }
-
-/*
-void manual_station_off(byte sid) {
-  unsigned long curr_time = now();
-
-  // set station stop time (now)
-  pd.scheduled_stop_time[sid] = curr_time;  
-}
-
-void manual_station_on(byte sid, int ontimer) {
-  unsigned long curr_time = now();
-  // set station start time (now)
-  pd.scheduled_start_time[sid] = curr_time + 1;
-  if (ontimer == 0) {
-    pd.scheduled_stop_time[sid] = ULONG_MAX-1;
-  } else { 
-    pd.scheduled_stop_time[sid] = pd.scheduled_start_time[sid] + ontimer;
-  }
-  // set program index
-  pd.scheduled_program_index[sid] = 99;
-  os.status.program_busy = 1;
-}
-*/
 
 void perform_ntp_sync(time_t curr_time) {
   // do not perform sync if this option is disabled, or if network is not available, or if a program is running
@@ -718,6 +661,38 @@ void reset_all_stations() {
       pd.scheduled_stop_time[sid] = curr_time;  
     }
   }
+}
+
+
+// Manually start a program
+// If pid==0, this is a test program (1 minute per station)
+// If pid==255, this is a short test program (2 second per station)
+// If pid > 0. run program pid-1
+void manual_start_program(byte pid) {
+  boolean match_found = false;
+  reset_all_stations_immediate();
+  ProgramStruct prog;
+  uint16_t dur;
+  byte sid, bid, s;
+  if ((pid>0)&&(pid<255)) {
+    pd.read(pid-1, &prog);
+  }
+  for(sid=0;sid<os.nstations;sid++) {
+    bid=sid>>3;
+    s=sid&0x07;
+    dur = 60;
+    if(pid==255)  dur=2;
+    else if(pid>0)
+      dur = water_time_decode(prog.durations[sid]);
+    if (dur>0 && !(os.stndis_bits[bid]&(1<<s))) {
+      pd.scheduled_stop_time[sid] = dur;
+      pd.scheduled_program_index[sid] = 254;      
+      match_found = true;
+    }
+  }
+  if(match_found) {
+    schedule_all_stations(now(), os.status.seq);
+  }  
 }
 
 // ================================

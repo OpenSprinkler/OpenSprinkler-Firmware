@@ -55,7 +55,8 @@ def main():
   sp = loc.split('-', 1)
   if len(sp)==2 and isInt(sp[0]) and len(sp[0])==5 and isInt(sp[1]) and len(sp[1])==4:
     loc=sp[0]
-    
+
+  tzone = None  
   # if loc is pws, query wunderground geolookup to get GPS coordinates
   if loc.startswith('pws:'):
     try:

@@ -2,7 +2,7 @@
 
 /* Program Data Structures and Functions
    Creative Commons Attribution-ShareAlike 3.0 license
-   Apr 2013 @ Rayshobby.net
+   Sep 2014 @ Rayshobby.net
 */
 
 #ifndef PROGRAM_STRUCT_H
