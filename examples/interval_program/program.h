@@ -95,7 +95,7 @@ public:
   static byte scheduled_program_index[]; // scheduled program index
   static byte  nprograms;     // number of programs
   static LogStruct lastrun;
-  static unsigned long last_stop_time;
+  static unsigned long last_seq_stop_time;  // the last stop time of a sequential station
   
   static void init();
   static void reset_runtime();

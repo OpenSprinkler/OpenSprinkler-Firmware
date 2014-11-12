@@ -48,8 +48,8 @@ struct ConStatus {
   byte program_busy:1;      // HIGH means a program is being executed currently
   byte has_rtc:1;           // HIGH means the controller has a DS1307 RTC
   byte has_sd:1;            // HIGH means a microSD card is detected
-  byte seq:1;               // HIGH means the controller is in sequential mode
   byte wt_received:1;       // HIGH means weather info has been received
+  byte seq:1;             // dummy bit
   byte display_board:4;     // the board that is being displayed onto the lcd
   byte network_fails:4;     // number of network fails
   byte mas:8;               // master station index
@@ -66,15 +66,17 @@ public:
   static byte nboards, nstations;
   
   static OptionStruct options[];  // option values, max, name, and flag
-    
-  static char* days_str[];		// 3-letter name of each weekday
+
   static byte station_bits[]; // station activation bits. each byte corresponds to a board (8 stations)
                               // first byte-> master controller, second byte-> ext. board 1, and so on
   /* station attributes */
   static byte masop_bits[];   // station master operation bits. each byte corresponds to a board (8 stations)
   static byte ignrain_bits[]; // ignore rain bits. each byte corresponds to a board (8 stations)
   static byte actrelay_bits[];// activate relay bits. each byte corresponds to a board (8 stations)
-  static byte stndis_bits[];  // station disable bits. each byte 
+  static byte stndis_bits[];  // station disable bits. each byte corresponds to a board (8 stations)
+  static byte rfstn_bits[];   // RF station flags. each byte corresponds to a board (8 stations)
+  static byte stnseq_bits[];  // station sequential bits. each byte corresponds to a board (8 stations)
+  
   static unsigned long rainsense_start_time;  // time (in seconds) when rain sensor is detected on
   static unsigned long raindelay_start_time;  // time (in seconds) when rain delay is started
   static unsigned long button_lasttime;
@@ -88,9 +90,14 @@ public:
   static void reboot();   // reboot the microcontroller
   static void begin();    // initialization, must call this function before calling other functions
   static byte start_network();  // initialize network with the given mac and port
+  static bool read_hardware_mac();  // read hardware mac address
+  
   //static void self_test(unsigned long ms);  // self-test function
   static void get_station_name(byte sid, char buf[]); // get station name
   static void set_station_name(byte sid, char buf[]); // set station name
+  static uint16_t get_station_name_rf(byte sid, unsigned long *on, unsigned long *off); // get station name and parse into RF code
+  static void update_rfstation_bits();
+  static void send_rfstation_signal(byte sid, bool status);
   static void station_attrib_bits_save(int addr, byte bits[]); // save station attribute bits to eeprom
   static void station_attrib_bits_load(int addr, byte bits[]); // load station attribute bits from eeprom
   // -- Controller status
@@ -126,7 +133,8 @@ public:
   static void lcd_print_pgm(PGM_P PROGMEM str);           // print a program memory string
   static void lcd_print_line_clear_pgm(PGM_P PROGMEM str, byte line);
   static void lcd_print_time(byte line);                  // print current time
-  static void lcd_print_ip(const byte *ip, int http_port);// print ip and port number
+  static void lcd_print_ip(const byte *ip, byte line);    // print ip
+  static void lcd_print_mac(const byte *mac, byte line);  // print mac 
   static void lcd_print_station(byte line, char c);       // print station bits of the board selected by display_board
  
   // -- Button and UI functions --

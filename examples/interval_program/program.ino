@@ -14,7 +14,7 @@ unsigned long ProgramData::scheduled_start_time[(MAX_EXT_BOARDS+1)*8];
 unsigned long ProgramData::scheduled_stop_time[(MAX_EXT_BOARDS+1)*8];
 byte ProgramData::scheduled_program_index[(MAX_EXT_BOARDS+1)*8];
 LogStruct ProgramData::lastrun;
-unsigned long ProgramData::last_stop_time;
+unsigned long ProgramData::last_seq_stop_time;
 
 void ProgramData::init() {
 	reset_runtime();
@@ -27,7 +27,7 @@ void ProgramData::reset_runtime() {
     scheduled_stop_time[i] = 0;
     scheduled_program_index[i] = 0;
   }
-  last_stop_time = 0;
+  last_seq_stop_time = 0;
 }
 
 // load program count from EEPROM

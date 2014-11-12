@@ -72,15 +72,21 @@ void ui_state_machine(time_t curr_time) {
           reset_all_stations();
         }
       } else {  // clicking B1: display device IP and port
-        os.lcd_print_ip(ether.myip, ether.hisport);
+        os.lcd.clear();
+        os.lcd_print_ip(ether.myip, 0);
+        os.lcd.setCursor(0, 1);
+        os.lcd_print_pgm(PSTR(":"));
+        os.lcd.print(ether.hisport);  
         ui_state = UI_STATE_DISP_IP;
       }
       break;
     case BUTTON_2:
       if (button & BUTTON_FLAG_HOLD) {  // holding B2: reboot
         os.reboot();
-      } else {  // clicking B2: display gateway IP
-        os.lcd_print_ip(ether.gwip, 0);
+      } else {  // clicking B2: display MAC and gate way IP
+        os.lcd.clear();
+        os.lcd_print_mac(ether.mymac, 0);
+        os.lcd_print_ip(ether.gwip, 1);
         ui_state = UI_STATE_DISP_GW;
       }
       break;
@@ -133,8 +139,8 @@ void setup() {
   MCUSR &= ~(1<<WDRF);
   
   DEBUG_BEGIN(9600);
-  DEBUG_PRINTLN("start");
-    
+  char *pt;
+  
   os.begin();          // OpenSprinkler init
   os.options_setup();  // Setup options
  
@@ -202,7 +208,7 @@ void loop()
   byte bid, sid, s, pid, bitvalue;
   ProgramStruct prog;
 
-  os.status.seq = os.options[OPTION_SEQUENTIAL].value;
+  //os.status.seq = os.options[OPTION_SEQUENTIAL].value;
   os.status.mas = os.options[OPTION_MASTER_STATION].value;
 
   // ====== Process Ethernet packets ======
@@ -359,6 +365,12 @@ void loop()
                   digitalWrite(PIN_RELAY, LOW);
                 }
               } // if activate relay
+              // upon turning on station, process RF
+              // if the station is a RF station
+              if(os.rfstn_bits[bid]&(1<<s)) {
+                // send RF on signal
+                os.send_rfstation_signal(sid, true);
+              }
             } //if curr_time > scheduled_start_time
           } // if current station is not running
         }//end_s
@@ -370,16 +382,16 @@ void loop()
       // activate / deactivate valves
       os.apply_all_station_bits();
 
-      // check through run-time data, calculate last_stop_time,
+      // check through run-time data, calculate the last stop time of sequential stations
       boolean program_still_busy = false;
-      pd.last_stop_time = 0;
+      pd.last_seq_stop_time = 0;
       unsigned long sst;
       for(sid=0;sid<os.nstations;sid++) {
         // check if any station has a valid stop time
         // and the stop time must be larger than curr_time
         sst = pd.scheduled_stop_time[sid];
         if (sst > curr_time) {
-          pd.last_stop_time = (sst > pd.last_stop_time ) ? sst : pd.last_stop_time;
+          pd.last_seq_stop_time = (sst > pd.last_seq_stop_time ) ? sst : pd.last_seq_stop_time;
           program_still_busy = true;
         }
       }
@@ -395,7 +407,7 @@ void loop()
         
         // in case some options have changed while executing the program        
         os.status.mas = os.options[OPTION_MASTER_STATION].value; // update master station
-        os.status.seq = os.options[OPTION_SEQUENTIAL].value;
+        //os.status.seq = os.options[OPTION_SEQUENTIAL].value;
       }
     }//if_some_program_is_running
 
@@ -509,8 +521,7 @@ void check_network(time_t curr_time) {
     }
     else os.status.network_fails=0;
     // if failed more than once, reconnect
-    if ((os.status.network_fails>2 || (curr_time - os.dhcpnew_lasttime > DHCP_RENEW_INTERVAL))
-        &&os.options[OPTION_NETFAIL_RECONNECT].value) {
+    if ((os.status.network_fails>2 || (curr_time - os.dhcpnew_lasttime > DHCP_RENEW_INTERVAL))) {
       os.dhcpnew_lasttime = curr_time;
       //os.lcd_print_line_clear_pgm(PSTR(""),0);
       if (os.start_network())
@@ -554,6 +565,12 @@ void turn_off_station(byte sid, byte mas, unsigned long curr_time) {
         delay(os.options[OPTION_RELAY_PULSE].value*10);
       } 
       digitalWrite(PIN_RELAY, LOW);
+    }
+    // upon turning off station, process RF station
+    // if the station is a RF station
+    if(os.rfstn_bits[bid]&(1<<s)) {
+      // turn off station
+      os.send_rfstation_signal(sid, false);
     }
   }
   
@@ -606,13 +623,10 @@ void schedule_all_stations(unsigned long curr_time, byte seq)
   // if we are in sequential mode, and if there are 
   // existing running/scheduled programs
   int16_t station_delay = water_time_decode(os.options[OPTION_STATION_DELAY_TIME].value);
-  if (seq && pd.last_stop_time > 0) {
-    accumulate_time = pd.last_stop_time + station_delay;
+  if (seq && pd.last_seq_stop_time > 0) {
+    accumulate_time = pd.last_seq_stop_time + station_delay;
   }
 
-  DEBUG_PRINT("current time:");
-  DEBUG_PRINTLN(curr_time);
-  
   byte sid;
     
   // calculate start / stop time of each station
@@ -728,6 +742,12 @@ void delete_log(char *name) {
   }
 }
 
+int freeRam () {
+  extern int __heap_start, *__brkval; 
+  int v; 
+  return (int) &v - (__brkval == 0 ? (int) &__heap_start : (int) __brkval); 
+}
+
 // write run record to log on SD card
 void write_log(byte type, unsigned long curr_time) {
   if (!os.status.has_sd)  return;
@@ -738,11 +758,13 @@ void write_log(byte type, unsigned long curr_time) {
 
   sd.chdir("/");
   if (sd.chdir(LOG_PREFIX) == false) {
+    return;
     // create dir if it doesn't exist yet
-    if (sd.mkdir(LOG_PREFIX) == false)
-      return;    
+    //if (sd.mkdir(LOG_PREFIX) == false) {
+    //  return;    
+    //}
   }
-
+  DEBUG_PRINT(freeRam());  
   SdFile file;
   file.open(tmp_buffer, O_CREAT | O_WRITE );
   file.seekEnd();
@@ -772,6 +794,7 @@ void write_log(byte type, unsigned long curr_time) {
   str += "\r\n";
   str.toCharArray(tmp_buffer, TMP_BUFFER_SIZE);
 
+  DEBUG_PRINTLN(tmp_buffer);
   file.write(tmp_buffer);
   file.close();
 }

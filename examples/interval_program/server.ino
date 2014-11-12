@@ -24,6 +24,7 @@ static uint8_t ntpclientportL = 123; // Default NTP client port
 #define HTML_DATA_MISSING      0x10
 #define HTML_DATA_OUTOFBOUND   0x11
 #define HTML_DATA_FORMATERROR  0x12
+#define HTML_RFCODE_ERROR      0x13
 #define HTML_PAGE_NOT_FOUND    0x20
 #define HTML_NOT_PERMITTED     0x30
 #define HTML_REDIRECT_HOME     0xFF
@@ -97,6 +98,8 @@ void server_json_stations_main()
   server_json_stations_attrib(PSTR("ignore_rain"), os.ignrain_bits);
   server_json_stations_attrib(PSTR("act_relay"), os.actrelay_bits);
   server_json_stations_attrib(PSTR("stn_dis"), os.stndis_bits);
+  server_json_stations_attrib(PSTR("rfstn"), os.rfstn_bits);
+  server_json_stations_attrib(PSTR("stn_seq"), os.stnseq_bits);
   bfill.emit_p(PSTR("],\"maxlen\":$D}"), STATION_NAME_SIZE);
 }
 
@@ -158,6 +161,11 @@ byte server_change_stations(char *p)
 
   server_change_stations_attrib(p, 'd', os.stndis_bits);
   os.station_attrib_bits_save(ADDR_EEPROM_STNDISABLE, os.stndis_bits); 
+  
+  os.update_rfstation_bits();
+  
+  server_change_stations_attrib(p, 'q', os.stnseq_bits);
+  os.station_attrib_bits_save(ADDR_EEPROM_STNSEQ, os.stnseq_bits); 
   
   return HTML_SUCCESS;
 }
