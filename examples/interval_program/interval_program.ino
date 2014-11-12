@@ -622,7 +622,7 @@ void schedule_all_stations(unsigned long curr_time, byte seq)
   unsigned long accumulate_time = curr_time + 1;
   // if we are in sequential mode, and if there are 
   // existing running/scheduled programs
-  int16_t station_delay = water_time_decode(os.options[OPTION_STATION_DELAY_TIME].value);
+  int16_t station_delay = water_time_decode_signed(os.options[OPTION_STATION_DELAY_TIME].value);
   if (seq && pd.last_seq_stop_time > 0) {
     accumulate_time = pd.last_seq_stop_time + station_delay;
   }
@@ -722,6 +722,11 @@ void make_logfile_name(char *name) {
   str.toCharArray(tmp_buffer, TMP_BUFFER_SIZE);
 }
 
+// create log directory
+void create_log_dir() {
+
+}
+
 // delete log file
 // if name is 'all', delete all logs
 void delete_log(char *name) {
@@ -732,7 +737,10 @@ void delete_log(char *name) {
     SdFile file;
 
     if (sd.chdir(LOG_PREFIX)) {
+      // delete the whole log folder
       sd.vwd()->rmRfStar();
+      // then create the log folder again
+      create_log_dir();
     }
     return;
   } else {
@@ -758,11 +766,10 @@ void write_log(byte type, unsigned long curr_time) {
 
   sd.chdir("/");
   if (sd.chdir(LOG_PREFIX) == false) {
-    return;
     // create dir if it doesn't exist yet
-    //if (sd.mkdir(LOG_PREFIX) == false) {
-    //  return;    
-    //}
+    if (sd.mkdir(LOG_PREFIX) == false) {
+      return;    
+    }
   }
   DEBUG_PRINT(freeRam());  
   SdFile file;

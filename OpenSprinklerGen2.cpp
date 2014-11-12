@@ -128,7 +128,7 @@ OptionStruct OpenSprinkler::options[NUM_OPTIONS] = {
   {1,   1,   _str_ar,   _json_ar},    // this option is required
   {0,   MAX_EXT_BOARDS, _str_ext, _json_ext}, // number of extension board. 0: no extension boards
   {1,   1,   _str_log,  _json_log},   // sequential mode. 1: stations run sequentially; 0: concurrently
-  {0,   254, _str_sdt,  _json_sdt},   // station delay time (0 to 240 seconds).
+  {128, 247, _str_sdt,  _json_sdt},   // station delay time (-59 minutes to 59 minutes).
   {0,   8,   _str_mas,  _json_mas},   // index of master station. 0: no master station
   {0,   60,  _str_mton, _json_mton},  // master on time [0,60] seconds
   {60,  120, _str_mtof, _json_mtof},  // master off time [-60,60] seconds
@@ -960,7 +960,7 @@ void OpenSprinkler::lcd_print_option(int i) {
     lcd.print((int)options[i].value*10);
     break;
   case OPTION_STATION_DELAY_TIME:
-    lcd.print(water_time_decode(options[i].value));
+    lcd.print(water_time_decode_signed(options[i].value));
     break;
   case OPTION_LCD_CONTRAST:
     analogWrite(PIN_LCD_CONTRAST, options[i].value);
@@ -1118,6 +1118,22 @@ byte water_time_encode(uint16_t i) {
   } else {
     return 254;
   }
+}
+
+// encode a 16-bit signed water time to 8-bit unsigned byte (leading bit is the sign)
+byte water_time_encode_signed(int16_t i) {
+  DEBUG_PRINTLN(i);
+  byte ret = water_time_encode(i>=0?i : -i);
+  DEBUG_PRINTLN(ret);
+  return ((i>=0) ? (128+ret) : (128-ret));
+}
+
+// decode a 8-bit unsigned byte (leading bit is the sign) into a 16-bit signed water time
+int16_t water_time_decode_signed(byte i) {
+  int16_t ret = i;
+  ret -= 128;
+  ret = water_time_decode(ret>=0?ret:-ret);
+  return (i>=128 ? ret : -ret);
 }
 
 // decode a 8-bit byte to a 16-bit unsigned water time

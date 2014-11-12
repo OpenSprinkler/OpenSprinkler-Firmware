@@ -66,7 +66,7 @@ static prog_uchar htmlReturnHome[] PROGMEM =
 boolean check_password(char *p)
 {
   if (os.options[OPTION_IGNORE_PASSWORD].value)  return true;
-  if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, "pw")) {
+  if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("pw"), true)) {
     ether.urlDecode(tmp_buffer);
     if (os.password_verify(tmp_buffer))
       return true;
@@ -283,7 +283,7 @@ byte server_change_runonce(char *p) {
   pid:program index (-1 will delete all programs)
 */
 byte server_delete_program(char *p) {
-  if (!ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, "pid"))
+  if (!ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("pid"), true))
     return HTML_DATA_MISSING;
     
   int pid=atoi(tmp_buffer);
@@ -325,7 +325,7 @@ uint16_t parse_listdata(char **p) {
   pid:program index
 */
 byte server_moveup_program(char *p) {
-  if (!ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, "pid")) {
+  if (!ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("pid"), true)) {
     return HTML_DATA_MISSING;  
   }
   int pid=atoi(tmp_buffer);
@@ -347,10 +347,10 @@ byte server_moveup_program(char *p) {
   dur?:  station water time
   name:  program name
 */
+prog_char _str_program[] PROGMEM = "Program ";
 byte server_change_program(char *p) {
-
   // parse program index
-  if (!ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, "pid")) {
+  if (!ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("pid"), true)) {
     return HTML_DATA_MISSING;
   }
   int pid=atoi(tmp_buffer);
@@ -362,6 +362,7 @@ byte server_change_program(char *p) {
   // search for the start of v=[
   char *pv;
   boolean found=false;
+
   for(pv=p;(*pv)!=0 && pv<p+100;pv++) {
     if(strncmp(pv, "v=[", 3)==0) {
       found=true;
@@ -389,11 +390,13 @@ byte server_change_program(char *p) {
   pv++; // this should be a ']'
   pv++; // this should be a ']'
   // parse program name
-  if (ether.findKeyVal(pv, tmp_buffer, TMP_BUFFER_SIZE, "name")) {
+
+  if (ether.findKeyVal(pv, tmp_buffer, TMP_BUFFER_SIZE, PSTR("name"), true)) {
     ether.urlDecode(tmp_buffer);
     strncpy(prog.name, tmp_buffer, PROGRAM_NAME_SIZE);
   } else {
-    strcpy(prog.name, "Program ");
+    strcpy_P(prog.name, _str_program);
+    //strcpy(prog.name, "Program ");
     itoa((pid==-1)? (pd.nprograms+1): (pid+1), prog.name+8, 10); 
   }
 
@@ -489,14 +492,13 @@ void server_json_options_main() {
     int32_t v=os.options[oid].value;
     if (oid==OPTION_MASTER_OFF_ADJ) {v-=60;}
     if (oid==OPTION_RELAY_PULSE) {v*=10;}    
-    if (oid==OPTION_STATION_DELAY_TIME) {v=water_time_decode(v);}
-    if (oid==OPTION_STATION_DELAY_TIME) {
+    if (oid==OPTION_STATION_DELAY_TIME) {v=water_time_decode_signed(v);}
+    /*if (oid==OPTION_STATION_DELAY_TIME) {
       bfill.emit_p(PSTR("\"$F\":$L"),
                  os.options[oid].json_str, v);  // account for value possibly larger than 32767
-    } else {
-      bfill.emit_p(PSTR("\"$F\":$D"),
-                   os.options[oid].json_str, v);
-    }
+    } else*/
+    bfill.emit_p(PSTR("\"$F\":$D"),
+                 os.options[oid].json_str, v);
     if(oid!=NUM_OPTIONS-1)
       bfill.emit_p(PSTR(","));
   }
@@ -525,26 +527,27 @@ byte server_json_options(char *p)
   en:  enable (0 or 1)
   rd:  rain delay hours (0 turns off rain delay)
 */
+
 byte server_change_values(char *p)
 {
-  if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, "rsn")) {
+  if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("rsn"), true)) {
     reset_all_stations();
   }
   
 #define TIME_REBOOT_DELAY  20
-  if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, "rbt") && atoi(tmp_buffer) > 0) {
+  if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("rbt"), true) && atoi(tmp_buffer) > 0) {
     //bfill.emit_p(PSTR("$F<meta http-equiv=\"refresh\" content=\"$D; url=/\">"), htmlOkHeader, TIME_REBOOT_DELAY);
     bfill.emit_p(PSTR("$FRebooting..."), htmlOkHeader);
     ether.httpServerReply_with_flags(bfill.position(), TCP_FLAGS_ACK_V|TCP_FLAGS_FIN_V);
     os.reboot();
   } 
   
-  if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, "en")) {
+  if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("en"), true)) {
     if (tmp_buffer[0]=='1' && !os.status.enabled)  os.enable();
     else if (tmp_buffer[0]=='0' &&  os.status.enabled)  os.disable();
   }   
   
-  if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, "rd")) {
+  if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("rd"), true)) {
     int rd = atoi(tmp_buffer);
     if (rd>0) {
       os.nvdata.rd_stop_time = now() + (unsigned long) rd * 3600;    
@@ -578,7 +581,7 @@ void string_remove_space(char *src) {
 */
 byte server_change_scripturl(char *p)
 {
-  if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, "jsp")) {
+  if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("jsp"), true)) {
     ether.urlDecode(tmp_buffer);
     tmp_buffer[MAX_SCRIPTURL]=0;  // make sure we don't exceed the maximum size
     // trim unwanted space characters
@@ -598,6 +601,9 @@ byte server_change_scripturl(char *p)
   wtkey: weather underground api key
   ttt: manual time (applicable only if ntp=0)
 */
+prog_char _key_loc[] PROGMEM = "loc";
+prog_char _key_wtkey[] PROGMEM = "wtkey";
+prog_char _key_ttt[] PROGMEM = "ttt";
 byte server_change_options(char *p)
 {
   // temporarily save some old options values
@@ -625,7 +631,11 @@ byte server_change_options(char *p)
 		    int32_t v = atol(tmp_buffer);
 		    if (oid==OPTION_MASTER_OFF_ADJ) {v+=60;} // master off time
 		    if (oid==OPTION_RELAY_PULSE) {v/=10;} // relay pulse time
-		    if (oid==OPTION_STATION_DELAY_TIME) {v=water_time_encode((uint16_t)v);} // encode station delay time
+		    if (oid==OPTION_STATION_DELAY_TIME) {
+		      DEBUG_PRINTLN(v);
+		      v=water_time_encode_signed((int16_t)v);
+		      DEBUG_PRINTLN(v);
+		    } // encode station delay time
 		    if (v>=0 && v<=os.options[oid].max) {
 		      os.options[oid].value = v;
 		    } else {
@@ -642,7 +652,7 @@ byte server_change_options(char *p)
     }
   }
   
-  if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, "loc")) {
+  if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("loc"), true)) {
     ether.urlDecode(tmp_buffer);
     tmp_buffer[MAX_LOCATION]=0;   // make sure we don't exceed the maximum size
     if (strcmp_to_eeprom(tmp_buffer, ADDR_EEPROM_LOCATION)) { // if location has changed
@@ -651,7 +661,7 @@ byte server_change_options(char *p)
     }
   }
   uint8_t keyfound = 0;
-  if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, "wtkey", &keyfound)) {
+  if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("wtkey"), true, &keyfound)) {
     ether.urlDecode(tmp_buffer);
     tmp_buffer[MAX_WEATHER_KEY]=0;
     if (strcmp_to_eeprom(tmp_buffer, ADDR_EEPROM_WEATHER_KEY)) {  // if weather key has changed
@@ -664,7 +674,7 @@ byte server_change_options(char *p)
     os.eeprom_string_set(ADDR_EEPROM_WEATHER_KEY, tmp_buffer);
   }
   // if not using NTP and manually setting time
-  if (!os.options[OPTION_USE_NTP].value && ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, "ttt")) {
+  if (!os.options[OPTION_USE_NTP].value && ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("ttt"), true)) {
     unsigned long t;
     t = atol(tmp_buffer);
     // before chaging time, reset all stations to avoid messing up with timing
@@ -702,9 +712,9 @@ byte server_change_options(char *p)
 */
 byte server_change_password(char *p)
 {
-  if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, "npw")) {
+  if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("npw"), true)) {
     char tbuf2[TMP_BUFFER_SIZE];
-    if (ether.findKeyVal(p, tbuf2, TMP_BUFFER_SIZE, "cpw") && strncmp(tmp_buffer, tbuf2, 16) == 0) {
+    if (ether.findKeyVal(p, tbuf2, TMP_BUFFER_SIZE, PSTR("cpw"), true) && strncmp(tmp_buffer, tbuf2, 16) == 0) {
       //os.password_set(tmp_buffer);
       ether.urlDecode(tmp_buffer);
       tmp_buffer[MAX_USER_PASSWORD]=0;  // make sure we don't exceed the maximum size
@@ -750,7 +760,7 @@ byte server_json_status(char *p)
 */
 byte server_change_manual(char *p) {
   int sid=-1;
-  if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, "sid")) {
+  if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("sid"), true)) {
     sid=atoi(tmp_buffer);
     if (sid<0 || sid>=os.nstations) return HTML_DATA_OUTOFBOUND;  
   } else {
@@ -758,7 +768,7 @@ byte server_change_manual(char *p) {
   }
   
   byte en=0;
-  if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, "en")) {
+  if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("en"), true)) {
     en=atoi(tmp_buffer);
   } else {
     return HTML_DATA_MISSING;
@@ -767,7 +777,7 @@ byte server_change_manual(char *p) {
   uint16_t timer=0;
   unsigned long curr_time = now();
   if (en) { // if turning on a station, must provide timer
-    if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, "t")) {
+    if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("t"), true)) {
       timer=(uint16_t)atol(tmp_buffer);
       if (timer==0 || timer>64800) {
         return HTML_DATA_OUTOFBOUND;
@@ -813,11 +823,11 @@ byte server_json_log(char *p) {
   if (!os.status.has_sd)  return HTML_PAGE_NOT_FOUND;
   
   unsigned int start, end;
-  if (!ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, "start"))
+  if (!ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("start"), true))
     return HTML_DATA_MISSING;
   start = atol(tmp_buffer) / 86400L;
   
-  if (!ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, "end"))
+  if (!ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("end"), true))
     return HTML_DATA_MISSING;
   end = atol(tmp_buffer) / 86400L;
   
@@ -876,7 +886,7 @@ byte server_json_log(char *p) {
 */
 byte server_delete_log(char *p) {
 
-  if (!ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, "day"))
+  if (!ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("day"), true))
     return HTML_DATA_MISSING;
   
   delete_log(tmp_buffer);

@@ -40,27 +40,46 @@ void EtherCard::printIp (const uint8_t *buf) {
 // The returned value is stored in strbuf. You must allocate
 // enough storage for strbuf, maxlen is the size of strbuf.
 // I.e the value it is declated with: strbuf[5]-> maxlen=5
-uint8_t EtherCard::findKeyVal (const char *str,char *strbuf, uint8_t maxlen,const char *key,uint8_t *keyfound)
+uint8_t EtherCard::findKeyVal (const char *str,char *strbuf, uint8_t maxlen,const char *key,bool key_in_pgm,uint8_t *keyfound)
 {
     uint8_t found=0;
     uint8_t i=0;
     const char *kp;
     kp=key;
-    while(*str &&  *str!=' ' && *str!='\n' && found==0){
-        if (*str == *kp){
-            kp++;
-            if (*kp == '\0'){
-                str++;
-                kp=key;
-                if (*str == '='){
-                    found=1;
-                }
-            }
-        }else{
-            kp=key;
-        }
-        str++;
-    }
+    if (key_in_pgm) {
+      // key is in program memory space
+      while(*str &&  *str!=' ' && *str!='\n' && found==0){
+          if (*str == pgm_read_byte(kp)){
+              kp++;
+              if (pgm_read_byte(kp) == '\0'){
+                  str++;
+                  kp=key;
+                  if (*str == '='){
+                      found=1;
+                  }
+              }
+          }else{
+              kp=key;
+          }
+          str++;
+      }
+    } else {
+      while(*str &&  *str!=' ' && *str!='\n' && found==0){
+          if (*str == *kp){
+              kp++;
+              if (*kp == '\0'){
+                  str++;
+                  kp=key;
+                  if (*str == '='){
+                      found=1;
+                  }
+              }
+          }else{
+              kp=key;
+          }
+          str++;
+      }
+    }    
     if (found==1){
         // copy the value to a buffer and terminate it with '\0'
         while(*str &&  *str!=' ' && *str!='\n' && *str!='&' && i<maxlen-1){

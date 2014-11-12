@@ -18,10 +18,6 @@ extern char tmp_buffer[];
 // the default script is WEATHER_SCRIPT_HOST/weather?.py
 static char website[] PROGMEM = WEATHER_SCRIPT_HOST ;
 
-prog_char _key_sunrise [] PROGMEM = "sunrise";
-prog_char _key_sunset  [] PROGMEM = "sunset";
-prog_char _key_scale   [] PROGMEM = "scale";
-prog_char _key_tz      [] PROGMEM = "tz";
 void getweather_callback(byte status, word off, word len) {
   char *p = (char*)Ethernet::buffer + off;
   
@@ -32,16 +28,14 @@ void getweather_callback(byte status, word off, word len) {
   if (*p != '&')  return;
   int v;
   DEBUG_PRINTLN(p);
-  char key[10];
-  strcpy_P(key, _key_sunrise);
-  if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, key)) {
+  if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("sunrise"), true)) {
     v = atoi(tmp_buffer);
     if (v>=0 && v<=1440) {
       os.nvdata.sunrise_time = v;
     }
   }
-  strcpy_P(key, _key_sunset);
-  if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, key)) {
+
+  if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("sunset"), true)) {
     v = atoi(tmp_buffer);
     if (v>=0 && v<=1440) {
       os.nvdata.sunset_time = v;
@@ -49,8 +43,7 @@ void getweather_callback(byte status, word off, word len) {
   }
   os.nvdata_save(); // save non-volatile memory
 
-  strcpy_P(key, _key_scale);
-  if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, key)) {
+  if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("scale"), true)) {
     v = atoi(tmp_buffer);
     if (v>=0 && v<=250) {
       os.options[OPTION_WATER_PERCENTAGE].value = v;
@@ -58,8 +51,7 @@ void getweather_callback(byte status, word off, word len) {
     }
   }
   
-  strcpy_P(key, _key_tz);
-  if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, key)) {
+  if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("tz"), true)) {
     v = atoi(tmp_buffer);
     if (v>=0 && v<= 96) {
       if (v != os.options[OPTION_TIMEZONE].value) {
