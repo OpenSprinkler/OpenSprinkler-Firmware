@@ -85,8 +85,7 @@ void ui_state_machine(time_t curr_time) {
         os.reboot();
       } else {  // clicking B2: display MAC and gate way IP
         os.lcd.clear();
-        os.lcd_print_mac(ether.mymac, 0);
-        os.lcd_print_ip(ether.gwip, 1);
+        os.lcd_print_mac(ether.mymac);
         ui_state = UI_STATE_DISP_GW;
       }
       break;
@@ -208,7 +207,6 @@ void loop()
   byte bid, sid, s, pid, bitvalue;
   ProgramStruct prog;
 
-  //os.status.seq = os.options[OPTION_SEQUENTIAL].value;
   os.status.mas = os.options[OPTION_MASTER_STATION].value;
 
   // ====== Process Ethernet packets ======
@@ -287,7 +285,7 @@ void loop()
             s=sid&0x07;
             // skip if the station is:
             // - master station (because master cannot be scheduled independently
-            // - currently running (cannot handle overlapping schedules of the same station)
+            // - running (cannot handle overlapping schedules of the same station)
             // - disabled
             if ((os.status.mas==sid+1) || (os.station_bits[bid]&(1<<s)) || (os.stndis_bits[bid]&(1<<s)))
               continue;
@@ -302,7 +300,9 @@ void loop()
                 water_time = water_time * os.options[OPTION_WATER_PERCENTAGE].value / 100;
               pd.scheduled_stop_time[sid] = water_time;
                                             
-              if (pd.scheduled_stop_time[sid]) {  // water time may end up being zero after scaling
+              if (pd.scheduled_stop_time[sid]) {
+                // check if water time is still valid
+                // because it may end up being zero after scaling
                 pd.scheduled_program_index[sid] = pid+1;  
                 match_found = true;
               }// if pd.scheduled_stop_time[sid]
@@ -313,7 +313,7 @@ void loop()
       
       // calculate start and end time
       if (match_found) {
-        schedule_all_stations(curr_time, os.status.seq);
+        schedule_all_stations(curr_time);
       }
     }//if_check_current_minute
     
@@ -326,6 +326,8 @@ void loop()
         for(s=0;s<8;s++) {
           byte sid = bid*8+s;
           
+          // skip master station
+          if (os.status.mas == sid+1) continue;
           // check if this station is scheduled, either running or waiting to run
           if (pd.scheduled_program_index[sid] > 0) {
             // if so, check if we should turn it off
@@ -342,8 +344,10 @@ void loop()
               // 1) master station is defined
               // 2) the station is non-master and is set to activate master
               // 3) controller is in sequential mode (if in parallel mode, master is handled differently)
-              //if ((os.status.mas>0) && (os.status.mas!=sid+1) && (os.masop_bits[bid]&(1<<s)) && os.status.seq && os.status.manual_mode==0) {
-              if ((os.status.mas>0) && (os.status.mas!=sid+1) && (os.masop_bits[bid]&(1<<s)) && os.status.seq) {
+              //if ((os.status.mas>0) && (os.status.mas!=sid+1) && (os.masop_bits[bid]&(1<<s)) && os.status.seq) {
+              // ray: we have changed the way master station is handled here
+              /*
+              if ((os.status.mas>0) && (os.status.mas!=sid+1) && (os.masop_bits[bid]&(1<<s))) {
                 byte masid=os.status.mas-1;
                 // master will turn on when a station opens,
                 // adjusted by the master on and off time
@@ -354,7 +358,7 @@ void loop()
                 if (curr_time >= pd.scheduled_start_time[masid] && curr_time < pd.scheduled_stop_time[masid]) {
                   os.set_station_bit(masid, 1);
                 }
-              }
+              }*/
               // upon turning on station, process relay
               // if the station is set to activate / deactivate relay
               if(os.actrelay_bits[bid]&(1<<s)) {
@@ -387,14 +391,20 @@ void loop()
       pd.last_seq_stop_time = 0;
       unsigned long sst;
       for(sid=0;sid<os.nstations;sid++) {
-        // check if any station has a valid stop time
+        bid = sid>>3;
+        s = sid&0x07;
+        // check if any sequential station has a valid stop time
         // and the stop time must be larger than curr_time
         sst = pd.scheduled_stop_time[sid];
-        if (sst > curr_time) {
-          pd.last_seq_stop_time = (sst > pd.last_seq_stop_time ) ? sst : pd.last_seq_stop_time;
+        if (sst>curr_time) {
+          if (os.stnseq_bits[bid]&(1<<s)) {   // only need to update last_seq_stop_time for sequential stations
+            pd.last_seq_stop_time = (sst>pd.last_seq_stop_time ) ? sst : pd.last_seq_stop_time;
+          }
           program_still_busy = true;
         }
       }
+      if(pd.last_seq_stop_time) DEBUG_PRINTLN(pd.last_seq_stop_time);
+      
       // if no station has a schedule
       if (program_still_busy == false) {
         // turn off all stations
@@ -407,22 +417,28 @@ void loop()
         
         // in case some options have changed while executing the program        
         os.status.mas = os.options[OPTION_MASTER_STATION].value; // update master station
-        //os.status.seq = os.options[OPTION_SEQUENTIAL].value;
       }
     }//if_some_program_is_running
 
-    // handle master station for parallel mode
-    //if ((os.status.mas>0) && os.status.manual_mode==1 || os.status.seq==0) {
-    if ((os.status.mas>0) && os.status.seq==0) {
-      // master will be on / off together with stations
+    // if master statino is defined
+    // handle master
+    if (os.status.mas>0) {
+      byte mas_on_adj = os.options[OPTION_MASTER_ON_ADJ].value;
+      byte mas_off_adj= os.options[OPTION_MASTER_OFF_ADJ].value;
       byte masbit = 0;
       for(sid=0;sid<os.nstations;sid++) {
+        // skip if this is the master station
+        if (os.status.mas == sid+1) continue;
         bid = sid>>3;
         s = sid&0x07;
-        // check there is any non-master station that activates master and is currently turned on
-        if ((os.status.mas!=sid+1) && (os.station_bits[bid]&(1<<s)) && (os.masop_bits[bid]&(1<<s))) {
-          masbit = 1;
-          break;
+        // if this station is running and is set to activate master
+        if ((os.station_bits[bid]&(1<<s)) && (os.masop_bits[bid]&(1<<s))) {
+          // check if timing is within the acceptable range
+          if (curr_time >= pd.scheduled_start_time[sid] + mas_on_adj &&
+              curr_time <= pd.scheduled_stop_time[sid] + mas_off_adj - 60) {
+            masbit = 1;
+            break;
+          }
         }
       }
       os.set_station_bit(os.status.mas-1, masbit);
@@ -440,6 +456,9 @@ void loop()
     
     // check network connection
     check_network(curr_time);
+    
+    // calculate statistics
+    calc_statistics(curr_time);
     
     // perform ntp sync
     perform_ntp_sync(curr_time);
@@ -475,6 +494,18 @@ void check_weather(time_t curr_time) {
   if (!os.checkwt_lasttime || ((curr_time - os.checkwt_lasttime) > inv)) {
     os.checkwt_lasttime = curr_time;
     GetWeather();
+  }
+}
+
+void calc_statistics(time_t curr_time) {
+  unsigned long total = os.water_percent_avg;
+  total = total * os.water_percent_n;
+  total += os.options[OPTION_WATER_PERCENTAGE].value;
+  os.water_percent_n ++;
+  os.water_percent_avg = byte(total / os.water_percent_n);
+  if (os.water_percent_n >= 24) {
+    os.water_percent_avg = os.options[OPTION_WATER_PERCENTAGE].value;
+    os.water_percent_n = 1;
   }
 }
 
@@ -552,9 +583,11 @@ void turn_off_station(byte sid, byte mas, unsigned long curr_time) {
 
     // upon turning off station, update master station stop time
     // because we may be manually turning station off earlier than scheduled
-    if ((mas!=sid+1) && (os.masop_bits[bid]&(1<<s)) && os.status.seq) {
+    // ray: this step is not necessary any more
+    //if ((mas!=sid+1) && (os.masop_bits[bid]&(1<<s)) && os.status.seq) {
+    /*if ((mas!=sid+1) && (os.masop_bits[bid]&(1<<s))) {
       pd.scheduled_stop_time[mas-1] = curr_time+os.options[OPTION_MASTER_OFF_ADJ].value-60;
-    }
+    }*/
 
     // upon turning off station, process relay
     // if the station is set to active / deactivate relay
@@ -617,35 +650,43 @@ void process_dynamic_events(unsigned long curr_time)
   }      
 }
 
-void schedule_all_stations(unsigned long curr_time, byte seq)
+//void schedule_all_stations(unsigned long curr_time, byte seq)  // remove seq option
+void schedule_all_stations(unsigned long curr_time)
 {
-  unsigned long accumulate_time = curr_time + 1;
-  // if we are in sequential mode, and if there are 
-  // existing running/scheduled programs
+  unsigned long con_start_time = curr_time + 1;   // concurrent start time
+  unsigned long seq_start_time = con_start_time;  // sequential start time
+  
   int16_t station_delay = water_time_decode_signed(os.options[OPTION_STATION_DELAY_TIME].value);
-  if (seq && pd.last_seq_stop_time > 0) {
-    accumulate_time = pd.last_seq_stop_time + station_delay;
+  // if the sequential queue has stations running
+  if (pd.last_seq_stop_time > 0) {
+    seq_start_time = pd.last_seq_stop_time + station_delay;
   }
 
+  DEBUG_PRINTLN(seq_start_time);
+  
   byte sid;
-    
-  // calculate start / stop time of each station
+  
+  // go through all stations and calculate start / stop time of each station
   for(sid=0;sid<os.nstations;sid++) {
     // skip master station because it's not scheduled independently
     if (os.status.mas==sid+1) continue;
     byte bid=sid>>3;
     byte s=sid&0x07;    
     
-    // if the station is not scheduled to run, or is already scheduled (i.e. start_time > 0) or is already running
-    // skip
+    // if the station is not scheduled to run (scheduled_stop_time = 0)
+    // or is already scheduled (i.e. start_time > 0)
+    // or is already running
+    // then we will skip this station
     if(!pd.scheduled_stop_time[sid] || pd.scheduled_start_time[sid] || (os.station_bits[bid]&(1<<s)))
       continue;
     
-    if (seq) {  // in sequential mode, stations are serialized
-      pd.scheduled_start_time[sid] = accumulate_time;
-      accumulate_time += pd.scheduled_stop_time[sid];
-      pd.scheduled_stop_time[sid] = accumulate_time;
-      accumulate_time += station_delay; // add station delay time
+    // check if this is a sequential station
+    if (os.stnseq_bits[bid]&(1<<s)) {
+      // sequential scheduling
+      pd.scheduled_start_time[sid] = seq_start_time;
+      seq_start_time += pd.scheduled_stop_time[sid];
+      pd.scheduled_stop_time[sid] = seq_start_time;
+      seq_start_time += station_delay; // add station delay time
       DEBUG_PRINT("[");
       DEBUG_PRINT(sid);
       DEBUG_PRINT(":");
@@ -653,10 +694,18 @@ void schedule_all_stations(unsigned long curr_time, byte seq)
       DEBUG_PRINT(",");
       DEBUG_PRINT(pd.scheduled_stop_time[sid]);
       DEBUG_PRINTLN("]");
-	  } else {
-      pd.scheduled_start_time[sid] = accumulate_time;
-      pd.scheduled_stop_time[sid] = accumulate_time + pd.scheduled_stop_time[sid];
-  	}
+    } else {
+      // concurrent scheduling
+      pd.scheduled_start_time[sid] = con_start_time;
+      pd.scheduled_stop_time[sid] = con_start_time + pd.scheduled_stop_time[sid];
+      DEBUG_PRINT("[");
+      DEBUG_PRINT(sid);
+      DEBUG_PRINT(":");
+      DEBUG_PRINT(pd.scheduled_start_time[sid]);
+      DEBUG_PRINT(",");
+      DEBUG_PRINT(pd.scheduled_stop_time[sid]);
+      DEBUG_PRINTLN("]");
+    }
     os.status.program_busy = 1;  // set program busy bit
 	}
 }
@@ -705,7 +754,7 @@ void manual_start_program(byte pid) {
     }
   }
   if(match_found) {
-    schedule_all_stations(now(), os.status.seq);
+    schedule_all_stations(now());
   }  
 }
 
@@ -722,14 +771,10 @@ void make_logfile_name(char *name) {
   str.toCharArray(tmp_buffer, TMP_BUFFER_SIZE);
 }
 
-// create log directory
-void create_log_dir() {
-
-}
-
 // delete log file
 // if name is 'all', delete all logs
 void delete_log(char *name) {
+  if (!os.options[OPTION_ENABLE_LOGGING].value) return;
   if (!os.status.has_sd) return;
 
   if (strncmp(name, "all", 3) == 0) {
@@ -739,8 +784,6 @@ void delete_log(char *name) {
     if (sd.chdir(LOG_PREFIX)) {
       // delete the whole log folder
       sd.vwd()->rmRfStar();
-      // then create the log folder again
-      create_log_dir();
     }
     return;
   } else {
@@ -750,14 +793,17 @@ void delete_log(char *name) {
   }
 }
 
+#ifdef SERIAL_DEBUG
 int freeRam () {
   extern int __heap_start, *__brkval; 
   int v; 
   return (int) &v - (__brkval == 0 ? (int) &__heap_start : (int) __brkval); 
 }
+#endif
 
 // write run record to log on SD card
 void write_log(byte type, unsigned long curr_time) {
+  if (!os.options[OPTION_ENABLE_LOGGING].value) return;
   if (!os.status.has_sd)  return;
 
   // file name will be logs/xxxxx.tx where xxxxx is the day in epoch time

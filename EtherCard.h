@@ -503,6 +503,7 @@ public:
     *     @return <i>unit_t</i> Length of the value. 0 if not found
     *     @note   Ensure strbuf has memory allocated of at least maxlen + 1 (to accomodate result plus terminating null)
     */
+    // ray: modified to add support for key stored in pgm memory
     static uint8_t findKeyVal(const char *str,char *strbuf,
                               uint8_t maxlen, const char *key, bool key_in_pgm = false,
                               uint8_t *keyfound = NULL);  // ray: added keyfound return variable

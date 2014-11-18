@@ -40,6 +40,7 @@ void EtherCard::printIp (const uint8_t *buf) {
 // The returned value is stored in strbuf. You must allocate
 // enough storage for strbuf, maxlen is the size of strbuf.
 // I.e the value it is declated with: strbuf[5]-> maxlen=5
+// ray: modified to add support for key stored in pgm memory
 uint8_t EtherCard::findKeyVal (const char *str,char *strbuf, uint8_t maxlen,const char *key,bool key_in_pgm,uint8_t *keyfound)
 {
     uint8_t found=0;

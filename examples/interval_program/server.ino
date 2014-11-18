@@ -29,27 +29,39 @@ static uint8_t ntpclientportL = 123; // Default NTP client port
 #define HTML_NOT_PERMITTED     0x30
 #define HTML_REDIRECT_HOME     0xFF
 
-static prog_uchar htmlOkHeader[] PROGMEM = 
+static prog_uchar html200OK[] PROGMEM =
     "HTTP/1.0 200 OK\r\n"
-    "Content-Type: text/html\r\n"
-    "Pragma: no-cache\r\n"
-    "Access-Control-Allow-Origin: *\r\n"
-    "\r\n"
 ;
 
-static prog_uchar htmlFileHeader[] PROGMEM =
-    "HTTP/1.0 200 OK\r\n"
+static prog_uchar htmlCacheCtrl[] PROGMEM =
     "Cache-Control: max-age=604800, public\r\n"
-    "\r\n"
 ;
 
-static prog_uchar htmlJSONHeader[] PROGMEM =
-    "HTTP/1.0 200 OK\r\n"
+static prog_uchar htmlNoCache[] PROGMEM = 
+    "Pragma: no-cache\r\n"
+;   
+    
+static prog_uchar htmlContentHTML[] PROGMEM =
+    "Content-Type: text/html\r\n"
+;
+
+static prog_uchar htmlAccessControl[] PROGMEM = 
+    "Access-Control-Allow-Origin: *\r\n"
+;
+
+static prog_uchar htmlContentCgz[] PROGMEM = 
+    "Content-Type: text/css;charset=utf-8\r\n"
+    "Content-Encoding: gzip\r\n"
+;
+
+static prog_uchar htmlContentJgz[] PROGMEM = 
+    "Content-Type: text/javascript;charset=utf-8\r\n"
+    "Content-Encoding: gzip\r\n"
+;
+    
+static prog_uchar htmlContentJSON[] PROGMEM =
     "Content-Type: application/json\r\n"
     "Connnection: close\r\n"
-    "Access-Control-Allow-Origin: *\r\n"
-    "Cache-Control: no-cache\r\n"
-    "\r\n"
 ;
 
 static prog_uchar htmlMobileHeader[] PROGMEM =
@@ -59,6 +71,18 @@ static prog_uchar htmlMobileHeader[] PROGMEM =
 static prog_uchar htmlReturnHome[] PROGMEM = 
   "<script>window.location=\"/\";</script>\n"
 ;
+
+void print_html_standard_header() {
+  bfill.emit_p(PSTR("$F$F$F$F\r\n"), html200OK, htmlContentHTML, htmlNoCache, htmlAccessControl);
+}
+
+void print_json_header() {
+  bfill.emit_p(PSTR("$F$F$F$F\r\n"), html200OK, htmlContentJSON, htmlAccessControl, htmlNoCache);
+}
+
+void print_json_header_with_bracket() {
+  bfill.emit_p(PSTR("$F$F$F$F\r\n{"), html200OK, htmlContentJSON, htmlAccessControl, htmlNoCache);
+}
 
 /**
   Check and verify password
@@ -108,7 +132,7 @@ void server_json_stations_main()
 */
 byte server_json_stations(char *p)
 {
-  server_json_header();
+  print_json_header_with_bracket();
   server_json_stations_main();
   return HTML_OK;
 }
@@ -174,7 +198,7 @@ byte server_change_stations(char *p)
   Output script url form
 */
 byte server_view_scripturl(char *p) {
-  bfill.emit_p(PSTR("$F"), htmlOkHeader);
+  print_html_standard_header();
   bfill.emit_p(PSTR("<hr /><form name=of action=cu method=get><p><b>Script URL:</b><input type=text size=32 maxlength=127 value=\"$E\" name=jsp></p><p>Default is $S<br />If local on uSD card, use ./</p><p><b>Password:</b><input type=password size=32 name=pw><input type=submit></p><hr /></form>"), ADDR_EEPROM_SCRIPTURL, DEFAULT_JAVASCRIPT_URL);  
   return HTML_OK;
 }
@@ -223,7 +247,7 @@ void server_json_programs_main() {
 */
 byte server_json_programs(char *p) 
 {
-  server_json_header();
+  print_json_header_with_bracket();
   server_json_programs_main();
   return HTML_OK;
 }
@@ -267,7 +291,7 @@ byte server_change_runonce(char *p) {
     }
   }
   if(match_found) {
-    schedule_all_stations(now(), os.status.seq);
+    schedule_all_stations(now());
     return HTML_SUCCESS;
   }
 
@@ -411,8 +435,6 @@ byte server_change_program(char *p) {
     pd.drem_to_absolute(prog.days);
   }
       
-  //bfill.emit_p(PSTR("$F<script>"), htmlOkHeader);
-
   if (pid==-1) {
     if(!pd.add(&prog))
       return HTML_DATA_OUTOFBOUND;
@@ -425,7 +447,7 @@ byte server_change_program(char *p) {
 
 byte server_json_controller(char *p)
 {
-  server_json_header();
+  print_json_header_with_bracket();
   server_json_controller_main();
   return HTML_OK;
 }
@@ -471,7 +493,8 @@ byte server_home(char *p)
   byte bid, sid;
   unsigned long curr_time = now();
 
-  bfill.emit_p(PSTR("$F<!DOCTYPE html>\n<html>\n<head>\n$F</head>\n<body>\n<script>"), htmlOkHeader, htmlMobileHeader);
+  print_html_standard_header();
+  bfill.emit_p(PSTR("<!DOCTYPE html>\n<html>\n<head>\n$F</head>\n<body>\n<script>"), htmlMobileHeader);
 
   // send server variables and javascript packets
   bfill.emit_p(PSTR("var ver=$D,ipas=$D;</script>\n"),
@@ -481,10 +504,10 @@ byte server_home(char *p)
   return HTML_OK;
 }
 
-void server_json_header()
+/*void server_json_header()
 {
   bfill.emit_p(PSTR("$F{"), htmlJSONHeader);
-}
+}*/
 
 void server_json_options_main() {
   byte oid;
@@ -512,7 +535,7 @@ void server_json_options_main() {
 */
 byte server_json_options(char *p)
 {
-  server_json_header();
+  print_json_header_with_bracket();
   server_json_options_main();
   return HTML_OK;
 }
@@ -536,8 +559,8 @@ byte server_change_values(char *p)
   
 #define TIME_REBOOT_DELAY  20
   if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("rbt"), true) && atoi(tmp_buffer) > 0) {
-    //bfill.emit_p(PSTR("$F<meta http-equiv=\"refresh\" content=\"$D; url=/\">"), htmlOkHeader, TIME_REBOOT_DELAY);
-    bfill.emit_p(PSTR("$FRebooting..."), htmlOkHeader);
+    print_html_standard_header();
+    //bfill.emit_p(PSTR("Rebooting..."));
     ether.httpServerReply_with_flags(bfill.position(), TCP_FLAGS_ACK_V|TCP_FLAGS_FIN_V);
     os.reboot();
   } 
@@ -619,7 +642,7 @@ byte server_change_options(char *p)
   for (byte oid=0; oid<NUM_OPTIONS; oid++) {
     //if ((os.options[oid].flag&OPFLAG_WEB_EDIT)==0) continue;
     // skip binary options that do not appear in the UI
-    if (oid==OPTION_RESET || oid==OPTION_DEVICE_ENABLE) continue;
+    if (oid==OPTION_RESET || oid==OPTION_DEVICE_ENABLE || oid==OPTION_ENABLE_LOGGING) continue;
     prev_value = os.options[oid].value;
     if (os.options[oid].max==1)  os.options[oid].value = 0;  // set a bool variable to 0 first
     char tbuf2[5] = {'o', 0, 0, 0, 0};
@@ -744,7 +767,7 @@ void server_json_status_main()
 */
 byte server_json_status(char *p)
 {
-  server_json_header();
+  print_json_header_with_bracket();
   server_json_status_main();
   return HTML_OK;
 }
@@ -788,7 +811,7 @@ byte server_change_manual(char *p) {
       // - currently running (cannot handle overlapping schedules of the same station)
       byte bid = sid>>3;
       byte s = sid&0x07;
-      if ((os.status.mas==sid+1) || (os.station_bits[bid]&(1<<s)))   //|| (os.stndis_bits[bid]&(1<<s))
+      if ((os.status.mas==sid+1) || (os.station_bits[bid]&(1<<s)))
         return HTML_NOT_PERMITTED;
       
       // if the station doesn't already have a scheduled stop time
@@ -797,7 +820,7 @@ byte server_change_manual(char *p) {
         // water time is scaled by watering percentage
         pd.scheduled_stop_time[sid] = timer;
         pd.scheduled_program_index[sid] = 99;   // testing stations are assigned program index 99
-        schedule_all_stations(curr_time, os.status.seq);
+        schedule_all_stations(curr_time);
       } else {
         return HTML_NOT_PERMITTED;
       }
@@ -834,7 +857,8 @@ byte server_json_log(char *p) {
   // start must be prior to end, and can't retrieve more than 365 days of data
   if ((start>end) || (end-start)>365)  return HTML_DATA_OUTOFBOUND;
   
-  bfill.emit_p(PSTR("$F["), htmlJSONHeader);
+  print_json_header();
+  bfill.emit_p(PSTR("["));
  
   char *s;
   int res, count = 0;
@@ -995,7 +1019,7 @@ void analyze_get_url(char *p)
         } else if (str[0]=='j' && str[1]=='o')  { // for /jo page we output fwv if password fails
           str+=3;
           if(check_password(str)==false) {
-            server_json_header();
+            print_json_header_with_bracket();
             bfill.emit_p(PSTR("\"$F\":$D}"),
                    os.options[0].json_str, os.options[0].value);
             ret = HTML_OK;
@@ -1015,10 +1039,12 @@ void analyze_get_url(char *p)
         case HTML_OK:
           break;
         case HTML_REDIRECT_HOME:
-          bfill.emit_p(PSTR("$F$F"), htmlOkHeader, htmlReturnHome);
+          print_html_standard_header();
+          bfill.emit_p(PSTR("$F"), htmlReturnHome);
           break;
         default:
-          bfill.emit_p(PSTR("$F{\"result\":$D}"), htmlJSONHeader, ret);
+          print_json_header();
+          bfill.emit_p(PSTR("{\"result\":$D}"), ret);
         }
         break;
       }
@@ -1033,7 +1059,8 @@ void analyze_get_url(char *p)
       sd.chdir("/");
       if (streamfile ((char *)tmp_buffer)==0) {
         // file not found
-        bfill.emit_p(PSTR("$F{\"result\":$D}"), htmlJSONHeader, HTML_PAGE_NOT_FOUND);
+        print_json_header();
+        bfill.emit_p(PSTR("{\"result\":$D}"), HTML_PAGE_NOT_FOUND);
         ether.httpServerReply_with_flags(bfill.position(), TCP_FLAGS_ACK_V|TCP_FLAGS_FIN_V);
       }
     } else {
@@ -1049,7 +1076,15 @@ byte streamfile (char* name) { //send a file to the buffer
   if(!sd.exists(name))  {return 0;}
   SdFile myfile(name, O_READ);
 
-  bfill.emit_p(PSTR("$F"), htmlFileHeader);
+  // print file header dependeing on file type
+  bfill.emit_p(PSTR("$F$F"), html200OK, htmlCacheCtrl);  
+  char *pext = name+strlen(name)-4;
+  if(strncmp(pext, ".cgz", 4)==0) {
+    bfill.emit_p(PSTR("$F"), htmlContentCgz);
+  } else if(strncmp(pext, ".jgz", 4)==0) {
+    bfill.emit_p(PSTR("$F"), htmlContentJgz);
+  }
+  bfill.emit_p(PSTR("\r\n"));
   ether.httpServerReply_with_flags(bfill.position(), TCP_FLAGS_ACK_V);
   bfill = ether.tcpOffset();
   while(myfile.available()) {

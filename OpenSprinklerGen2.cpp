@@ -30,6 +30,9 @@ unsigned long OpenSprinkler::ntpsync_lasttime;
 unsigned long OpenSprinkler::checkwt_lasttime;
 unsigned long OpenSprinkler::network_lasttime;
 unsigned long OpenSprinkler::dhcpnew_lasttime;
+byte OpenSprinkler::water_percent_avg;
+byte OpenSprinkler::water_percent_n;
+
 extern char tmp_buffer[];
 
 // Option json names
@@ -47,7 +50,7 @@ prog_char _json_gw3 [] PROGMEM = "gw3";
 prog_char _json_gw4 [] PROGMEM = "gw4";
 prog_char _json_hp0 [] PROGMEM = "hp0";
 prog_char _json_hp1 [] PROGMEM = "hp1";
-prog_char _json_ar  [] PROGMEM = "_ar"; // this option is retired
+prog_char _json_hwv [] PROGMEM = "hwv";
 prog_char _json_ext [] PROGMEM = "ext";
 prog_char _json_log [] PROGMEM = "log";
 prog_char _json_sdt [] PROGMEM = "sdt";
@@ -72,7 +75,7 @@ prog_char _json_ntp4[] PROGMEM = "ntp4";
 prog_char _json_reset[] PROGMEM = "reset";
 
 // Option names
-prog_char _str_fwv [] PROGMEM = "Firmware ver.";
+prog_char _str_fwv [] PROGMEM = "Firmware: ";
 prog_char _str_tz  [] PROGMEM = "TZone:";
 prog_char _str_ntp [] PROGMEM = "NTP?";
 prog_char _str_dhcp[] PROGMEM = "Use DHCP?";
@@ -86,7 +89,7 @@ prog_char _str_gw3 [] PROGMEM = "Gateway.ip3:";
 prog_char _str_gw4 [] PROGMEM = "Gateway.ip4:";
 prog_char _str_hp0 [] PROGMEM = "HTTP port:";
 prog_char _str_hp1 [] PROGMEM = "";
-prog_char _str_ar  [] PROGMEM = "";
+prog_char _str_hwv [] PROGMEM = "Hardware: ";
 prog_char _str_ext [] PROGMEM = "Exp. board:";
 prog_char _str_log [] PROGMEM = "Enable logging?";
 prog_char _str_sdt [] PROGMEM = "Stn delay:";
@@ -125,9 +128,9 @@ OptionStruct OpenSprinkler::options[NUM_OPTIONS] = {
   {1,   255, _str_gw4,  _json_gw4},
   {80,  255, _str_hp0,  _json_hp0},   // this and next byte define http port number
   {0,   255, _str_hp1,  _json_hp1},
-  {1,   1,   _str_ar,   _json_ar},    // this option is required
+  {OS_HW_VERSION, 0, _str_hwv, _json_hwv},
   {0,   MAX_EXT_BOARDS, _str_ext, _json_ext}, // number of extension board. 0: no extension boards
-  {1,   1,   _str_log,  _json_log},   // sequential mode. 1: stations run sequentially; 0: concurrently
+  {1,   1,   _str_log,  _json_log},   // enable logging: 0: disable; 1: enable. 
   {128, 247, _str_sdt,  _json_sdt},   // station delay time (-59 minutes to 59 minutes).
   {0,   8,   _str_mas,  _json_mas},   // index of master station. 0: no master station
   {0,   60,  _str_mton, _json_mton},  // master on time [0,60] seconds
@@ -295,7 +298,7 @@ void OpenSprinkler::begin() {
   // AVR assigns 0 to static variables by default
   // so only need to initialize non-zero ones
   status.enabled = 1;
-  status.seq = 1;
+  //status.seq = 1;
   
   old_status = status;
   
@@ -874,10 +877,17 @@ void OpenSprinkler::lcd_print_ip(const byte *ip, byte lineno) {
 }
 
 // print mac address
-void OpenSprinkler::lcd_print_mac(const byte *mac, byte lineno) {
-  lcd.setCursor(0, lineno);
-  lcd_print_pgm(PSTR("Mac:"));
-  for(byte i=0; i<6; i++) {
+void OpenSprinkler::lcd_print_mac(const byte *mac) {
+  lcd.setCursor(0, 0);
+  lcd_print_pgm(PSTR("MAC:"));
+  for(byte i=0; i<4; i++) {
+    lcd.print((mac[i]>>4), HEX);
+    lcd.print((mac[i]&0x0F), HEX);    
+    lcd_print_pgm(PSTR("-"));
+  }
+  lcd.setCursor(0, 1);
+  for(byte i=4; i<6; i++) {
+    if(i!=4) lcd_print_pgm(PSTR("-"));
     lcd.print((mac[i]>>4), HEX);
     lcd.print((mac[i]&0x0F), HEX);    
   }
@@ -923,6 +933,19 @@ void OpenSprinkler::lcd_print_station(byte line, char c) {
 
 }
 
+// Print a version number
+void OpenSprinkler::lcd_print_version(byte v) {
+  if(v > 99) {
+    lcd.print(v/100);
+    lcd.print(".");
+  }
+  if(v>9) {
+    lcd.print((v/10)%10);
+    lcd.print(".");
+  }
+  lcd.print(v%10);
+}
+
 // Print an option value
 void OpenSprinkler::lcd_print_option(int i) {
   lcd_print_line_clear_pgm(options[i].str, 0);  
@@ -932,6 +955,11 @@ void OpenSprinkler::lcd_print_option(int i) {
   //else lcd.noBlink();
   int tz;
   switch(i) {
+  case OPTION_HW_VERSION:
+    lcd.print("v");
+  case OPTION_FW_VERSION:
+    lcd_print_version(options[i].value);
+    break;
   case OPTION_TIMEZONE: // if this is the time zone option, do some conversion
     tz = (int)options[i].value-48;
     if (tz>=0) lcd_print_pgm(PSTR("+"));
@@ -1056,12 +1084,12 @@ void OpenSprinkler::ui_set_options(int oid)
 
     switch (button & BUTTON_MASK) {
     case BUTTON_1:
-      if (i==0) break; // ignore non-editable options
+      if (i==OPTION_FW_VERSION || i==OPTION_HW_VERSION) break; // ignore non-editable options
       if (options[i].max != options[i].value) options[i].value ++;
       break;
 
     case BUTTON_2:
-      if (i==0) break; // ignore non-editable options
+      if (i==OPTION_FW_VERSION || i==OPTION_HW_VERSION) break; // ignore non-editable options
       if (options[i].value != 0) options[i].value --;
       break;
 

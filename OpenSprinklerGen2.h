@@ -49,7 +49,7 @@ struct ConStatus {
   byte has_rtc:1;           // HIGH means the controller has a DS1307 RTC
   byte has_sd:1;            // HIGH means a microSD card is detected
   byte wt_received:1;       // HIGH means weather info has been received
-  byte seq:1;             // dummy bit
+  byte dummy:1;             // dummy bit
   byte display_board:4;     // the board that is being displayed onto the lcd
   byte network_fails:4;     // number of network fails
   byte mas:8;               // master station index
@@ -84,7 +84,8 @@ public:
   static unsigned long checkwt_lasttime;
   static unsigned long network_lasttime;
   static unsigned long dhcpnew_lasttime;
-  
+  static byte water_percent_avg;
+  static byte water_percent_n;
   // ====== Member Functions ======
   // -- Setup --
   static void reboot();   // reboot the microcontroller
@@ -134,9 +135,9 @@ public:
   static void lcd_print_line_clear_pgm(PGM_P PROGMEM str, byte line);
   static void lcd_print_time(byte line);                  // print current time
   static void lcd_print_ip(const byte *ip, byte line);    // print ip
-  static void lcd_print_mac(const byte *mac, byte line);  // print mac 
+  static void lcd_print_mac(const byte *mac);             // print mac 
   static void lcd_print_station(byte line, char c);       // print station bits of the board selected by display_board
- 
+  static void lcd_print_version(byte v);                   // print version number
   // -- Button and UI functions --
   static byte button_read(byte waitmode); // Read button value. options for 'waitmodes' are:
                                           // BUTTON_WAIT_NONE, BUTTON_WAIT_RELEASE, BUTTON_WAIT_HOLD

@@ -84,7 +84,7 @@ typedef enum {
   OPTION_GATEWAY_IP4,
   OPTION_HTTPPORT_0,
   OPTION_HTTPPORT_1,
-  OPTION_NETFAIL_RECONNECT_RETIRED,
+  OPTION_HW_VERSION,
   OPTION_EXT_BOARDS,
   OPTION_ENABLE_LOGGING,
   OPTION_STATION_DELAY_TIME,
@@ -120,13 +120,21 @@ typedef enum {
 // =====================================
 
 // ====== Define hardware version here ======
-#define OS_HW_VERSION 20
+#undef OS_HW_VERSION
+
+#if F_CPU==8000000L
+  #define OS_HW_VERSION 20
+#elif F_CPU==12000000L
+  #define OS_HW_VERSION 21
+#elif F_CPU==16000000L
+  #define OS_HW_VERSION 22
+#endif
 
 #ifndef OS_HW_VERSION
 #error "==This error is intentional==: you must define OS_HW_VERSION in arduino-xxxx/libraries/OpenSprinklerGen2/defines.h"
 #endif
 
-#if OS_HW_VERSION == 20 || OS_HW_VERSION == 21
+#if OS_HW_VERSION == 20 || OS_HW_VERSION == 21 || OS_HW_VERSION == 22
 
   #define PIN_BUTTON_1      31    // button 1
   #define PIN_BUTTON_2      30    // button 2
@@ -184,7 +192,7 @@ typedef enum {
 
 #define 	wdt_reset()   __asm__ __volatile__ ("wdr")
 
-#define SERIAL_DEBUG
+//#define SERIAL_DEBUG
 
 #ifdef SERIAL_DEBUG
 
