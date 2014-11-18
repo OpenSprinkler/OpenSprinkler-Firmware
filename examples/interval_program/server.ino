@@ -516,10 +516,7 @@ void server_json_options_main() {
     if (oid==OPTION_MASTER_OFF_ADJ) {v-=60;}
     if (oid==OPTION_RELAY_PULSE) {v*=10;}    
     if (oid==OPTION_STATION_DELAY_TIME) {v=water_time_decode_signed(v);}
-    /*if (oid==OPTION_STATION_DELAY_TIME) {
-      bfill.emit_p(PSTR("\"$F\":$L"),
-                 os.options[oid].json_str, v);  // account for value possibly larger than 32767
-    } else*/
+    if (pgm_read_byte(os.options[oid].json_str)=='_') continue;
     bfill.emit_p(PSTR("\"$F\":$D"),
                  os.options[oid].json_str, v);
     if(oid!=NUM_OPTIONS-1)
@@ -641,8 +638,12 @@ byte server_change_options(char *p)
   byte prev_value;
   for (byte oid=0; oid<NUM_OPTIONS; oid++) {
     //if ((os.options[oid].flag&OPFLAG_WEB_EDIT)==0) continue;
-    // skip binary options that do not appear in the UI
-    if (oid==OPTION_RESET || oid==OPTION_DEVICE_ENABLE || oid==OPTION_ENABLE_LOGGING) continue;
+    
+    // skip options that cannot be set through web UI
+    if (oid==OPTION_RESET || oid==OPTION_DEVICE_ENABLE ||
+        oid==OPTION_FW_VERSION || oid==OPTION_HW_VERSION ||
+        oid==OPTION_SEQUENTIAL_RETIRED)
+      continue;
     prev_value = os.options[oid].value;
     if (os.options[oid].max==1)  os.options[oid].value = 0;  // set a bool variable to 0 first
     char tbuf2[5] = {'o', 0, 0, 0, 0};

@@ -52,7 +52,7 @@ prog_char _json_hp0 [] PROGMEM = "hp0";
 prog_char _json_hp1 [] PROGMEM = "hp1";
 prog_char _json_hwv [] PROGMEM = "hwv";
 prog_char _json_ext [] PROGMEM = "ext";
-prog_char _json_log [] PROGMEM = "log";
+prog_char _json_seq [] PROGMEM = "_";
 prog_char _json_sdt [] PROGMEM = "sdt";
 prog_char _json_mas [] PROGMEM = "mas";
 prog_char _json_mton[] PROGMEM = "mton";
@@ -72,6 +72,7 @@ prog_char _json_ntp1[] PROGMEM = "ntp1";
 prog_char _json_ntp2[] PROGMEM = "ntp2";
 prog_char _json_ntp3[] PROGMEM = "ntp3";
 prog_char _json_ntp4[] PROGMEM = "ntp4";
+prog_char _json_log [] PROGMEM = "lg";
 prog_char _json_reset[] PROGMEM = "reset";
 
 // Option names
@@ -91,7 +92,7 @@ prog_char _str_hp0 [] PROGMEM = "HTTP port:";
 prog_char _str_hp1 [] PROGMEM = "";
 prog_char _str_hwv [] PROGMEM = "Hardware: ";
 prog_char _str_ext [] PROGMEM = "Exp. board:";
-prog_char _str_log [] PROGMEM = "Enable logging?";
+prog_char _str_seq [] PROGMEM = "";
 prog_char _str_sdt [] PROGMEM = "Stn delay:";
 prog_char _str_mas [] PROGMEM = "Mas. station:";
 prog_char _str_mton[] PROGMEM = "Mas.  on adj.:";
@@ -106,11 +107,12 @@ prog_char _str_con [] PROGMEM = "LCD contrast:";
 prog_char _str_lit [] PROGMEM = "LCD backlight:";
 prog_char _str_dim [] PROGMEM = "LCD dimming:";
 prog_char _str_rlp [] PROGMEM = "Relay pulse:";
-prog_char _str_uwt  [] PROGMEM = "Use weather?";
+prog_char _str_uwt [] PROGMEM = "Use weather?";
 prog_char _str_ntp1[] PROGMEM = "NTP.ip1:";
 prog_char _str_ntp2[] PROGMEM = "NTP.ip2:";
 prog_char _str_ntp3[] PROGMEM = "NTP.ip3:";
 prog_char _str_ntp4[] PROGMEM = "NTP.ip4:";
+prog_char _str_log [] PROGMEM = "Enable logging?";
 prog_char _str_reset[] PROGMEM = "Reset all?";
 
 OptionStruct OpenSprinkler::options[NUM_OPTIONS] = {
@@ -130,7 +132,7 @@ OptionStruct OpenSprinkler::options[NUM_OPTIONS] = {
   {0,   255, _str_hp1,  _json_hp1},
   {OS_HW_VERSION, 0, _str_hwv, _json_hwv},
   {0,   MAX_EXT_BOARDS, _str_ext, _json_ext}, // number of extension board. 0: no extension boards
-  {1,   1,   _str_log,  _json_log},   // enable logging: 0: disable; 1: enable. 
+  {1,   1,   _str_seq,  _json_seq},   // reqired
   {128, 247, _str_sdt,  _json_sdt},   // station delay time (-59 minutes to 59 minutes).
   {0,   8,   _str_mas,  _json_mas},   // index of master station. 0: no master station
   {0,   60,  _str_mton, _json_mton},  // master on time [0,60] seconds
@@ -150,6 +152,7 @@ OptionStruct OpenSprinkler::options[NUM_OPTIONS] = {
   {9,   255, _str_ntp2, _json_ntp2}, 
   {54,  255, _str_ntp3, _json_ntp3},
   {119, 255, _str_ntp4, _json_ntp4},
+  {1,   1,   _str_log,  _json_log},   // enable logging: 0: disable; 1: enable.   
   {0,   1,   _str_reset,_json_reset}
 };
 
