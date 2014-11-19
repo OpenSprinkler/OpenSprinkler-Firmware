@@ -115,6 +115,7 @@ typedef enum {
 #define LOGDATA_STATION    0x00
 #define LOGDATA_RAINSENSE  0x01
 #define LOGDATA_RAINDELAY  0x02
+#define LOGDATA_STAT       0x03
 
 // =====================================
 // ====== Arduino Pin Assignments ======

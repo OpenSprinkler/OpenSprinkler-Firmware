@@ -85,7 +85,6 @@ public:
   static unsigned long network_lasttime;
   static unsigned long dhcpnew_lasttime;
   static byte water_percent_avg;
-  static byte water_percent_n;
   // ====== Member Functions ======
   // -- Setup --
   static void reboot();   // reboot the microcontroller

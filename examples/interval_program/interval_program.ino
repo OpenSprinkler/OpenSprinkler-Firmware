@@ -19,6 +19,7 @@
 #define RTC_SYNC_INTERVAL       60      // RTC sync interval, 60 secs
 #define CHECK_NETWORK_INTERVAL  30      // Network checking interval, 30 secs
 #define DHCP_RENEW_INTERVAL     43200L  // DHCP renewal interval: 12 hrs
+#define STAT_UPDATE_INTERVAL    900L    // Statistics update interval: 15 mins
 #define CHECK_WEATHER_INTERVAL  900     // Weather check interval: 15 mins
 #define LCD_DIMMING_TIMEOUT      15     // LCD dimming timeout: 15 secs
 #define PING_TIMEOUT            200     // Ping test timeout: 200 ms
@@ -458,7 +459,7 @@ void loop()
     check_network(curr_time);
     
     // calculate statistics
-    calc_statistics(curr_time);
+    log_statistics(curr_time);
     
     // perform ntp sync
     perform_ntp_sync(curr_time);
@@ -497,15 +498,23 @@ void check_weather(time_t curr_time) {
   }
 }
 
-void calc_statistics(time_t curr_time) {
-  unsigned long total = os.water_percent_avg;
-  total = total * os.water_percent_n;
-  total += os.options[OPTION_WATER_PERCENTAGE].value;
-  os.water_percent_n ++;
-  os.water_percent_avg = byte(total / os.water_percent_n);
-  if (os.water_percent_n >= 24) {
-    os.water_percent_avg = os.options[OPTION_WATER_PERCENTAGE].value;
-    os.water_percent_n = 1;
+void log_statistics(time_t curr_time) {
+  static byte stat_n = 0;
+  static unsigned long stat_lasttime = 0;
+  // update statistics
+  if ((stat_lasttime ==0) || (curr_time - stat_lasttime) > STAT_UPDATE_INTERVAL) {
+    stat_lasttime = curr_time;
+    unsigned long wp_total = os.water_percent_avg;
+    wp_total = wp_total * stat_n;
+    wp_total += os.options[OPTION_WATER_PERCENTAGE].value;
+    stat_n ++;
+    os.water_percent_avg = byte(wp_total / stat_n);
+    DEBUG_PRINTLN(os.water_percent_avg);
+    // writes every 24 hours (4 * 24)
+    if (stat_n == 96) {
+      write_log(LOGDATA_STAT, curr_time);
+      stat_n = 0;
+    }
   }
 }
 
@@ -840,6 +849,10 @@ void write_log(byte type, unsigned long curr_time) {
     str += "0,\"rd\",";
     str += (curr_time - os.raindelay_start_time);
     break;
+  case LOGDATA_STAT:
+    str += "0,\"wl\",";
+    str += os.water_percent_avg;
+    break; 
   }
   str += ",";
   str += curr_time;  

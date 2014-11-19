@@ -31,7 +31,6 @@ unsigned long OpenSprinkler::checkwt_lasttime;
 unsigned long OpenSprinkler::network_lasttime;
 unsigned long OpenSprinkler::dhcpnew_lasttime;
 byte OpenSprinkler::water_percent_avg;
-byte OpenSprinkler::water_percent_n;
 
 extern char tmp_buffer[];
 
