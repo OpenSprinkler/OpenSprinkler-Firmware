@@ -847,17 +847,26 @@ byte server_json_log(char *p) {
   if (!os.status.has_sd)  return HTML_PAGE_NOT_FOUND;
   
   unsigned int start, end;
-  if (!ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("start"), true))
-    return HTML_DATA_MISSING;
-  start = atol(tmp_buffer) / 86400L;
-  
-  if (!ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("end"), true))
-    return HTML_DATA_MISSING;
-  end = atol(tmp_buffer) / 86400L;
-  
-  // start must be prior to end, and can't retrieve more than 365 days of data
-  if ((start>end) || (end-start)>365)  return HTML_DATA_OUTOFBOUND;
-  
+  /*if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("hist"), true)) {
+    int hist = atoi(tmp_buffer);
+    if (hist< 0 || hist > 365) return HTML_DATA_OUTOFBOUND;
+    end = now() / 86400L;
+    start = end - hist;
+  }
+  else*/
+  {
+    if (!ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("start"), true))
+      return HTML_DATA_MISSING;
+    start = atol(tmp_buffer) / 86400L;
+    
+    if (!ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("end"), true))
+      return HTML_DATA_MISSING;
+    end = atol(tmp_buffer) / 86400L;
+    
+    // start must be prior to end, and can't retrieve more than 365 days of data
+    if ((start>end) || (end-start)>365)  return HTML_DATA_OUTOFBOUND;
+  }
+    
   print_json_header();
   bfill.emit_p(PSTR("["));
  

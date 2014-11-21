@@ -116,17 +116,17 @@ prog_char _str_reset[] PROGMEM = "Reset all?";
 
 OptionStruct OpenSprinkler::options[NUM_OPTIONS] = {
   {OS_FW_VERSION, 0, _str_fwv, _json_fwv}, // firmware version
-  {32,  108, _str_tz,   _json_tz},    // default time zone: GMT-4
+  {28,  108, _str_tz,   _json_tz},    // default time zone: GMT-5
   {1,   1,   _str_ntp,  _json_ntp},   // use NTP sync
   {1,   1,   _str_dhcp, _json_dhcp},  // 0: use static ip, 1: use dhcp
-  {192, 255, _str_ip1,  _json_ip1},   // this and next 3 bytes define static ip
-  {168, 255, _str_ip2,  _json_ip2},
-  {1,   255, _str_ip3,  _json_ip3},
-  {22,  255, _str_ip4,  _json_ip4},
-  {192, 255, _str_gw1,  _json_gw1},   // this and next 3 bytes define static gateway ip
-  {168, 255, _str_gw2,  _json_gw2},
-  {1,   255, _str_gw3,  _json_gw3},
-  {1,   255, _str_gw4,  _json_gw4},
+  {0,   255, _str_ip1,  _json_ip1},   // this and next 3 bytes define static ip
+  {0,   255, _str_ip2,  _json_ip2},
+  {0,   255, _str_ip3,  _json_ip3},
+  {0,   255, _str_ip4,  _json_ip4},
+  {0,   255, _str_gw1,  _json_gw1},   // this and next 3 bytes define static gateway ip
+  {0,   255, _str_gw2,  _json_gw2},
+  {0,   255, _str_gw3,  _json_gw3},
+  {0,   255, _str_gw4,  _json_gw4},
   {80,  255, _str_hp0,  _json_hp0},   // this and next byte define http port number
   {0,   255, _str_hp1,  _json_hp1},
   {OS_HW_VERSION, 0, _str_hwv, _json_hwv},

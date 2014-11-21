@@ -19,7 +19,7 @@
 #define RTC_SYNC_INTERVAL       60      // RTC sync interval, 60 secs
 #define CHECK_NETWORK_INTERVAL  30      // Network checking interval, 30 secs
 #define DHCP_RENEW_INTERVAL     43200L  // DHCP renewal interval: 12 hrs
-#define STAT_UPDATE_INTERVAL    900L    // Statistics update interval: 15 mins
+#define STAT_UPDATE_INTERVAL    900     // Statistics update interval: 15 mins
 #define CHECK_WEATHER_INTERVAL  900     // Weather check interval: 15 mins
 #define LCD_DIMMING_TIMEOUT      15     // LCD dimming timeout: 15 secs
 #define PING_TIMEOUT            200     // Ping test timeout: 200 ms
@@ -461,11 +461,11 @@ void loop()
     // calculate statistics
     log_statistics(curr_time);
     
-    // perform ntp sync
-    perform_ntp_sync(curr_time);
-    
     // check weather
     check_weather(curr_time);
+
+    // perform ntp sync
+    perform_ntp_sync(curr_time);
   }
 }
 
@@ -501,7 +501,7 @@ void check_weather(time_t curr_time) {
 void log_statistics(time_t curr_time) {
   static byte stat_n = 0;
   static unsigned long stat_lasttime = 0;
-  // update statistics
+  // update statistics once 15 minutes
   if ((stat_lasttime ==0) || (curr_time - stat_lasttime) > STAT_UPDATE_INTERVAL) {
     stat_lasttime = curr_time;
     unsigned long wp_total = os.water_percent_avg;
@@ -510,7 +510,7 @@ void log_statistics(time_t curr_time) {
     stat_n ++;
     os.water_percent_avg = byte(wp_total / stat_n);
     DEBUG_PRINTLN(os.water_percent_avg);
-    // writes every 24 hours (4 * 24)
+    // writes every 4*24 times (1 day)
     if (stat_n == 96) {
       write_log(LOGDATA_STAT, curr_time);
       stat_n = 0;
