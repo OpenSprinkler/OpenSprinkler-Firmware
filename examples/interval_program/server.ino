@@ -1098,9 +1098,9 @@ byte streamfile (char* name) { //send a file to the buffer
   ether.httpServerReply_with_flags(bfill.position(), TCP_FLAGS_ACK_V);
   bfill = ether.tcpOffset();
   while(myfile.available()) {
-    int nbytes = myfile.read(Ethernet::buffer+54, 512);
+    int nbytes = myfile.read(Ethernet::buffer+54, ETHER_BUFFER_SIZE - 54);
     cur = nbytes;
-    if (cur>=512) {
+    if (cur>=ETHER_BUFFER_SIZE - 54) {
       ether.httpServerReply_with_flags(cur,TCP_FLAGS_ACK_V, 3);
       cur=0;
     } else {
