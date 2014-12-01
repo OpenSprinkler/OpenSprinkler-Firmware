@@ -144,7 +144,7 @@ OptionStruct OpenSprinkler::options[NUM_OPTIONS] = {
   {0,   255, _str_devid,_json_devid}, // device id
   {110, 255, _str_con,  _json_con},   // lcd contrast
   {100, 255, _str_lit,  _json_lit},   // lcd backlight
-  {5,   255, _str_dim,  _json_dim},   // lcd dimming
+  {15,   255, _str_dim,  _json_dim},   // lcd dimming
   {0,   200, _str_rlp,  _json_rlp},   // relay pulse
   {0,   5,   _str_uwt,  _json_uwt}, 
   {204, 255, _str_ntp1, _json_ntp1},  // this and the next three bytes define the ntp server ip

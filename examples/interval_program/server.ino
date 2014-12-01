@@ -855,7 +855,6 @@ byte server_json_log(char *p) {
   
   unsigned int start, end;
 
-#if OS_HW_VERSION == 20 || OS_HW_VERSION == 22
   // past n day history
   if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("hist"), true)) {
     int hist = atoi(tmp_buffer);
@@ -864,7 +863,6 @@ byte server_json_log(char *p) {
     start = end - hist;
   }
   else
-#endif
   {
     if (!ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("start"), true))
       return HTML_DATA_MISSING;
@@ -914,6 +912,9 @@ byte server_json_log(char *p) {
       // special records are all in the form of [0,"xx",...]
       // where xx is the type name
       if (type_specified && strncmp(type, tmp_buffer+4, 2))
+        continue;
+      // if type is not specified, output everything except "wl" records
+      if (!type_specified && !strncmp("wl", tmp_buffer+4, 2)) 
         continue;
       // if this is the first record, do not print comma
       if (first)  { bfill.emit_p(PSTR("$S"), tmp_buffer); first=false;}
