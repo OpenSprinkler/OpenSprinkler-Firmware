@@ -313,9 +313,9 @@ void OpenSprinkler::begin() {
   // define lcd custom icons
   byte lcd_wifi_char[8] = {
     B00000,
-    B10100,
-    B01000,
-    B10101,
+    B00000,
+    B00001,
+    B00001,
     B00001,
     B00101,
     B00101,
@@ -351,14 +351,48 @@ void OpenSprinkler::begin() {
     B10000,
     B00000
   };
-  lcd.createChar(1, lcd_wifi_char);  
-  lcd_wifi_char[1]=0;
-  lcd_wifi_char[2]=0;
-  lcd_wifi_char[3]=1;    
+  byte lcd_water1_char[8] = {
+    B00000,
+    B00000,
+    B01010,
+    B10101,
+    B10101,
+    B00100,
+    B00100,
+    B00000
+  };
+  byte lcd_water2_char[8] = {
+    B00000,
+    B01010,
+    B10101,
+    B10101,
+    B00100,
+    B10101,
+    B00100,
+    B00000
+  };
+  byte lcd_water3_char[8] = {
+    B00000,
+    B01010,
+    B10101,
+    B00100,
+    B10101,
+    B00100,
+    B10101,
+    B00000
+  };
+
   lcd.createChar(0, lcd_wifi_char);  
+  lcd_wifi_char[1]=B10100;
+  lcd_wifi_char[2]=B01000;
+  lcd_wifi_char[3]=B10101;
+  lcd.createChar(1, lcd_wifi_char);
   lcd.createChar(2, lcd_sd_char);
   lcd.createChar(3, lcd_rain_char);
   lcd.createChar(4, lcd_connect_char);
+  lcd.createChar(5, lcd_water1_char);
+  lcd.createChar(6, lcd_water2_char);
+  lcd.createChar(7, lcd_water3_char);
   
   // set rf data pin
   pinMode(PIN_RF_DATA, OUTPUT);

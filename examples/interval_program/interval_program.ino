@@ -34,7 +34,7 @@ ProgramData pd;   // ProgramdData object
 SdFat sd;         // SD card object
 
 // ====== UI defines ======
-static char ui_anim_chars[3] = {'.', 'o', 'O'};
+static char ui_anim_chars[3] = {5, 6, 7};
   
 #define UI_STATE_DEFAULT   0
 #define UI_STATE_DISP_IP   1
