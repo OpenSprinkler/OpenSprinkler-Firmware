@@ -246,7 +246,10 @@ bool ENC28J60::broadcast_enabled = false;
 
 // max frame length which the conroller will accept:
 // (note: maximum ethernet frame length would be 1518)
-#define MAX_FRAMELEN      1500
+// 1500 - Payload
+// add 14 Bytes for MAC header
+// add 4 Bytes for VLAN header
+#define MAX_FRAMELEN 1514
 
 #define FULL_SPEED  1   // switch to full-speed SPI for bulk transfers
 
