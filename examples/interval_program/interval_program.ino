@@ -458,14 +458,14 @@ void loop()
     // check network connection
     check_network(curr_time);
     
-    // calculate statistics
-    log_statistics(curr_time);
-    
     // check weather
     check_weather(curr_time);
 
     // perform ntp sync
     perform_ntp_sync(curr_time);
+
+    // calculate statistics
+    log_statistics(curr_time);
   }
 }
 
@@ -490,31 +490,11 @@ void check_weather(time_t curr_time) {
   // do not check weather if the Use Weather option is disabled, or if network is not available, or if a program is running
   if (os.status.network_fails>0 || os.status.program_busy) return;
 
-  uint16_t inv = 10;
+  uint16_t inv = 30;  // recheck every 30 seconds if didn't receive anything last time
   if (os.status.wt_received)  inv = CHECK_WEATHER_INTERVAL;
   if (!os.checkwt_lasttime || ((curr_time - os.checkwt_lasttime) > inv)) {
     os.checkwt_lasttime = curr_time;
     GetWeather();
-  }
-}
-
-void log_statistics(time_t curr_time) {
-  static byte stat_n = 0;
-  static unsigned long stat_lasttime = 0;
-  // update statistics once 15 minutes
-  if ((stat_lasttime ==0) || (curr_time - stat_lasttime) > STAT_UPDATE_INTERVAL) {
-    stat_lasttime = curr_time;
-    unsigned long wp_total = os.water_percent_avg;
-    wp_total = wp_total * stat_n;
-    wp_total += os.options[OPTION_WATER_PERCENTAGE].value;
-    stat_n ++;
-    os.water_percent_avg = byte(wp_total / stat_n);
-    DEBUG_PRINTLN(os.water_percent_avg);
-    // writes every 4*24 times (1 day)
-    if (stat_n == 96) {
-      write_log(LOGDATA_STAT, curr_time);
-      stat_n = 0;
-    }
   }
 }
 
@@ -667,7 +647,7 @@ void schedule_all_stations(unsigned long curr_time)
   
   int16_t station_delay = water_time_decode_signed(os.options[OPTION_STATION_DELAY_TIME].value);
   // if the sequential queue has stations running
-  if (pd.last_seq_stop_time > 0) {
+  if (pd.last_seq_stop_time > curr_time) {
     seq_start_time = pd.last_seq_stop_time + station_delay;
   }
 
@@ -771,13 +751,13 @@ void manual_start_program(byte pid) {
 // ====== LOGGING FUNCTIONS =======
 // ================================
 // Log files will be named /logs/xxxxx.txt
-const char LOG_PREFIX[] = "/logs/";
+char LOG_PREFIX[] = "/logs/";
 void make_logfile_name(char *name) {
   sd.chdir("/");
-  String str = LOG_PREFIX;
-  str += name;
-  str += ".txt";
-  str.toCharArray(tmp_buffer, TMP_BUFFER_SIZE);
+  strcpy(tmp_buffer+TMP_BUFFER_SIZE-10, name);
+  strcpy(tmp_buffer, LOG_PREFIX);
+  strcat(tmp_buffer, tmp_buffer+TMP_BUFFER_SIZE-10);
+  strcat_P(tmp_buffer, PSTR(".txt"));
 }
 
 // delete log file
@@ -810,6 +790,13 @@ int freeRam () {
 }
 #endif
 
+char *log_type_names[] = {
+  "",
+  "rs",
+  "rd",
+  "wl"
+};
+
 // write run record to log on SD card
 void write_log(byte type, unsigned long curr_time) {
   if (!os.options[OPTION_ENABLE_LOGGING].value) return;
@@ -826,41 +813,76 @@ void write_log(byte type, unsigned long curr_time) {
       return;    
     }
   }
-  DEBUG_PRINT(freeRam());  
+  DEBUG_PRINTLN(freeRam());  
   SdFile file;
   file.open(tmp_buffer, O_CREAT | O_WRITE );
   file.seekEnd();
-  String str;
-  str = "[";
+  //String str;
+  //str = "[";
+  strcpy_P(tmp_buffer, PSTR("["));
 
-  switch(type) {
-  case LOGDATA_STATION:
-    str += pd.lastrun.program;
+  if(type == LOGDATA_STATION) {
+    /*str += pd.lastrun.program;
     str += ",";
     str += pd.lastrun.station;
     str += ",";
-    str += pd.lastrun.duration;
-    break;
-  case LOGDATA_RAINSENSE:
-    str += "0,\"rs\",";
-    str += (curr_time - os.rainsense_start_time);
-    break;
-  case LOGDATA_RAINDELAY:
-    str += "0,\"rd\",";
-    str += (curr_time - os.raindelay_start_time);
-    break;
-  case LOGDATA_STAT:
-    str += "0,\"wl\",";
-    str += os.water_percent_avg;
-    break; 
+    str += pd.lastrun.duration;*/
+    itoa(pd.lastrun.program, tmp_buffer+strlen(tmp_buffer), 10);
+    strcat_P(tmp_buffer, PSTR(","));
+    itoa(pd.lastrun.station, tmp_buffer+strlen(tmp_buffer), 10);
+    strcat_P(tmp_buffer, PSTR(","));
+    itoa(pd.lastrun.duration, tmp_buffer+strlen(tmp_buffer), 10);
+  } else {
+    /*str += "0,\"";
+    str += log_type_names[type];
+    str += "\",";*/
+    strcat_P(tmp_buffer, PSTR("0,\""));
+    strcat(tmp_buffer, log_type_names[type]);
+    strcat_P(tmp_buffer, PSTR("\","));
+    switch(type) {
+      case LOGDATA_RAINSENSE:
+        //str += (curr_time - os.rainsense_start_time);
+        ultoa((curr_time - os.rainsense_start_time), tmp_buffer+strlen(tmp_buffer), 10);
+        break;
+      case LOGDATA_RAINDELAY:
+        //str += (curr_time - os.raindelay_start_time);
+        ultoa((curr_time - os.raindelay_start_time), tmp_buffer+strlen(tmp_buffer), 10);
+        break;
+      case LOGDATA_WATERLEVEL:
+        //str += os.water_percent_avg;
+        itoa(os.water_percent_avg, tmp_buffer+strlen(tmp_buffer), 10);
+        break;
+    }
   }
-  str += ",";
+  /*str += ",";
   str += curr_time;  
   str += "]";
   str += "\r\n";
-  str.toCharArray(tmp_buffer, TMP_BUFFER_SIZE);
-
-  DEBUG_PRINTLN(tmp_buffer);
+  str.toCharArray(tmp_buffer, TMP_BUFFER_SIZE);*/
+  strcat_P(tmp_buffer, PSTR(","));
+  ultoa(curr_time, tmp_buffer+strlen(tmp_buffer), 10);
+  strcat_P(tmp_buffer, PSTR("]\r\n"));
+  
   file.write(tmp_buffer);
   file.close();
+}
+
+void log_statistics(time_t curr_time) {
+  static byte stat_n = 0;
+  static unsigned long stat_lasttime = 0;
+  // update statistics once 15 minutes
+  if (curr_time - stat_lasttime > STAT_UPDATE_INTERVAL) {
+    stat_lasttime = curr_time;
+    unsigned long wp_total = os.water_percent_avg;
+    wp_total = wp_total * stat_n;
+    wp_total += os.options[OPTION_WATER_PERCENTAGE].value;
+    stat_n ++;
+    os.water_percent_avg = byte(wp_total / stat_n);
+    // writes every 4*24 times (1 day)
+    if (stat_n == 96) {
+      DEBUG_PRINTLN("wl");
+      write_log(LOGDATA_WATERLEVEL, curr_time);
+      stat_n = 0;
+    }
+  }
 }

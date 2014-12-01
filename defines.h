@@ -37,7 +37,7 @@
 /* program data is now stored at the beginning of the EEPROM
  * so that they can be preserved across firmware upgrades,
  * unless if program data structure is changed */
-#define MAX_UIDDATA                   8  // unique ID, 8 bytes max
+#define MAX_UIDDATA                  8  // unique ID, 8 bytes max
 #define MAX_PROGRAMDATA            996  // program data, 996 bytes max
 #define MAX_NVCONDATA                8  // non-volatile controller data, 8 bytes max
 #define MAX_USER_PASSWORD           32  // user password, 32 bytes max
@@ -115,7 +115,7 @@ typedef enum {
 #define LOGDATA_STATION    0x00
 #define LOGDATA_RAINSENSE  0x01
 #define LOGDATA_RAINDELAY  0x02
-#define LOGDATA_STAT       0x03
+#define LOGDATA_WATERLEVEL 0x03
 
 // =====================================
 // ====== Arduino Pin Assignments ======

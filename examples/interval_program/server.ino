@@ -260,6 +260,8 @@ byte server_json_programs(char *p)
   t:  station water time
 */
 byte server_change_runonce(char *p) {
+  // decode url first
+  ether.urlDecode(p);
   // search for the start of v=[
   char *pv;
   boolean found=false;
@@ -373,6 +375,8 @@ byte server_moveup_program(char *p) {
 */
 prog_char _str_program[] PROGMEM = "Program ";
 byte server_change_program(char *p) {
+  // decode url first
+  ether.urlDecode(p);
   // parse program index
   if (!ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("pid"), true)) {
     return HTML_DATA_MISSING;
@@ -836,10 +840,13 @@ byte server_change_manual(char *p) {
 
 /**
   Get log data
-  Command: /jl?start=x&end=x
+  Command: /jl?start=x&end=x&type=x
   
   start: start time (epoch time)
   end:   end time (epoch time)
+  type:  type of log records (optional)
+         rs, rd, wl
+         if unspecified, output all records
 */  
 byte server_json_log(char *p) {
 
@@ -847,13 +854,17 @@ byte server_json_log(char *p) {
   if (!os.status.has_sd)  return HTML_PAGE_NOT_FOUND;
   
   unsigned int start, end;
-  /*if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("hist"), true)) {
+
+#if OS_HW_VERSION == 20 || OS_HW_VERSION == 22
+  // past n day history
+  if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("hist"), true)) {
     int hist = atoi(tmp_buffer);
     if (hist< 0 || hist > 365) return HTML_DATA_OUTOFBOUND;
     end = now() / 86400L;
     start = end - hist;
   }
-  else*/
+  else
+#endif
   {
     if (!ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("start"), true))
       return HTML_DATA_MISSING;
@@ -866,7 +877,13 @@ byte server_json_log(char *p) {
     // start must be prior to end, and can't retrieve more than 365 days of data
     if ((start>end) || (end-start)>365)  return HTML_DATA_OUTOFBOUND;
   }
-    
+
+  // extract the type parameter
+  char type[4] = {0};
+  bool type_specified = false;
+  if (ether.findKeyVal(p, type, 4, PSTR("type"), true))
+    type_specified = true;
+  
   print_json_header();
   bfill.emit_p(PSTR("["));
  
@@ -893,6 +910,11 @@ byte server_json_log(char *p) {
       // remove the \n character
       if (tmp_buffer[res-1] == '\n')  tmp_buffer[res-1] = 0;
       
+      // check record type
+      // special records are all in the form of [0,"xx",...]
+      // where xx is the type name
+      if (type_specified && strncmp(type, tmp_buffer+4, 2))
+        continue;
       // if this is the first record, do not print comma
       if (first)  { bfill.emit_p(PSTR("$S"), tmp_buffer); first=false;}
       else {  bfill.emit_p(PSTR(",$S"), tmp_buffer); }
