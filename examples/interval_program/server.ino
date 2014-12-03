@@ -235,7 +235,7 @@ void server_json_programs_main() {
     else
       bfill.emit_p(PSTR("\"]"));
     if (pid%3==2) { // push out a packet every 4 programs
-      ether.httpServerReply_with_flags(bfill.position(), TCP_FLAGS_ACK_V);
+      ether.httpServerReply_with_flags(bfill.position(), TCP_FLAGS_ACK_V, 3);
       bfill=ether.tcpOffset();
     } 
   }
@@ -504,7 +504,6 @@ byte server_home(char *p)
   bfill.emit_p(PSTR("var ver=$D,ipas=$D;</script>\n"),
                OS_FW_VERSION, os.options[OPTION_IGNORE_PASSWORD].value);
   bfill.emit_p(PSTR("<script src=\"$E/home.js\"></script>\n</body>\n</html>"), ADDR_EEPROM_SCRIPTURL);
-  //ether.httpServerReply_with_flags(bfill.position(), TCP_FLAGS_ACK_V|TCP_FLAGS_FIN_V);
   return HTML_OK;
 }
 
@@ -840,8 +839,11 @@ byte server_change_manual(char *p) {
 
 /**
   Get log data
-  Command: /jl?start=x&end=x&type=x
+  Command: /jl?start=x&end=x&hist=x&type=x
   
+  hist:  history (past n days)
+         when hist is speceified, the start
+         and end parameters below will be ignored
   start: start time (epoch time)
   end:   end time (epoch time)
   type:  type of log records (optional)
@@ -921,7 +923,7 @@ byte server_json_log(char *p) {
       else {  bfill.emit_p(PSTR(",$S"), tmp_buffer); }
       count ++;
       if (count % 25 == 0) {  // push out a packet every 25 records
-        ether.httpServerReply_with_flags(bfill.position(), TCP_FLAGS_ACK_V);
+        ether.httpServerReply_with_flags(bfill.position(), TCP_FLAGS_ACK_V, 3);
         bfill=ether.tcpOffset();
         count = 0;
       }
