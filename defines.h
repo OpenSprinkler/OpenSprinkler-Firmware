@@ -191,7 +191,7 @@ typedef enum {
 #if defined(__AVR_ATmega1284P__)
 #define ETHER_BUFFER_SIZE   1500  // 1284P has 16K RAM
 #else
-#define ETHER_BUFFER_SIZE   900  // if buffer size is increased, you must check the total RAM consumption
+#define ETHER_BUFFER_SIZE   850  // if buffer size is increased, you must check the total RAM consumption
 #endif
                                  // otherwise it may cause the program to crash
 #define TMP_BUFFER_SIZE     120  // scratch buffer size

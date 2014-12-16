@@ -240,7 +240,7 @@ byte server_json_programs(char *p)
     } else {
       bfill.emit_p(PSTR("\"]"));
     }
-    if ((pid%4)==3) { // push out a packet every 4 programs
+    if ((pid%3)==2) { // push out a packet every 3 programs
       ether.httpServerReply_with_flags(bfill.position(), TCP_FLAGS_ACK_V, 3);
       bfill=ether.tcpOffset();
     } 
@@ -374,22 +374,29 @@ byte server_moveup_program(char *p) {
 prog_char _str_program[] PROGMEM = "Program ";
 byte server_change_program(char *p) {
   byte i;
-  // terminate the string at the first SPACE character
-  int j;
-  for(j=0;j<strlen(p);j++) {
-    if(p[j]==' '||p[j]=='\n'||p[j]=='\r') {p[j]=0; break;}
-  }  
-  ether.urlDecode(p);
+
+  ProgramStruct prog;
+
   // parse program index
   if (!ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("pid"), true)) {
     return HTML_DATA_MISSING;
   }
   int pid=atoi(tmp_buffer);
   if (!(pid>=-1 && pid< pd.nprograms)) return HTML_DATA_OUTOFBOUND;
-  
-  // parse program data
-  ProgramStruct prog;
     
+  // parse program name
+  if (ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("name"), true)) {
+    ether.urlDecode(tmp_buffer);
+    strncpy(prog.name, tmp_buffer, PROGRAM_NAME_SIZE);
+  } else {
+    strcpy_P(prog.name, _str_program);
+    itoa((pid==-1)? (pd.nprograms+1): (pid+1), prog.name+8, 10); 
+  }
+
+  // do a full string decoding
+  ether.urlDecode(p);
+
+  // parse ad-hoc v=[...
   // search for the start of v=[
   char *pv;
   boolean found=false;
@@ -422,30 +429,12 @@ byte server_change_program(char *p) {
   pv++; // this should be a ']'
   // parse program name
 
-  char* pname;
-  uint8_t keyfound;
-  if (ether.findKeyVal(pv, tmp_buffer, TMP_BUFFER_SIZE, PSTR("name"), true, &keyfound, &pname) && pname) {
-    /* copy until the end of string or & */
-    j=0;
-    while(*pname && *pname!='&' && *pname!='\n') {
-      tmp_buffer[j++] = *pname++;
-    }
-    tmp_buffer[j]=0;
-    DEBUG_PRINTLN(tmp_buffer);
-    strncpy(prog.name, tmp_buffer, PROGRAM_NAME_SIZE);
-  } else {
-    strcpy_P(prog.name, _str_program);
-    //strcpy(prog.name, "Program ");
-    itoa((pid==-1)? (pd.nprograms+1): (pid+1), prog.name+8, 10); 
-  }
-
   // i should be equal to os.nstations at this point
   for(;i<MAX_NUM_STATIONS;i++) {
     prog.durations[i] = 0;     // clear unused field
   }
 
   // process interval day remainder (relative-> absolute)
-
   if (prog.type == PROGRAM_TYPE_INTERVAL && prog.days[1] > 1) { 
     pd.drem_to_absolute(prog.days);
   }
