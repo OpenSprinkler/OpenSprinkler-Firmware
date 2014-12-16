@@ -2,7 +2,7 @@
 
 /* Macro definitions and Arduino pin assignments
    Creative Commons Attribution-ShareAlike 3.0 license
-   Nov 2014 @ Rayshobby.net
+   Dec 2014 @ Rayshobby.net
 */
 
 #ifndef _Defines_h
@@ -11,7 +11,7 @@
 // =================================================
 // ====== Firmware Version and Maximal Values ======
 // =================================================
-#define OS_FW_VERSION  211 // firmware version (211 means 2.1.1 etc)
+#define OS_FW_VERSION  212 // firmware version (212 means 2.1.2 etc)
                             // if this number is different from stored in EEPROM,
                             // an EEPROM reset will be automatically triggered
 
@@ -191,7 +191,7 @@ typedef enum {
 #if defined(__AVR_ATmega1284P__)
 #define ETHER_BUFFER_SIZE   1500  // 1284P has 16K RAM
 #else
-#define ETHER_BUFFER_SIZE   850  // if buffer size is increased, you must check the total RAM consumption
+#define ETHER_BUFFER_SIZE   900  // if buffer size is increased, you must check the total RAM consumption
 #endif
                                  // otherwise it may cause the program to crash
 #define TMP_BUFFER_SIZE     120  // scratch buffer size

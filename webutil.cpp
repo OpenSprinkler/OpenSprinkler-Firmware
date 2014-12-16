@@ -41,7 +41,7 @@ void EtherCard::printIp (const uint8_t *buf) {
 // enough storage for strbuf, maxlen is the size of strbuf.
 // I.e the value it is declated with: strbuf[5]-> maxlen=5
 // ray: modified to add support for key stored in pgm memory
-uint8_t EtherCard::findKeyVal (const char *str,char *strbuf, uint8_t maxlen,const char *key,bool key_in_pgm,uint8_t *keyfound)
+uint8_t EtherCard::findKeyVal (const char *str,char *strbuf, uint8_t maxlen,const char *key,bool key_in_pgm,uint8_t *keyfound,char** pos)
 {
     uint8_t found=0;
     uint8_t i=0;
@@ -80,7 +80,8 @@ uint8_t EtherCard::findKeyVal (const char *str,char *strbuf, uint8_t maxlen,cons
           }
           str++;
       }
-    }    
+    }
+    if (pos) *pos = (char*)str;
     if (found==1){
         // copy the value to a buffer and terminate it with '\0'
         while(*str &&  *str!=' ' && *str!='\n' && *str!='&' && i<maxlen-1){

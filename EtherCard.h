@@ -506,7 +506,7 @@ public:
     // ray: modified to add support for key stored in pgm memory
     static uint8_t findKeyVal(const char *str,char *strbuf,
                               uint8_t maxlen, const char *key, bool key_in_pgm = false,
-                              uint8_t *keyfound = NULL);  // ray: added keyfound return variable
+                              uint8_t *keyfound = NULL, char** pos = NULL);         // ray: added pos return variable
 
     /**   @brief  Decode a URL string e.g "hello%20joe" or "hello+joe" becomes "hello joe"
     *     @param  urlbuf Pointer to the null terminated URL

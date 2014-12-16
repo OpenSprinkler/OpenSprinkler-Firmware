@@ -1086,12 +1086,14 @@ void OpenSprinkler::ui_set_options(int oid)
 
     switch (button & BUTTON_MASK) {
     case BUTTON_1:
-      if (i==OPTION_FW_VERSION || i==OPTION_HW_VERSION) break; // ignore non-editable options
+      if (i==OPTION_FW_VERSION || i==OPTION_HW_VERSION ||
+          i==OPTION_HTTPPORT_0 || i==OPTION_HTTPPORT_1) break; // ignore non-editable options
       if (options[i].max != options[i].value) options[i].value ++;
       break;
 
     case BUTTON_2:
-      if (i==OPTION_FW_VERSION || i==OPTION_HW_VERSION) break; // ignore non-editable options
+      if (i==OPTION_FW_VERSION || i==OPTION_HW_VERSION ||
+          i==OPTION_HTTPPORT_0 || i==OPTION_HTTPPORT_1) break; // ignore non-editable options
       if (options[i].value != 0) options[i].value --;
       break;
 

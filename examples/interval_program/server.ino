@@ -203,7 +203,12 @@ byte server_view_scripturl(char *p) {
   return HTML_OK;
 }
 
-void server_json_programs_main() {
+/**
+  Output program data
+*/
+byte server_json_programs(char *p) 
+{
+  print_json_header_with_bracket();
   bfill.emit_p(PSTR("\"nprogs\":$D,\"nboards\":$D,\"mnp\":$D,\"mnst\":$D,\"pnsize\":$D,\"pd\":["),
                pd.nprograms, os.nboards, MAX_NUMBER_PROGRAMS, MAX_NUM_STARTTIMES, PROGRAM_NAME_SIZE);
   byte pid, bid, i;
@@ -230,25 +235,18 @@ void server_json_programs_main() {
     strncpy(tmp_buffer, prog.name, PROGRAM_NAME_SIZE);
     tmp_buffer[PROGRAM_NAME_SIZE] = 0;  // make sure the string ends
     bfill.emit_p(PSTR("$S"), tmp_buffer);
-    if(pid!=pd.nprograms-1)
+    if(pid!=pd.nprograms-1) {
       bfill.emit_p(PSTR("\"],"));
-    else
+    } else {
       bfill.emit_p(PSTR("\"]"));
-    if (pid%3==2) { // push out a packet every 4 programs
+    }
+    if ((pid%4)==3) { // push out a packet every 4 programs
       ether.httpServerReply_with_flags(bfill.position(), TCP_FLAGS_ACK_V, 3);
       bfill=ether.tcpOffset();
     } 
   }
-  bfill.emit_p(PSTR("]}"));   
-}
-
-/**
-  Output program data
-*/
-byte server_json_programs(char *p) 
-{
-  print_json_header_with_bracket();
-  server_json_programs_main();
+  bfill.emit_p(PSTR("]}"));
+  delay(1);
   return HTML_OK;
 }
 
@@ -375,7 +373,12 @@ byte server_moveup_program(char *p) {
 */
 prog_char _str_program[] PROGMEM = "Program ";
 byte server_change_program(char *p) {
-  // decode url first
+  byte i;
+  // terminate the string at the first SPACE character
+  int j;
+  for(j=0;j<strlen(p);j++) {
+    if(p[j]==' '||p[j]=='\n'||p[j]=='\r') {p[j]=0; break;}
+  }  
   ether.urlDecode(p);
   // parse program index
   if (!ether.findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("pid"), true)) {
@@ -397,7 +400,7 @@ byte server_change_program(char *p) {
       break;
     }
   }
-  byte i;
+
   if(!found)  return HTML_DATA_MISSING;
   pv+=3;
   // parse headers
@@ -419,8 +422,16 @@ byte server_change_program(char *p) {
   pv++; // this should be a ']'
   // parse program name
 
-  if (ether.findKeyVal(pv, tmp_buffer, TMP_BUFFER_SIZE, PSTR("name"), true)) {
-    ether.urlDecode(tmp_buffer);
+  char* pname;
+  uint8_t keyfound;
+  if (ether.findKeyVal(pv, tmp_buffer, TMP_BUFFER_SIZE, PSTR("name"), true, &keyfound, &pname) && pname) {
+    /* copy until the end of string or & */
+    j=0;
+    while(*pname && *pname!='&' && *pname!='\n') {
+      tmp_buffer[j++] = *pname++;
+    }
+    tmp_buffer[j]=0;
+    DEBUG_PRINTLN(tmp_buffer);
     strncpy(prog.name, tmp_buffer, PROGRAM_NAME_SIZE);
   } else {
     strcpy_P(prog.name, _str_program);
@@ -931,6 +942,7 @@ byte server_json_log(char *p) {
   }
 
   bfill.emit_p(PSTR("]"));   
+  delay(1);
   return HTML_OK; 
 }
 
