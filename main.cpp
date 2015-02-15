@@ -1,19 +1,49 @@
-// Example code for OpenSprinkler Generation 2
-
-/* This is a program-based sprinkler schedule algorithm.
- Programs are set similar to calendar schedule.
- Each program specifies the days, stations,
- start time, end time, interval and duration.
- The number of programs you can create are subject to EEPROM size.
- 
- Creative Commons Attribution-ShareAlike 3.0 license
- Sep 2014 @ Rayshobby.net
+/* OpenSprinkler AVR/RPI/BBB Firmware
+ * Copyright (C) 2014 by Ray Wang (ray@opensprinkler.com)
+ *
+ * Main loop
+ * Sep 2014 @ Rayshobby.net
+ *
+ * This file is part of the OpenSprinkler Firmware
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see
+ * <http://www.gnu.org/licenses/>. 
  */
+ 
 #include <limits.h>
-#include <OpenSprinklerGen2.h>
-#include <SdFat.h>
-#include <Wire.h>
+
+#include "OpenSprinkler.h"
 #include "program.h"
+#include "weather.h"
+
+#if defined(ARDUINO)
+#include "SdFat.h"
+#include "Wire.h"
+byte Ethernet::buffer[ETHER_BUFFER_SIZE]; // Ethernet packet buffer
+SdFat sd;                                 // SD card object
+
+void reset_all_stations();
+unsigned long getNtpTime();
+void manual_start_program(byte pid);
+#else
+#include "server.h"
+char ether_buffer[ETHER_BUFFER_SIZE];
+struct sockaddr_in svr_addr, cli_addr;
+socklen_t sin_len;
+int sock;
+int client;
+#endif
 
 #define NTP_SYNC_INTERVAL       86400L  // NYP sync interval, 24 hrs
 #define RTC_SYNC_INTERVAL       60      // RTC sync interval, 60 secs
@@ -24,14 +54,14 @@
 #define LCD_DIMMING_TIMEOUT      15     // LCD dimming timeout: 15 secs
 #define PING_TIMEOUT            200     // Ping test timeout: 200 ms
 
-byte Ethernet::buffer[ETHER_BUFFER_SIZE]; // Ethernet packet buffer
-char tmp_buffer[TMP_BUFFER_SIZE+1];       // scratch buffer
+extern char tmp_buffer[];       // scratch buffer
 BufferFiller bfill;                       // buffer filler
 
 // ====== Object defines ======
 OpenSprinkler os; // OpenSprinkler object
 ProgramData pd;   // ProgramdData object 
-SdFat sd;         // SD card object
+
+#if defined(ARDUINO)
 
 // ====== UI defines ======
 static char ui_anim_chars[3] = {'.', 'o', 'O'};
@@ -83,7 +113,7 @@ void ui_state_machine(time_t curr_time) {
       break;
     case BUTTON_2:
       if (button & BUTTON_FLAG_HOLD) {  // holding B2: reboot
-        os.reboot();
+        os.reboot_dev();
       } else {  // clicking B2: display MAC and gate way IP
         os.lcd.clear();
         os.lcd_print_mac(ether.mymac);
@@ -132,14 +162,13 @@ void ui_state_machine(time_t curr_time) {
 }
 
 // ======================
-// Arduino Setup Function
+// Setup Function
 // ======================
-void setup() { 
+void do_setup() { 
   /* Clear WDT reset flag. */
   MCUSR &= ~(1<<WDRF);
   
   DEBUG_BEGIN(9600);
-  char *pt;
   
   os.begin();          // OpenSprinkler init
   os.options_setup();  // Setup options
@@ -171,13 +200,14 @@ void setup() {
     
   if (os.start_network()) {  // initialize network
     os.status.network_fails = 0;
-  } else  os.status.network_fails = 1;
-
+  } else {
+    os.status.network_fails = 1;
+  }
   delay(500);
 
   os.apply_all_station_bits(); // reset station bits
   
-  os.button_lasttime = now();
+  os.button_lasttime = os.now_tz();
 }
 
 // Arduino software reset function
@@ -194,15 +224,38 @@ ISR(WDT_vect)
     sysReset();
   }
 }
+#else
+void do_setup() { 
+  os.begin();          // OpenSprinkler init
+  os.options_setup();  // Setup options
+ 
+  pd.init();            // ProgramData init
+  if (os.start_network()) {  // initialize network
+    DEBUG_PRINTLN("network established.");
+    os.status.network_fails = 0;
+  } else {
+    DEBUG_PRINTLN("network failed.");  
+    os.status.network_fails = 1; 
+  }
+}
+#endif
 
-  
-// =================
-// Arduino Main Loop
-// =================
-void loop()
+void write_log(byte type, ulong curr_time);
+void schedule_all_stations(ulong curr_time);
+void turn_off_station(byte sid, byte mas, ulong curr_time);
+void process_dynamic_events(ulong curr_time);
+void check_network(time_t curr_time);
+void check_weather(time_t curr_time);
+void perform_ntp_sync(time_t curr_time);
+void log_statistics(time_t curr_time);
+void delete_log(char *name);
+void analyze_get_url(char *p);
+
+/** Main Loop */
+void do_loop()
 {
-  static unsigned long last_time = 0;
-  static unsigned long last_minute = 0;
+  static ulong last_time = 0;
+  static ulong last_minute = 0;
   static uint16_t pos;
 
   byte bid, sid, s, pid, bitvalue;
@@ -210,27 +263,36 @@ void loop()
 
   os.status.mas = os.options[OPTION_MASTER_STATION].value;
 
+  time_t curr_time = os.now_tz();
   // ====== Process Ethernet packets ======
+#if defined(ARDUINO)  
   pos=ether.packetLoop(ether.packetReceive());
   if (pos>0) {  // packet received
     analyze_get_url((char*)Ethernet::buffer+pos);
   }
-  // ====== end of Process Ethernet packets
-  
   wdt_reset();  // reset watchdog timer
   wdt_timeout = 0;
-   
-  time_t curr_time = now();
+
   ui_state_machine(curr_time);
+
+#else
+  client = accept(sock, (struct sockaddr *) &cli_addr, &sin_len);
+  if(client>=0) {
+    DEBUG_PRINTLN("got packet");
+    read(client, ether_buffer, ETHER_BUFFER_SIZE);
+    analyze_get_url(ether_buffer);
+  }
+#endif  
 
   // if 1 second has passed
   if (last_time != curr_time) {
-
+    DEBUG_PRINTLN(curr_time);
     last_time = curr_time;
 
-
+#if defined(ARDUINO)
     if (!ui_state)    
       os.lcd_print_time(0);       // print time
+#endif
 
     // ====== Check raindelay status ======
     if (os.status.rain_delayed) {
@@ -269,7 +331,7 @@ void loop()
     }
 
     // ====== Schedule program data ======
-    unsigned long curr_minute = curr_time / 60;
+    ulong curr_minute = curr_time / 60;
     boolean match_found = false;
     // since the granularity of start time is minute
     // we only need to check once every minute
@@ -295,7 +357,7 @@ void loop()
             if (prog.durations[sid] && !pd.scheduled_stop_time[sid]) {
               // initialize schedule data by storing water time temporarily in stop_time
               // water time is scaled by watering percentage
-              unsigned long water_time = (unsigned long)water_time_decode(prog.durations[sid]);
+              ulong water_time = (ulong)water_time_decode(prog.durations[sid]);
               // if the program is set to use weather scaling 
               if (prog.use_weather)
                 water_time = water_time * os.options[OPTION_WATER_PERCENTAGE].value / 100;
@@ -364,10 +426,10 @@ void loop()
               // if the station is set to activate / deactivate relay
               if(os.actrelay_bits[bid]&(1<<s)) {
                 // turn relay on
-                digitalWrite(PIN_RELAY, HIGH);
+                os.set_relay(1);
                 if(os.options[OPTION_RELAY_PULSE].value > 0) {  // if relay is set to pulse
                   delay(os.options[OPTION_RELAY_PULSE].value*10);
-                  digitalWrite(PIN_RELAY, LOW);
+                  os.set_relay(0);
                 }
               } // if activate relay
               // upon turning on station, process RF
@@ -390,7 +452,7 @@ void loop()
       // check through run-time data, calculate the last stop time of sequential stations
       boolean program_still_busy = false;
       pd.last_seq_stop_time = 0;
-      unsigned long sst;
+      ulong sst;
       for(sid=0;sid<os.nstations;sid++) {
         bid = sid>>3;
         s = sid&0x07;
@@ -451,10 +513,12 @@ void loop()
     // activate/deactivate valves
     os.apply_all_station_bits();
     
+#if defined(ARDUINO)
     // process LCD display
     if (!ui_state)    
       os.lcd_print_station(1, ui_anim_chars[curr_time%3]);
-    
+#endif
+
     // check network connection
     check_network(curr_time);
     
@@ -469,88 +533,20 @@ void loop()
   }
 }
 
-void perform_ntp_sync(time_t curr_time) {
-  // do not perform sync if this option is disabled, or if network is not available, or if a program is running
-  if (!os.options[OPTION_USE_NTP].value || os.status.network_fails>0 || os.status.program_busy) return;   
-
-  if (os.ntpsync_lasttime == 0 || (curr_time - os.ntpsync_lasttime > NTP_SYNC_INTERVAL)) {
-    os.ntpsync_lasttime = curr_time;
-    if (!ui_state) {
-      os.lcd_print_line_clear_pgm(PSTR("NTP Syncing..."),1);
-    }
-    unsigned long t = getNtpTime();   
-    if (t>0) {    
-      setTime(t);
-      if (os.status.has_rtc) RTC.set(t); // if rtc exists, update rtc
-    }
-  }
-}
-
 void check_weather(time_t curr_time) {
   // do not check weather if the Use Weather option is disabled, or if network is not available, or if a program is running
   if (os.status.network_fails>0 || os.status.program_busy) return;
 
-  uint16_t inv = 30;  // recheck every 30 seconds if didn't receive anything last time
+  uint16_t inv = 180;  // recheck every 30 seconds if didn't receive anything last time
   if (os.status.wt_received)  inv = CHECK_WEATHER_INTERVAL;
   if (!os.checkwt_lasttime || ((curr_time - os.checkwt_lasttime) > inv)) {
     os.checkwt_lasttime = curr_time;
+    // ray: todo
     GetWeather();
   }
 }
 
-void check_network(time_t curr_time) {
-  if (os.status.program_busy) {return;}
-
-  // do not perform network checking if the controller has just started, or if a program is running
-  //if (os.network_lasttime == 0) { os.network_lasttime = curr_time; os.dhcpnew_lasttime = curr_time;}
-  if (!os.network_lasttime) {
-    os.start_network();
-  }
-  
-  // check network condition periodically
-  // check interval depends on the fail times
-  // the more time it fails, the longer the gap between two checks
-  unsigned long interval = 1 << (os.status.network_fails);
-  interval *= CHECK_NETWORK_INTERVAL;
-  if (curr_time - os.network_lasttime > interval) {
-    // change LCD icon to indicate it's checking network
-    if (!ui_state) {
-      os.lcd.setCursor(15, 1);
-      os.lcd.write(4);
-    }
-      
-    os.network_lasttime = curr_time;
-   
-    // ping gateway ip
-    ether.clientIcmpRequest(ether.gwip);
-    
-    unsigned long start = millis();
-    boolean failed = true;
-    // wait at most PING_TIMEOUT milliseconds for ping result
-    do {
-      ether.packetLoop(ether.packetReceive());
-      if (ether.packetLoopIcmpCheckReply(ether.gwip)) {
-        failed = false;
-        break;
-      }
-    } while(millis() - start < PING_TIMEOUT);
-    if (failed)  {
-      os.status.network_fails++;
-      // clamp it to 6
-      if (os.status.network_fails > 6) os.status.network_fails = 6;
-    }
-    else os.status.network_fails=0;
-    // if failed more than once, reconnect
-    if ((os.status.network_fails>2 || (curr_time - os.dhcpnew_lasttime > DHCP_RENEW_INTERVAL))) {
-      os.dhcpnew_lasttime = curr_time;
-      //os.lcd_print_line_clear_pgm(PSTR(""),0);
-      if (os.start_network())
-        os.status.network_fails=0;
-    }
-  } 
-}
-
-void turn_off_station(byte sid, byte mas, unsigned long curr_time) {
+void turn_off_station(byte sid, byte mas, ulong curr_time) {
   byte bid = sid>>3;
   byte s = sid&0x07;
   os.set_station_bit(sid, 0);
@@ -583,10 +579,10 @@ void turn_off_station(byte sid, byte mas, unsigned long curr_time) {
     if(os.actrelay_bits[bid]&(1<<s)) {
       // turn relay off
       if(os.options[OPTION_RELAY_PULSE].value > 0) {  // if relay is set to pulse
-        digitalWrite(PIN_RELAY, HIGH);
+        os.set_relay(1);
         delay(os.options[OPTION_RELAY_PULSE].value*10);
       } 
-      digitalWrite(PIN_RELAY, LOW);
+      os.set_relay(0);
     }
     // upon turning off station, process RF station
     // if the station is a RF station
@@ -603,8 +599,7 @@ void turn_off_station(byte sid, byte mas, unsigned long curr_time) {
   
 }
 
-void process_dynamic_events(unsigned long curr_time)
-{
+void process_dynamic_events(ulong curr_time) {
   // check if rain is detected
   bool rain = false;
   bool en = os.status.enabled ? true : false;
@@ -639,11 +634,10 @@ void process_dynamic_events(unsigned long curr_time)
   }      
 }
 
-//void schedule_all_stations(unsigned long curr_time, byte seq)  // remove seq option
-void schedule_all_stations(unsigned long curr_time)
-{
-  unsigned long con_start_time = curr_time + 1;   // concurrent start time
-  unsigned long seq_start_time = con_start_time;  // sequential start time
+//void schedule_all_stations(ulong curr_time, byte seq)  // remove seq option
+void schedule_all_stations(ulong curr_time) {
+  ulong con_start_time = curr_time + 1;   // concurrent start time
+  ulong seq_start_time = con_start_time;  // sequential start time
   
   int16_t station_delay = water_time_decode_signed(os.options[OPTION_STATION_DELAY_TIME].value);
   // if the sequential queue has stations running
@@ -707,7 +701,7 @@ void reset_all_stations_immediate() {
 
 void reset_all_stations() {
   // stop all running and scheduled stations
-  unsigned long curr_time = now();
+  ulong curr_time = os.now_tz();
   for(byte sid=0;sid<os.nstations;sid++) {
     if(pd.scheduled_program_index[sid] > 0) {
       pd.scheduled_stop_time[sid] = curr_time;  
@@ -743,7 +737,7 @@ void manual_start_program(byte pid) {
     }
   }
   if(match_found) {
-    schedule_all_stations(now());
+    schedule_all_stations(os.now_tz());
   }  
 }
 
@@ -753,52 +747,45 @@ void manual_start_program(byte pid) {
 // Log files will be named /logs/xxxxx.txt
 char LOG_PREFIX[] = "/logs/";
 void make_logfile_name(char *name) {
+#if defined(ARDUINO)
   sd.chdir("/");
+#endif
   strcpy(tmp_buffer+TMP_BUFFER_SIZE-10, name);
   strcpy(tmp_buffer, LOG_PREFIX);
   strcat(tmp_buffer, tmp_buffer+TMP_BUFFER_SIZE-10);
   strcat_P(tmp_buffer, PSTR(".txt"));
 }
 
-// delete log file
-// if name is 'all', delete all logs
-void delete_log(char *name) {
-  if (!os.options[OPTION_ENABLE_LOGGING].value) return;
-  if (!os.status.has_sd) return;
-
-  if (strncmp(name, "all", 3) == 0) {
-    // delete the log folder
-    SdFile file;
-
-    if (sd.chdir(LOG_PREFIX)) {
-      // delete the whole log folder
-      sd.vwd()->rmRfStar();
-    }
-    return;
-  } else {
-    make_logfile_name(name);
-    if (!sd.exists(tmp_buffer))  return;
-    sd.remove(tmp_buffer);
-  }
-}
-
-#ifdef SERIAL_DEBUG
-int freeRam () {
-  extern int __heap_start, *__brkval; 
-  int v; 
-  return (int) &v - (__brkval == 0 ? (int) &__heap_start : (int) __brkval); 
-}
-#endif
-
-char *log_type_names[] = {
+const char *log_type_names[] = {
   "",
   "rs",
   "rd",
   "wl"
 };
 
+void log_statistics(time_t curr_time) {
+  static byte stat_n = 0;
+  static ulong stat_lasttime = 0;
+  // update statistics once 15 minutes
+  if (curr_time - stat_lasttime > STAT_UPDATE_INTERVAL) {
+    stat_lasttime = curr_time;
+    ulong wp_total = os.water_percent_avg;
+    wp_total = wp_total * stat_n;
+    wp_total += os.options[OPTION_WATER_PERCENTAGE].value;
+    stat_n ++;
+    os.water_percent_avg = byte(wp_total / stat_n);
+    // writes every 4*24 times (1 day)
+    if (stat_n == 96) {
+      DEBUG_PRINTLN("wl");
+      write_log(LOGDATA_WATERLEVEL, curr_time);
+      stat_n = 0;
+    }
+  }
+}
+
+#if defined(ARDUINO)
 // write run record to log on SD card
-void write_log(byte type, unsigned long curr_time) {
+void write_log(byte type, ulong curr_time) {
   if (!os.options[OPTION_ENABLE_LOGGING].value) return;
   if (!os.status.has_sd)  return;
 
@@ -813,7 +800,6 @@ void write_log(byte type, unsigned long curr_time) {
       return;    
     }
   }
-  DEBUG_PRINTLN(freeRam());  
   SdFile file;
   file.open(tmp_buffer, O_CREAT | O_WRITE );
   file.seekEnd();
@@ -867,22 +853,120 @@ void write_log(byte type, unsigned long curr_time) {
   file.close();
 }
 
-void log_statistics(time_t curr_time) {
-  static byte stat_n = 0;
-  static unsigned long stat_lasttime = 0;
-  // update statistics once 15 minutes
-  if (curr_time - stat_lasttime > STAT_UPDATE_INTERVAL) {
-    stat_lasttime = curr_time;
-    unsigned long wp_total = os.water_percent_avg;
-    wp_total = wp_total * stat_n;
-    wp_total += os.options[OPTION_WATER_PERCENTAGE].value;
-    stat_n ++;
-    os.water_percent_avg = byte(wp_total / stat_n);
-    // writes every 4*24 times (1 day)
-    if (stat_n == 96) {
-      DEBUG_PRINTLN("wl");
-      write_log(LOGDATA_WATERLEVEL, curr_time);
-      stat_n = 0;
+void check_network(time_t curr_time) {
+  if (os.status.program_busy) {return;}
+
+  // do not perform network checking if the controller has just started, or if a program is running
+  //if (os.network_lasttime == 0) { os.network_lasttime = curr_time; os.dhcpnew_lasttime = curr_time;}
+  if (!os.network_lasttime) {
+    os.start_network();
+  }
+  
+  // check network condition periodically
+  // check interval depends on the fail times
+  // the more time it fails, the longer the gap between two checks
+  ulong interval = 1 << (os.status.network_fails);
+  interval *= CHECK_NETWORK_INTERVAL;
+  if (curr_time - os.network_lasttime > interval) {
+    // change LCD icon to indicate it's checking network
+    if (!ui_state) {
+      os.lcd.setCursor(15, 1);
+      os.lcd.write(4);
+    }
+      
+    os.network_lasttime = curr_time;
+   
+    // ping gateway ip
+    ether.clientIcmpRequest(ether.gwip);
+    
+    ulong start = millis();
+    boolean failed = true;
+    // wait at most PING_TIMEOUT milliseconds for ping result
+    do {
+      ether.packetLoop(ether.packetReceive());
+      if (ether.packetLoopIcmpCheckReply(ether.gwip)) {
+        failed = false;
+        break;
+      }
+    } while(millis() - start < PING_TIMEOUT);
+    if (failed)  {
+      os.status.network_fails++;
+      // clamp it to 6
+      if (os.status.network_fails > 6) os.status.network_fails = 6;
+    }
+    else os.status.network_fails=0;
+    // if failed more than once, reconnect
+    if ((os.status.network_fails>2 || (curr_time - os.dhcpnew_lasttime > DHCP_RENEW_INTERVAL))) {
+      os.dhcpnew_lasttime = curr_time;
+      //os.lcd_print_line_clear_pgm(PSTR(""),0);
+      if (os.start_network())
+        os.status.network_fails=0;
+    }
+  } 
+}
+
+void perform_ntp_sync(time_t curr_time) {
+  // do not perform sync if this option is disabled, or if network is not available, or if a program is running
+  if (!os.options[OPTION_USE_NTP].value || os.status.network_fails>0 || os.status.program_busy) return;   
+
+  if (os.ntpsync_lasttime == 0 || (curr_time - os.ntpsync_lasttime > NTP_SYNC_INTERVAL)) {
+    os.ntpsync_lasttime = curr_time;
+    if (!ui_state) {
+      os.lcd_print_line_clear_pgm(PSTR("NTP Syncing..."),1);
+    }
+    ulong t = getNtpTime();   
+    if (t>0) {    
+      setTime(t);
+      if (os.status.has_rtc) RTC.set(t); // if rtc exists, update rtc
     }
   }
 }
+
+// delete log file
+// if name is 'all', delete all logs
+void delete_log(char *name) {
+  if (!os.options[OPTION_ENABLE_LOGGING].value) return;
+  if (!os.status.has_sd) return;
+
+  if (strncmp(name, "all", 3) == 0) {
+    // delete the log folder
+    SdFile file;
+
+    if (sd.chdir(LOG_PREFIX)) {
+      // delete the whole log folder
+      sd.vwd()->rmRfStar();
+    }
+    return;
+  } else {
+    make_logfile_name(name);
+    if (!sd.exists(tmp_buffer))  return;
+    sd.remove(tmp_buffer);
+  }
+}
+
+#else
+int main(int argc, char *argv[]) {
+  do_setup();
+  
+  while(true) {
+    do_loop();
+  }
+  return 0;
+}
+
+void write_log(byte type, ulong curr_time) {
+
+}
+
+void check_network(time_t curr_time) {
+
+}
+
+void perform_ntp_sync(time_t curr_time) {
+
+}
+
+void delete_log(char *name) {
+
+}
+#endif

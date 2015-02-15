@@ -1,30 +1,52 @@
-// Example code for OpenSprinkler Generation 2
+/* OpenSprinkler AVR/RPI/BBB Library
+ * Copyright (C) 2014 by Ray Wang (ray@opensprinkler.com)
+ *
+ * Program data structures and functions header file
+ * Sep 2014 @ Rayshobby.net
+ *
+ * This file is part of the OpenSprinkler library
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see
+ * <http://www.gnu.org/licenses/>. 
+ */
 
-/* Program Data Structures and Functions
-   Creative Commons Attribution-ShareAlike 3.0 license
-   Sep 2014 @ Rayshobby.net
-*/
 
-#ifndef PROGRAM_STRUCT_H
-#define PROGRAM_STRUCT_H
+#ifndef _PROGRAM_H
+#define _PROGRAM_H
 
 #define MAX_NUM_STARTTIMES  4
 #define PROGRAM_NAME_SIZE   12
-#include <OpenSprinklerGen2.h>
+#include "OpenSprinkler.h"
 
-// Log data structure
+/** Log data structure */
 struct LogStruct {
   byte station;
   byte program;
-  unsigned int duration;
-  unsigned long endtime;
+  uint16_t duration;
+  uint32_t endtime;
 };
 
 #define PROGRAM_TYPE_WEEKLY   0
 #define PROGRAM_TYPE_BIWEEKLY 1
 #define PROGRAM_TYPE_MONTHLY  2
 #define PROGRAM_TYPE_INTERVAL 3
-// Program data structure
+
+#define STARTTIME_SUNRISE_BIT 14
+#define STARTTIME_SUNSET_BIT  13
+#define STARTTIME_SIGN_BIT    12
+
+/** Program data structure */
 class ProgramStruct {
 public:
   byte enabled  :1;  // HIGH means the program is enabled
@@ -62,27 +84,30 @@ public:
   //   starttimes[1]: repeat count
   //   starttimes[2]: repeat every
   // Start time structure:
-  //   if bit 15 = 1: negative, undefined
-  //   if bit 14 = 1: sunrise time +/- offset (by lowest 12 bits)
-  //   if bit 13 = 1: sunset  time +/- offset (by lowest 12 bits)
-  //      bit 12: unused, undefined
-  // else: standard start time (value between 0 to 1440, by lowest 12 bits)
+  //   bit 15         : not used, reserved
+  //   if bit 14 == 1 : sunrise time +/- offset (by lowest 12 bits)
+  //   or bit 13 == 1 : sunset  time +/- offset (by lowest 12 bits)
+  //      bit 12      : sign, 0 is positive, 1 is negative
+  //      bit 11      : not used, reserved
+  //   else: standard start time (value between 0 to 1440, by bits 0 to 10)
   int16_t starttimes[MAX_NUM_STARTTIMES];
 
-  uint8_t durations[MAX_NUM_STATIONS];  // duration / water time of each station
+  byte durations[MAX_NUM_STATIONS];  // duration / water time of each station
   
   char name[PROGRAM_NAME_SIZE];
 
   byte check_match(time_t t);
+  int16_t starttime_decode(int16_t t);  
 };
 
-// program structure size
+/** Program data nvm addresses */
 #define PROGRAMSTRUCT_SIZE         (sizeof(ProgramStruct))
-#define ADDR_PROGRAMTYPEVERSION     ADDR_EEPROM_PROGRAMS
-#define ADDR_PROGRAMCOUNTER        (ADDR_EEPROM_PROGRAMS+1)
-#define ADDR_PROGRAMDATA           (ADDR_EEPROM_PROGRAMS+2)
-// maximum number of programs, restricted by internal EEPROM size
-#define MAX_NUMBER_PROGRAMS  ((MAX_PROGRAMDATA-2)/PROGRAMSTRUCT_SIZE)
+#define ADDR_PROGRAMTYPEVERSION     ADDR_NVM_PROGRAMS
+#define ADDR_PROGRAMCOUNTER        (ADDR_NVM_PROGRAMS+1)
+#define ADDR_PROGRAMDATA           (ADDR_NVM_PROGRAMS+2)
+
+// maximum number of programs, restricted by internal NVM size
+#define MAX_NUMBER_PROGRAMS        ((MAX_PROGRAMDATA-2)/PROGRAMSTRUCT_SIZE)
 
 extern OpenSprinkler os;
 
@@ -90,12 +115,12 @@ extern OpenSprinkler os;
 
 class ProgramData {
 public:  
-  static unsigned long scheduled_start_time[];// scheduled start time for each station
-  static unsigned long scheduled_stop_time[]; // scheduled stop time for each station
+  static ulong scheduled_start_time[];// scheduled start time for each station
+  static ulong scheduled_stop_time[]; // scheduled stop time for each station
   static byte scheduled_program_index[]; // scheduled program index
   static byte  nprograms;     // number of programs
   static LogStruct lastrun;
-  static unsigned long last_seq_stop_time;  // the last stop time of a sequential station
+  static ulong last_seq_stop_time;  // the last stop time of a sequential station
   
   static void init();
   static void reset_runtime();
@@ -112,4 +137,4 @@ private:
   static void save_count();
 };
 
-#endif
+#endif  // _PROGRAM_H

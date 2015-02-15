@@ -24,8 +24,8 @@
   23 Dec 2013 -- modified by Ray Wang (Rayshobby LLC) to add support for MCP7940
  */
 
-#include "Wire.h"
 #include "DS1307RTC.h"
+#include <Wire.h>
 
 #define DS1307_CTRL_ID 0x68
 #define MCP7940_CTRL_ID 0x6F // ray: ctrl id for MCP7940N

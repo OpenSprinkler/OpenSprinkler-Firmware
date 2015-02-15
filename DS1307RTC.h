@@ -6,7 +6,7 @@
 #ifndef DS1307RTC_h
 #define DS1307RTC_h
 
-#include <Time.h>
+#include "Time.h"
 
 // library interface description
 class DS1307RTC

@@ -1,20 +1,42 @@
-// Example code for OpenSprinkler Generation 2
-
-/* Program Data Structures and Functions
-   Creative Commons Attribution-ShareAlike 3.0 license
-   Sep 2014 @ Rayshobby.net
-*/
+/* OpenSprinkler AVR/RPI/BBB Library
+ * Copyright (C) 2014 by Ray Wang (ray@opensprinkler.com)
+ *
+ * Program data structures and functions
+ * Sep 2014 @ Rayshobby.net
+ *
+ * This file is part of the OpenSprinkler library
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see
+ * <http://www.gnu.org/licenses/>. 
+ */
 
 #include <limits.h>
 #include "program.h"
 
+#if !defined(SECS_PER_DAY)
+#define SECS_PER_MIN  (60UL)
+#define SECS_PER_HOUR (3600UL)
+#define SECS_PER_DAY  (SECS_PER_HOUR * 24UL)
+#endif
+
 // Declare static data members
 byte ProgramData::nprograms = 0;
-unsigned long ProgramData::scheduled_start_time[(MAX_EXT_BOARDS+1)*8];
-unsigned long ProgramData::scheduled_stop_time[(MAX_EXT_BOARDS+1)*8];
+ulong ProgramData::scheduled_start_time[(MAX_EXT_BOARDS+1)*8];
+ulong ProgramData::scheduled_stop_time[(MAX_EXT_BOARDS+1)*8];
 byte ProgramData::scheduled_program_index[(MAX_EXT_BOARDS+1)*8];
 LogStruct ProgramData::lastrun;
-unsigned long ProgramData::last_seq_stop_time;
+ulong ProgramData::last_seq_stop_time;
 
 void ProgramData::init() {
 	reset_runtime();
@@ -30,14 +52,14 @@ void ProgramData::reset_runtime() {
   last_seq_stop_time = 0;
 }
 
-// load program count from EEPROM
+// load program count from NVM
 void ProgramData::load_count() {
-  nprograms = eeprom_read_byte((unsigned char *) ADDR_PROGRAMCOUNTER);
+  nprograms = nvm_read_byte((byte *) ADDR_PROGRAMCOUNTER);
 }
 
-// save program count to EEPROM
+// save program count to NVM
 void ProgramData::save_count() {
-  eeprom_write_byte((unsigned char *) ADDR_PROGRAMCOUNTER, nprograms);
+  nvm_write_byte((byte *) ADDR_PROGRAMCOUNTER, nprograms);
 }
 
 // erase all program data
@@ -53,7 +75,7 @@ void ProgramData::read(byte pid, ProgramStruct *buf) {
     // todo: handle SD card
   } else {
     unsigned int addr = ADDR_PROGRAMDATA + (unsigned int)pid * PROGRAMSTRUCT_SIZE;
-    eeprom_read_block((void*)buf, (const void *)addr, PROGRAMSTRUCT_SIZE);  
+    nvm_read_block((void*)buf, (const void *)addr, PROGRAMSTRUCT_SIZE);  
   }
 }
 
@@ -64,7 +86,7 @@ byte ProgramData::add(ProgramStruct *buf) {
   } else {
     if (nprograms >= MAX_NUMBER_PROGRAMS)  return 0;
     unsigned int addr = ADDR_PROGRAMDATA + (unsigned int)nprograms * PROGRAMSTRUCT_SIZE;
-    eeprom_write_block((const void*)buf, (void *)addr, PROGRAMSTRUCT_SIZE);
+    nvm_write_block((const void*)buf, (void *)addr, PROGRAMSTRUCT_SIZE);
     nprograms ++;
     save_count();
   }
@@ -81,12 +103,20 @@ void ProgramData::moveup(byte pid) {
     // swap program pid-1 and pid
     unsigned int src = ADDR_PROGRAMDATA + (unsigned int)(pid-1) * PROGRAMSTRUCT_SIZE;
     unsigned int dst = src + PROGRAMSTRUCT_SIZE;
+#if defined(ARDUINO)    
     byte tmp;
     for(int i=0;i<PROGRAMSTRUCT_SIZE;i++,src++,dst++) {
-      tmp = eeprom_read_byte((byte *)src);
-      eeprom_write_byte((byte *)src, eeprom_read_byte((byte *)dst));
-      eeprom_write_byte((byte *)dst, tmp);
+      tmp = nvm_read_byte((byte *)src);
+      nvm_write_byte((byte *)src, nvm_read_byte((byte *)dst));
+      nvm_write_byte((byte *)dst, tmp);
     }
+#else
+    ProgramStruct tmp1, tmp2;
+    nvm_read_block(&tmp1, (void *)src, PROGRAMSTRUCT_SIZE);
+    nvm_read_block(&tmp2, (void *)dst, PROGRAMSTRUCT_SIZE);
+    nvm_write_block(&tmp1, (void *)dst, PROGRAMSTRUCT_SIZE);
+    nvm_write_block(&tmp2, (void *)src, PROGRAMSTRUCT_SIZE);
+#endif
   }
 }
 
@@ -97,7 +127,7 @@ byte ProgramData::modify(byte pid, ProgramStruct *buf) {
     // handle SD card
   } else {
     unsigned int addr = ADDR_PROGRAMDATA + (unsigned int)pid * PROGRAMSTRUCT_SIZE;
-    eeprom_write_block((const void*)buf, (void *)addr, PROGRAMSTRUCT_SIZE);
+    nvm_write_block((const void*)buf, (void *)addr, PROGRAMSTRUCT_SIZE);
   }
   return 1;
 }
@@ -113,8 +143,8 @@ byte ProgramData::del(byte pid) {
     unsigned int addr = ADDR_PROGRAMDATA + (unsigned int)(pid+1) * PROGRAMSTRUCT_SIZE;
     // erase by copying backward
     for (; addr < ADDR_PROGRAMDATA + nprograms * PROGRAMSTRUCT_SIZE; addr += PROGRAMSTRUCT_SIZE) {
-      eeprom_read_block((void*)&copy, (const void *)addr, PROGRAMSTRUCT_SIZE);  
-      eeprom_write_block((const void*)&copy, (void *)(addr-PROGRAMSTRUCT_SIZE), PROGRAMSTRUCT_SIZE);
+      nvm_read_block((void*)&copy, (const void *)addr, PROGRAMSTRUCT_SIZE);  
+      nvm_write_block((const void*)&copy, (void *)(addr-PROGRAMSTRUCT_SIZE), PROGRAMSTRUCT_SIZE);
     }
     nprograms --;
     save_count();
@@ -122,16 +152,46 @@ byte ProgramData::del(byte pid) {
   return 1;
 }
 
+// decode a sunrise/sunset start time to actual start time
+int16_t ProgramStruct::starttime_decode(int16_t t) {
+  int16_t offset = t&0x7ff;
+  if((t>>STARTTIME_SIGN_BIT)&1) offset = -offset;
+  if((t>>STARTTIME_SUNRISE_BIT)&1) { // sunrise time
+    t = os.nvdata.sunrise_time + offset;
+    if (t<0) t=0; // clamp it to 0 if less than 0
+  } else if((t>>STARTTIME_SUNSET_BIT)&1) {
+    t = os.nvdata.sunset_time + offset;
+    if (t>=1440) t=1439; // clamp it to 1440 if larger than 1440
+  }
+  return t;
+}
+
 // Check if a given time matches program schedule
 byte ProgramStruct::check_match(time_t t) {
 
-  unsigned int current_minute = (unsigned int)hour(t)*60+(unsigned int)minute(t);
+#if defined(ARDUINO)
+  unsigned int hour_t = hour(t);
+  unsigned int minute_t = minute(t);
+  byte weekday_t = weekday(t);        // weekday ranges from [0,6] within Sunday being 1
+  byte day_t = day(t);
+  byte month_t = month(t);
+#else
+  time_t ct = t;
+  struct tm *ti = gmtime(&ct);
+  unsigned int hour_t = ti->tm_hour;
+  unsigned int minute_t = ti->tm_min;
+  byte weekday_t = (ti->tm_wday+1)%7;  // tm_wday ranges from [0,6] with Sunday being 0
+  byte day_t = ti->tm_mday;
+  byte month_t = ti->tm_mon+1;   // tm_mon ranges from [0,11]
+#endif
+
+  unsigned int current_minute = hour_t*60+minute_t;
   
   // check program enable status
   if (!enabled) return 0;
  
-  byte wd = ((byte)weekday(t)+5)%7;
-  byte dt = day(t);
+  byte wd = (weekday_t+5)%7;
+  byte dt = day_t;
   byte i;
   // check day match
   switch(type) {
@@ -165,14 +225,14 @@ byte ProgramStruct::check_match(time_t t) {
     // odd day restriction
     // skip 31st and Feb 29
     if(dt==31)  return 0;
-    else if (dt==29 && month(t)==2)  return 0;
+    else if (dt==29 && month_t==2)  return 0;
     else if ((dt%2)!=1)  return 0;
   }
   
   // check start time match
   if (!starttime_type) {
     // repeating type
-    int16_t start = starttimes[0];
+    int16_t start = starttime_decode(starttimes[0]);
     int16_t repeat = starttimes[1];
     int16_t interval = starttimes[2];
     // if current time is prior to start time, return false
@@ -207,19 +267,19 @@ byte ProgramStruct::check_match(time_t t) {
   } else {
     // given start time type
     for(i=0;i<MAX_NUM_STARTTIMES;i++) {
-      if (current_minute == starttimes[i])  return 1;
+      if (current_minute == starttime_decode(starttimes[i]))  return 1;
     }
   }
   return 0;
 }
 
 // convert absolute remainder (reference time 1970 01-01) to relative remainder (reference time today)
-// absolute remainder is stored in eeprom, relative remainder is presented to web
+// absolute remainder is stored in nvm, relative remainder is presented to web
 void ProgramData::drem_to_relative(byte days[2]) {
   byte rem_abs=days[0];
   byte inv=days[1];
   // todo: use now_tz()?
-  days[0] = (byte)((rem_abs + inv - (now()/SECS_PER_DAY) % inv) % inv);
+  days[0] = (byte)((rem_abs + inv - (os.now_tz()/SECS_PER_DAY) % inv) % inv);
 }
 
 // relative remainder -> absolute remainder
@@ -227,5 +287,7 @@ void ProgramData::drem_to_absolute(byte days[2]) {
   byte rem_rel=days[0];
   byte inv=days[1];
   // todo: use now_tz()?
-  days[0] = (byte)(((now()/SECS_PER_DAY) + rem_rel) % inv);
+  days[0] = (byte)(((os.now_tz()/SECS_PER_DAY) + rem_rel) % inv);
 }
+
+

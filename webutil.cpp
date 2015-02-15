@@ -96,6 +96,8 @@ uint8_t EtherCard::findKeyVal (const char *str,char *strbuf, uint8_t maxlen,cons
     return(i);
 }
 
+extern unsigned char h2int(char c);
+/*
 // convert a single hex digit character to its integer value
 unsigned char h2int(char c)
 {
@@ -110,7 +112,7 @@ unsigned char h2int(char c)
     }
     return(0);
 }
-
+*/
 // decode a url string e.g "hello%20joe" or "hello+joe" becomes "hello joe"
 void EtherCard::urlDecode (char *urlbuf)
 {

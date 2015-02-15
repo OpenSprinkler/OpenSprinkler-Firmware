@@ -1,14 +1,29 @@
-// Arduino library code for OpenSprinkler Generation 2
+/* OpenSprinkler AVR/RPI/BBB Library
+ * Copyright (C) 2014 by Ray Wang (ray@opensprinkler.com)
+ *
+ * OpenSprinkler library 
+ * Sep 2014 @ Rayshobby.net
+ *
+ * This file is part of the OpenSprinkler library
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see
+ * <http://www.gnu.org/licenses/>. 
+ */
 
-/* OpenSprinkler Class Implementation
-   Creative Commons Attribution-ShareAlike 3.0 license
-   Nov 2014 @ Rayshobby.net
-*/
+#include "OpenSprinkler.h"
 
-#include "OpenSprinklerGen2.h"
-
-// Declare static data members
-LiquidCrystal OpenSprinkler::lcd;
+/** Declare static data members */
 NVConData OpenSprinkler::nvdata;
 ConStatus OpenSprinkler::status;
 ConStatus OpenSprinkler::old_status;
@@ -23,18 +38,22 @@ byte OpenSprinkler::stndis_bits[MAX_EXT_BOARDS+1];
 byte OpenSprinkler::rfstn_bits[MAX_EXT_BOARDS+1];
 byte OpenSprinkler::stnseq_bits[MAX_EXT_BOARDS+1];
 
-unsigned long OpenSprinkler::rainsense_start_time;
-unsigned long OpenSprinkler::raindelay_start_time;
-unsigned long OpenSprinkler::button_lasttime;
-unsigned long OpenSprinkler::ntpsync_lasttime;
-unsigned long OpenSprinkler::checkwt_lasttime;
-unsigned long OpenSprinkler::network_lasttime;
-unsigned long OpenSprinkler::dhcpnew_lasttime;
+ulong OpenSprinkler::rainsense_start_time;
+ulong OpenSprinkler::raindelay_start_time;
+ulong OpenSprinkler::button_lasttime;
+ulong OpenSprinkler::ntpsync_lasttime;
+ulong OpenSprinkler::checkwt_lasttime;
+ulong OpenSprinkler::network_lasttime;
+ulong OpenSprinkler::dhcpnew_lasttime;
 byte OpenSprinkler::water_percent_avg;
 
-extern char tmp_buffer[];
+char tmp_buffer[TMP_BUFFER_SIZE+1];       // scratch buffer
 
-// Option json names
+#if defined(ARDUINO)
+  LiquidCrystal OpenSprinkler::lcd;
+#endif
+
+/** Option json names */
 prog_char _json_fwv [] PROGMEM = "fwv";
 prog_char _json_tz  [] PROGMEM = "tz";
 prog_char _json_ntp [] PROGMEM = "ntp";
@@ -74,7 +93,7 @@ prog_char _json_ntp4[] PROGMEM = "ntp4";
 prog_char _json_log [] PROGMEM = "lg";
 prog_char _json_reset[] PROGMEM = "reset";
 
-// Option names
+/** Option names */
 prog_char _str_fwv [] PROGMEM = "Firmware: ";
 prog_char _str_tz  [] PROGMEM = "TZone:";
 prog_char _str_ntp [] PROGMEM = "NTP?";
@@ -147,15 +166,15 @@ OptionStruct OpenSprinkler::options[NUM_OPTIONS] = {
   {15,   255, _str_dim,  _json_dim},   // lcd dimming
   {0,   200, _str_rlp,  _json_rlp},   // relay pulse
   {0,   5,   _str_uwt,  _json_uwt}, 
-  {204, 255, _str_ntp1, _json_ntp1},  // this and the next three bytes define the ntp server ip
-  {9,   255, _str_ntp2, _json_ntp2}, 
-  {54,  255, _str_ntp3, _json_ntp3},
-  {119, 255, _str_ntp4, _json_ntp4},
+  {50,  255, _str_ntp1, _json_ntp1},  // this and the next three bytes define the ntp server ip
+  {97,  255, _str_ntp2, _json_ntp2}, 
+  {210, 255, _str_ntp3, _json_ntp3},
+  {169, 255, _str_ntp4, _json_ntp4},
   {1,   1,   _str_log,  _json_log},   // enable logging: 0: disable; 1: enable.   
   {0,   1,   _str_reset,_json_reset}
 };
 
-// Weekday display strings
+/** Weekday display strings */
 prog_char str_day0[] PROGMEM = "Mon";
 prog_char str_day1[] PROGMEM = "Tue";
 prog_char str_day2[] PROGMEM = "Wed";
@@ -164,7 +183,7 @@ prog_char str_day4[] PROGMEM = "Fri";
 prog_char str_day5[] PROGMEM = "Sat";
 prog_char str_day6[] PROGMEM = "Sun";
 
-PGM_P days_str[7] PROGMEM = {
+prog_char* days_str[7] = {
   str_day0,
   str_day1,
   str_day2,
@@ -174,23 +193,21 @@ PGM_P days_str[7] PROGMEM = {
   str_day6
 };
 
-// ====== Ethernet defines ======
-//static byte mymac[] = { 0x00,0x69,0x69,0x2D,0x31,0x00 }; // mac address
+time_t OpenSprinkler::now_tz() {
+  return now()+(int32_t)3600/4*(int32_t)(options[OPTION_TIMEZONE].value-48);
+}
 
-// ===============
-// Setup Functions
-// ===============
+#if defined(ARDUINO)
 
 #define MAC_CTRL_ID 0x50
-
 bool OpenSprinkler::read_hardware_mac() {
   uint8_t ret;
-  Wire.beginTransmission(MAC_CTRL_ID); // Begin talking to EEPROM
+  Wire.beginTransmission(MAC_CTRL_ID);
   Wire.write((uint8_t)(0x00));
   ret = Wire.endTransmission();
   if (ret)  return false;
 
-  Wire.beginTransmission(MAC_CTRL_ID); // Begin talking to EEPROM
+  Wire.beginTransmission(MAC_CTRL_ID);
   Wire.write(0xFA); // The address of the register we want
   Wire.endTransmission(); // Send the data
   Wire.requestFrom(MAC_CTRL_ID, 6); // Request 6 bytes from the EEPROM
@@ -201,7 +218,7 @@ bool OpenSprinkler::read_hardware_mac() {
   return true;
 }
 
-// Arduino software reset function
+/** Arduino software reset function */
 void(* resetFunc) (void) = 0;
 
 // Initialize network with the given mac address and http port
@@ -209,10 +226,10 @@ byte OpenSprinkler::start_network() {
 
   lcd_print_line_clear_pgm(PSTR("Connecting..."), 1);
 
-  network_lasttime = now();
+  network_lasttime = now_tz();
   dhcpnew_lasttime = network_lasttime;
 
-  // new for 2.2: read EEPROM for hardware MAC
+  // new for 2.2: read hardware MAC
   if(!read_hardware_mac())
   {
     // if no hardware MAC exists, set software MAC
@@ -226,7 +243,7 @@ byte OpenSprinkler::start_network() {
         
   if(!ether.begin(ETHER_BUFFER_SIZE, (uint8_t*)tmp_buffer, PIN_ETHER_CS))  return 0;
   // calculate http port number
-  ether.hisport = (int)(options[OPTION_HTTPPORT_1].value<<8) + (int)options[OPTION_HTTPPORT_0].value;
+  ether.hisport = (unsigned int)(options[OPTION_HTTPPORT_1].value<<8) + (unsigned int)options[OPTION_HTTPPORT_0].value;
 
   if (options[OPTION_USE_DHCP].value) {
     // register with domain name "OpenSprinkler-xx" where xx is the last byte of the MAC address
@@ -248,12 +265,11 @@ byte OpenSprinkler::start_network() {
   return 1;
 }
 
-// Reboot controller
-void OpenSprinkler::reboot() {
+/** Reboot controller */
+void OpenSprinkler::reboot_dev() {
   resetFunc();
 }
 
-// OpenSprinkler init function
 void OpenSprinkler::begin() {
 
   // shift register setup
@@ -282,9 +298,8 @@ void OpenSprinkler::begin() {
   // turn on LCD backlight and contrast
   pinMode(PIN_LCD_BACKLIGHT, OUTPUT);
   pinMode(PIN_LCD_CONTRAST, OUTPUT);
-  analogWrite(PIN_LCD_CONTRAST, options[OPTION_LCD_CONTRAST].value);
-  analogWrite(PIN_LCD_BACKLIGHT, 255-options[OPTION_LCD_BACKLIGHT].value); 
-
+  lcd_set_brightness();
+  lcd_set_contrast();
   // turn on lcd
   lcd.init(1, PIN_LCD_RS, 255, PIN_LCD_EN, PIN_LCD_D4, PIN_LCD_D5, PIN_LCD_D6, PIN_LCD_D7, 0,0,0,0);
   lcd.begin(16, 2);
@@ -382,162 +397,6 @@ void OpenSprinkler::begin() {
   }
 }
 
-unsigned long eeprom_hex2ulong(unsigned char* addr, byte len) {
-  char c;
-  unsigned long v = 0;
-  for(byte i=0;i<len;i++) {
-    c = eeprom_read_byte(addr++);
-    v <<= 4;
-    if(c>='0' && c<='9') {
-      v += (c-'0');
-    } else if (c>='A' && c<='F') {
-      v += 10 + (c-'A');
-    } else if (c>='a' && c<='f') {
-      v += 10 + (c-'a');
-    } else {
-      return 0;
-    }
-  }
-  return v;
-}
-
-// Get station name from eeprom and parse into RF code
-uint16_t OpenSprinkler::get_station_name_rf(byte sid, unsigned long* on, unsigned long *off) {
-  unsigned char* start = (unsigned char *)(ADDR_EEPROM_STN_NAMES) + (int)sid * STATION_NAME_SIZE;
-  unsigned long v;
-  v = eeprom_hex2ulong(start, 6);
-  if (!v) return 0;
-  if (on) *on = v;
-  v = eeprom_hex2ulong(start+6, 6);
-  if (!v) return 0;
-  if (off) *off = v;
-  v = eeprom_hex2ulong(start+12, 4);
-  if (!v) return 0;
-  return v;
-}
-
-// Get station name from eeprom
-void OpenSprinkler::get_station_name(byte sid, char tmp[]) {
-  int i=0;
-  int start = ADDR_EEPROM_STN_NAMES + (int)sid * STATION_NAME_SIZE;
-  tmp[STATION_NAME_SIZE]=0;
-  while(1) {
-    tmp[i] = eeprom_read_byte((unsigned char *)(start+i));
-    if (tmp[i]==0 || i==(STATION_NAME_SIZE-1)) break;
-    i++;
-  }
-  return;
-}
-
-// Set station name to eeprom
-void OpenSprinkler::set_station_name(byte sid, char tmp[]) {
-  int i=0;
-  int start = ADDR_EEPROM_STN_NAMES + (int)sid * STATION_NAME_SIZE;
-  tmp[STATION_NAME_SIZE]=0;
-  while(1) {
-    eeprom_write_byte((unsigned char *)(start+i), tmp[i]);
-    if (tmp[i]==0 || i==(STATION_NAME_SIZE-1)) break;
-    i++;
-  }
-  return;  
-}
-
-// Save station attribute bits to EEPROM
-void OpenSprinkler::station_attrib_bits_save(int addr, byte bits[]) {
-  eeprom_write_block(bits, (unsigned char *)addr, MAX_EXT_BOARDS+1);
-}
-
-void OpenSprinkler::station_attrib_bits_load(int addr, byte bits[]) {
-  eeprom_read_block(bits, (unsigned char *)addr, MAX_EXT_BOARDS+1);
-}
-
-
-// ==================
-// String Functions
-// ==================
-void OpenSprinkler::eeprom_string_set(int start_addr, char* buf) {
-  byte i=0;
-  for (; (*buf)!=0; buf++, i++) {
-    eeprom_write_byte((unsigned char*)(start_addr+i), *(buf));
-  }
-  eeprom_write_byte((unsigned char*)(start_addr+i), 0);  
-}
-
-void OpenSprinkler::eeprom_string_get(int start_addr, char *buf) {
-  byte c;
-  byte i = 0;
-  do {
-    c = eeprom_read_byte((unsigned char*)(start_addr+i));
-    //if (c==' ') c='+';
-    *(buf++) = c;
-    i ++;
-  } while (c != 0);
-}
-
-
-// verify if a string matches password
-byte OpenSprinkler::password_verify(char *pw) { 
-  unsigned char *addr = (unsigned char*)ADDR_EEPROM_PASSWORD;
-  byte c1, c2;
-  while(1) {
-    c1 = eeprom_read_byte(addr++);
-    c2 = *pw++;
-    if (c1==0 || c2==0)
-      break;
-    if (c1!=c2) {
-      return 0;
-    }
-  }
-  return (c1==c2) ? 1 : 0;
-}
-
-// compare a string to eeprom
-byte strcmp_to_eeprom(const char* src, int _addr) {
-  byte i=0;
-  byte c1, c2;
-  unsigned char *addr = (unsigned char*)_addr;
-  while(1) {
-    c1 = eeprom_read_byte(addr++);
-    c2 = *src++;
-    if (c1==0 || c2==0)
-      break;      
-    if (c1!=c2)  return 1;
-  }
-  return (c1==c2) ? 0 : 1;
-}
-
-// ==================
-// Schedule Functions
-// ==================
-
-// Index of today's weekday (Monday is 0)
-byte OpenSprinkler::weekday_today() {
-  //return ((byte)weekday()+5)%7; // Time::weekday() assumes Sunday is 1
-  tmElements_t tm;
-  RTC.read(tm);
-  return (tm.Wday+5)%7;
-}
-
-// Set station bit
-void OpenSprinkler::set_station_bit(byte sid, byte value) {
-  byte bid = (sid>>3);  // board index
-  byte s = sid&0x07;     // station bit index
-  if (value) {
-    station_bits[bid] = station_bits[bid] | ((byte)1<<s);
-  } 
-  else {
-    station_bits[bid] = station_bits[bid] &~((byte)1<<s);
-  }
-}	
-
-// Clear all station bits
-void OpenSprinkler::clear_all_station_bits() {
-  byte bid;
-  for(bid=0;bid<=MAX_EXT_BOARDS;bid++) {
-    station_bits[bid] = 0;
-  }
-}
-
 // Apply all station bits
 // !!! This will activate/deactivate valves !!!
 void OpenSprinkler::apply_all_station_bits() {
@@ -561,6 +420,229 @@ void OpenSprinkler::apply_all_station_bits() {
   digitalWrite(PIN_SR_LATCH, HIGH);
 }		
 
+void OpenSprinkler::rainsensor_status() {
+  // options[OPTION_RS_TYPE]: 0 if normally closed, 1 if normally open
+  status.rain_sensed = (digitalRead(PIN_RAINSENSOR) == options[OPTION_RAINSENSOR_TYPE].value ? 0 : 1);
+}
+
+int OpenSprinkler::detect_exp() {
+  unsigned int v = analogRead(PIN_EXP_SENSE);
+  // OpenSprinkler uses voltage divider to detect expansion boards
+  // Master controller has a 1.5K pull-up;
+  // each expansion board (8 stations) has 10K pull-down connected in parallel;
+  // so the exact ADC value for n expansion boards is:
+  //    ADC = 1024 * 10 / (10 + 1.5 * n)
+  // For  0,   1,   2,   3,   4,   5 expansion boards, the ADC values are:
+  //   1024, 890, 787, 706, 640, 585
+  // Actual threshold is taken as the midpoint between, to account for errors
+  int n = -1;
+  if (v > 957) { // 0
+    n = 0;
+  } else if (v > 838) { // 1
+    n = 1;
+  } else if (v > 746) { // 2
+    n = 2;
+  } else if (v > 673) { // 3
+    n = 3;
+  } else if (v > 612) { // 4
+    n = 4;
+  } else if (v > 562) { // 5
+    n = 5;
+  } else {  // cannot determine
+  }
+  return n;
+}
+
+#else // for RPI/BBB
+
+extern struct sockaddr_in svr_addr, cli_addr;
+extern socklen_t sin_len;
+extern int sock;
+extern int client;
+byte OpenSprinkler::start_network() {
+  int one = 1;
+  sin_len = sizeof(cli_addr);
+  sock = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
+  if (sock < 0) {
+    DEBUG_PRINTLN("sock failed.")
+    return 0;
+  }
+  setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &one, sizeof(int));    
+  
+  unsigned int port = (unsigned int)(options[OPTION_HTTPPORT_1].value<<8) + (unsigned int)options[OPTION_HTTPPORT_0].value;
+  port = 8888;
+  DEBUG_PRINTLN(port);
+  svr_addr.sin_family = AF_INET;
+  svr_addr.sin_addr.s_addr = INADDR_ANY;
+  svr_addr.sin_port = htons(port);
+    
+  if (bind(sock, (struct sockaddr *) &svr_addr, sizeof(svr_addr)) == -1) {
+    DEBUG_PRINTLN("bind failed.")
+    close(sock);
+    return 0;
+  }
+  listen(sock, 5);    
+  
+  return 1;
+}
+
+#include <sys/reboot.h>
+void OpenSprinkler::reboot_dev() {
+	reboot(RB_AUTOBOOT);
+}
+
+void OpenSprinkler::begin() {
+  // ray: todo
+  // hardware pin setup
+}
+
+void OpenSprinkler::apply_all_station_bits() {
+  // ray: todo
+}
+
+void OpenSprinkler::rainsensor_status() {
+  // ray: todo
+}
+
+int OpenSprinkler::detect_exp() {
+  return -1;
+}
+
+#endif // defined(ARDUINO)
+
+static ulong nvm_hex2ulong(byte *addr, byte len) {
+  char c;
+  ulong v = 0;
+  nvm_read_block(tmp_buffer, (void*)addr, len);
+  for(byte i=0;i<len;i++) {
+    c = tmp_buffer[i];
+    v <<= 4;
+    if(c>='0' && c<='9') {
+      v += (c-'0');
+    } else if (c>='A' && c<='F') {
+      v += 10 + (c-'A');
+    } else if (c>='a' && c<='f') {
+      v += 10 + (c-'a');
+    } else {
+      return 0;
+    }
+  }
+  return v;
+}
+
+// Get station name from nvm and parse into RF code
+uint16_t OpenSprinkler::get_station_name_rf(byte sid, ulong* on, ulong *off) {
+  byte *start = (byte *)(ADDR_NVM_STN_NAMES) + (int)sid * STATION_NAME_SIZE;
+  ulong v;
+  v = nvm_hex2ulong(start, 6);
+  if (!v) return 0;
+  if (on) *on = v;
+  v = nvm_hex2ulong(start+6, 6);
+  if (!v) return 0;
+  if (off) *off = v;
+  v = nvm_hex2ulong(start+12, 4);
+  if (!v) return 0;
+  return v;
+}
+
+// Get station name from nvm
+void OpenSprinkler::get_station_name(byte sid, char tmp[]) {
+  tmp[STATION_NAME_SIZE]=0;
+  nvm_read_block(tmp, (void*)(ADDR_NVM_STN_NAMES+(int)sid*STATION_NAME_SIZE), STATION_NAME_SIZE);
+  return;
+}
+
+// Set station name to nvm
+void OpenSprinkler::set_station_name(byte sid, char tmp[]) {
+  tmp[STATION_NAME_SIZE]=0;  
+  nvm_write_block(tmp, (void*)(ADDR_NVM_STN_NAMES+(int)sid*STATION_NAME_SIZE), STATION_NAME_SIZE);
+  return;  
+}
+
+// Save station attribute bits to NVM
+void OpenSprinkler::station_attrib_bits_save(int addr, byte bits[]) {
+  nvm_write_block(bits, (void*)addr, MAX_EXT_BOARDS+1);
+}
+
+void OpenSprinkler::station_attrib_bits_load(int addr, byte bits[]) {
+  nvm_read_block(bits, (void*)addr, MAX_EXT_BOARDS+1);
+}
+
+// verify if a string matches password
+byte OpenSprinkler::password_verify(char *pw) { 
+  byte *addr = (byte*)ADDR_NVM_PASSWORD;
+  byte c1, c2;
+  while(1) {
+    c1 = nvm_read_byte(addr++);
+    c2 = *pw++;
+    if (c1==0 || c2==0)
+      break;
+    if (c1!=c2) {
+      return 0;
+    }
+  }
+  return (c1==c2) ? 1 : 0;
+}
+
+// ==================
+// Schedule Functions
+// ==================
+
+// Index of today's weekday (Monday is 0)
+byte OpenSprinkler::weekday_today() {
+  //return ((byte)weekday()+5)%7; // Time::weekday() assumes Sunday is 1
+#if defined(ARDUINO)
+  tmElements_t tm;
+  RTC.read(tm);
+  return (tm.Wday+5)%7;
+#else
+  return 0;
+  // ray: todo
+#endif  
+}
+
+void OpenSprinkler::set_relay(byte status) {
+#if defined(ARDUINO)
+  digitalWrite(PIN_RELAY, status);
+#else
+  // ray: todo
+#endif
+}
+
+// Set station bit
+void OpenSprinkler::set_station_bit(byte sid, byte value) {
+  byte bid = (sid>>3);  // board index
+  byte s = sid&0x07;     // station bit index
+  if (value) {
+    station_bits[bid] = station_bits[bid] | ((byte)1<<s);
+  } 
+  else {
+    station_bits[bid] = station_bits[bid] &~((byte)1<<s);
+  }
+}	
+
+// Clear all station bits
+void OpenSprinkler::clear_all_station_bits() {
+  byte bid;
+  for(bid=0;bid<=MAX_EXT_BOARDS;bid++) {
+    station_bits[bid] = 0;
+  }
+}
+
+
+
+
+void transmit_rfbit(ulong lenH, ulong lenL) {
+#if defined(ARDUINO)
+  PORT_RF |= (1<<PINX_RF);
+  delayMicroseconds(lenH);
+  PORT_RF &=~(1<<PINX_RF);
+  delayMicroseconds(lenL);
+#else
+
+#endif
+}
+
 void OpenSprinkler::update_rfstation_bits() {
   byte bid, s, sid;
   for(bid=0;bid<(1+MAX_EXT_BOARDS);bid++) {
@@ -574,16 +656,9 @@ void OpenSprinkler::update_rfstation_bits() {
   }
 }
 
-void transmit_rfbit(unsigned long lenH, unsigned long lenL) {
-  PORT_RF |= (1<<PINX_RF);
-  delayMicroseconds(lenH);
-  PORT_RF &=~(1<<PINX_RF);
-  delayMicroseconds(lenL);
-}
-
-void send_rfsignal(unsigned long code, unsigned long len) {
-  unsigned long len3 = len * 3;
-  unsigned long len31 = len * 31; 
+void send_rfsignal(ulong code, ulong len) {
+  ulong len3 = len * 3;
+  ulong len31 = len * 31; 
   for(byte n=0;n<24;n++) {
     int i=23;
     // send code
@@ -601,7 +676,7 @@ void send_rfsignal(unsigned long code, unsigned long len) {
 }
 
 void OpenSprinkler::send_rfstation_signal(byte sid, bool turnon) {
-  unsigned long on, off;
+  ulong on, off;
   uint16_t length = get_station_name_rf(sid, &on, &off);
   length = (length>>1)+(length>>2); // screw
   DEBUG_PRINTLN(on);
@@ -610,29 +685,29 @@ void OpenSprinkler::send_rfstation_signal(byte sid, bool turnon) {
   send_rfsignal(turnon ? on : off, length);
 }
 
-// =================
-// Options Functions
-// =================
 
+/** Options Functions */
 void OpenSprinkler::options_setup() {
 
-  // add 0.5 second delay to allow EEPROM to stablize
+  // add 0.5 second delay to allow nvm to stablize
   delay(500);
   
   // check reset condition: either firmware version has changed, or reset flag is up
-  byte curr_ver = eeprom_read_byte((unsigned char*)(ADDR_EEPROM_OPTIONS+OPTION_FW_VERSION));
+  byte curr_ver = nvm_read_byte((byte*)(ADDR_NVM_OPTIONS+OPTION_FW_VERSION));
   //if (curr_ver<100) curr_ver = curr_ver*10; // adding a default 0 if version number is the old type
-  if (curr_ver != OS_FW_VERSION || eeprom_read_byte((unsigned char*)(ADDR_EEPROM_OPTIONS+OPTION_RESET))==0xAA)  {
-
+  if (curr_ver != OS_FW_VERSION || nvm_read_byte((byte*)(ADDR_NVM_OPTIONS+OPTION_RESET))==0xAA)  {
+#if defined(ARDUINO)
     lcd_print_line_clear_pgm(PSTR("Resetting Device"), 0);
     lcd_print_line_clear_pgm(PSTR("Please Wait..."), 1);  
-    
-    // ======== Reset EEPROM data ========
+#endif
+    // ======== Reset NVM data ========
     int i, sn;
 
-    // 0. wipe out eeprom
-    for(i=0;i<INT_EEPROM_SIZE;i++) {
-      eeprom_write_byte((unsigned char*)i, 0);
+    // 0. wipe out nvm
+    for(i=0;i<TMP_BUFFER_SIZE;i++) tmp_buffer[i]=0;
+    for(i=0;i<NVM_SIZE;i+=TMP_BUFFER_SIZE) {
+      int nbytes = ((NVM_SIZE-i)>TMP_BUFFER_SIZE)?TMP_BUFFER_SIZE:(NVM_SIZE-i);
+      nvm_write_block(tmp_buffer, (void*)i, nbytes);
     }
     
     // 1. write program data default parameters
@@ -641,48 +716,46 @@ void OpenSprinkler::options_setup() {
     nvdata_save();
     
     // 3. write string parameters 
-    eeprom_string_set(ADDR_EEPROM_PASSWORD, DEFAULT_PASSWORD);
-    eeprom_string_set(ADDR_EEPROM_LOCATION, DEFAULT_LOCATION);
-    eeprom_string_set(ADDR_EEPROM_SCRIPTURL, DEFAULT_JAVASCRIPT_URL);
-    eeprom_string_set(ADDR_EEPROM_WEATHER_KEY, DEFAULT_WEATHER_KEY);
+    nvm_write_block(DEFAULT_PASSWORD, (void*)ADDR_NVM_PASSWORD, strlen(DEFAULT_PASSWORD)+1);
+    nvm_write_block(DEFAULT_LOCATION, (void*)ADDR_NVM_LOCATION, strlen(DEFAULT_LOCATION)+1);
+    nvm_write_block(DEFAULT_JAVASCRIPT_URL, (void*)ADDR_NVM_SCRIPTURL, strlen(DEFAULT_JAVASCRIPT_URL)+1);
+    nvm_write_block(DEFAULT_WEATHER_KEY, (void*)ADDR_NVM_WEATHER_KEY, strlen(DEFAULT_WEATHER_KEY)+1);
 
     // 4. reset station names, default Sxx
-    for(i=ADDR_EEPROM_STN_NAMES, sn=1; i<ADDR_EEPROM_MAS_OP; i+=STATION_NAME_SIZE, sn++) {
-      eeprom_write_byte((unsigned char *)i    ,'S');
-      eeprom_write_byte((unsigned char *)(i+1),'0'+(sn/10));
-      eeprom_write_byte((unsigned char *)(i+2),'0'+(sn%10)); 
+    tmp_buffer[0]='S';
+    tmp_buffer[3]=0;
+    for(i=ADDR_NVM_STN_NAMES, sn=1; i<ADDR_NVM_MAS_OP; i+=STATION_NAME_SIZE, sn++) {
+      tmp_buffer[1]='0'+(sn/10);
+      tmp_buffer[2]='0'+(sn%10);
+      nvm_write_block(tmp_buffer, (void*)i, strlen(tmp_buffer)+1);
     }
     
     // 5. reset station attributes
-    // since we wiped out eeprom, only non-zero attributes need to be initialized
-    for(i=ADDR_EEPROM_MAS_OP; i<ADDR_EEPROM_MAS_OP+(MAX_EXT_BOARDS+1); i++) {
-      // default master operation bits on
-      eeprom_write_byte((unsigned char *)i, 0xff);
+    // since we wiped out nvm, only non-zero attributes need to be initialized
+    for(i=0;i<MAX_EXT_BOARDS+1;i++) {
+      tmp_buffer[i]=0xff;
     }
-
-    for(i=ADDR_EEPROM_STNSEQ; i<ADDR_EEPROM_STNSEQ+(MAX_EXT_BOARDS+1); i++) {
-      // default master operation bits on
-      eeprom_write_byte((unsigned char *)i, 0xff);
-    }
+    nvm_write_block(tmp_buffer, (void*)ADDR_NVM_MAS_OP, MAX_EXT_BOARDS+1);
+    nvm_write_block(tmp_buffer, (void*)ADDR_NVM_STNSEQ, MAX_EXT_BOARDS+1);    
 
     // 6. write options
     options_save(); // write default option values
-    //======== END OF EEPROM RESET CODE ========
+    //======== END OF NVM RESET CODE ========
     
-    // restart after resetting EEPROM.
+    // restart after resetting NVM.
     delay(500);
-    reboot();
+    reboot_dev();
   } 
   else {
-    // load ram parameters from eeprom
+    // load ram parameters from nvm
     // 1. load options
     options_load();
     // 2. station attributes
-    station_attrib_bits_load(ADDR_EEPROM_MAS_OP, masop_bits);
-    station_attrib_bits_load(ADDR_EEPROM_IGNRAIN, ignrain_bits);
-    station_attrib_bits_load(ADDR_EEPROM_ACTRELAY, actrelay_bits);
-    station_attrib_bits_load(ADDR_EEPROM_STNDISABLE, stndis_bits);
-    station_attrib_bits_load(ADDR_EEPROM_STNSEQ, stnseq_bits);    
+    station_attrib_bits_load(ADDR_NVM_MAS_OP, masop_bits);
+    station_attrib_bits_load(ADDR_NVM_IGNRAIN, ignrain_bits);
+    station_attrib_bits_load(ADDR_NVM_ACTRELAY, actrelay_bits);
+    station_attrib_bits_load(ADDR_NVM_STNDISABLE, stndis_bits);
+    station_attrib_bits_load(ADDR_NVM_STNSEQ, stnseq_bits);    
     // set RF station flags
     update_rfstation_bits();
 
@@ -690,6 +763,7 @@ void OpenSprinkler::options_setup() {
     nvdata_load();
   }
 
+#if defined(ARDUINO)
 	byte button = button_read(BUTTON_WAIT_NONE);
 	
 	switch(button & BUTTON_MASK) {
@@ -698,7 +772,7 @@ void OpenSprinkler::options_setup() {
   	// if BUTTON_2 is pressed during startup, go to 'reset all options'
 		ui_set_options(OPTION_RESET);
 		if (options[OPTION_RESET].value) {
-			resetFunc();
+			reboot_dev();
 		}
 		break;
 
@@ -717,44 +791,48 @@ void OpenSprinkler::options_setup() {
     lcd.clear();
     ui_set_options(0);
     if (options[OPTION_RESET].value) {
-      resetFunc(); 
+      reboot_dev(); 
     }
     break;
   }
+  
   // turn on LCD backlight and contrast
   pinMode(PIN_LCD_BACKLIGHT, OUTPUT);
   pinMode(PIN_LCD_CONTRAST, OUTPUT);
-  analogWrite(PIN_LCD_CONTRAST, options[OPTION_LCD_CONTRAST].value);
-  analogWrite(PIN_LCD_BACKLIGHT, 255-options[OPTION_LCD_BACKLIGHT].value); 
+  lcd_set_brightness();
+  lcd_set_contrast();
+#endif  
 }
 
-// Load non-volatile controller status data from internal eeprom
+// Load non-volatile controller status data from internal nvm
 void OpenSprinkler::nvdata_load() {
-  eeprom_read_block(&nvdata, (unsigned char*)ADDR_EEPROM_NVCONDATA, sizeof(NVConData));
+  nvm_read_block(&nvdata, (void*)ADDR_NVM_NVCONDATA, sizeof(NVConData));
   old_status = status;
 }
 
-// Save non-volatile controller status data to internal eeprom
+// Save non-volatile controller status data to internal nvm
 void OpenSprinkler::nvdata_save() {
-  eeprom_write_block(&nvdata, (unsigned char*)ADDR_EEPROM_NVCONDATA, sizeof(NVConData));
+  nvm_write_block(&nvdata, (void*)ADDR_NVM_NVCONDATA, sizeof(NVConData));
 }
 
-// Load options from internal eeprom
+// Load options from internal nvm
 void OpenSprinkler::options_load() {
+  nvm_read_block(tmp_buffer, (void*)ADDR_NVM_OPTIONS, NUM_OPTIONS);
   for (byte i=0; i<NUM_OPTIONS; i++) {
-    options[i].value = eeprom_read_byte((unsigned char *)(ADDR_EEPROM_OPTIONS + i));
+    options[i].value = tmp_buffer[i];
   }
   nboards = options[OPTION_EXT_BOARDS].value+1;
   nstations = nboards * 8;
   status.enabled = options[OPTION_DEVICE_ENABLE].value;
 }
 
-// Save options to internal eeprom
+// Save options to internal nvm
 void OpenSprinkler::options_save() {
   // save options in reverse order so version number is written the last
   for (int i=NUM_OPTIONS-1; i>=0; i--) {
-    eeprom_write_byte((unsigned char *) (ADDR_EEPROM_OPTIONS + i), options[i].value);
+    tmp_buffer[i] = options[i].value;
   }
+  nvm_write_block(tmp_buffer, (void*)ADDR_NVM_OPTIONS, NUM_OPTIONS);
   nboards = options[OPTION_EXT_BOARDS].value+1;
   nstations = nboards * 8;
   status.enabled = options[OPTION_DEVICE_ENABLE].value;
@@ -789,44 +867,9 @@ void OpenSprinkler::raindelay_stop() {
   nvdata_save();
 }
 
-byte OpenSprinkler::detect_exp() {
-  unsigned int v = analogRead(PIN_EXP_SENSE);
-  // OpenSprinkler uses voltage divider to detect expansion boards
-  // Master controller has a 1.5K pull-up;
-  // each expansion board (8 stations) has 10K pull-down connected in parallel;
-  // so the exact ADC value for n expansion boards is:
-  //    ADC = 1024 * 10 / (10 + 1.5 * n)
-  // For  0,   1,   2,   3,   4,   5 expansion boards, the ADC values are:
-  //   1024, 890, 787, 706, 640, 585
-  // Actual threshold is taken as the midpoint between, to account for errors
-  byte n = 255;
-  if (v > 957) { // 0
-    n = 0;
-  } else if (v > 838) { // 1
-    n = 1;
-  } else if (v > 746) { // 2
-    n = 2;
-  } else if (v > 673) { // 3
-    n = 3;
-  } else if (v > 612) { // 4
-    n = 4;
-  } else if (v > 562) { // 5
-    n = 5;
-  } else {  // cannot determine
-  }
-  return n;
-}
-
-void OpenSprinkler::rainsensor_status() {
-  // options[OPTION_RS_TYPE]: 0 if normally closed, 1 if normally open
-  status.rain_sensed = (digitalRead(PIN_RAINSENSOR) == options[OPTION_RAINSENSOR_TYPE].value ? 0 : 1);
-}
-
-// =============
-// LCD Functions
-// =============
-
-// Print a program memory string
+#if defined(ARDUINO)
+/** LCD and button functions */
+/** print a program memory string */
 void OpenSprinkler::lcd_print_pgm(PGM_P PROGMEM str) {
   uint8_t c;
   while((c=pgm_read_byte(str++))!= '\0') {
@@ -834,7 +877,7 @@ void OpenSprinkler::lcd_print_pgm(PGM_P PROGMEM str) {
   }
 }
 
-// Print a program memory string to a given line with clearing
+/** print a program memory string to a given line with clearing */
 void OpenSprinkler::lcd_print_line_clear_pgm(PGM_P PROGMEM str, byte line) {
   lcd.setCursor(0, line);
   uint8_t c;
@@ -852,23 +895,23 @@ void OpenSprinkler::lcd_print_2digit(int v)
   lcd.print((int)(v%10));
 }
 
-// Print time to a given line
+/** print time to a given line */
 void OpenSprinkler::lcd_print_time(byte line)
 {
-  time_t t=now();
+  time_t t=now_tz();
   lcd.setCursor(0, line);
   lcd_print_2digit(hour(t));
   lcd_print_pgm(PSTR(":"));
   lcd_print_2digit(minute(t));
   lcd_print_pgm(PSTR("  "));
-  lcd_print_pgm((PGM_P)pgm_read_word(&days_str[weekday_today()]));
+  lcd_print_pgm(days_str[weekday_today()]);
   lcd_print_pgm(PSTR(" "));
   lcd_print_2digit(month(t));
   lcd_print_pgm(PSTR("-"));
   lcd_print_2digit(day(t));
 }
 
-// print ip address
+/** print ip address */
 void OpenSprinkler::lcd_print_ip(const byte *ip, byte lineno) {
   lcd.setCursor(0, lineno);
   for (byte i=0; i<3; i++) {
@@ -878,7 +921,7 @@ void OpenSprinkler::lcd_print_ip(const byte *ip, byte lineno) {
   lcd.print((int)ip[3]);
 }
 
-// print mac address
+/** print mac address */
 void OpenSprinkler::lcd_print_mac(const byte *mac) {
   lcd.setCursor(0, 0);
   lcd_print_pgm(PSTR("MAC:"));
@@ -895,9 +938,8 @@ void OpenSprinkler::lcd_print_mac(const byte *mac) {
   }
 }
 
-// Print station bits
+/** print station bits */
 void OpenSprinkler::lcd_print_station(byte line, char c) {
-  //lcd_print_line_clear_pgm(PSTR(""), line);
   lcd.setCursor(0, line);
   if (status.display_board == 0) {
     lcd_print_pgm(PSTR("MC:"));  // Master controller is display as 'MC'
@@ -935,7 +977,7 @@ void OpenSprinkler::lcd_print_station(byte line, char c) {
 
 }
 
-// Print a version number
+/** print a version number */
 void OpenSprinkler::lcd_print_version(byte v) {
   if(v > 99) {
     lcd.print(v/100);
@@ -948,13 +990,11 @@ void OpenSprinkler::lcd_print_version(byte v) {
   lcd.print(v%10);
 }
 
-// Print an option value
+/** print an option value */
 void OpenSprinkler::lcd_print_option(int i) {
   lcd_print_line_clear_pgm(options[i].str, 0);  
   lcd_print_line_clear_pgm(PSTR(""), 1);
   lcd.setCursor(0, 1);
-  //if(options[i].flag&OPFLAG_SETUP_EDIT) lcd.blink();
-  //else lcd.noBlink();
   int tz;
   switch(i) {
   case OPTION_HW_VERSION:
@@ -993,11 +1033,11 @@ void OpenSprinkler::lcd_print_option(int i) {
     lcd.print(water_time_decode_signed(options[i].value));
     break;
   case OPTION_LCD_CONTRAST:
-    analogWrite(PIN_LCD_CONTRAST, options[i].value);
+    lcd_set_contrast();
     lcd.print((int)options[i].value);
     break;
   case OPTION_LCD_BACKLIGHT:
-    analogWrite(PIN_LCD_BACKLIGHT, 255-options[i].value);
+    lcd_set_brightness();
     lcd.print((int)options[i].value);
     break;
 
@@ -1019,11 +1059,8 @@ void OpenSprinkler::lcd_print_option(int i) {
 }
 
 
-// ================
-// Button Functions
-// ================
-
-// Wait for button
+/** Button functions */
+/** wait for button */
 byte OpenSprinkler::button_read_busy(byte pin_butt, byte waitmode, byte butt, byte is_holding) {
 
   int hold_time = 0;
@@ -1044,7 +1081,7 @@ byte OpenSprinkler::button_read_busy(byte pin_butt, byte waitmode, byte butt, by
 
 }
 
-// Read button and returns button value 'OR'ed with flag bits
+/** read button and returns button value 'OR'ed with flag bits */
 byte OpenSprinkler::button_read(byte waitmode)
 {
   static byte old = BUTTON_NONE;
@@ -1061,7 +1098,7 @@ byte OpenSprinkler::button_read(byte waitmode)
     curr = button_read_busy(PIN_BUTTON_3, waitmode, BUTTON_3, is_holding);
   }
 
-  /* set flags in return value */
+  // set flags in return value
   byte ret = curr;
   if (!(old&BUTTON_MASK) && (curr&BUTTON_MASK))
     ret |= BUTTON_FLAG_DOWN;
@@ -1072,15 +1109,13 @@ byte OpenSprinkler::button_read(byte waitmode)
   return ret;
 }
 
-
-// user interface for setting options during startup
+/** user interface for setting options during startup */
 void OpenSprinkler::ui_set_options(int oid)
 {
   boolean finished = false;
   byte button;
   int i=oid;
 
-  //lcd_print_option(i);
   while(!finished) {
     button = button_read(BUTTON_WAIT_HOLD);
 
@@ -1129,55 +1164,12 @@ void OpenSprinkler::ui_set_options(int oid)
   lcd.noBlink();
 }
 
-
-// ================================================
-// ====== Data Encoding / Decoding Functions ======
-// ================================================
-// encode a 16-bit unsigned water time to 8-bit byte
-/* encoding scheme:
-   byte value : water time
-     [0.. 59]  : [0..59]  (seconds)
-    [60..238]  : [1..179] (minutes), or 60 to 10740 seconds
-   [239..254]  : [3..18]  (hours),   or 10800 to 64800 seconds
-*/
-byte water_time_encode(uint16_t i) {
-  if (i<60) {
-    return byte(i);
-  } else if (i<10800) {
-    return byte(i/60+59);
-  } else if (i<64800) {
-    return byte(i/3600+236);
-  } else {
-    return 254;
-  }
+void OpenSprinkler::lcd_set_contrast() {
+  analogWrite(PIN_LCD_CONTRAST, options[OPTION_LCD_CONTRAST].value);
 }
 
-// encode a 16-bit signed water time to 8-bit unsigned byte (leading bit is the sign)
-byte water_time_encode_signed(int16_t i) {
-  DEBUG_PRINTLN(i);
-  byte ret = water_time_encode(i>=0?i : -i);
-  DEBUG_PRINTLN(ret);
-  return ((i>=0) ? (128+ret) : (128-ret));
+void OpenSprinkler::lcd_set_brightness() {
+  analogWrite(PIN_LCD_BACKLIGHT, 255-options[OPTION_LCD_BACKLIGHT].value);
 }
-
-// decode a 8-bit unsigned byte (leading bit is the sign) into a 16-bit signed water time
-int16_t water_time_decode_signed(byte i) {
-  int16_t ret = i;
-  ret -= 128;
-  ret = water_time_decode(ret>=0?ret:-ret);
-  return (i>=128 ? ret : -ret);
-}
-
-// decode a 8-bit byte to a 16-bit unsigned water time
-uint16_t water_time_decode(byte i) {
-  uint16_t ii = i;
-  if (i<60) {
-    return ii;
-  } else if (i<239) {
-    return (ii-59)*60;
-  } else {
-    return (ii-236)*3600;
-  }  
-}
-
+#endif  // LCD and button functions
 
