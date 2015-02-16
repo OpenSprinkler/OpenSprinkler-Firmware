@@ -54,7 +54,6 @@ static void getweather_callback(byte status, uint16_t off, uint16_t len) {
   }
   if (*p != '&')  return;
   int v;
-  DEBUG_PRINTLN(p);
   if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("sunrise"), true)) {
     v = atoi(tmp_buffer);
     if (v>=0 && v<=1440) {
@@ -126,7 +125,6 @@ void GetWeather() {
   };
   *dst = *src;
   
-  DEBUG_PRINTLN(dst);
   os.status.wt_received = 0;
   uint16_t _port = ether.hisport; // save current port number
   ether.hisport = 80;
@@ -163,39 +161,66 @@ void peel_http_header() {
 }
 
 void GetWeather() {
-  static int sockfd = -1;
-  static struct sockaddr_in serv_addr;
-  static struct hostent *server;
+  int sockfd = -1;
+  struct sockaddr_in serv_addr;
+  struct hostent *server;
+
+  sockfd = socket(AF_INET, SOCK_STREAM, 0);
   if(sockfd < 0) {
-    sockfd = socket(AF_INET, SOCK_STREAM, 0);
-    if(sockfd < 0) {
-      DEBUG_PRINTLN("can't establish socket.");
-      return;
-    }
-    strcpy(tmp_buffer, "rayshobby.net");
-    server = gethostbyname(tmp_buffer);
-    if(server == NULL) {
-      DEBUG_PRINTLN("can't resolve weather server.");
-      return;
-    }
-    bzero((char*)&serv_addr, sizeof(serv_addr));
-    serv_addr.sin_family = AF_INET;
-    bcopy((char*)server->h_addr, (char*)&serv_addr.sin_addr.s_addr, server->h_length);
-    serv_addr.sin_port = htons(80);
+    DEBUG_PRINTLN("can't establish socket.");
+    return;
   }
+  strcpy(tmp_buffer, WEATHER_SCRIPT_HOST);
+  server = gethostbyname(tmp_buffer);
+  if(server == NULL) {
+    DEBUG_PRINTLN("can't resolve weather server.");
+    close(sockfd);
+    return;
+  }
+  bzero((char*)&serv_addr, sizeof(serv_addr));
+  serv_addr.sin_family = AF_INET;
+  bcopy((char*)server->h_addr, (char*)&serv_addr.sin_addr.s_addr, server->h_length);
+  serv_addr.sin_port = htons(80);
  
   int ret=connect(sockfd, (struct sockaddr*)&serv_addr, sizeof(serv_addr));
   if ( ret < 0) {
+    DEBUG_PRINTLN("failed to connect.");
+    close(sockfd);
     return;
   }
 
   BufferFiller bf = tmp_buffer;  
-  bf.emit_p(PSTR("GET /scripts/weather$D.py?loc=$E&key=$E&fwv=$D HTTP/1.0\r\nHOST: 50.187.48.14\r\n\r\n"),
+  //bf.emit_p(PSTR("GET /weather$D.py?loc=$E&key=$E&fwv=$D HTTP/1.0\r\nHOST: weather.opensprinkler.com\r\n\r\n"),
+  bf.emit_p(PSTR("$D.py?loc=$E&key=$E&fwv=$D"),
                 (int) os.options[OPTION_USE_WEATHER].value,
                 ADDR_NVM_LOCATION,
                 ADDR_NVM_WEATHER_KEY,
                 (int)os.options[OPTION_FW_VERSION].value);    
-  int n=write(sockfd,tmp_buffer,strlen(tmp_buffer));
+
+  char *src=tmp_buffer+strlen(tmp_buffer);
+  char *dst=tmp_buffer+TMP_BUFFER_SIZE-1;
+  
+  char c;
+  // url encode. convert SPACE to %20
+  // copy reversely from the end because we are potentially expanding
+  // the string size 
+  while(src!=tmp_buffer) {
+    c = *src--;
+    if(c==' ') {
+      *dst-- = '0';
+      *dst-- = '2';
+      *dst-- = '%';
+    } else {
+      *dst-- = c;
+    }
+  };
+  *dst = *src;
+  
+  char urlBuffer[255];
+  strcpy(urlBuffer, "GET /weather");
+  strcat(urlBuffer, dst);
+  strcat(urlBuffer, " HTTP/1.0\r\nHOST: weather.opensprinkler.com\r\n\r\n");
+  int n=write(sockfd,urlBuffer,strlen(urlBuffer));
   if(n<0) {
     DEBUG_PRINTLN("error sending data to weather server.");
     return;
@@ -204,6 +229,7 @@ void GetWeather() {
   
   time_t timeout = os.now_tz() + 5;
   n=-1;
+  os.status.wt_received = 0;
   while(os.now_tz() < timeout) {
     n = read(sockfd, ether_buffer, ETHER_BUFFER_SIZE);
     if(n>0) {

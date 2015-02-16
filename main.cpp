@@ -75,9 +75,9 @@ static char ui_anim_chars[3] = {'.', 'o', 'O'};
 static byte ui_state = UI_STATE_DEFAULT;
 static byte ui_state_runprog = 0;
 
-void ui_state_machine(time_t curr_time) {
+void ui_state_machine() {
 
-  if (os.button_lasttime && os.button_lasttime + LCD_DIMMING_TIMEOUT < curr_time) {
+  if (os.button_lasttime && os.button_lasttime + LCD_DIMMING_TIMEOUT < now()) {
     analogWrite(PIN_LCD_BACKLIGHT, 255-os.options[OPTION_LCD_DIMMING].value); 
     os.button_lasttime = 0;
     ui_state = UI_STATE_DEFAULT;  // also recover to default state
@@ -87,7 +87,7 @@ void ui_state_machine(time_t curr_time) {
   byte button = os.button_read(BUTTON_WAIT_HOLD);
 
   if (button & BUTTON_FLAG_DOWN) {   // repond only to button down events
-    os.button_lasttime = curr_time;
+    os.button_lasttime = now();
     analogWrite(PIN_LCD_BACKLIGHT, 255-os.options[OPTION_LCD_BACKLIGHT].value); // button is pressed, turn on LCD right away
   } else {
     return;
@@ -208,7 +208,7 @@ void do_setup() {
 
   os.apply_all_station_bits(); // reset station bits
   
-  os.button_lasttime = os.now_tz();
+  os.button_lasttime = os.now();
 }
 
 // Arduino software reset function
@@ -245,9 +245,9 @@ void write_log(byte type, ulong curr_time);
 void schedule_all_stations(ulong curr_time);
 void turn_off_station(byte sid, byte mas, ulong curr_time);
 void process_dynamic_events(ulong curr_time);
-void check_network(time_t curr_time);
-void check_weather(time_t curr_time);
-void perform_ntp_sync(time_t curr_time);
+void check_network();
+void check_weather();
+void perform_ntp_sync();
 void log_statistics(time_t curr_time);
 void delete_log(char *name);
 void analyze_get_url(char *p);
@@ -274,7 +274,7 @@ void do_loop()
   wdt_reset();  // reset watchdog timer
   wdt_timeout = 0;
 
-  ui_state_machine(curr_time);
+  ui_state_machine();
 
 #else // Process Ethernet packets for RPI/BBB
   client = accept(sock, (struct sockaddr *) &cli_addr, &sin_len);
@@ -519,28 +519,27 @@ void do_loop()
 #endif
 
     // check network connection
-    check_network(curr_time);
+    check_network();
     
     // check weather
-    check_weather(curr_time);
+    check_weather();
 
     // perform ntp sync
-    perform_ntp_sync(curr_time);
+    perform_ntp_sync();
 
     // calculate statistics
     log_statistics(curr_time);
   }
 }
 
-void check_weather(time_t curr_time) {
+void check_weather() {
   // do not check weather if the Use Weather option is disabled, or if network is not available, or if a program is running
   if (os.status.network_fails>0 || os.status.program_busy) return;
 
   uint16_t inv = 180;  // recheck every 30 seconds if didn't receive anything last time
   if (os.status.wt_received)  inv = CHECK_WEATHER_INTERVAL;
-  if (!os.checkwt_lasttime || ((curr_time - os.checkwt_lasttime) > inv)) {
-    os.checkwt_lasttime = curr_time;
-    // ray: todo
+  if (!os.checkwt_lasttime || ((now() - os.checkwt_lasttime) > inv)) {
+    os.checkwt_lasttime = now();
     GetWeather();
   }
 }
@@ -816,7 +815,6 @@ void write_log(byte type, ulong curr_time) {
     }
   }
   FILE *file;
-  DEBUG_PRINTLN(tmp_buffer);
   file = fopen(tmp_buffer, "rb+");
   if(!file) {
     file = fopen(tmp_buffer, "wb");
@@ -914,12 +912,11 @@ void delete_log(char *name) {
 #endif  
 }
 
-void check_network(time_t curr_time) {
+void check_network() {
 #if defined(ARDUINO)
   if (os.status.program_busy) {return;}
 
   // do not perform network checking if the controller has just started, or if a program is running
-  //if (os.network_lasttime == 0) { os.network_lasttime = curr_time; os.dhcpnew_lasttime = curr_time;}
   if (!os.network_lasttime) {
     os.start_network();
   }
@@ -929,14 +926,14 @@ void check_network(time_t curr_time) {
   // the more time it fails, the longer the gap between two checks
   ulong interval = 1 << (os.status.network_fails);
   interval *= CHECK_NETWORK_INTERVAL;
-  if (curr_time - os.network_lasttime > interval) {
+  if (now() - os.network_lasttime > interval) {
     // change LCD icon to indicate it's checking network
     if (!ui_state) {
       os.lcd.setCursor(15, 1);
       os.lcd.write(4);
     }
       
-    os.network_lasttime = curr_time;
+    os.network_lasttime = now();
    
     // ping gateway ip
     ether.clientIcmpRequest(ether.gwip);
@@ -958,8 +955,8 @@ void check_network(time_t curr_time) {
     }
     else os.status.network_fails=0;
     // if failed more than once, reconnect
-    if ((os.status.network_fails>2 || (curr_time - os.dhcpnew_lasttime > DHCP_RENEW_INTERVAL))) {
-      os.dhcpnew_lasttime = curr_time;
+    if ((os.status.network_fails>2 || (now() - os.dhcpnew_lasttime > DHCP_RENEW_INTERVAL))) {
+      os.dhcpnew_lasttime = now();
       //os.lcd_print_line_clear_pgm(PSTR(""),0);
       if (os.start_network())
         os.status.network_fails=0;
@@ -971,13 +968,13 @@ void check_network(time_t curr_time) {
 #endif
 }
 
-void perform_ntp_sync(time_t curr_time) {
+void perform_ntp_sync() {
 #if defined(ARDUINO)
   // do not perform sync if this option is disabled, or if network is not available, or if a program is running
   if (!os.options[OPTION_USE_NTP].value || os.status.network_fails>0 || os.status.program_busy) return;   
 
-  if (os.ntpsync_lasttime == 0 || (curr_time - os.ntpsync_lasttime > NTP_SYNC_INTERVAL)) {
-    os.ntpsync_lasttime = curr_time;
+  if (os.ntpsync_lasttime == 0 || (now() - os.ntpsync_lasttime > NTP_SYNC_INTERVAL)) {
+    os.ntpsync_lasttime = now();
     if (!ui_state) {
       os.lcd_print_line_clear_pgm(PSTR("NTP Syncing..."),1);
     }

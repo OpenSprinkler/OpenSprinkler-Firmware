@@ -907,9 +907,7 @@ byte server_change_options(char *p)
 		    if (oid==OPTION_MASTER_OFF_ADJ) {v+=60;} // master off time
 		    if (oid==OPTION_RELAY_PULSE) {v/=10;} // relay pulse time
 		    if (oid==OPTION_STATION_DELAY_TIME) {
-		      DEBUG_PRINTLN(v);
 		      v=water_time_encode_signed((int16_t)v);
-		      DEBUG_PRINTLN(v);
 		    } // encode station delay time
 		    if (v>=0 && v<=os.options[oid].max) {
 		      os.options[oid].value = v;
@@ -942,9 +940,7 @@ byte server_change_options(char *p)
     urlDecode(tmp_buffer);
     tmp_buffer[MAX_WEATHER_KEY]=0;
     if (strcmp_to_nvm(tmp_buffer, ADDR_NVM_WEATHER_KEY)) {  // if weather key has changed
-      //os.nvm_string_set(ADDR_NVM_WEATHER_KEY, tmp_buffer);
       nvm_write_block(tmp_buffer, (void*)ADDR_NVM_WEATHER_KEY, strlen(tmp_buffer)+1);
-      //os.checkwt_lasttime = 0;  // immediately update weather
       weather_change = true;
     }
   } else if (keyfound) {

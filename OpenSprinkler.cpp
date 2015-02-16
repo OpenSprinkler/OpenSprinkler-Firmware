@@ -227,7 +227,7 @@ byte OpenSprinkler::start_network() {
 
   lcd_print_line_clear_pgm(PSTR("Connecting..."), 1);
 
-  network_lasttime = now_tz();
+  network_lasttime = now();
   dhcpnew_lasttime = network_lasttime;
 
   // new for 2.2: read hardware MAC

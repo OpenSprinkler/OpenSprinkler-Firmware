@@ -154,6 +154,7 @@ byte ProgramData::del(byte pid) {
 
 // decode a sunrise/sunset start time to actual start time
 int16_t ProgramStruct::starttime_decode(int16_t t) {
+  if((t>>15)&1) return -1;
   int16_t offset = t&0x7ff;
   if((t>>STARTTIME_SIGN_BIT)&1) offset = -offset;
   if((t>>STARTTIME_SUNRISE_BIT)&1) { // sunrise time
