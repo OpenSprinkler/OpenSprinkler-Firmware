@@ -199,6 +199,7 @@ time_t OpenSprinkler::now_tz() {
 
 #if defined(ARDUINO)
 
+// read hardware MAC 
 #define MAC_CTRL_ID 0x50
 bool OpenSprinkler::read_hardware_mac() {
   uint8_t ret;

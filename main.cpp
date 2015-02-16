@@ -36,7 +36,8 @@ SdFat sd;                                 // SD card object
 void reset_all_stations();
 unsigned long getNtpTime();
 void manual_start_program(byte pid);
-#else
+#else // header and defs for RPI/BBB
+#include <sys/stat.h>
 #include "server.h"
 char ether_buffer[ETHER_BUFFER_SIZE];
 struct sockaddr_in svr_addr, cli_addr;
@@ -265,7 +266,7 @@ void do_loop()
 
   time_t curr_time = os.now_tz();
   // ====== Process Ethernet packets ======
-#if defined(ARDUINO)  
+#if defined(ARDUINO)  // Process Ethernet packets for Arduino
   pos=ether.packetLoop(ether.packetReceive());
   if (pos>0) {  // packet received
     analyze_get_url((char*)Ethernet::buffer+pos);
@@ -275,18 +276,16 @@ void do_loop()
 
   ui_state_machine(curr_time);
 
-#else
+#else // Process Ethernet packets for RPI/BBB
   client = accept(sock, (struct sockaddr *) &cli_addr, &sin_len);
   if(client>=0) {
-    DEBUG_PRINTLN("got packet");
     read(client, ether_buffer, ETHER_BUFFER_SIZE);
     analyze_get_url(ether_buffer);
   }
-#endif  
+#endif  // Process Ethernet packets
 
   // if 1 second has passed
   if (last_time != curr_time) {
-    DEBUG_PRINTLN(curr_time);
     last_time = curr_time;
 
 #if defined(ARDUINO)
@@ -466,7 +465,7 @@ void do_loop()
           program_still_busy = true;
         }
       }
-      if(pd.last_seq_stop_time) DEBUG_PRINTLN(pd.last_seq_stop_time);
+      //if(pd.last_seq_stop_time) DEBUG_PRINTLN(pd.last_seq_stop_time);
       
       // if no station has a schedule
       if (program_still_busy == false) {
@@ -645,7 +644,7 @@ void schedule_all_stations(ulong curr_time) {
     seq_start_time = pd.last_seq_stop_time + station_delay;
   }
 
-  DEBUG_PRINTLN(seq_start_time);
+  //DEBUG_PRINTLN(seq_start_time);
   
   byte sid;
   
@@ -745,7 +744,12 @@ void manual_start_program(byte pid) {
 // ====== LOGGING FUNCTIONS =======
 // ================================
 // Log files will be named /logs/xxxxx.txt
+#if defined(ARDUINO)
 char LOG_PREFIX[] = "/logs/";
+#else
+char LOG_PREFIX[] = "./logs/";
+#endif
+
 void make_logfile_name(char *name) {
 #if defined(ARDUINO)
   sd.chdir("/");
@@ -783,15 +787,16 @@ void log_statistics(time_t curr_time) {
   }
 }
 
-#if defined(ARDUINO)
 // write run record to log on SD card
 void write_log(byte type, ulong curr_time) {
   if (!os.options[OPTION_ENABLE_LOGGING].value) return;
-  if (!os.status.has_sd)  return;
-
+  
   // file name will be logs/xxxxx.tx where xxxxx is the day in epoch time
   ultoa(curr_time / 86400, tmp_buffer, 10);
   make_logfile_name(tmp_buffer);
+
+#if defined(ARDUINO) // prepare log folder for Arduino
+  if (!os.status.has_sd)  return;
 
   sd.chdir("/");
   if (sd.chdir(LOG_PREFIX) == false) {
@@ -803,6 +808,23 @@ void write_log(byte type, ulong curr_time) {
   SdFile file;
   file.open(tmp_buffer, O_CREAT | O_WRITE );
   file.seekEnd();
+#else // prepare log folder for RPI/BBB
+  struct stat st;
+  if(stat(LOG_PREFIX, &st)) {
+    if(mkdir(LOG_PREFIX, S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IWGRP | S_IXGRP | S_IROTH | S_IWOTH | S_IXOTH)) {
+      return;
+    }
+  }
+  FILE *file;
+  DEBUG_PRINTLN(tmp_buffer);
+  file = fopen(tmp_buffer, "rb+");
+  if(!file) {
+    file = fopen(tmp_buffer, "wb");
+    if (!file)  return;
+  }
+  fseek(file, 0, SEEK_END);
+#endif  // prepare log folder
+
   //String str;
   //str = "[";
   strcpy_P(tmp_buffer, PSTR("["));
@@ -849,11 +871,51 @@ void write_log(byte type, ulong curr_time) {
   ultoa(curr_time, tmp_buffer+strlen(tmp_buffer), 10);
   strcat_P(tmp_buffer, PSTR("]\r\n"));
   
+#if defined(ARDUINO)  
   file.write(tmp_buffer);
   file.close();
+#else
+  fwrite(tmp_buffer, 1, strlen(tmp_buffer), file);
+  fclose(file);
+#endif  
+}
+
+
+// delete log file
+// if name is 'all', delete all logs
+void delete_log(char *name) {
+  if (!os.options[OPTION_ENABLE_LOGGING].value) return;
+#if defined(ARDUINO)
+  if (!os.status.has_sd) return;
+
+  if (strncmp(name, "all", 3) == 0) {
+    // delete the log folder
+    SdFile file;
+
+    if (sd.chdir(LOG_PREFIX)) {
+      // delete the whole log folder
+      sd.vwd()->rmRfStar();
+    }
+    return;
+  } else {
+    make_logfile_name(name);
+    if (!sd.exists(tmp_buffer))  return;
+    sd.remove(tmp_buffer);
+  }
+#else // delete_log implementation for RPI/BBB
+  if (strncmp(name, "all", 3) == 0) {
+    // delete the log folder
+    rmdir(LOG_PREFIX);
+    return;
+  } else {
+    make_logfile_name(name);
+    remove(tmp_buffer);
+  }
+#endif  
 }
 
 void check_network(time_t curr_time) {
+#if defined(ARDUINO)
   if (os.status.program_busy) {return;}
 
   // do not perform network checking if the controller has just started, or if a program is running
@@ -902,10 +964,15 @@ void check_network(time_t curr_time) {
       if (os.start_network())
         os.status.network_fails=0;
     }
-  } 
+  }
+#else
+  // nothing to do here
+  // Linux will do this for you
+#endif
 }
 
 void perform_ntp_sync(time_t curr_time) {
+#if defined(ARDUINO)
   // do not perform sync if this option is disabled, or if network is not available, or if a program is running
   if (!os.options[OPTION_USE_NTP].value || os.status.network_fails>0 || os.status.program_busy) return;   
 
@@ -920,31 +987,14 @@ void perform_ntp_sync(time_t curr_time) {
       if (os.status.has_rtc) RTC.set(t); // if rtc exists, update rtc
     }
   }
-}
-
-// delete log file
-// if name is 'all', delete all logs
-void delete_log(char *name) {
-  if (!os.options[OPTION_ENABLE_LOGGING].value) return;
-  if (!os.status.has_sd) return;
-
-  if (strncmp(name, "all", 3) == 0) {
-    // delete the log folder
-    SdFile file;
-
-    if (sd.chdir(LOG_PREFIX)) {
-      // delete the whole log folder
-      sd.vwd()->rmRfStar();
-    }
-    return;
-  } else {
-    make_logfile_name(name);
-    if (!sd.exists(tmp_buffer))  return;
-    sd.remove(tmp_buffer);
-  }
-}
-
 #else
+  // nothing to do here
+  // Linux will do this for you 
+#endif
+}
+
+
+#if !defined(ARDUINO) // main function for RPI/BBB
 int main(int argc, char *argv[]) {
   do_setup();
   
@@ -952,21 +1002,5 @@ int main(int argc, char *argv[]) {
     do_loop();
   }
   return 0;
-}
-
-void write_log(byte type, ulong curr_time) {
-
-}
-
-void check_network(time_t curr_time) {
-
-}
-
-void perform_ntp_sync(time_t curr_time) {
-
-}
-
-void delete_log(char *name) {
-
 }
 #endif

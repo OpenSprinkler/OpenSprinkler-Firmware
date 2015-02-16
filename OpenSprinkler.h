@@ -45,7 +45,7 @@
   #include <netdb.h>
   #include <arpa/inet.h>
   #include <err.h>  
-#endif
+#endif // headers
 
 #include "defines.h"
 #include "utils.h"
@@ -160,7 +160,7 @@ public:
   static void apply_all_station_bits(); // apply all station bits (activate/deactive values)
 
   // -- LCD functions
-#if defined(ARDUINO)  
+#if defined(ARDUINO) // LCD functions for Arduino
   static void lcd_print_pgm(PGM_P PROGMEM str);           // print a program memory string
   static void lcd_print_line_clear_pgm(PGM_P PROGMEM str, byte line);
   static void lcd_print_time(byte line);                  // print current time

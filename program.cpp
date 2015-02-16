@@ -103,20 +103,20 @@ void ProgramData::moveup(byte pid) {
     // swap program pid-1 and pid
     unsigned int src = ADDR_PROGRAMDATA + (unsigned int)(pid-1) * PROGRAMSTRUCT_SIZE;
     unsigned int dst = src + PROGRAMSTRUCT_SIZE;
-#if defined(ARDUINO)    
+#if defined(ARDUINO) // NVM write for Arduino
     byte tmp;
     for(int i=0;i<PROGRAMSTRUCT_SIZE;i++,src++,dst++) {
       tmp = nvm_read_byte((byte *)src);
       nvm_write_byte((byte *)src, nvm_read_byte((byte *)dst));
       nvm_write_byte((byte *)dst, tmp);
     }
-#else
+#else // NVM write for RPI/BBB
     ProgramStruct tmp1, tmp2;
     nvm_read_block(&tmp1, (void *)src, PROGRAMSTRUCT_SIZE);
     nvm_read_block(&tmp2, (void *)dst, PROGRAMSTRUCT_SIZE);
     nvm_write_block(&tmp1, (void *)dst, PROGRAMSTRUCT_SIZE);
     nvm_write_block(&tmp2, (void *)src, PROGRAMSTRUCT_SIZE);
-#endif
+#endif // NVM write
   }
 }
 
@@ -169,13 +169,13 @@ int16_t ProgramStruct::starttime_decode(int16_t t) {
 // Check if a given time matches program schedule
 byte ProgramStruct::check_match(time_t t) {
 
-#if defined(ARDUINO)
+#if defined(ARDUINO) // get current time from Arduino
   unsigned int hour_t = hour(t);
   unsigned int minute_t = minute(t);
   byte weekday_t = weekday(t);        // weekday ranges from [0,6] within Sunday being 1
   byte day_t = day(t);
   byte month_t = month(t);
-#else
+#else // get current time from RPI/BBB
   time_t ct = t;
   struct tm *ti = gmtime(&ct);
   unsigned int hour_t = ti->tm_hour;
@@ -183,7 +183,7 @@ byte ProgramStruct::check_match(time_t t) {
   byte weekday_t = (ti->tm_wday+1)%7;  // tm_wday ranges from [0,6] with Sunday being 0
   byte day_t = ti->tm_mday;
   byte month_t = ti->tm_mon+1;   // tm_mon ranges from [0,11]
-#endif
+#endif // get current time
 
   unsigned int current_minute = hour_t*60+minute_t;
   

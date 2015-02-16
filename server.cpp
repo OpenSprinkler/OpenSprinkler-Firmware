@@ -1105,12 +1105,13 @@ byte server_change_manual(char *p) {
          rs, rd, wl
          if unspecified, output all records
 */  
-#if defined(ARDUINO)
 byte server_json_log(char *p) {
 
+#if defined(ARDUINO)
   // if no sd card, return false
   if (!os.status.has_sd)  return HTML_PAGE_NOT_FOUND;
-  
+#endif
+
   unsigned int start, end;
 
   // past n day history
@@ -1150,18 +1151,35 @@ byte server_json_log(char *p) {
     itoa(i, tmp_buffer, 10);
     make_logfile_name(tmp_buffer);
 
+#if defined(ARDUINO)  // prepare to open log file for Arduino
     if (!sd.exists(tmp_buffer)) continue;
-    
     SdFile file;
-    int res;
     file.open(tmp_buffer, O_READ);
+#else // prepare to open log file for RPI/BBB
+    FILE *file;
+    file = fopen(tmp_buffer, "rb");
+    if(!file) continue;
+#endif // prepare to open log file
+
+    int res;
     while(true) {
+    #if defined(ARDUINO)
       res = file.fgets(tmp_buffer, TMP_BUFFER_SIZE-1);
-      if (res <= 0)
-      {
+      if (res <= 0) {
         file.close();
         break;
       }
+    #else
+      if(fgets(tmp_buffer, TMP_BUFFER_SIZE-1, file)) {
+        res = strlen(tmp_buffer);
+      } else {
+        res = 0;
+      }
+      if (res <= 0) {
+        fclose(file);
+        break;
+      }
+    #endif
       
       // remove the \n character
       if (tmp_buffer[res-1] == '\n')  tmp_buffer[res-1] = 0;
@@ -1189,11 +1207,6 @@ byte server_json_log(char *p) {
   delay(1);
   return HTML_OK; 
 }
-#else
-byte server_json_log(char *p) {
-  return HTML_OK;
-}
-#endif
 /**
   Delete log
   Command: /dl?pw=xxx&day=xxx
