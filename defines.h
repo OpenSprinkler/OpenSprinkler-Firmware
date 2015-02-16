@@ -24,10 +24,15 @@
 #ifndef _DEFINES_H
 #define _DEFINES_H
 
-/** Firmware version and maximal values */
+/** Firmware version, hardware version, and maximal values */
 #define OS_FW_VERSION  213  // 213 -> 2.1.3
                             // if this number is different from the one stored in non-volatile memory
                             // a device reset will be automatically triggered
+
+
+#define OS_HW_VERSION_BASE   0x00
+#define OSPI_HW_VERSION_BASE 0x40
+#define OSBO_HW_VERSION_BASE 0x80
 
 #define MAX_EXT_BOARDS   5  // maximum number of exp. boards (each expands 8 stations)
 
@@ -151,11 +156,11 @@ typedef enum {
 #if defined(ARDUINO) 
 
   #if F_CPU==8000000L
-    #define OS_HW_VERSION 20
+    #define OS_HW_VERSION (OS_HW_VERSION_BASE+20)
   #elif F_CPU==12000000L
-    #define OS_HW_VERSION 21
+    #define OS_HW_VERSION (OS_HW_VERSION_BASE+21)
   #elif F_CPU==16000000L
-    #define OS_HW_VERSION 22
+    #define OS_HW_VERSION (OS_HW_VERSION_BASE+22)
   #endif
 
   // hardware pins
@@ -212,11 +217,10 @@ typedef enum {
 
 #else // Hardware defines for RPI/BBB
 
-  #define OS_HW_VERSION    255 // for RPI/BBB, hardware version is irrelevant
-
   /** OSPi pin defines */
   #if defined(OSPI)
 
+  #define OS_HW_VERSION    OSPI_HW_VERSION_BASE
   #define PIN_SR_LATCH      22    // shift register latch pin
   #define PIN_SR_DATA       27    // shift register data pin
   #define PIN_SR_CLOCK       4    // shift register clock pin
@@ -230,7 +234,8 @@ typedef enum {
   
   /** BBB pin defines */
   #elif defined(OSBO)
-
+  
+  #define OS_HW_VERSION    OSBO_HW_VERSION_BASE
   #define PIN_SR_LATCH       3    // shift register latch pin
   #define PIN_SR_DATA       21    // shift register data pin
   #define PIN_SR_CLOCK      22    // shift register clock pin
