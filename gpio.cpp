@@ -25,7 +25,7 @@
 
 #if defined(ARDUINO)
 
-#elif defined(OSPI)
+#elif defined(OSPI) || defined(OSBO)
 
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -125,12 +125,6 @@ void digitalWrite(int pin, byte value) {
 
   close(fd);
 }
-
-#elif defined(OSBO)
-
-void pinMode(int pin, byte mode) {}
-void digitalWrite(int pin, byte value) {}
-byte digitalRead(int pin) {return 0;}
 
 #else
 

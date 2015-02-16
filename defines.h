@@ -236,13 +236,16 @@ typedef enum {
   #elif defined(OSBO)
   
   #define OS_HW_VERSION    OSBO_HW_VERSION_BASE
-  #define PIN_SR_LATCH       3    // shift register latch pin
-  #define PIN_SR_DATA       21    // shift register data pin
-  #define PIN_SR_CLOCK      22    // shift register clock pin
-  #define PIN_SR_OE          1    // shift register output enable pin
-  #define PIN_RAINSENSOR    11    // rain sensor is connected to pin D3
-  #define PIN_RELAY         14    // mini relay is connected to pin D14
-
+  // these are gpio pin numbers, refer to
+  // https://github.com/mkaczanowski/BeagleBoneBlack-GPIO/blob/master/GPIO/GPIOConst.cpp
+  #define PIN_SR_LATCH      60    // P9_12, shift register latch pin
+  #define PIN_SR_DATA       30    // P9_11, shift register data pin
+  #define PIN_SR_CLOCK      31    // P9_13, shift register clock pin
+  #define PIN_SR_OE         50    // P9_14, shift register output enable pin
+  #define PIN_RAINSENSOR    48    // P9_15, rain sensor is connected to pin D3
+  #define PIN_RELAY         51    // P9_16, mini relay is connected to pin D14
+  #define PIN_RF_DATA       51    // RF transmitter pin
+  
   #else
     #error "cannot recognize hardware name / version"
   #endif
