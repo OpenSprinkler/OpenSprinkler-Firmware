@@ -119,6 +119,7 @@ void digitalWrite(int pin, byte value) {
 
   if (1 != write(fd, &s_values_str[LOW == value ? 0 : 1], 1)) {
     DEBUG_PRINTLN("failed to write value");
+    DEBUG_PRINTLN(pin);
     return;
   }
 

@@ -333,7 +333,9 @@ void OpenSprinkler::begin() {
 
   // Rain sensor port set up
   pinMode(PIN_RAINSENSOR, INPUT);
-  digitalWrite(PIN_RAINSENSOR, HIGH); // enabled internal pullup
+#if defined(ARDUINO)
+  digitalWrite(PIN_RAINSENSOR, HIGH); // enabled internal pullupa
+#endif
 
   // Default controller status variables
   // AVR assigns 0 to static variables by default
