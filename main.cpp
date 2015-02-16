@@ -208,7 +208,7 @@ void do_setup() {
 
   os.apply_all_station_bits(); // reset station bits
   
-  os.button_lasttime = os.now();
+  os.button_lasttime = now();
 }
 
 // Arduino software reset function

@@ -212,17 +212,21 @@ typedef enum {
 
 #else // Hardware defines for RPI/BBB
 
-  #define OS_HW_VERSION   255 // for RPI/BBB, hardware version is irrelevant
+  #define OS_HW_VERSION    255 // for RPI/BBB, hardware version is irrelevant
 
   /** OSPi pin defines */
   #if defined(OSPI)
 
-  #define PIN_SR_LATCH       3    // shift register latch pin
-  #define PIN_SR_DATA       21    // shift register data pin
-  #define PIN_SR_CLOCK      22    // shift register clock pin
-  #define PIN_SR_OE          1    // shift register output enable pin
-  #define PIN_RAINSENSOR    11    // rain sensor is connected to pin D3
-  #define PIN_RELAY         14    // mini relay is connected to pin D14
+  #define PIN_SR_LATCH      22    // shift register latch pin
+  #define PIN_SR_DATA       27    // shift register data pin
+  #define PIN_SR_CLOCK       4    // shift register clock pin
+  #define PIN_SR_OE         17    // shift register output enable pin
+  #define PIN_RAINSENSOR    14    // rain sensor
+  #define PIN_RELAY         15    // mini relay
+  #define PIN_RF_DATA        7    // RF transmitter pin
+  #define PIN_BUTTON_1      23    // button 1
+  #define PIN_BUTTON_2      24    // button 2
+  #define PIN_BUTTON_3      25    // button 3   
   
   /** BBB pin defines */
   #elif defined(OSBO)

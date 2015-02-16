@@ -22,6 +22,7 @@
  */
 
 #include "OpenSprinkler.h"
+#include "gpio.h"
 
 /** Declare static data members */
 NVConData OpenSprinkler::nvdata;
@@ -271,6 +272,46 @@ void OpenSprinkler::reboot_dev() {
   resetFunc();
 }
 
+#else // for RPI/BBB
+
+extern struct sockaddr_in svr_addr, cli_addr;
+extern socklen_t sin_len;
+extern int sock;
+extern int client;
+byte OpenSprinkler::start_network() {
+  int one = 1;
+  sin_len = sizeof(cli_addr);
+  sock = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
+  if (sock < 0) {
+    DEBUG_PRINTLN("sock failed.")
+    return 0;
+  }
+  setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &one, sizeof(int));    
+  
+  unsigned int port = (unsigned int)(options[OPTION_HTTPPORT_1].value<<8) + (unsigned int)options[OPTION_HTTPPORT_0].value;
+  port = 8888;
+  DEBUG_PRINTLN(port);
+  svr_addr.sin_family = AF_INET;
+  svr_addr.sin_addr.s_addr = INADDR_ANY;
+  svr_addr.sin_port = htons(port);
+    
+  if (bind(sock, (struct sockaddr *) &svr_addr, sizeof(svr_addr)) == -1) {
+    DEBUG_PRINTLN("bind failed.")
+    close(sock);
+    return 0;
+  }
+  listen(sock, 5);    
+  
+  return 1;
+}
+
+#include <sys/reboot.h>
+void OpenSprinkler::reboot_dev() {
+	reboot(RB_AUTOBOOT);
+}
+
+#endif // defined(ARDUINO)
+
 void OpenSprinkler::begin() {
 
   // shift register setup
@@ -290,28 +331,10 @@ void OpenSprinkler::begin() {
   // pull shift register OE low to enable output
   digitalWrite(PIN_SR_OE, LOW);
 
-  // set sd cs pin high to release SD
-  pinMode(PIN_SD_CS, OUTPUT);
-  digitalWrite(PIN_SD_CS, HIGH);
-  
-  // set PWM frequency for adjustable LCD backlight and contrast 
-  TCCR1B = 0x01;
-  // turn on LCD backlight and contrast
-  pinMode(PIN_LCD_BACKLIGHT, OUTPUT);
-  pinMode(PIN_LCD_CONTRAST, OUTPUT);
-  lcd_set_brightness();
-  lcd_set_contrast();
-  // turn on lcd
-  lcd.init(1, PIN_LCD_RS, 255, PIN_LCD_EN, PIN_LCD_D4, PIN_LCD_D5, PIN_LCD_D6, PIN_LCD_D7, 0,0,0,0);
-  lcd.begin(16, 2);
-   
   // Rain sensor port set up
   pinMode(PIN_RAINSENSOR, INPUT);
   digitalWrite(PIN_RAINSENSOR, HIGH); // enabled internal pullup
 
-  // Init I2C
-  Wire.begin();
-  
   // Default controller status variables
   // AVR assigns 0 to static variables by default
   // so only need to initialize non-zero ones
@@ -326,6 +349,32 @@ void OpenSprinkler::begin() {
   nboards = 1;
   nstations = 8;
   
+  // set rf data pin
+  pinMode(PIN_RF_DATA, OUTPUT);
+  digitalWrite(PIN_RF_DATA, LOW);
+  
+  pinMode(PIN_RELAY, OUTPUT);
+  digitalWrite(PIN_RELAY, LOW);
+  
+#if defined(ARDUINO)
+  // set sd cs pin high to release SD
+  pinMode(PIN_SD_CS, OUTPUT);
+  digitalWrite(PIN_SD_CS, HIGH);
+  
+  // set PWM frequency for adjustable LCD backlight and contrast 
+  TCCR1B = 0x01;
+  // turn on LCD backlight and contrast
+  pinMode(PIN_LCD_BACKLIGHT, OUTPUT);
+  pinMode(PIN_LCD_CONTRAST, OUTPUT);
+  lcd_set_brightness();
+  lcd_set_contrast();
+  // turn on lcd
+  lcd.init(1, PIN_LCD_RS, 255, PIN_LCD_EN, PIN_LCD_D4, PIN_LCD_D5, PIN_LCD_D6, PIN_LCD_D7, 0,0,0,0);
+  lcd.begin(16, 2);
+
+  // Init I2C
+  Wire.begin();
+
   // define lcd custom icons
   byte lcd_wifi_char[8] = {
     B00000,
@@ -375,14 +424,7 @@ void OpenSprinkler::begin() {
   lcd.createChar(2, lcd_sd_char);
   lcd.createChar(3, lcd_rain_char);
   lcd.createChar(4, lcd_connect_char);
-  
-  // set rf data pin
-  pinMode(PIN_RF_DATA, OUTPUT);
-  digitalWrite(PIN_RF_DATA, LOW);
-  
-  pinMode(PIN_RELAY, OUTPUT);
-  digitalWrite(PIN_RELAY, LOW);
-  
+
   // set button pins
   // enable internal pullup
   pinMode(PIN_BUTTON_1, INPUT);
@@ -396,6 +438,7 @@ void OpenSprinkler::begin() {
   if (RTC.detect()==0) {
     status.has_rtc = 1;
   }
+#endif
 }
 
 // Apply all station bits
@@ -427,6 +470,7 @@ void OpenSprinkler::rainsensor_status() {
 }
 
 int OpenSprinkler::detect_exp() {
+#if defined(ARDUINO) 
   unsigned int v = analogRead(PIN_EXP_SENSE);
   // OpenSprinkler uses voltage divider to detect expansion boards
   // Master controller has a 1.5K pull-up;
@@ -452,64 +496,10 @@ int OpenSprinkler::detect_exp() {
   } else {  // cannot determine
   }
   return n;
-}
-
-#else // for RPI/BBB
-
-extern struct sockaddr_in svr_addr, cli_addr;
-extern socklen_t sin_len;
-extern int sock;
-extern int client;
-byte OpenSprinkler::start_network() {
-  int one = 1;
-  sin_len = sizeof(cli_addr);
-  sock = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
-  if (sock < 0) {
-    DEBUG_PRINTLN("sock failed.")
-    return 0;
-  }
-  setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &one, sizeof(int));    
-  
-  unsigned int port = (unsigned int)(options[OPTION_HTTPPORT_1].value<<8) + (unsigned int)options[OPTION_HTTPPORT_0].value;
-  port = 8888;
-  DEBUG_PRINTLN(port);
-  svr_addr.sin_family = AF_INET;
-  svr_addr.sin_addr.s_addr = INADDR_ANY;
-  svr_addr.sin_port = htons(port);
-    
-  if (bind(sock, (struct sockaddr *) &svr_addr, sizeof(svr_addr)) == -1) {
-    DEBUG_PRINTLN("bind failed.")
-    close(sock);
-    return 0;
-  }
-  listen(sock, 5);    
-  
-  return 1;
-}
-
-#include <sys/reboot.h>
-void OpenSprinkler::reboot_dev() {
-	reboot(RB_AUTOBOOT);
-}
-
-void OpenSprinkler::begin() {
-  // ray: todo
-  // hardware pin setup
-}
-
-void OpenSprinkler::apply_all_station_bits() {
-  // ray: todo
-}
-
-void OpenSprinkler::rainsensor_status() {
-  // ray: todo
-}
-
-int OpenSprinkler::detect_exp() {
+#else
   return -1;
+#endif  
 }
-
-#endif // defined(ARDUINO)
 
 static ulong nvm_hex2ulong(byte *addr, byte len) {
   char c;
@@ -603,11 +593,7 @@ byte OpenSprinkler::weekday_today() {
 }
 
 void OpenSprinkler::set_relay(byte status) {
-#if defined(ARDUINO)
   digitalWrite(PIN_RELAY, status);
-#else
-  // ray: todo
-#endif
 }
 
 // Set station bit
