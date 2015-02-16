@@ -402,25 +402,6 @@ void do_loop()
             if (curr_time >= pd.scheduled_start_time[sid] && curr_time < pd.scheduled_stop_time[sid]) {
               os.set_station_bit(sid, 1);
               
-              // schedule master station here if
-              // 1) master station is defined
-              // 2) the station is non-master and is set to activate master
-              // 3) controller is in sequential mode (if in parallel mode, master is handled differently)
-              //if ((os.status.mas>0) && (os.status.mas!=sid+1) && (os.masop_bits[bid]&(1<<s)) && os.status.seq) {
-              // ray: we have changed the way master station is handled here
-              /*
-              if ((os.status.mas>0) && (os.status.mas!=sid+1) && (os.masop_bits[bid]&(1<<s))) {
-                byte masid=os.status.mas-1;
-                // master will turn on when a station opens,
-                // adjusted by the master on and off time
-                pd.scheduled_start_time[masid] = pd.scheduled_start_time[sid]+os.options[OPTION_MASTER_ON_ADJ].value;
-                pd.scheduled_stop_time[masid] = pd.scheduled_stop_time[sid]+os.options[OPTION_MASTER_OFF_ADJ].value-60;
-                pd.scheduled_program_index[masid] = pd.scheduled_program_index[sid];
-                // immediately check if we should turn on master now
-                if (curr_time >= pd.scheduled_start_time[masid] && curr_time < pd.scheduled_stop_time[masid]) {
-                  os.set_station_bit(masid, 1);
-                }
-              }*/
               // upon turning on station, process relay
               // if the station is set to activate / deactivate relay
               if(os.actrelay_bits[bid]&(1<<s)) {
@@ -563,14 +544,6 @@ void turn_off_station(byte sid, byte mas, ulong curr_time) {
       pd.lastrun.endtime = curr_time;
       write_log(LOGDATA_STATION, curr_time);
     }      
-
-    // upon turning off station, update master station stop time
-    // because we may be manually turning station off earlier than scheduled
-    // ray: this step is not necessary any more
-    //if ((mas!=sid+1) && (os.masop_bits[bid]&(1<<s)) && os.status.seq) {
-    /*if ((mas!=sid+1) && (os.masop_bits[bid]&(1<<s))) {
-      pd.scheduled_stop_time[mas-1] = curr_time+os.options[OPTION_MASTER_OFF_ADJ].value-60;
-    }*/
 
     // upon turning off station, process relay
     // if the station is set to active / deactivate relay
@@ -823,25 +796,15 @@ void write_log(byte type, ulong curr_time) {
   fseek(file, 0, SEEK_END);
 #endif  // prepare log folder
 
-  //String str;
-  //str = "[";
   strcpy_P(tmp_buffer, PSTR("["));
 
   if(type == LOGDATA_STATION) {
-    /*str += pd.lastrun.program;
-    str += ",";
-    str += pd.lastrun.station;
-    str += ",";
-    str += pd.lastrun.duration;*/
     itoa(pd.lastrun.program, tmp_buffer+strlen(tmp_buffer), 10);
     strcat_P(tmp_buffer, PSTR(","));
     itoa(pd.lastrun.station, tmp_buffer+strlen(tmp_buffer), 10);
     strcat_P(tmp_buffer, PSTR(","));
     itoa(pd.lastrun.duration, tmp_buffer+strlen(tmp_buffer), 10);
   } else {
-    /*str += "0,\"";
-    str += log_type_names[type];
-    str += "\",";*/
     strcat_P(tmp_buffer, PSTR("0,\""));
     strcat(tmp_buffer, log_type_names[type]);
     strcat_P(tmp_buffer, PSTR("\","));
@@ -860,11 +823,6 @@ void write_log(byte type, ulong curr_time) {
         break;
     }
   }
-  /*str += ",";
-  str += curr_time;  
-  str += "]";
-  str += "\r\n";
-  str.toCharArray(tmp_buffer, TMP_BUFFER_SIZE);*/
   strcat_P(tmp_buffer, PSTR(","));
   ultoa(curr_time, tmp_buffer+strlen(tmp_buffer), 10);
   strcat_P(tmp_buffer, PSTR("]\r\n"));

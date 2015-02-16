@@ -190,7 +190,6 @@ void GetWeather() {
   }
 
   BufferFiller bf = tmp_buffer;  
-  //bf.emit_p(PSTR("GET /weather$D.py?loc=$E&key=$E&fwv=$D HTTP/1.0\r\nHOST: weather.opensprinkler.com\r\n\r\n"),
   bf.emit_p(PSTR("$D.py?loc=$E&key=$E&fwv=$D"),
                 (int) os.options[OPTION_USE_WEATHER].value,
                 ADDR_NVM_LOCATION,

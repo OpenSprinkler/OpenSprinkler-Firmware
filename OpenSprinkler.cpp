@@ -630,9 +630,6 @@ void OpenSprinkler::clear_all_station_bits() {
   }
 }
 
-
-
-
 void transmit_rfbit(ulong lenH, ulong lenL) {
 #if defined(ARDUINO)
   PORT_RF |= (1<<PINX_RF);
