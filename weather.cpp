@@ -88,6 +88,10 @@ static void getweather_callback(byte status, uint16_t off, uint16_t len) {
       }
     }
   }
+  
+  if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("eip"), true)) {
+    os.external_ip = atol(tmp_buffer);
+  }
   os.status.wt_received = 1;
 }
 

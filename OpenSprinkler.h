@@ -115,6 +115,7 @@ public:
   static ulong checkwt_lasttime;
   static ulong network_lasttime;
   static ulong dhcpnew_lasttime;
+  static ulong external_ip;
   static byte  water_percent_avg;
   
   // member functions

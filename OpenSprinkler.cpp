@@ -46,6 +46,7 @@ ulong OpenSprinkler::ntpsync_lasttime;
 ulong OpenSprinkler::checkwt_lasttime;
 ulong OpenSprinkler::network_lasttime;
 ulong OpenSprinkler::dhcpnew_lasttime;
+ulong OpenSprinkler::external_ip;
 byte OpenSprinkler::water_percent_avg;
 
 char tmp_buffer[TMP_BUFFER_SIZE+1];       // scratch buffer
