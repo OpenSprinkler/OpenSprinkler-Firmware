@@ -929,8 +929,6 @@ byte server_change_options(char *p)
     urlDecode(tmp_buffer);
     tmp_buffer[MAX_LOCATION]=0;   // make sure we don't exceed the maximum size
     if (strcmp_to_nvm(tmp_buffer, ADDR_NVM_LOCATION)) { // if location has changed
-      //os.nvm_string_set(ADDR_NVM_LOCATION, tmp_buffer);
-      DEBUG_PRINTLN(tmp_buffer);
       nvm_write_block(tmp_buffer, (void*)ADDR_NVM_LOCATION, strlen(tmp_buffer)+1);
       weather_change = true;
     }
@@ -945,7 +943,6 @@ byte server_change_options(char *p)
     }
   } else if (keyfound) {
     tmp_buffer[0]=0;
-    //os.nvm_string_set(ADDR_NVM_WEATHER_KEY, tmp_buffer);
     nvm_write_block(tmp_buffer, (void*)ADDR_NVM_WEATHER_KEY, strlen(tmp_buffer)+1);
   }
   // if not using NTP and manually setting time
@@ -992,11 +989,11 @@ byte server_change_password(char *p)
   if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("npw"), true)) {
     char tbuf2[TMP_BUFFER_SIZE];
     if (findKeyVal(p, tbuf2, TMP_BUFFER_SIZE, PSTR("cpw"), true) && strncmp(tmp_buffer, tbuf2, MAX_USER_PASSWORD) == 0) {
-      //os.password_set(tmp_buffer);
       urlDecode(tmp_buffer);
       tmp_buffer[MAX_USER_PASSWORD]=0;  // make sure we don't exceed the maximum size
-      //os.nvm_string_set(ADDR_NVM_PASSWORD, tmp_buffer);
-      nvm_write_block(tmp_buffer, (void*)ADDR_NVM_PASSWORD, strlen(tmp_buffer)+1);
+      byte size = strlen(tmp_buffer)+1;
+      if(size >= MAX_USER_PASSWORD) size = MAX_USER_PASSWORD;
+      nvm_write_block(tmp_buffer, (void*)ADDR_NVM_PASSWORD, size);
       return HTML_SUCCESS;
     } else {
       return HTML_MISMATCH;

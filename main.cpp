@@ -446,7 +446,6 @@ void do_loop()
           program_still_busy = true;
         }
       }
-      //if(pd.last_seq_stop_time) DEBUG_PRINTLN(pd.last_seq_stop_time);
       
       // if no station has a schedule
       if (program_still_busy == false) {
@@ -616,8 +615,6 @@ void schedule_all_stations(ulong curr_time) {
     seq_start_time = pd.last_seq_stop_time + station_delay;
   }
 
-  //DEBUG_PRINTLN(seq_start_time);
-  
   byte sid;
   
   // go through all stations and calculate start / stop time of each station

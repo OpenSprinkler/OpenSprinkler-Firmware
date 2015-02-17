@@ -33,6 +33,7 @@
 #define OS_HW_VERSION_BASE   0x00
 #define OSPI_HW_VERSION_BASE 0x40
 #define OSBO_HW_VERSION_BASE 0x80
+#define SIM_HW_VERSION_BASE  0xB0
 
 #define MAX_EXT_BOARDS   5  // maximum number of exp. boards (each expands 8 stations)
 
@@ -247,7 +248,16 @@ typedef enum {
   #define PIN_RF_DATA       51    // RF transmitter pin
   
   #else
-    #error "cannot recognize hardware name / version"
+    //#error "cannot recognize hardware name / version"
+    #define OS_HW_VERSION    SIM_HW_VERSION_BASE    
+    #define PIN_SR_LATCH    0
+    #define PIN_SR_DATA     0
+    #define PIN_SR_CLOCK    0
+    #define PIN_SR_OE       0
+    #define PIN_RAINSENSOR  0
+    #define PIN_RELAY       0
+    #define PIN_RF_DATA     0
+    
   #endif
   
   #define ETHER_BUFFER_SIZE   1500

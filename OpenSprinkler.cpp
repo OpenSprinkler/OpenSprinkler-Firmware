@@ -566,7 +566,10 @@ byte OpenSprinkler::password_verify(char *pw) {
   byte *addr = (byte*)ADDR_NVM_PASSWORD;
   byte c1, c2;
   while(1) {
-    c1 = nvm_read_byte(addr++);
+    if(addr == (byte*)ADDR_NVM_PASSWORD+MAX_USER_PASSWORD)
+      c1 = 0;
+    else
+      c1 = nvm_read_byte(addr++);
     c2 = *pw++;
     if (c1==0 || c2==0)
       break;
