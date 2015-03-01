@@ -1,8 +1,8 @@
-/* OpenSprinkler AVR/RPI/BBB Firmware
- * Copyright (C) 2014 by Ray Wang (ray@opensprinkler.com)
+/* OpenSprinkler Unified (AVR/RPI/BBB/LINUX) Firmware
+ * Copyright (C) 2015 by Ray Wang (ray@opensprinkler.com)
  *
  * Main loop
- * Sep 2014 @ Rayshobby.net
+ * Feb 2015 @ OpenSprinkler.com
  *
  * This file is part of the OpenSprinkler Firmware
  *
@@ -42,7 +42,7 @@ void manual_start_program(byte pid);
 char ether_buffer[ETHER_BUFFER_SIZE];
 struct sockaddr_in svr_addr, cli_addr;
 socklen_t sin_len;
-int sock;
+int sock = -1;
 int client;
 #endif
 

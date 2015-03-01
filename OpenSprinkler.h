@@ -1,8 +1,8 @@
-/* OpenSprinkler AVR/RPI/BBB Library
- * Copyright (C) 2014 by Ray Wang (ray@opensprinkler.com)
+/* OpenSprinkler Unified (AVR/RPI/BBB/LINUX) Firmware
+ * Copyright (C) 2015 by Ray Wang (ray@opensprinkler.com)
  *
  * OpenSprinkler library header file
- * Sep 2014 @ Rayshobby.net
+ * Feb 2015 @ OpenSprinkler.com
  *
  * This file is part of the OpenSprinkler library
  *
@@ -25,7 +25,7 @@
 #ifndef _OPENSPRINKLER_H
 #define _OPENSPRINKLER_H
 
-#if defined(ARDUINO)
+#if defined(ARDUINO) // heades for AVR
   #include "Arduino.h"
   #include <avr/eeprom.h>
   #include <Wire.h>
@@ -33,7 +33,7 @@
   #include "Time.h"
   #include "DS1307RTC.h"
   #include "EtherCard.h"
-#else // headers for RPI/BBB
+#else // headers for RPI/BBB/LINUX
   #include <stdio.h>
   #include <stdlib.h>
   #include <string.h>
@@ -45,17 +45,17 @@
   #include <netdb.h>
   #include <arpa/inet.h>
   #include <err.h>  
-#endif // headers
+#endif // end of headers
 
 #include "defines.h"
 #include "utils.h"
 
 /** Option data structure */
 struct OptionStruct{
-  byte value;     // each option is stored as a byte
-  byte max;       // maximum value
-  const char* str;      // name string
-  const char* json_str; // json string
+  byte value;     // each option value is stored as a byte
+  byte max;       // maximum value of the option
+  const char* str;      // full name
+  const char* json_str; // json name
 };
 
 /** Non-volatile data */
@@ -87,7 +87,7 @@ public:
 #if defined(ARDUINO)
   static LiquidCrystal lcd;
 #else
-  // LCD define for RPI/BBB
+  // todo: LCD define for RPI
 #endif
 
   static NVConData nvdata;
@@ -107,21 +107,21 @@ public:
   static byte rfstn_bits[];       // RF station flags. each byte corresponds to a board (8 stations)
   static byte stnseq_bits[];      // station sequential bits. each byte corresponds to a board (8 stations)
   
-  // timing variables
-  static ulong rainsense_start_time;  // time (in seconds) when rain sensor is detected on
-  static ulong raindelay_start_time;  // time (in seconds) when rain delay is started
-  static ulong button_lasttime;
-  static ulong ntpsync_lasttime;
-  static ulong checkwt_lasttime;
-  static ulong network_lasttime;
-  static ulong dhcpnew_lasttime;
-  static ulong external_ip;
-  static byte  water_percent_avg;
+  // variables for time keeping
+  static ulong rainsense_start_time;  // time when the most recent rain sensor activation was detected
+  static ulong raindelay_start_time;  // time when the most recent rain delay started
+  static ulong button_lasttime;       // time when button was checked
+  static ulong ntpsync_lasttime;      // time when ntp sync was performed
+  static ulong checkwt_lasttime;      // time when weather was checked
+  static ulong network_lasttime;      // time when network was checked
+  static ulong dhcpnew_lasttime;      // time when dhcp renew was performed
+  static ulong external_ip;           // external ip address
+  static byte  water_percent_avg;     // average water percentage over a day
   
   // member functions
   // -- setup
   static void reboot_dev();   // reboot the microcontroller
-  static void begin();    // initialization, must call this function before calling other functions
+  static void begin();        // initialization, must call this function before calling other functions
   static byte start_network();  // initialize network with the given mac and port
 #if defined(ARDUINO)
   static bool read_hardware_mac();  // read hardware mac address
@@ -147,13 +147,13 @@ public:
   static byte password_verify(char *pw);  // verify password
 
   // -- controller operation
-  static void enable();     // enable controller operation
-  static void disable();    // disable controller operation, all stations will be closed immediately
+  static void enable();           // enable controller operation
+  static void disable();          // disable controller operation, all stations will be closed immediately
   static void raindelay_start();  // start raindelay
-  static void raindelay_stop(); // stop rain delay  
-  static void rainsensor_status(); // update rainsensor status
+  static void raindelay_stop();   // stop rain delay  
+  static void rainsensor_status();// update rainsensor status
   static int detect_exp();        // detect the number of expansion boards
-  static byte weekday_today();  // returns index of today's weekday (Monday is 0) 
+  static byte weekday_today();    // returns index of today's weekday (Monday is 0) 
   static void set_relay(byte status); // set relay on or off
   
   static void set_station_bit(byte sid, byte value); // set station bit of one station (sid->station index, value->0/1)

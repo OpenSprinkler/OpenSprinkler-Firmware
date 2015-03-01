@@ -1,8 +1,8 @@
-/* OpenSprinkler AVR/RPI/BBB Library
- * Copyright (C) 2014 by Ray Wang (ray@opensprinkler.com)
+/* OpenSprinkler Unified (AVR/RPI/BBB/LINUX) Firmware
+ * Copyright (C) 2015 by Ray Wang (ray@opensprinkler.com)
  *
  * OpenSprinkler macro defines and hardware pin assignments
- * Sep 2014 @ Rayshobby.net
+ * Feb 2015 @ OpenSprinkler.com
  *
  * This file is part of the OpenSprinkler library
  *
@@ -25,10 +25,9 @@
 #define _DEFINES_H
 
 /** Firmware version, hardware version, and maximal values */
-#define OS_FW_VERSION  213  // 213 -> 2.1.3
+#define OS_FW_VERSION  213  // Firmware version: 213 means 2.1.3
                             // if this number is different from the one stored in non-volatile memory
                             // a device reset will be automatically triggered
-
 
 #define OS_HW_VERSION_BASE   0x00
 #define OSPI_HW_VERSION_BASE 0x40
@@ -40,9 +39,9 @@
 #define MAX_NUM_STATIONS  ((1+MAX_EXT_BOARDS)*8)  // maximum number of stations
 
 /** Non-volatile memory (NVM) defines */
-#if defined(ARDUINO)
+#if defined(ARDUINO) 
 
-/** NVM structure:
+/** NVM data structure:
   * |     |              |     |---STRING PARAMETERS---|               |----STATION ATTRIBUTES-----  |          |
   * | UID | PROGRAM_DATA | CON | PWD | LOC | URL | KEY | STATION_NAMES | MAS | IGR | ACT | DIS | SEQ | OPTIONS  |
   * | (8) |    (996)     | (8) |(32) |(48) |(64) |(32) | (6*8*16)=768  | (6) | (6) | (6) | (6) | (6) |  (62)    |
@@ -50,7 +49,8 @@
   * 0     8            1004  1012   1044  1092  1156  1188            1956  1962  1968  1974 1980   1986       2048
   */
 
-  #define NVM_SIZE            2048  // ATmega644 eeprom size
+  #define NVM_SIZE            2048  // For AVR, nvm data is stored in EEPROM
+                                    // ATmega644 has 2KB EEPROM
   #define STATION_NAME_SIZE   16    // maximum number of characters in each station name
   
   #define MAX_UIDDATA         8     // unique ID, 8 bytes max
@@ -61,9 +61,11 @@
   #define MAX_SCRIPTURL       64    // javascript url, 64 bytes max
   #define MAX_WEATHER_KEY     32    // weather api key, 32 bytes max
   
-#else // NVM defines for RPI/BBB
+#else // NVM defines for RPI/BBB/LINUX
 
-  #define NVM_FILENAME        "nvm.dat" // for RPI/BBB, nvm data is stored in file
+  // These are kept the same as AVR for compatibility
+  // But these can be increased if needed
+  #define NVM_FILENAME        "nvm.dat" // for RPI/BBB, nvm data is stored in a file
   #define NVM_SIZE            2048 // impose a file size limit: 64KB
   #define STATION_NAME_SIZE   16    // maximum number of characters in each station name
   
@@ -75,7 +77,7 @@
   #define MAX_SCRIPTURL       64    // javascript url, 64 bytes max
   #define MAX_WEATHER_KEY     32    // weather api key, 32 bytes max
     
-#endif  // NVM defines
+#endif  // end of NVM defines
 
 /** NVM data addresses */
 #define ADDR_NVM_UID           0
@@ -145,7 +147,7 @@ typedef enum {
   NUM_OPTIONS	// total number of options
 } OS_OPTION_t;
 
-// Log Data Type
+/** Log Data Type */
 #define LOGDATA_STATION    0x00
 #define LOGDATA_RAINSENSE  0x01
 #define LOGDATA_RAINDELAY  0x02
@@ -199,7 +201,7 @@ typedef enum {
   #define 	wdt_reset()   __asm__ __volatile__ ("wdr")  // watchdog timer reset
 
   //#define SERIAL_DEBUG
-  #if defined(SERIAL_DEBUG)
+  #if defined(SERIAL_DEBUG) /** Serial debug functions */
 
     #define DEBUG_BEGIN(x)   Serial.begin(x)
     #define DEBUG_PRINT(x)   Serial.print(x)
@@ -228,7 +230,7 @@ typedef enum {
   #define PIN_SR_OE         17    // shift register output enable pin
   #define PIN_RAINSENSOR    14    // rain sensor
   #define PIN_RELAY         15    // mini relay
-  #define PIN_RF_DATA        7    // RF transmitter pin
+  #define PIN_RF_DATA       15    // RF transmitter pin
   #define PIN_BUTTON_1      23    // button 1
   #define PIN_BUTTON_2      24    // button 2
   #define PIN_BUTTON_3      25    // button 3   
@@ -248,7 +250,8 @@ typedef enum {
   #define PIN_RF_DATA       51    // RF transmitter pin
   
   #else
-    //#error "cannot recognize hardware name / version"
+    // For Linux or other software simulators
+    // use fake hardware pins
     #define OS_HW_VERSION    SIM_HW_VERSION_BASE    
     #define PIN_SR_LATCH    0
     #define PIN_SR_DATA     0
@@ -262,7 +265,7 @@ typedef enum {
   
   #define ETHER_BUFFER_SIZE   1500
     
-  #define DEBUG_BEGIN(x)          {}
+  #define DEBUG_BEGIN(x)          {}  /** Serial debug functions */
   inline  void DEBUG_PRINT(int x) {printf("%d", x);}
   inline  void DEBUG_PRINT(const char*s) {printf("%s", s);}
   #define DEBUG_PRINTLN(x)        {DEBUG_PRINT(x);printf("\n");}
@@ -272,7 +275,7 @@ typedef enum {
   #define now()       time(0)
   #define delay(x)    {}
   
-  /** Re-define avr-specific (e.g. program memory) types to use standard types */
+  /** Re-define avr-specific (e.g. PGM) types to use standard types */
   #define pgm_read_byte(x) *(x)
   #define PSTR(x)      x
   #define strcat_P     strcat
@@ -286,7 +289,7 @@ typedef enum {
   typedef unsigned short  uint16_t;
   typedef bool boolean;
   
-#endif  // Hardawre defines
+#endif  // end of Hardawre defines
 
 #define TMP_BUFFER_SIZE     120  // scratch buffer size
 

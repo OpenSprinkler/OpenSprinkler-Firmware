@@ -1,8 +1,8 @@
-/* OpenSprinkler AVR/RPI/BBB Library
+/* OpenSprinkler Unified (AVR/RPI/BBB/LINUX) Firmware
  * Copyright (C) 2014 by Ray Wang (ray@opensprinkler.com)
  *
  * GPIO functions
- * Sep 2014 @ Rayshobby.net
+ * Feb 2015 @ OpenSprinkler.com
  *
  * This file is part of the OpenSprinkler library
  *

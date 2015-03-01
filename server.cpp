@@ -1,8 +1,8 @@
-/* OpenSprinkler AVR/RPI/BBB Library
- * Copyright (C) 2014 by Ray Wang (ray@opensprinkler.com)
+/* OpenSprinkler Unified (AVR/RPI/BBB/LINUX) Firmware
+ * Copyright (C) 2015 by Ray Wang (ray@opensprinkler.com)
  *
  * Server functions
- * Sep 2014 @ Rayshobby.net
+ * Feb 2015 @ OpenSprinkler.com
  *
  * This file is part of the OpenSprinkler library
  *

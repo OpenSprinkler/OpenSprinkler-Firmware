@@ -1,8 +1,8 @@
-/* OpenSprinkler AVR/RPI/BBB Library
- * Copyright (C) 2014 by Ray Wang (ray@opensprinkler.com)
+/* OpenSprinkler Unified (AVR/RPI/BBB/LINUX) Firmware
+ * Copyright (C) 2015 by Ray Wang (ray@opensprinkler.com)
  *
  * OpenSprinkler library 
- * Sep 2014 @ Rayshobby.net
+ * Feb 2015 @ OpenSprinkler.com
  *
  * This file is part of the OpenSprinkler library
  *
@@ -53,6 +53,8 @@ char tmp_buffer[TMP_BUFFER_SIZE+1];       // scratch buffer
 
 #if defined(ARDUINO)
   LiquidCrystal OpenSprinkler::lcd;
+#elif defined(OSPI)
+  // todo: LCD define for OSPi
 #endif
 
 /** Option json names */
@@ -72,7 +74,7 @@ prog_char _json_hp0 [] PROGMEM = "hp0";
 prog_char _json_hp1 [] PROGMEM = "hp1";
 prog_char _json_hwv [] PROGMEM = "hwv";
 prog_char _json_ext [] PROGMEM = "ext";
-prog_char _json_seq [] PROGMEM = "_";
+prog_char _json_seq [] PROGMEM = "_";   // the option 'sequential' is now retired
 prog_char _json_sdt [] PROGMEM = "sdt";
 prog_char _json_mas [] PROGMEM = "mas";
 prog_char _json_mton[] PROGMEM = "mton";
@@ -112,7 +114,7 @@ prog_char _str_hp0 [] PROGMEM = "HTTP port:";
 prog_char _str_hp1 [] PROGMEM = "";
 prog_char _str_hwv [] PROGMEM = "Hardware: ";
 prog_char _str_ext [] PROGMEM = "Exp. board:";
-prog_char _str_seq [] PROGMEM = "";
+prog_char _str_seq [] PROGMEM = "";   // the option 'sequential' is now retired
 prog_char _str_sdt [] PROGMEM = "Stn delay:";
 prog_char _str_mas [] PROGMEM = "Mas. station:";
 prog_char _str_mton[] PROGMEM = "Mas.  on adj.:";
@@ -148,11 +150,16 @@ OptionStruct OpenSprinkler::options[NUM_OPTIONS] = {
   {0,   255, _str_gw2,  _json_gw2},
   {0,   255, _str_gw3,  _json_gw3},
   {0,   255, _str_gw4,  _json_gw4},
+#if defined(ARDUINO)                  // on AVR, the default HTTP port is 80
   {80,  255, _str_hp0,  _json_hp0},   // this and next byte define http port number
   {0,   255, _str_hp1,  _json_hp1},
+#else                                 // on RPI/BBB/LINUX, the default HTTP port is 8080
+  {144, 255, _str_hp0,  _json_hp0},   // this and next byte define http port number
+  {31,  255, _str_hp1,  _json_hp1},
+#endif  
   {OS_HW_VERSION, 0, _str_hwv, _json_hwv},
   {0,   MAX_EXT_BOARDS, _str_ext, _json_ext}, // number of extension board. 0: no extension boards
-  {1,   1,   _str_seq,  _json_seq},   // reqired
+  {1,   1,   _str_seq,  _json_seq},   // the option 'sequential' is now retired
   {128, 247, _str_sdt,  _json_sdt},   // station delay time (-59 minutes to 59 minutes).
   {0,   8,   _str_mas,  _json_mas},   // index of master station. 0: no master station
   {0,   60,  _str_mton, _json_mton},  // master on time [0,60] seconds
@@ -195,11 +202,12 @@ prog_char* days_str[7] = {
   str_day6
 };
 
+// return local time (UTC time plus time zone offset)
 time_t OpenSprinkler::now_tz() {
   return now()+(int32_t)3600/4*(int32_t)(options[OPTION_TIMEZONE].value-48);
 }
 
-#if defined(ARDUINO)
+#if defined(ARDUINO)  // AVR network init functions
 
 // read hardware MAC 
 #define MAC_CTRL_ID 0x50
@@ -221,10 +229,9 @@ bool OpenSprinkler::read_hardware_mac() {
   return true;
 }
 
-/** Arduino software reset function */
-void(* resetFunc) (void) = 0;
+void(* resetFunc) (void) = 0; // AVR software reset function 
 
-// Initialize network with the given mac address and http port
+/** Initialize network with the given mac address and http port */
 byte OpenSprinkler::start_network() {
 
   lcd_print_line_clear_pgm(PSTR("Connecting..."), 1);
@@ -232,10 +239,10 @@ byte OpenSprinkler::start_network() {
   network_lasttime = now();
   dhcpnew_lasttime = network_lasttime;
 
-  // new for 2.2: read hardware MAC
+  // new from 2.2: read hardware MAC
   if(!read_hardware_mac())
   {
-    // if no hardware MAC exists, set software MAC
+    // if no hardware MAC exists, use software MAC
     tmp_buffer[0] = 0x00;
     tmp_buffer[1] = 0x69;
     tmp_buffer[2] = 0x69;
@@ -249,9 +256,11 @@ byte OpenSprinkler::start_network() {
   ether.hisport = (unsigned int)(options[OPTION_HTTPPORT_1].value<<8) + (unsigned int)options[OPTION_HTTPPORT_0].value;
 
   if (options[OPTION_USE_DHCP].value) {
+    // set up DHCP
     // register with domain name "OpenSprinkler-xx" where xx is the last byte of the MAC address
     if (!ether.dhcpSetup()) return 0;
   } else {
+    // set up static IP
     byte staticip[] = {
       options[OPTION_STATIC_IP1].value,
       options[OPTION_STATIC_IP2].value,
@@ -273,7 +282,7 @@ void OpenSprinkler::reboot_dev() {
   resetFunc();
 }
 
-#else // for RPI/BBB
+#else // RPI/BBB/LINUX network init functions
 
 extern struct sockaddr_in svr_addr, cli_addr;
 extern socklen_t sin_len;
@@ -284,24 +293,34 @@ byte OpenSprinkler::start_network() {
   sin_len = sizeof(cli_addr);
   sock = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
   if (sock < 0) {
-    DEBUG_PRINTLN("sock failed.")
+    DEBUG_PRINT("failed to create socket: ");
+    DEBUG_PRINTLN(sock);
     return 0;
   }
   setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &one, sizeof(int));    
   
   unsigned int port = (unsigned int)(options[OPTION_HTTPPORT_1].value<<8) + (unsigned int)options[OPTION_HTTPPORT_0].value;
-  port = 8888;
-  DEBUG_PRINTLN(port);
   svr_addr.sin_family = AF_INET;
   svr_addr.sin_addr.s_addr = INADDR_ANY;
   svr_addr.sin_port = htons(port);
     
-  if (bind(sock, (struct sockaddr *) &svr_addr, sizeof(svr_addr)) == -1) {
-    DEBUG_PRINTLN("bind failed.")
+  int ret = bind(sock, (struct sockaddr *) &svr_addr, sizeof(svr_addr));
+  if (ret == -1) {
+    DEBUG_PRINT("failed to bind socket: ");
+    DEBUG_PRINTLN(ret);
     close(sock);
     return 0;
   }
-  listen(sock, 5);    
+  ret = listen(sock, 5);
+  if (ret == -1) {
+    DEBUG_PRINT("failed to listen on socket: ");
+    DEBUG_PRINTLN(ret);
+    close(sock);
+    return 0;
+  }    
+
+  DEBUG_PRINT("started web server at port ");
+  DEBUG_PRINTLN(port);
   
   return 1;
 }
@@ -311,7 +330,7 @@ void OpenSprinkler::reboot_dev() {
 	reboot(RB_AUTOBOOT);
 }
 
-#endif // defined(ARDUINO)
+#endif // end network init functions
 
 void OpenSprinkler::begin() {
 
@@ -334,8 +353,11 @@ void OpenSprinkler::begin() {
 
   // Rain sensor port set up
   pinMode(PIN_RAINSENSOR, INPUT);
+  
 #if defined(ARDUINO)
-  digitalWrite(PIN_RAINSENSOR, HIGH); // enabled internal pullupa
+  digitalWrite(PIN_RAINSENSOR, HIGH); // enabled internal pullup
+#else
+  // RPI and BBB have external pullups
 #endif
 
   // Default controller status variables
@@ -346,8 +368,8 @@ void OpenSprinkler::begin() {
   
   old_status = status;
   
-  nvdata.sunrise_time = 360;  // 6:00am default
-  nvdata.sunset_time = 1080;  // 6:00pm default
+  nvdata.sunrise_time = 360;  // 6:00am default sunrise
+  nvdata.sunset_time = 1080;  // 6:00pm default sunset
   
   nboards = 1;
   nstations = 8;
@@ -359,7 +381,7 @@ void OpenSprinkler::begin() {
   pinMode(PIN_RELAY, OUTPUT);
   digitalWrite(PIN_RELAY, LOW);
   
-#if defined(ARDUINO)
+#if defined(ARDUINO)  // AVR LCD functions 
   // set sd cs pin high to release SD
   pinMode(PIN_SD_CS, OUTPUT);
   digitalWrite(PIN_SD_CS, HIGH);
@@ -472,7 +494,7 @@ void OpenSprinkler::rainsensor_status() {
   status.rain_sensed = (digitalRead(PIN_RAINSENSOR) == options[OPTION_RAINSENSOR_TYPE].value ? 0 : 1);
 }
 
-int OpenSprinkler::detect_exp() {
+int OpenSprinkler::detect_exp() { // AVR has capability to detect number of expansion boards
 #if defined(ARDUINO) 
   unsigned int v = analogRead(PIN_EXP_SENSE);
   // OpenSprinkler uses voltage divider to detect expansion boards
@@ -594,7 +616,7 @@ byte OpenSprinkler::weekday_today() {
   return (tm.Wday+5)%7;
 #else
   return 0;
-  // ray: todo
+  // todo: is this function needed for RPI/BBB?
 #endif  
 }
 
@@ -605,7 +627,7 @@ void OpenSprinkler::set_relay(byte status) {
 // Set station bit
 void OpenSprinkler::set_station_bit(byte sid, byte value) {
   byte bid = (sid>>3);  // board index
-  byte s = sid&0x07;     // station bit index
+  byte s = sid&0x07;    // station bit index
   if (value) {
     station_bits[bid] = station_bits[bid] | ((byte)1<<s);
   } 
@@ -629,7 +651,10 @@ void transmit_rfbit(ulong lenH, ulong lenL) {
   PORT_RF &=~(1<<PINX_RF);
   delayMicroseconds(lenL);
 #else
-
+  digitalWrite(PIN_RF_DATA, 1);
+  usleep(lenH);
+  digitalWrite(PIN_RF_DATA, 0);
+  usleep(lenL);
 #endif
 }
 
@@ -668,7 +693,7 @@ void send_rfsignal(ulong code, ulong len) {
 void OpenSprinkler::send_rfstation_signal(byte sid, bool turnon) {
   ulong on, off;
   uint16_t length = get_station_name_rf(sid, &on, &off);
-  length = (length>>1)+(length>>2); // screw
+  length = (length>>1)+(length>>2);   // due to internal call delay, scale time down to 75% 
   DEBUG_PRINTLN(on);
   DEBUG_PRINTLN(off);
   DEBUG_PRINTLN(length);
@@ -753,7 +778,7 @@ void OpenSprinkler::options_setup() {
     nvdata_load();
   }
 
-#if defined(ARDUINO)
+#if defined(ARDUINO)  // handle AVR buttons
 	byte button = button_read(BUTTON_WAIT_NONE);
 	
 	switch(button & BUTTON_MASK) {
@@ -857,7 +882,7 @@ void OpenSprinkler::raindelay_stop() {
   nvdata_save();
 }
 
-#if defined(ARDUINO)
+#if defined(ARDUINO)    // AVR LCD and button functions
 /** LCD and button functions */
 /** print a program memory string */
 void OpenSprinkler::lcd_print_pgm(PGM_P PROGMEM str) {
@@ -1014,10 +1039,10 @@ void OpenSprinkler::lcd_print_option(int i) {
     lcd.print((int)options[i].value-60);
     break;
   case OPTION_HTTPPORT_0:
-    lcd.print((int)(options[i+1].value<<8)+options[i].value);
+    lcd.print((unsigned int)(options[i+1].value<<8)+options[i].value);
     break;
   case OPTION_RELAY_PULSE:
-    lcd.print((int)options[i].value*10);
+    lcd.print((unsigned int)options[i].value*10);
     break;
   case OPTION_STATION_DELAY_TIME:
     lcd.print(water_time_decode_signed(options[i].value));
@@ -1161,5 +1186,5 @@ void OpenSprinkler::lcd_set_contrast() {
 void OpenSprinkler::lcd_set_brightness() {
   analogWrite(PIN_LCD_BACKLIGHT, 255-options[OPTION_LCD_BACKLIGHT].value);
 }
-#endif  // LCD and button functions
+#endif  // end of LCD and button functions
 

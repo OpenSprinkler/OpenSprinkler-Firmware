@@ -1,8 +1,8 @@
-/* OpenSprinkler AVR/RPI/BBB Library
- * Copyright (C) 2014 by Ray Wang (ray@opensprinkler.com)
+/* OpenSprinkler Unified (AVR/RPI/BBB/LINUX) Firmware
+ * Copyright (C) 2015 by Ray Wang (ray@opensprinkler.com)
  *
  * Weather functions
- * Sep 2014 @ Rayshobby.net
+ * Feb 2015 @ OpenSprinkler.com
  *
  * This file is part of the OpenSprinkler library
  *
@@ -95,7 +95,7 @@ static void getweather_callback(byte status, uint16_t off, uint16_t len) {
   os.status.wt_received = 1;
 }
 
-#if defined(ARDUINO)
+#if defined(ARDUINO)  // for AVR
 void GetWeather() {
   // check if we've already done dns lookup
   if(ether.hisip[0] == 0) {
@@ -135,9 +135,10 @@ void GetWeather() {
   ether.browseUrl(PSTR("/weather"), dst, website, getweather_callback);
   ether.hisport = _port;
 }
-#else // GetWeather() for RPI/BBB
 
-void peel_http_header() {
+#else // for RPI/BBB/LINUX
+
+void peel_http_header() { // remove the HTTP header
   int i=0;
   bool eol=true;
   while(i<ETHER_BUFFER_SIZE) {
@@ -171,13 +172,14 @@ void GetWeather() {
 
   sockfd = socket(AF_INET, SOCK_STREAM, 0);
   if(sockfd < 0) {
-    DEBUG_PRINTLN("can't establish socket.");
+    DEBUG_PRINT("can't establish socket: ");
+    DEBUG_PRINTLN(sockfd);
     return;
   }
   strcpy(tmp_buffer, WEATHER_SCRIPT_HOST);
   server = gethostbyname(tmp_buffer);
   if(server == NULL) {
-    DEBUG_PRINTLN("can't resolve weather server.");
+    DEBUG_PRINTLN("can't resolve weather server");
     close(sockfd);
     return;
   }
@@ -188,7 +190,8 @@ void GetWeather() {
  
   int ret=connect(sockfd, (struct sockaddr*)&serv_addr, sizeof(serv_addr));
   if ( ret < 0) {
-    DEBUG_PRINTLN("failed to connect.");
+    DEBUG_PRINT("failed to connect: ");
+    DEBUG_PRINTLN(ret);
     close(sockfd);
     return;
   }
@@ -225,7 +228,7 @@ void GetWeather() {
   strcat(urlBuffer, " HTTP/1.0\r\nHOST: weather.opensprinkler.com\r\n\r\n");
   int n=write(sockfd,urlBuffer,strlen(urlBuffer));
   if(n<0) {
-    DEBUG_PRINTLN("error sending data to weather server.");
+    DEBUG_PRINTLN("error sending data to weather server");
     return;
   }
   bzero(tmp_buffer, TMP_BUFFER_SIZE);
@@ -243,7 +246,7 @@ void GetWeather() {
     }
   }
   if(n<0) {
-    DEBUG_PRINTLN("error reading data from weather server.");
+    DEBUG_PRINTLN("error reading data from weather server");
   }
   close(sockfd);
 }
