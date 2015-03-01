@@ -6,7 +6,7 @@ This is a unified OpenSprinkler firmware for
 Arduino, RPi, BBB based OpenSprinklers.
 
 --------------------------------------------
-For microcontroller (Arduino):
+For OS (Arduino-based OpenSprinkler) 2.x:
 
 Option 1: install Arduino make, then open
 Makefile and modify the path to your Arduino
@@ -19,17 +19,15 @@ and copy the OpenSprinkler folder to your
 Arduino's libraries folder. 
 
 --------------------------------------------
-For RPi:
+For OSPi (OpenSprinkler Pi):
 
-Run the following command:
-gcc -o opensprinkler -DOSPI -m32 main.cpp OpenSprinkler.cpp program.cpp server.cpp utils.cpp weather.cpp gpio.cpp
+Run build script ./build_ospi.sh
 
 --------------------------------------------
 
-For BBB:
+For OSBo (OpenSprinkler Beagle):
 
-Run the following command:
-gcc -o opensprinkler -DOSBO -m32 main.cpp OpenSprinkler.cpp program.cpp server.cpp utils.cpp weather.cpp gpio.cpp
+Run build script ./build_osbo.sh
 
 ============================================
 Questions and comments:
