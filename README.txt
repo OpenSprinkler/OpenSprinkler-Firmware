@@ -22,14 +22,14 @@ Arduino's libraries folder.
 For RPi:
 
 Run the following command:
-gcc -o opensprinkler -DOSPI -m32 main.cpp OpenSprinkler.cpp program.cpp server.cpp utils.cpp weather.cpp
+gcc -o opensprinkler -DOSPI -m32 main.cpp OpenSprinkler.cpp program.cpp server.cpp utils.cpp weather.cpp gpio.cpp
 
 --------------------------------------------
 
 For BBB:
 
 Run the following command:
-gcc -o opensprinkler -DOSBO -m32 main.cpp OpenSprinkler.cpp program.cpp server.cpp utils.cpp weather.cpp
+gcc -o opensprinkler -DOSBO -m32 main.cpp OpenSprinkler.cpp program.cpp server.cpp utils.cpp weather.cpp gpio.cpp
 
 ============================================
 Questions and comments:
