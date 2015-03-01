@@ -693,10 +693,11 @@ void send_rfsignal(ulong code, ulong len) {
 void OpenSprinkler::send_rfstation_signal(byte sid, bool turnon) {
   ulong on, off;
   uint16_t length = get_station_name_rf(sid, &on, &off);
+#if defined(ARDUINO)
   length = (length>>1)+(length>>2);   // due to internal call delay, scale time down to 75% 
-  DEBUG_PRINTLN(on);
-  DEBUG_PRINTLN(off);
-  DEBUG_PRINTLN(length);
+#else
+  length = (length>>2)+(length>>3);   // on RPi and BBB, there is even more overhead, scale to 37.5%
+#endif
   send_rfsignal(turnon ? on : off, length);
 }
 
@@ -709,11 +710,14 @@ void OpenSprinkler::options_setup() {
   
   // check reset condition: either firmware version has changed, or reset flag is up
   byte curr_ver = nvm_read_byte((byte*)(ADDR_NVM_OPTIONS+OPTION_FW_VERSION));
+  
   //if (curr_ver<100) curr_ver = curr_ver*10; // adding a default 0 if version number is the old type
   if (curr_ver != OS_FW_VERSION || nvm_read_byte((byte*)(ADDR_NVM_OPTIONS+OPTION_RESET))==0xAA)  {
 #if defined(ARDUINO)
     lcd_print_line_clear_pgm(PSTR("Resetting Device"), 0);
     lcd_print_line_clear_pgm(PSTR("Please Wait..."), 1);  
+#else
+    DEBUG_PRINT("Resetting Options...");
 #endif
     // ======== Reset NVM data ========
     int i, sn;
@@ -759,7 +763,10 @@ void OpenSprinkler::options_setup() {
     
     // restart after resetting NVM.
     delay(500);
+    DEBUG_PRINTLN("done");
+#if defined(ARDUINO)
     reboot_dev();
+#endif
   } 
   else {
     // load ram parameters from nvm
