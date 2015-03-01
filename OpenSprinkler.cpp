@@ -768,7 +768,8 @@ void OpenSprinkler::options_setup() {
     reboot_dev();
 #endif
   } 
-  else {
+  
+  {
     // load ram parameters from nvm
     // 1. load options
     options_load();
