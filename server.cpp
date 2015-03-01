@@ -315,7 +315,10 @@ inline void rewind_ether_buffer() {
 
 inline void send_packet(bool final=false) {
   write(client, ether_buffer, strlen(ether_buffer));
-  close(client);  
+  if (final)
+    close(client);  
+  else
+    rewind_ether_buffer();
 }
 #endif
 
