@@ -300,6 +300,9 @@ byte OpenSprinkler::start_network() {
   setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &one, sizeof(int));    
   
   unsigned int port = (unsigned int)(options[OPTION_HTTPPORT_1].value<<8) + (unsigned int)options[OPTION_HTTPPORT_0].value;
+#if defined(DEMO)
+  port = 8080;
+#endif  
   svr_addr.sin_family = AF_INET;
   svr_addr.sin_addr.s_addr = INADDR_ANY;
   svr_addr.sin_port = htons(port);
