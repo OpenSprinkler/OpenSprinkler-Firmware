@@ -993,12 +993,12 @@ byte server_change_options(char *p)
 */
 byte server_change_password(char *p)
 {
-#if defined(DEMO)
-  return HTML_UNAUTHORIZED;
-#endif
   if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("npw"), true)) {
     char tbuf2[TMP_BUFFER_SIZE];
     if (findKeyVal(p, tbuf2, TMP_BUFFER_SIZE, PSTR("cpw"), true) && strncmp(tmp_buffer, tbuf2, MAX_USER_PASSWORD) == 0) {
+      #if defined(DEMO)
+        return HTML_SUCCESS;
+      #endif
       urlDecode(tmp_buffer);
       tmp_buffer[MAX_USER_PASSWORD]=0;  // make sure we don't exceed the maximum size
       byte size = strlen(tmp_buffer)+1;
