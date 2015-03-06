@@ -855,6 +855,9 @@ void string_remove_space(char *src) {
 */
 byte server_change_scripturl(char *p)
 {
+#if defined(DEMO)
+  return HTML_REDIRECT_HOME;
+#endif
   if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("jsp"), true)) {
     urlDecode(tmp_buffer);
     tmp_buffer[MAX_SCRIPTURL]=0;  // make sure we don't exceed the maximum size
