@@ -330,7 +330,11 @@ byte OpenSprinkler::start_network() {
 
 #include <sys/reboot.h>
 void OpenSprinkler::reboot_dev() {
+#if defined(DEMO)
+  // do nothing
+#elif
 	reboot(RB_AUTOBOOT);
+#endif
 }
 
 #endif // end network init functions
