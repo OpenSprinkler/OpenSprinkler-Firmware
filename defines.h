@@ -252,7 +252,11 @@ typedef enum {
   #else
     // For Linux or other software simulators
     // use fake hardware pins
-    #define OS_HW_VERSION    SIM_HW_VERSION_BASE    
+    #if defined(DEMO)
+      #define OS_HW_VERSION 255   // assign hardware number 255 to DEMO firmware
+    #else    
+      #define OS_HW_VERSION SIM_HW_VERSION_BASE
+    #endif
     #define PIN_SR_LATCH    0
     #define PIN_SR_DATA     0
     #define PIN_SR_CLOCK    0
