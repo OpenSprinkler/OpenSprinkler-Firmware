@@ -990,6 +990,9 @@ byte server_change_options(char *p)
 */
 byte server_change_password(char *p)
 {
+#if defined(DEMO)
+  return HTML_UNAUTHORIZED;
+#endif
   if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("npw"), true)) {
     char tbuf2[TMP_BUFFER_SIZE];
     if (findKeyVal(p, tbuf2, TMP_BUFFER_SIZE, PSTR("cpw"), true) && strncmp(tmp_buffer, tbuf2, MAX_USER_PASSWORD) == 0) {
