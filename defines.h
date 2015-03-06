@@ -32,7 +32,7 @@
 #define OS_HW_VERSION_BASE   0x00
 #define OSPI_HW_VERSION_BASE 0x40
 #define OSBO_HW_VERSION_BASE 0x80
-#define SIM_HW_VERSION_BASE  0xB0
+#define SIM_HW_VERSION_BASE  0xC0
 
 #define MAX_EXT_BOARDS   5  // maximum number of exp. boards (each expands 8 stations)
 
