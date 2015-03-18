@@ -332,7 +332,7 @@ byte OpenSprinkler::start_network() {
 void OpenSprinkler::reboot_dev() {
 #if defined(DEMO)
   // do nothing
-#elif
+#else
 	reboot(RB_AUTOBOOT);
 #endif
 }

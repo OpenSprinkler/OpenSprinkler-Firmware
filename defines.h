@@ -163,7 +163,11 @@ typedef enum {
   #elif F_CPU==12000000L
     #define OS_HW_VERSION (OS_HW_VERSION_BASE+21)
   #elif F_CPU==16000000L
-    #define OS_HW_VERSION (OS_HW_VERSION_BASE+22)
+    #if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
+      #define OS_HW_VERSION (OS_HW_VERSION_BASE+23)
+    #else
+      #define OS_HW_VERSION (OS_HW_VERSION_BASE+22)
+    #endif
   #endif
 
   // hardware pins
