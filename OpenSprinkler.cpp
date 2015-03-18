@@ -1,7 +1,7 @@
 /* OpenSprinkler Unified (AVR/RPI/BBB/LINUX) Firmware
  * Copyright (C) 2015 by Ray Wang (ray@opensprinkler.com)
  *
- * OpenSprinkler library 
+ * OpenSprinkler library
  * Feb 2015 @ OpenSprinkler.com
  *
  * This file is part of the OpenSprinkler library
@@ -18,7 +18,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see
- * <http://www.gnu.org/licenses/>. 
+ * <http://www.gnu.org/licenses/>.
  */
 
 #include "OpenSprinkler.h"
@@ -156,7 +156,7 @@ OptionStruct OpenSprinkler::options[NUM_OPTIONS] = {
 #else                                 // on RPI/BBB/LINUX, the default HTTP port is 8080
   {144, 255, _str_hp0,  _json_hp0},   // this and next byte define http port number
   {31,  255, _str_hp1,  _json_hp1},
-#endif  
+#endif
   {OS_HW_VERSION, 0, _str_hwv, _json_hwv},
   {0,   MAX_EXT_BOARDS, _str_ext, _json_ext}, // number of extension board. 0: no extension boards
   {1,   1,   _str_seq,  _json_seq},   // the option 'sequential' is now retired
@@ -174,12 +174,12 @@ OptionStruct OpenSprinkler::options[NUM_OPTIONS] = {
   {100, 255, _str_lit,  _json_lit},   // lcd backlight
   {15,   255, _str_dim,  _json_dim},   // lcd dimming
   {0,   200, _str_rlp,  _json_rlp},   // relay pulse
-  {0,   5,   _str_uwt,  _json_uwt}, 
+  {0,   5,   _str_uwt,  _json_uwt},
   {50,  255, _str_ntp1, _json_ntp1},  // this and the next three bytes define the ntp server ip
-  {97,  255, _str_ntp2, _json_ntp2}, 
+  {97,  255, _str_ntp2, _json_ntp2},
   {210, 255, _str_ntp3, _json_ntp3},
   {169, 255, _str_ntp4, _json_ntp4},
-  {1,   1,   _str_log,  _json_log},   // enable logging: 0: disable; 1: enable.   
+  {1,   1,   _str_log,  _json_log},   // enable logging: 0: disable; 1: enable.
   {0,   1,   _str_reset,_json_reset}
 };
 
@@ -209,7 +209,7 @@ time_t OpenSprinkler::now_tz() {
 
 #if defined(ARDUINO)  // AVR network init functions
 
-// read hardware MAC 
+// read hardware MAC
 #define MAC_CTRL_ID 0x50
 bool OpenSprinkler::read_hardware_mac() {
   uint8_t ret;
@@ -229,7 +229,7 @@ bool OpenSprinkler::read_hardware_mac() {
   return true;
 }
 
-void(* resetFunc) (void) = 0; // AVR software reset function 
+void(* resetFunc) (void) = 0; // AVR software reset function
 
 /** Initialize network with the given mac address and http port */
 byte OpenSprinkler::start_network() {
@@ -250,7 +250,7 @@ byte OpenSprinkler::start_network() {
     tmp_buffer[4] = 0x31;
     tmp_buffer[5] = options[OPTION_DEVICE_ID].value;
   }
-        
+
   if(!ether.begin(ETHER_BUFFER_SIZE, (uint8_t*)tmp_buffer, PIN_ETHER_CS))  return 0;
   // calculate http port number
   ether.hisport = (unsigned int)(options[OPTION_HTTPPORT_1].value<<8) + (unsigned int)options[OPTION_HTTPPORT_0].value;
@@ -297,16 +297,16 @@ byte OpenSprinkler::start_network() {
     DEBUG_PRINTLN(sock);
     return 0;
   }
-  setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &one, sizeof(int));    
-  
+  setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &one, sizeof(int));
+
   unsigned int port = (unsigned int)(options[OPTION_HTTPPORT_1].value<<8) + (unsigned int)options[OPTION_HTTPPORT_0].value;
 #if defined(DEMO)
   port = 8080;
-#endif  
+#endif
   svr_addr.sin_family = AF_INET;
   svr_addr.sin_addr.s_addr = INADDR_ANY;
   svr_addr.sin_port = htons(port);
-    
+
   int ret = bind(sock, (struct sockaddr *) &svr_addr, sizeof(svr_addr));
   if (ret == -1) {
     DEBUG_PRINT("failed to bind socket: ");
@@ -320,11 +320,11 @@ byte OpenSprinkler::start_network() {
     DEBUG_PRINTLN(ret);
     close(sock);
     return 0;
-  }    
+  }
 
   DEBUG_PRINT("started web server at port ");
   DEBUG_PRINTLN(port);
-  
+
   return 1;
 }
 
@@ -350,17 +350,17 @@ void OpenSprinkler::begin() {
 
   pinMode(PIN_SR_CLOCK, OUTPUT);
   pinMode(PIN_SR_DATA,  OUTPUT);
-  
+
 	// Reset all stations
   clear_all_station_bits();
   apply_all_station_bits();
-  
+
   // pull shift register OE low to enable output
   digitalWrite(PIN_SR_OE, LOW);
 
   // Rain sensor port set up
   pinMode(PIN_RAINSENSOR, INPUT);
-  
+
 #if defined(ARDUINO)
   digitalWrite(PIN_RAINSENSOR, HIGH); // enabled internal pullup
 #else
@@ -372,28 +372,28 @@ void OpenSprinkler::begin() {
   // so only need to initialize non-zero ones
   status.enabled = 1;
   //status.seq = 1;
-  
+
   old_status = status;
-  
+
   nvdata.sunrise_time = 360;  // 6:00am default sunrise
   nvdata.sunset_time = 1080;  // 6:00pm default sunset
-  
+
   nboards = 1;
   nstations = 8;
-  
+
   // set rf data pin
   pinMode(PIN_RF_DATA, OUTPUT);
   digitalWrite(PIN_RF_DATA, LOW);
-  
+
   pinMode(PIN_RELAY, OUTPUT);
   digitalWrite(PIN_RELAY, LOW);
-  
-#if defined(ARDUINO)  // AVR LCD functions 
+
+#if defined(ARDUINO)  // AVR LCD functions
   // set sd cs pin high to release SD
   pinMode(PIN_SD_CS, OUTPUT);
   digitalWrite(PIN_SD_CS, HIGH);
-  
-  // set PWM frequency for adjustable LCD backlight and contrast 
+
+  // set PWM frequency for adjustable LCD backlight and contrast
   TCCR1B = 0x01;
   // turn on LCD backlight and contrast
   pinMode(PIN_LCD_BACKLIGHT, OUTPUT);
@@ -437,7 +437,7 @@ void OpenSprinkler::begin() {
     B00000,
     B10101,
     B10101
-  };  
+  };
   byte lcd_connect_char[8] = {
     B00000,
     B00000,
@@ -448,11 +448,11 @@ void OpenSprinkler::begin() {
     B10000,
     B00000
   };
-  lcd.createChar(1, lcd_wifi_char);  
+  lcd.createChar(1, lcd_wifi_char);
   lcd_wifi_char[1]=0;
   lcd_wifi_char[2]=0;
-  lcd_wifi_char[3]=1;    
-  lcd.createChar(0, lcd_wifi_char);  
+  lcd_wifi_char[3]=1;
+  lcd.createChar(0, lcd_wifi_char);
   lcd.createChar(2, lcd_sd_char);
   lcd.createChar(3, lcd_rain_char);
   lcd.createChar(4, lcd_connect_char);
@@ -461,11 +461,11 @@ void OpenSprinkler::begin() {
   // enable internal pullup
   pinMode(PIN_BUTTON_1, INPUT);
   pinMode(PIN_BUTTON_2, INPUT);
-  pinMode(PIN_BUTTON_3, INPUT);    
+  pinMode(PIN_BUTTON_3, INPUT);
   digitalWrite(PIN_BUTTON_1, HIGH);
   digitalWrite(PIN_BUTTON_2, HIGH);
-  digitalWrite(PIN_BUTTON_3, HIGH);    
-  
+  digitalWrite(PIN_BUTTON_3, HIGH);
+
   // detect if DS1307 RTC exists
   if (RTC.detect()==0) {
     status.has_rtc = 1;
@@ -490,11 +490,11 @@ void OpenSprinkler::apply_all_station_bits() {
     for(s=0;s<8;s++) {
       digitalWrite(PIN_SR_CLOCK, LOW);
       digitalWrite(PIN_SR_DATA, (sbits & ((byte)1<<(7-s))) ? HIGH : LOW );
-      digitalWrite(PIN_SR_CLOCK, HIGH);          
+      digitalWrite(PIN_SR_CLOCK, HIGH);
     }
   }
   digitalWrite(PIN_SR_LATCH, HIGH);
-}		
+}
 
 void OpenSprinkler::rainsensor_status() {
   // options[OPTION_RS_TYPE]: 0 if normally closed, 1 if normally open
@@ -502,7 +502,7 @@ void OpenSprinkler::rainsensor_status() {
 }
 
 int OpenSprinkler::detect_exp() { // AVR has capability to detect number of expansion boards
-#if defined(ARDUINO) 
+#if defined(ARDUINO)
   unsigned int v = analogRead(PIN_EXP_SENSE);
   // OpenSprinkler uses voltage divider to detect expansion boards
   // Master controller has a 1.5K pull-up;
@@ -530,7 +530,7 @@ int OpenSprinkler::detect_exp() { // AVR has capability to detect number of expa
   return n;
 #else
   return -1;
-#endif  
+#endif
 }
 
 static ulong nvm_hex2ulong(byte *addr, byte len) {
@@ -577,9 +577,9 @@ void OpenSprinkler::get_station_name(byte sid, char tmp[]) {
 
 // Set station name to nvm
 void OpenSprinkler::set_station_name(byte sid, char tmp[]) {
-  tmp[STATION_NAME_SIZE]=0;  
+  tmp[STATION_NAME_SIZE]=0;
   nvm_write_block(tmp, (void*)(ADDR_NVM_STN_NAMES+(int)sid*STATION_NAME_SIZE), STATION_NAME_SIZE);
-  return;  
+  return;
 }
 
 // Save station attribute bits to NVM
@@ -592,7 +592,7 @@ void OpenSprinkler::station_attrib_bits_load(int addr, byte bits[]) {
 }
 
 // verify if a string matches password
-byte OpenSprinkler::password_verify(char *pw) { 
+byte OpenSprinkler::password_verify(char *pw) {
   byte *addr = (byte*)ADDR_NVM_PASSWORD;
   byte c1, c2;
   while(1) {
@@ -624,7 +624,7 @@ byte OpenSprinkler::weekday_today() {
 #else
   return 0;
   // todo: is this function needed for RPI/BBB?
-#endif  
+#endif
 }
 
 void OpenSprinkler::set_relay(byte status) {
@@ -637,11 +637,11 @@ void OpenSprinkler::set_station_bit(byte sid, byte value) {
   byte s = sid&0x07;    // station bit index
   if (value) {
     station_bits[bid] = station_bits[bid] | ((byte)1<<s);
-  } 
+  }
   else {
     station_bits[bid] = station_bits[bid] &~((byte)1<<s);
   }
-}	
+}
 
 // Clear all station bits
 void OpenSprinkler::clear_all_station_bits() {
@@ -674,13 +674,13 @@ void OpenSprinkler::update_rfstation_bits() {
       if(get_station_name_rf(sid, NULL, NULL)) {
         rfstn_bits[bid] |= (1<<s);
       }
-    }      
+    }
   }
 }
 
 void send_rfsignal(ulong code, ulong len) {
   ulong len3 = len * 3;
-  ulong len31 = len * 31; 
+  ulong len31 = len * 31;
   for(byte n=0;n<24;n++) {
     int i=23;
     // send code
@@ -701,7 +701,7 @@ void OpenSprinkler::send_rfstation_signal(byte sid, bool turnon) {
   ulong on, off;
   uint16_t length = get_station_name_rf(sid, &on, &off);
 #if defined(ARDUINO)
-  length = (length>>1)+(length>>2);   // due to internal call delay, scale time down to 75% 
+  length = (length>>1)+(length>>2);   // due to internal call delay, scale time down to 75%
 #else
   length = (length>>2)+(length>>3);   // on RPi and BBB, there is even more overhead, scale to 37.5%
 #endif
@@ -714,15 +714,15 @@ void OpenSprinkler::options_setup() {
 
   // add 0.5 second delay to allow nvm to stablize
   delay(500);
-  
+
   // check reset condition: either firmware version has changed, or reset flag is up
   byte curr_ver = nvm_read_byte((byte*)(ADDR_NVM_OPTIONS+OPTION_FW_VERSION));
-  
+
   //if (curr_ver<100) curr_ver = curr_ver*10; // adding a default 0 if version number is the old type
   if (curr_ver != OS_FW_VERSION || nvm_read_byte((byte*)(ADDR_NVM_OPTIONS+OPTION_RESET))==0xAA)  {
 #if defined(ARDUINO)
     lcd_print_line_clear_pgm(PSTR("Resetting Device"), 0);
-    lcd_print_line_clear_pgm(PSTR("Please Wait..."), 1);  
+    lcd_print_line_clear_pgm(PSTR("Please Wait..."), 1);
 #else
     DEBUG_PRINT("Resetting Options...");
 #endif
@@ -735,13 +735,13 @@ void OpenSprinkler::options_setup() {
       int nbytes = ((NVM_SIZE-i)>TMP_BUFFER_SIZE)?TMP_BUFFER_SIZE:(NVM_SIZE-i);
       nvm_write_block(tmp_buffer, (void*)i, nbytes);
     }
-    
+
     // 1. write program data default parameters
-    
+
     // 2. write non-volatile controller status
     nvdata_save();
-    
-    // 3. write string parameters 
+
+    // 3. write string parameters
     nvm_write_block(DEFAULT_PASSWORD, (void*)ADDR_NVM_PASSWORD, strlen(DEFAULT_PASSWORD)+1);
     nvm_write_block(DEFAULT_LOCATION, (void*)ADDR_NVM_LOCATION, strlen(DEFAULT_LOCATION)+1);
     nvm_write_block(DEFAULT_JAVASCRIPT_URL, (void*)ADDR_NVM_SCRIPTURL, strlen(DEFAULT_JAVASCRIPT_URL)+1);
@@ -755,27 +755,27 @@ void OpenSprinkler::options_setup() {
       tmp_buffer[2]='0'+(sn%10);
       nvm_write_block(tmp_buffer, (void*)i, strlen(tmp_buffer)+1);
     }
-    
+
     // 5. reset station attributes
     // since we wiped out nvm, only non-zero attributes need to be initialized
     for(i=0;i<MAX_EXT_BOARDS+1;i++) {
       tmp_buffer[i]=0xff;
     }
     nvm_write_block(tmp_buffer, (void*)ADDR_NVM_MAS_OP, MAX_EXT_BOARDS+1);
-    nvm_write_block(tmp_buffer, (void*)ADDR_NVM_STNSEQ, MAX_EXT_BOARDS+1);    
+    nvm_write_block(tmp_buffer, (void*)ADDR_NVM_STNSEQ, MAX_EXT_BOARDS+1);
 
     // 6. write options
     options_save(); // write default option values
     //======== END OF NVM RESET CODE ========
-    
+
     // restart after resetting NVM.
     delay(500);
     DEBUG_PRINTLN("done");
 #if defined(ARDUINO)
     reboot_dev();
 #endif
-  } 
-  
+  }
+
   {
     // load ram parameters from nvm
     // 1. load options
@@ -785,7 +785,7 @@ void OpenSprinkler::options_setup() {
     station_attrib_bits_load(ADDR_NVM_IGNRAIN, ignrain_bits);
     station_attrib_bits_load(ADDR_NVM_ACTRELAY, actrelay_bits);
     station_attrib_bits_load(ADDR_NVM_STNDISABLE, stndis_bits);
-    station_attrib_bits_load(ADDR_NVM_STNSEQ, stnseq_bits);    
+    station_attrib_bits_load(ADDR_NVM_STNSEQ, stnseq_bits);
     // set RF station flags
     update_rfstation_bits();
 
@@ -795,9 +795,9 @@ void OpenSprinkler::options_setup() {
 
 #if defined(ARDUINO)  // handle AVR buttons
 	byte button = button_read(BUTTON_WAIT_NONE);
-	
+
 	switch(button & BUTTON_MASK) {
-	
+
   case BUTTON_1:
   	// if BUTTON_2 is pressed during startup, go to 'reset all options'
 		ui_set_options(OPTION_RESET);
@@ -808,7 +808,7 @@ void OpenSprinkler::options_setup() {
 
   case BUTTON_2:  // button 2 is used to enter bootloader
     break;
-  		
+
 	case BUTTON_3:
   	// if BUTTON_3 is pressed during startup, enter Setup option mode
     lcd_print_line_clear_pgm(PSTR("==Set Options=="), 0);
@@ -821,17 +821,17 @@ void OpenSprinkler::options_setup() {
     lcd.clear();
     ui_set_options(0);
     if (options[OPTION_RESET].value) {
-      reboot_dev(); 
+      reboot_dev();
     }
     break;
   }
-  
+
   // turn on LCD backlight and contrast
   pinMode(PIN_LCD_BACKLIGHT, OUTPUT);
   pinMode(PIN_LCD_CONTRAST, OUTPUT);
   lcd_set_brightness();
   lcd_set_contrast();
-#endif  
+#endif
 }
 
 // Load non-volatile controller status data from internal nvm
@@ -916,7 +916,7 @@ void OpenSprinkler::lcd_print_line_clear_pgm(PGM_P PROGMEM str, byte line) {
     lcd.print((char)c);
     cnt++;
   }
-  for(; (16-cnt) >= 0; cnt ++) lcd_print_pgm(PSTR(" "));  
+  for(; (16-cnt) >= 0; cnt ++) lcd_print_pgm(PSTR(" "));
 }
 
 void OpenSprinkler::lcd_print_2digit(int v)
@@ -945,9 +945,9 @@ void OpenSprinkler::lcd_print_time(byte line)
 void OpenSprinkler::lcd_print_ip(const byte *ip, byte lineno) {
   lcd.setCursor(0, lineno);
   for (byte i=0; i<3; i++) {
-    lcd.print((int)ip[i]); 
+    lcd.print((int)ip[i]);
     lcd_print_pgm(PSTR("."));
-  }   
+  }
   lcd.print((int)ip[3]);
 }
 
@@ -957,14 +957,14 @@ void OpenSprinkler::lcd_print_mac(const byte *mac) {
   lcd_print_pgm(PSTR("MAC:"));
   for(byte i=0; i<4; i++) {
     lcd.print((mac[i]>>4), HEX);
-    lcd.print((mac[i]&0x0F), HEX);    
+    lcd.print((mac[i]&0x0F), HEX);
     lcd_print_pgm(PSTR("-"));
   }
   lcd.setCursor(0, 1);
   for(byte i=4; i<6; i++) {
     if(i!=4) lcd_print_pgm(PSTR("-"));
     lcd.print((mac[i]>>4), HEX);
-    lcd.print((mac[i]&0x0F), HEX);    
+    lcd.print((mac[i]&0x0F), HEX);
   }
 }
 
@@ -979,7 +979,7 @@ void OpenSprinkler::lcd_print_station(byte line, char c) {
     lcd.print((int)status.display_board);
     lcd_print_pgm(PSTR(":"));   // extension boards are displayed as E1, E2...
   }
-  
+
   if (!status.enabled) {
   	lcd_print_line_clear_pgm(PSTR("-Disabled!-"), 1);
   } else {
@@ -1022,7 +1022,7 @@ void OpenSprinkler::lcd_print_version(byte v) {
 
 /** print an option value */
 void OpenSprinkler::lcd_print_option(int i) {
-  lcd_print_line_clear_pgm(options[i].str, 0);  
+  lcd_print_line_clear_pgm(options[i].str, 0);
   lcd_print_line_clear_pgm(PSTR(""), 1);
   lcd.setCursor(0, 1);
   int tz;
@@ -1043,7 +1043,7 @@ void OpenSprinkler::lcd_print_option(int i) {
     else {
       lcd.print(tz);  // print fractional portion
     }
-    lcd_print_pgm(PSTR(" GMT"));    
+    lcd_print_pgm(PSTR(" GMT"));
     break;
   case OPTION_MASTER_ON_ADJ:
     lcd_print_pgm(PSTR("+"));
@@ -1103,7 +1103,7 @@ byte OpenSprinkler::button_read_busy(byte pin_butt, byte waitmode, byte butt, by
   while (digitalRead(pin_butt) == 0 &&
          (waitmode == BUTTON_WAIT_RELEASE || (waitmode == BUTTON_WAIT_HOLD && hold_time<BUTTON_HOLD_MS))) {
     delay(BUTTON_DELAY_MS);
-    hold_time += BUTTON_DELAY_MS;      
+    hold_time += BUTTON_DELAY_MS;
   };
   if (is_holding || hold_time >= BUTTON_HOLD_MS)
     butt |= BUTTON_FLAG_HOLD;
@@ -1163,7 +1163,7 @@ void OpenSprinkler::ui_set_options(int oid)
       break;
 
     case BUTTON_3:
-      if (!(button & BUTTON_FLAG_DOWN)) break; 
+      if (!(button & BUTTON_FLAG_DOWN)) break;
       if (button & BUTTON_FLAG_HOLD) {
         // if OPTION_RESET is set to nonzero, change it to reset condition value
         if (options[OPTION_RESET].value) {
@@ -1172,7 +1172,7 @@ void OpenSprinkler::ui_set_options(int oid)
         // long press, save options
         options_save();
         finished = true;
-      } 
+      }
       else {
         // click, move to the next option
         if (i==OPTION_USE_DHCP && options[i].value) i += 9; // if use DHCP, skip static ip set
