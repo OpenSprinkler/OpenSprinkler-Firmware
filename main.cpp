@@ -511,7 +511,9 @@ void do_loop()
     log_statistics(curr_time);
   }
 
-  usleep(10000);
+  #if defined(ARDUINO)
+    usleep(10000);
+  #endif
 }
 
 void check_weather() {
