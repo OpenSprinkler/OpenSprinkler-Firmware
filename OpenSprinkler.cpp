@@ -291,14 +291,14 @@ extern int client;
 byte OpenSprinkler::start_network() {
   int one = 1;
   sin_len = sizeof(cli_addr);
-  sock = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
+  sock = socket(AF_INET, SOCK_STREAM, 0);
   if (sock < 0) {
     DEBUG_PRINT("failed to create socket: ");
     DEBUG_PRINTLN(sock);
     return 0;
   }
   setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &one, sizeof(int));
-
+  ioctl(sock, FIONBIO, 1); // Make socket non-blocking
   unsigned int port = (unsigned int)(options[OPTION_HTTPPORT_1].value<<8) + (unsigned int)options[OPTION_HTTPPORT_0].value;
 #if defined(DEMO)
   port = 8080;
