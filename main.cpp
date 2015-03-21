@@ -511,7 +511,7 @@ void do_loop()
     log_statistics(curr_time);
   }
 
-  #if defined(ARDUINO)
+  #if !defined(ARDUINO)
     usleep(10000);
   #endif
 }
