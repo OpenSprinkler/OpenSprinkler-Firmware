@@ -18,7 +18,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see
- * <http://www.gnu.org/licenses/>. 
+ * <http://www.gnu.org/licenses/>.
  */
 
 
@@ -39,12 +39,13 @@
   #include <string.h>
   #include <time.h>
   #include <unistd.h>
-  #include <sys/types.h> 
+  #include <sys/types.h>
   #include <sys/socket.h>
   #include <netinet/in.h>
+  #include <sys/ioctl.h>
   #include <netdb.h>
   #include <arpa/inet.h>
-  #include <err.h>  
+  #include <err.h>
 #endif // end of headers
 
 #include "defines.h"
@@ -78,11 +79,11 @@ struct ConStatus {
   byte display_board:4;     // the board that is being displayed onto the lcd
   byte network_fails:4;     // number of network fails
   byte mas:8;               // master station index
-}; 
+};
 
 class OpenSprinkler {
 public:
-  
+
   // data members
 #if defined(ARDUINO)
   static LiquidCrystal lcd;
@@ -94,7 +95,7 @@ public:
   static ConStatus status;
   static ConStatus old_status;
   static byte nboards, nstations;
-  
+
   static OptionStruct options[];  // option values, max, name, and flag
 
   static byte station_bits[];     // station activation bits. each byte corresponds to a board (8 stations)
@@ -106,7 +107,7 @@ public:
   static byte stndis_bits[];      // station disable bits. each byte corresponds to a board (8 stations)
   static byte rfstn_bits[];       // RF station flags. each byte corresponds to a board (8 stations)
   static byte stnseq_bits[];      // station sequential bits. each byte corresponds to a board (8 stations)
-  
+
   // variables for time keeping
   static ulong rainsense_start_time;  // time when the most recent rain sensor activation was detected
   static ulong raindelay_start_time;  // time when the most recent rain delay started
@@ -117,7 +118,7 @@ public:
   static ulong dhcpnew_lasttime;      // time when dhcp renew was performed
   static ulong external_ip;           // external ip address
   static byte  water_percent_avg;     // average water percentage over a day
-  
+
   // member functions
   // -- setup
   static void reboot_dev();   // reboot the microcontroller
@@ -150,12 +151,12 @@ public:
   static void enable();           // enable controller operation
   static void disable();          // disable controller operation, all stations will be closed immediately
   static void raindelay_start();  // start raindelay
-  static void raindelay_stop();   // stop rain delay  
+  static void raindelay_stop();   // stop rain delay
   static void rainsensor_status();// update rainsensor status
   static int detect_exp();        // detect the number of expansion boards
-  static byte weekday_today();    // returns index of today's weekday (Monday is 0) 
+  static byte weekday_today();    // returns index of today's weekday (Monday is 0)
   static void set_relay(byte status); // set relay on or off
-  
+
   static void set_station_bit(byte sid, byte value); // set station bit of one station (sid->station index, value->0/1)
   static void clear_all_station_bits(); // clear all station bits
   static void apply_all_station_bits(); // apply all station bits (activate/deactive values)
@@ -166,7 +167,7 @@ public:
   static void lcd_print_line_clear_pgm(PGM_P PROGMEM str, byte line);
   static void lcd_print_time(byte line);                  // print current time
   static void lcd_print_ip(const byte *ip, byte line);    // print ip
-  static void lcd_print_mac(const byte *mac);             // print mac 
+  static void lcd_print_mac(const byte *mac);             // print mac
   static void lcd_print_station(byte line, char c);       // print station bits of the board selected by display_board
   static void lcd_print_version(byte v);                   // print version number
 

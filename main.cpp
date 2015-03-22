@@ -18,9 +18,9 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see
- * <http://www.gnu.org/licenses/>. 
+ * <http://www.gnu.org/licenses/>.
  */
- 
+
 #include <limits.h>
 
 #include "OpenSprinkler.h"
@@ -60,13 +60,13 @@ BufferFiller bfill;                       // buffer filler
 
 // ====== Object defines ======
 OpenSprinkler os; // OpenSprinkler object
-ProgramData pd;   // ProgramdData object 
+ProgramData pd;   // ProgramdData object
 
 #if defined(ARDUINO)
 
 // ====== UI defines ======
 static char ui_anim_chars[3] = {'.', 'o', 'O'};
-  
+
 #define UI_STATE_DEFAULT   0
 #define UI_STATE_DISP_IP   1
 #define UI_STATE_DISP_GW   2
@@ -78,11 +78,11 @@ static byte ui_state_runprog = 0;
 void ui_state_machine() {
 
   if (os.button_lasttime && os.button_lasttime + LCD_DIMMING_TIMEOUT < now()) {
-    analogWrite(PIN_LCD_BACKLIGHT, 255-os.options[OPTION_LCD_DIMMING].value); 
+    analogWrite(PIN_LCD_BACKLIGHT, 255-os.options[OPTION_LCD_DIMMING].value);
     os.button_lasttime = 0;
     ui_state = UI_STATE_DEFAULT;  // also recover to default state
   }
-      
+
   // read button, if something is pressed, wait till release
   byte button = os.button_read(BUTTON_WAIT_HOLD);
 
@@ -108,7 +108,7 @@ void ui_state_machine() {
         os.lcd_print_ip(ether.myip, 0);
         os.lcd.setCursor(0, 1);
         os.lcd_print_pgm(PSTR(":"));
-        os.lcd.print(ether.hisport);  
+        os.lcd.print(ether.hisport);
         ui_state = UI_STATE_DISP_IP;
       }
       break;
@@ -165,15 +165,15 @@ void ui_state_machine() {
 // ======================
 // Setup Function
 // ======================
-void do_setup() { 
+void do_setup() {
   /* Clear WDT reset flag. */
   MCUSR &= ~(1<<WDRF);
-  
+
   DEBUG_BEGIN(9600);
-  
+
   os.begin();          // OpenSprinkler init
   os.options_setup();  // Setup options
- 
+
   pd.init();            // ProgramData init
 
   setSyncInterval(RTC_SYNC_INTERVAL);  // RTC sync interval
@@ -190,15 +190,15 @@ void do_setup() {
   /* set new watchdog timeout prescaler value */
   WDTCSR = 1<<WDP3 | 1<<WDP0;  // 8.0 seconds
   /* Enable the WD interrupt (note no reset). */
-  WDTCSR |= _BV(WDIE);  
-    
+  WDTCSR |= _BV(WDIE);
+
   // attempt to detect SD card
   os.lcd_print_line_clear_pgm(PSTR("Detecting uSD..."), 1);
 
   if(sd.begin(PIN_SD_CS, SPI_HALF_SPEED)) {
     os.status.has_sd = 1;
   }
-    
+
   if (os.start_network()) {  // initialize network
     os.status.network_fails = 0;
   } else {
@@ -207,7 +207,7 @@ void do_setup() {
   delay(500);
 
   os.apply_all_station_bits(); // reset station bits
-  
+
   os.button_lasttime = now();
 }
 
@@ -226,17 +226,17 @@ ISR(WDT_vect)
   }
 }
 #else
-void do_setup() { 
+void do_setup() {
   os.begin();          // OpenSprinkler init
   os.options_setup();  // Setup options
- 
+
   pd.init();            // ProgramData init
   if (os.start_network()) {  // initialize network
     DEBUG_PRINTLN("network established.");
     os.status.network_fails = 0;
   } else {
-    DEBUG_PRINTLN("network failed.");  
-    os.status.network_fails = 1; 
+    DEBUG_PRINTLN("network failed.");
+    os.status.network_fails = 1;
   }
 }
 #endif
@@ -289,13 +289,13 @@ void do_loop()
     last_time = curr_time;
 
 #if defined(ARDUINO)
-    if (!ui_state)    
+    if (!ui_state)
       os.lcd_print_time(0);       // print time
 #endif
 
     // ====== Check raindelay status ======
     if (os.status.rain_delayed) {
-      if (curr_time >= os.nvdata.rd_stop_time) {  // rain delay is over  
+      if (curr_time >= os.nvdata.rd_stop_time) {  // rain delay is over
         os.raindelay_stop();
       }
     } else {
@@ -351,34 +351,34 @@ void do_loop()
             // - disabled
             if ((os.status.mas==sid+1) || (os.station_bits[bid]&(1<<s)) || (os.stndis_bits[bid]&(1<<s)))
               continue;
-            
+
             // if station has non-zero water time and if it doesn't already have a scheduled stop time
             if (prog.durations[sid] && !pd.scheduled_stop_time[sid]) {
               // initialize schedule data by storing water time temporarily in stop_time
               // water time is scaled by watering percentage
               ulong water_time = (ulong)water_time_decode(prog.durations[sid]);
-              // if the program is set to use weather scaling 
+              // if the program is set to use weather scaling
               if (prog.use_weather)
                 water_time = water_time * os.options[OPTION_WATER_PERCENTAGE].value / 100;
               pd.scheduled_stop_time[sid] = water_time;
-                                            
+
               if (pd.scheduled_stop_time[sid]) {
                 // check if water time is still valid
                 // because it may end up being zero after scaling
-                pd.scheduled_program_index[sid] = pid+1;  
+                pd.scheduled_program_index[sid] = pid+1;
                 match_found = true;
               }// if pd.scheduled_stop_time[sid]
             }// if prog.durations[sid]
           }// for sid
         }// if check_match
       }// for pid
-      
+
       // calculate start and end time
       if (match_found) {
         schedule_all_stations(curr_time);
       }
     }//if_check_current_minute
-    
+
     // ====== Run program data ======
     // Check if a program is running currently
     // If so, do station run-time keeping
@@ -387,21 +387,21 @@ void do_loop()
         bitvalue = os.station_bits[bid];
         for(s=0;s<8;s++) {
           byte sid = bid*8+s;
-          
+
           // skip master station
           if (os.status.mas == sid+1) continue;
           // check if this station is scheduled, either running or waiting to run
           if (pd.scheduled_program_index[sid] > 0) {
             // if so, check if we should turn it off
             if (curr_time >= pd.scheduled_stop_time[sid]) {
-              turn_off_station(sid, os.status.mas, curr_time);          
+              turn_off_station(sid, os.status.mas, curr_time);
             }
           }
           // if current station is not running, check if we should turn it on
           if(!((bitvalue>>s)&1)) {
             if (curr_time >= pd.scheduled_start_time[sid] && curr_time < pd.scheduled_stop_time[sid]) {
               os.set_station_bit(sid, 1);
-              
+
               // upon turning on station, process relay
               // if the station is set to activate / deactivate relay
               if(os.actrelay_bits[bid]&(1<<s)) {
@@ -422,10 +422,10 @@ void do_loop()
           } // if current station is not running
         }//end_s
       }//end_bid
-      
+
       // process dynamic events
       process_dynamic_events(curr_time);
-      
+
       // activate / deactivate valves
       os.apply_all_station_bits();
 
@@ -446,7 +446,7 @@ void do_loop()
           program_still_busy = true;
         }
       }
-      
+
       // if no station has a schedule
       if (program_still_busy == false) {
         // turn off all stations
@@ -456,8 +456,8 @@ void do_loop()
         pd.reset_runtime();
         // reset program busy bit
         os.status.program_busy = 0;
-        
-        // in case some options have changed while executing the program        
+
+        // in case some options have changed while executing the program
         os.status.mas = os.options[OPTION_MASTER_STATION].value; // update master station
       }
     }//if_some_program_is_running
@@ -484,23 +484,23 @@ void do_loop()
         }
       }
       os.set_station_bit(os.status.mas-1, masbit);
-    }    
-                  
+    }
+
     // process dynamic events
     process_dynamic_events(curr_time);
-      
+
     // activate/deactivate valves
     os.apply_all_station_bits();
-    
+
 #if defined(ARDUINO)
     // process LCD display
-    if (!ui_state)    
+    if (!ui_state)
       os.lcd_print_station(1, ui_anim_chars[curr_time%3]);
 #endif
 
     // check network connection
     check_network();
-    
+
     // check weather
     check_weather();
 
@@ -510,6 +510,10 @@ void do_loop()
     // calculate statistics
     log_statistics(curr_time);
   }
+
+  #if !defined(ARDUINO)
+    usleep(10000);
+  #endif
 }
 
 void check_weather() {
@@ -531,7 +535,7 @@ void turn_off_station(byte sid, byte mas, ulong curr_time) {
 
   // ignore if we are turning off a station that's not running or scheduled to run
   if (!pd.scheduled_start_time[sid])  return;
-  
+
   // check if the current time is past the scheduled start time,
   // because we may be turning off a station that hasn't started yet
   if (curr_time > pd.scheduled_start_time[sid]) {
@@ -542,7 +546,7 @@ void turn_off_station(byte sid, byte mas, ulong curr_time) {
       pd.lastrun.duration = curr_time - pd.scheduled_start_time[sid];
       pd.lastrun.endtime = curr_time;
       write_log(LOGDATA_STATION, curr_time);
-    }      
+    }
 
     // upon turning off station, process relay
     // if the station is set to active / deactivate relay
@@ -551,7 +555,7 @@ void turn_off_station(byte sid, byte mas, ulong curr_time) {
       if(os.options[OPTION_RELAY_PULSE].value > 0) {  // if relay is set to pulse
         os.set_relay(1);
         delay(os.options[OPTION_RELAY_PULSE].value*10);
-      } 
+      }
       os.set_relay(0);
     }
     // upon turning off station, process RF station
@@ -561,12 +565,12 @@ void turn_off_station(byte sid, byte mas, ulong curr_time) {
       os.send_rfstation_signal(sid, false);
     }
   }
-  
+
   // reset program run-time data variables
   pd.scheduled_start_time[sid] = 0;
   pd.scheduled_stop_time[sid] = 0;
-  pd.scheduled_program_index[sid] = 0;  
-  
+  pd.scheduled_program_index[sid] = 0;
+
 }
 
 void process_dynamic_events(ulong curr_time) {
@@ -591,24 +595,24 @@ void process_dynamic_events(ulong curr_time) {
           (!en || (rain && !(rbits&(1<<s)))) ) {
         if (sbits&(1<<s)) { // if station is currently running
           turn_off_station(sid, os.status.mas, curr_time);
-                   
+
         } else if (pd.scheduled_program_index[sid] > 0) { // if station is currently not running but is waiting to run
-        
+
           // reset program data variables
           pd.scheduled_start_time[sid] = 0;
           pd.scheduled_stop_time[sid] = 0;
-          pd.scheduled_program_index[sid] = 0;             
+          pd.scheduled_program_index[sid] = 0;
         }
       }
     }
-  }      
+  }
 }
 
 //void schedule_all_stations(ulong curr_time, byte seq)  // remove seq option
 void schedule_all_stations(ulong curr_time) {
   ulong con_start_time = curr_time + 1;   // concurrent start time
   ulong seq_start_time = con_start_time;  // sequential start time
-  
+
   int16_t station_delay = water_time_decode_signed(os.options[OPTION_STATION_DELAY_TIME].value);
   // if the sequential queue has stations running
   if (pd.last_seq_stop_time > curr_time) {
@@ -616,21 +620,21 @@ void schedule_all_stations(ulong curr_time) {
   }
 
   byte sid;
-  
+
   // go through all stations and calculate start / stop time of each station
   for(sid=0;sid<os.nstations;sid++) {
     // skip master station because it's not scheduled independently
     if (os.status.mas==sid+1) continue;
     byte bid=sid>>3;
-    byte s=sid&0x07;    
-    
+    byte s=sid&0x07;
+
     // if the station is not scheduled to run (scheduled_stop_time = 0)
     // or is already scheduled (i.e. start_time > 0)
     // or is already running
     // then we will skip this station
     if(!pd.scheduled_stop_time[sid] || pd.scheduled_start_time[sid] || (os.station_bits[bid]&(1<<s)))
       continue;
-    
+
     // check if this is a sequential station
     if (os.stnseq_bits[bid]&(1<<s)) {
       // sequential scheduling
@@ -672,7 +676,7 @@ void reset_all_stations() {
   ulong curr_time = os.now_tz();
   for(byte sid=0;sid<os.nstations;sid++) {
     if(pd.scheduled_program_index[sid] > 0) {
-      pd.scheduled_stop_time[sid] = curr_time;  
+      pd.scheduled_stop_time[sid] = curr_time;
     }
   }
 }
@@ -700,13 +704,13 @@ void manual_start_program(byte pid) {
       dur = water_time_decode(prog.durations[sid]);
     if (dur>0 && !(os.stndis_bits[bid]&(1<<s))) {
       pd.scheduled_stop_time[sid] = dur;
-      pd.scheduled_program_index[sid] = 254;      
+      pd.scheduled_program_index[sid] = 254;
       match_found = true;
     }
   }
   if(match_found) {
     schedule_all_stations(os.now_tz());
-  }  
+  }
 }
 
 // ================================
@@ -759,7 +763,7 @@ void log_statistics(time_t curr_time) {
 // write run record to log on SD card
 void write_log(byte type, ulong curr_time) {
   if (!os.options[OPTION_ENABLE_LOGGING].value) return;
-  
+
   // file name will be logs/xxxxx.tx where xxxxx is the day in epoch time
   ultoa(curr_time / 86400, tmp_buffer, 10);
   make_logfile_name(tmp_buffer);
@@ -771,7 +775,7 @@ void write_log(byte type, ulong curr_time) {
   if (sd.chdir(LOG_PREFIX) == false) {
     // create dir if it doesn't exist yet
     if (sd.mkdir(LOG_PREFIX) == false) {
-      return;    
+      return;
     }
   }
   SdFile file;
@@ -823,14 +827,14 @@ void write_log(byte type, ulong curr_time) {
   strcat_P(tmp_buffer, PSTR(","));
   ultoa(curr_time, tmp_buffer+strlen(tmp_buffer), 10);
   strcat_P(tmp_buffer, PSTR("]\r\n"));
-  
-#if defined(ARDUINO)  
+
+#if defined(ARDUINO)
   file.write(tmp_buffer);
   file.close();
 #else
   fwrite(tmp_buffer, 1, strlen(tmp_buffer), file);
   fclose(file);
-#endif  
+#endif
 }
 
 
@@ -864,7 +868,7 @@ void delete_log(char *name) {
     make_logfile_name(name);
     remove(tmp_buffer);
   }
-#endif  
+#endif
 }
 
 void check_network() {
@@ -875,7 +879,7 @@ void check_network() {
   if (!os.network_lasttime) {
     os.start_network();
   }
-  
+
   // check network condition periodically
   // check interval depends on the fail times
   // the more time it fails, the longer the gap between two checks
@@ -887,12 +891,12 @@ void check_network() {
       os.lcd.setCursor(15, 1);
       os.lcd.write(4);
     }
-      
+
     os.network_lasttime = now();
-   
+
     // ping gateway ip
     ether.clientIcmpRequest(ether.gwip);
-    
+
     ulong start = millis();
     boolean failed = true;
     // wait at most PING_TIMEOUT milliseconds for ping result
@@ -926,22 +930,22 @@ void check_network() {
 void perform_ntp_sync() {
 #if defined(ARDUINO)
   // do not perform sync if this option is disabled, or if network is not available, or if a program is running
-  if (!os.options[OPTION_USE_NTP].value || os.status.network_fails>0 || os.status.program_busy) return;   
+  if (!os.options[OPTION_USE_NTP].value || os.status.network_fails>0 || os.status.program_busy) return;
 
   if (os.ntpsync_lasttime == 0 || (now() - os.ntpsync_lasttime > NTP_SYNC_INTERVAL)) {
     os.ntpsync_lasttime = now();
     if (!ui_state) {
       os.lcd_print_line_clear_pgm(PSTR("NTP Syncing..."),1);
     }
-    ulong t = getNtpTime();   
-    if (t>0) {    
+    ulong t = getNtpTime();
+    if (t>0) {
       setTime(t);
       if (os.status.has_rtc) RTC.set(t); // if rtc exists, update rtc
     }
   }
 #else
   // nothing to do here
-  // Linux will do this for you 
+  // Linux will do this for you
 #endif
 }
 
@@ -949,7 +953,7 @@ void perform_ntp_sync() {
 #if !defined(ARDUINO) // main function for RPI/BBB
 int main(int argc, char *argv[]) {
   do_setup();
-  
+
   while(true) {
     do_loop();
   }
