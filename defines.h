@@ -99,7 +99,7 @@
 #define DEFAULT_PASSWORD          "opendoor"
 #define DEFAULT_LOCATION          "Boston,MA"
 #define DEFAULT_WEATHER_KEY       ""
-#define DEFAULT_JAVASCRIPT_URL    "http://ui.opensprinkler.com/js"
+#define DEFAULT_JAVASCRIPT_URL    "https://ui.opensprinkler.com/js"
 #define WEATHER_SCRIPT_HOST       "weather.opensprinkler.com"
 
 /** Macro define of each option 
