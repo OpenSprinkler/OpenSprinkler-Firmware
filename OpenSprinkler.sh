@@ -27,9 +27,9 @@
 PATH=/sbin:/usr/sbin:/bin:/usr/bin
 NAME=OpenSprinkler
 DESC="Open Sprinkler (Unified) Raspberry Pi"
-DAEMON=<%OpenSprinkler_Path%>/OpenSprinkler
+DAEMON=__OpenSprinkler_Path__/OpenSprinkler
 DAEMON_ARGS=""
-HOMEDIR=<%OpenSprinkler_Path%>
+HOMEDIR=__OpenSprinkler_Path__
 PIDFILE=/var/run/$NAME.pid
 SCRIPTNAME=/etc/init.d/$NAME
 
