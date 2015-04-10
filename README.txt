@@ -21,13 +21,13 @@ Arduino's libraries folder.
 --------------------------------------------
 For OSPi (OpenSprinkler Pi):
 
-Run build script ./build_ospi.sh
+Run build script ./build.sh ospi
 
 --------------------------------------------
 
 For OSBo (OpenSprinkler Beagle):
 
-Run build script ./build_osbo.sh
+Run build script ./build.sh osbo
 
 ============================================
 Questions and comments:
