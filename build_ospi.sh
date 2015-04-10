@@ -7,13 +7,20 @@ DIR=`pwd`
 popd > /dev/null
 
 # Update binary location in start up script
-sed -i "s/\_\_OpenSprinkler\_Path\_\_/$DIR/g" OpenSprinkler.sh
+sed -i 's,\_\_OpenSprinkler\_Path\_\_,'"$DIR"',g' OpenSprinkler.sh
 
-# Move start up script to init.d directory
-mv OpenSprinkler.sh /etc/init.d/
+if [ ! -f /etc/init.d/OpenSprinkler.sh ]; then
+	echo "Adding OpenSprinkler launch script..."
 
-# Add to auto-launch on system startup
-update-rc.d OpenSprinkler.sh defaults
+	# Move start up script to init.d directory
+	mv OpenSprinkler.sh /etc/init.d/
 
-# Start the deamon now
-/etc/init.d/OpenSprinkler.sh start
+	# Add to auto-launch on system startup
+	update-rc.d OpenSprinkler.sh defaults
+
+	# Start the deamon now
+	/etc/init.d/OpenSprinkler.sh start
+
+fi
+
+echo "Done!"
