@@ -13,13 +13,13 @@ if [ ! -f /etc/init.d/OpenSprinkler.sh ]; then
 	echo "Adding OpenSprinkler launch script..."
 
 	# Move start up script to init.d directory
-	mv OpenSprinkler.sh /etc/init.d/
+	sudo mv OpenSprinkler.sh /etc/init.d/
 
 	# Add to auto-launch on system startup
-	update-rc.d OpenSprinkler.sh defaults
+	sudo update-rc.d OpenSprinkler.sh defaults
 
 	# Start the deamon now
-	/etc/init.d/OpenSprinkler.sh start
+	sudo /etc/init.d/OpenSprinkler.sh start
 
 fi
 
