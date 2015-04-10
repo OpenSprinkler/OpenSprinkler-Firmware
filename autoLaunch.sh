@@ -1,3 +1,5 @@
+#!/bin/bash
+
 if [ -f OpenSprinkler.launch ] && [ ! -f /etc/init.d/OpenSprinkler.sh ]; then
 	echo "Adding OpenSprinkler launch script..."
 
