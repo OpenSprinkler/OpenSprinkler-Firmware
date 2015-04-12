@@ -52,8 +52,10 @@ byte OpenSprinkler::water_percent_avg;
 char tmp_buffer[TMP_BUFFER_SIZE+1];       // scratch buffer
 
 #if defined(ARDUINO)
+  #define _BIN B                          // Arduino binary literal format
   LiquidCrystal OpenSprinkler::lcd;
-#elif defined(OSPI)
+#elif defined(RPI-BBB-LCD)
+  #define _BIN 0b                         // C++ binary literal format
   // todo: LCD define for OSPi
 #endif
 
@@ -409,44 +411,44 @@ void OpenSprinkler::begin() {
 
   // define lcd custom icons
   byte lcd_wifi_char[8] = {
-    B00000,
-    B10100,
-    B01000,
-    B10101,
-    B00001,
-    B00101,
-    B00101,
-    B10101
+    _BIN00000,
+    _BIN10100,
+    _BIN01000,
+    _BIN10101,
+    _BIN00001,
+    _BIN00101,
+    _BIN00101,
+    _BIN10101
   };
   byte lcd_sd_char[8] = {
-    B00000,
-    B00000,
-    B11111,
-    B10001,
-    B11111,
-    B10001,
-    B10011,
-    B11110
+    _BIN00000,
+    _BIN00000,
+    _BIN11111,
+    _BIN10001,
+    _BIN11111,
+    _BIN10001,
+    _BIN10011,
+    _BIN11110
   };
   byte lcd_rain_char[8] = {
-    B00000,
-    B00000,
-    B00110,
-    B01001,
-    B11111,
-    B00000,
-    B10101,
-    B10101
+    _BIN00000,
+    _BIN00000,
+    _BIN00110,
+    _BIN01001,
+    _BIN11111,
+    _BIN00000,
+    _BIN10101,
+    _BIN10101
   };
   byte lcd_connect_char[8] = {
-    B00000,
-    B00000,
-    B00111,
-    B00011,
-    B00101,
-    B01000,
-    B10000,
-    B00000
+    _BIN00000,
+    _BIN00000,
+    _BIN00111,
+    _BIN00011,
+    _BIN00101,
+    _BIN01000,
+    _BIN10000,
+    _BIN00000
   };
   lcd.createChar(1, lcd_wifi_char);
   lcd_wifi_char[1]=0;
