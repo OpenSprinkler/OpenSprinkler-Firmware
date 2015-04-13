@@ -51,12 +51,14 @@ byte OpenSprinkler::water_percent_avg;
 
 char tmp_buffer[TMP_BUFFER_SIZE+1];       // scratch buffer
 
+#if defined(ARDUINO) || (RPI-BBB-LCD)
+  LiquidCrystal OpenSprinkler::lcd;
+#endif
+
 #if defined(ARDUINO)
   #define _BIN B                          // Arduino binary literal format
-  LiquidCrystal OpenSprinkler::lcd;
 #elif defined(RPI-BBB-LCD)
   #define _BIN 0b                         // C++ binary literal format
-  // todo: LCD define for OSPi
 #endif
 
 /** Option json names */
@@ -390,7 +392,7 @@ void OpenSprinkler::begin() {
   pinMode(PIN_RELAY, OUTPUT);
   digitalWrite(PIN_RELAY, LOW);
 
-#if defined(ARDUINO)  // AVR LCD functions
+#if defined(ARDUINO)  // AVR LCD/UI functions
   // set sd cs pin high to release SD
   pinMode(PIN_SD_CS, OUTPUT);
   digitalWrite(PIN_SD_CS, HIGH);
@@ -409,6 +411,25 @@ void OpenSprinkler::begin() {
   // Init I2C
   Wire.begin();
 
+  // set button pins
+  // enable internal pullup
+  pinMode(PIN_BUTTON_1, INPUT);
+  pinMode(PIN_BUTTON_2, INPUT);
+  pinMode(PIN_BUTTON_3, INPUT);
+  digitalWrite(PIN_BUTTON_1, HIGH);
+  digitalWrite(PIN_BUTTON_2, HIGH);
+  digitalWrite(PIN_BUTTON_3, HIGH);
+
+  // detect if DS1307 RTC exists
+  if (RTC.detect()==0) {
+    status.has_rtc = 1;
+  }
+#elif defined(RPI-BBB-LCD) // RPi/BBB LCD functions
+  LCD lcd(I2C_NUM_BUS, I2C_DEV_ADDR, RS_PIN, RW_PIN, EN_PIN, D4_PIN, D5_PIN, D6_PIN, D7_PIN, BL_PIN, NEGATIVE);
+	lcd.begin(16, 2);				// Initilize 16x2 display
+#endif
+
+#if defined(ARDUINO) || (RPI-BBB-LCD) // AVR and RPi/BBB LCD functions
   // define lcd custom icons
   byte lcd_wifi_char[8] = {
     _BIN00000,
@@ -458,20 +479,6 @@ void OpenSprinkler::begin() {
   lcd.createChar(2, lcd_sd_char);
   lcd.createChar(3, lcd_rain_char);
   lcd.createChar(4, lcd_connect_char);
-
-  // set button pins
-  // enable internal pullup
-  pinMode(PIN_BUTTON_1, INPUT);
-  pinMode(PIN_BUTTON_2, INPUT);
-  pinMode(PIN_BUTTON_3, INPUT);
-  digitalWrite(PIN_BUTTON_1, HIGH);
-  digitalWrite(PIN_BUTTON_2, HIGH);
-  digitalWrite(PIN_BUTTON_3, HIGH);
-
-  // detect if DS1307 RTC exists
-  if (RTC.detect()==0) {
-    status.has_rtc = 1;
-  }
 #endif
 }
 
@@ -722,7 +729,7 @@ void OpenSprinkler::options_setup() {
 
   //if (curr_ver<100) curr_ver = curr_ver*10; // adding a default 0 if version number is the old type
   if (curr_ver != OS_FW_VERSION || nvm_read_byte((byte*)(ADDR_NVM_OPTIONS+OPTION_RESET))==0xAA)  {
-#if defined(ARDUINO)
+#if defined(ARDUINO) || (RPI-BBB-LCD)
     lcd_print_line_clear_pgm(PSTR("Resetting Device"), 0);
     lcd_print_line_clear_pgm(PSTR("Please Wait..."), 1);
 #else
@@ -899,8 +906,8 @@ void OpenSprinkler::raindelay_stop() {
   nvdata_save();
 }
 
-#if defined(ARDUINO)    // AVR LCD and button functions
-/** LCD and button functions */
+#if defined(ARDUINO) || (RPI-BBB-LCD)   // AVR and RPi/BBB LCD functions
+/** LCD functions */
 /** print a program memory string */
 void OpenSprinkler::lcd_print_pgm(PGM_P PROGMEM str) {
   uint8_t c;
@@ -1089,8 +1096,9 @@ void OpenSprinkler::lcd_print_option(int i) {
   else if (i==OPTION_RELAY_PULSE)
     lcd_print_pgm(PSTR(" ms"));
 }
+#endif
 
-
+#if defined(ARDUINO) // AVR button functions
 /** Button functions */
 /** wait for button */
 byte OpenSprinkler::button_read_busy(byte pin_butt, byte waitmode, byte butt, byte is_holding) {
@@ -1204,4 +1212,3 @@ void OpenSprinkler::lcd_set_brightness() {
   analogWrite(PIN_LCD_BACKLIGHT, 255-options[OPTION_LCD_BACKLIGHT].value);
 }
 #endif  // end of LCD and button functions
-

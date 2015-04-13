@@ -25,7 +25,7 @@
 #ifndef _OPENSPRINKLER_H
 #define _OPENSPRINKLER_H
 
-#if defined(ARDUINO) // heades for AVR
+#if defined(ARDUINO) // headers for AVR
   #include "Arduino.h"
   #include <avr/eeprom.h>
   #include <Wire.h>
@@ -34,6 +34,19 @@
   #include "DS1307RTC.h"
   #include "EtherCard.h"
 #else // headers for RPI/BBB/LINUX
+    #if defined((RPI-BBB-LCD)
+      #include "LCD.h"
+      #define I2C_DEV_ADDR 0x20	// PUT YOUR I2C LCD BACKPACK ADDRESS HERE!
+      #define I2C_NUM_BUS 1		// 0 for RPi B rev 1, 1 for pretty much all else
+      #define RS_PIN 6
+      #define RW_PIN 5
+      #define EN_PIN 4
+      #define BL_PIN 7
+      #define D4_PIN 0
+      #define D5_PIN 1
+      #define D6_PIN 2
+      #define D7_PIN 3
+    #endif
   #include <stdio.h>
   #include <stdlib.h>
   #include <string.h>
@@ -85,10 +98,10 @@ class OpenSprinkler {
 public:
 
   // data members
-#if defined(ARDUINO)
+#if defined(ARDUINO) || (RPI-BBB-LCD)
   static LiquidCrystal lcd;
-#else
-  // todo: LCD define for RPI
+#elif defined(RPI-BBB-LCD)
+  static LCD lcd;
 #endif
 
   static NVConData nvdata;
@@ -162,7 +175,7 @@ public:
   static void apply_all_station_bits(); // apply all station bits (activate/deactive values)
 
   // -- LCD functions
-#if defined(ARDUINO) // LCD functions for Arduino
+#if defined(ARDUINO) || (RPI-BBB-LCD) // LCD functions for AVR/RPi/BBB
   static void lcd_print_pgm(PGM_P PROGMEM str);           // print a program memory string
   static void lcd_print_line_clear_pgm(PGM_P PROGMEM str, byte line);
   static void lcd_print_time(byte line);                  // print current time
@@ -171,20 +184,26 @@ public:
   static void lcd_print_station(byte line, char c);       // print station bits of the board selected by display_board
   static void lcd_print_version(byte v);                   // print version number
 
-  // -- UI and buttons
-  static byte button_read(byte waitmode); // Read button value. options for 'waitmodes' are:
-                                          // BUTTON_WAIT_NONE, BUTTON_WAIT_RELEASE, BUTTON_WAIT_HOLD
-                                          // return values are 'OR'ed with flags
-                                          // check defines.h for details
-
-  // -- UI functions --
-  static void ui_set_options(int oid);    // ui for setting options (oid-> starting option index)
-  static void lcd_set_brightness();
-  static void lcd_set_contrast();
+  #if defined(ARDUINO) // UI functions for AVR
+    // -- UI and buttons
+    static byte button_read(byte waitmode); // Read button value. options for 'waitmodes' are:
+                                            // BUTTON_WAIT_NONE, BUTTON_WAIT_RELEASE, BUTTON_WAIT_HOLD
+                                            // return values are 'OR'ed with flags
+                                            // check defines.h for details
+  
+    // -- UI functions --
+    static void ui_set_options(int oid);    // ui for setting options (oid-> starting option index)
+    static void lcd_set_brightness();
+    static void lcd_set_contrast();
+  #endif
+#endif
 private:
+#if defined(ARDUINO) || (RPI-BBB-LCD) // LCD functions for AVR/RPi/BBB
   static void lcd_print_option(int i);  // print an option to the lcd
   static void lcd_print_2digit(int v);  // print a integer in 2 digits
-  static byte button_read_busy(byte pin_butt, byte waitmode, byte butt, byte is_holding);
+  #if defined(ARDUINO) // UI functions for AVR
+    static byte button_read_busy(byte pin_butt, byte waitmode, byte butt, byte is_holding);
+  #endif
 #endif // LCD functions
 };
 
