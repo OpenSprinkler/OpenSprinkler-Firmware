@@ -298,7 +298,8 @@ byte OpenSprinkler::start_network() {
     return 0;
   }
   setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &one, sizeof(int));
-  ioctl(sock, FIONBIO, 1); // Make socket non-blocking
+  int on=1;
+  ioctl(sock, FIONBIO, (char*)&on); // Make socket non-blocking
   unsigned int port = (unsigned int)(options[OPTION_HTTPPORT_1].value<<8) + (unsigned int)options[OPTION_HTTPPORT_0].value;
 #if defined(DEMO)
   port = 8080;

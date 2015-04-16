@@ -512,7 +512,7 @@ void do_loop()
   }
 
   #if !defined(ARDUINO)
-    usleep(10000);
+    usleep(1000);
   #endif
 }
 
