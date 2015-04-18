@@ -44,6 +44,7 @@ ulong OpenSprinkler::raindelay_start_time;
 ulong OpenSprinkler::button_lasttime;
 ulong OpenSprinkler::ntpsync_lasttime;
 ulong OpenSprinkler::checkwt_lasttime;
+ulong OpenSprinkler::checkwt_success_lasttime;
 ulong OpenSprinkler::network_lasttime;
 ulong OpenSprinkler::dhcpnew_lasttime;
 ulong OpenSprinkler::external_ip;
@@ -259,6 +260,20 @@ byte OpenSprinkler::start_network() {
     // set up DHCP
     // register with domain name "OpenSprinkler-xx" where xx is the last byte of the MAC address
     if (!ether.dhcpSetup()) return 0;
+    // once we have valid DHCP IP, we write these into static IP / gateway IP
+    byte *ip = ether.myip;
+    options[OPTION_STATIC_IP1].value = ip[0];
+    options[OPTION_STATIC_IP2].value = ip[1];
+    options[OPTION_STATIC_IP3].value = ip[2];
+    options[OPTION_STATIC_IP4].value = ip[3];            
+
+    ip = ether.gwip;
+    options[OPTION_GATEWAY_IP1].value = ip[0];
+    options[OPTION_GATEWAY_IP2].value = ip[1];
+    options[OPTION_GATEWAY_IP3].value = ip[2];
+    options[OPTION_GATEWAY_IP4].value = ip[3];
+    options_save();
+    
   } else {
     // set up static IP
     byte staticip[] = {

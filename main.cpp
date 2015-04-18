@@ -46,12 +46,12 @@ int sock = -1;
 int client;
 #endif
 
-#define NTP_SYNC_INTERVAL       86400L  // NYP sync interval, 24 hrs
+#define NTP_SYNC_INTERVAL       86401L  // NYP sync interval, 24 hrs
 #define RTC_SYNC_INTERVAL       60      // RTC sync interval, 60 secs
-#define CHECK_NETWORK_INTERVAL  30      // Network checking interval, 30 secs
-#define DHCP_RENEW_INTERVAL     43200L  // DHCP renewal interval: 12 hrs
+#define CHECK_NETWORK_INTERVAL  53      // Network checking interval, 53 secs
+#define DHCP_RENEW_INTERVAL     43201L  // DHCP renewal interval: 12 hrs
 #define STAT_UPDATE_INTERVAL    900     // Statistics update interval: 15 mins
-#define CHECK_WEATHER_INTERVAL  900     // Weather check interval: 15 mins
+#define CHECK_WEATHER_INTERVAL  907     // Weather check interval: 15 mins
 #define LCD_DIMMING_TIMEOUT      15     // LCD dimming timeout: 15 secs
 #define PING_TIMEOUT            200     // Ping test timeout: 200 ms
 
@@ -520,10 +520,10 @@ void check_weather() {
   // do not check weather if the Use Weather option is disabled, or if network is not available, or if a program is running
   if (os.status.network_fails>0 || os.status.program_busy) return;
 
-  uint16_t inv = 180;  // recheck every 30 seconds if didn't receive anything last time
+  uint16_t inv = 191;  // recheck every 191 seconds if didn't receive anything last time
   if (os.status.wt_received)  inv = CHECK_WEATHER_INTERVAL;
-  if (!os.checkwt_lasttime || ((now() - os.checkwt_lasttime) > inv)) {
-    os.checkwt_lasttime = now();
+  if (!os.checkwt_lasttime || ((os.now_tz() - os.checkwt_lasttime) > inv)) {
+    os.checkwt_lasttime = os.now_tz();
     GetWeather();
   }
 }

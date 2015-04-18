@@ -738,7 +738,7 @@ void server_json_controller_main() {
   byte bid, sid;
   ulong curr_time = os.now_tz();  
   //os.nvm_string_get(ADDR_NVM_LOCATION, tmp_buffer);
-  bfill.emit_p(PSTR("\"devt\":$L,\"nbrd\":$D,\"en\":$D,\"rd\":$D,\"rs\":$D,\"rdst\":$L,\"loc\":\"$E\",\"wtkey\":\"$E\",\"sunrise\":$D,\"sunset\":$D,\"eip\":$L,\"sbits\":["),
+  bfill.emit_p(PSTR("\"devt\":$L,\"nbrd\":$D,\"en\":$D,\"rd\":$D,\"rs\":$D,\"rdst\":$L,\"loc\":\"$E\",\"wtkey\":\"$E\",\"sunrise\":$D,\"sunset\":$D,\"eip\":$L,\"lwc\":$L,\"lswc\":$L,\"sbits\":["),
               curr_time,
               os.nboards,
               os.status.enabled,
@@ -749,7 +749,9 @@ void server_json_controller_main() {
               ADDR_NVM_WEATHER_KEY,
               os.nvdata.sunrise_time,
               os.nvdata.sunset_time,
-              os.external_ip);
+              os.external_ip,
+              os.checkwt_lasttime,
+              os.checkwt_success_lasttime);
   // print sbits
   for(bid=0;bid<os.nboards;bid++)
     bfill.emit_p(PSTR("$D,"), os.station_bits[bid]);  

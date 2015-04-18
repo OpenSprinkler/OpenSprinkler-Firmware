@@ -93,6 +93,7 @@ static void getweather_callback(byte status, uint16_t off, uint16_t len) {
     os.external_ip = atol(tmp_buffer);
   }
   os.status.wt_received = 1;
+  os.checkwt_success_lasttime = os.now_tz();
 }
 
 #if defined(ARDUINO)  // for AVR

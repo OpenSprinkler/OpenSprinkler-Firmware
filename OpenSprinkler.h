@@ -114,6 +114,7 @@ public:
   static ulong button_lasttime;       // time when button was checked
   static ulong ntpsync_lasttime;      // time when ntp sync was performed
   static ulong checkwt_lasttime;      // time when weather was checked
+  static ulong checkwt_success_lasttime; // time when weather check was successful
   static ulong network_lasttime;      // time when network was checked
   static ulong dhcpnew_lasttime;      // time when dhcp renew was performed
   static ulong external_ip;           // external ip address
