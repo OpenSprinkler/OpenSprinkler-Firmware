@@ -119,8 +119,8 @@ byte water_time_encode(uint16_t i) {
   } else if(i==65535) {
     return 255;
   } else {
-    return 0;
-  }
+    return 254;
+  } 
 }
 
 // decode a 8-bit byte to a 16-bit unsigned water time
@@ -137,7 +137,7 @@ uint16_t water_time_decode(byte i) {
   } else if (i==255) {
     return 65535;
   } else {
-    return 0;
+    return 65534;
   }
 }
 
