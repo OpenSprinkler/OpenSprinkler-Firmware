@@ -71,7 +71,8 @@ static void getweather_callback(byte status, uint16_t off, uint16_t len) {
 
   if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("scale"), true)) {
     v = atoi(tmp_buffer);
-    if (v>=0 && v<=250) {
+    if (v>=0 && v<=250 && v != os.options[OPTION_WATER_PERCENTAGE].value) {
+      // only save if the value has changed
       os.options[OPTION_WATER_PERCENTAGE].value = v;
       os.options_save();
     }
@@ -83,7 +84,6 @@ static void getweather_callback(byte status, uint16_t off, uint16_t len) {
       if (v != os.options[OPTION_TIMEZONE].value) {
         // if timezone changed, save change and force ntp sync
         os.options[OPTION_TIMEZONE].value = v;
-        os.ntpsync_lasttime = 0;      
         os.options_save();
       }
     }

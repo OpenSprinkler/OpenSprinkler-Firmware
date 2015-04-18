@@ -46,12 +46,17 @@ int sock = -1;
 int client;
 #endif
 
-#define NTP_SYNC_INTERVAL       86401L  // NYP sync interval, 24 hrs
+// Some perturbations have been added to the timing values below
+// to avoid two events happening too clost to each other
+// This is because Arduino is not good at handling multiple
+// web requests at the same time
+#define NTP_SYNC_INTERVAL       86403L  // NYP sync interval, 24 hrs
 #define RTC_SYNC_INTERVAL       60      // RTC sync interval, 60 secs
 #define CHECK_NETWORK_INTERVAL  53      // Network checking interval, 53 secs
-#define DHCP_RENEW_INTERVAL     43201L  // DHCP renewal interval: 12 hrs
+#define DHCP_RENEW_INTERVAL     86417L  // DHCP renewal interval: 24 hrs
 #define STAT_UPDATE_INTERVAL    900     // Statistics update interval: 15 mins
-#define CHECK_WEATHER_INTERVAL  907     // Weather check interval: 15 mins
+#define CHECK_WEATHER_INTERVAL 1801     // Weather check interval: 30 minutes
+#define CHECK_WEATHER_SUCCESS_INTERVAL 86433L // Weather check success interval: 24 hrs
 #define LCD_DIMMING_TIMEOUT      15     // LCD dimming timeout: 15 secs
 #define PING_TIMEOUT            200     // Ping test timeout: 200 ms
 
@@ -498,14 +503,14 @@ void do_loop()
       os.lcd_print_station(1, ui_anim_chars[curr_time%3]);
 #endif
 
+    // perform ntp sync
+    perform_ntp_sync();
+
     // check network connection
     check_network();
 
     // check weather
     check_weather();
-
-    // perform ntp sync
-    perform_ntp_sync();
 
     // calculate statistics
     log_statistics(curr_time);
@@ -522,7 +527,13 @@ void check_weather() {
 
   uint16_t inv = 191;  // recheck every 191 seconds if didn't receive anything last time
   if (os.status.wt_received)  inv = CHECK_WEATHER_INTERVAL;
-  if (!os.checkwt_lasttime || ((os.now_tz() - os.checkwt_lasttime) > inv)) {
+  ulong ntz = os.now_tz();
+  if (os.checkwt_success_lasttime && (ntz - os.checkwt_success_lasttime > CHECK_WEATHER_SUCCESS_INTERVAL)) {
+    // if weather check has failed to return for too long, restart network
+    os.network_lasttime = 0;
+    return;
+  }
+  if (!os.checkwt_lasttime || ((ntz - os.checkwt_lasttime) > inv)) {
     os.checkwt_lasttime = os.now_tz();
     GetWeather();
   }
@@ -932,8 +943,8 @@ void perform_ntp_sync() {
   // do not perform sync if this option is disabled, or if network is not available, or if a program is running
   if (!os.options[OPTION_USE_NTP].value || os.status.network_fails>0 || os.status.program_busy) return;
 
-  if (os.ntpsync_lasttime == 0 || (now() - os.ntpsync_lasttime > NTP_SYNC_INTERVAL)) {
-    os.ntpsync_lasttime = now();
+  if (os.ntpsync_lasttime == 0 || (os.now_tz() - os.ntpsync_lasttime > NTP_SYNC_INTERVAL)) {
+    os.ntpsync_lasttime = os.now_tz();
     if (!ui_state) {
       os.lcd_print_line_clear_pgm(PSTR("NTP Syncing..."),1);
     }
