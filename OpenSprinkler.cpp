@@ -174,7 +174,7 @@ OptionStruct OpenSprinkler::options[NUM_OPTIONS] = {
   {100, 255, _str_lit,  _json_lit},   // lcd backlight
   {15,   255, _str_dim,  _json_dim},   // lcd dimming
   {0,   200, _str_rlp,  _json_rlp},   // relay pulse
-  {0,   5,   _str_uwt,  _json_uwt},
+  {0,   255, _str_uwt,  _json_uwt},
   {50,  255, _str_ntp1, _json_ntp1},  // this and the next three bytes define the ntp server ip
   {97,  255, _str_ntp2, _json_ntp2},
   {210, 255, _str_ntp3, _json_ntp3},
@@ -618,9 +618,8 @@ byte OpenSprinkler::password_verify(char *pw) {
 byte OpenSprinkler::weekday_today() {
   //return ((byte)weekday()+5)%7; // Time::weekday() assumes Sunday is 1
 #if defined(ARDUINO)
-  tmElements_t tm;
-  RTC.read(tm);
-  return (tm.Wday+5)%7;
+  ulong wd = now_tz() / 86400L;
+  return (wd+3) % 7;  // Jan 1, 1970 is a Thursday
 #else
   return 0;
   // todo: is this function needed for RPI/BBB?
