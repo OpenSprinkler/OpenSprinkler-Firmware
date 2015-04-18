@@ -51,15 +51,17 @@ byte OpenSprinkler::water_percent_avg;
 
 char tmp_buffer[TMP_BUFFER_SIZE+1];       // scratch buffer
 
-#if defined(ARDUINO) || (RPI-BBB-LCD)
+#if defined(ARDUINO)
   LiquidCrystal OpenSprinkler::lcd;
+#elif defined(RPIBBBLCD) // OpenSprinkler_I2C_RPi doesn't like object being created without parameters...
+  LCD OpenSprinkler::lcd(I2C_NUM_BUS, I2C_DEV_ADDR, RS_PIN, RW_PIN, EN_PIN, D4_PIN, D5_PIN, D6_PIN, D7_PIN, BL_PIN, NEGATIVE);
 #endif
 
-#if defined(ARDUINO)
-  #define _BIN B                          // Arduino binary literal format
-#elif defined(RPI-BBB-LCD)
-  #define _BIN 0b                         // C++ binary literal format
-#endif
+/* #if defined(ARDUINO)
+  #define BINLIT B    // Arduino binary literal format
+#elif defined(RPIBBBLCD)
+  #define BINLIT 0b   // C++ binary literal format                  
+#endif */
 
 /** Option json names */
 prog_char _json_fwv [] PROGMEM = "fwv";
@@ -424,53 +426,17 @@ void OpenSprinkler::begin() {
   if (RTC.detect()==0) {
     status.has_rtc = 1;
   }
-#elif defined(RPI-BBB-LCD) // RPi/BBB LCD functions
-  LCD lcd(I2C_NUM_BUS, I2C_DEV_ADDR, RS_PIN, RW_PIN, EN_PIN, D4_PIN, D5_PIN, D6_PIN, D7_PIN, BL_PIN, NEGATIVE);
+#elif defined(RPIBBBLCD) // RPi/BBB LCD functions
+  // lcd.init(I2C_NUM_BUS, I2C_DEV_ADDR, RS_PIN, RW_PIN, EN_PIN, D4_PIN, D5_PIN, D6_PIN, D7_PIN, BL_PIN, NEGATIVE);
 	lcd.begin(16, 2);				// Initilize 16x2 display
 #endif
 
-#if defined(ARDUINO) || (RPI-BBB-LCD) // AVR and RPi/BBB LCD functions
-  // define lcd custom icons
-  byte lcd_wifi_char[8] = {
-    _BIN00000,
-    _BIN10100,
-    _BIN01000,
-    _BIN10101,
-    _BIN00001,
-    _BIN00101,
-    _BIN00101,
-    _BIN10101
-  };
-  byte lcd_sd_char[8] = {
-    _BIN00000,
-    _BIN00000,
-    _BIN11111,
-    _BIN10001,
-    _BIN11111,
-    _BIN10001,
-    _BIN10011,
-    _BIN11110
-  };
-  byte lcd_rain_char[8] = {
-    _BIN00000,
-    _BIN00000,
-    _BIN00110,
-    _BIN01001,
-    _BIN11111,
-    _BIN00000,
-    _BIN10101,
-    _BIN10101
-  };
-  byte lcd_connect_char[8] = {
-    _BIN00000,
-    _BIN00000,
-    _BIN00111,
-    _BIN00011,
-    _BIN00101,
-    _BIN01000,
-    _BIN10000,
-    _BIN00000
-  };
+#if defined(ARDUINO) || (RPIBBBLCD) // AVR and RPi/BBB LCD functions
+  // define lcd custom icons - now in decimal as C++ doesn't do binary literals
+  byte lcd_wifi_char[8] = {0,20,8,21,1,5,5,21};
+  byte lcd_sd_char[8] = {0,0,31,17,31,17,17,30};
+  byte lcd_rain_char[8] = {0,0,6,9,31,0,21,21};
+  byte lcd_connect_char[8] = {0,0,7,3,5,8,16,0};
   lcd.createChar(1, lcd_wifi_char);
   lcd_wifi_char[1]=0;
   lcd_wifi_char[2]=0;
@@ -729,7 +695,7 @@ void OpenSprinkler::options_setup() {
 
   //if (curr_ver<100) curr_ver = curr_ver*10; // adding a default 0 if version number is the old type
   if (curr_ver != OS_FW_VERSION || nvm_read_byte((byte*)(ADDR_NVM_OPTIONS+OPTION_RESET))==0xAA)  {
-#if defined(ARDUINO) || (RPI-BBB-LCD)
+#if defined(ARDUINO) || (RPIBBBLCD)
     lcd_print_line_clear_pgm(PSTR("Resetting Device"), 0);
     lcd_print_line_clear_pgm(PSTR("Please Wait..."), 1);
 #else
@@ -906,7 +872,7 @@ void OpenSprinkler::raindelay_stop() {
   nvdata_save();
 }
 
-#if defined(ARDUINO) || (RPI-BBB-LCD)   // AVR and RPi/BBB LCD functions
+#if defined(ARDUINO) || (RPIBBBLCD)   // AVR and RPi/BBB LCD functions
 /** LCD functions */
 /** print a program memory string */
 void OpenSprinkler::lcd_print_pgm(PGM_P PROGMEM str) {

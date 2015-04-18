@@ -34,7 +34,7 @@
   #include "DS1307RTC.h"
   #include "EtherCard.h"
 #else // headers for RPI/BBB/LINUX
-    #if defined((RPI-BBB-LCD)
+    #if defined(RPIBBBLCD)
       #include "LCD.h"
       #define I2C_DEV_ADDR 0x20	// PUT YOUR I2C LCD BACKPACK ADDRESS HERE!
       #define I2C_NUM_BUS 1		// 0 for RPi B rev 1, 1 for pretty much all else
@@ -98,9 +98,9 @@ class OpenSprinkler {
 public:
 
   // data members
-#if defined(ARDUINO) || (RPI-BBB-LCD)
+#if defined(ARDUINO)
   static LiquidCrystal lcd;
-#elif defined(RPI-BBB-LCD)
+#elif defined(RPIBBBLCD)
   static LCD lcd;
 #endif
 
@@ -175,7 +175,7 @@ public:
   static void apply_all_station_bits(); // apply all station bits (activate/deactive values)
 
   // -- LCD functions
-#if defined(ARDUINO) || (RPI-BBB-LCD) // LCD functions for AVR/RPi/BBB
+#if defined(ARDUINO) || (RPIBBBLCD) // LCD functions for AVR/RPi/BBB
   static void lcd_print_pgm(PGM_P PROGMEM str);           // print a program memory string
   static void lcd_print_line_clear_pgm(PGM_P PROGMEM str, byte line);
   static void lcd_print_time(byte line);                  // print current time
@@ -198,7 +198,7 @@ public:
   #endif
 #endif
 private:
-#if defined(ARDUINO) || (RPI-BBB-LCD) // LCD functions for AVR/RPi/BBB
+#if defined(ARDUINO) || (RPIBBBLCD) // LCD functions for AVR/RPi/BBB
   static void lcd_print_option(int i);  // print an option to the lcd
   static void lcd_print_2digit(int v);  // print a integer in 2 digits
   #if defined(ARDUINO) // UI functions for AVR

@@ -64,7 +64,7 @@ ProgramData pd;   // ProgramdData object
 
 // ====== UI defines ======
 
-#if defined(ARDUINO) || (RPI-BBB-LCD)
+#if defined(ARDUINO) || (RPIBBBLCD)
 static char ui_anim_chars[3] = {'.', 'o', 'O'};
 #endif
 
@@ -235,7 +235,7 @@ void do_setup() {
   os.options_setup();  // Setup options
 
   pd.init();            // ProgramData init
-  #if defined(RPI-BBB-LCD)
+  #if defined(RPIBBBLCD)
     os.lcd_print_time(0);  // display time to LCD
   #endif
   if (os.start_network()) {  // initialize network
@@ -298,7 +298,7 @@ void do_loop()
 #if defined(ARDUINO)
     if (!ui_state)
       os.lcd_print_time(0);       // print time
-#elif defined(RPI-BBB-LCD)
+#elif defined(RPIBBBLCD)
     os.lcd_print_time(0);  // display time to LCD without UI state check
 #endif
 
@@ -505,7 +505,7 @@ void do_loop()
     // process LCD display
     if (!ui_state)
       os.lcd_print_station(1, ui_anim_chars[curr_time%3]);
-#elif defined(RPI-BBB-LCD)
+#elif defined(RPIBBBLCD)
     os.lcd_print_station(1, ui_anim_chars[curr_time%3]);  // LCD display without UI state check
 #endif
 
