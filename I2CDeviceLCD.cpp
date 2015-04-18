@@ -101,7 +101,7 @@ void I2CDeviceLCD::pinMode(uint8_t pin, uint8_t dir)
 {
 	if( _initialised )
 	{
-		if( OUTPUT == dir )
+		if( OUT == dir )
 		{
 			_dirMask &= ~( 1 << pin );
 		}
@@ -126,7 +126,7 @@ ssize_t I2CDeviceLCD::digitalWrite(uint8_t pin, uint8_t level)
 	if( _initialised && (pin <= 7) )
 	{
 		// Only write to HIGH the port if the port has been configured as
-		// an OUTPUT pin. Add the new state of the pin to the shadow
+		// an output pin. Add the new state of the pin to the shadow
 		writeVal = (1 << pin) & ~_dirMask;
 		if( level == HIGH )
 		{

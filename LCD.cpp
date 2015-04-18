@@ -115,12 +115,12 @@ bool LCD::init(uint8_t i2cNumBus, uint8_t i2cDevAddr,
 	_data_pins[6] = d6;
 	_data_pins[7] = d7;
 
-	// Initialize the IO port direction to OUTPUT
+	// Initialize the IO port direction to output
 	// ------------------------------------------
 	uint8_t i;
 	for( i = 0; i < 4; i++ )
 	{
-		pinMode(_data_pins[i], OUTPUT);
+		pinMode(_data_pins[i], OUT);
 	}
 
 	// Initialize the rest of the ports if it is an 8bit controlled LCD
@@ -129,18 +129,18 @@ bool LCD::init(uint8_t i2cNumBus, uint8_t i2cDevAddr,
 	{
 		for( i = 4; i < 8; i++ )
 		{
-			pinMode(_data_pins[i], OUTPUT);
+			pinMode(_data_pins[i], OUT);
 		}
 	}
-	pinMode(_rs_pin, OUTPUT);
+	pinMode(_rs_pin, OUT);
 
 	// we can save 1 pin by not using RW. Indicate by passing 255 instead of pin#
 	if( _rw_pin != 255 )
 	{
-		pinMode(_rw_pin, OUTPUT);
+		pinMode(_rw_pin, OUT);
 	}
 
-	pinMode(_enable_pin, OUTPUT);
+	pinMode(_enable_pin, OUT);
 
 	// Initialise displaymode functions to defaults: LCD_1LINE and LCD_5x8DOTS
 	// -------------------------------------------------------------------------
@@ -173,7 +173,7 @@ bool LCD::init(uint8_t i2cNumBus, uint8_t i2cDevAddr,
 // setBacklightPin
 void LCD::setBacklightPin(uint8_t pin, t_backlighPol pol)
 {
-	pinMode(pin, OUTPUT);       // Difine the backlight pin as output
+	pinMode(pin, OUT);       // Define the backlight pin as output
 	_backlightPin = pin;
 	_polarity = pol;
 	setBacklight(BACKLIGHT_OFF);   // Set the backlight low by default

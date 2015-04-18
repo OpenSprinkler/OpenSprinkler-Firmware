@@ -17,8 +17,8 @@
 #define LCD_8BIT  0
 
 // Direct data exchange
-#define INPUT 0
-#define OUTPUT 1
+#define IN 0
+#define OUT 1
 
 //Level
 #define HIGH 1
