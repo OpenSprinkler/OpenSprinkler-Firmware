@@ -22,7 +22,8 @@
  */
 
 #include "utils.h"
-
+#include "OpenSprinkler.h"
+extern OpenSprinkler os;
 #if defined(ARDUINO)
 #include <avr/eeprom.h>
 
@@ -101,17 +102,53 @@ byte strcmp_to_nvm(const char* src, int _addr) {
    byte value : water time
      [0.. 59]  : [0..59]  (seconds)
     [60..238]  : [1..179] (minutes), or 60 to 10740 seconds
-   [239..254]  : [3..18]  (hours),   or 10800 to 64800 seconds
+   [239..252]  : [3..16]  (hours),   or 10800 to 57600 seconds
+         253   : unused
+         254   : sunrise to sunset
+         255   : sunset to sunrise
 */
 byte water_time_encode(uint16_t i) {
   if (i<60) {
     return (byte)(i);
   } else if (i<10800) {
     return (byte)(i/60+59);
-  } else if (i<64800) {
+  } else if (i<=57600) {
     return (byte)(i/3600+236);
-  } else {
+  } else if(i==65534) {
     return 254;
+  } else if(i==65535) {
+    return 255;
+  } else {
+    return 0;
+  }
+}
+
+// decode a 8-bit byte to a 16-bit unsigned water time
+uint16_t water_time_decode(byte i) {
+  uint16_t ii = i;
+  if (i<60) {
+    return ii;
+  } else if (i<239) {
+    return (ii-59)*60;
+  } else if (i<=252) {
+    return (ii-236)*3600;
+  } else if (i==254) {
+    return 65534;
+  } else if (i==255) {
+    return 65535;
+  } else {
+    return 0;
+  }
+}
+
+// resolve water time
+ulong water_time_resolve(uint16_t v) {
+  if(v==65534) {
+    return (os.nvdata.sunset_time-os.nvdata.sunrise_time) * 60L;
+  } else if(v==65535) {
+    return (os.nvdata.sunrise_time+1440-os.nvdata.sunset_time) * 60L;
+  } else  {
+    return v;
   }
 }
 
@@ -127,18 +164,6 @@ int16_t water_time_decode_signed(byte i) {
   ret -= 128;
   ret = water_time_decode(ret>=0?ret:-ret);
   return (i>=128 ? ret : -ret);
-}
-
-// decode a 8-bit byte to a 16-bit unsigned water time
-uint16_t water_time_decode(byte i) {
-  uint16_t ii = i;
-  if (i<60) {
-    return ii;
-  } else if (i<239) {
-    return (ii-59)*60;
-  } else {
-    return (ii-236)*3600;
-  }  
 }
 
 

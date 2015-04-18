@@ -361,7 +361,7 @@ void do_loop()
             if (prog.durations[sid] && !pd.scheduled_stop_time[sid]) {
               // initialize schedule data by storing water time temporarily in stop_time
               // water time is scaled by watering percentage
-              ulong water_time = (ulong)water_time_decode(prog.durations[sid]);
+              ulong water_time = water_time_resolve(water_time_decode(prog.durations[sid]));
               // if the program is set to use weather scaling
               if (prog.use_weather)
                 water_time = water_time * os.options[OPTION_WATER_PERCENTAGE].value / 100;
@@ -701,7 +701,7 @@ void manual_start_program(byte pid) {
   boolean match_found = false;
   reset_all_stations_immediate();
   ProgramStruct prog;
-  uint16_t dur;
+  ulong dur;
   byte sid, bid, s;
   if ((pid>0)&&(pid<255)) {
     pd.read(pid-1, &prog);
@@ -712,7 +712,7 @@ void manual_start_program(byte pid) {
     dur = 60;
     if(pid==255)  dur=2;
     else if(pid>0)
-      dur = water_time_decode(prog.durations[sid]);
+      dur = water_time_resolve(water_time_decode(prog.durations[sid]));
     if (dur>0 && !(os.stndis_bits[bid]&(1<<s))) {
       pd.scheduled_stop_time[sid] = dur;
       pd.scheduled_program_index[sid] = 254;
@@ -959,7 +959,6 @@ void perform_ntp_sync() {
   // Linux will do this for you
 #endif
 }
-
 
 #if !defined(ARDUINO) // main function for RPI/BBB
 int main(int argc, char *argv[]) {

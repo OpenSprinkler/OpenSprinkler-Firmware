@@ -34,6 +34,7 @@
 byte strcmp_to_nvm(const char* src, int addr);
 byte water_time_encode(uint16_t i);
 uint16_t water_time_decode(byte i);
+ulong water_time_resolve(uint16_t v);
 byte water_time_encode_signed(int16_t i);
 int16_t water_time_decode_signed(byte i);
 
