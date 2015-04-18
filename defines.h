@@ -99,7 +99,7 @@
 #define DEFAULT_PASSWORD          "opendoor"
 #define DEFAULT_LOCATION          "Boston,MA"
 #define DEFAULT_WEATHER_KEY       ""
-#define DEFAULT_JAVASCRIPT_URL    "http://ui.opensprinkler.com/js"
+#define DEFAULT_JAVASCRIPT_URL    "https://ui.opensprinkler.com/js"
 #define WEATHER_SCRIPT_HOST       "weather.opensprinkler.com"
 
 /** Macro define of each option 
@@ -274,9 +274,15 @@ typedef enum {
   #define ETHER_BUFFER_SIZE   1500
     
   #define DEBUG_BEGIN(x)          {}  /** Serial debug functions */
-  inline  void DEBUG_PRINT(int x) {printf("%d", x);}
-  inline  void DEBUG_PRINT(const char*s) {printf("%s", s);}
-  #define DEBUG_PRINTLN(x)        {DEBUG_PRINT(x);printf("\n");}
+  //#define ENABLE_DEBUG
+  #if defined(ENABLE_DEBUG)
+    inline  void DEBUG_PRINT(int x) {printf("%d", x);}
+    inline  void DEBUG_PRINT(const char*s) {printf("%s", s);}
+    #define DEBUG_PRINTLN(x)        {DEBUG_PRINT(x);printf("\n");}
+  #else
+    #define DEBUG_PRINT(x) {}
+    #define DEBUG_PRINTLN(x) {}
+  #endif
 
   inline void itoa(int v,char *s,int b)   {sprintf(s,"%d",v);}
   inline void ultoa(unsigned long v,char *s,int b) {sprintf(s,"%lu",v);}
