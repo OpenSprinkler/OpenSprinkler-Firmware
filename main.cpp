@@ -175,7 +175,8 @@ void do_setup() {
   MCUSR &= ~(1<<WDRF);
 
   DEBUG_BEGIN(9600);
-
+  DEBUG_PRINTLN("started.");
+  
   os.begin();          // OpenSprinkler init
   os.options_setup();  // Setup options
 
@@ -619,7 +620,6 @@ void process_dynamic_events(ulong curr_time) {
   }
 }
 
-//void schedule_all_stations(ulong curr_time, byte seq)  // remove seq option
 void schedule_all_stations(ulong curr_time) {
   ulong con_start_time = curr_time + 1;   // concurrent start time
   ulong seq_start_time = con_start_time;  // sequential start time

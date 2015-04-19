@@ -512,7 +512,7 @@ byte server_change_runonce(char *p) {
     // if non-zero duration is given
     // and if the station has not been disabled
     if (dur>0 && !(os.stndis_bits[bid]&(1<<s))) {
-      pd.scheduled_stop_time[sid] = dur;
+      pd.scheduled_stop_time[sid] = water_time_resolve(dur);
       pd.scheduled_program_index[sid] = 254;      
       match_found = true;
     }
@@ -631,6 +631,7 @@ byte server_change_program(char *p) {
   pv++; // this should be a '['
   for (i=0;i<os.nstations;i++) {
     uint16_t pre = parse_listdata(&pv);
+    DEBUG_PRINTLN(pre);
     prog.durations[i] = water_time_encode(pre);
   }
   pv++; // this should be a ']'
