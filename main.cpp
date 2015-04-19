@@ -249,7 +249,7 @@ void do_setup() {
 
 void write_log(byte type, ulong curr_time);
 void schedule_all_stations(ulong curr_time);
-void turn_off_station(byte sid, byte mas, ulong curr_time);
+void turn_off_station(byte sid, ulong curr_time);
 void process_dynamic_events(ulong curr_time);
 void check_network();
 void check_weather();
@@ -269,7 +269,7 @@ void do_loop()
   ProgramStruct prog;
 
   os.status.mas = os.options[OPTION_MASTER_STATION].value;
-
+  os.status.mas2= os.options[OPTION_MASTER_STATION_2].value;
   time_t curr_time = os.now_tz();
   // ====== Process Ethernet packets ======
 #if defined(ARDUINO)  // Process Ethernet packets for Arduino
@@ -355,7 +355,8 @@ void do_loop()
             // - master station (because master cannot be scheduled independently
             // - running (cannot handle overlapping schedules of the same station)
             // - disabled
-            if ((os.status.mas==sid+1) || (os.station_bits[bid]&(1<<s)) || (os.stndis_bits[bid]&(1<<s)))
+            if ((os.status.mas==sid+1) || (os.status.mas2==sid+1) ||
+                (os.station_bits[bid]&(1<<s)) || (os.stndis_bits[bid]&(1<<s)))
               continue;
 
             // if station has non-zero water time and if it doesn't already have a scheduled stop time
@@ -396,11 +397,12 @@ void do_loop()
 
           // skip master station
           if (os.status.mas == sid+1) continue;
+          if (os.status.mas2== sid+1) continue;
           // check if this station is scheduled, either running or waiting to run
           if (pd.scheduled_program_index[sid] > 0) {
             // if so, check if we should turn it off
             if (curr_time >= pd.scheduled_stop_time[sid]) {
-              turn_off_station(sid, os.status.mas, curr_time);
+              turn_off_station(sid, curr_time);
             }
           }
           // if current station is not running, check if we should turn it on
@@ -408,16 +410,6 @@ void do_loop()
             if (curr_time >= pd.scheduled_start_time[sid] && curr_time < pd.scheduled_stop_time[sid]) {
               os.set_station_bit(sid, 1);
 
-              // upon turning on station, process relay
-              // if the station is set to activate / deactivate relay
-              if(os.actrelay_bits[bid]&(1<<s)) {
-                // turn relay on
-                os.set_relay(1);
-                if(os.options[OPTION_RELAY_PULSE].value > 0) {  // if relay is set to pulse
-                  delay(os.options[OPTION_RELAY_PULSE].value*10);
-                  os.set_relay(0);
-                }
-              } // if activate relay
               // upon turning on station, process RF
               // if the station is a RF station
               if(os.rfstn_bits[bid]&(1<<s)) {
@@ -465,10 +457,11 @@ void do_loop()
 
         // in case some options have changed while executing the program
         os.status.mas = os.options[OPTION_MASTER_STATION].value; // update master station
+        os.status.mas2= os.options[OPTION_MASTER_STATION_2].value; // update master2 station
       }
     }//if_some_program_is_running
 
-    // if master statino is defined
+    // if master station is defined
     // handle master
     if (os.status.mas>0) {
       byte mas_on_adj = os.options[OPTION_MASTER_ON_ADJ].value;
@@ -491,6 +484,28 @@ void do_loop()
       }
       os.set_station_bit(os.status.mas-1, masbit);
     }
+    // handle master2
+    if (os.status.mas2>0) {
+      byte mas_on_adj_2 = os.options[OPTION_MASTER_ON_ADJ_2].value;
+      byte mas_off_adj_2= os.options[OPTION_MASTER_OFF_ADJ_2].value;
+      byte masbit2 = 0;
+      for(sid=0;sid<os.nstations;sid++) {
+        // skip if this is the master station
+        if (os.status.mas2 == sid+1) continue;
+        bid = sid>>3;
+        s = sid&0x07;
+        // if this station is running and is set to activate master
+        if ((os.station_bits[bid]&(1<<s)) && (os.masop2_bits[bid]&(1<<s))) {
+          // check if timing is within the acceptable range
+          if (curr_time >= pd.scheduled_start_time[sid] + mas_on_adj_2 &&
+              curr_time <= pd.scheduled_stop_time[sid] + mas_off_adj_2 - 60) {
+            masbit2 = 1;
+            break;
+          }
+        }
+      }
+      os.set_station_bit(os.status.mas2-1, masbit2);
+    }    
 
     // process dynamic events
     process_dynamic_events(curr_time);
@@ -540,7 +555,7 @@ void check_weather() {
   }
 }
 
-void turn_off_station(byte sid, byte mas, ulong curr_time) {
+void turn_off_station(byte sid, ulong curr_time) {
   byte bid = sid>>3;
   byte s = sid&0x07;
   os.set_station_bit(sid, 0);
@@ -552,7 +567,7 @@ void turn_off_station(byte sid, byte mas, ulong curr_time) {
   // because we may be turning off a station that hasn't started yet
   if (curr_time > pd.scheduled_start_time[sid]) {
     // record lastrun log (only for non-master stations)
-    if(mas!=(sid+1)) {
+    if(os.status.mas!=(sid+1) && os.status.mas2!=(sid+1)) {
       pd.lastrun.station = sid;
       pd.lastrun.program = pd.scheduled_program_index[sid];
       pd.lastrun.duration = curr_time - pd.scheduled_start_time[sid];
@@ -560,16 +575,6 @@ void turn_off_station(byte sid, byte mas, ulong curr_time) {
       write_log(LOGDATA_STATION, curr_time);
     }
 
-    // upon turning off station, process relay
-    // if the station is set to active / deactivate relay
-    if(os.actrelay_bits[bid]&(1<<s)) {
-      // turn relay off
-      if(os.options[OPTION_RELAY_PULSE].value > 0) {  // if relay is set to pulse
-        os.set_relay(1);
-        delay(os.options[OPTION_RELAY_PULSE].value*10);
-      }
-      os.set_relay(0);
-    }
     // upon turning off station, process RF station
     // if the station is a RF station
     if(os.rfstn_bits[bid]&(1<<s)) {
@@ -606,7 +611,7 @@ void process_dynamic_events(ulong curr_time) {
       if ((pd.scheduled_program_index[sid]<99) &&
           (!en || (rain && !(rbits&(1<<s)))) ) {
         if (sbits&(1<<s)) { // if station is currently running
-          turn_off_station(sid, os.status.mas, curr_time);
+          turn_off_station(sid, curr_time);
 
         } else if (pd.scheduled_program_index[sid] > 0) { // if station is currently not running but is waiting to run
 
@@ -636,6 +641,7 @@ void schedule_all_stations(ulong curr_time) {
   for(sid=0;sid<os.nstations;sid++) {
     // skip master station because it's not scheduled independently
     if (os.status.mas==sid+1) continue;
+    if (os.status.mas2==sid+1) continue;
     byte bid=sid>>3;
     byte s=sid&0x07;
 

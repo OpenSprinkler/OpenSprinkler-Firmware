@@ -58,7 +58,7 @@ extern ProgramData pd;
 
 void write_log(byte type, ulong curr_time);
 void schedule_all_stations(ulong curr_time);
-void turn_off_station(byte sid, byte mas, ulong curr_time);
+void turn_off_station(byte sid, ulong curr_time);
 void process_dynamic_events(ulong curr_time);
 void check_network(time_t curr_time);
 void check_weather(time_t curr_time);
@@ -388,7 +388,7 @@ void server_json_stations_main()
   }
   server_json_stations_attrib(PSTR("masop"), os.masop_bits);
   server_json_stations_attrib(PSTR("ignore_rain"), os.ignrain_bits);
-  server_json_stations_attrib(PSTR("act_relay"), os.actrelay_bits);
+  server_json_stations_attrib(PSTR("masop2"), os.masop2_bits);
   server_json_stations_attrib(PSTR("stn_dis"), os.stndis_bits);
   server_json_stations_attrib(PSTR("rfstn"), os.rfstn_bits);
   server_json_stations_attrib(PSTR("stn_seq"), os.stnseq_bits);
@@ -418,13 +418,13 @@ void server_change_stations_attrib(char *p, char header, byte *attrib)
 
 /**
   Change Station Name and Attributes
-  Command: /cs?pw=xxx&s?=x&m?=x&i?=x&a?=x&d?=x
+  Command: /cs?pw=xxx&s?=x&m?=x&i?=x&n?=x&d?=x
   
   pw: password
   s?: station name (? is station index, starting from 0)
   m?: master operation bit field (? is board index, starting from 0)
   i?: ignore rain bit field
-  a?: activate relay bit field
+  n?: master2 operation bit field
   d?: disable sation bit field
 */
 byte server_change_stations(char *p)
@@ -446,8 +446,8 @@ byte server_change_stations(char *p)
   server_change_stations_attrib(p, 'i', os.ignrain_bits);    
   os.station_attrib_bits_save(ADDR_NVM_IGNRAIN, os.ignrain_bits);
   
-  server_change_stations_attrib(p, 'a', os.actrelay_bits);
-  os.station_attrib_bits_save(ADDR_NVM_ACTRELAY, os.actrelay_bits);
+  server_change_stations_attrib(p, 'n', os.masop2_bits);
+  os.station_attrib_bits_save(ADDR_NVM_MAS_OP_2, os.masop2_bits);
 
   server_change_stations_attrib(p, 'd', os.stndis_bits);
   os.station_attrib_bits_save(ADDR_NVM_STNDISABLE, os.stndis_bits); 
@@ -662,8 +662,7 @@ void server_json_options_main() {
   byte oid;
   for(oid=0;oid<NUM_OPTIONS;oid++) {
     int32_t v=os.options[oid].value;
-    if (oid==OPTION_MASTER_OFF_ADJ) {v-=60;}
-    if (oid==OPTION_RELAY_PULSE) {v*=10;}    
+    if (oid==OPTION_MASTER_OFF_ADJ || oid==OPTION_MASTER_OFF_ADJ_2) {v-=60;}
     if (oid==OPTION_STATION_DELAY_TIME) {v=water_time_decode_signed(v);}
     if (pgm_read_byte(os.options[oid].json_str)=='_') continue;
     bfill.emit_p(PSTR("\"$F\":$D"),
@@ -914,8 +913,7 @@ byte server_change_options(char *p)
         os.options[oid].value = 1;  // if the bool variable is detected, set to 1
       } else {
 		    int32_t v = atol(tmp_buffer);
-		    if (oid==OPTION_MASTER_OFF_ADJ) {v+=60;} // master off time
-		    if (oid==OPTION_RELAY_PULSE) {v/=10;} // relay pulse time
+		    if (oid==OPTION_MASTER_OFF_ADJ || oid==OPTION_MASTER_OFF_ADJ_2) {v+=60;} // master off time
 		    if (oid==OPTION_STATION_DELAY_TIME) {
 		      v=water_time_encode_signed((int16_t)v);
 		    } // encode station delay time
@@ -1076,9 +1074,9 @@ byte server_change_manual(char *p) {
       // - currently running (cannot handle overlapping schedules of the same station)
       byte bid = sid>>3;
       byte s = sid&0x07;
-      if ((os.status.mas==sid+1) || (os.station_bits[bid]&(1<<s)))
+      if ((os.status.mas==sid+1) || (os.status.mas2==sid+1) || (os.station_bits[bid]&(1<<s)))
         return HTML_NOT_PERMITTED;
-      
+
       // if the station doesn't already have a scheduled stop time
       if (!pd.scheduled_stop_time[sid]) {
         // initialize schedule data by storing water time temporarily in stop_time
@@ -1093,7 +1091,7 @@ byte server_change_manual(char *p) {
       return HTML_DATA_MISSING;
     }
   } else {  // turn off station
-    turn_off_station(sid, os.status.mas, curr_time);
+    turn_off_station(sid, curr_time);
   }
   return HTML_SUCCESS;
 }

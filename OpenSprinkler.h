@@ -79,6 +79,7 @@ struct ConStatus {
   byte display_board:4;     // the board that is being displayed onto the lcd
   byte network_fails:4;     // number of network fails
   byte mas:8;               // master station index
+  byte mas2:8;              // master2 station index
 };
 
 class OpenSprinkler {
@@ -101,9 +102,9 @@ public:
   static byte station_bits[];     // station activation bits. each byte corresponds to a board (8 stations)
                                   // first byte-> master controller, second byte-> ext. board 1, and so on
   // station attributes
-  static byte masop_bits[];       // station master operation bits. each byte corresponds to a board (8 stations)
+  static byte masop_bits[];       // master operation bits. each byte corresponds to a board (8 stations)
   static byte ignrain_bits[];     // ignore rain bits. each byte corresponds to a board (8 stations)
-  static byte actrelay_bits[];    // activate relay bits. each byte corresponds to a board (8 stations)
+  static byte masop2_bits[];      // master2 operation bits. each byte corresponds to a board (8 stations)
   static byte stndis_bits[];      // station disable bits. each byte corresponds to a board (8 stations)
   static byte rfstn_bits[];       // RF station flags. each byte corresponds to a board (8 stations)
   static byte stnseq_bits[];      // station sequential bits. each byte corresponds to a board (8 stations)
@@ -156,7 +157,6 @@ public:
   static void rainsensor_status();// update rainsensor status
   static int detect_exp();        // detect the number of expansion boards
   static byte weekday_today();    // returns index of today's weekday (Monday is 0)
-  static void set_relay(byte status); // set relay on or off
 
   static void set_station_bit(byte sid, byte value); // set station bit of one station (sid->station index, value->0/1)
   static void clear_all_station_bits(); // clear all station bits

@@ -34,7 +34,7 @@ byte OpenSprinkler::nstations;
 byte OpenSprinkler::station_bits[MAX_EXT_BOARDS+1];
 byte OpenSprinkler::masop_bits[MAX_EXT_BOARDS+1];
 byte OpenSprinkler::ignrain_bits[MAX_EXT_BOARDS+1];
-byte OpenSprinkler::actrelay_bits[MAX_EXT_BOARDS+1];
+byte OpenSprinkler::masop2_bits[MAX_EXT_BOARDS+1];
 byte OpenSprinkler::stndis_bits[MAX_EXT_BOARDS+1];
 byte OpenSprinkler::rfstn_bits[MAX_EXT_BOARDS+1];
 byte OpenSprinkler::stnseq_bits[MAX_EXT_BOARDS+1];
@@ -89,53 +89,59 @@ prog_char _json_devid[]PROGMEM = "devid";
 prog_char _json_con [] PROGMEM = "con";
 prog_char _json_lit [] PROGMEM = "lit";
 prog_char _json_dim [] PROGMEM = "dim";
-prog_char _json_rlp [] PROGMEM = "rlp";
+prog_char _json_rlp [] PROGMEM = "_";
 prog_char _json_uwt [] PROGMEM = "uwt";
 prog_char _json_ntp1[] PROGMEM = "ntp1";
 prog_char _json_ntp2[] PROGMEM = "ntp2";
 prog_char _json_ntp3[] PROGMEM = "ntp3";
 prog_char _json_ntp4[] PROGMEM = "ntp4";
 prog_char _json_log [] PROGMEM = "lg";
+prog_char _json_mas2[] PROGMEM = "mas2";
+prog_char _json_mton2[]PROGMEM = "mton2";
+prog_char _json_mtof2[]PROGMEM = "mtof2";
 prog_char _json_reset[] PROGMEM = "reset";
 
 /** Option names */
 prog_char _str_fwv [] PROGMEM = "Firmware: ";
 prog_char _str_tz  [] PROGMEM = "TZone:";
 prog_char _str_ntp [] PROGMEM = "NTP?";
-prog_char _str_dhcp[] PROGMEM = "Use DHCP?";
+prog_char _str_dhcp[] PROGMEM = "DHCP?";
 prog_char _str_ip1 [] PROGMEM = "Static.ip1:";
-prog_char _str_ip2 [] PROGMEM = "Static.ip2:";
-prog_char _str_ip3 [] PROGMEM = "Static.ip3:";
-prog_char _str_ip4 [] PROGMEM = "Static.ip4:";
+prog_char _str_ip2 [] PROGMEM = ".ip2:";
+prog_char _str_ip3 [] PROGMEM = ".ip3:";
+prog_char _str_ip4 [] PROGMEM = ".ip4:";
 prog_char _str_gw1 [] PROGMEM = "Gateway.ip1:";
-prog_char _str_gw2 [] PROGMEM = "Gateway.ip2:";
-prog_char _str_gw3 [] PROGMEM = "Gateway.ip3:";
-prog_char _str_gw4 [] PROGMEM = "Gateway.ip4:";
+prog_char _str_gw2 [] PROGMEM = ".ip2:";
+prog_char _str_gw3 [] PROGMEM = ".ip3:";
+prog_char _str_gw4 [] PROGMEM = ".ip4:";
 prog_char _str_hp0 [] PROGMEM = "HTTP port:";
 prog_char _str_hp1 [] PROGMEM = "";
 prog_char _str_hwv [] PROGMEM = "Hardware: ";
 prog_char _str_ext [] PROGMEM = "Exp. board:";
 prog_char _str_seq [] PROGMEM = "";   // the option 'sequential' is now retired
 prog_char _str_sdt [] PROGMEM = "Stn delay:";
-prog_char _str_mas [] PROGMEM = "Mas. station:";
-prog_char _str_mton[] PROGMEM = "Mas.  on adj.:";
-prog_char _str_mtof[] PROGMEM = "Mas. off adj.:";
+prog_char _str_mas [] PROGMEM = "Master1:";
+prog_char _str_mton[] PROGMEM = "Master1  on adj:";
+prog_char _str_mtof[] PROGMEM = "Master1 off adj:";
 prog_char _str_urs [] PROGMEM = "Rain sensor:";
 prog_char _str_rso [] PROGMEM = "Normally open?";
-prog_char _str_wl  [] PROGMEM = "% Water time:";
+prog_char _str_wl  [] PROGMEM = "% Watering:";
 prog_char _str_den [] PROGMEM = "Device enable?";
 prog_char _str_ipas[] PROGMEM = "Ign password?";
 prog_char _str_devid[]PROGMEM = "Dev. ID:";
 prog_char _str_con [] PROGMEM = "LCD contrast:";
-prog_char _str_lit [] PROGMEM = "LCD backlight:";
-prog_char _str_dim [] PROGMEM = "LCD dimming:";
-prog_char _str_rlp [] PROGMEM = "Relay pulse:";
+prog_char _str_lit [] PROGMEM = "Backlight:";
+prog_char _str_dim [] PROGMEM = "Dimming:";
+prog_char _str_rlp [] PROGMEM = ""; // the option 'relay pulsing' is now retired
 prog_char _str_uwt [] PROGMEM = "Use weather?";
 prog_char _str_ntp1[] PROGMEM = "NTP.ip1:";
-prog_char _str_ntp2[] PROGMEM = "NTP.ip2:";
-prog_char _str_ntp3[] PROGMEM = "NTP.ip3:";
-prog_char _str_ntp4[] PROGMEM = "NTP.ip4:";
-prog_char _str_log [] PROGMEM = "Enable logging?";
+prog_char _str_ntp2[] PROGMEM = ".ip2:";
+prog_char _str_ntp3[] PROGMEM = ".ip3:";
+prog_char _str_ntp4[] PROGMEM = ".ip4:";
+prog_char _str_log [] PROGMEM = "Logging?";
+prog_char _str_mas2[] PROGMEM = "Master2:";
+prog_char _str_mton2[]PROGMEM = "Master2  on adj:";
+prog_char _str_mtof2[]PROGMEM = "Master2 off adj:";
 prog_char _str_reset[] PROGMEM = "Reset all?";
 
 OptionStruct OpenSprinkler::options[NUM_OPTIONS] = {
@@ -174,13 +180,16 @@ OptionStruct OpenSprinkler::options[NUM_OPTIONS] = {
   {110, 255, _str_con,  _json_con},   // lcd contrast
   {100, 255, _str_lit,  _json_lit},   // lcd backlight
   {15,   255, _str_dim,  _json_dim},   // lcd dimming
-  {0,   200, _str_rlp,  _json_rlp},   // relay pulse
+  {0,   200, _str_rlp,  _json_rlp},   // the options 'relay pulse' is now retired
   {0,   255, _str_uwt,  _json_uwt},
   {50,  255, _str_ntp1, _json_ntp1},  // this and the next three bytes define the ntp server ip
   {97,  255, _str_ntp2, _json_ntp2},
   {210, 255, _str_ntp3, _json_ntp3},
   {169, 255, _str_ntp4, _json_ntp4},
   {1,   1,   _str_log,  _json_log},   // enable logging: 0: disable; 1: enable.
+  {0,   8,   _str_mas2, _json_mas2},  // index of master 2. 0: no master2 station
+  {0,   60,  _str_mton2,_json_mton2},
+  {60,  120, _str_mtof2,_json_mtof2}, 
   {0,   1,   _str_reset,_json_reset}
 };
 
@@ -401,8 +410,8 @@ void OpenSprinkler::begin() {
   pinMode(PIN_RF_DATA, OUTPUT);
   digitalWrite(PIN_RF_DATA, LOW);
 
-  pinMode(PIN_RELAY, OUTPUT);
-  digitalWrite(PIN_RELAY, LOW);
+  /*pinMode(PIN_RELAY, OUTPUT);
+  digitalWrite(PIN_RELAY, LOW);*/
 
 #if defined(ARDUINO)  // AVR LCD functions
   // set sd cs pin high to release SD
@@ -642,10 +651,6 @@ byte OpenSprinkler::weekday_today() {
 #endif
 }
 
-void OpenSprinkler::set_relay(byte status) {
-  digitalWrite(PIN_RELAY, status);
-}
-
 // Set station bit
 void OpenSprinkler::set_station_bit(byte sid, byte value) {
   byte bid = (sid>>3);  // board index
@@ -798,7 +803,7 @@ void OpenSprinkler::options_setup() {
     // 2. station attributes
     station_attrib_bits_load(ADDR_NVM_MAS_OP, masop_bits);
     station_attrib_bits_load(ADDR_NVM_IGNRAIN, ignrain_bits);
-    station_attrib_bits_load(ADDR_NVM_ACTRELAY, actrelay_bits);
+    station_attrib_bits_load(ADDR_NVM_MAS_OP_2, masop2_bits);
     station_attrib_bits_load(ADDR_NVM_STNDISABLE, stndis_bits);
     station_attrib_bits_load(ADDR_NVM_STNSEQ, stnseq_bits);
     // set RF station flags
@@ -1002,6 +1007,8 @@ void OpenSprinkler::lcd_print_station(byte line, char c) {
 	  for (byte s=0; s<8; s++) {
 	    if (status.display_board == 0 &&(s+1) == options[OPTION_MASTER_STATION].value) {
 	      lcd.print((bitvalue&1) ? (char)c : 'M'); // print master station
+	    } else if (status.display_board ==0 && (s+1) == options[OPTION_MASTER_STATION_2].value) {
+	      lcd.print((bitvalue&1) ? (char)c : 'N'); // print master2 station
 	    } else {
 	      lcd.print((bitvalue&1) ? (char)c : '_');
 	    }
@@ -1061,18 +1068,17 @@ void OpenSprinkler::lcd_print_option(int i) {
     lcd_print_pgm(PSTR(" GMT"));
     break;
   case OPTION_MASTER_ON_ADJ:
+  case OPTION_MASTER_ON_ADJ_2:
     lcd_print_pgm(PSTR("+"));
     lcd.print((int)options[i].value);
     break;
   case OPTION_MASTER_OFF_ADJ:
+  case OPTION_MASTER_OFF_ADJ_2:
     if(options[i].value>=60)  lcd_print_pgm(PSTR("+"));
     lcd.print((int)options[i].value-60);
     break;
   case OPTION_HTTPPORT_0:
     lcd.print((unsigned int)(options[i+1].value<<8)+options[i].value);
-    break;
-  case OPTION_RELAY_PULSE:
-    lcd.print((unsigned int)options[i].value*10);
     break;
   case OPTION_STATION_DELAY_TIME:
     lcd.print(water_time_decode_signed(options[i].value));
@@ -1085,7 +1091,6 @@ void OpenSprinkler::lcd_print_option(int i) {
     lcd_set_brightness();
     lcd.print((int)options[i].value);
     break;
-
   default:
     // if this is a boolean option
     if (options[i].max==1)
@@ -1095,12 +1100,8 @@ void OpenSprinkler::lcd_print_option(int i) {
     break;
   }
   if (i==OPTION_WATER_PERCENTAGE)  lcd_print_pgm(PSTR("%"));
-  else if (i==OPTION_MASTER_ON_ADJ || i==OPTION_MASTER_OFF_ADJ)
+  else if (i==OPTION_MASTER_ON_ADJ || i==OPTION_MASTER_OFF_ADJ || i==OPTION_MASTER_ON_ADJ_2 || i==OPTION_MASTER_OFF_ADJ_2 || i==OPTION_STATION_DELAY_TIME)
     lcd_print_pgm(PSTR(" sec"));
-  else if (i==OPTION_STATION_DELAY_TIME)
-    lcd_print_pgm(PSTR(" sec"));
-  else if (i==OPTION_RELAY_PULSE)
-    lcd_print_pgm(PSTR(" ms"));
 }
 
 
@@ -1194,6 +1195,7 @@ void OpenSprinkler::ui_set_options(int oid)
         else if(i==OPTION_HTTPPORT_0) i+=2; // skip OPTION_HTTPPORT_1
         else if(i==OPTION_USE_RAINSENSOR && options[i].value==0) i+=2; // if not using rain sensor, skip rain sensor type
         else if(i==OPTION_MASTER_STATION && options[i].value==0) i+=3; // if not using master station, skip master on/off adjust
+        else if(i==OPTION_MASTER_STATION_2&& options[i].value==0) i+=3; // if not using master2, skip master2 on/off adjust
         else  {
           i = (i+1) % NUM_OPTIONS;
         }

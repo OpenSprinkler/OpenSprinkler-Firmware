@@ -43,10 +43,10 @@
 
 /** NVM data structure:
   * |     |              |     |---STRING PARAMETERS---|               |----STATION ATTRIBUTES-----  |          |
-  * | UID | PROGRAM_DATA | CON | PWD | LOC | URL | KEY | STATION_NAMES | MAS | IGR | ACT | DIS | SEQ | OPTIONS  |
-  * | (8) |    (996)     | (8) |(32) |(48) |(64) |(32) | (6*8*16)=768  | (6) | (6) | (6) | (6) | (6) |  (62)    |
-  * |     |              |     |     |     |     |     |               |     |     |     |     |     |          |
-  * 0     8            1004  1012   1044  1092  1156  1188            1956  1962  1968  1974 1980   1986       2048
+  * | UID | PROGRAM_DATA | CON | PWD | LOC | URL | KEY | STATION_NAMES | MAS | IGR | MAS2 | DIS | SEQ | OPTIONS  |
+  * | (8) |    (996)     | (8) |(32) |(48) |(64) |(32) | (6*8*16)=768  | (6) | (6) | (6)  | (6) | (6) |  (62)    |
+  * |     |              |     |     |     |     |     |               |     |     |      |     |     |          |
+  * 0     8            1004  1012   1044  1092  1156  1188            1956  1962  1968   1974 1980   1986       2048
   */
 
   #define NVM_SIZE            2048  // For AVR, nvm data is stored in EEPROM
@@ -90,8 +90,8 @@
 #define ADDR_NVM_STN_NAMES     (ADDR_NVM_WEATHER_KEY+MAX_WEATHER_KEY)
 #define ADDR_NVM_MAS_OP        (ADDR_NVM_STN_NAMES+MAX_NUM_STATIONS*STATION_NAME_SIZE) // master op bits
 #define ADDR_NVM_IGNRAIN       (ADDR_NVM_MAS_OP+(MAX_EXT_BOARDS+1))  // ignore rain bits 
-#define ADDR_NVM_ACTRELAY      (ADDR_NVM_IGNRAIN+(MAX_EXT_BOARDS+1)) // activate relay bits
-#define ADDR_NVM_STNDISABLE    (ADDR_NVM_ACTRELAY+(MAX_EXT_BOARDS+1))// station disable bits
+#define ADDR_NVM_MAS_OP_2      (ADDR_NVM_IGNRAIN+(MAX_EXT_BOARDS+1)) // master2 op bits
+#define ADDR_NVM_STNDISABLE    (ADDR_NVM_MAS_OP_2+(MAX_EXT_BOARDS+1))// station disable bits
 #define ADDR_NVM_STNSEQ        (ADDR_NVM_STNDISABLE+(MAX_EXT_BOARDS+1))// station sequential bits
 #define ADDR_NVM_OPTIONS       (ADDR_NVM_STNSEQ+(MAX_EXT_BOARDS+1))  // options
 
@@ -143,6 +143,9 @@ typedef enum {
   OPTION_NTP_IP3,
   OPTION_NTP_IP4,
   OPTION_ENABLE_LOGGING,
+  OPTION_MASTER_STATION_2,
+  OPTION_MASTER_ON_ADJ_2,
+  OPTION_MASTER_OFF_ADJ_2,
   OPTION_RESET,
   NUM_OPTIONS	// total number of options
 } OS_OPTION_t;
@@ -192,7 +195,7 @@ typedef enum {
   #define PIN_ETHER_CS       4    // Ethernet controller chip select pin
   #define PIN_SD_CS          0    // SD card chip select pin
   #define PIN_RAINSENSOR    11    // rain sensor is connected to pin D3
-  #define PIN_RELAY         14    // mini relay is connected to pin D14
+  //#define PIN_RELAY         14    // mini relay is connected to pin D14
   #define PIN_EXP_SENSE      4    // expansion board sensing pin (A4)
 
   // Ethernet buffer size
@@ -233,7 +236,7 @@ typedef enum {
   #define PIN_SR_CLOCK       4    // shift register clock pin
   #define PIN_SR_OE         17    // shift register output enable pin
   #define PIN_RAINSENSOR    14    // rain sensor
-  #define PIN_RELAY         15    // mini relay
+  //#define PIN_RELAY         15    // mini relay
   #define PIN_RF_DATA       15    // RF transmitter pin
   #define PIN_BUTTON_1      23    // button 1
   #define PIN_BUTTON_2      24    // button 2
@@ -250,7 +253,7 @@ typedef enum {
   #define PIN_SR_CLOCK      31    // P9_13, shift register clock pin
   #define PIN_SR_OE         50    // P9_14, shift register output enable pin
   #define PIN_RAINSENSOR    48    // P9_15, rain sensor is connected to pin D3
-  #define PIN_RELAY         51    // P9_16, mini relay is connected to pin D14
+  //#define PIN_RELAY         51    // P9_16, mini relay is connected to pin D14
   #define PIN_RF_DATA       51    // RF transmitter pin
   
   #else
@@ -266,7 +269,7 @@ typedef enum {
     #define PIN_SR_CLOCK    0
     #define PIN_SR_OE       0
     #define PIN_RAINSENSOR  0
-    #define PIN_RELAY       0
+    //#define PIN_RELAY       0
     #define PIN_RF_DATA     0
     
   #endif
