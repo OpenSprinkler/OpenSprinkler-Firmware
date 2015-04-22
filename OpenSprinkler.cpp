@@ -168,7 +168,7 @@ OptionStruct OpenSprinkler::options[NUM_OPTIONS] = {
   {0,   MAX_EXT_BOARDS, _str_ext, _json_ext}, // number of extension board. 0: no extension boards
   {1,   1,   _str_seq,  _json_seq},   // the option 'sequential' is now retired
   {128, 247, _str_sdt,  _json_sdt},   // station delay time (-59 minutes to 59 minutes).
-  {0,   8,   _str_mas,  _json_mas},   // index of master station. 0: no master station
+  {0,   MAX_NUM_STATIONS, _str_mas,  _json_mas},   // index of master station. 0: no master station
   {0,   60,  _str_mton, _json_mton},  // master on time [0,60] seconds
   {60,  120, _str_mtof, _json_mtof},  // master off time [-60,60] seconds
   {0,   1,   _str_urs,  _json_urs},   // rain sensor control bit. 1: use rain sensor input; 0: ignore
@@ -187,7 +187,7 @@ OptionStruct OpenSprinkler::options[NUM_OPTIONS] = {
   {210, 255, _str_ntp3, _json_ntp3},
   {169, 255, _str_ntp4, _json_ntp4},
   {1,   1,   _str_log,  _json_log},   // enable logging: 0: disable; 1: enable.
-  {0,   8,   _str_mas2, _json_mas2},  // index of master 2. 0: no master2 station
+  {0,   MAX_NUM_STATIONS, _str_mas2, _json_mas2},  // index of master 2. 0: no master2 station
   {0,   60,  _str_mton2,_json_mton2},
   {60,  120, _str_mtof2,_json_mtof2}, 
   {0,   1,   _str_reset,_json_reset}
@@ -1005,9 +1005,11 @@ void OpenSprinkler::lcd_print_station(byte line, char c) {
   } else {
 	  byte bitvalue = station_bits[status.display_board];
 	  for (byte s=0; s<8; s++) {
-	    if (status.display_board == 0 &&(s+1) == options[OPTION_MASTER_STATION].value) {
+	    byte sid = (byte)status.display_board<<3;
+	    sid += (s+1);
+	    if (sid == options[OPTION_MASTER_STATION].value) {
 	      lcd.print((bitvalue&1) ? (char)c : 'M'); // print master station
-	    } else if (status.display_board ==0 && (s+1) == options[OPTION_MASTER_STATION_2].value) {
+	    } else if (sid == options[OPTION_MASTER_STATION_2].value) {
 	      lcd.print((bitvalue&1) ? (char)c : 'N'); // print master2 station
 	    } else {
 	      lcd.print((bitvalue&1) ? (char)c : '_');

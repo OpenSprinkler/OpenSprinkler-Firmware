@@ -274,7 +274,7 @@ typedef enum {
     
   #endif
   
-  #define ETHER_BUFFER_SIZE   1500
+  #define ETHER_BUFFER_SIZE   16384
     
   #define DEBUG_BEGIN(x)          {}  /** Serial debug functions */
   //#define ENABLE_DEBUG
