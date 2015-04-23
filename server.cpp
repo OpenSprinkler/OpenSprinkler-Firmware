@@ -18,7 +18,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see
- * <http://www.gnu.org/licenses/>. 
+ * <http://www.gnu.org/licenses/>.
  */
 
 #include "OpenSprinkler.h"
@@ -37,7 +37,7 @@ static uint8_t ntpclientportL = 123; // Default NTP client port
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <sys/types.h> 
+#include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netdb.h>
@@ -84,35 +84,35 @@ void make_logfile_name(char *name);
 #define HTML_REDIRECT_HOME     0xFF
 
 static prog_uchar html200OK[] PROGMEM =
-  "HTTP/1.0 200 OK\r\n"
+  "HTTP/1.1 200 OK\r\n"
 ;
 
 static prog_uchar htmlCacheCtrl[] PROGMEM =
   "Cache-Control: max-age=604800, public\r\n"
 ;
 
-static prog_uchar htmlNoCache[] PROGMEM = 
-  "Pragma: no-cache\r\n"
-;   
-    
+static prog_uchar htmlNoCache[] PROGMEM =
+  "Cache-Control: max-age=0, no-cache, no-store, must-revalidate\r\n"
+;
+
 static prog_uchar htmlContentHTML[] PROGMEM =
   "Content-Type: text/html\r\n"
 ;
 
-static prog_uchar htmlAccessControl[] PROGMEM = 
+static prog_uchar htmlAccessControl[] PROGMEM =
   "Access-Control-Allow-Origin: *\r\n"
 ;
 
-static prog_uchar htmlContentCgz[] PROGMEM = 
+static prog_uchar htmlContentCgz[] PROGMEM =
   "Content-Type: text/css;charset=utf-8\r\n"
   "Content-Encoding: gzip\r\n"
 ;
 
-static prog_uchar htmlContentJgz[] PROGMEM = 
+static prog_uchar htmlContentJgz[] PROGMEM =
   "Content-Type: text/javascript;charset=utf-8\r\n"
   "Content-Encoding: gzip\r\n"
 ;
-    
+
 static prog_uchar htmlContentJSON[] PROGMEM =
   "Content-Type: application/json\r\n"
   "Connnection: close\r\n"
@@ -122,7 +122,7 @@ static prog_uchar htmlMobileHeader[] PROGMEM =
   "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1.0,minimum-scale=1.0,user-scalable=no\">\r\n"
 ;
 
-static prog_uchar htmlReturnHome[] PROGMEM = 
+static prog_uchar htmlReturnHome[] PROGMEM =
   "<script>window.location=\"/\";</script>\n"
 ;
 
@@ -197,10 +197,10 @@ byte findKeyVal (const char *str,char *strbuf, uint8_t maxlen,const char *key,bo
 inline void rewind_ether_buffer() {
   bfill = ether.tcpOffset();
 }
-  
+
 inline void send_packet(bool final=false) {
   if(final) {
-    ether.httpServerReply_with_flags(bfill.position(), TCP_FLAGS_ACK_V|TCP_FLAGS_FIN_V);  
+    ether.httpServerReply_with_flags(bfill.position(), TCP_FLAGS_ACK_V|TCP_FLAGS_FIN_V);
   } else {
     ether.httpServerReply_with_flags(bfill.position(), TCP_FLAGS_ACK_V, 3);
     bfill=ether.tcpOffset();
@@ -221,7 +221,7 @@ void print_json_header() {
   write(client, htmlContentJSON, strlen(htmlContentJSON));
   write(client, htmlNoCache, strlen(htmlNoCache));
   write(client, htmlAccessControl, strlen(htmlAccessControl));
-  write(client, "\r\n", 2);  
+  write(client, "\r\n", 2);
 }
 
 void print_json_header_with_bracket() {
@@ -229,7 +229,7 @@ void print_json_header_with_bracket() {
   write(client, htmlContentJSON, strlen(htmlContentJSON));
   write(client, htmlNoCache, strlen(htmlNoCache));
   write(client, htmlAccessControl, strlen(htmlAccessControl));
-  write(client, "\r\n{", 3);  
+  write(client, "\r\n{", 3);
 }
 
 byte findKeyVal (const char *str,char *strbuf, uint8_t maxlen,const char *key,bool key_in_pgm=false,uint8_t *keyfound=NULL)
@@ -316,7 +316,7 @@ inline void rewind_ether_buffer() {
 inline void send_packet(bool final=false) {
   write(client, ether_buffer, strlen(ether_buffer));
   if (final)
-    close(client);  
+    close(client);
   else
     rewind_ether_buffer();
 }
@@ -419,7 +419,7 @@ void server_change_stations_attrib(char *p, char header, byte *attrib)
 /**
   Change Station Name and Attributes
   Command: /cs?pw=xxx&s?=x&m?=x&i?=x&n?=x&d?=x
-  
+
   pw: password
   s?: station name (? is station index, starting from 0)
   m?: master operation bit field (? is board index, starting from 0)
@@ -443,20 +443,20 @@ byte server_change_stations(char *p)
   server_change_stations_attrib(p, 'm', os.masop_bits);
   os.station_attrib_bits_save(ADDR_NVM_MAS_OP, os.masop_bits);
 
-  server_change_stations_attrib(p, 'i', os.ignrain_bits);    
+  server_change_stations_attrib(p, 'i', os.ignrain_bits);
   os.station_attrib_bits_save(ADDR_NVM_IGNRAIN, os.ignrain_bits);
-  
+
   server_change_stations_attrib(p, 'n', os.masop2_bits);
   os.station_attrib_bits_save(ADDR_NVM_MAS_OP_2, os.masop2_bits);
 
   server_change_stations_attrib(p, 'd', os.stndis_bits);
-  os.station_attrib_bits_save(ADDR_NVM_STNDISABLE, os.stndis_bits); 
-  
+  os.station_attrib_bits_save(ADDR_NVM_STNDISABLE, os.stndis_bits);
+
   os.update_rfstation_bits();
-  
+
   server_change_stations_attrib(p, 'q', os.stnseq_bits);
-  os.station_attrib_bits_save(ADDR_NVM_STNSEQ, os.stnseq_bits); 
-  
+  os.station_attrib_bits_save(ADDR_NVM_STNSEQ, os.stnseq_bits);
+
   return HTML_SUCCESS;
 }
 
@@ -480,7 +480,7 @@ uint16_t parse_listdata(char **p) {
 /**
   Change run-once program
   Command: /cr?pw=xxx&t=[x,x,x...]
-  
+
   pw: password
   t:  station water time
 */
@@ -494,14 +494,14 @@ byte server_change_runonce(char *p) {
     if(strncmp(pv, "t=[", 3)==0) {
       found=true;
       break;
-    } 
+    }
   }
   if(!found)  return HTML_DATA_MISSING;
   pv+=3;
-  
+
   // reset all stations and prepare to run one-time program
   reset_all_stations_immediate();
-  
+
   byte sid, bid, s;
   uint16_t dur;
   boolean match_found = false;
@@ -513,7 +513,7 @@ byte server_change_runonce(char *p) {
     // and if the station has not been disabled
     if (dur>0 && !(os.stndis_bits[bid]&(1<<s))) {
       pd.scheduled_stop_time[sid] = water_time_resolve(dur);
-      pd.scheduled_program_index[sid] = 254;      
+      pd.scheduled_program_index[sid] = 254;
       match_found = true;
     }
   }
@@ -536,7 +536,7 @@ byte server_change_runonce(char *p) {
 byte server_delete_program(char *p) {
   if (!findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("pid"), true))
     return HTML_DATA_MISSING;
-    
+
   int pid=atoi(tmp_buffer);
   if (pid == -1) {
     pd.eraseall();
@@ -552,26 +552,26 @@ byte server_delete_program(char *p) {
 /**
   Move up a program
   Command: /up?pw=xxx&pid=xxx
-  
+
   pw: password
   pid:program index
 */
 byte server_moveup_program(char *p) {
   if (!findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("pid"), true)) {
-    return HTML_DATA_MISSING;  
+    return HTML_DATA_MISSING;
   }
   int pid=atoi(tmp_buffer);
   if (!(pid>=1 && pid< pd.nprograms)) return HTML_DATA_OUTOFBOUND;
-  
+
   pd.moveup(pid);
-  
-  return HTML_SUCCESS;  
+
+  return HTML_SUCCESS;
 }
 
 /**
   Change a program
   Command: /cp?pw=xxx&pid=x&v=[flag,days0,days1,[start0,start1,start2,start3],[dur0,dur1,dur2..]]&name=x
-  
+
   pw:    password
   pid:   program index
   flag:  program flag
@@ -591,14 +591,14 @@ byte server_change_program(char *p) {
   }
   int pid=atoi(tmp_buffer);
   if (!(pid>=-1 && pid< pd.nprograms)) return HTML_DATA_OUTOFBOUND;
-    
+
   // parse program name
   if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("name"), true)) {
     urlDecode(tmp_buffer);
     strncpy(prog.name, tmp_buffer, PROGRAM_NAME_SIZE);
   } else {
     strcpy_P(prog.name, _str_program);
-    itoa((pid==-1)? (pd.nprograms+1): (pid+1), prog.name+8, 10); 
+    itoa((pid==-1)? (pd.nprograms+1): (pid+1), prog.name+8, 10);
   }
 
   // do a full string decoding
@@ -644,10 +644,10 @@ byte server_change_program(char *p) {
   }
 
   // process interval day remainder (relative-> absolute)
-  if (prog.type == PROGRAM_TYPE_INTERVAL && prog.days[1] > 1) { 
+  if (prog.type == PROGRAM_TYPE_INTERVAL && prog.days[1] > 1) {
     pd.drem_to_absolute(prog.days);
   }
-      
+
   if (pid==-1) {
     if(!pd.add(&prog))
       return HTML_DATA_OUTOFBOUND;
@@ -684,7 +684,7 @@ byte server_json_options(char *p)
 }
 
 /** Output program data */
-byte server_json_programs(char *p) 
+byte server_json_programs(char *p)
 {
   print_json_header_with_bracket();
   bfill.emit_p(PSTR("\"nprogs\":$D,\"nboards\":$D,\"mnp\":$D,\"mnst\":$D,\"pnsize\":$D,\"pd\":["),
@@ -696,7 +696,7 @@ byte server_json_programs(char *p)
     if (prog.type == PROGRAM_TYPE_INTERVAL && prog.days[1] > 1) {
       pd.drem_to_relative(prog.days);
     }
-    
+
     byte bytedata = *(char*)(&prog);
     bfill.emit_p(PSTR("[$D,$D,$D,["), bytedata, prog.days[0], prog.days[1]);
     // start times data
@@ -720,7 +720,7 @@ byte server_json_programs(char *p)
     }
     if ((pid%3)==2) { // push out a packet every 3 programs
       send_packet();
-    } 
+    }
   }
   bfill.emit_p(PSTR("]}"));
   delay(1);
@@ -730,13 +730,13 @@ byte server_json_programs(char *p)
 /** Output script url form */
 byte server_view_scripturl(char *p) {
   print_html_standard_header();
-  bfill.emit_p(PSTR("<hr /><form name=of action=cu method=get><p><b>Script URL:</b><input type=text size=32 maxlength=127 value=\"$E\" name=jsp></p><p>Default is $S<br />If local on uSD card, use ./</p><p><b>Password:</b><input type=password size=32 name=pw><input type=submit></p><hr /></form>"), ADDR_NVM_SCRIPTURL, DEFAULT_JAVASCRIPT_URL);  
+  bfill.emit_p(PSTR("<hr /><form name=of action=cu method=get><p><b>Script URL:</b><input type=text size=32 maxlength=127 value=\"$E\" name=jsp></p><p>Default is $S<br />If local on uSD card, use ./</p><p><b>Password:</b><input type=password size=32 name=pw><input type=submit></p><hr /></form>"), ADDR_NVM_SCRIPTURL, DEFAULT_JAVASCRIPT_URL);
   return HTML_OK;
 }
 
 void server_json_controller_main() {
   byte bid, sid;
-  ulong curr_time = os.now_tz();  
+  ulong curr_time = os.now_tz();
   //os.nvm_string_get(ADDR_NVM_LOCATION, tmp_buffer);
   bfill.emit_p(PSTR("\"devt\":$L,\"nbrd\":$D,\"en\":$D,\"rd\":$D,\"rs\":$D,\"rdst\":$L,\"loc\":\"$E\",\"wtkey\":\"$E\",\"sunrise\":$D,\"sunset\":$D,\"eip\":$L,\"lwc\":$L,\"lswc\":$L,\"sbits\":["),
               curr_time,
@@ -754,7 +754,7 @@ void server_json_controller_main() {
               os.checkwt_success_lasttime);
   // print sbits
   for(bid=0;bid<os.nboards;bid++)
-    bfill.emit_p(PSTR("$D,"), os.station_bits[bid]);  
+    bfill.emit_p(PSTR("$D,"), os.station_bits[bid]);
   bfill.emit_p(PSTR("0],\"ps\":["));
   // print ps
   for(sid=0;sid<os.nstations;sid++) {
@@ -767,7 +767,7 @@ void server_json_controller_main() {
       send_packet();
     }
   }
-  
+
   bfill.emit_p(PSTR("[0,0]],\"lrun\":[$D,$D,$D,$L]}"), pd.lastrun.station, pd.lastrun.program, pd.lastrun.duration, pd.lastrun.endtime);
 }
 
@@ -799,7 +799,7 @@ byte server_home(char *p)
 /**
   Change controller variables
   Command: /cv?pw=xxx&rsn=x&rbt=x&en=x&rd=x
-  
+
   pw:  password
   rsn: reset all stations (0 or 1)
   rbt: reboot controller (0 or 1)
@@ -812,30 +812,30 @@ byte server_change_values(char *p)
   if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("rsn"), true)) {
     reset_all_stations();
   }
-  
+
 #define TIME_REBOOT_DELAY  20
   if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("rbt"), true) && atoi(tmp_buffer) > 0) {
     print_html_standard_header();
     //bfill.emit_p(PSTR("Rebooting..."));
     send_packet(true);
     os.reboot_dev();
-  } 
-  
+  }
+
   if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("en"), true)) {
     if (tmp_buffer[0]=='1' && !os.status.enabled)  os.enable();
     else if (tmp_buffer[0]=='0' &&  os.status.enabled)  os.disable();
-  }   
-  
+  }
+
   if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("rd"), true)) {
     int rd = atoi(tmp_buffer);
     if (rd>0) {
-      os.nvdata.rd_stop_time = os.now_tz() + (unsigned long) rd * 3600;    
+      os.nvdata.rd_stop_time = os.now_tz() + (unsigned long) rd * 3600;
       os.raindelay_start();
     } else if (rd==0){
       os.raindelay_stop();
     } else  return HTML_DATA_OUTOFBOUND;
-  }  
- 
+  }
+
   return HTML_SUCCESS;
 }
 
@@ -854,7 +854,7 @@ void string_remove_space(char *src) {
 /**
   Change script url
   Command: /cu?pw=xxx&jsp=x
-  
+
   pw:  password
   jsp: Javascript path
 */
@@ -872,12 +872,12 @@ byte server_change_scripturl(char *p)
     nvm_write_block(tmp_buffer, (void *)ADDR_NVM_SCRIPTURL, strlen(tmp_buffer)+1);
   }
   return HTML_REDIRECT_HOME;
-}  
+}
 
 /**
   Change options
   Command: /co?pw=xxx&o?=x&loc=x&wtkey=x&ttt=x
-  
+
   pw:  password
   o?:  option name (? is option index)
   loc: location
@@ -893,7 +893,7 @@ byte server_change_options(char *p)
 	bool time_change = false;
 	bool weather_change = false;
 	bool network_change = false;
-  
+
   // !!! p and bfill share the same buffer, so don't write
   // to bfill before you are done analyzing the buffer !!!
   // process option values
@@ -901,7 +901,7 @@ byte server_change_options(char *p)
   byte prev_value;
   for (byte oid=0; oid<NUM_OPTIONS; oid++) {
     //if ((os.options[oid].flag&OPFLAG_WEB_EDIT)==0) continue;
-    
+
     // skip options that cannot be set through web UI
     if (oid==OPTION_RESET || oid==OPTION_DEVICE_ENABLE ||
         oid==OPTION_FW_VERSION || oid==OPTION_HW_VERSION ||
@@ -935,7 +935,7 @@ byte server_change_options(char *p)
     	if (oid==OPTION_USE_WEATHER)       weather_change = true;
     }
   }
-  
+
   if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("loc"), true)) {
     urlDecode(tmp_buffer);
     tmp_buffer[MAX_LOCATION]=0;   // make sure we don't exceed the maximum size
@@ -962,25 +962,25 @@ byte server_change_options(char *p)
     t = atol(tmp_buffer);
     // before chaging time, reset all stations to avoid messing up with timing
     reset_all_stations_immediate();
-#if defined(ARDUINO)    
-    setTime(t);  
+#if defined(ARDUINO)
+    setTime(t);
     if (os.status.has_rtc) RTC.set(t); // if rtc exists, update rtc
-#endif    
+#endif
   }
   if (err) {
     return HTML_DATA_OUTOFBOUND;
-  } 
+  }
 
   os.options_save();
-  
+
   if(time_change) {
     os.ntpsync_lasttime = 0;
   }
-  
+
   if(weather_change) {
     os.checkwt_lasttime = 0;  // force weather update
   }
-  
+
   if(network_change) {
   	os.network_lasttime = 0;	// force restart network
   }
@@ -990,7 +990,7 @@ byte server_change_options(char *p)
 /**
   Change password
   Command: /sp?pw=xxx&npw=x&cpw=x
-  
+
   pw:  password
   npw: new password
   cpw: confirm new password
@@ -1025,7 +1025,7 @@ void server_json_status_main()
     bfill.emit_p(PSTR("$D"), (os.station_bits[(sid>>3)]>>(sid&0x07))&1);
     if(sid!=os.nstations-1) bfill.emit_p(PSTR(","));
   }
-  bfill.emit_p(PSTR("],\"nstations\":$D}"), os.nstations);  
+  bfill.emit_p(PSTR("],\"nstations\":$D}"), os.nstations);
 }
 
 /**
@@ -1041,7 +1041,7 @@ byte server_json_status(char *p)
 /**
   Test station (previously manual operation)
   Command: /cm?pw=xxx&sid=x&en=x&t=x
-  
+
   pw: password
   sid:station name (starting from 0)
   en: enable (0 or 1)
@@ -1051,18 +1051,18 @@ byte server_change_manual(char *p) {
   int sid=-1;
   if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("sid"), true)) {
     sid=atoi(tmp_buffer);
-    if (sid<0 || sid>=os.nstations) return HTML_DATA_OUTOFBOUND;  
+    if (sid<0 || sid>=os.nstations) return HTML_DATA_OUTOFBOUND;
   } else {
-    return HTML_DATA_MISSING;  
+    return HTML_DATA_MISSING;
   }
-  
+
   byte en=0;
   if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("en"), true)) {
     en=atoi(tmp_buffer);
   } else {
     return HTML_DATA_MISSING;
   }
-  
+
   uint16_t timer=0;
   unsigned long curr_time = os.now_tz();
   if (en) { // if turning on a station, must provide timer
@@ -1102,7 +1102,7 @@ byte server_change_manual(char *p) {
 /**
   Get log data
   Command: /jl?start=x&end=x&hist=x&type=x
-  
+
   hist:  history (past n days)
          when hist is speceified, the start
          and end parameters below will be ignored
@@ -1111,7 +1111,7 @@ byte server_change_manual(char *p) {
   type:  type of log records (optional)
          rs, rd, wl
          if unspecified, output all records
-*/  
+*/
 byte server_json_log(char *p) {
 
 #if defined(ARDUINO)
@@ -1133,11 +1133,11 @@ byte server_json_log(char *p) {
     if (!findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("start"), true))
       return HTML_DATA_MISSING;
     start = atol(tmp_buffer) / 86400L;
-    
+
     if (!findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("end"), true))
       return HTML_DATA_MISSING;
     end = atol(tmp_buffer) / 86400L;
-    
+
     // start must be prior to end, and can't retrieve more than 365 days of data
     if ((start>end) || (end-start)>365)  return HTML_DATA_OUTOFBOUND;
   }
@@ -1147,10 +1147,10 @@ byte server_json_log(char *p) {
   bool type_specified = false;
   if (findKeyVal(p, type, 4, PSTR("type"), true))
     type_specified = true;
-  
+
   print_json_header();
   bfill.emit_p(PSTR("["));
- 
+
   char *s;
   int res, count = 0;
   bool first = true;
@@ -1187,17 +1187,17 @@ byte server_json_log(char *p) {
         break;
       }
     #endif
-      
+
       // remove the \n character
       if (tmp_buffer[res-1] == '\n')  tmp_buffer[res-1] = 0;
-      
+
       // check record type
       // special records are all in the form of [0,"xx",...]
       // where xx is the type name
       if (type_specified && strncmp(type, tmp_buffer+4, 2))
         continue;
       // if type is not specified, output everything except "wl" records
-      if (!type_specified && !strncmp("wl", tmp_buffer+4, 2)) 
+      if (!type_specified && !strncmp("wl", tmp_buffer+4, 2))
         continue;
       // if this is the first record, do not print comma
       if (first)  { bfill.emit_p(PSTR("$S"), tmp_buffer); first=false;}
@@ -1210,15 +1210,15 @@ byte server_json_log(char *p) {
     }
   }
 
-  bfill.emit_p(PSTR("]"));   
+  bfill.emit_p(PSTR("]"));
   delay(1);
-  return HTML_OK; 
+  return HTML_OK;
 }
 /**
   Delete log
   Command: /dl?pw=xxx&day=xxx
            /dl?pw=xxx&day=all
- 
+
   pw: password
   day:day (epoch time / 86400)
   if day=all: delete all log files)
@@ -1227,9 +1227,9 @@ byte server_delete_log(char *p) {
 
   if (!findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("day"), true))
     return HTML_DATA_MISSING;
-  
+
   delete_log(tmp_buffer);
-  
+
   return HTML_SUCCESS;
 }
 
@@ -1277,15 +1277,15 @@ URLStruct urls[] = {
   {_url_cr,server_change_runonce},
   {_url_up,server_moveup_program},
   {_url_jp,server_json_programs},
-  
+
 
   {_url_co,server_change_options},
   {_url_jo,server_json_options},
   {_url_sp,server_change_password},
 
-  {_url_js,server_json_status},  
+  {_url_js,server_json_status},
   {_url_cm,server_change_manual},
-  
+
   {_url_cs,server_change_stations},
   {_url_jn,server_json_stations},
 
@@ -1294,18 +1294,18 @@ URLStruct urls[] = {
 
   {_url_su,server_view_scripturl},
   {_url_cu,server_change_scripturl},
- 
+
 };
 
 #if defined(ARDUINO)
-byte streamfile (char* name) { //send a file to the buffer 
+byte streamfile (char* name) { //send a file to the buffer
   unsigned long cur=0;
-  sd.chdir("/");  
+  sd.chdir("/");
   if(!sd.exists(name))  {return 0;}
   SdFile myfile(name, O_READ);
 
   // print file header dependeing on file type
-  bfill.emit_p(PSTR("$F$F"), html200OK, htmlCacheCtrl);  
+  bfill.emit_p(PSTR("$F$F"), html200OK, htmlCacheCtrl);
   char *pext = name+strlen(name)-4;
   if(strncmp(pext, ".cgz", 4)==0) {
     bfill.emit_p(PSTR("$F"), htmlContentCgz);
@@ -1322,7 +1322,7 @@ byte streamfile (char* name) { //send a file to the buffer
       send_packet();
       cur=0;
     } else {
-      break;      
+      break;
     }
   }
   //ether.httpServerReply_with_flags(cur, TCP_FLAGS_ACK_V+TCP_FLAGS_FIN_V, 3);
@@ -1343,9 +1343,9 @@ void analyze_get_url(char *p)
 #if defined(ARDUINO)
   ether.httpServerReplyAck();
 #endif
-  rewind_ether_buffer();  
+  rewind_ether_buffer();
 
-  // the tcp packet usually starts with 'GET /' -> 5 chars    
+  // the tcp packet usually starts with 'GET /' -> 5 chars
   char *str = p+5;
 
   if(str[0]==' ') {
@@ -1357,7 +1357,7 @@ void analyze_get_url(char *p)
     // scan to see if there is a / in the name
     char *ss = str;
     while(*ss &&  *ss!=' ' && *ss!='\n' && *ss != '?' && *ss != '/') {
-      ss++;      
+      ss++;
     }
     // if a '/' is encountered this is requesting a file
     i = 0;
@@ -1367,7 +1367,7 @@ void analyze_get_url(char *p)
     for(;i<sizeof(urls)/sizeof(URLStruct);i++) {
       if(pgm_read_byte(urls[i].url)==str[0]
        &&pgm_read_byte(urls[i].url+1)==str[1]) {
-  
+
         // check password
         byte ret = HTML_UNAUTHORIZED;
 
@@ -1407,10 +1407,10 @@ void analyze_get_url(char *p)
         break;
       }
     }
-    
+
     if((i==sizeof(urls)/sizeof(URLStruct)) && os.status.has_sd) {
       // no server funtion found, file handler
-      byte k=0;  
+      byte k=0;
       while (str[k]!=' ' && k<32) {tmp_buffer[k]=str[k];k++;}//search the end, indicated by space
       tmp_buffer[k]=0;
       // change dir to root
@@ -1433,8 +1433,8 @@ void analyze_get_url(char *p)
 unsigned long getNtpTime()
 {
   byte ntpip[4] = {
-    os.options[OPTION_NTP_IP1].value, 
-    os.options[OPTION_NTP_IP2].value, 
+    os.options[OPTION_NTP_IP1].value,
+    os.options[OPTION_NTP_IP2].value,
     os.options[OPTION_NTP_IP3].value,
     os.options[OPTION_NTP_IP4].value};
   uint32_t time;
@@ -1452,11 +1452,11 @@ unsigned long getNtpTime()
         }else{
           time-=2208988800UL;
         }
-        return time;      
+        return time;
       }
     } while(millis() < expire);
     tick ++;
-  } while(tick<20);  
+  } while(tick<20);
   return 0;
 }
 #endif
