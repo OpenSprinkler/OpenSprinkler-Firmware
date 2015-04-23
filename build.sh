@@ -11,6 +11,14 @@ else
 fi
 
 if [ -f OpenSprinkler.launch ] && [ ! -f /etc/init.d/OpenSprinkler.sh ]; then
+
+	read -p "Do you want to start OpenSprinkler on startup? " -n 1 -r
+	echo
+
+	if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+		exit 0
+	fi
+
 	echo "Adding OpenSprinkler launch script..."
 
 	# Get current directory (binary location)
