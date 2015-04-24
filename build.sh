@@ -1,5 +1,13 @@
 #!/bin/bash
 
+while getopts ":s" opt; do
+  case $opt in
+    s)
+	  SILENT=true
+	  command shift
+      ;;
+  esac
+done
 echo "Building OpenSprinkler..."
 
 if [ "$1" == "demo" ]; then
@@ -10,7 +18,7 @@ else
 	gcc -o OpenSprinkler -DOSPI main.cpp OpenSprinkler.cpp program.cpp server.cpp utils.cpp weather.cpp gpio.cpp
 fi
 
-if [ -f OpenSprinkler.launch ] && [ ! -f /etc/init.d/OpenSprinkler.sh ]; then
+if [ ! "$SILENT" = true ] && [ -f OpenSprinkler.launch ] && [ ! -f /etc/init.d/OpenSprinkler.sh ]; then
 
 	read -p "Do you want to start OpenSprinkler on startup? " -n 1 -r
 	echo
