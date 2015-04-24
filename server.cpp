@@ -730,7 +730,7 @@ byte server_json_programs(char *p)
 /** Output script url form */
 byte server_view_scripturl(char *p) {
   print_html_standard_header();
-  bfill.emit_p(PSTR("<hr /><form name=of action=cu method=get><p><b>Script URL:</b><input type=text size=32 maxlength=127 value=\"$E\" name=jsp></p><p>Default is $S<br />If local on uSD card, use ./</p><p><b>Password:</b><input type=password size=32 name=pw><input type=submit></p><hr /></form>"), ADDR_NVM_SCRIPTURL, DEFAULT_JAVASCRIPT_URL);
+  bfill.emit_p(PSTR("<hr /><form name=of action=cu method=get><p><b>Script URL:</b><input type=text size=32 maxlength=127 value=\"$E\" name=jsp></p><p>Default is $S<br />If local on uSD card, use ./</p><p><b>Password:</b><input type=password size=32 name=pw><input type=submit></p><hr /></form><script src=https://ui.opensprinkler.com/js/hasher.js></script>"), ADDR_NVM_SCRIPTURL, DEFAULT_JAVASCRIPT_URL);
   return HTML_OK;
 }
 
