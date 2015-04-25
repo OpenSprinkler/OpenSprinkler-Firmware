@@ -67,10 +67,13 @@ BufferFiller bfill;                       // buffer filler
 OpenSprinkler os; // OpenSprinkler object
 ProgramData pd;   // ProgramdData object
 
-#if defined(ARDUINO)
-
 // ====== UI defines ======
+
+#if defined(ARDUINO) || (RPIBBBLCD)
 static char ui_anim_chars[3] = {'.', 'o', 'O'};
+#endif
+
+#if defined(ARDUINO)
 
 #define UI_STATE_DEFAULT   0
 #define UI_STATE_DISP_IP   1
@@ -231,12 +234,16 @@ ISR(WDT_vect)
     sysReset();
   }
 }
+
 #else
 void do_setup() {
   os.begin();          // OpenSprinkler init
   os.options_setup();  // Setup options
 
   pd.init();            // ProgramData init
+  #if defined(RPIBBBLCD)
+    os.lcd_print_time(0);  // display time to LCD
+  #endif
   if (os.start_network()) {  // initialize network
     DEBUG_PRINTLN("network established.");
     os.status.network_fails = 0;
@@ -297,6 +304,8 @@ void do_loop()
 #if defined(ARDUINO)
     if (!ui_state)
       os.lcd_print_time(0);       // print time
+#elif defined(RPIBBBLCD)
+    os.lcd_print_time(0);  // display time to LCD without UI state check
 #endif
 
     // ====== Check raindelay status ======
@@ -517,6 +526,8 @@ void do_loop()
     // process LCD display
     if (!ui_state)
       os.lcd_print_station(1, ui_anim_chars[curr_time%3]);
+#elif defined(RPIBBBLCD)
+    os.lcd_print_station(1, ui_anim_chars[curr_time%3]);  // LCD display without UI state check
 #endif
 
     // perform ntp sync

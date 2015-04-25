@@ -54,9 +54,15 @@ char tmp_buffer[TMP_BUFFER_SIZE+1];       // scratch buffer
 
 #if defined(ARDUINO)
   LiquidCrystal OpenSprinkler::lcd;
-#elif defined(OSPI)
-  // todo: LCD define for OSPi
+#elif defined(RPIBBBLCD) // OpenSprinkler_I2C_RPi doesn't like object being created without parameters...
+  LCD OpenSprinkler::lcd(I2C_NUM_BUS, I2C_DEV_ADDR, RS_PIN, RW_PIN, EN_PIN, D4_PIN, D5_PIN, D6_PIN, D7_PIN, BL_PIN, NEGATIVE);
 #endif
+
+/* #if defined(ARDUINO)
+  #define BINLIT B    // Arduino binary literal format
+#elif defined(RPIBBBLCD)
+  #define BINLIT 0b   // C++ binary literal format                  
+#endif */
 
 /** Option json names */
 prog_char _json_fwv [] PROGMEM = "fwv";
@@ -413,7 +419,7 @@ void OpenSprinkler::begin() {
   /*pinMode(PIN_RELAY, OUTPUT);
   digitalWrite(PIN_RELAY, LOW);*/
 
-#if defined(ARDUINO)  // AVR LCD functions
+#if defined(ARDUINO)  // AVR LCD/UI functions
   // set sd cs pin high to release SD
   pinMode(PIN_SD_CS, OUTPUT);
   digitalWrite(PIN_SD_CS, HIGH);
@@ -432,56 +438,6 @@ void OpenSprinkler::begin() {
   // Init I2C
   Wire.begin();
 
-  // define lcd custom icons
-  byte lcd_wifi_char[8] = {
-    B00000,
-    B10100,
-    B01000,
-    B10101,
-    B00001,
-    B00101,
-    B00101,
-    B10101
-  };
-  byte lcd_sd_char[8] = {
-    B00000,
-    B00000,
-    B11111,
-    B10001,
-    B11111,
-    B10001,
-    B10011,
-    B11110
-  };
-  byte lcd_rain_char[8] = {
-    B00000,
-    B00000,
-    B00110,
-    B01001,
-    B11111,
-    B00000,
-    B10101,
-    B10101
-  };
-  byte lcd_connect_char[8] = {
-    B00000,
-    B00000,
-    B00111,
-    B00011,
-    B00101,
-    B01000,
-    B10000,
-    B00000
-  };
-  lcd.createChar(1, lcd_wifi_char);
-  lcd_wifi_char[1]=0;
-  lcd_wifi_char[2]=0;
-  lcd_wifi_char[3]=1;
-  lcd.createChar(0, lcd_wifi_char);
-  lcd.createChar(2, lcd_sd_char);
-  lcd.createChar(3, lcd_rain_char);
-  lcd.createChar(4, lcd_connect_char);
-
   // set button pins
   // enable internal pullup
   pinMode(PIN_BUTTON_1, INPUT);
@@ -495,6 +451,25 @@ void OpenSprinkler::begin() {
   if (RTC.detect()==0) {
     status.has_rtc = 1;
   }
+#elif defined(RPIBBBLCD) // RPi/BBB LCD functions
+  // lcd.init(I2C_NUM_BUS, I2C_DEV_ADDR, RS_PIN, RW_PIN, EN_PIN, D4_PIN, D5_PIN, D6_PIN, D7_PIN, BL_PIN, NEGATIVE);
+	lcd.begin(16, 2);				// Initilize 16x2 display
+#endif
+
+#if defined(ARDUINO) || (RPIBBBLCD) // AVR and RPi/BBB LCD functions
+  // define lcd custom icons - now in decimal as C++ doesn't do binary literals
+  byte lcd_wifi_char[8] = {0,20,8,21,1,5,5,21};
+  byte lcd_sd_char[8] = {0,0,31,17,31,17,17,30};
+  byte lcd_rain_char[8] = {0,0,6,9,31,0,21,21};
+  byte lcd_connect_char[8] = {0,0,7,3,5,8,16,0};
+  lcd.createChar(1, lcd_wifi_char);
+  lcd_wifi_char[1]=0;
+  lcd_wifi_char[2]=0;
+  lcd_wifi_char[3]=1;
+  lcd.createChar(0, lcd_wifi_char);
+  lcd.createChar(2, lcd_sd_char);
+  lcd.createChar(3, lcd_rain_char);
+  lcd.createChar(4, lcd_connect_char);
 #endif
 }
 
@@ -740,7 +715,7 @@ void OpenSprinkler::options_setup() {
 
   //if (curr_ver<100) curr_ver = curr_ver*10; // adding a default 0 if version number is the old type
   if (curr_ver != OS_FW_VERSION || nvm_read_byte((byte*)(ADDR_NVM_OPTIONS+OPTION_RESET))==0xAA)  {
-#if defined(ARDUINO)
+#if defined(ARDUINO) || (RPIBBBLCD)
     lcd_print_line_clear_pgm(PSTR("Resetting Device"), 0);
     lcd_print_line_clear_pgm(PSTR("Please Wait..."), 1);
 #else
@@ -917,8 +892,8 @@ void OpenSprinkler::raindelay_stop() {
   nvdata_save();
 }
 
-#if defined(ARDUINO)    // AVR LCD and button functions
-/** LCD and button functions */
+#if defined(ARDUINO) || (RPIBBBLCD)   // AVR and RPi/BBB LCD functions
+/** LCD functions */
 /** print a program memory string */
 void OpenSprinkler::lcd_print_pgm(PGM_P PROGMEM str) {
   uint8_t c;
@@ -1105,8 +1080,9 @@ void OpenSprinkler::lcd_print_option(int i) {
   else if (i==OPTION_MASTER_ON_ADJ || i==OPTION_MASTER_OFF_ADJ || i==OPTION_MASTER_ON_ADJ_2 || i==OPTION_MASTER_OFF_ADJ_2 || i==OPTION_STATION_DELAY_TIME)
     lcd_print_pgm(PSTR(" sec"));
 }
+#endif
 
-
+#if defined(ARDUINO) // AVR button functions
 /** Button functions */
 /** wait for button */
 byte OpenSprinkler::button_read_busy(byte pin_butt, byte waitmode, byte butt, byte is_holding) {
@@ -1221,4 +1197,3 @@ void OpenSprinkler::lcd_set_brightness() {
   analogWrite(PIN_LCD_BACKLIGHT, 255-options[OPTION_LCD_BACKLIGHT].value);
 }
 #endif  // end of LCD and button functions
-
