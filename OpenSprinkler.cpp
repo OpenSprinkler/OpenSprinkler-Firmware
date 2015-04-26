@@ -259,6 +259,9 @@ byte OpenSprinkler::start_network() {
     tmp_buffer[3] = 0x2D;
     tmp_buffer[4] = 0x31;
     tmp_buffer[5] = options[OPTION_DEVICE_ID].value;
+  } else {
+    // has hardware MAC chip
+    status.has_hwmac = 1;
   }
 
   if(!ether.begin(ETHER_BUFFER_SIZE, (uint8_t*)tmp_buffer, PIN_ETHER_CS))  return 0;

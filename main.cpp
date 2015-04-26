@@ -796,8 +796,11 @@ void write_log(byte type, ulong curr_time) {
     }
   }
   SdFile file;
-  file.open(tmp_buffer, O_CREAT | O_WRITE );
+  int ret = file.open(tmp_buffer, O_CREAT | O_WRITE );
   file.seekEnd();
+  if(!ret) {
+    return;
+  }
 #else // prepare log folder for RPI/BBB
   struct stat st;
   if(stat(LOG_PREFIX, &st)) {
