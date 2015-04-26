@@ -365,8 +365,13 @@ void do_loop()
               // water time is scaled by watering percentage
               ulong water_time = water_time_resolve(water_time_decode(prog.durations[sid]));
               // if the program is set to use weather scaling
-              if (prog.use_weather)
-                water_time = water_time * os.options[OPTION_WATER_PERCENTAGE].value / 100;
+              if (prog.use_weather) {
+                byte wl = os.options[OPTION_WATER_PERCENTAGE].value;
+                water_time = water_time * wl / 100;
+                if (wl < 20 && water_time < 10) // if water_percentage is less than 20% and water_time is less than 10 seconds
+                                                // do not water
+                  water_time = 0;
+              }
               pd.scheduled_stop_time[sid] = water_time;
 
               if (pd.scheduled_stop_time[sid]) {
