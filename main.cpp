@@ -38,12 +38,11 @@ unsigned long getNtpTime();
 void manual_start_program(byte pid);
 #else // header and defs for RPI/BBB
 #include <sys/stat.h>
+#include "etherport.h"
 #include "server.h"
 char ether_buffer[ETHER_BUFFER_SIZE];
-struct sockaddr_in svr_addr, cli_addr;
-socklen_t sin_len;
-int sock = -1;
-int client;
+EthernetServer *m_server = 0;
+EthernetClient *m_client = 0;
 #endif
 
 // Some perturbations have been added to the timing values below
@@ -283,10 +282,23 @@ void do_loop()
   ui_state_machine();
 
 #else // Process Ethernet packets for RPI/BBB
-  client = accept(sock, (struct sockaddr *) &cli_addr, &sin_len);
-  if(client>=0) {
-    read(client, ether_buffer, ETHER_BUFFER_SIZE);
-    analyze_get_url(ether_buffer);
+  EthernetClient client = m_server->available();
+  if (client) {
+    while(true) {
+      int len = client.read((uint8_t*) ether_buffer, ETHER_BUFFER_SIZE);
+      if (len <=0) {
+        if(!client.connected()) {
+          break;
+        } else {
+          continue;
+        }
+      } else {
+        m_client = &client;
+        analyze_get_url(ether_buffer);
+        m_client = 0;
+        break;
+      }
+    }
   }
 #endif  // Process Ethernet packets
 

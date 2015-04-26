@@ -33,21 +33,13 @@ static uint8_t ntpclientportL = 123; // Default NTP client port
 
 #else
 
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <netdb.h>
-#include <arpa/inet.h>
-#include <err.h>
 #include <stdarg.h>
+#include <stdlib.h>
+#include "etherport.h"
 #include "server.h"
 
-extern int client;
 extern char ether_buffer[];
+extern EthernetClient *m_client;
 
 #endif
 
@@ -209,27 +201,27 @@ inline void send_packet(bool final=false) {
 
 #else
 void print_html_standard_header() {
-  write(client, html200OK, strlen(html200OK));
-  write(client, htmlContentHTML, strlen(htmlContentHTML));
-  write(client, htmlNoCache, strlen(htmlNoCache));
-  write(client, htmlAccessControl, strlen(htmlAccessControl));
-  write(client, "\r\n", 2);
+  m_client->write((const uint8_t *)html200OK, strlen(html200OK));
+  m_client->write((const uint8_t *)htmlContentHTML, strlen(htmlContentHTML));
+  m_client->write((const uint8_t *)htmlNoCache, strlen(htmlNoCache));
+  m_client->write((const uint8_t *)htmlAccessControl, strlen(htmlAccessControl));
+  m_client->write((const uint8_t *)"\r\n", 2);
 }
 
 void print_json_header() {
-  write(client, html200OK, strlen(html200OK));
-  write(client, htmlContentJSON, strlen(htmlContentJSON));
-  write(client, htmlNoCache, strlen(htmlNoCache));
-  write(client, htmlAccessControl, strlen(htmlAccessControl));
-  write(client, "\r\n", 2);
+  m_client->write((const uint8_t *)html200OK, strlen(html200OK));
+  m_client->write((const uint8_t *)htmlContentJSON, strlen(htmlContentJSON));
+  m_client->write((const uint8_t *)htmlNoCache, strlen(htmlNoCache));
+  m_client->write((const uint8_t *)htmlAccessControl, strlen(htmlAccessControl));
+  m_client->write((const uint8_t *)"\r\n", 2);
 }
 
 void print_json_header_with_bracket() {
-  write(client, html200OK, strlen(html200OK));
-  write(client, htmlContentJSON, strlen(htmlContentJSON));
-  write(client, htmlNoCache, strlen(htmlNoCache));
-  write(client, htmlAccessControl, strlen(htmlAccessControl));
-  write(client, "\r\n{", 3);
+  m_client->write((const uint8_t *)html200OK, strlen(html200OK));
+  m_client->write((const uint8_t *)htmlContentJSON, strlen(htmlContentJSON));
+  m_client->write((const uint8_t *)htmlNoCache, strlen(htmlNoCache));
+  m_client->write((const uint8_t *)htmlAccessControl, strlen(htmlAccessControl));
+  m_client->write((const uint8_t *)"\r\n{", 3);
 }
 
 byte findKeyVal (const char *str,char *strbuf, uint8_t maxlen,const char *key,bool key_in_pgm=false,uint8_t *keyfound=NULL)
@@ -314,9 +306,9 @@ inline void rewind_ether_buffer() {
 }
 
 inline void send_packet(bool final=false) {
-  write(client, ether_buffer, strlen(ether_buffer));
+  m_client->write((const uint8_t *)ether_buffer, strlen(ether_buffer));
   if (final)
-    close(client);
+    m_client->stop();
   else
     rewind_ether_buffer();
 }
@@ -631,7 +623,6 @@ byte server_change_program(char *p) {
   pv++; // this should be a '['
   for (i=0;i<os.nstations;i++) {
     uint16_t pre = parse_listdata(&pv);
-    DEBUG_PRINTLN(pre);
     prog.durations[i] = water_time_encode(pre);
   }
   pv++; // this should be a ']'

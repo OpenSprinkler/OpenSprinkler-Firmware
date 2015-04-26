@@ -24,8 +24,10 @@
 #if defined(ARDUINO)
 
 #else
+#include "etherport.h"
 #include <string.h>
 #include <stdlib.h>
+#include <netdb.h>
 extern char ether_buffer[];
 #endif
 
@@ -46,6 +48,7 @@ static void getweather_callback(byte status, uint16_t off, uint16_t len) {
   char *p = (char*)Ethernet::buffer + off;
 #else
   char *p = ether_buffer;
+  DEBUG_PRINTLN(p);
 #endif
 
   /* scan the buffer until the first & symbol */
@@ -167,33 +170,29 @@ void peel_http_header() { // remove the HTTP header
 }
 
 void GetWeather() {
-  int sockfd = -1;
-  struct sockaddr_in serv_addr;
-  struct hostent *server;
+  EthernetClient client;
 
-  sockfd = socket(AF_INET, SOCK_STREAM, 0);
-  if(sockfd < 0) {
-    DEBUG_PRINT("can't establish socket: ");
-    DEBUG_PRINTLN(sockfd);
-    return;
+  static struct hostent *server = NULL;
+  if (!server) {
+    strcpy(tmp_buffer, WEATHER_SCRIPT_HOST);
+    server = gethostbyname(tmp_buffer);
+    if (!server) {
+      DEBUG_PRINTLN("can't resolve weather server");
+      return;    
+    }
+    DEBUG_PRINT("weather server ip:");
+    DEBUG_PRINT(((uint8_t*)server->h_addr)[0]);
+    DEBUG_PRINT(":");
+    DEBUG_PRINT(((uint8_t*)server->h_addr)[1]);
+    DEBUG_PRINT(":");
+    DEBUG_PRINT(((uint8_t*)server->h_addr)[2]);
+    DEBUG_PRINT(":");
+    DEBUG_PRINTLN(((uint8_t*)server->h_addr)[3]);
   }
-  strcpy(tmp_buffer, WEATHER_SCRIPT_HOST);
-  server = gethostbyname(tmp_buffer);
-  if(server == NULL) {
-    DEBUG_PRINTLN("can't resolve weather server");
-    close(sockfd);
-    return;
-  }
-  bzero((char*)&serv_addr, sizeof(serv_addr));
-  serv_addr.sin_family = AF_INET;
-  bcopy((char*)server->h_addr, (char*)&serv_addr.sin_addr.s_addr, server->h_length);
-  serv_addr.sin_port = htons(80);
- 
-  int ret=connect(sockfd, (struct sockaddr*)&serv_addr, sizeof(serv_addr));
-  if ( ret < 0) {
-    DEBUG_PRINT("failed to connect: ");
-    DEBUG_PRINTLN(ret);
-    close(sockfd);
+
+  if (!client.connect((uint8_t*)server->h_addr, 80)) {
+    DEBUG_PRINTLN("failed to connect to weather server");
+    client.stop();
     return;
   }
 
@@ -227,29 +226,25 @@ void GetWeather() {
   strcpy(urlBuffer, "GET /weather");
   strcat(urlBuffer, dst);
   strcat(urlBuffer, " HTTP/1.0\r\nHOST: weather.opensprinkler.com\r\n\r\n");
-  int n=write(sockfd,urlBuffer,strlen(urlBuffer));
-  if(n<0) {
-    DEBUG_PRINTLN("error sending data to weather server");
-    return;
-  }
+  
+  client.write((uint8_t *)urlBuffer, strlen(urlBuffer));
+  
   bzero(tmp_buffer, TMP_BUFFER_SIZE);
   
-  time_t timeout = os.now_tz() + 5;
-  n=-1;
+  time_t timeout = os.now_tz() + 5; // 5 seconds timeout
   os.status.wt_received = 0;
   while(os.now_tz() < timeout) {
-    n = read(sockfd, ether_buffer, ETHER_BUFFER_SIZE);
-    if(n>0) {
-      peel_http_header();
-      getweather_callback(0, 0, ETHER_BUFFER_SIZE);
-      close(sockfd);
-      return;
+    int len=client.read((uint8_t *)ether_buffer, ETHER_BUFFER_SIZE);
+    if (len<=0) {
+      if(!client.connected())
+        break;
+      else 
+        continue;
     }
+    peel_http_header();
+    getweather_callback(0, 0, ETHER_BUFFER_SIZE);
   }
-  if(n<0) {
-    DEBUG_PRINTLN("error reading data from weather server");
-  }
-  close(sockfd);
+  client.stop();
 }
 #endif // GetWeather()
 

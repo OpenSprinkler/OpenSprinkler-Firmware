@@ -34,18 +34,10 @@
   #include "DS1307RTC.h"
   #include "EtherCard.h"
 #else // headers for RPI/BBB/LINUX
-  #include <stdio.h>
-  #include <stdlib.h>
-  #include <string.h>
   #include <time.h>
+  #include <string.h>
   #include <unistd.h>
-  #include <sys/types.h>
-  #include <sys/socket.h>
-  #include <netinet/in.h>
-  #include <sys/ioctl.h>
-  #include <netdb.h>
-  #include <arpa/inet.h>
-  #include <err.h>
+  #include "etherport.h"
 #endif // end of headers
 
 #include "defines.h"

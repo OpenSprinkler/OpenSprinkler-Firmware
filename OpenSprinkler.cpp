@@ -311,49 +311,20 @@ void OpenSprinkler::reboot_dev() {
 
 #else // RPI/BBB/LINUX network init functions
 
-extern struct sockaddr_in svr_addr, cli_addr;
-extern socklen_t sin_len;
-extern int sock;
-extern int client;
+extern EthernetServer *m_server;
+
 byte OpenSprinkler::start_network() {
-  int one = 1;
-  sin_len = sizeof(cli_addr);
-  sock = socket(AF_INET, SOCK_STREAM, 0);
-  if (sock < 0) {
-    DEBUG_PRINT("failed to create socket: ");
-    DEBUG_PRINTLN(sock);
-    return 0;
-  }
-  setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &one, sizeof(int));
-  int on=1;
-  ioctl(sock, FIONBIO, (char*)&on); // Make socket non-blocking
   unsigned int port = (unsigned int)(options[OPTION_HTTPPORT_1].value<<8) + (unsigned int)options[OPTION_HTTPPORT_0].value;
 #if defined(DEMO)
   port = 8080;
 #endif
-  svr_addr.sin_family = AF_INET;
-  svr_addr.sin_addr.s_addr = INADDR_ANY;
-  svr_addr.sin_port = htons(port);
-
-  int ret = bind(sock, (struct sockaddr *) &svr_addr, sizeof(svr_addr));
-  if (ret == -1) {
-    DEBUG_PRINT("failed to bind socket: ");
-    DEBUG_PRINTLN(ret);
-    close(sock);
-    return 0;
+  if(m_server)  {
+    delete m_server;
+    m_server = 0;
   }
-  ret = listen(sock, 5);
-  if (ret == -1) {
-    DEBUG_PRINT("failed to listen on socket: ");
-    DEBUG_PRINTLN(ret);
-    close(sock);
-    return 0;
-  }
-
-  DEBUG_PRINT("started web server at port ");
-  DEBUG_PRINTLN(port);
-
-  return 1;
+  
+  m_server = new EthernetServer(port);
+  return m_server->begin();
 }
 
 #include <sys/reboot.h>
