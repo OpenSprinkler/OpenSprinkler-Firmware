@@ -115,7 +115,7 @@ static prog_uchar htmlContentJgz[] PROGMEM =
 
 static prog_uchar htmlContentJSON[] PROGMEM =
   "Content-Type: application/json\r\n"
-  "Connnection: close\r\n"
+  "Connection: close\r\n"
 ;
 
 static prog_uchar htmlMobileHeader[] PROGMEM =

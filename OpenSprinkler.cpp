@@ -361,6 +361,7 @@ void OpenSprinkler::reboot_dev() {
 #if defined(DEMO)
   // do nothing
 #else
+  sync();
 	reboot(RB_AUTOBOOT);
 #endif
 }
