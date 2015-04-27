@@ -58,6 +58,10 @@ char tmp_buffer[TMP_BUFFER_SIZE+1];       // scratch buffer
   // todo: LCD define for OSPi
 #endif
 
+#if defined(OSPI)
+  byte OpenSprinkler::pin_sr_data = PIN_SR_DATA;
+#endif
+
 /** Option json names */
 prog_char _json_fwv [] PROGMEM = "fwv";
 prog_char _json_tz  [] PROGMEM = "tz";
@@ -102,46 +106,46 @@ prog_char _json_mtof2[]PROGMEM = "mtof2";
 prog_char _json_reset[] PROGMEM = "reset";
 
 /** Option names */
-prog_char _str_fwv [] PROGMEM = "Firmware: ";
+prog_char _str_fwv [] PROGMEM = "FW:";
 prog_char _str_tz  [] PROGMEM = "TZone:";
 prog_char _str_ntp [] PROGMEM = "NTP?";
 prog_char _str_dhcp[] PROGMEM = "DHCP?";
-prog_char _str_ip1 [] PROGMEM = "Static.ip1:";
+prog_char _str_ip1 [] PROGMEM = "OS.ip1:";
 prog_char _str_ip2 [] PROGMEM = ".ip2:";
 prog_char _str_ip3 [] PROGMEM = ".ip3:";
 prog_char _str_ip4 [] PROGMEM = ".ip4:";
-prog_char _str_gw1 [] PROGMEM = "Gateway.ip1:";
+prog_char _str_gw1 [] PROGMEM = "GW.ip1:";
 prog_char _str_gw2 [] PROGMEM = ".ip2:";
 prog_char _str_gw3 [] PROGMEM = ".ip3:";
 prog_char _str_gw4 [] PROGMEM = ".ip4:";
-prog_char _str_hp0 [] PROGMEM = "HTTP port:";
+prog_char _str_hp0 [] PROGMEM = "Port:";
 prog_char _str_hp1 [] PROGMEM = "";
-prog_char _str_hwv [] PROGMEM = "Hardware: ";
+prog_char _str_hwv [] PROGMEM = "HW: ";
 prog_char _str_ext [] PROGMEM = "Exp. board:";
 prog_char _str_seq [] PROGMEM = "";   // the option 'sequential' is now retired
 prog_char _str_sdt [] PROGMEM = "Stn delay:";
-prog_char _str_mas [] PROGMEM = "Master1:";
-prog_char _str_mton[] PROGMEM = "Master1  on adj:";
-prog_char _str_mtof[] PROGMEM = "Master1 off adj:";
+prog_char _str_mas [] PROGMEM = "Mas1:";
+prog_char _str_mton[] PROGMEM = "Mas1  on adj:";
+prog_char _str_mtof[] PROGMEM = "Mas1 off adj:";
 prog_char _str_urs [] PROGMEM = "Rain sensor:";
 prog_char _str_rso [] PROGMEM = "Normally open?";
 prog_char _str_wl  [] PROGMEM = "% Watering:";
-prog_char _str_den [] PROGMEM = "Device enable?";
-prog_char _str_ipas[] PROGMEM = "Ign password?";
+prog_char _str_den [] PROGMEM = "Dev. enable?";
+prog_char _str_ipas[] PROGMEM = "Ign pwd?";
 prog_char _str_devid[]PROGMEM = "Dev. ID:";
-prog_char _str_con [] PROGMEM = "LCD contrast:";
-prog_char _str_lit [] PROGMEM = "Backlight:";
-prog_char _str_dim [] PROGMEM = "Dimming:";
+prog_char _str_con [] PROGMEM = "LCD con.:";
+prog_char _str_lit [] PROGMEM = "LCD lit.:";
+prog_char _str_dim [] PROGMEM = "LCD dim.:";
 prog_char _str_rlp [] PROGMEM = ""; // the option 'relay pulsing' is now retired
 prog_char _str_uwt [] PROGMEM = "Use weather?";
 prog_char _str_ntp1[] PROGMEM = "NTP.ip1:";
 prog_char _str_ntp2[] PROGMEM = ".ip2:";
 prog_char _str_ntp3[] PROGMEM = ".ip3:";
 prog_char _str_ntp4[] PROGMEM = ".ip4:";
-prog_char _str_log [] PROGMEM = "Logging?";
-prog_char _str_mas2[] PROGMEM = "Master2:";
-prog_char _str_mton2[]PROGMEM = "Master2  on adj:";
-prog_char _str_mtof2[]PROGMEM = "Master2 off adj:";
+prog_char _str_log [] PROGMEM = "Log?";
+prog_char _str_mas2[] PROGMEM = "Mas2:";
+prog_char _str_mton2[]PROGMEM = "Mas2  on adj:";
+prog_char _str_mtof2[]PROGMEM = "Mas2 off adj:";
 prog_char _str_reset[] PROGMEM = "Reset all?";
 
 OptionStruct OpenSprinkler::options[NUM_OPTIONS] = {
@@ -332,7 +336,7 @@ void OpenSprinkler::reboot_dev() {
 #if defined(DEMO)
   // do nothing
 #else
-  sync();
+  sync(); // add sync to prevent file corruption
 	reboot(RB_AUTOBOOT);
 #endif
 }
@@ -349,7 +353,20 @@ void OpenSprinkler::begin() {
   digitalWrite(PIN_SR_LATCH, HIGH);
 
   pinMode(PIN_SR_CLOCK, OUTPUT);
+  
+#if defined(OSPI)
+  pin_sr_data = PIN_SR_DATA;
+  // detect RPi revision
+  unsigned int rev = detect_rpi_rev();
+  if (rev==0x0002 || rev==0x0003) 
+    pin_sr_data = PIN_SR_DATA_ALT;
+  DEBUG_PRINT("rpi revision:");
+  DEBUG_PRINTLN(rev);
+  // if this is revision 1, use PIN_SR_DATA_ALT
+  pinMode(pin_sr_data, OUTPUT);
+#else
   pinMode(PIN_SR_DATA,  OUTPUT);
+#endif
 
 	// Reset all stations
   clear_all_station_bits();
@@ -362,7 +379,7 @@ void OpenSprinkler::begin() {
   pinMode(PIN_RAINSENSOR, INPUT);
 
 #if defined(ARDUINO)
-  digitalWrite(PIN_RAINSENSOR, HIGH); // enabled internal pullup
+  digitalWrite(PIN_RAINSENSOR, HIGH); // enabled internal pullup on rain sensor
 #else
   // RPI and BBB have external pullups
 #endif
@@ -371,7 +388,6 @@ void OpenSprinkler::begin() {
   // AVR assigns 0 to static variables by default
   // so only need to initialize non-zero ones
   status.enabled = 1;
-  //status.seq = 1;
 
   old_status = status;
 
@@ -489,7 +505,11 @@ void OpenSprinkler::apply_all_station_bits() {
       sbits = 0;
     for(s=0;s<8;s++) {
       digitalWrite(PIN_SR_CLOCK, LOW);
+#if defined(OSPI) // if OSPi, use dynamically assigned pin_sr_data
+      digitalWrite(pin_sr_data, (sbits & ((byte)1<<(7-s))) ? HIGH : LOW );
+#else      
       digitalWrite(PIN_SR_DATA, (sbits & ((byte)1<<(7-s))) ? HIGH : LOW );
+#endif
       digitalWrite(PIN_SR_CLOCK, HIGH);
     }
   }
@@ -716,7 +736,7 @@ void OpenSprinkler::options_setup() {
   //if (curr_ver<100) curr_ver = curr_ver*10; // adding a default 0 if version number is the old type
   if (curr_ver != OS_FW_VERSION || nvm_read_byte((byte*)(ADDR_NVM_OPTIONS+OPTION_RESET))==0xAA)  {
 #if defined(ARDUINO)
-    lcd_print_line_clear_pgm(PSTR("Resetting Device"), 0);
+    lcd_print_line_clear_pgm(PSTR("Resetting..."), 0);
     lcd_print_line_clear_pgm(PSTR("Please Wait..."), 1);
 #else
     DEBUG_PRINT("Resetting Options...");
@@ -921,10 +941,9 @@ void OpenSprinkler::lcd_print_2digit(int v)
 }
 
 /** print time to a given line */
-void OpenSprinkler::lcd_print_time(byte line)
+void OpenSprinkler::lcd_print_time(time_t t)
 {
-  time_t t=now_tz();
-  lcd.setCursor(0, line);
+  lcd.setCursor(0, 0);
   lcd_print_2digit(hour(t));
   lcd_print_pgm(PSTR(":"));
   lcd_print_2digit(minute(t));
@@ -937,30 +956,25 @@ void OpenSprinkler::lcd_print_time(byte line)
 }
 
 /** print ip address */
-void OpenSprinkler::lcd_print_ip(const byte *ip, byte lineno) {
-  lcd.setCursor(0, lineno);
-  for (byte i=0; i<3; i++) {
-    lcd.print((int)ip[i]);
-    lcd_print_pgm(PSTR("."));
+void OpenSprinkler::lcd_print_ip(const byte *ip, byte endian) {
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  for (byte i=0; i<4; i++) {
+    lcd.print(endian ? (int)ip[3-i] : (int)ip[i]);
+    if(i<3) lcd_print_pgm(PSTR("."));
   }
-  lcd.print((int)ip[3]);
 }
 
 /** print mac address */
 void OpenSprinkler::lcd_print_mac(const byte *mac) {
   lcd.setCursor(0, 0);
-  lcd_print_pgm(PSTR("MAC:"));
-  for(byte i=0; i<4; i++) {
+  for(byte i=0; i<6; i++) {
+    if(i)  lcd_print_pgm(PSTR("-"));
     lcd.print((mac[i]>>4), HEX);
     lcd.print((mac[i]&0x0F), HEX);
-    lcd_print_pgm(PSTR("-"));
+    if(i==4) lcd.setCursor(0, 1);
   }
-  lcd.setCursor(0, 1);
-  for(byte i=4; i<6; i++) {
-    if(i!=4) lcd_print_pgm(PSTR("-"));
-    lcd.print((mac[i]>>4), HEX);
-    lcd.print((mac[i]&0x0F), HEX);
-  }
+  lcd_print_pgm(PSTR(" (MAC)"));
 }
 
 /** print station bits */

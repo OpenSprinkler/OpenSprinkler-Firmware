@@ -102,23 +102,41 @@ void ui_state_machine() {
     switch (button & BUTTON_MASK) {
     case BUTTON_1:
       if (button & BUTTON_FLAG_HOLD) {  // holding B1: stop all stations
-        if (digitalRead(PIN_BUTTON_2)==0) { // if B2 is pressed, run a short test (internal test)
+        if (digitalRead(PIN_BUTTON_3)==0) { // if B3 is pressed while holding B1, run a short test (internal test)
           manual_start_program(255);
+        } else if (digitalRead(PIN_BUTTON_2)==0) { // if B2 is pressed while holding B1, display gateway IP
+          os.lcd_print_ip(ether.gwip, 0);
+          os.lcd.setCursor(0, 1);
+          os.lcd_print_pgm(PSTR("(gwip)"));
+          ui_state = UI_STATE_DISP_IP;
         } else {
           reset_all_stations();
         }
       } else {  // clicking B1: display device IP and port
-        os.lcd.clear();
         os.lcd_print_ip(ether.myip, 0);
         os.lcd.setCursor(0, 1);
         os.lcd_print_pgm(PSTR(":"));
         os.lcd.print(ether.hisport);
+        os.lcd_print_pgm(PSTR(" (osip)"));
         ui_state = UI_STATE_DISP_IP;
       }
       break;
     case BUTTON_2:
       if (button & BUTTON_FLAG_HOLD) {  // holding B2: reboot
-        os.reboot_dev();
+        if (digitalRead(PIN_BUTTON_1)==0) { // if B1 is pressed while holding B2, display external IP
+          os.lcd_print_ip((byte*)(&os.external_ip), 1);
+          os.lcd.setCursor(0, 1);
+          os.lcd_print_pgm(PSTR("(eip)"));
+          ui_state = UI_STATE_DISP_IP;
+        } else if (digitalRead(PIN_BUTTON_3)==0) {  // if B3 is pressed while holding B2, display last successful weather call
+          os.lcd.clear();
+          os.lcd_print_time(os.checkwt_success_lasttime);
+          os.lcd.setCursor(0, 1);
+          os.lcd_print_pgm(PSTR("(lswc)"));
+          ui_state = UI_STATE_DISP_IP;          
+        } else { 
+          os.reboot_dev();
+        }
       } else {  // clicking B2: display MAC and gate way IP
         os.lcd.clear();
         os.lcd_print_mac(ether.mymac);
@@ -185,7 +203,7 @@ void do_setup() {
   // if rtc exists, sets it as time sync source
   setSyncProvider(os.status.has_rtc ? RTC.get : NULL);
   delay(500);
-  os.lcd_print_time(0);  // display time to LCD
+  os.lcd_print_time(os.now_tz());  // display time to LCD
 
   // enable WDT
   /* In order to change WDE or the prescaler, we need to
@@ -308,7 +326,7 @@ void do_loop()
 
 #if defined(ARDUINO)
     if (!ui_state)
-      os.lcd_print_time(0);       // print time
+      os.lcd_print_time(os.now_tz());       // print time
 #endif
 
     // ====== Check raindelay status ======

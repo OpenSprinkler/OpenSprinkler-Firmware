@@ -84,6 +84,11 @@ public:
   // todo: LCD define for RPI
 #endif
 
+#if defined(OSPI)
+  static byte pin_sr_data;    // RPi shift register data pin
+                              // to handle RPi rev. 1
+#endif
+
   static NVConData nvdata;
   static ConStatus status;
   static ConStatus old_status;
@@ -158,8 +163,8 @@ public:
 #if defined(ARDUINO) // LCD functions for Arduino
   static void lcd_print_pgm(PGM_P PROGMEM str);           // print a program memory string
   static void lcd_print_line_clear_pgm(PGM_P PROGMEM str, byte line);
-  static void lcd_print_time(byte line);                  // print current time
-  static void lcd_print_ip(const byte *ip, byte line);    // print ip
+  static void lcd_print_time(time_t t);                  // print current time
+  static void lcd_print_ip(const byte *ip, byte endian);    // print ip
   static void lcd_print_mac(const byte *mac);             // print mac
   static void lcd_print_station(byte line, char c);       // print station bits of the board selected by display_board
   static void lcd_print_version(byte v);                   // print version number

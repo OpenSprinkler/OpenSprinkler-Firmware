@@ -48,6 +48,9 @@ int16_t water_time_decode_signed(byte i);
   void nvm_write_block(const void *src, void *dst, int len);
   byte nvm_read_byte(const byte *p);
   void nvm_write_byte(const byte *p, byte v);
+#if defined(OSPI)
+  unsigned int detect_rpi_rev();
+#endif
 #endif  // NVM functions
 
 #endif // _UTILS_H

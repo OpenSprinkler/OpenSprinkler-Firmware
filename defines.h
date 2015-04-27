@@ -195,7 +195,7 @@ typedef enum {
   #define PIN_ETHER_CS       4    // Ethernet controller chip select pin
   #define PIN_SD_CS          0    // SD card chip select pin
   #define PIN_RAINSENSOR    11    // rain sensor is connected to pin D3
-  //#define PIN_RELAY         14    // mini relay is connected to pin D14
+  //#define PIN_RELAY         14    // mini relay is connected to pin D14, relay support is not retired
   #define PIN_EXP_SENSE      4    // expansion board sensing pin (A4)
 
   // Ethernet buffer size
@@ -233,10 +233,11 @@ typedef enum {
   #define OS_HW_VERSION    OSPI_HW_VERSION_BASE
   #define PIN_SR_LATCH      22    // shift register latch pin
   #define PIN_SR_DATA       27    // shift register data pin
+  #define PIN_SR_DATA_ALT   21    // shift register data pin (alternative, for RPi 1 rev. 1 boards)
   #define PIN_SR_CLOCK       4    // shift register clock pin
   #define PIN_SR_OE         17    // shift register output enable pin
   #define PIN_RAINSENSOR    14    // rain sensor
-  //#define PIN_RELAY         15    // mini relay
+  //#define PIN_RELAY         15    // mini relay, relay support is now retired
   #define PIN_RF_DATA       15    // RF transmitter pin
   #define PIN_BUTTON_1      23    // button 1
   #define PIN_BUTTON_2      24    // button 2
@@ -253,7 +254,7 @@ typedef enum {
   #define PIN_SR_CLOCK      31    // P9_13, shift register clock pin
   #define PIN_SR_OE         50    // P9_14, shift register output enable pin
   #define PIN_RAINSENSOR    48    // P9_15, rain sensor is connected to pin D3
-  //#define PIN_RELAY         51    // P9_16, mini relay is connected to pin D14
+  //#define PIN_RELAY         51    // P9_16, mini relay is connected to pin D14, relay support is now retired
   #define PIN_RF_DATA       51    // RF transmitter pin
   
   #else
