@@ -805,7 +805,6 @@ void log_statistics(time_t curr_time) {
     os.water_percent_avg = byte(wp_total / stat_n);
     // writes every 4*24 times (1 day)
     if (stat_n == 96) {
-      DEBUG_PRINTLN("wl");
       write_log(LOGDATA_WATERLEVEL, curr_time);
       stat_n = 0;
     }

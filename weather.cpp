@@ -48,7 +48,6 @@ static void getweather_callback(byte status, uint16_t off, uint16_t len) {
   char *p = (char*)Ethernet::buffer + off;
 #else
   char *p = ether_buffer;
-  DEBUG_PRINTLN(p);
 #endif
 
   /* scan the buffer until the first & symbol */

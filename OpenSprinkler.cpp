@@ -360,8 +360,6 @@ void OpenSprinkler::begin() {
   unsigned int rev = detect_rpi_rev();
   if (rev==0x0002 || rev==0x0003) 
     pin_sr_data = PIN_SR_DATA_ALT;
-  DEBUG_PRINT("rpi revision:");
-  DEBUG_PRINTLN(rev);
   // if this is revision 1, use PIN_SR_DATA_ALT
   pinMode(pin_sr_data, OUTPUT);
 #else

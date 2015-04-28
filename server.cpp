@@ -61,6 +61,7 @@ void analyze_get_url(char *p);
 void reset_all_stations_immediate();
 void reset_all_stations();
 void make_logfile_name(char *name);
+int available_ether_buffer();
 
 // Define return error code
 #define HTML_OK                0x00
@@ -186,17 +187,21 @@ byte findKeyVal (const char *str,char *strbuf, uint8_t maxlen,const char *key,bo
   return(i);
 }
 
-inline void rewind_ether_buffer() {
+void rewind_ether_buffer() {
   bfill = ether.tcpOffset();
 }
 
-inline void send_packet(bool final=false) {
+void send_packet(bool final=false) {
   if(final) {
     ether.httpServerReply_with_flags(bfill.position(), TCP_FLAGS_ACK_V|TCP_FLAGS_FIN_V);
   } else {
     ether.httpServerReply_with_flags(bfill.position(), TCP_FLAGS_ACK_V, 3);
     bfill=ether.tcpOffset();
   }
+}
+
+int available_ether_buffer() {
+  return ETHER_BUFFER_SIZE - (int)bfill.position();
 }
 
 #else
@@ -301,16 +306,20 @@ void BufferFiller::emit_p(const char *fmt, ...) {
   va_end(ap);
 }
 
-inline void rewind_ether_buffer() {
+void rewind_ether_buffer() {
   bfill = ether_buffer;
 }
 
-inline void send_packet(bool final=false) {
+void send_packet(bool final=false) {
   m_client->write((const uint8_t *)ether_buffer, strlen(ether_buffer));
   if (final)
     m_client->stop();
   else
     rewind_ether_buffer();
+}
+
+int available_ether_buffer() {
+  return ETHER_BUFFER_SIZE - (int)bfill.position();
 }
 #endif
 
@@ -377,6 +386,9 @@ void server_json_stations_main()
     bfill.emit_p(PSTR("\"$S\""), tmp_buffer);
     if(sid!=os.nstations-1)
       bfill.emit_p(PSTR(","));
+    if ((sid+1)%32 == 0) {  // push out one packet every 32 stations
+      send_packet();
+    }
   }
   server_json_stations_attrib(PSTR("masop"), os.masop_bits);
   server_json_stations_attrib(PSTR("ignore_rain"), os.ignrain_bits);
@@ -710,7 +722,9 @@ byte server_json_programs(char *p)
     } else {
       bfill.emit_p(PSTR("\"]"));
     }
-    if ((pid%3)==2) { // push out a packet every 3 programs
+    // push out a packet if available
+    // buffer size is getting small
+    if (available_ether_buffer() < 250) {
       send_packet();
     }
   }
@@ -755,7 +769,9 @@ void server_json_controller_main() {
       rem = (curr_time >= pd.scheduled_start_time[sid]) ? (pd.scheduled_stop_time[sid]-curr_time) : (pd.scheduled_stop_time[sid]-pd.scheduled_start_time[sid]);
     }
     bfill.emit_p(PSTR("[$D,$L,$L],"), pd.scheduled_program_index[sid], rem, pd.scheduled_start_time[sid]);
-    if((sid+1)%20==0) {
+    // if available ether buffer is getting small
+    // send out a packet
+    if(available_ether_buffer() < 50) {
       send_packet();
     }
   }
@@ -1195,7 +1211,9 @@ byte server_json_log(char *p) {
       if (first)  { bfill.emit_p(PSTR("$S"), tmp_buffer); first=false;}
       else {  bfill.emit_p(PSTR(",$S"), tmp_buffer); }
       count ++;
-      if (count % 25 == 0) {  // push out a packet every 25 records
+      // if the available ether buffer size is getting small
+      // push out a packet
+      if (available_ether_buffer() < 50) {
         send_packet();
         count = 0;
       }
