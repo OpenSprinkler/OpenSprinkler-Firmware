@@ -369,16 +369,23 @@ boolean check_password(char *p)
 
 void server_json_stations_attrib(const char* name, const byte* attrib)
 {
-  bfill.emit_p(PSTR("],\"$F\":["), name);
+  bfill.emit_p(PSTR("\"$F\":["), name);
   for(byte i=0;i<os.nboards;i++) {
     bfill.emit_p(PSTR("$D"), attrib[i]);
     if(i!=os.nboards-1)
       bfill.emit_p(PSTR(","));
   }
+  bfill.emit_p(PSTR("],"));
 }
 
 void server_json_stations_main()
 {
+  server_json_stations_attrib(PSTR("masop"), os.masop_bits);
+  server_json_stations_attrib(PSTR("ignore_rain"), os.ignrain_bits);
+  server_json_stations_attrib(PSTR("masop2"), os.masop2_bits);
+  server_json_stations_attrib(PSTR("stn_dis"), os.stndis_bits);
+  server_json_stations_attrib(PSTR("rfstn"), os.rfstn_bits);
+  server_json_stations_attrib(PSTR("stn_seq"), os.stnseq_bits);
   bfill.emit_p(PSTR("\"snames\":["));
   byte sid;
   for(sid=0;sid<os.nstations;sid++) {
@@ -386,16 +393,10 @@ void server_json_stations_main()
     bfill.emit_p(PSTR("\"$S\""), tmp_buffer);
     if(sid!=os.nstations-1)
       bfill.emit_p(PSTR(","));
-    if ((sid+1)%32 == 0) {  // push out one packet every 32 stations
+    if (available_ether_buffer()<80) {
       send_packet();
     }
   }
-  server_json_stations_attrib(PSTR("masop"), os.masop_bits);
-  server_json_stations_attrib(PSTR("ignore_rain"), os.ignrain_bits);
-  server_json_stations_attrib(PSTR("masop2"), os.masop2_bits);
-  server_json_stations_attrib(PSTR("stn_dis"), os.stndis_bits);
-  server_json_stations_attrib(PSTR("rfstn"), os.rfstn_bits);
-  server_json_stations_attrib(PSTR("stn_seq"), os.stnseq_bits);
   bfill.emit_p(PSTR("],\"maxlen\":$D}"), STATION_NAME_SIZE);
 }
 
@@ -771,7 +772,7 @@ void server_json_controller_main() {
     bfill.emit_p(PSTR("[$D,$L,$L],"), pd.scheduled_program_index[sid], rem, pd.scheduled_start_time[sid]);
     // if available ether buffer is getting small
     // send out a packet
-    if(available_ether_buffer() < 50) {
+    if(available_ether_buffer() < 80) {
       send_packet();
     }
   }
@@ -1160,7 +1161,8 @@ byte server_json_log(char *p) {
   bfill.emit_p(PSTR("["));
 
   char *s;
-  int res, count = 0;
+  int res;
+  //int count = 0;
   bool first = true;
   for(int i=start;i<=end;i++) {
     itoa(i, tmp_buffer, 10);
@@ -1210,12 +1212,12 @@ byte server_json_log(char *p) {
       // if this is the first record, do not print comma
       if (first)  { bfill.emit_p(PSTR("$S"), tmp_buffer); first=false;}
       else {  bfill.emit_p(PSTR(",$S"), tmp_buffer); }
-      count ++;
+      //count ++;
       // if the available ether buffer size is getting small
       // push out a packet
-      if (available_ether_buffer() < 50) {
+      if (available_ether_buffer() < 80) {
         send_packet();
-        count = 0;
+        //count = 0;
       }
     }
   }

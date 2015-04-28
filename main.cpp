@@ -192,7 +192,6 @@ void do_setup() {
   MCUSR &= ~(1<<WDRF);
 
   DEBUG_BEGIN(9600);
-  DEBUG_PRINTLN("started.");
   
   os.begin();          // OpenSprinkler init
   os.options_setup();  // Setup options
@@ -694,24 +693,24 @@ void schedule_all_stations(ulong curr_time) {
       seq_start_time += pd.scheduled_stop_time[sid];
       pd.scheduled_stop_time[sid] = seq_start_time;
       seq_start_time += station_delay; // add station delay time
-      DEBUG_PRINT("[");
+      /*DEBUG_PRINT("[");
       DEBUG_PRINT(sid);
       DEBUG_PRINT(":");
       DEBUG_PRINT(pd.scheduled_start_time[sid]);
       DEBUG_PRINT(",");
       DEBUG_PRINT(pd.scheduled_stop_time[sid]);
-      DEBUG_PRINTLN("]");
+      DEBUG_PRINTLN("]");*/
     } else {
       // concurrent scheduling
       pd.scheduled_start_time[sid] = con_start_time;
       pd.scheduled_stop_time[sid] = con_start_time + pd.scheduled_stop_time[sid];
-      DEBUG_PRINT("[");
+      /*DEBUG_PRINT("[");
       DEBUG_PRINT(sid);
       DEBUG_PRINT(":");
       DEBUG_PRINT(pd.scheduled_start_time[sid]);
       DEBUG_PRINT(",");
       DEBUG_PRINT(pd.scheduled_stop_time[sid]);
-      DEBUG_PRINTLN("]");
+      DEBUG_PRINTLN("]");*/
     }
     os.status.program_busy = 1;  // set program busy bit
 	}
