@@ -63,24 +63,24 @@ char tmp_buffer[TMP_BUFFER_SIZE+1];       // scratch buffer
 #endif
 
 /** Option json names */
-prog_char _json_fwv [] PROGMEM = "fwv";
-prog_char _json_tz  [] PROGMEM = "tz";
-prog_char _json_ntp [] PROGMEM = "ntp";
-prog_char _json_dhcp[] PROGMEM = "dhcp";
-prog_char _json_ip1 [] PROGMEM = "ip1";
-prog_char _json_ip2 [] PROGMEM = "ip2";
+prog_char _json_fwv [] PROGMEM = "fwv";  //firmware version json call
+prog_char _json_tz  [] PROGMEM = "tz";   //timezone offset
+prog_char _json_ntp [] PROGMEM = "ntp";  
+prog_char _json_dhcp[] PROGMEM = "dhcp"; //use dhcp?
+prog_char _json_ip1 [] PROGMEM = "ip1";  //block 1 device IP address
+prog_char _json_ip2 [] PROGMEM = "ip2";  
 prog_char _json_ip3 [] PROGMEM = "ip3";
 prog_char _json_ip4 [] PROGMEM = "ip4";
-prog_char _json_gw1 [] PROGMEM = "gw1";
+prog_char _json_gw1 [] PROGMEM = "gw1";  //block 1 gateway IP address
 prog_char _json_gw2 [] PROGMEM = "gw2";
 prog_char _json_gw3 [] PROGMEM = "gw3";
 prog_char _json_gw4 [] PROGMEM = "gw4";
-prog_char _json_hp0 [] PROGMEM = "hp0";
-prog_char _json_hp1 [] PROGMEM = "hp1";
-prog_char _json_hwv [] PROGMEM = "hwv";
-prog_char _json_ext [] PROGMEM = "ext";
+prog_char _json_hp0 [] PROGMEM = "hp0";  //block 1 port number ie:80
+prog_char _json_hp1 [] PROGMEM = "hp1";  //block 2 port number ie:83
+prog_char _json_hwv [] PROGMEM = "hwv";  //hardware version
+prog_char _json_ext [] PROGMEM = "ext";  //extension boards
 prog_char _json_seq [] PROGMEM = "_";   // the option 'sequential' is now retired
-prog_char _json_sdt [] PROGMEM = "sdt";
+prog_char _json_sdt [] PROGMEM = "sdt";  //station delay time
 prog_char _json_mas [] PROGMEM = "mas";
 prog_char _json_mton[] PROGMEM = "mton";
 prog_char _json_mtof[] PROGMEM = "mtof";
@@ -104,6 +104,8 @@ prog_char _json_mas2[] PROGMEM = "mas2";
 prog_char _json_mton2[]PROGMEM = "mton2";
 prog_char _json_mtof2[]PROGMEM = "mtof2";
 prog_char _json_reset[] PROGMEM = "reset";
+prog_char _json_etg  [] PROGMEM = "etg";
+prog_char _json_ets  [] PROGMEM = "ets";
 
 /** Option names */
 prog_char _str_fwv [] PROGMEM = "FW:";
@@ -147,6 +149,8 @@ prog_char _str_mas2[] PROGMEM = "Mas2:";
 prog_char _str_mton2[]PROGMEM = "Mas2  on adj:";
 prog_char _str_mtof2[]PROGMEM = "Mas2 off adj:";
 prog_char _str_reset[] PROGMEM = "Reset all?";
+prog_char _str_etg  [] PROGMEM = "ET Daily Grass";
+prog_char _str_ets  [] PROGMEM = "ET Daily Shrubs";
 
 OptionStruct OpenSprinkler::options[NUM_OPTIONS] = {
   {OS_FW_VERSION, 0, _str_fwv, _json_fwv}, // firmware version
