@@ -177,7 +177,7 @@ int EthernetClient::read(uint8_t *buf, size_t size)
 	FD_ZERO(&sock_set);
 	FD_SET(m_sock, &sock_set);
 	struct timeval timeout;
-	timeout.tv_sec = 1;
+	timeout.tv_sec = 3;
 	timeout.tv_usec = 0;
 
 	select(m_sock + 1, &sock_set, NULL, NULL, &timeout);

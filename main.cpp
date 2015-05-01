@@ -575,15 +575,13 @@ void check_weather() {
   // do not check weather if the Use Weather option is disabled, or if network is not available, or if a program is running
   if (os.status.network_fails>0 || os.status.program_busy) return;
 
-  uint16_t inv = 191;  // recheck every 191 seconds if didn't receive anything last time
-  if (os.status.wt_received)  inv = CHECK_WEATHER_INTERVAL;
   ulong ntz = os.now_tz();
   if (os.checkwt_success_lasttime && (ntz - os.checkwt_success_lasttime > CHECK_WEATHER_SUCCESS_INTERVAL)) {
     // if weather check has failed to return for too long, restart network
     os.network_lasttime = 0;
     return;
   }
-  if (!os.checkwt_lasttime || ((ntz - os.checkwt_lasttime) > inv)) {
+  if (!os.checkwt_lasttime || ((ntz - os.checkwt_lasttime) > CHECK_WEATHER_INTERVAL)) {
     os.checkwt_lasttime = os.now_tz();
     GetWeather();
   }

@@ -94,7 +94,6 @@ static void getweather_callback(byte status, uint16_t off, uint16_t len) {
   if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("eip"), true)) {
     os.external_ip = atol(tmp_buffer);
   }
-  os.status.wt_received = 1;
   os.checkwt_success_lasttime = os.now_tz();
 }
 
@@ -132,7 +131,6 @@ void GetWeather() {
   };
   *dst = *src;
   
-  os.status.wt_received = 0;
   uint16_t _port = ether.hisport; // save current port number
   ether.hisport = 80;
   ether.browseUrl(PSTR("/weather"), dst, website, getweather_callback);
@@ -231,7 +229,6 @@ void GetWeather() {
   bzero(tmp_buffer, TMP_BUFFER_SIZE);
   
   time_t timeout = os.now_tz() + 5; // 5 seconds timeout
-  os.status.wt_received = 0;
   while(os.now_tz() < timeout) {
     int len=client.read((uint8_t *)ether_buffer, ETHER_BUFFER_SIZE);
     if (len<=0) {
