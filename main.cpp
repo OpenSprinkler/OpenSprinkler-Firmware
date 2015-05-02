@@ -46,6 +46,8 @@ EthernetClient *m_client = 0;
 #endif
 #if defined(RAINPGM1)
 void manual_start_program(byte pid);
+void reset_all_stations();
+bool rainpgm1act = false;
 #endif
 
 // Some perturbations have been added to the timing values below
@@ -627,8 +629,13 @@ void turn_off_station(byte sid, ulong curr_time) {
 
 void process_dynamic_events(ulong curr_time) {
 #if defined(RAINPGM1) // Rain sensor triggers manual run of first program
-  if (os.options[OPTION_USE_RAINSENSOR].value && os.status.rain_sensed) {
+  if (!rainpgm1act && os.options[OPTION_USE_RAINSENSOR].value && os.status.rain_sensed) {
     manual_start_program(1);
+    rainpgm1act = true;
+  }
+  if (rainpgm1act && os.options[OPTION_USE_RAINSENSOR].value && !os.status.rain_sensed) {
+    void reset_all_stations();
+    rainpgm1act = false;
   }
 #else // Normal rain sensor operation
   // check if rain is detected
