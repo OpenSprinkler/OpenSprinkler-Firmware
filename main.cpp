@@ -634,7 +634,7 @@ void process_dynamic_events(ulong curr_time) {
     rainpgm1act = true;
   }
   if (rainpgm1act && os.options[OPTION_USE_RAINSENSOR].value && !os.status.rain_sensed) {
-    void reset_all_stations();
+    reset_all_stations();
     rainpgm1act = false;
   }
 #else // Normal rain sensor operation
