@@ -44,6 +44,9 @@ char ether_buffer[ETHER_BUFFER_SIZE];
 EthernetServer *m_server = 0;
 EthernetClient *m_client = 0;
 #endif
+#if defined(RAINPGM1)
+void manual_start_program(byte pid);
+#endif
 
 // Some perturbations have been added to the timing values below
 // to avoid two events happening too clost to each other
