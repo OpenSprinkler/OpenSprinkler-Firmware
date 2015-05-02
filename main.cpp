@@ -623,6 +623,11 @@ void turn_off_station(byte sid, ulong curr_time) {
 }
 
 void process_dynamic_events(ulong curr_time) {
+#if defined(RAINPGM1) // Rain sensor triggers manual run of first program
+  if (os.options[OPTION_USE_RAINSENSOR].value && os.status.rain_sensed) {
+    manual_start_program(1);
+  }
+#else // Normal rain sensor operation
   // check if rain is detected
   bool rain = false;
   bool en = os.status.enabled ? true : false;
@@ -655,6 +660,7 @@ void process_dynamic_events(ulong curr_time) {
       }
     }
   }
+#endif
 }
 
 void schedule_all_stations(ulong curr_time) {
