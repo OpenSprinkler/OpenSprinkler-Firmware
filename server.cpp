@@ -198,6 +198,7 @@ void send_packet(bool final=false) {
     ether.httpServerReply_with_flags(bfill.position(), TCP_FLAGS_ACK_V, 3);
     bfill=ether.tcpOffset();
   }
+  delay(1); // for Arduino we need to insert a slight delay to allow packet to be sent out
 }
 
 int available_ether_buffer() {
