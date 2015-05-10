@@ -198,7 +198,6 @@ void send_packet(bool final=false) {
     ether.httpServerReply_with_flags(bfill.position(), TCP_FLAGS_ACK_V, 3);
     bfill=ether.tcpOffset();
   }
-  delay(1); // for Arduino we need to insert a slight delay to allow packet to be sent out
 }
 
 int available_ether_buffer() {
@@ -399,6 +398,7 @@ void server_json_stations_main()
     }
   }
   bfill.emit_p(PSTR("],\"maxlen\":$D}"), STATION_NAME_SIZE);
+  delay(1);
 }
 
 /** Output station names and attributes */
@@ -779,6 +779,7 @@ void server_json_controller_main() {
   }
 
   bfill.emit_p(PSTR("[0,0]],\"lrun\":[$D,$D,$D,$L]}"), pd.lastrun.station, pd.lastrun.program, pd.lastrun.duration, pd.lastrun.endtime);
+  delay(1);
 }
 
 
@@ -1338,6 +1339,7 @@ byte streamfile (char* name) { //send a file to the buffer
       break;
     }
   }
+  delay(1);
   //ether.httpServerReply_with_flags(cur, TCP_FLAGS_ACK_V+TCP_FLAGS_FIN_V, 3);
   send_packet(true);
 
