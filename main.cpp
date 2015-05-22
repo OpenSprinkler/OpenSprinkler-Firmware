@@ -192,6 +192,7 @@ void do_setup() {
   MCUSR &= ~(1<<WDRF);
 
   DEBUG_BEGIN(9600);
+  DEBUG_PRINTLN("started.");
   
   os.begin();          // OpenSprinkler init
   os.options_setup();  // Setup options
@@ -576,12 +577,12 @@ void check_weather() {
   if (os.status.network_fails>0 || os.status.program_busy) return;
 
   ulong ntz = os.now_tz();
-  if (os.checkwt_success_lasttime && (ntz - os.checkwt_success_lasttime > CHECK_WEATHER_SUCCESS_INTERVAL)) {
+  if (os.checkwt_success_lasttime && os.checkwt_lasttime && (ntz > os.checkwt_success_lasttime + CHECK_WEATHER_SUCCESS_INTERVAL)) {
     // if weather check has failed to return for too long, restart network
     os.network_lasttime = 0;
     return;
   }
-  if (!os.checkwt_lasttime || ((ntz - os.checkwt_lasttime) > CHECK_WEATHER_INTERVAL)) {
+  if (!os.checkwt_lasttime || (ntz > os.checkwt_lasttime + CHECK_WEATHER_INTERVAL)) {
     os.checkwt_lasttime = os.now_tz();
     GetWeather();
   }
@@ -793,7 +794,7 @@ void log_statistics(time_t curr_time) {
   static byte stat_n = 0;
   static ulong stat_lasttime = 0;
   // update statistics once 15 minutes
-  if (curr_time - stat_lasttime > STAT_UPDATE_INTERVAL) {
+  if (curr_time > stat_lasttime + STAT_UPDATE_INTERVAL) {
     stat_lasttime = curr_time;
     ulong wp_total = os.water_percent_avg;
     wp_total = wp_total * stat_n;
@@ -936,7 +937,7 @@ void check_network() {
   // the more time it fails, the longer the gap between two checks
   ulong interval = 1 << (os.status.network_fails);
   interval *= CHECK_NETWORK_INTERVAL;
-  if (now() - os.network_lasttime > interval) {
+  if (now() > os.network_lasttime + interval) {
     // change LCD icon to indicate it's checking network
     if (!ui_state) {
       os.lcd.setCursor(15, 1);
@@ -965,7 +966,7 @@ void check_network() {
     }
     else os.status.network_fails=0;
     // if failed more than once, reconnect
-    if ((os.status.network_fails>2 || (now() - os.dhcpnew_lasttime > DHCP_RENEW_INTERVAL))) {
+    if (os.status.network_fails>2 || (now() > os.dhcpnew_lasttime + DHCP_RENEW_INTERVAL)) {
       os.dhcpnew_lasttime = now();
       //os.lcd_print_line_clear_pgm(PSTR(""),0);
       if (os.start_network())
@@ -983,7 +984,7 @@ void perform_ntp_sync() {
   // do not perform sync if this option is disabled, or if network is not available, or if a program is running
   if (!os.options[OPTION_USE_NTP].value || os.status.network_fails>0 || os.status.program_busy) return;
 
-  if (os.ntpsync_lasttime == 0 || (os.now_tz() - os.ntpsync_lasttime > NTP_SYNC_INTERVAL)) {
+  if (os.ntpsync_lasttime == 0 || (os.now_tz() > os.ntpsync_lasttime + NTP_SYNC_INTERVAL)) {
     os.ntpsync_lasttime = os.now_tz();
     if (!ui_state) {
       os.lcd_print_line_clear_pgm(PSTR("NTP Syncing..."),1);

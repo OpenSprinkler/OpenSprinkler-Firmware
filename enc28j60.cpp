@@ -377,9 +377,12 @@ byte ENC28J60::initialize (uint16_t size, const byte* macaddr, byte csPin) {
 
     writeOp(ENC28J60_SOFT_RESET, 0, ENC28J60_SOFT_RESET);
     delay(2); // errata B7/2
-    while (!readOp(ENC28J60_READ_CTRL_REG, ESTAT) & ESTAT_CLKRDY)
-        ;
-
+    
+    unsigned long st = millis();
+    while (!readOp(ENC28J60_READ_CTRL_REG, ESTAT) & ESTAT_CLKRDY) {
+      if (millis() > st+30000L) return 0;  // 30 seconds timeout
+    }
+    
     gNextPacketPtr = RXSTART_INIT;
     writeReg(ERXST, RXSTART_INIT);
     writeReg(ERXRDPT, RXSTART_INIT);
