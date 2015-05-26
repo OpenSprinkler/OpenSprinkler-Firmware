@@ -177,7 +177,7 @@ typedef enum {
   #define PIN_BUTTON_1      31    // button 1
   #define PIN_BUTTON_2      30    // button 2
   #define PIN_BUTTON_3      29    // button 3 
-  #define PIN_RF_DATA       28    // RF data pin 
+  #define PIN_RF_DATA       27    // RF data pin 
   #define PORT_RF        PORTA
   #define PINX_RF        PINA3
   #define PIN_SR_LATCH       3    // shift register latch pin
