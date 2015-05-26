@@ -471,6 +471,9 @@ void OpenSprinkler::begin() {
   lcd.createChar(3, lcd_rain_char);
   lcd.createChar(4, lcd_connect_char);
 
+  // Expansion detection
+  pinMode(PIN_EXP_SENSE, INPUT);
+
   // set button pins
   // enable internal pullup
   pinMode(PIN_BUTTON_1, INPUT);
