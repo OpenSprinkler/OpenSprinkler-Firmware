@@ -685,7 +685,7 @@ byte server_json_programs(char *p)
   print_json_header_with_bracket();
   bfill.emit_p(PSTR("\"nprogs\":$D,\"nboards\":$D,\"mnp\":$D,\"mnst\":$D,\"pnsize\":$D,\"pd\":["),
                pd.nprograms, os.nboards, MAX_NUMBER_PROGRAMS, MAX_NUM_STARTTIMES, PROGRAM_NAME_SIZE);
-  byte pid, bid, i;
+  byte pid, i;
   ProgramStruct prog;
   for(pid=0;pid<pd.nprograms;pid++) {
     pd.read(pid, &prog);
@@ -775,7 +775,7 @@ void server_json_controller_main() {
   }
 
   if(read_from_file(PSTR(WEATHER_OPTS_FILENAME), tmp_buffer)) {
-    bfill.emit_p(PSTR(",\"wto\":\"$S\""), tmp_buffer);
+    bfill.emit_p(PSTR(",\"wto\":{$S}"), tmp_buffer);
   }
   bfill.emit_p(PSTR("}"));
   delay(1);
@@ -793,9 +793,6 @@ byte server_json_controller(char *p)
 /** Output homepage */
 byte server_home(char *p)
 {
-  byte bid, sid;
-  unsigned long curr_time = os.now_tz();
-
   print_html_standard_header();
   bfill.emit_p(PSTR("<!DOCTYPE html>\n<html>\n<head>\n$F</head>\n<body>\n<script>"), htmlMobileHeader);
 
@@ -1164,9 +1161,6 @@ byte server_json_log(char *p) {
   print_json_header();
   bfill.emit_p(PSTR("["));
 
-  char *s;
-  int res;
-  //int count = 0;
   bool first = true;
   for(int i=start;i<=end;i++) {
     itoa(i, tmp_buffer, 10);

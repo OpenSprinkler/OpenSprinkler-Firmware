@@ -38,7 +38,7 @@ void write_to_file(const char *name, const char *data) {
   strcpy_P(fn, name);
   sd.chdir("/");
   SdFile file;
-  int ret = file.open(fn, O_CREAT | O_WRITE );
+  int ret = file.open(fn, O_CREAT | O_WRITE | O_TRUNC);
   if(!ret) {
     return;
   }    
