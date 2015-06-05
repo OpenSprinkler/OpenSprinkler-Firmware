@@ -775,7 +775,7 @@ void server_json_controller_main() {
   }
 
   if(read_from_file(PSTR(WEATHER_OPTS_FILENAME), tmp_buffer)) {
-    bfill.emit_p(PSTR(",\"wto\":\"{$S}\""), tmp_buffer);
+    bfill.emit_p(PSTR(",\"wto\":\"$S\""), tmp_buffer);
   }
   bfill.emit_p(PSTR("}"));
   delay(1);

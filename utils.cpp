@@ -118,7 +118,7 @@ void nvm_write_byte(const byte *p, byte v) {
 
 void write_to_file(const char *name, const char *data) {
   FILE *file;
-  file = fopen(tmp_buffer, "wb");
+  file = fopen(name, "wb");
 
   if (!file) { return; }
   
@@ -129,7 +129,7 @@ void write_to_file(const char *name, const char *data) {
 bool read_from_file(const char *name, char *data) {
 
   FILE *file;
-  file = fopen(tmp_buffer, "rb");
+  file = fopen(name, "rb");
   if(!file) {
     data[0] = 0;
     return true;
