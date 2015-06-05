@@ -24,10 +24,48 @@
 #include "utils.h"
 #include "OpenSprinkler.h"
 extern OpenSprinkler os;
-#if defined(ARDUINO)
-#include <avr/eeprom.h>
+extern char tmp_buffer[];
 
-#else
+#if defined(ARDUINO)  // AVR
+#include <avr/eeprom.h>
+#include "SdFat.h"
+extern SdFat sd;
+
+void write_to_file(const char *name, const char *data) {
+  if (!os.status.has_sd)  return;
+  
+  char *fn = tmp_buffer+TMP_BUFFER_SIZE-12;
+  strcpy_P(fn, name);
+  sd.chdir("/");
+  SdFile file;
+  int ret = file.open(fn, O_CREAT | O_WRITE );
+  if(!ret) {
+    return;
+  }    
+  file.write(data);
+  file.close();  
+}
+
+bool read_from_file(const char *name, char *data) {
+  if (!os.status.has_sd)  return false;
+  
+  char *fn = tmp_buffer+TMP_BUFFER_SIZE-12;  
+  strcpy_P(fn, name);
+  sd.chdir("/");
+  SdFile file;
+  int ret = file.open(fn, O_READ );
+  if(!ret) {
+    data[0]=0;
+    return true;  // return true but with empty string
+  }
+  ret = file.fgets(data, TMP_BUFFER_SIZE);
+  data[TMP_BUFFER_SIZE]=0;
+  file.close();
+  return true;
+}
+
+#else // RPI/BBB/LINUX
+
 void nvm_read_block(void *dst, const void *src, int len) {
   FILE *fp = fopen(NVM_FILENAME, "rb");
   if(fp) {
@@ -78,6 +116,40 @@ void nvm_write_byte(const byte *p, byte v) {
   }
 }
 
+void write_to_file(const char *name, const char *data) {
+  FILE *file;
+  file = fopen(tmp_buffer, "wb");
+
+  if (!file) { return; }
+  
+  fwrite(data, 1, strlen(data), file);
+  fclose(file);
+}
+
+bool read_from_file(const char *name, char *data) {
+
+  FILE *file;
+  file = fopen(tmp_buffer, "rb");
+  if(!file) {
+    data[0] = 0;
+    return true;
+  }
+
+  int res;
+  if(fgets(tmp_buffer, TMP_BUFFER_SIZE, file)) {
+    res = strlen(tmp_buffer);
+  } else {
+    res = 0;
+  }
+  if (res <= 0) {
+    data[0] = 0;
+  }
+      
+  data[TMP_BUFFER_SIZE]=0;
+  fclose(file);
+  return true;
+}
+
 #if defined(OSPI)
 unsigned int detect_rpi_rev() {
   FILE * filp;
@@ -107,7 +179,6 @@ unsigned int detect_rpi_rev() {
 
 // compare a string to nvm
 byte strcmp_to_nvm(const char* src, int _addr) {
-  byte i=0;
   byte c1, c2;
   byte *addr = (byte*)_addr;
   while(1) {

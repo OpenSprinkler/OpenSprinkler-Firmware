@@ -28,6 +28,7 @@
 NVConData OpenSprinkler::nvdata;
 ConStatus OpenSprinkler::status;
 ConStatus OpenSprinkler::old_status;
+byte OpenSprinkler::hw_type;
 
 byte OpenSprinkler::nboards;
 byte OpenSprinkler::nstations;
@@ -334,7 +335,7 @@ byte OpenSprinkler::start_network() {
 #include <sys/reboot.h>
 void OpenSprinkler::reboot_dev() {
 #if defined(DEMO)
-  // do nothing
+  // do nothingb
 #else
   sync(); // add sync to prevent file corruption
 	reboot(RB_AUTOBOOT);
@@ -342,6 +343,24 @@ void OpenSprinkler::reboot_dev() {
 }
 
 #endif // end network init functions
+
+#if defined(ARDUINO)
+void OpenSprinkler::lcd_start() {
+  // turn on lcd
+  lcd.init(1, PIN_LCD_RS, 255, PIN_LCD_EN, PIN_LCD_D4, PIN_LCD_D5, PIN_LCD_D6, PIN_LCD_D7, 0,0,0,0);
+  lcd.begin();
+
+  if (lcd.type() == LCD_STD) {
+    // set PWM frequency for adjustable LCD backlight and contrast
+    TCCR1B = 0x01;
+    // turn on LCD backlight and contrast
+    pinMode(PIN_LCD_BACKLIGHT, OUTPUT);
+    pinMode(PIN_LCD_CONTRAST, OUTPUT);
+    lcd_set_brightness();
+    lcd_set_contrast();
+  }
+}
+#endif
 
 void OpenSprinkler::begin() {
 
@@ -402,24 +421,43 @@ void OpenSprinkler::begin() {
   /*pinMode(PIN_RELAY, OUTPUT);
   digitalWrite(PIN_RELAY, LOW);*/
 
-#if defined(ARDUINO)  // AVR LCD functions
+#if defined(ARDUINO)  // AVR SD and LCD functions
   // set sd cs pin high to release SD
   pinMode(PIN_SD_CS, OUTPUT);
   digitalWrite(PIN_SD_CS, HIGH);
 
-  // set PWM frequency for adjustable LCD backlight and contrast
-  TCCR1B = 0x01;
-  // turn on LCD backlight and contrast
-  pinMode(PIN_LCD_BACKLIGHT, OUTPUT);
-  pinMode(PIN_LCD_CONTRAST, OUTPUT);
-  lcd_set_brightness();
-  lcd_set_contrast();
-  // turn on lcd
-  lcd.init(1, PIN_LCD_RS, 255, PIN_LCD_EN, PIN_LCD_D4, PIN_LCD_D5, PIN_LCD_D6, PIN_LCD_D7, 0,0,0,0);
-  lcd.begin(16, 2);
-
   // Init I2C
   Wire.begin();
+
+  #if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__) // OS 2.3 specific detections
+    uint8_t ret;
+
+    // detect hardware type
+    hw_type = HW_TYPE_AC;
+    Wire.beginTransmission(MAC_CTRL_ID);
+    Wire.write(0x00);
+  	ret = Wire.endTransmission();
+  	if (!ret) {
+    	Wire.requestFrom(MAC_CTRL_ID, 1);
+    	while(!Wire.available());
+    	ret = Wire.read();
+      if (hw_type == HW_TYPE_AC || hw_type == HW_TYPE_DC || hw_type == HW_TYPE_LATCH) {
+        hw_type = ret;
+      } else {
+        // hardware type is not assigned
+      }
+    }
+    
+    if (hw_type == HW_TYPE_DC) {
+      pinMode(PIN_BOOST, OUTPUT);
+      digitalWrite(PIN_BOOST, LOW);
+
+      pinMode(PIN_BOOST_EN, OUTPUT);
+      digitalWrite(PIN_BOOST_EN, LOW);        
+    }
+  #endif
+
+  lcd_start();
 
   // define lcd custom icons
   byte lcd_wifi_char[8] = {

@@ -96,16 +96,6 @@ static prog_uchar htmlAccessControl[] PROGMEM =
   "Access-Control-Allow-Origin: *\r\n"
 ;
 
-static prog_uchar htmlContentCgz[] PROGMEM =
-  "Content-Type: text/css;charset=utf-8\r\n"
-  "Content-Encoding: gzip\r\n"
-;
-
-static prog_uchar htmlContentJgz[] PROGMEM =
-  "Content-Type: text/javascript;charset=utf-8\r\n"
-  "Content-Encoding: gzip\r\n"
-;
-
 static prog_uchar htmlContentJSON[] PROGMEM =
   "Content-Type: application/json\r\n"
   "Connection: close\r\n"
@@ -746,7 +736,7 @@ void server_json_controller_main() {
   byte bid, sid;
   ulong curr_time = os.now_tz();
   //os.nvm_string_get(ADDR_NVM_LOCATION, tmp_buffer);
-  bfill.emit_p(PSTR("\"devt\":$L,\"nbrd\":$D,\"en\":$D,\"rd\":$D,\"rs\":$D,\"rdst\":$L,\"loc\":\"$E\",\"wtkey\":\"$E\",\"sunrise\":$D,\"sunset\":$D,\"eip\":$L,\"lwc\":$L,\"lswc\":$L,\"sbits\":["),
+  bfill.emit_p(PSTR("\"devt\":$L,\"nbrd\":$D,\"en\":$D,\"rd\":$D,\"rs\":$D,\"rdst\":$L,\"loc\":\"$E\",\"wtkey\":\"$E\",\"sunrise\":$D,\"sunset\":$D,\"eip\":$L,\"lwc\":$L,\"lswc\":$L,\"lrun\":[$D,$D,$D,$L],\"sbits\":["),
               curr_time,
               os.nboards,
               os.status.enabled,
@@ -759,7 +749,11 @@ void server_json_controller_main() {
               os.nvdata.sunset_time,
               os.external_ip,
               os.checkwt_lasttime,
-              os.checkwt_success_lasttime);
+              os.checkwt_success_lasttime,
+              pd.lastrun.station,
+              pd.lastrun.program,
+              pd.lastrun.duration,
+              pd.lastrun.endtime);
   // print sbits
   for(bid=0;bid<os.nboards;bid++)
     bfill.emit_p(PSTR("$D,"), os.station_bits[bid]);
@@ -770,7 +764,9 @@ void server_json_controller_main() {
     if (pd.scheduled_program_index[sid] > 0) {
       rem = (curr_time >= pd.scheduled_start_time[sid]) ? (pd.scheduled_stop_time[sid]-curr_time) : (pd.scheduled_stop_time[sid]-pd.scheduled_start_time[sid]);
     }
-    bfill.emit_p(PSTR("[$D,$L,$L],"), pd.scheduled_program_index[sid], rem, pd.scheduled_start_time[sid]);
+    bfill.emit_p(PSTR("[$D,$L,$L]"), pd.scheduled_program_index[sid], rem, pd.scheduled_start_time[sid]);
+    bfill.emit_p((sid<os.nstations-1)?PSTR(","):PSTR("]"));
+
     // if available ether buffer is getting small
     // send out a packet
     if(available_ether_buffer() < 80) {
@@ -778,7 +774,10 @@ void server_json_controller_main() {
     }
   }
 
-  bfill.emit_p(PSTR("[0,0]],\"lrun\":[$D,$D,$D,$L]}"), pd.lastrun.station, pd.lastrun.program, pd.lastrun.duration, pd.lastrun.endtime);
+  if(read_from_file(PSTR(WEATHER_OPTS_FILENAME), tmp_buffer)) {
+    bfill.emit_p(PSTR(",\"wto\":[$S]"), tmp_buffer);
+  }
+  bfill.emit_p(PSTR("}"));
   delay(1);
 }
 
@@ -895,9 +894,6 @@ byte server_change_scripturl(char *p)
   wtkey: weather underground api key
   ttt: manual time (applicable only if ntp=0)
 */
-prog_char _key_loc[] PROGMEM = "loc";
-prog_char _key_wtkey[] PROGMEM = "wtkey";
-prog_char _key_ttt[] PROGMEM = "ttt";
 byte server_change_options(char *p)
 {
   // temporarily save some old options values
@@ -977,6 +973,12 @@ byte server_change_options(char *p)
     setTime(t);
     if (os.status.has_rtc) RTC.set(t); // if rtc exists, update rtc
 #endif
+  }
+  if(findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("wto"), true)) {
+    urlDecode(tmp_buffer);
+    tmp_buffer[TMP_BUFFER_SIZE]=0;
+    // store weather key
+    write_to_file(PSTR(WEATHER_OPTS_FILENAME), tmp_buffer);
   }
   if (err) {
     return HTML_DATA_OUTOFBOUND;
@@ -1183,13 +1185,13 @@ byte server_json_log(char *p) {
     int res;
     while(true) {
     #if defined(ARDUINO)
-      res = file.fgets(tmp_buffer, TMP_BUFFER_SIZE-1);
+      res = file.fgets(tmp_buffer, TMP_BUFFER_SIZE);
       if (res <= 0) {
         file.close();
         break;
       }
     #else
-      if(fgets(tmp_buffer, TMP_BUFFER_SIZE-1, file)) {
+      if(fgets(tmp_buffer, TMP_BUFFER_SIZE, file)) {
         res = strlen(tmp_buffer);
       } else {
         res = 0;
@@ -1311,47 +1313,6 @@ URLStruct urls[] = {
 
 };
 
-#if defined(ARDUINO)
-byte streamfile (char* name) { //send a file to the buffer
-  unsigned long cur=0;
-  sd.chdir("/");
-  if(!sd.exists(name))  {return 0;}
-  SdFile myfile(name, O_READ);
-
-  // print file header dependeing on file type
-  bfill.emit_p(PSTR("$F$F"), html200OK, htmlCacheCtrl);
-  char *pext = name+strlen(name)-4;
-  if(strncmp(pext, ".cgz", 4)==0) {
-    bfill.emit_p(PSTR("$F"), htmlContentCgz);
-  } else if(strncmp(pext, ".jgz", 4)==0) {
-    bfill.emit_p(PSTR("$F"), htmlContentJgz);
-  }
-  bfill.emit_p(PSTR("\r\n"));
-  send_packet();
-  while(myfile.available()) {
-    int nbytes = myfile.read(Ethernet::buffer+54, ETHER_BUFFER_SIZE - 54);
-    cur = nbytes;
-    if (cur>=ETHER_BUFFER_SIZE - 54) {
-      //ether.httpServerReply_with_flags(cur,TCP_FLAGS_ACK_V, 3);
-      send_packet();
-      cur=0;
-    } else {
-      break;
-    }
-  }
-  delay(1);
-  //ether.httpServerReply_with_flags(cur, TCP_FLAGS_ACK_V+TCP_FLAGS_FIN_V, 3);
-  send_packet(true);
-
-  myfile.close();
-  return 1;
-}
-#else
-byte streamfile (char* name) {
-  return 1;
-}
-#endif
-
 // analyze the current url
 void analyze_get_url(char *p)
 {
@@ -1423,21 +1384,12 @@ void analyze_get_url(char *p)
       }
     }
 
-    if((i==sizeof(urls)/sizeof(URLStruct)) && os.status.has_sd) {
-      // no server funtion found, file handler
-      byte k=0;
-      while (str[k]!=' ' && k<32) {tmp_buffer[k]=str[k];k++;}//search the end, indicated by space
-      tmp_buffer[k]=0;
-      // change dir to root
-      if (streamfile ((char *)tmp_buffer)==0) {
-        // file not found
-        print_json_header();
-        bfill.emit_p(PSTR("{\"result\":$D}"), HTML_PAGE_NOT_FOUND);
-        send_packet(true);
-      }
-    } else {
-      send_packet(true);
+    if((i==sizeof(urls)/sizeof(URLStruct))) {
+      // no server funtion found
+      print_json_header();
+      bfill.emit_p(PSTR("{\"result\":$D}"), HTML_PAGE_NOT_FOUND);
     }
+    send_packet(true);
   }
   //delay(50); // add a bit of delay here
 }

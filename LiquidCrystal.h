@@ -1,8 +1,8 @@
-#ifndef LiquidCrystal_h
-#define LiquidCrystal_h
+#ifndef LIQUID_CRYSTAL_DUAL_H
+#define LIQUID_CRYSTAL_DUAL_H
 
 #include <inttypes.h>
-#include "Print.h"
+#include <Print.h>
 
 // commands
 #define LCD_CLEARDISPLAY 0x01
@@ -42,25 +42,26 @@
 #define LCD_5x10DOTS 0x04
 #define LCD_5x8DOTS 0x00
 
+// flags for backlight control
+#define LCD_BACKLIGHT 0x08
+#define LCD_NOBACKLIGHT 0x00
+
+#define En B00000100  // Enable bit
+#define Rw B00000010  // Read/Write bit
+#define Rs B00000001  // Register select bit
+
+#define LCD_STD 0     // Standard LCD
+#define LCD_I2C 1     // I2C LCD
+#define LCD_I2C_ADDR  0x27
+
 class LiquidCrystal : public Print {
 public:
   LiquidCrystal() {}
-  LiquidCrystal(uint8_t rs, uint8_t enable,
-		uint8_t d0, uint8_t d1, uint8_t d2, uint8_t d3,
-		uint8_t d4, uint8_t d5, uint8_t d6, uint8_t d7);
-  LiquidCrystal(uint8_t rs, uint8_t rw, uint8_t enable,
-		uint8_t d0, uint8_t d1, uint8_t d2, uint8_t d3,
-		uint8_t d4, uint8_t d5, uint8_t d6, uint8_t d7);
-  LiquidCrystal(uint8_t rs, uint8_t rw, uint8_t enable,
-		uint8_t d0, uint8_t d1, uint8_t d2, uint8_t d3);
-  LiquidCrystal(uint8_t rs, uint8_t enable,
-		uint8_t d0, uint8_t d1, uint8_t d2, uint8_t d3);
-
   void init(uint8_t fourbitmode, uint8_t rs, uint8_t rw, uint8_t enable,
-	    uint8_t d0, uint8_t d1, uint8_t d2, uint8_t d3,
-	    uint8_t d4, uint8_t d5, uint8_t d6, uint8_t d7);
-    
-  void begin(uint8_t cols, uint8_t rows, uint8_t charsize = LCD_5x8DOTS);
+        uint8_t d0, uint8_t d1, uint8_t d2, uint8_t d3,
+        uint8_t d4, uint8_t d5, uint8_t d6, uint8_t d7);
+
+  void begin();
 
   void clear();
   void home();
@@ -82,14 +83,30 @@ public:
   void setCursor(uint8_t, uint8_t); 
   virtual size_t write(uint8_t);
   void command(uint8_t);
-  
-  using Print::write;
+
+  inline uint8_t type() { return _type; }
+  #if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
+  void noBacklight();
+  void backlight();
+  #endif
+	 
+  using Print::write;	 
 private:
   void send(uint8_t, uint8_t);
   void write4bits(uint8_t);
-  void write8bits(uint8_t);
   void pulseEnable();
 
+  #if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
+  void expanderWrite(uint8_t);
+  void pulseEnable(uint8_t);
+  uint8_t _addr;
+  uint8_t _cols;
+  uint8_t _rows;
+  uint8_t _charsize;
+  uint8_t _backlightval;
+  #endif
+
+  uint8_t _type;    // LCD type. 0: standard; 1: I2C
   uint8_t _rs_pin; // LOW: command.  HIGH: character.
   uint8_t _rw_pin; // LOW: write to LCD.  HIGH: read from LCD.
   uint8_t _enable_pin; // activated by a HIGH pulse.
@@ -104,4 +121,4 @@ private:
   uint8_t _numlines,_currline;
 };
 
-#endif
+#endif // LIQUID_CRYSTAL_DUAL_H

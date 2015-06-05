@@ -93,6 +93,7 @@ public:
   static ConStatus status;
   static ConStatus old_status;
   static byte nboards, nstations;
+  static byte hw_type;           // hardware type
 
   static OptionStruct options[];  // option values, max, name, and flag
 
@@ -182,6 +183,7 @@ public:
 private:
   static void lcd_print_option(int i);  // print an option to the lcd
   static void lcd_print_2digit(int v);  // print a integer in 2 digits
+  static void lcd_start();
   static byte button_read_busy(byte pin_butt, byte waitmode, byte butt, byte is_holding);
 #endif // LCD functions
 };
