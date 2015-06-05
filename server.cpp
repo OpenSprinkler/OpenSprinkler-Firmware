@@ -775,7 +775,7 @@ void server_json_controller_main() {
   }
 
   if(read_from_file(PSTR(WEATHER_OPTS_FILENAME), tmp_buffer)) {
-    bfill.emit_p(PSTR(",\"wto\":[$S]"), tmp_buffer);
+    bfill.emit_p(PSTR(",\"wto\":\"{$S}\""), tmp_buffer);
   }
   bfill.emit_p(PSTR("}"));
   delay(1);
@@ -1384,7 +1384,7 @@ void analyze_get_url(char *p)
       }
     }
 
-    if((i==sizeof(urls)/sizeof(URLStruct))) {
+    if(i==sizeof(urls)/sizeof(URLStruct)) {
       // no server funtion found
       print_json_header();
       bfill.emit_p(PSTR("{\"result\":$D}"), HTML_PAGE_NOT_FOUND);

@@ -18,7 +18,9 @@
 //   SI  - Pin 11
 //   CS  - Pin  8
 //
+#ifndef __PROG_TYPES_COMPAT__
 #define __PROG_TYPES_COMPAT__
+#endif
 
 #ifndef EtherCard_h
 #define EtherCard_h

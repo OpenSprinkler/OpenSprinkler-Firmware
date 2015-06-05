@@ -97,8 +97,6 @@ void DS1307RTC::read( tmElements_t &tm)
 
 void DS1307RTC::write(tmElements_t &tm)
 {
-  static uint8_t initialized = 0;
-  
   if (ctrl_id == DS1307_CTRL_ID) {
     Wire.beginTransmission(ctrl_id);  
     Wire.write((uint8_t)0x00); // reset register pointer  
