@@ -88,7 +88,6 @@ static prog_char _json_hp0 [] PROGMEM = "hp0";
 static prog_char _json_hp1 [] PROGMEM = "hp1";
 static prog_char _json_hwv [] PROGMEM = "hwv";
 static prog_char _json_ext [] PROGMEM = "ext";
-static prog_char _json_seq [] PROGMEM = "_";   // the option 'sequential' is now retired
 static prog_char _json_sdt [] PROGMEM = "sdt";
 static prog_char _json_mas [] PROGMEM = "mas";
 static prog_char _json_mton[] PROGMEM = "mton";
@@ -102,7 +101,6 @@ static prog_char _json_devid[]PROGMEM = "devid";
 static prog_char _json_con [] PROGMEM = "con";
 static prog_char _json_lit [] PROGMEM = "lit";
 static prog_char _json_dim [] PROGMEM = "dim";
-static prog_char _json_rlp [] PROGMEM = "_";
 static prog_char _json_uwt [] PROGMEM = "uwt";
 static prog_char _json_ntp1[] PROGMEM = "ntp1";
 static prog_char _json_ntp2[] PROGMEM = "ntp2";
@@ -132,7 +130,6 @@ static prog_char _str_hp0 [] PROGMEM = "Port:";
 static prog_char _str_hp1 [] PROGMEM = "";
 static prog_char _str_hwv [] PROGMEM = "HW: ";
 static prog_char _str_ext [] PROGMEM = "Exp. board:";
-static prog_char _str_seq [] PROGMEM = "";   // the option 'sequential' is now retired
 static prog_char _str_sdt [] PROGMEM = "Stn delay:";
 static prog_char _str_mas [] PROGMEM = "Mas1:";
 static prog_char _str_mton[] PROGMEM = "Mas1  on adj:";
@@ -146,7 +143,6 @@ static prog_char _str_devid[]PROGMEM = "Dev. ID:";
 static prog_char _str_con [] PROGMEM = "LCD con.:";
 static prog_char _str_lit [] PROGMEM = "LCD lit.:";
 static prog_char _str_dim [] PROGMEM = "LCD dim.:";
-static prog_char _str_rlp [] PROGMEM = ""; // the option 'relay pulsing' is now retired
 static prog_char _str_uwt [] PROGMEM = "Use weather?";
 static prog_char _str_ntp1[] PROGMEM = "NTP.ip1:";
 static prog_char _str_ntp2[] PROGMEM = ".ip2:";
@@ -181,7 +177,7 @@ OptionStruct OpenSprinkler::options[NUM_OPTIONS] = {
 #endif
   {OS_HW_VERSION, 0, _str_hwv, _json_hwv},
   {0,   MAX_EXT_BOARDS, _str_ext, _json_ext}, // number of extension board. 0: no extension boards
-  {1,   1,   _str_seq,  _json_seq},   // the option 'sequential' is now retired
+  {1,   1,   0,         0},           // the option 'sequential' is now retired
   {128, 247, _str_sdt,  _json_sdt},   // station delay time (-59 minutes to 59 minutes).
   {0,   MAX_NUM_STATIONS, _str_mas,  _json_mas},   // index of master station. 0: no master station
   {0,   60,  _str_mton, _json_mton},  // master on time [0,60] seconds
@@ -194,8 +190,8 @@ OptionStruct OpenSprinkler::options[NUM_OPTIONS] = {
   {0,   255, _str_devid,_json_devid}, // device id
   {110, 255, _str_con,  _json_con},   // lcd contrast
   {100, 255, _str_lit,  _json_lit},   // lcd backlight
-  {15,   255, _str_dim,  _json_dim},   // lcd dimming
-  {0,   200, _str_rlp,  _json_rlp},   // the options 'relay pulse' is now retired
+  {15,   255, _str_dim, _json_dim},   // lcd dimming
+  {0,   200, 0,         0},           // the options 'relay pulse' is now retired
   {0,   255, _str_uwt,  _json_uwt},
   {50,  255, _str_ntp1, _json_ntp1},  // this and the next three bytes define the ntp server ip
   {97,  255, _str_ntp2, _json_ntp2},
@@ -286,7 +282,7 @@ byte OpenSprinkler::start_network() {
 
   if (options[OPTION_USE_DHCP].value) {
     // set up DHCP
-    // register with domain name "OpenSprinkler-xx" where xx is the last byte of the MAC address
+    // register with domain name "OS-xx" where xx is the last byte of the MAC address
     if (!ether.dhcpSetup()) return 0;
     // once we have valid DHCP IP, we write these into static IP / gateway IP
     byte *ip = ether.myip;
@@ -362,13 +358,15 @@ void OpenSprinkler::lcd_start() {
   lcd.begin();
 
   if (lcd.type() == LCD_STD) {
+    // this is standard 16x2 LCD
     // set PWM frequency for adjustable LCD backlight and contrast
     TCCR1B = 0x01;
     // turn on LCD backlight and contrast
-    pinMode(PIN_LCD_BACKLIGHT, OUTPUT);
-    pinMode(PIN_LCD_CONTRAST, OUTPUT);
     lcd_set_brightness();
     lcd_set_contrast();
+  } else {
+    // this is I2C LCD
+    // handle brightness
   }
 }
 #endif
@@ -897,8 +895,6 @@ void OpenSprinkler::options_setup() {
   }
 
   // turn on LCD backlight and contrast
-  pinMode(PIN_LCD_BACKLIGHT, OUTPUT);
-  pinMode(PIN_LCD_CONTRAST, OUTPUT);
   lcd_set_brightness();
   lcd_set_contrast();
   
@@ -1265,7 +1261,7 @@ void OpenSprinkler::ui_set_options(int oid)
         else  {
           i = (i+1) % NUM_OPTIONS;
         }
-        if(pgm_read_byte(options[i].json_str)=='_') i++;
+        if(options[i].json_str==0) i++;
       }
       break;
     }
@@ -1278,11 +1274,28 @@ void OpenSprinkler::ui_set_options(int oid)
 }
 
 void OpenSprinkler::lcd_set_contrast() {
-  analogWrite(PIN_LCD_CONTRAST, options[OPTION_LCD_CONTRAST].value);
+  // set contrast is only valid for standard LCD
+  if (lcd.type()==LCD_STD) {
+    pinMode(PIN_LCD_CONTRAST, OUTPUT);
+    analogWrite(PIN_LCD_CONTRAST, options[OPTION_LCD_CONTRAST].value);
+  }
 }
 
-void OpenSprinkler::lcd_set_brightness() {
-  analogWrite(PIN_LCD_BACKLIGHT, 255-options[OPTION_LCD_BACKLIGHT].value);
+void OpenSprinkler::lcd_set_brightness(byte value) {
+  #if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
+  if (lcd.type()==LCD_I2C) {
+    if (value) lcd.backlight();
+    else lcd.noBacklight();
+  }
+  #endif
+  if (lcd.type()==LCD_STD) {
+    pinMode(PIN_LCD_BACKLIGHT, OUTPUT);
+    if (value) {
+      analogWrite(PIN_LCD_BACKLIGHT, 255-options[OPTION_LCD_BACKLIGHT].value);
+    } else {
+      analogWrite(PIN_LCD_BACKLIGHT, 255-options[OPTION_LCD_DIMMING].value);    
+    }
+  }
 }
 #endif  // end of LCD and button functions
 

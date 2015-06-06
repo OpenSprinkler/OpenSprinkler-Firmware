@@ -51,7 +51,7 @@
 /** Non-volatile memory (NVM) defines */
 #if defined(ARDUINO) 
 
-/** NVM data structure:
+/** 2KB NVM data structure:
   * |     |              |     |---STRING PARAMETERS---|               |----STATION ATTRIBUTES-----  |          |
   * | UID | PROGRAM_DATA | CON | PWD | LOC | URL | KEY | STATION_NAMES | MAS | IGR | MAS2 | DIS | SEQ | OPTIONS  |
   * | (8) |    (996)     | (8) |(32) |(48) |(64) |(32) | (6*8*16)=768  | (6) | (6) | (6)  | (6) | (6) |  (62)    |
@@ -146,7 +146,7 @@ typedef enum {
   OPTION_LCD_CONTRAST,
   OPTION_LCD_BACKLIGHT,
   OPTION_LCD_DIMMING,
-  OPTION_RELAY_PULSE,
+  OPTION_RELAY_PULSE_RETIRED,
   OPTION_USE_WEATHER,
   OPTION_NTP_IP1,
   OPTION_NTP_IP2,

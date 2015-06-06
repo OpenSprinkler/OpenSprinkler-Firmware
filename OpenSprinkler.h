@@ -178,7 +178,7 @@ public:
 
   // -- UI functions --
   static void ui_set_options(int oid);    // ui for setting options (oid-> starting option index)
-  static void lcd_set_brightness();
+  static void lcd_set_brightness(byte value=1);
   static void lcd_set_contrast();
 private:
   static void lcd_print_option(int i);  // print an option to the lcd

@@ -82,7 +82,7 @@ static byte ui_state_runprog = 0;
 void ui_state_machine() {
 
   if (!os.button_timeout) {
-    analogWrite(PIN_LCD_BACKLIGHT, 255-os.options[OPTION_LCD_DIMMING].value);
+    os.lcd_set_brightness(0);
     ui_state = UI_STATE_DEFAULT;  // also recover to default state
   }
 
@@ -91,7 +91,7 @@ void ui_state_machine() {
 
   if (button & BUTTON_FLAG_DOWN) {   // repond only to button down events
     os.button_timeout = LCD_BACKLIGHT_TIMEOUT;
-    analogWrite(PIN_LCD_BACKLIGHT, 255-os.options[OPTION_LCD_BACKLIGHT].value); // button is pressed, turn on LCD right away
+    os.lcd_set_brightness(1);
   } else {
     return;
   }

@@ -661,7 +661,7 @@ void server_json_options_main() {
     int32_t v=os.options[oid].value;
     if (oid==OPTION_MASTER_OFF_ADJ || oid==OPTION_MASTER_OFF_ADJ_2) {v-=60;}
     if (oid==OPTION_STATION_DELAY_TIME) {v=water_time_decode_signed(v);}
-    if (pgm_read_byte(os.options[oid].json_str)=='_') continue;
+    if (os.options[oid].json_str==0) continue;
     if (oid==OPTION_DEVICE_ID && os.status.has_hwmac) continue; // do not send DEVICE ID if hardware MAC exists
     bfill.emit_p(PSTR("\"$F\":$D"),
                  os.options[oid].json_str, v);
@@ -669,7 +669,7 @@ void server_json_options_main() {
       bfill.emit_p(PSTR(","));
   }
 
-  bfill.emit_p(PSTR(",\"dexp\":$D,\"mexp\":$D}"), os.detect_exp(), MAX_EXT_BOARDS);
+  bfill.emit_p(PSTR(",\"dexp\":$D,\"mexp\":$D,\"hwt\":$D}"), os.detect_exp(), MAX_EXT_BOARDS, os.hw_type);
 }
 
 
