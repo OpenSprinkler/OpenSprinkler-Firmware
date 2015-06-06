@@ -64,6 +64,17 @@ bool read_from_file(const char *name, char *data, int maxsize) {
   return true;
 }
 
+void remove_file(const char *name) {
+  if (!os.status.has_sd)  return;
+
+  char *fn = tmp_buffer+TMP_BUFFER_SIZE-12;  
+  strcpy_P(fn, name);
+  sd.chdir("/");
+  DEBUG_PRINTLN(fn);
+  if (!sd.exists(fn))  return;
+  sd.remove(fn);
+}
+
 #else // RPI/BBB/LINUX
 
 void nvm_read_block(void *dst, const void *src, int len) {
@@ -148,6 +159,10 @@ bool read_from_file(const char *name, char *data, int maxsize) {
   data[maxsize-1]=0;
   fclose(file);
   return true;
+}
+
+void remove_file(const char *name) {
+  remove(name);
 }
 
 #if defined(OSPI)

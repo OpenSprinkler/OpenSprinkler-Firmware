@@ -215,13 +215,6 @@ void do_setup() {
   /* Enable the WD interrupt (note no reset). */
   WDTCSR |= _BV(WDIE);
 
-  // attempt to detect SD card
-  os.lcd_print_line_clear_pgm(PSTR("Detecting uSD..."), 1);
-
-  if(sd.begin(PIN_SD_CS, SPI_HALF_SPEED)) {
-    os.status.has_sd = 1;
-  }
-
   if (os.start_network()) {  // initialize network
     os.status.network_fails = 0;
   } else {

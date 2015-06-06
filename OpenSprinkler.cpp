@@ -21,6 +21,7 @@
  * <http://www.gnu.org/licenses/>.
  */
 
+#include <SdFat.h>
 #include "OpenSprinkler.h"
 #include "gpio.h"
 
@@ -52,6 +53,8 @@ ulong OpenSprinkler::external_ip;
 byte OpenSprinkler::water_percent_avg;
 
 char tmp_buffer[TMP_BUFFER_SIZE+1];       // scratch buffer
+prog_char wtopts_name [] PROGMEM = WEATHER_OPTS_FILENAME;
+extern SdFat sd;
 
 #if defined(ARDUINO)
   LiquidCrystal OpenSprinkler::lcd;
@@ -64,90 +67,90 @@ char tmp_buffer[TMP_BUFFER_SIZE+1];       // scratch buffer
 #endif
 
 /** Option json names */
-prog_char _json_fwv [] PROGMEM = "fwv";
-prog_char _json_tz  [] PROGMEM = "tz";
-prog_char _json_ntp [] PROGMEM = "ntp";
-prog_char _json_dhcp[] PROGMEM = "dhcp";
-prog_char _json_ip1 [] PROGMEM = "ip1";
-prog_char _json_ip2 [] PROGMEM = "ip2";
-prog_char _json_ip3 [] PROGMEM = "ip3";
-prog_char _json_ip4 [] PROGMEM = "ip4";
-prog_char _json_gw1 [] PROGMEM = "gw1";
-prog_char _json_gw2 [] PROGMEM = "gw2";
-prog_char _json_gw3 [] PROGMEM = "gw3";
-prog_char _json_gw4 [] PROGMEM = "gw4";
-prog_char _json_hp0 [] PROGMEM = "hp0";
-prog_char _json_hp1 [] PROGMEM = "hp1";
-prog_char _json_hwv [] PROGMEM = "hwv";
-prog_char _json_ext [] PROGMEM = "ext";
-prog_char _json_seq [] PROGMEM = "_";   // the option 'sequential' is now retired
-prog_char _json_sdt [] PROGMEM = "sdt";
-prog_char _json_mas [] PROGMEM = "mas";
-prog_char _json_mton[] PROGMEM = "mton";
-prog_char _json_mtof[] PROGMEM = "mtof";
-prog_char _json_urs [] PROGMEM = "urs";
-prog_char _json_rso [] PROGMEM = "rso";
-prog_char _json_wl  [] PROGMEM = "wl";
-prog_char _json_den [] PROGMEM = "den";
-prog_char _json_ipas[] PROGMEM = "ipas";
-prog_char _json_devid[]PROGMEM = "devid";
-prog_char _json_con [] PROGMEM = "con";
-prog_char _json_lit [] PROGMEM = "lit";
-prog_char _json_dim [] PROGMEM = "dim";
-prog_char _json_rlp [] PROGMEM = "_";
-prog_char _json_uwt [] PROGMEM = "uwt";
-prog_char _json_ntp1[] PROGMEM = "ntp1";
-prog_char _json_ntp2[] PROGMEM = "ntp2";
-prog_char _json_ntp3[] PROGMEM = "ntp3";
-prog_char _json_ntp4[] PROGMEM = "ntp4";
-prog_char _json_log [] PROGMEM = "lg";
-prog_char _json_mas2[] PROGMEM = "mas2";
-prog_char _json_mton2[]PROGMEM = "mton2";
-prog_char _json_mtof2[]PROGMEM = "mtof2";
-prog_char _json_reset[] PROGMEM = "reset";
+static prog_char _json_fwv [] PROGMEM = "fwv";
+static prog_char _json_tz  [] PROGMEM = "tz";
+static prog_char _json_ntp [] PROGMEM = "ntp";
+static prog_char _json_dhcp[] PROGMEM = "dhcp";
+static prog_char _json_ip1 [] PROGMEM = "ip1";
+static prog_char _json_ip2 [] PROGMEM = "ip2";
+static prog_char _json_ip3 [] PROGMEM = "ip3";
+static prog_char _json_ip4 [] PROGMEM = "ip4";
+static prog_char _json_gw1 [] PROGMEM = "gw1";
+static prog_char _json_gw2 [] PROGMEM = "gw2";
+static prog_char _json_gw3 [] PROGMEM = "gw3";
+static prog_char _json_gw4 [] PROGMEM = "gw4";
+static prog_char _json_hp0 [] PROGMEM = "hp0";
+static prog_char _json_hp1 [] PROGMEM = "hp1";
+static prog_char _json_hwv [] PROGMEM = "hwv";
+static prog_char _json_ext [] PROGMEM = "ext";
+static prog_char _json_seq [] PROGMEM = "_";   // the option 'sequential' is now retired
+static prog_char _json_sdt [] PROGMEM = "sdt";
+static prog_char _json_mas [] PROGMEM = "mas";
+static prog_char _json_mton[] PROGMEM = "mton";
+static prog_char _json_mtof[] PROGMEM = "mtof";
+static prog_char _json_urs [] PROGMEM = "urs";
+static prog_char _json_rso [] PROGMEM = "rso";
+static prog_char _json_wl  [] PROGMEM = "wl";
+static prog_char _json_den [] PROGMEM = "den";
+static prog_char _json_ipas[] PROGMEM = "ipas";
+static prog_char _json_devid[]PROGMEM = "devid";
+static prog_char _json_con [] PROGMEM = "con";
+static prog_char _json_lit [] PROGMEM = "lit";
+static prog_char _json_dim [] PROGMEM = "dim";
+static prog_char _json_rlp [] PROGMEM = "_";
+static prog_char _json_uwt [] PROGMEM = "uwt";
+static prog_char _json_ntp1[] PROGMEM = "ntp1";
+static prog_char _json_ntp2[] PROGMEM = "ntp2";
+static prog_char _json_ntp3[] PROGMEM = "ntp3";
+static prog_char _json_ntp4[] PROGMEM = "ntp4";
+static prog_char _json_log [] PROGMEM = "lg";
+static prog_char _json_mas2[] PROGMEM = "mas2";
+static prog_char _json_mton2[]PROGMEM = "mton2";
+static prog_char _json_mtof2[]PROGMEM = "mtof2";
+static prog_char _json_reset[] PROGMEM = "reset";
 
 /** Option names */
-prog_char _str_fwv [] PROGMEM = "FW:";
-prog_char _str_tz  [] PROGMEM = "TZone:";
-prog_char _str_ntp [] PROGMEM = "NTP?";
-prog_char _str_dhcp[] PROGMEM = "DHCP?";
-prog_char _str_ip1 [] PROGMEM = "OS.ip1:";
-prog_char _str_ip2 [] PROGMEM = ".ip2:";
-prog_char _str_ip3 [] PROGMEM = ".ip3:";
-prog_char _str_ip4 [] PROGMEM = ".ip4:";
-prog_char _str_gw1 [] PROGMEM = "GW.ip1:";
-prog_char _str_gw2 [] PROGMEM = ".ip2:";
-prog_char _str_gw3 [] PROGMEM = ".ip3:";
-prog_char _str_gw4 [] PROGMEM = ".ip4:";
-prog_char _str_hp0 [] PROGMEM = "Port:";
-prog_char _str_hp1 [] PROGMEM = "";
-prog_char _str_hwv [] PROGMEM = "HW: ";
-prog_char _str_ext [] PROGMEM = "Exp. board:";
-prog_char _str_seq [] PROGMEM = "";   // the option 'sequential' is now retired
-prog_char _str_sdt [] PROGMEM = "Stn delay:";
-prog_char _str_mas [] PROGMEM = "Mas1:";
-prog_char _str_mton[] PROGMEM = "Mas1  on adj:";
-prog_char _str_mtof[] PROGMEM = "Mas1 off adj:";
-prog_char _str_urs [] PROGMEM = "Rain sensor:";
-prog_char _str_rso [] PROGMEM = "Normally open?";
-prog_char _str_wl  [] PROGMEM = "% Watering:";
-prog_char _str_den [] PROGMEM = "Dev. enable?";
-prog_char _str_ipas[] PROGMEM = "Ign pwd?";
-prog_char _str_devid[]PROGMEM = "Dev. ID:";
-prog_char _str_con [] PROGMEM = "LCD con.:";
-prog_char _str_lit [] PROGMEM = "LCD lit.:";
-prog_char _str_dim [] PROGMEM = "LCD dim.:";
-prog_char _str_rlp [] PROGMEM = ""; // the option 'relay pulsing' is now retired
-prog_char _str_uwt [] PROGMEM = "Use weather?";
-prog_char _str_ntp1[] PROGMEM = "NTP.ip1:";
-prog_char _str_ntp2[] PROGMEM = ".ip2:";
-prog_char _str_ntp3[] PROGMEM = ".ip3:";
-prog_char _str_ntp4[] PROGMEM = ".ip4:";
-prog_char _str_log [] PROGMEM = "Log?";
-prog_char _str_mas2[] PROGMEM = "Mas2:";
-prog_char _str_mton2[]PROGMEM = "Mas2  on adj:";
-prog_char _str_mtof2[]PROGMEM = "Mas2 off adj:";
-prog_char _str_reset[] PROGMEM = "Reset all?";
+static prog_char _str_fwv [] PROGMEM = "FW:";
+static prog_char _str_tz  [] PROGMEM = "TZone:";
+static prog_char _str_ntp [] PROGMEM = "NTP?";
+static prog_char _str_dhcp[] PROGMEM = "DHCP?";
+static prog_char _str_ip1 [] PROGMEM = "OS.ip1:";
+static prog_char _str_ip2 [] PROGMEM = ".ip2:";
+static prog_char _str_ip3 [] PROGMEM = ".ip3:";
+static prog_char _str_ip4 [] PROGMEM = ".ip4:";
+static prog_char _str_gw1 [] PROGMEM = "GW.ip1:";
+static prog_char _str_gw2 [] PROGMEM = ".ip2:";
+static prog_char _str_gw3 [] PROGMEM = ".ip3:";
+static prog_char _str_gw4 [] PROGMEM = ".ip4:";
+static prog_char _str_hp0 [] PROGMEM = "Port:";
+static prog_char _str_hp1 [] PROGMEM = "";
+static prog_char _str_hwv [] PROGMEM = "HW: ";
+static prog_char _str_ext [] PROGMEM = "Exp. board:";
+static prog_char _str_seq [] PROGMEM = "";   // the option 'sequential' is now retired
+static prog_char _str_sdt [] PROGMEM = "Stn delay:";
+static prog_char _str_mas [] PROGMEM = "Mas1:";
+static prog_char _str_mton[] PROGMEM = "Mas1  on adj:";
+static prog_char _str_mtof[] PROGMEM = "Mas1 off adj:";
+static prog_char _str_urs [] PROGMEM = "Rain sensor:";
+static prog_char _str_rso [] PROGMEM = "Normally open?";
+static prog_char _str_wl  [] PROGMEM = "% Watering:";
+static prog_char _str_den [] PROGMEM = "Dev. enable?";
+static prog_char _str_ipas[] PROGMEM = "Ign pwd?";
+static prog_char _str_devid[]PROGMEM = "Dev. ID:";
+static prog_char _str_con [] PROGMEM = "LCD con.:";
+static prog_char _str_lit [] PROGMEM = "LCD lit.:";
+static prog_char _str_dim [] PROGMEM = "LCD dim.:";
+static prog_char _str_rlp [] PROGMEM = ""; // the option 'relay pulsing' is now retired
+static prog_char _str_uwt [] PROGMEM = "Use weather?";
+static prog_char _str_ntp1[] PROGMEM = "NTP.ip1:";
+static prog_char _str_ntp2[] PROGMEM = ".ip2:";
+static prog_char _str_ntp3[] PROGMEM = ".ip3:";
+static prog_char _str_ntp4[] PROGMEM = ".ip4:";
+static prog_char _str_log [] PROGMEM = "Log?";
+static prog_char _str_mas2[] PROGMEM = "Mas2:";
+static prog_char _str_mton2[]PROGMEM = "Mas2  on adj:";
+static prog_char _str_mtof2[]PROGMEM = "Mas2 off adj:";
+static prog_char _str_reset[] PROGMEM = "Reset all?";
 
 OptionStruct OpenSprinkler::options[NUM_OPTIONS] = {
   {OS_FW_VERSION, 0, _str_fwv, _json_fwv}, // firmware version
@@ -199,13 +202,13 @@ OptionStruct OpenSprinkler::options[NUM_OPTIONS] = {
 };
 
 /** Weekday display strings */
-prog_char str_day0[] PROGMEM = "Mon";
-prog_char str_day1[] PROGMEM = "Tue";
-prog_char str_day2[] PROGMEM = "Wed";
-prog_char str_day3[] PROGMEM = "Thu";
-prog_char str_day4[] PROGMEM = "Fri";
-prog_char str_day5[] PROGMEM = "Sat";
-prog_char str_day6[] PROGMEM = "Sun";
+static prog_char str_day0[] PROGMEM = "Mon";
+static prog_char str_day1[] PROGMEM = "Tue";
+static prog_char str_day2[] PROGMEM = "Wed";
+static prog_char str_day3[] PROGMEM = "Thu";
+static prog_char str_day4[] PROGMEM = "Fri";
+static prog_char str_day5[] PROGMEM = "Sat";
+static prog_char str_day6[] PROGMEM = "Sun";
 
 prog_char* days_str[7] = {
   str_day0,
@@ -423,18 +426,14 @@ void OpenSprinkler::begin() {
   digitalWrite(PIN_RELAY, LOW);*/
 
 #if defined(ARDUINO)  // AVR SD and LCD functions
-  // set sd cs pin high to release SD
-  pinMode(PIN_SD_CS, OUTPUT);
-  digitalWrite(PIN_SD_CS, HIGH);
-
   // Init I2C
   Wire.begin();
 
+  hw_type = HW_TYPE_AC;
   #if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__) // OS 2.3 specific detections
     uint8_t ret;
 
     // detect hardware type
-    hw_type = HW_TYPE_AC;
     Wire.beginTransmission(MAC_CTRL_ID);
     Wire.write(0x00);
   	ret = Wire.endTransmission();
@@ -442,7 +441,7 @@ void OpenSprinkler::begin() {
     	Wire.requestFrom(MAC_CTRL_ID, 1);
     	while(!Wire.available());
     	ret = Wire.read();
-      if (hw_type == HW_TYPE_AC || hw_type == HW_TYPE_DC || hw_type == HW_TYPE_LATCH) {
+      if (ret == HW_TYPE_AC || ret == HW_TYPE_DC || ret == HW_TYPE_LATCH) {
         hw_type = ret;
       } else {
         // hardware type is not assigned
@@ -459,7 +458,8 @@ void OpenSprinkler::begin() {
   #endif
 
   lcd_start();
-
+  lcd_print_pgm(PSTR(" OpenSprinkler"));  
+ 
   // define lcd custom icons
   byte lcd_wifi_char[8] = {
     B00000,
@@ -509,6 +509,14 @@ void OpenSprinkler::begin() {
   lcd.createChar(2, lcd_sd_char);
   lcd.createChar(3, lcd_rain_char);
   lcd.createChar(4, lcd_connect_char);
+
+  // set sd cs pin high to release SD
+  pinMode(PIN_SD_CS, OUTPUT);
+  digitalWrite(PIN_SD_CS, HIGH);
+
+  if(sd.begin(PIN_SD_CS, SPI_HALF_SPEED)) {
+    status.has_sd = 1;
+  }
 
   // set button pins
   // enable internal pullup
@@ -818,11 +826,13 @@ void OpenSprinkler::options_setup() {
 
     // 6. write options
     options_save(); // write default option values
+    
+    // 7. delete sd files
+    remove_file(wtopts_name);
     //======== END OF NVM RESET CODE ========
 
     // restart after resetting NVM.
     delay(500);
-    DEBUG_PRINTLN("done");
 #if defined(ARDUINO)
     reboot_dev();
 #endif
@@ -883,6 +893,25 @@ void OpenSprinkler::options_setup() {
   pinMode(PIN_LCD_CONTRAST, OUTPUT);
   lcd_set_brightness();
   lcd_set_contrast();
+  
+  lcd.setCursor(2, 1);
+  lcd_print_pgm(PSTR("HW v"));
+  byte hwv = options[OPTION_HW_VERSION].value;
+  lcd.print((char)('0'+(hwv/10)));
+  lcd.print('.');
+  lcd.print((char)('0'+(hwv%10)));
+  switch(hw_type) {
+  case HW_TYPE_DC:
+    lcd_print_pgm(PSTR(" DC"));
+    break;
+  case HW_TYPE_LATCH:
+    lcd_print_pgm(PSTR(" LA"));
+    break;
+  default:
+    lcd_print_pgm(PSTR(" AC"));
+  }
+  delay(1000);
+
 #endif
 }
 
