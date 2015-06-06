@@ -21,7 +21,6 @@
  * <http://www.gnu.org/licenses/>.
  */
 
-#include <SdFat.h>
 #include "OpenSprinkler.h"
 #include "gpio.h"
 
@@ -53,11 +52,17 @@ ulong OpenSprinkler::external_ip;
 byte OpenSprinkler::water_percent_avg;
 
 char tmp_buffer[TMP_BUFFER_SIZE+1];       // scratch buffer
-prog_char wtopts_name [] PROGMEM = WEATHER_OPTS_FILENAME;
-extern SdFat sd;
+
+#if defined(ARDUINO)
+  prog_char wtopts_name[] PROGMEM = WEATHER_OPTS_FILENAME;
+#else
+  char wtopts_name[] = WEATHER_OPTS_FILENAME;
+#endif
 
 #if defined(ARDUINO)
   LiquidCrystal OpenSprinkler::lcd;
+  #include <SdFat.h>
+  extern SdFat sd;
 #elif defined(OSPI)
   // todo: LCD define for OSPi
 #endif

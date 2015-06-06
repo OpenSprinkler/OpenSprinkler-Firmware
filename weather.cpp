@@ -31,7 +31,7 @@
 extern char ether_buffer[];
 #endif
 
-extern char wtopts_name[];
+extern const char wtopts_name[];
 
 #include "OpenSprinkler.h"
 #include "utils.h"

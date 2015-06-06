@@ -109,7 +109,7 @@ static prog_uchar htmlReturnHome[] PROGMEM =
   "<script>window.location=\"/\";</script>\n"
 ;
 
-extern char wtopts_name[];
+extern const char wtopts_name[];
 
 #if defined(ARDUINO)
 void print_html_standard_header() {
