@@ -101,6 +101,7 @@ static prog_char _json_devid[]PROGMEM = "devid";
 static prog_char _json_con [] PROGMEM = "con";
 static prog_char _json_lit [] PROGMEM = "lit";
 static prog_char _json_dim [] PROGMEM = "dim";
+static prog_char _json_bst [] PROGMEM = "bst";
 static prog_char _json_uwt [] PROGMEM = "uwt";
 static prog_char _json_ntp1[] PROGMEM = "ntp1";
 static prog_char _json_ntp2[] PROGMEM = "ntp2";
@@ -143,6 +144,7 @@ static prog_char _str_devid[]PROGMEM = "Dev. ID:";
 static prog_char _str_con [] PROGMEM = "LCD con.:";
 static prog_char _str_lit [] PROGMEM = "LCD lit.:";
 static prog_char _str_dim [] PROGMEM = "LCD dim.:";
+static prog_char _str_bst [] PROGMEM = "Boost:";
 static prog_char _str_uwt [] PROGMEM = "Use weather?";
 static prog_char _str_ntp1[] PROGMEM = "NTP.ip1:";
 static prog_char _str_ntp2[] PROGMEM = ".ip2:";
@@ -190,9 +192,9 @@ OptionStruct OpenSprinkler::options[NUM_OPTIONS] = {
   {0,   255, _str_devid,_json_devid}, // device id
   {110, 255, _str_con,  _json_con},   // lcd contrast
   {100, 255, _str_lit,  _json_lit},   // lcd backlight
-  {15,   255, _str_dim, _json_dim},   // lcd dimming
-  {0,   200, 0,         0},           // the options 'relay pulse' is now retired
-  {0,   255, _str_uwt,  _json_uwt},
+  {15,  255, _str_dim,  _json_dim},   // lcd dimming
+  {60,  250, _str_bst,  _json_bst},   // boost time (only valid to DC and LATCH type)
+  {0,   255, _str_uwt,  _json_uwt},   // weather algorithm (0 means not using weather algorithm)
   {50,  255, _str_ntp1, _json_ntp1},  // this and the next three bytes define the ntp server ip
   {97,  255, _str_ntp2, _json_ntp2},
   {210, 255, _str_ntp3, _json_ntp3},
@@ -431,11 +433,11 @@ void OpenSprinkler::begin() {
   /*pinMode(PIN_RELAY, OUTPUT);
   digitalWrite(PIN_RELAY, LOW);*/
 
+  hw_type = HW_TYPE_AC;
 #if defined(ARDUINO)  // AVR SD and LCD functions
   // Init I2C
   Wire.begin();
 
-  hw_type = HW_TYPE_AC;
   #if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__) // OS 2.3 specific detections
     uint8_t ret;
 
@@ -464,57 +466,57 @@ void OpenSprinkler::begin() {
   #endif
 
   lcd_start();
-  lcd_print_pgm(PSTR(" OpenSprinkler"));  
- 
+
   // define lcd custom icons
-  byte lcd_wifi_char[8] = {
-    B00000,
-    B10100,
-    B01000,
-    B10101,
-    B00001,
-    B00101,
-    B00101,
-    B10101
-  };
-  byte lcd_sd_char[8] = {
-    B00000,
-    B00000,
-    B11111,
-    B10001,
-    B11111,
-    B10001,
-    B10011,
-    B11110
-  };
-  byte lcd_rain_char[8] = {
-    B00000,
-    B00000,
-    B00110,
-    B01001,
-    B11111,
-    B00000,
-    B10101,
-    B10101
-  };
-  byte lcd_connect_char[8] = {
-    B00000,
-    B00000,
-    B00111,
-    B00011,
-    B00101,
-    B01000,
-    B10000,
-    B00000
-  };
-  lcd.createChar(1, lcd_wifi_char);
-  lcd_wifi_char[1]=0;
-  lcd_wifi_char[2]=0;
-  lcd_wifi_char[3]=1;
-  lcd.createChar(0, lcd_wifi_char);
-  lcd.createChar(2, lcd_sd_char);
-  lcd.createChar(3, lcd_rain_char);
-  lcd.createChar(4, lcd_connect_char);
+  byte _icon[8];
+  // WiFi icon
+  _icon[0] = B00000;
+  _icon[1] = B10100;
+  _icon[2] = B01000;
+  _icon[3] = B10101;
+  _icon[4] = B00001;
+  _icon[5] = B00101;
+  _icon[6] = B00101;
+  _icon[7] = B10101;
+  lcd.createChar(1, _icon);
+  
+  _icon[1]=0;
+  _icon[2]=0;
+  _icon[3]=1;
+  lcd.createChar(0, _icon);
+  
+  // uSD card icon
+  _icon[0] = B00000;
+  _icon[1] = B00000;
+  _icon[2] = B11111;
+  _icon[3] = B10001;
+  _icon[4] = B11111;
+  _icon[5] = B10001;
+  _icon[6] = B10011;
+  _icon[7] = B11110;
+  lcd.createChar(2, _icon);  
+  
+  // Rain icon
+  _icon[0] = B00000;
+  _icon[1] = B00000;
+  _icon[2] = B00110;
+  _icon[3] = B01001;
+  _icon[4] = B11111;
+  _icon[5] = B00000;
+  _icon[6] = B10101;
+  _icon[7] = B10101;
+  lcd.createChar(3, _icon);
+  
+  // Connect icon
+  _icon[0] = B00000;
+  _icon[1] = B00000;
+  _icon[2] = B00111;
+  _icon[3] = B00011;
+  _icon[4] = B00101;
+  _icon[5] = B01000;
+  _icon[6] = B10000;
+  _icon[7] = B00000;
+  lcd.createChar(4, _icon);
 
   // set sd cs pin high to release SD
   pinMode(PIN_SD_CS, OUTPUT);
@@ -546,7 +548,13 @@ void OpenSprinkler::apply_all_station_bits() {
   digitalWrite(PIN_SR_LATCH, LOW);
   byte bid, s, sbits;
 
-
+  bool engage_booster = false;
+  
+  #if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
+  // old station bits
+  static byte old_station_bits[MAX_EXT_BOARDS+1];
+  #endif
+  
   // Shift out all station bit values
   // from the highest bit to the lowest
   for(bid=0;bid<=MAX_EXT_BOARDS;bid++) {
@@ -554,6 +562,17 @@ void OpenSprinkler::apply_all_station_bits() {
       sbits = station_bits[MAX_EXT_BOARDS-bid];
     else
       sbits = 0;
+    
+    #if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
+    // check if any station is changing from 0 to 1
+    // take the bit inverse of the old status
+    // and with the new status
+    if ((~old_station_bits[MAX_EXT_BOARDS-bid]) & sbits) {
+      engage_booster = true;
+    }
+    old_station_bits[MAX_EXT_BOARDS-bid] = sbits;
+    #endif
+          
     for(s=0;s<8;s++) {
       digitalWrite(PIN_SR_CLOCK, LOW);
 #if defined(OSPI) // if OSPi, use dynamically assigned pin_sr_data
@@ -564,7 +583,26 @@ void OpenSprinkler::apply_all_station_bits() {
       digitalWrite(PIN_SR_CLOCK, HIGH);
     }
   }
+  
+  #if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
+  if((hw_type==HW_TYPE_DC) && engage_booster) {
+    DEBUG_PRINTLN(F("engage booster"));
+    // boost voltage
+    digitalWrite(PIN_BOOST, HIGH);
+    delay(250);
+    digitalWrite(PIN_BOOST, LOW);
+   
+    // enable boosted voltage for a short period of time
+    digitalWrite(PIN_BOOST_EN, HIGH);
+    digitalWrite(PIN_SR_LATCH, HIGH);
+    delay(500);
+    digitalWrite(PIN_BOOST_EN, LOW);
+  } else {
+    digitalWrite(PIN_SR_LATCH, HIGH);
+  }
+  #else
   digitalWrite(PIN_SR_LATCH, HIGH);
+  #endif
 }
 
 void OpenSprinkler::rainsensor_status() {
@@ -899,6 +937,8 @@ void OpenSprinkler::options_setup() {
   lcd_set_contrast();
   
   if (!button) {
+    // flash screen
+    lcd_print_line_clear_pgm(PSTR(" OpenSprinkler"),0);
     lcd.setCursor(2, 1);
     lcd_print_pgm(PSTR("HW v"));
     byte hwv = options[OPTION_HW_VERSION].value;
@@ -1152,6 +1192,18 @@ void OpenSprinkler::lcd_print_option(int i) {
   case OPTION_LCD_BACKLIGHT:
     lcd_set_brightness();
     lcd.print((int)options[i].value);
+    break;
+  case OPTION_BOOST_TIME:
+    #if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
+    if(hw_type==HW_TYPE_AC) {
+      lcd.print('-');
+    } else {
+      lcd.print((int)options[i].value*4);
+      lcd_print_pgm(PSTR(" ms"));
+    }
+    #else
+    lcd.print('-');
+    #endif
     break;
   default:
     // if this is a boolean option

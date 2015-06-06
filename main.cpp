@@ -134,8 +134,7 @@ void ui_state_machine() {
           os.lcd_print_pgm(PSTR("(lswc)"));
           ui_state = UI_STATE_DISP_IP;          
         } else { 
-          //os.reboot_dev();
-          os.status.safe_reboot = 1;
+          os.reboot_dev();
         }
       } else {  // clicking B2: display MAC and gate way IP
         os.lcd.clear();

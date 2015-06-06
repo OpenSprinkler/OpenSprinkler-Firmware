@@ -661,6 +661,14 @@ void server_json_options_main() {
     int32_t v=os.options[oid].value;
     if (oid==OPTION_MASTER_OFF_ADJ || oid==OPTION_MASTER_OFF_ADJ_2) {v-=60;}
     if (oid==OPTION_STATION_DELAY_TIME) {v=water_time_decode_signed(v);}
+    #if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
+    if (oid==OPTION_BOOST_TIME) {
+      if (os.hw_type==HW_TYPE_AC) continue;
+      else v<<=2;
+    }
+    #else
+    if (oid==OPTION_BOOST_TIME) continue;
+    #endif    
     if (os.options[oid].json_str==0) continue;
     if (oid==OPTION_DEVICE_ID && os.status.has_hwmac) continue; // do not send DEVICE ID if hardware MAC exists
     bfill.emit_p(PSTR("\"$F\":$D"),
@@ -978,6 +986,7 @@ byte server_change_options(char *p)
     tmp_buffer[TMP_BUFFER_SIZE]=0;
     // store weather key
     write_to_file(wtopts_name, tmp_buffer);
+    weather_change = true;
   }
   if (err) {
     return HTML_DATA_OUTOFBOUND;

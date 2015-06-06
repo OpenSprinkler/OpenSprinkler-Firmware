@@ -51,7 +51,6 @@ static void getweather_callback(byte status, uint16_t off, uint16_t len) {
 #else
   char *p = ether_buffer;
 #endif
-
   /* scan the buffer until the first & symbol */
   while(*p && *p!='&') {
     p++;
@@ -109,7 +108,6 @@ void GetWeather() {
   //bfill=ether.tcpOffset();
   char tmp[30];
   read_from_file(wtopts_name, tmp, 30);
-  DEBUG_PRINTLN(tmp);
   BufferFiller bf = (uint8_t*)tmp_buffer;
   bf.emit_p(PSTR("$D.py?loc=$E&key=$E&fwv=$D&wto=$S"),
                 (int) os.options[OPTION_USE_WEATHER].value,
