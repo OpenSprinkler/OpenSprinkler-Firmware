@@ -105,12 +105,15 @@ void GetWeather() {
   }
 
   //bfill=ether.tcpOffset();
+  char tmp[30];
+  read_from_file(PSTR(WEATHER_OPTS_FILENAME), tmp, 30);
   BufferFiller bf = (uint8_t*)tmp_buffer;
-  bf.emit_p(PSTR("$D.py?loc=$E&key=$E&fwv=$D"),
+  bf.emit_p(PSTR("$D.py?loc=$E&key=$E&fwv=$D&wto=$S"),
                 (int) os.options[OPTION_USE_WEATHER].value,
                 ADDR_NVM_LOCATION,
                 ADDR_NVM_WEATHER_KEY,
-                (int)os.options[OPTION_FW_VERSION].value);
+                (int)os.options[OPTION_FW_VERSION].value,
+                tmp);
   // copy string to tmp_buffer, replacing all spaces with _
   char *src=tmp_buffer+strlen(tmp_buffer);
   char *dst=tmp_buffer+TMP_BUFFER_SIZE-1;
@@ -193,12 +196,15 @@ void GetWeather() {
     return;
   }
 
-  BufferFiller bf = tmp_buffer;  
-  bf.emit_p(PSTR("$D.py?loc=$E&key=$E&fwv=$D"),
+  BufferFiller bf = tmp_buffer;
+  char tmp[100];
+  read_from_file(PSTR(WEATHER_OPTS_FILENAME), tmp, 100);
+  bf.emit_p(PSTR("$D.py?loc=$E&key=$E&fwv=$D&wto=$S"),
                 (int) os.options[OPTION_USE_WEATHER].value,
                 ADDR_NVM_LOCATION,
                 ADDR_NVM_WEATHER_KEY,
-                (int)os.options[OPTION_FW_VERSION].value);    
+                (int)os.options[OPTION_FW_VERSION].value,
+                tmp);    
 
   char *src=tmp_buffer+strlen(tmp_buffer);
   char *dst=tmp_buffer+TMP_BUFFER_SIZE-1;

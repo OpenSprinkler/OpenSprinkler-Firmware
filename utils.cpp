@@ -46,7 +46,7 @@ void write_to_file(const char *name, const char *data) {
   file.close();  
 }
 
-bool read_from_file(const char *name, char *data) {
+bool read_from_file(const char *name, char *data, int maxsize) {
   if (!os.status.has_sd)  return false;
   
   char *fn = tmp_buffer+TMP_BUFFER_SIZE-12;  
@@ -58,8 +58,8 @@ bool read_from_file(const char *name, char *data) {
     data[0]=0;
     return true;  // return true but with empty string
   }
-  ret = file.fgets(data, TMP_BUFFER_SIZE);
-  data[TMP_BUFFER_SIZE]=0;
+  ret = file.fgets(data, maxsize);
+  data[maxsize-1]=0;
   file.close();
   return true;
 }
@@ -126,7 +126,7 @@ void write_to_file(const char *name, const char *data) {
   fclose(file);
 }
 
-bool read_from_file(const char *name, char *data) {
+bool read_from_file(const char *name, char *data, int maxsize) {
 
   FILE *file;
   file = fopen(name, "rb");
@@ -136,7 +136,7 @@ bool read_from_file(const char *name, char *data) {
   }
 
   int res;
-  if(fgets(tmp_buffer, TMP_BUFFER_SIZE, file)) {
+  if(fgets(tmp_buffer, maxsize, file)) {
     res = strlen(tmp_buffer);
   } else {
     res = 0;
@@ -145,7 +145,7 @@ bool read_from_file(const char *name, char *data) {
     data[0] = 0;
   }
       
-  data[TMP_BUFFER_SIZE]=0;
+  data[maxsize-1]=0;
   fclose(file);
   return true;
 }

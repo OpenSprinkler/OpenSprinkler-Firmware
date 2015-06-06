@@ -42,7 +42,7 @@ byte OpenSprinkler::stnseq_bits[MAX_EXT_BOARDS+1];
 
 ulong OpenSprinkler::rainsense_start_time;
 ulong OpenSprinkler::raindelay_start_time;
-ulong OpenSprinkler::button_lasttime;
+byte OpenSprinkler::button_timeout;
 ulong OpenSprinkler::ntpsync_lasttime;
 ulong OpenSprinkler::checkwt_lasttime;
 ulong OpenSprinkler::checkwt_success_lasttime;
@@ -252,7 +252,7 @@ byte OpenSprinkler::start_network() {
   lcd_print_line_clear_pgm(PSTR("Connecting..."), 1);
 
   network_lasttime = now();
-  dhcpnew_lasttime = network_lasttime;
+  dhcpnew_lasttime = now();
 
   // new from 2.2: read hardware MAC
   if(!read_hardware_mac())
@@ -405,7 +405,8 @@ void OpenSprinkler::begin() {
   // AVR assigns 0 to static variables by default
   // so only need to initialize non-zero ones
   status.enabled = 1;
-
+  status.safe_reboot = 0;
+  
   old_status = status;
 
   nvdata.sunrise_time = 360;  // 6:00am default sunrise

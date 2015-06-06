@@ -992,7 +992,8 @@ byte server_change_options(char *p)
   }
 
   if(network_change) {
-  	os.network_lasttime = 0;	// force restart network
+    // network related options have changed
+    // this would require a restart to take effect
   }
   return HTML_SUCCESS;
 }
