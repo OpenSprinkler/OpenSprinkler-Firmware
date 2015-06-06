@@ -107,6 +107,7 @@ static prog_char _json_log [] PROGMEM = "lg";
 static prog_char _json_mas2[] PROGMEM = "mas2";
 static prog_char _json_mton2[]PROGMEM = "mton2";
 static prog_char _json_mtof2[]PROGMEM = "mtof2";
+static prog_char _json_fwm[]  PROGMEM = "fwm";
 static prog_char _json_reset[] PROGMEM = "reset";
 
 /** Option names */
@@ -150,6 +151,7 @@ static prog_char _str_log [] PROGMEM = "Log?";
 static prog_char _str_mas2[] PROGMEM = "Mas2:";
 static prog_char _str_mton2[]PROGMEM = "Mas2  on adj:";
 static prog_char _str_mtof2[]PROGMEM = "Mas2 off adj:";
+static prog_char _str_fwm[]  PROGMEM = "FWm:";
 static prog_char _str_reset[] PROGMEM = "Reset all?";
 
 OptionStruct OpenSprinkler::options[NUM_OPTIONS] = {
@@ -198,6 +200,7 @@ OptionStruct OpenSprinkler::options[NUM_OPTIONS] = {
   {0,   MAX_NUM_STATIONS, _str_mas2, _json_mas2},  // index of master 2. 0: no master2 station
   {0,   60,  _str_mton2,_json_mton2},
   {60,  120, _str_mtof2,_json_mtof2}, 
+  {OS_FW_MINOR, 0, _str_fwm, _json_fwm}, // firmware version  
   {0,   1,   _str_reset,_json_reset}
 };
 
@@ -894,24 +897,25 @@ void OpenSprinkler::options_setup() {
   lcd_set_brightness();
   lcd_set_contrast();
   
-  lcd.setCursor(2, 1);
-  lcd_print_pgm(PSTR("HW v"));
-  byte hwv = options[OPTION_HW_VERSION].value;
-  lcd.print((char)('0'+(hwv/10)));
-  lcd.print('.');
-  lcd.print((char)('0'+(hwv%10)));
-  switch(hw_type) {
-  case HW_TYPE_DC:
-    lcd_print_pgm(PSTR(" DC"));
-    break;
-  case HW_TYPE_LATCH:
-    lcd_print_pgm(PSTR(" LA"));
-    break;
-  default:
-    lcd_print_pgm(PSTR(" AC"));
+  if (!button) {
+    lcd.setCursor(2, 1);
+    lcd_print_pgm(PSTR("HW v"));
+    byte hwv = options[OPTION_HW_VERSION].value;
+    lcd.print((char)('0'+(hwv/10)));
+    lcd.print('.');
+    lcd.print((char)('0'+(hwv%10)));
+    switch(hw_type) {
+    case HW_TYPE_DC:
+      lcd_print_pgm(PSTR(" DC"));
+      break;
+    case HW_TYPE_LATCH:
+      lcd_print_pgm(PSTR(" LA"));
+      break;
+    default:
+      lcd_print_pgm(PSTR(" AC"));
+    }
+    delay(1000);
   }
-  delay(1000);
-
 #endif
 }
 
@@ -1224,13 +1228,13 @@ void OpenSprinkler::ui_set_options(int oid)
 
     switch (button & BUTTON_MASK) {
     case BUTTON_1:
-      if (i==OPTION_FW_VERSION || i==OPTION_HW_VERSION ||
+      if (i==OPTION_FW_VERSION || i==OPTION_HW_VERSION || i==OPTION_FW_MINOR ||
           i==OPTION_HTTPPORT_0 || i==OPTION_HTTPPORT_1) break; // ignore non-editable options
       if (options[i].max != options[i].value) options[i].value ++;
       break;
 
     case BUTTON_2:
-      if (i==OPTION_FW_VERSION || i==OPTION_HW_VERSION ||
+      if (i==OPTION_FW_VERSION || i==OPTION_HW_VERSION || i==OPTION_FW_MINOR ||
           i==OPTION_HTTPPORT_0 || i==OPTION_HTTPPORT_1) break; // ignore non-editable options
       if (options[i].value != 0) options[i].value --;
       break;

@@ -911,7 +911,7 @@ byte server_change_options(char *p)
     // skip options that cannot be set through web UI
     if (oid==OPTION_RESET || oid==OPTION_DEVICE_ENABLE ||
         oid==OPTION_FW_VERSION || oid==OPTION_HW_VERSION ||
-        oid==OPTION_SEQUENTIAL_RETIRED)
+        oid==OPTION_FW_MINOR || oid==OPTION_SEQUENTIAL_RETIRED)
       continue;
     prev_value = os.options[oid].value;
     if (os.options[oid].max==1)  os.options[oid].value = 0;  // set a bool variable to 0 first
