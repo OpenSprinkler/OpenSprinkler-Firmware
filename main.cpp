@@ -652,10 +652,13 @@ void process_dynamic_events(ulong curr_time) {
     sbits = os.station_bits[bid];
     for(s=0;s<8;s++) {
       sid=bid*8+s;
+
+      // ignore master stations because they are handled separately      
+      if (os.status.mas == sid+1) continue;
+      if (os.status.mas2== sid+1) continue;      
       // If this is a normal program (not a run-once or test program)
       // and either the controller is disabled, or
       // if raining and ignore rain bit is cleared
-      //if (!mm && (pd.scheduled_program_index[sid] != 254) &&
       if ((pd.scheduled_program_index[sid]<99) &&
           (!en || (rain && !(rbits&(1<<s)))) ) {
         if (sbits&(1<<s)) { // if station is currently running
