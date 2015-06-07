@@ -147,8 +147,8 @@ bool read_from_file(const char *name, char *data, int maxsize) {
   }
 
   int res;
-  if(fgets(tmp_buffer, maxsize, file)) {
-    res = strlen(tmp_buffer);
+  if(fgets(data, maxsize, file)) {
+    res = strlen(data);
   } else {
     res = 0;
   }

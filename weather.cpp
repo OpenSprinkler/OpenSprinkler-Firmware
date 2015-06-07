@@ -225,7 +225,7 @@ void GetWeather() {
     }
   };
   *dst = *src;
-  
+
   char urlBuffer[255];
   strcpy(urlBuffer, "GET /weather");
   strcat(urlBuffer, dst);
