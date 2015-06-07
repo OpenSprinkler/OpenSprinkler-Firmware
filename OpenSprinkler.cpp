@@ -47,7 +47,6 @@ ulong OpenSprinkler::ntpsync_lasttime;
 ulong OpenSprinkler::checkwt_lasttime;
 ulong OpenSprinkler::checkwt_success_lasttime;
 ulong OpenSprinkler::network_lasttime;
-ulong OpenSprinkler::dhcpnew_lasttime;
 ulong OpenSprinkler::external_ip;
 byte OpenSprinkler::water_percent_avg;
 
@@ -261,7 +260,6 @@ byte OpenSprinkler::start_network() {
   lcd_print_line_clear_pgm(PSTR("Connecting..."), 1);
 
   network_lasttime = now();
-  dhcpnew_lasttime = now();
 
   // new from 2.2: read hardware MAC
   if(!read_hardware_mac())

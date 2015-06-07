@@ -17,6 +17,7 @@
 #include "EtherCard.h"
 #include "net.h"
 
+uint32_t now();
 #define gPB ether.buffer
 
 #define DHCP_BOOTREQUEST 1
@@ -237,7 +238,8 @@ static void process_dhcp_offer (uint16_t len) {
             case 58:  leaseTime = 0; // option 58 = Renewal Time, 51 = Lease Time
                       for (byte i = 0; i<4; i++)
                           leaseTime = (leaseTime << 8) + ptr[i];
-                      leaseTime *= 1000;      // milliseconds
+                      //leaseTime *= 1000;      // milliseconds // ray: use seconds and not millis
+                      if (leaseTime > 86400L) leaseTime = 86400L;
                       break;
             case 54:  EtherCard::copyIp(EtherCard::dhcpip, ptr);
                       break;
@@ -332,8 +334,8 @@ void EtherCard::DhcpStateMachine (uint16_t len) {
     switch (dhcpState) {
 
     case DHCP_STATE_BOUND:
-        //!@todo Due to millis() 49 day wrap-around, DHCP renewal may not work as expected
-        if (millis() >= leaseStart + leaseTime) {
+        //if (millis() >= leaseStart + leaseTime) { // ray: fix millis() 49-day wrap around issue
+        if (now() > leaseStart + leaseTime) {
             send_dhcp_message();
             dhcpState = DHCP_STATE_RENEWING;
             stateTimer = millis();
@@ -366,7 +368,8 @@ void EtherCard::DhcpStateMachine (uint16_t len) {
     case DHCP_STATE_RENEWING:
         if (dhcp_received_message_type(len, DHCP_ACK)) {
             disableBroadcast(true); //Disable broadcast after temporary enable
-            leaseStart = millis();
+            //leaseStart = millis();
+            leaseStart = now(); // ray: use seconds and not millis()
             if (gwip[0] != 0) setGwIp(gwip); // why is this? because it initiates an arp request
             dhcpState = DHCP_STATE_BOUND;
         } else {

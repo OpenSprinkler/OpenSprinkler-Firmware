@@ -277,22 +277,22 @@ void EtherCard::httpServerReplyAck () {
     get_seq(); //get the sequence number of packets after an ack from GET
 }
 
-void EtherCard::httpServerReply_with_flags (uint16_t dlen, uint8_t flags, uint8_t dup) {
+/*void EtherCard::httpServerReply_with_flags (uint16_t dlen, uint8_t flags, uint8_t dup) {
 for(byte i=0;i<=dup;i++) {
   set_seq();
   gPB[TCP_FLAGS_P] = flags; // final packet
   make_tcp_ack_with_data_noflags(dlen); // send data
 }
 SEQ=SEQ+dlen;
-}
-/*
+}*/
+
 void EtherCard::httpServerReply_with_flags (uint16_t dlen , uint8_t flags) {
     set_seq();
     gPB[TCP_FLAGS_P] = flags; // final packet
     make_tcp_ack_with_data_noflags(dlen); // send data
     SEQ=SEQ+dlen;
 }
-*/
+
 void EtherCard::clientIcmpRequest(const uint8_t *destip) {
     setMACandIPs(gwmacaddr, destip);
     gPB[ETH_TYPE_H_P] = ETHTYPE_IP_H_V;

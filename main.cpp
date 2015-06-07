@@ -52,7 +52,6 @@ EthernetClient *m_client = 0;
 #define NTP_SYNC_TIMEOUT        86403L  // NYP sync timeout, 24 hrs
 #define RTC_SYNC_INTERVAL       60      // RTC sync interval, 60 secs
 #define CHECK_NETWORK_TIMEOUT   59      // Network checking timeout, 59 secs
-#define DHCP_RENEW_TIMEOUT      86417L  // DHCP renewal timeout: 24 hrs
 #define STAT_UPDATE_TIMEOUT     900     // Statistics update timeout: 15 mins
 #define CHECK_WEATHER_TIMEOUT   1801     // Weather check interval: 30 minutes
 #define CHECK_WEATHER_SUCCESS_TIMEOUT 86433L // Weather check success interval: 24 hrs
@@ -985,8 +984,8 @@ void check_network() {
     if (os.status.network_fails>=6) {
       // mark for safe restart
       os.status.safe_reboot = 1;
-    } else if (os.status.network_fails>2 || (now() > os.dhcpnew_lasttime + DHCP_RENEW_TIMEOUT)) {
-      // if failed more than twice, reconnect    
+    } else if (os.status.network_fails>2) {
+      // if failed more than twice, try to reconnect    
       if (os.start_network())
         os.status.network_fails=0;
     }
