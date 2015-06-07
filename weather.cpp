@@ -233,7 +233,7 @@ void GetWeather() {
   
   client.write((uint8_t *)urlBuffer, strlen(urlBuffer));
   
-  bzero(tmp_buffer, TMP_BUFFER_SIZE);
+  bzero(ether_buffer, ETHER_BUFFER_SIZE);
   
   time_t timeout = os.now_tz() + 5; // 5 seconds timeout
   while(os.now_tz() < timeout) {
