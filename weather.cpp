@@ -31,6 +31,8 @@
 extern char ether_buffer[];
 #endif
 
+extern const char wtopts_name[];
+
 #include "OpenSprinkler.h"
 #include "utils.h"
 #include "server.h"
@@ -49,7 +51,6 @@ static void getweather_callback(byte status, uint16_t off, uint16_t len) {
 #else
   char *p = ether_buffer;
 #endif
-
   /* scan the buffer until the first & symbol */
   while(*p && *p!='&') {
     p++;
@@ -105,12 +106,15 @@ void GetWeather() {
   }
 
   //bfill=ether.tcpOffset();
+  char tmp[30];
+  read_from_file(wtopts_name, tmp, 30);
   BufferFiller bf = (uint8_t*)tmp_buffer;
-  bf.emit_p(PSTR("$D.py?loc=$E&key=$E&fwv=$D"),
+  bf.emit_p(PSTR("$D.py?loc=$E&key=$E&fwv=$D&wto=$S"),
                 (int) os.options[OPTION_USE_WEATHER].value,
                 ADDR_NVM_LOCATION,
                 ADDR_NVM_WEATHER_KEY,
-                (int)os.options[OPTION_FW_VERSION].value);
+                (int)os.options[OPTION_FW_VERSION].value,
+                tmp);
   // copy string to tmp_buffer, replacing all spaces with _
   char *src=tmp_buffer+strlen(tmp_buffer);
   char *dst=tmp_buffer+TMP_BUFFER_SIZE-1;
@@ -193,12 +197,15 @@ void GetWeather() {
     return;
   }
 
-  BufferFiller bf = tmp_buffer;  
-  bf.emit_p(PSTR("$D.py?loc=$E&key=$E&fwv=$D"),
+  BufferFiller bf = tmp_buffer;
+  char tmp[100];
+  read_from_file(wtopts_name, tmp, 100);
+  bf.emit_p(PSTR("$D.py?loc=$E&key=$E&fwv=$D&wto=$S"),
                 (int) os.options[OPTION_USE_WEATHER].value,
                 ADDR_NVM_LOCATION,
                 ADDR_NVM_WEATHER_KEY,
-                (int)os.options[OPTION_FW_VERSION].value);    
+                (int)os.options[OPTION_FW_VERSION].value,
+                tmp);    
 
   char *src=tmp_buffer+strlen(tmp_buffer);
   char *dst=tmp_buffer+TMP_BUFFER_SIZE-1;
@@ -218,7 +225,7 @@ void GetWeather() {
     }
   };
   *dst = *src;
-  
+
   char urlBuffer[255];
   strcpy(urlBuffer, "GET /weather");
   strcat(urlBuffer, dst);
@@ -226,7 +233,7 @@ void GetWeather() {
   
   client.write((uint8_t *)urlBuffer, strlen(urlBuffer));
   
-  bzero(tmp_buffer, TMP_BUFFER_SIZE);
+  bzero(ether_buffer, ETHER_BUFFER_SIZE);
   
   time_t timeout = os.now_tz() + 5; // 5 seconds timeout
   while(os.now_tz() < timeout) {

@@ -283,8 +283,8 @@ bool EtherCard::dhcpSetup () {
     using_dhcp = true;
 
     // Set a unique hostname, use Arduino-?? with last octet of mac address
-    hostname[3] = '0' + (mymac[5] >> 4);
-    hostname[4] = '0' + (mymac[5] & 0x0F);
+    hostname[3] = 'A' + (mymac[5] >> 4);
+    hostname[4] = 'A' + (mymac[5] & 0x0F);
 
     dhcpState = DHCP_STATE_INIT;
     uint16_t start = millis();

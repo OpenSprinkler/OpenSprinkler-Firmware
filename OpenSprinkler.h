@@ -66,7 +66,7 @@ struct ConStatus {
   byte program_busy:1;      // HIGH means a program is being executed currently
   byte has_rtc:1;           // HIGH means the controller has a DS1307 RTC
   byte has_sd:1;            // HIGH means a microSD card is detected
-  byte wt_received:1;       // HIGH means weather info has been received
+  byte safe_reboot:1;       // HIGH means a safe reboot has been marked
   byte has_hwmac:1;         // has hardware MAC chip
   byte display_board:4;     // the board that is being displayed onto the lcd
   byte network_fails:4;     // number of network fails
@@ -93,6 +93,7 @@ public:
   static ConStatus status;
   static ConStatus old_status;
   static byte nboards, nstations;
+  static byte hw_type;           // hardware type
 
   static OptionStruct options[];  // option values, max, name, and flag
 
@@ -109,7 +110,7 @@ public:
   // variables for time keeping
   static ulong rainsense_start_time;  // time when the most recent rain sensor activation was detected
   static ulong raindelay_start_time;  // time when the most recent rain delay started
-  static ulong button_lasttime;       // time when button was checked
+  static byte  button_timeout;        // button timeout
   static ulong ntpsync_lasttime;      // time when ntp sync was performed
   static ulong checkwt_lasttime;      // time when weather was checked
   static ulong checkwt_success_lasttime; // time when weather check was successful
@@ -177,11 +178,12 @@ public:
 
   // -- UI functions --
   static void ui_set_options(int oid);    // ui for setting options (oid-> starting option index)
-  static void lcd_set_brightness();
+  static void lcd_set_brightness(byte value=1);
   static void lcd_set_contrast();
 private:
   static void lcd_print_option(int i);  // print an option to the lcd
   static void lcd_print_2digit(int v);  // print a integer in 2 digits
+  static void lcd_start();
   static byte button_read_busy(byte pin_butt, byte waitmode, byte butt, byte is_holding);
 #endif // LCD functions
 };

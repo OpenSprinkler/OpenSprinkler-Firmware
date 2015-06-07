@@ -1,9 +1,7 @@
 #include "LiquidCrystal.h"
-
-#include <stdio.h>
-#include <string.h>
 #include <inttypes.h>
-#include "Arduino.h"
+#include <Arduino.h>
+#include <Wire.h>
 
 // When the display powers up, it is configured as follows:
 //
@@ -24,30 +22,125 @@
 // can't assume that its in that state when a sketch starts (and the
 // LiquidCrystal constructor is called).
 
-LiquidCrystal::LiquidCrystal(uint8_t rs, uint8_t rw, uint8_t enable,
-			     uint8_t d0, uint8_t d1, uint8_t d2, uint8_t d3,
-			     uint8_t d4, uint8_t d5, uint8_t d6, uint8_t d7)
-{
-  init(0, rs, rw, enable, d0, d1, d2, d3, d4, d5, d6, d7);
-}
+void LiquidCrystal::begin() {
+  #if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
+  if (_type == LCD_I2C) {
+	  _displayfunction = LCD_4BITMODE | LCD_2LINE | LCD_5x8DOTS;
 
-LiquidCrystal::LiquidCrystal(uint8_t rs, uint8_t enable,
-			     uint8_t d0, uint8_t d1, uint8_t d2, uint8_t d3,
-			     uint8_t d4, uint8_t d5, uint8_t d6, uint8_t d7)
-{
-  init(0, rs, 255, enable, d0, d1, d2, d3, d4, d5, d6, d7);
-}
+	  // SEE PAGE 45/46 FOR INITIALIZATION SPECIFICATION!
+	  // according to datasheet, we need at least 40ms after power rises above 2.7V
+	  // before sending commands. Arduino can turn on way befer 4.5V so we'll wait 50
+	  delay(50); 
 
-LiquidCrystal::LiquidCrystal(uint8_t rs, uint8_t rw, uint8_t enable,
-			     uint8_t d0, uint8_t d1, uint8_t d2, uint8_t d3)
-{
-  init(1, rs, rw, enable, d0, d1, d2, d3, 0, 0, 0, 0);
-}
+	  // Now we pull both RS and R/W low to begin commands
+	  expanderWrite(_backlightval);	// reset expanderand turn backlight off (Bit 8 =1)
+	  delay(1000);
 
-LiquidCrystal::LiquidCrystal(uint8_t rs,  uint8_t enable,
-			     uint8_t d0, uint8_t d1, uint8_t d2, uint8_t d3)
-{
-  init(1, rs, 255, enable, d0, d1, d2, d3, 0, 0, 0, 0);
+	  //put the LCD into 4 bit mode
+	  // this is according to the hitachi HD44780 datasheet
+	  // figure 24, pg 46
+
+	  // we start in 8bit mode, try to set 4 bit mode
+	  write4bits(0x03 << 4);
+	  delayMicroseconds(4500); // wait min 4.1ms
+
+	  // second try
+	  write4bits(0x03 << 4);
+	  delayMicroseconds(4500); // wait min 4.1ms
+
+	  // third go!
+	  write4bits(0x03 << 4); 
+	  delayMicroseconds(150);
+
+	  // finally, set to 4-bit interface
+	  write4bits(0x02 << 4); 
+
+	  // set # lines, font size, etc.
+	  command(LCD_FUNCTIONSET | _displayfunction);  
+	
+	  // turn the display on with no cursor or blinking default
+	  _displaycontrol = LCD_DISPLAYON | LCD_CURSOROFF | LCD_BLINKOFF;
+	  display();
+	
+	  // clear it off
+	  clear();
+	
+	  // Initialize to default text direction (for roman languages)
+	  _displaymode = LCD_ENTRYLEFT | LCD_ENTRYSHIFTDECREMENT;
+	
+	  // set the entry mode
+	  command(LCD_ENTRYMODESET | _displaymode);
+	
+	  home();
+	}
+	#endif
+	
+  if (_type == LCD_STD) {	
+    _displayfunction |= LCD_2LINE;
+    _numlines = 2;
+    _currline = 0;
+
+    // SEE PAGE 45/46 FOR INITIALIZATION SPECIFICATION!
+    // according to datasheet, we need at least 40ms after power rises above 2.7V
+    // before sending commands. Arduino can turn on way befer 4.5V so we'll wait 50
+    delayMicroseconds(50000); 
+    // Now we pull both RS and R/W low to begin commands
+    digitalWrite(_rs_pin, LOW);
+    digitalWrite(_enable_pin, LOW);
+    if (_rw_pin != 255) { 
+      digitalWrite(_rw_pin, LOW);
+    }
+    
+    //put the LCD into 4 bit or 8 bit mode
+    if (! (_displayfunction & LCD_8BITMODE)) {
+      // this is according to the hitachi HD44780 datasheet
+      // figure 24, pg 46
+
+      // we start in 8bit mode, try to set 4 bit mode
+      write4bits(0x03);
+      delayMicroseconds(4500); // wait min 4.1ms
+
+      // second try
+      write4bits(0x03);
+      delayMicroseconds(4500); // wait min 4.1ms
+      
+      // third go!
+      write4bits(0x03); 
+      delayMicroseconds(150);
+
+      // finally, set to 4-bit interface
+      write4bits(0x02); 
+    } else {
+      // this is according to the hitachi HD44780 datasheet
+      // page 45 figure 23
+
+      // Send function set command sequence
+      command(LCD_FUNCTIONSET | _displayfunction);
+      delayMicroseconds(4500);  // wait more than 4.1ms
+
+      // second try
+      command(LCD_FUNCTIONSET | _displayfunction);
+      delayMicroseconds(150);
+
+      // third go
+      command(LCD_FUNCTIONSET | _displayfunction);
+    }
+
+    // finally, set # lines, font size, etc.
+    command(LCD_FUNCTIONSET | _displayfunction);  
+
+    // turn the display on with no cursor or blinking default
+    _displaycontrol = LCD_DISPLAYON | LCD_CURSOROFF | LCD_BLINKOFF;  
+    display();
+
+    // clear it off
+    clear();
+
+    // Initialize to default text direction (for romance languages)
+    _displaymode = LCD_ENTRYLEFT | LCD_ENTRYSHIFTDECREMENT;
+    // set the entry mode
+    command(LCD_ENTRYMODESET | _displaymode);
+  }
 }
 
 void LiquidCrystal::init(uint8_t fourbitmode, uint8_t rs, uint8_t rw, uint8_t enable,
@@ -66,101 +159,42 @@ void LiquidCrystal::init(uint8_t fourbitmode, uint8_t rs, uint8_t rw, uint8_t en
   _data_pins[5] = d5;
   _data_pins[6] = d6;
   _data_pins[7] = d7; 
-
-  pinMode(_rs_pin, OUTPUT);
-  // we can save 1 pin by not using RW. Indicate by passing 255 instead of pin#
-  if (_rw_pin != 255) { 
-    pinMode(_rw_pin, OUTPUT);
-  }
-  pinMode(_enable_pin, OUTPUT);
   
-  if (fourbitmode)
-    _displayfunction = LCD_4BITMODE | LCD_1LINE | LCD_5x8DOTS;
-  else 
-    _displayfunction = LCD_8BITMODE | LCD_1LINE | LCD_5x8DOTS;
+	Wire.begin();
+  _type = LCD_STD;
+  #if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
+  // detect I2C and assign _type variable accordingly
+  Wire.beginTransmission(LCD_I2C_ADDR);
+  Wire.write(0x00);
+  uint8_t ret = Wire.endTransmission();
+  if (!ret)  _type = LCD_I2C;  
   
-  begin(16, 1);  
-}
+  if (_type == LCD_I2C) {
+	  _addr = LCD_I2C_ADDR;
+	  _cols = 16;
+	  _rows = 2;
+	  _charsize = LCD_5x8DOTS;
+	  _backlightval = LCD_BACKLIGHT;
+	}	  
+  #endif
 
-void LiquidCrystal::begin(uint8_t cols, uint8_t lines, uint8_t dotsize) {
-  if (lines > 1) {
-    _displayfunction |= LCD_2LINE;
-  }
-  _numlines = lines;
-  _currline = 0;
-
-  // for some 1 line displays you can select a 10 pixel high font
-  if ((dotsize != 0) && (lines == 1)) {
-    _displayfunction |= LCD_5x10DOTS;
-  }
-
-  // SEE PAGE 45/46 FOR INITIALIZATION SPECIFICATION!
-  // according to datasheet, we need at least 40ms after power rises above 2.7V
-  // before sending commands. Arduino can turn on way befer 4.5V so we'll wait 50
-  delayMicroseconds(50000); 
-  // Now we pull both RS and R/W low to begin commands
-  digitalWrite(_rs_pin, LOW);
-  digitalWrite(_enable_pin, LOW);
-  if (_rw_pin != 255) { 
-    digitalWrite(_rw_pin, LOW);
-  }
-  
-  //put the LCD into 4 bit or 8 bit mode
-  if (! (_displayfunction & LCD_8BITMODE)) {
-    // this is according to the hitachi HD44780 datasheet
-    // figure 24, pg 46
-
-    // we start in 8bit mode, try to set 4 bit mode
-    write4bits(0x03);
-    delayMicroseconds(4500); // wait min 4.1ms
-
-    // second try
-    write4bits(0x03);
-    delayMicroseconds(4500); // wait min 4.1ms
+  if (_type == LCD_STD) {
+    pinMode(_rs_pin, OUTPUT);
+    // we can save 1 pin by not using RW. Indicate by passing 255 instead of pin#
+    if (_rw_pin != 255) { 
+      pinMode(_rw_pin, OUTPUT);
+    }
+    pinMode(_enable_pin, OUTPUT);
     
-    // third go!
-    write4bits(0x03); 
-    delayMicroseconds(150);
-
-    // finally, set to 4-bit interface
-    write4bits(0x02); 
-  } else {
-    // this is according to the hitachi HD44780 datasheet
-    // page 45 figure 23
-
-    // Send function set command sequence
-    command(LCD_FUNCTIONSET | _displayfunction);
-    delayMicroseconds(4500);  // wait more than 4.1ms
-
-    // second try
-    command(LCD_FUNCTIONSET | _displayfunction);
-    delayMicroseconds(150);
-
-    // third go
-    command(LCD_FUNCTIONSET | _displayfunction);
   }
-
-  // finally, set # lines, font size, etc.
-  command(LCD_FUNCTIONSET | _displayfunction);  
-
-  // turn the display on with no cursor or blinking default
-  _displaycontrol = LCD_DISPLAYON | LCD_CURSOROFF | LCD_BLINKOFF;  
-  display();
-
-  // clear it off
-  clear();
-
-  // Initialize to default text direction (for romance languages)
-  _displaymode = LCD_ENTRYLEFT | LCD_ENTRYSHIFTDECREMENT;
-  // set the entry mode
-  command(LCD_ENTRYMODESET | _displaymode);
+  _displayfunction = LCD_4BITMODE | LCD_2LINE | LCD_5x8DOTS;
 
 }
 
 /********** high level commands, for the user! */
 void LiquidCrystal::clear()
 {
-  command(LCD_CLEARDISPLAY);  // clear display, set cursor position to zero
+  command(LCD_CLEARDISPLAY);// clear display, set cursor position to zero
   delayMicroseconds(2000);  // this command takes a long time!
 }
 
@@ -173,10 +207,18 @@ void LiquidCrystal::home()
 void LiquidCrystal::setCursor(uint8_t col, uint8_t row)
 {
   int row_offsets[] = { 0x00, 0x40, 0x14, 0x54 };
-  if ( row >= _numlines ) {
-    row = _numlines-1;    // we count rows starting w/0
+  #if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)  
+  if (_type == LCD_I2C) {
+    if (row > _rows) {
+      row = _rows-1;    // we count rows starting w/0
+    }
   }
-  
+  #endif
+  if (_type == LCD_STD) {
+    if (row >= _numlines) {
+      row = _numlines-1;
+    }
+  }  
   command(LCD_SETDDRAMADDR | (col + row_offsets[row]));
 }
 
@@ -252,35 +294,87 @@ void LiquidCrystal::createChar(uint8_t location, uint8_t charmap[]) {
   }
 }
 
+#if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
+// Turn the (optional) backlight off/on
+void LiquidCrystal::noBacklight(void) {
+  _backlightval=LCD_NOBACKLIGHT;
+  expanderWrite(0);
+}
+
+void LiquidCrystal::backlight(void) {
+  _backlightval=LCD_BACKLIGHT;
+  expanderWrite(0);
+}
+#endif
+
 /*********** mid level commands, for sending data/cmds */
 
 inline void LiquidCrystal::command(uint8_t value) {
-  send(value, LOW);
+	send(value, 0);
 }
 
 inline size_t LiquidCrystal::write(uint8_t value) {
-  send(value, HIGH);
+	send(value, Rs);
   return 1; // assume sucess
 }
 
 /************ low level data pushing commands **********/
 
-// write either command or data, with automatic 4/8-bit selection
+// write either command or data
 void LiquidCrystal::send(uint8_t value, uint8_t mode) {
-  digitalWrite(_rs_pin, mode);
+  #if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
+  if (_type == LCD_I2C) {
+	  uint8_t highnib=value&0xf0;
+	  uint8_t lownib=(value<<4)&0xf0;
+	  write4bits((highnib)|mode);
+	  write4bits((lownib)|mode); 
+  } 
+  #endif
+  if (_type == LCD_STD) {
+    digitalWrite(_rs_pin, mode);
 
-  // if there is a RW pin indicated, set it low to Write
-  if (_rw_pin != 255) { 
-    digitalWrite(_rw_pin, LOW);
-  }
-  
-  if (_displayfunction & LCD_8BITMODE) {
-    write8bits(value); 
-  } else {
+    // if there is a RW pin indicated, set it low to Write
+    if (_rw_pin != 255) { 
+      digitalWrite(_rw_pin, LOW);
+    }
+    
     write4bits(value>>4);
     write4bits(value);
   }
 }
+
+void LiquidCrystal::write4bits(uint8_t value) {
+  #if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
+  if (_type == LCD_I2C) {
+	  expanderWrite(value);
+	  pulseEnable(value);
+  }
+  #endif
+  if (_type == LCD_STD) {
+    for (int i = 0; i < 4; i++) {
+      pinMode(_data_pins[i], OUTPUT);
+      digitalWrite(_data_pins[i], (value >> i) & 0x01);
+    }
+
+    pulseEnable();
+  }
+}
+
+#if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
+void LiquidCrystal::expanderWrite(uint8_t _data){                                        
+	Wire.beginTransmission(_addr);
+	Wire.write((int)(_data) | _backlightval);
+	Wire.endTransmission();   
+}
+
+void LiquidCrystal::pulseEnable(uint8_t _data){
+	expanderWrite(_data | En);	// En high
+	delayMicroseconds(1);		// enable pulse must be >450ns
+	
+	expanderWrite(_data & ~En);	// En low
+	delayMicroseconds(50);		// commands need > 37us to settle
+}
+#endif
 
 void LiquidCrystal::pulseEnable(void) {
   digitalWrite(_enable_pin, LOW);
@@ -291,20 +385,3 @@ void LiquidCrystal::pulseEnable(void) {
   delayMicroseconds(100);   // commands need > 37us to settle
 }
 
-void LiquidCrystal::write4bits(uint8_t value) {
-  for (int i = 0; i < 4; i++) {
-    pinMode(_data_pins[i], OUTPUT);
-    digitalWrite(_data_pins[i], (value >> i) & 0x01);
-  }
-
-  pulseEnable();
-}
-
-void LiquidCrystal::write8bits(uint8_t value) {
-  for (int i = 0; i < 8; i++) {
-    pinMode(_data_pins[i], OUTPUT);
-    digitalWrite(_data_pins[i], (value >> i) & 0x01);
-  }
-  
-  pulseEnable();
-}

@@ -28,6 +28,7 @@
 NVConData OpenSprinkler::nvdata;
 ConStatus OpenSprinkler::status;
 ConStatus OpenSprinkler::old_status;
+byte OpenSprinkler::hw_type;
 
 byte OpenSprinkler::nboards;
 byte OpenSprinkler::nstations;
@@ -41,7 +42,7 @@ byte OpenSprinkler::stnseq_bits[MAX_EXT_BOARDS+1];
 
 ulong OpenSprinkler::rainsense_start_time;
 ulong OpenSprinkler::raindelay_start_time;
-ulong OpenSprinkler::button_lasttime;
+byte OpenSprinkler::button_timeout;
 ulong OpenSprinkler::ntpsync_lasttime;
 ulong OpenSprinkler::checkwt_lasttime;
 ulong OpenSprinkler::checkwt_success_lasttime;
@@ -53,7 +54,15 @@ byte OpenSprinkler::water_percent_avg;
 char tmp_buffer[TMP_BUFFER_SIZE+1];       // scratch buffer
 
 #if defined(ARDUINO)
+  prog_char wtopts_name[] PROGMEM = WEATHER_OPTS_FILENAME;
+#else
+  char wtopts_name[] = WEATHER_OPTS_FILENAME;
+#endif
+
+#if defined(ARDUINO)
   LiquidCrystal OpenSprinkler::lcd;
+  #include <SdFat.h>
+  extern SdFat sd;
 #elif defined(OSPI)
   // todo: LCD define for OSPi
 #endif
@@ -63,90 +72,90 @@ char tmp_buffer[TMP_BUFFER_SIZE+1];       // scratch buffer
 #endif
 
 /** Option json names */
-prog_char _json_fwv [] PROGMEM = "fwv";
-prog_char _json_tz  [] PROGMEM = "tz";
-prog_char _json_ntp [] PROGMEM = "ntp";
-prog_char _json_dhcp[] PROGMEM = "dhcp";
-prog_char _json_ip1 [] PROGMEM = "ip1";
-prog_char _json_ip2 [] PROGMEM = "ip2";
-prog_char _json_ip3 [] PROGMEM = "ip3";
-prog_char _json_ip4 [] PROGMEM = "ip4";
-prog_char _json_gw1 [] PROGMEM = "gw1";
-prog_char _json_gw2 [] PROGMEM = "gw2";
-prog_char _json_gw3 [] PROGMEM = "gw3";
-prog_char _json_gw4 [] PROGMEM = "gw4";
-prog_char _json_hp0 [] PROGMEM = "hp0";
-prog_char _json_hp1 [] PROGMEM = "hp1";
-prog_char _json_hwv [] PROGMEM = "hwv";
-prog_char _json_ext [] PROGMEM = "ext";
-prog_char _json_seq [] PROGMEM = "_";   // the option 'sequential' is now retired
-prog_char _json_sdt [] PROGMEM = "sdt";
-prog_char _json_mas [] PROGMEM = "mas";
-prog_char _json_mton[] PROGMEM = "mton";
-prog_char _json_mtof[] PROGMEM = "mtof";
-prog_char _json_urs [] PROGMEM = "urs";
-prog_char _json_rso [] PROGMEM = "rso";
-prog_char _json_wl  [] PROGMEM = "wl";
-prog_char _json_den [] PROGMEM = "den";
-prog_char _json_ipas[] PROGMEM = "ipas";
-prog_char _json_devid[]PROGMEM = "devid";
-prog_char _json_con [] PROGMEM = "con";
-prog_char _json_lit [] PROGMEM = "lit";
-prog_char _json_dim [] PROGMEM = "dim";
-prog_char _json_rlp [] PROGMEM = "_";
-prog_char _json_uwt [] PROGMEM = "uwt";
-prog_char _json_ntp1[] PROGMEM = "ntp1";
-prog_char _json_ntp2[] PROGMEM = "ntp2";
-prog_char _json_ntp3[] PROGMEM = "ntp3";
-prog_char _json_ntp4[] PROGMEM = "ntp4";
-prog_char _json_log [] PROGMEM = "lg";
-prog_char _json_mas2[] PROGMEM = "mas2";
-prog_char _json_mton2[]PROGMEM = "mton2";
-prog_char _json_mtof2[]PROGMEM = "mtof2";
-prog_char _json_reset[] PROGMEM = "reset";
+static prog_char _json_fwv [] PROGMEM = "fwv";
+static prog_char _json_tz  [] PROGMEM = "tz";
+static prog_char _json_ntp [] PROGMEM = "ntp";
+static prog_char _json_dhcp[] PROGMEM = "dhcp";
+static prog_char _json_ip1 [] PROGMEM = "ip1";
+static prog_char _json_ip2 [] PROGMEM = "ip2";
+static prog_char _json_ip3 [] PROGMEM = "ip3";
+static prog_char _json_ip4 [] PROGMEM = "ip4";
+static prog_char _json_gw1 [] PROGMEM = "gw1";
+static prog_char _json_gw2 [] PROGMEM = "gw2";
+static prog_char _json_gw3 [] PROGMEM = "gw3";
+static prog_char _json_gw4 [] PROGMEM = "gw4";
+static prog_char _json_hp0 [] PROGMEM = "hp0";
+static prog_char _json_hp1 [] PROGMEM = "hp1";
+static prog_char _json_hwv [] PROGMEM = "hwv";
+static prog_char _json_ext [] PROGMEM = "ext";
+static prog_char _json_sdt [] PROGMEM = "sdt";
+static prog_char _json_mas [] PROGMEM = "mas";
+static prog_char _json_mton[] PROGMEM = "mton";
+static prog_char _json_mtof[] PROGMEM = "mtof";
+static prog_char _json_urs [] PROGMEM = "urs";
+static prog_char _json_rso [] PROGMEM = "rso";
+static prog_char _json_wl  [] PROGMEM = "wl";
+static prog_char _json_den [] PROGMEM = "den";
+static prog_char _json_ipas[] PROGMEM = "ipas";
+static prog_char _json_devid[]PROGMEM = "devid";
+static prog_char _json_con [] PROGMEM = "con";
+static prog_char _json_lit [] PROGMEM = "lit";
+static prog_char _json_dim [] PROGMEM = "dim";
+static prog_char _json_bst [] PROGMEM = "bst";
+static prog_char _json_uwt [] PROGMEM = "uwt";
+static prog_char _json_ntp1[] PROGMEM = "ntp1";
+static prog_char _json_ntp2[] PROGMEM = "ntp2";
+static prog_char _json_ntp3[] PROGMEM = "ntp3";
+static prog_char _json_ntp4[] PROGMEM = "ntp4";
+static prog_char _json_log [] PROGMEM = "lg";
+static prog_char _json_mas2[] PROGMEM = "mas2";
+static prog_char _json_mton2[]PROGMEM = "mton2";
+static prog_char _json_mtof2[]PROGMEM = "mtof2";
+static prog_char _json_fwm[]  PROGMEM = "fwm";
+static prog_char _json_reset[] PROGMEM = "reset";
 
 /** Option names */
-prog_char _str_fwv [] PROGMEM = "FW:";
-prog_char _str_tz  [] PROGMEM = "TZone:";
-prog_char _str_ntp [] PROGMEM = "NTP?";
-prog_char _str_dhcp[] PROGMEM = "DHCP?";
-prog_char _str_ip1 [] PROGMEM = "OS.ip1:";
-prog_char _str_ip2 [] PROGMEM = ".ip2:";
-prog_char _str_ip3 [] PROGMEM = ".ip3:";
-prog_char _str_ip4 [] PROGMEM = ".ip4:";
-prog_char _str_gw1 [] PROGMEM = "GW.ip1:";
-prog_char _str_gw2 [] PROGMEM = ".ip2:";
-prog_char _str_gw3 [] PROGMEM = ".ip3:";
-prog_char _str_gw4 [] PROGMEM = ".ip4:";
-prog_char _str_hp0 [] PROGMEM = "Port:";
-prog_char _str_hp1 [] PROGMEM = "";
-prog_char _str_hwv [] PROGMEM = "HW: ";
-prog_char _str_ext [] PROGMEM = "Exp. board:";
-prog_char _str_seq [] PROGMEM = "";   // the option 'sequential' is now retired
-prog_char _str_sdt [] PROGMEM = "Stn delay:";
-prog_char _str_mas [] PROGMEM = "Mas1:";
-prog_char _str_mton[] PROGMEM = "Mas1  on adj:";
-prog_char _str_mtof[] PROGMEM = "Mas1 off adj:";
-prog_char _str_urs [] PROGMEM = "Rain sensor:";
-prog_char _str_rso [] PROGMEM = "Normally open?";
-prog_char _str_wl  [] PROGMEM = "% Watering:";
-prog_char _str_den [] PROGMEM = "Dev. enable?";
-prog_char _str_ipas[] PROGMEM = "Ign pwd?";
-prog_char _str_devid[]PROGMEM = "Dev. ID:";
-prog_char _str_con [] PROGMEM = "LCD con.:";
-prog_char _str_lit [] PROGMEM = "LCD lit.:";
-prog_char _str_dim [] PROGMEM = "LCD dim.:";
-prog_char _str_rlp [] PROGMEM = ""; // the option 'relay pulsing' is now retired
-prog_char _str_uwt [] PROGMEM = "Use weather?";
-prog_char _str_ntp1[] PROGMEM = "NTP.ip1:";
-prog_char _str_ntp2[] PROGMEM = ".ip2:";
-prog_char _str_ntp3[] PROGMEM = ".ip3:";
-prog_char _str_ntp4[] PROGMEM = ".ip4:";
-prog_char _str_log [] PROGMEM = "Log?";
-prog_char _str_mas2[] PROGMEM = "Mas2:";
-prog_char _str_mton2[]PROGMEM = "Mas2  on adj:";
-prog_char _str_mtof2[]PROGMEM = "Mas2 off adj:";
-prog_char _str_reset[] PROGMEM = "Reset all?";
+static prog_char _str_fwv [] PROGMEM = "FW:";
+static prog_char _str_tz  [] PROGMEM = "TZone:";
+static prog_char _str_ntp [] PROGMEM = "NTP?";
+static prog_char _str_dhcp[] PROGMEM = "DHCP?";
+static prog_char _str_ip1 [] PROGMEM = "OS.ip1:";
+static prog_char _str_ip2 [] PROGMEM = ".ip2:";
+static prog_char _str_ip3 [] PROGMEM = ".ip3:";
+static prog_char _str_ip4 [] PROGMEM = ".ip4:";
+static prog_char _str_gw1 [] PROGMEM = "GW.ip1:";
+static prog_char _str_gw2 [] PROGMEM = ".ip2:";
+static prog_char _str_gw3 [] PROGMEM = ".ip3:";
+static prog_char _str_gw4 [] PROGMEM = ".ip4:";
+static prog_char _str_hp0 [] PROGMEM = "Port:";
+static prog_char _str_hp1 [] PROGMEM = "";
+static prog_char _str_hwv [] PROGMEM = "HW: ";
+static prog_char _str_ext [] PROGMEM = "Exp. board:";
+static prog_char _str_sdt [] PROGMEM = "Stn delay:";
+static prog_char _str_mas [] PROGMEM = "Mas1:";
+static prog_char _str_mton[] PROGMEM = "Mas1  on adj:";
+static prog_char _str_mtof[] PROGMEM = "Mas1 off adj:";
+static prog_char _str_urs [] PROGMEM = "Rain sensor:";
+static prog_char _str_rso [] PROGMEM = "Normally open?";
+static prog_char _str_wl  [] PROGMEM = "% Watering:";
+static prog_char _str_den [] PROGMEM = "Dev. enable?";
+static prog_char _str_ipas[] PROGMEM = "Ign pwd?";
+static prog_char _str_devid[]PROGMEM = "Dev. ID:";
+static prog_char _str_con [] PROGMEM = "LCD con.:";
+static prog_char _str_lit [] PROGMEM = "LCD lit.:";
+static prog_char _str_dim [] PROGMEM = "LCD dim.:";
+static prog_char _str_bst [] PROGMEM = "Boost:";
+static prog_char _str_uwt [] PROGMEM = "Use weather?";
+static prog_char _str_ntp1[] PROGMEM = "NTP.ip1:";
+static prog_char _str_ntp2[] PROGMEM = ".ip2:";
+static prog_char _str_ntp3[] PROGMEM = ".ip3:";
+static prog_char _str_ntp4[] PROGMEM = ".ip4:";
+static prog_char _str_log [] PROGMEM = "Log?";
+static prog_char _str_mas2[] PROGMEM = "Mas2:";
+static prog_char _str_mton2[]PROGMEM = "Mas2  on adj:";
+static prog_char _str_mtof2[]PROGMEM = "Mas2 off adj:";
+static prog_char _str_fwm[]  PROGMEM = "FWm:";
+static prog_char _str_reset[] PROGMEM = "Reset all?";
 
 OptionStruct OpenSprinkler::options[NUM_OPTIONS] = {
   {OS_FW_VERSION, 0, _str_fwv, _json_fwv}, // firmware version
@@ -170,7 +179,7 @@ OptionStruct OpenSprinkler::options[NUM_OPTIONS] = {
 #endif
   {OS_HW_VERSION, 0, _str_hwv, _json_hwv},
   {0,   MAX_EXT_BOARDS, _str_ext, _json_ext}, // number of extension board. 0: no extension boards
-  {1,   1,   _str_seq,  _json_seq},   // the option 'sequential' is now retired
+  {1,   1,   0,         0},           // the option 'sequential' is now retired
   {128, 247, _str_sdt,  _json_sdt},   // station delay time (-59 minutes to 59 minutes).
   {0,   MAX_NUM_STATIONS, _str_mas,  _json_mas},   // index of master station. 0: no master station
   {0,   60,  _str_mton, _json_mton},  // master on time [0,60] seconds
@@ -183,9 +192,9 @@ OptionStruct OpenSprinkler::options[NUM_OPTIONS] = {
   {0,   255, _str_devid,_json_devid}, // device id
   {110, 255, _str_con,  _json_con},   // lcd contrast
   {100, 255, _str_lit,  _json_lit},   // lcd backlight
-  {15,   255, _str_dim,  _json_dim},   // lcd dimming
-  {0,   200, _str_rlp,  _json_rlp},   // the options 'relay pulse' is now retired
-  {0,   255, _str_uwt,  _json_uwt},
+  {15,  255, _str_dim,  _json_dim},   // lcd dimming
+  {60,  250, _str_bst,  _json_bst},   // boost time (only valid to DC and LATCH type)
+  {0,   255, _str_uwt,  _json_uwt},   // weather algorithm (0 means not using weather algorithm)
   {50,  255, _str_ntp1, _json_ntp1},  // this and the next three bytes define the ntp server ip
   {97,  255, _str_ntp2, _json_ntp2},
   {210, 255, _str_ntp3, _json_ntp3},
@@ -194,17 +203,18 @@ OptionStruct OpenSprinkler::options[NUM_OPTIONS] = {
   {0,   MAX_NUM_STATIONS, _str_mas2, _json_mas2},  // index of master 2. 0: no master2 station
   {0,   60,  _str_mton2,_json_mton2},
   {60,  120, _str_mtof2,_json_mtof2}, 
+  {OS_FW_MINOR, 0, _str_fwm, _json_fwm}, // firmware version  
   {0,   1,   _str_reset,_json_reset}
 };
 
 /** Weekday display strings */
-prog_char str_day0[] PROGMEM = "Mon";
-prog_char str_day1[] PROGMEM = "Tue";
-prog_char str_day2[] PROGMEM = "Wed";
-prog_char str_day3[] PROGMEM = "Thu";
-prog_char str_day4[] PROGMEM = "Fri";
-prog_char str_day5[] PROGMEM = "Sat";
-prog_char str_day6[] PROGMEM = "Sun";
+static prog_char str_day0[] PROGMEM = "Mon";
+static prog_char str_day1[] PROGMEM = "Tue";
+static prog_char str_day2[] PROGMEM = "Wed";
+static prog_char str_day3[] PROGMEM = "Thu";
+static prog_char str_day4[] PROGMEM = "Fri";
+static prog_char str_day5[] PROGMEM = "Sat";
+static prog_char str_day6[] PROGMEM = "Sun";
 
 prog_char* days_str[7] = {
   str_day0,
@@ -251,7 +261,7 @@ byte OpenSprinkler::start_network() {
   lcd_print_line_clear_pgm(PSTR("Connecting..."), 1);
 
   network_lasttime = now();
-  dhcpnew_lasttime = network_lasttime;
+  dhcpnew_lasttime = now();
 
   // new from 2.2: read hardware MAC
   if(!read_hardware_mac())
@@ -274,7 +284,7 @@ byte OpenSprinkler::start_network() {
 
   if (options[OPTION_USE_DHCP].value) {
     // set up DHCP
-    // register with domain name "OpenSprinkler-xx" where xx is the last byte of the MAC address
+    // register with domain name "OS-xx" where xx is the last byte of the MAC address
     if (!ether.dhcpSetup()) return 0;
     // once we have valid DHCP IP, we write these into static IP / gateway IP
     byte *ip = ether.myip;
@@ -334,7 +344,7 @@ byte OpenSprinkler::start_network() {
 #include <sys/reboot.h>
 void OpenSprinkler::reboot_dev() {
 #if defined(DEMO)
-  // do nothing
+  // do nothingb
 #else
   sync(); // add sync to prevent file corruption
 	reboot(RB_AUTOBOOT);
@@ -342,6 +352,26 @@ void OpenSprinkler::reboot_dev() {
 }
 
 #endif // end network init functions
+
+#if defined(ARDUINO)
+void OpenSprinkler::lcd_start() {
+  // turn on lcd
+  lcd.init(1, PIN_LCD_RS, 255, PIN_LCD_EN, PIN_LCD_D4, PIN_LCD_D5, PIN_LCD_D6, PIN_LCD_D7, 0,0,0,0);
+  lcd.begin();
+
+  if (lcd.type() == LCD_STD) {
+    // this is standard 16x2 LCD
+    // set PWM frequency for adjustable LCD backlight and contrast
+    TCCR1B = 0x01;
+    // turn on LCD backlight and contrast
+    lcd_set_brightness();
+    lcd_set_contrast();
+  } else {
+    // this is I2C LCD
+    // handle brightness
+  }
+}
+#endif
 
 void OpenSprinkler::begin() {
 
@@ -386,7 +416,8 @@ void OpenSprinkler::begin() {
   // AVR assigns 0 to static variables by default
   // so only need to initialize non-zero ones
   status.enabled = 1;
-
+  status.safe_reboot = 0;
+  
   old_status = status;
 
   nvdata.sunrise_time = 360;  // 6:00am default sunrise
@@ -402,74 +433,98 @@ void OpenSprinkler::begin() {
   /*pinMode(PIN_RELAY, OUTPUT);
   digitalWrite(PIN_RELAY, LOW);*/
 
-#if defined(ARDUINO)  // AVR LCD functions
+  hw_type = HW_TYPE_AC;
+#if defined(ARDUINO)  // AVR SD and LCD functions
+  // Init I2C
+  Wire.begin();
+
+  #if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__) // OS 2.3 specific detections
+    uint8_t ret;
+
+    // detect hardware type
+    Wire.beginTransmission(MAC_CTRL_ID);
+    Wire.write(0x00);
+  	ret = Wire.endTransmission();
+  	if (!ret) {
+    	Wire.requestFrom(MAC_CTRL_ID, 1);
+    	while(!Wire.available());
+    	ret = Wire.read();
+      if (ret == HW_TYPE_AC || ret == HW_TYPE_DC || ret == HW_TYPE_LATCH) {
+        hw_type = ret;
+      } else {
+        // hardware type is not assigned
+      }
+    }
+    
+    if (hw_type == HW_TYPE_DC) {
+      pinMode(PIN_BOOST, OUTPUT);
+      digitalWrite(PIN_BOOST, LOW);
+
+      pinMode(PIN_BOOST_EN, OUTPUT);
+      digitalWrite(PIN_BOOST_EN, LOW);        
+    }
+  #endif
+
+  lcd_start();
+
+  // define lcd custom icons
+  byte _icon[8];
+  // WiFi icon
+  _icon[0] = B00000;
+  _icon[1] = B10100;
+  _icon[2] = B01000;
+  _icon[3] = B10101;
+  _icon[4] = B00001;
+  _icon[5] = B00101;
+  _icon[6] = B00101;
+  _icon[7] = B10101;
+  lcd.createChar(1, _icon);
+  
+  _icon[1]=0;
+  _icon[2]=0;
+  _icon[3]=1;
+  lcd.createChar(0, _icon);
+  
+  // uSD card icon
+  _icon[0] = B00000;
+  _icon[1] = B00000;
+  _icon[2] = B11111;
+  _icon[3] = B10001;
+  _icon[4] = B11111;
+  _icon[5] = B10001;
+  _icon[6] = B10011;
+  _icon[7] = B11110;
+  lcd.createChar(2, _icon);  
+  
+  // Rain icon
+  _icon[0] = B00000;
+  _icon[1] = B00000;
+  _icon[2] = B00110;
+  _icon[3] = B01001;
+  _icon[4] = B11111;
+  _icon[5] = B00000;
+  _icon[6] = B10101;
+  _icon[7] = B10101;
+  lcd.createChar(3, _icon);
+  
+  // Connect icon
+  _icon[0] = B00000;
+  _icon[1] = B00000;
+  _icon[2] = B00111;
+  _icon[3] = B00011;
+  _icon[4] = B00101;
+  _icon[5] = B01000;
+  _icon[6] = B10000;
+  _icon[7] = B00000;
+  lcd.createChar(4, _icon);
+
   // set sd cs pin high to release SD
   pinMode(PIN_SD_CS, OUTPUT);
   digitalWrite(PIN_SD_CS, HIGH);
 
-  // set PWM frequency for adjustable LCD backlight and contrast
-  TCCR1B = 0x01;
-  // turn on LCD backlight and contrast
-  pinMode(PIN_LCD_BACKLIGHT, OUTPUT);
-  pinMode(PIN_LCD_CONTRAST, OUTPUT);
-  lcd_set_brightness();
-  lcd_set_contrast();
-  // turn on lcd
-  lcd.init(1, PIN_LCD_RS, 255, PIN_LCD_EN, PIN_LCD_D4, PIN_LCD_D5, PIN_LCD_D6, PIN_LCD_D7, 0,0,0,0);
-  lcd.begin(16, 2);
-
-  // Init I2C
-  Wire.begin();
-
-  // define lcd custom icons
-  byte lcd_wifi_char[8] = {
-    B00000,
-    B10100,
-    B01000,
-    B10101,
-    B00001,
-    B00101,
-    B00101,
-    B10101
-  };
-  byte lcd_sd_char[8] = {
-    B00000,
-    B00000,
-    B11111,
-    B10001,
-    B11111,
-    B10001,
-    B10011,
-    B11110
-  };
-  byte lcd_rain_char[8] = {
-    B00000,
-    B00000,
-    B00110,
-    B01001,
-    B11111,
-    B00000,
-    B10101,
-    B10101
-  };
-  byte lcd_connect_char[8] = {
-    B00000,
-    B00000,
-    B00111,
-    B00011,
-    B00101,
-    B01000,
-    B10000,
-    B00000
-  };
-  lcd.createChar(1, lcd_wifi_char);
-  lcd_wifi_char[1]=0;
-  lcd_wifi_char[2]=0;
-  lcd_wifi_char[3]=1;
-  lcd.createChar(0, lcd_wifi_char);
-  lcd.createChar(2, lcd_sd_char);
-  lcd.createChar(3, lcd_rain_char);
-  lcd.createChar(4, lcd_connect_char);
+  if(sd.begin(PIN_SD_CS, SPI_HALF_SPEED)) {
+    status.has_sd = 1;
+  }
 
   // set button pins
   // enable internal pullup
@@ -493,7 +548,13 @@ void OpenSprinkler::apply_all_station_bits() {
   digitalWrite(PIN_SR_LATCH, LOW);
   byte bid, s, sbits;
 
-
+  bool engage_booster = false;
+  
+  #if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
+  // old station bits
+  static byte old_station_bits[MAX_EXT_BOARDS+1];
+  #endif
+  
   // Shift out all station bit values
   // from the highest bit to the lowest
   for(bid=0;bid<=MAX_EXT_BOARDS;bid++) {
@@ -501,6 +562,17 @@ void OpenSprinkler::apply_all_station_bits() {
       sbits = station_bits[MAX_EXT_BOARDS-bid];
     else
       sbits = 0;
+    
+    #if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
+    // check if any station is changing from 0 to 1
+    // take the bit inverse of the old status
+    // and with the new status
+    if ((~old_station_bits[MAX_EXT_BOARDS-bid]) & sbits) {
+      engage_booster = true;
+    }
+    old_station_bits[MAX_EXT_BOARDS-bid] = sbits;
+    #endif
+          
     for(s=0;s<8;s++) {
       digitalWrite(PIN_SR_CLOCK, LOW);
 #if defined(OSPI) // if OSPi, use dynamically assigned pin_sr_data
@@ -511,7 +583,26 @@ void OpenSprinkler::apply_all_station_bits() {
       digitalWrite(PIN_SR_CLOCK, HIGH);
     }
   }
+  
+  #if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
+  if((hw_type==HW_TYPE_DC) && engage_booster) {
+    DEBUG_PRINTLN(F("engage booster"));
+    // boost voltage
+    digitalWrite(PIN_BOOST, HIGH);
+    delay(250);
+    digitalWrite(PIN_BOOST, LOW);
+   
+    // enable boosted voltage for a short period of time
+    digitalWrite(PIN_BOOST_EN, HIGH);
+    digitalWrite(PIN_SR_LATCH, HIGH);
+    delay(500);
+    digitalWrite(PIN_BOOST_EN, LOW);
+  } else {
+    digitalWrite(PIN_SR_LATCH, HIGH);
+  }
+  #else
   digitalWrite(PIN_SR_LATCH, HIGH);
+  #endif
 }
 
 void OpenSprinkler::rainsensor_status() {
@@ -779,11 +870,13 @@ void OpenSprinkler::options_setup() {
 
     // 6. write options
     options_save(); // write default option values
+    
+    // 7. delete sd files
+    remove_file(wtopts_name);
     //======== END OF NVM RESET CODE ========
 
     // restart after resetting NVM.
     delay(500);
-    DEBUG_PRINTLN("done");
 #if defined(ARDUINO)
     reboot_dev();
 #endif
@@ -840,10 +933,30 @@ void OpenSprinkler::options_setup() {
   }
 
   // turn on LCD backlight and contrast
-  pinMode(PIN_LCD_BACKLIGHT, OUTPUT);
-  pinMode(PIN_LCD_CONTRAST, OUTPUT);
   lcd_set_brightness();
   lcd_set_contrast();
+  
+  if (!button) {
+    // flash screen
+    lcd_print_line_clear_pgm(PSTR(" OpenSprinkler"),0);
+    lcd.setCursor(2, 1);
+    lcd_print_pgm(PSTR("HW v"));
+    byte hwv = options[OPTION_HW_VERSION].value;
+    lcd.print((char)('0'+(hwv/10)));
+    lcd.print('.');
+    lcd.print((char)('0'+(hwv%10)));
+    switch(hw_type) {
+    case HW_TYPE_DC:
+      lcd_print_pgm(PSTR(" DC"));
+      break;
+    case HW_TYPE_LATCH:
+      lcd_print_pgm(PSTR(" LA"));
+      break;
+    default:
+      lcd_print_pgm(PSTR(" AC"));
+    }
+    delay(1000);
+  }
 #endif
 }
 
@@ -1080,6 +1193,18 @@ void OpenSprinkler::lcd_print_option(int i) {
     lcd_set_brightness();
     lcd.print((int)options[i].value);
     break;
+  case OPTION_BOOST_TIME:
+    #if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
+    if(hw_type==HW_TYPE_AC) {
+      lcd.print('-');
+    } else {
+      lcd.print((int)options[i].value*4);
+      lcd_print_pgm(PSTR(" ms"));
+    }
+    #else
+    lcd.print('-');
+    #endif
+    break;
   default:
     // if this is a boolean option
     if (options[i].max==1)
@@ -1156,13 +1281,13 @@ void OpenSprinkler::ui_set_options(int oid)
 
     switch (button & BUTTON_MASK) {
     case BUTTON_1:
-      if (i==OPTION_FW_VERSION || i==OPTION_HW_VERSION ||
+      if (i==OPTION_FW_VERSION || i==OPTION_HW_VERSION || i==OPTION_FW_MINOR ||
           i==OPTION_HTTPPORT_0 || i==OPTION_HTTPPORT_1) break; // ignore non-editable options
       if (options[i].max != options[i].value) options[i].value ++;
       break;
 
     case BUTTON_2:
-      if (i==OPTION_FW_VERSION || i==OPTION_HW_VERSION ||
+      if (i==OPTION_FW_VERSION || i==OPTION_HW_VERSION || i==OPTION_FW_MINOR ||
           i==OPTION_HTTPPORT_0 || i==OPTION_HTTPPORT_1) break; // ignore non-editable options
       if (options[i].value != 0) options[i].value --;
       break;
@@ -1188,7 +1313,7 @@ void OpenSprinkler::ui_set_options(int oid)
         else  {
           i = (i+1) % NUM_OPTIONS;
         }
-        if(pgm_read_byte(options[i].json_str)=='_') i++;
+        if(options[i].json_str==0) i++;
       }
       break;
     }
@@ -1201,11 +1326,28 @@ void OpenSprinkler::ui_set_options(int oid)
 }
 
 void OpenSprinkler::lcd_set_contrast() {
-  analogWrite(PIN_LCD_CONTRAST, options[OPTION_LCD_CONTRAST].value);
+  // set contrast is only valid for standard LCD
+  if (lcd.type()==LCD_STD) {
+    pinMode(PIN_LCD_CONTRAST, OUTPUT);
+    analogWrite(PIN_LCD_CONTRAST, options[OPTION_LCD_CONTRAST].value);
+  }
 }
 
-void OpenSprinkler::lcd_set_brightness() {
-  analogWrite(PIN_LCD_BACKLIGHT, 255-options[OPTION_LCD_BACKLIGHT].value);
+void OpenSprinkler::lcd_set_brightness(byte value) {
+  #if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
+  if (lcd.type()==LCD_I2C) {
+    if (value) lcd.backlight();
+    else lcd.noBacklight();
+  }
+  #endif
+  if (lcd.type()==LCD_STD) {
+    pinMode(PIN_LCD_BACKLIGHT, OUTPUT);
+    if (value) {
+      analogWrite(PIN_LCD_BACKLIGHT, 255-options[OPTION_LCD_BACKLIGHT].value);
+    } else {
+      analogWrite(PIN_LCD_BACKLIGHT, 255-options[OPTION_LCD_DIMMING].value);    
+    }
+  }
 }
 #endif  // end of LCD and button functions
 

@@ -25,23 +25,33 @@
 #define _DEFINES_H
 
 /** Firmware version, hardware version, and maximal values */
-#define OS_FW_VERSION  214  // Firmware version: 214 means 2.1.4
+#define OS_FW_VERSION  215  // Firmware version: 215 means 2.1.5
                             // if this number is different from the one stored in non-volatile memory
                             // a device reset will be automatically triggered
 
+#define OS_FW_MINOR      0  // Firmware minor version
+
+/** Hardware version base numbers */
 #define OS_HW_VERSION_BASE   0x00
 #define OSPI_HW_VERSION_BASE 0x40
 #define OSBO_HW_VERSION_BASE 0x80
 #define SIM_HW_VERSION_BASE  0xC0
 
+/** Hardware type macro defines */
+#define HW_TYPE_AC           0xAC   // standard 24VAC for 24VAC solenoids only, with triacs
+#define HW_TYPE_DC           0xDC   // DC powered, for both DC and 24VAC solenoids, with boost converter and MOSFETs
+#define HW_TYPE_LATCH        0x1A   // DC powered, for DC latching solenoids only, with boost converter and H-bridges
+
 #define MAX_EXT_BOARDS   5  // maximum number of exp. boards (each expands 8 stations)
 
 #define MAX_NUM_STATIONS  ((1+MAX_EXT_BOARDS)*8)  // maximum number of stations
 
+#define WEATHER_OPTS_FILENAME "wtopts.txt"    // the file where weather options are stored
+
 /** Non-volatile memory (NVM) defines */
 #if defined(ARDUINO) 
 
-/** NVM data structure:
+/** 2KB NVM data structure:
   * |     |              |     |---STRING PARAMETERS---|               |----STATION ATTRIBUTES-----  |          |
   * | UID | PROGRAM_DATA | CON | PWD | LOC | URL | KEY | STATION_NAMES | MAS | IGR | MAS2 | DIS | SEQ | OPTIONS  |
   * | (8) |    (996)     | (8) |(32) |(48) |(64) |(32) | (6*8*16)=768  | (6) | (6) | (6)  | (6) | (6) |  (62)    |
@@ -136,7 +146,7 @@ typedef enum {
   OPTION_LCD_CONTRAST,
   OPTION_LCD_BACKLIGHT,
   OPTION_LCD_DIMMING,
-  OPTION_RELAY_PULSE,
+  OPTION_BOOST_TIME,
   OPTION_USE_WEATHER,
   OPTION_NTP_IP1,
   OPTION_NTP_IP2,
@@ -146,6 +156,7 @@ typedef enum {
   OPTION_MASTER_STATION_2,
   OPTION_MASTER_ON_ADJ_2,
   OPTION_MASTER_OFF_ADJ_2,
+  OPTION_FW_MINOR,
   OPTION_RESET,
   NUM_OPTIONS	// total number of options
 } OS_OPTION_t;
@@ -184,6 +195,8 @@ typedef enum {
   #define PIN_SR_DATA       21    // shift register data pin
   #define PIN_SR_CLOCK      22    // shift register clock pin
   #define PIN_SR_OE          1    // shift register output enable pin
+  
+  // regular 16x2 LCD pin defines
   #define PIN_LCD_RS        19    // LCD rs pin
   #define PIN_LCD_EN        18    // LCD enable pin
   #define PIN_LCD_D4        20    // LCD d4 pin
@@ -192,10 +205,14 @@ typedef enum {
   #define PIN_LCD_D7        23    // LCD d7 pin
   #define PIN_LCD_BACKLIGHT 12    // LCD backlight pin
   #define PIN_LCD_CONTRAST  13    // LCD contrast pin
+  
+  // DC controller pin defines
+  #define PIN_BOOST         20    // booster pin
+  #define PIN_BOOST_EN      23    // boost voltage enable pin
+  
   #define PIN_ETHER_CS       4    // Ethernet controller chip select pin
   #define PIN_SD_CS          0    // SD card chip select pin
   #define PIN_RAINSENSOR    11    // rain sensor is connected to pin D3
-  //#define PIN_RELAY         14    // mini relay is connected to pin D14, relay support is not retired
   #define PIN_EXP_SENSE      4    // expansion board sensing pin (A4)
 
   // Ethernet buffer size

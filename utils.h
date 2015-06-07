@@ -37,7 +37,9 @@ uint16_t water_time_decode(byte i);
 ulong water_time_resolve(uint16_t v);
 byte water_time_encode_signed(int16_t i);
 int16_t water_time_decode_signed(byte i);
-
+void write_to_file(const char *name, const char *data);
+bool read_from_file(const char *name, char *data, int maxsize=TMP_BUFFER_SIZE);
+void remove_file(const char *name);
 #if defined(ARDUINO)
   #define nvm_read_block  eeprom_read_block
   #define nvm_write_block eeprom_write_block
