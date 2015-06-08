@@ -53,7 +53,7 @@ EthernetClient *m_client = 0;
 #define RTC_SYNC_INTERVAL       60      // RTC sync interval, 60 secs
 #define CHECK_NETWORK_TIMEOUT   59      // Network checking timeout, 59 secs
 #define STAT_UPDATE_TIMEOUT     900     // Statistics update timeout: 15 mins
-#define CHECK_WEATHER_TIMEOUT   1801     // Weather check interval: 30 minutes
+#define CHECK_WEATHER_TIMEOUT   3601    // Weather check interval: 1 hour
 #define CHECK_WEATHER_SUCCESS_TIMEOUT 86433L // Weather check success interval: 24 hrs
 #define LCD_BACKLIGHT_TIMEOUT   15      // LCD backlight timeout: 15 secs
 #define PING_TIMEOUT            200     // Ping test timeout: 200 ms
@@ -596,7 +596,7 @@ void check_weather() {
     return;
   }
   if (!os.checkwt_lasttime || (ntz > os.checkwt_lasttime + CHECK_WEATHER_TIMEOUT)) {
-    os.checkwt_lasttime = os.now_tz();
+    os.checkwt_lasttime = ntz;
     GetWeather();
   }
 }
