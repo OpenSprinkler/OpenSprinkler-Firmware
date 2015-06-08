@@ -47,7 +47,7 @@ void write_to_file(const char *name, const char *data) {
 }
 
 bool read_from_file(const char *name, char *data, int maxsize) {
-  if (!os.status.has_sd)  return false;
+  if (!os.status.has_sd)  { data[0]=0; return false; }
   
   char *fn = tmp_buffer+TMP_BUFFER_SIZE-12;  
   strcpy_P(fn, name);

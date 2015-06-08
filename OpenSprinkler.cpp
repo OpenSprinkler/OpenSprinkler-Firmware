@@ -978,6 +978,7 @@ void OpenSprinkler::options_load() {
   nboards = options[OPTION_EXT_BOARDS].value+1;
   nstations = nboards * 8;
   status.enabled = options[OPTION_DEVICE_ENABLE].value;
+  options[OPTION_FW_MINOR].value = OS_FW_MINOR;
 }
 
 // Save options to internal nvm
