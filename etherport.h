@@ -33,7 +33,7 @@
 #include <inttypes.h>
 #include <ctype.h>
 
-#ifndef MSG_NOSIGNAL
+#ifdef __APPLE__
 #	define MSG_NOSIGNAL SO_NOSIGPIPE
 #endif
 
