@@ -3,7 +3,7 @@
  *
  * Linux Ethernet functions header file
  * This file is based on Richard Zimmerman's sprinklers_pi program
- * Copyright (c) 2013 Richard Zimmerman 
+ * Copyright (c) 2013 Richard Zimmerman
  *
  * This file is part of the OpenSprinkler library
  *
@@ -19,7 +19,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see
- * <http://www.gnu.org/licenses/>. 
+ * <http://www.gnu.org/licenses/>.
  */
 
 #ifndef _ETHERPORT_H_
@@ -32,6 +32,10 @@
 #include <stdio.h>
 #include <inttypes.h>
 #include <ctype.h>
+
+#ifdef __APPLE__
+#	define MSG_NOSIGNAL SO_NOSIGPIPE
+#endif
 
 class EthernetServer;
 
