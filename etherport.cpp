@@ -3,7 +3,7 @@
  *
  * Linux Ethernet functions
  * This file is based on Richard Zimmerman's sprinklers_pi program
- * Copyright (c) 2013 Richard Zimmerman 
+ * Copyright (c) 2013 Richard Zimmerman
  *
  * This file is part of the OpenSprinkler library
  *
@@ -19,7 +19,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see
- * <http://www.gnu.org/licenses/>. 
+ * <http://www.gnu.org/licenses/>.
  */
 
 #if defined(ARDUINO)
@@ -194,7 +194,7 @@ int EthernetClient::read(uint8_t *buf, size_t size)
 
 size_t EthernetClient::write(const uint8_t *buf, size_t size)
 {
-	return ::write(m_sock, buf, size);
+	return ::send(m_sock, buf, size, MSG_NOSIGNAL);
 }
 
 #endif
