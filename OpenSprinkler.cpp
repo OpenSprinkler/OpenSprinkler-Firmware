@@ -37,8 +37,8 @@ byte OpenSprinkler::masop_bits[MAX_EXT_BOARDS+1];
 byte OpenSprinkler::ignrain_bits[MAX_EXT_BOARDS+1];
 byte OpenSprinkler::masop2_bits[MAX_EXT_BOARDS+1];
 byte OpenSprinkler::stndis_bits[MAX_EXT_BOARDS+1];
-byte OpenSprinkler::rfstn_bits[MAX_EXT_BOARDS+1];
 byte OpenSprinkler::stnseq_bits[MAX_EXT_BOARDS+1];
+byte OpenSprinkler::stnspe_bits[MAX_EXT_BOARDS+1];
 
 ulong OpenSprinkler::rainsense_start_time;
 ulong OpenSprinkler::raindelay_start_time;
@@ -48,7 +48,6 @@ ulong OpenSprinkler::checkwt_lasttime;
 ulong OpenSprinkler::checkwt_success_lasttime;
 ulong OpenSprinkler::network_lasttime;
 ulong OpenSprinkler::external_ip;
-byte OpenSprinkler::water_percent_avg;
 
 char tmp_buffer[TMP_BUFFER_SIZE+1];       // scratch buffer
 
@@ -767,19 +766,6 @@ void transmit_rfbit(ulong lenH, ulong lenL) {
 #endif
 }
 
-void OpenSprinkler::update_rfstation_bits() {
-  byte bid, s, sid;
-  for(bid=0;bid<(1+MAX_EXT_BOARDS);bid++) {
-    rfstn_bits[bid] = 0;
-    for(s=0;s<8;s++) {
-      sid = (bid<<3) | s;
-      if(get_station_name_rf(sid, NULL, NULL)) {
-        rfstn_bits[bid] |= (1<<s);
-      }
-    }
-  }
-}
-
 void send_rfsignal(ulong code, ulong len) {
   ulong len3 = len * 3;
   ulong len31 = len * 31;
@@ -846,7 +832,8 @@ void OpenSprinkler::options_setup() {
     // 3. write string parameters
     nvm_write_block(DEFAULT_PASSWORD, (void*)ADDR_NVM_PASSWORD, strlen(DEFAULT_PASSWORD)+1);
     nvm_write_block(DEFAULT_LOCATION, (void*)ADDR_NVM_LOCATION, strlen(DEFAULT_LOCATION)+1);
-    nvm_write_block(DEFAULT_JAVASCRIPT_URL, (void*)ADDR_NVM_SCRIPTURL, strlen(DEFAULT_JAVASCRIPT_URL)+1);
+    nvm_write_block(DEFAULT_JAVASCRIPT_URL, (void*)ADDR_NVM_JAVASCRIPTURL, strlen(DEFAULT_JAVASCRIPT_URL)+1);
+    nvm_write_block(DEFAULT_WEATHER_URL, (void*)ADDR_NVM_WEATHERURL, strlen(DEFAULT_WEATHER_URL)+1);    
     nvm_write_block(DEFAULT_WEATHER_KEY, (void*)ADDR_NVM_WEATHER_KEY, strlen(DEFAULT_WEATHER_KEY)+1);
 
     // 4. reset station names, default Sxx
@@ -890,9 +877,8 @@ void OpenSprinkler::options_setup() {
     station_attrib_bits_load(ADDR_NVM_MAS_OP_2, masop2_bits);
     station_attrib_bits_load(ADDR_NVM_STNDISABLE, stndis_bits);
     station_attrib_bits_load(ADDR_NVM_STNSEQ, stnseq_bits);
-    // set RF station flags
-    update_rfstation_bits();
-
+    station_attrib_bits_load(ADDR_NVM_STNSPE, stnspe_bits);
+    
     // 3. load non-volatile controller data
     nvdata_load();
   }

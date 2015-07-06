@@ -376,8 +376,8 @@ void server_json_stations_main()
   server_json_stations_attrib(PSTR("ignore_rain"), os.ignrain_bits);
   server_json_stations_attrib(PSTR("masop2"), os.masop2_bits);
   server_json_stations_attrib(PSTR("stn_dis"), os.stndis_bits);
-  server_json_stations_attrib(PSTR("rfstn"), os.rfstn_bits);
   server_json_stations_attrib(PSTR("stn_seq"), os.stnseq_bits);
+  server_json_stations_attrib(PSTR("stn_spe"), os.stnspe_bits);
   bfill.emit_p(PSTR("\"snames\":["));
   byte sid;
   for(sid=0;sid<os.nstations;sid++) {
@@ -438,22 +438,23 @@ byte server_change_stations(char *p)
     }
   }
 
-  server_change_stations_attrib(p, 'm', os.masop_bits);
+  server_change_stations_attrib(p, 'm', os.masop_bits); // master1
   os.station_attrib_bits_save(ADDR_NVM_MAS_OP, os.masop_bits);
 
-  server_change_stations_attrib(p, 'i', os.ignrain_bits);
+  server_change_stations_attrib(p, 'i', os.ignrain_bits); // ignore rain
   os.station_attrib_bits_save(ADDR_NVM_IGNRAIN, os.ignrain_bits);
 
-  server_change_stations_attrib(p, 'n', os.masop2_bits);
+  server_change_stations_attrib(p, 'n', os.masop2_bits); // master2
   os.station_attrib_bits_save(ADDR_NVM_MAS_OP_2, os.masop2_bits);
 
-  server_change_stations_attrib(p, 'd', os.stndis_bits);
+  server_change_stations_attrib(p, 'd', os.stndis_bits); // disable
   os.station_attrib_bits_save(ADDR_NVM_STNDISABLE, os.stndis_bits);
 
-  os.update_rfstation_bits();
-
-  server_change_stations_attrib(p, 'q', os.stnseq_bits);
+  server_change_stations_attrib(p, 'q', os.stnseq_bits); // sequential
   os.station_attrib_bits_save(ADDR_NVM_STNSEQ, os.stnseq_bits);
+
+  server_change_stations_attrib(p, 'p', os.stnseq_bits); // special
+  os.station_attrib_bits_save(ADDR_NVM_STNSPE, os.stnspe_bits);
 
   return HTML_SUCCESS;
 }
@@ -658,6 +659,12 @@ byte server_change_program(char *p) {
 void server_json_options_main() {
   byte oid;
   for(oid=0;oid<NUM_OPTIONS;oid++) {
+    #if !defined(ARDUINO) // do not send the following parameters for non-Arduino platforms
+    if (oid==OPTION_USE_NTP     || oid==OPTION_USE_DHCP    ||
+        oid==OPTION_STATIC_IP1  || oid==OPTION_STATIC_IP2  || oid==OPTION_STATIC_IP3  || oid==OPTION_STATIC_IP4  ||
+        oid==OPTION_GATEWAY_IP1 || oid==OPTION_GATEWAY_IP2 || oid==OPTION_GATEWAY_IP3 || oid==OPTION_GATEWAY_IP4)
+        continue;
+    #endif
     int32_t v=os.options[oid].value;
     if (oid==OPTION_MASTER_OFF_ADJ || oid==OPTION_MASTER_OFF_ADJ_2) {v-=60;}
     if (oid==OPTION_STATION_DELAY_TIME) {v=water_time_decode_signed(v);}
@@ -668,7 +675,8 @@ void server_json_options_main() {
     }
     #else
     if (oid==OPTION_BOOST_TIME) continue;
-    #endif    
+    #endif
+   
     if (os.options[oid].json_str==0) continue;
     if (oid==OPTION_DEVICE_ID && os.status.has_hwmac) continue; // do not send DEVICE ID if hardware MAC exists
     bfill.emit_p(PSTR("\"$F\":$D"),
@@ -738,7 +746,7 @@ byte server_json_programs(char *p)
 /** Output script url form */
 byte server_view_scripturl(char *p) {
   print_html_standard_header();
-  bfill.emit_p(PSTR("<hr /><form name=of action=cu method=get><p><b>Script URL:</b><input type=text size=32 maxlength=127 value=\"$E\" name=jsp></p><p>Default is $S<br />If local on uSD card, use ./</p><p><b>Password:</b><input type=password size=32 name=pw><input type=submit></p><hr /></form><script src=https://ui.opensprinkler.com/js/hasher.js></script>"), ADDR_NVM_SCRIPTURL, DEFAULT_JAVASCRIPT_URL);
+  bfill.emit_p(PSTR("<form name=of action=cu method=get><table cellspacing=\"12\"><tr><td><b>JavaScript</b>:</td><td><input type=text size=40 maxlength=40 value=\"$E\" name=jsp></td></tr><tr><td>Default:</td><td>$S</td></tr><tr><td><b>Weather</b>:</td><td><input type=text size=40 maxlength=40 value=\"$E\" name=wsp></td></tr><tr><td>Default:</td><td>$S</td></tr><tr><td><b>Password</b>:</td><td><input type=password size=32 name=pw> <input type=submit></td></tr></table></form><script src=https://ui.opensprinkler.com/js/hasher.js></script>"), ADDR_NVM_JAVASCRIPTURL, DEFAULT_JAVASCRIPT_URL, ADDR_NVM_WEATHERURL, DEFAULT_WEATHER_URL);
   return HTML_OK;
 }
 
@@ -809,7 +817,7 @@ byte server_home(char *p)
   // send server variables and javascript packets
   bfill.emit_p(PSTR("var ver=$D,ipas=$D;</script>\n"),
                OS_FW_VERSION, os.options[OPTION_IGNORE_PASSWORD].value);
-  bfill.emit_p(PSTR("<script src=\"$E/home.js\"></script>\n</body>\n</html>"), ADDR_NVM_SCRIPTURL);
+  bfill.emit_p(PSTR("<script src=\"$E/home.js\"></script>\n</body>\n</html>"), ADDR_NVM_JAVASCRIPTURL);
   return HTML_OK;
 }
 
@@ -882,11 +890,16 @@ byte server_change_scripturl(char *p)
 #endif
   if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("jsp"), true)) {
     urlDecode(tmp_buffer);
-    tmp_buffer[MAX_SCRIPTURL]=0;  // make sure we don't exceed the maximum size
+    tmp_buffer[MAX_JAVASCRIPTURL]=0;  // make sure we don't exceed the maximum size
     // trim unwanted space characters
     string_remove_space(tmp_buffer);
-    //os.nvm_string_set(ADDR_NVM_SCRIPTURL, tmp_buffer);
-    nvm_write_block(tmp_buffer, (void *)ADDR_NVM_SCRIPTURL, strlen(tmp_buffer)+1);
+    nvm_write_block(tmp_buffer, (void *)ADDR_NVM_JAVASCRIPTURL, strlen(tmp_buffer)+1);
+  } 
+  if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("wsp"), true)) {
+    urlDecode(tmp_buffer);
+    tmp_buffer[MAX_WEATHERURL]=0;
+    string_remove_space(tmp_buffer);
+    nvm_write_block(tmp_buffer, (void *)ADDR_NVM_WEATHERURL, strlen(tmp_buffer)+1);
   }
   return HTML_REDIRECT_HOME;
 }

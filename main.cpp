@@ -262,7 +262,6 @@ void process_dynamic_events(ulong curr_time);
 void check_network();
 void check_weather();
 void perform_ntp_sync();
-void log_statistics(time_t curr_time);
 void delete_log(char *name);
 void analyze_get_url(char *p);
 
@@ -439,10 +438,10 @@ void do_loop()
 
               // upon turning on station, process RF
               // if the station is a RF station
-              if(os.rfstn_bits[bid]&(1<<s)) {
+              /*if(os.rfstn_bits[bid]&(1<<s)) {
                 // send RF on signal
                 os.send_rfstation_signal(sid, true);
-              }
+              }*/
             } //if curr_time > scheduled_start_time
           } // if current station is not running
         }//end_s
@@ -574,8 +573,6 @@ void do_loop()
     // check weather
     check_weather();
 
-    // calculate statistics
-    log_statistics(curr_time);
   }
 
   #if !defined(ARDUINO)
@@ -598,12 +595,11 @@ void check_weather() {
   if (!os.checkwt_lasttime || (ntz > os.checkwt_lasttime + CHECK_WEATHER_TIMEOUT)) {
     os.checkwt_lasttime = ntz;
     GetWeather();
+    write_log(LOGDATA_WATERLEVEL, ntz); // warning: water level may update a few seconds after getweather is called
   }
 }
 
 void turn_off_station(byte sid, ulong curr_time) {
-  byte bid = sid>>3;
-  byte s = sid&0x07;
   os.set_station_bit(sid, 0);
 
   // ignore if we are turning off a station that's not running or scheduled to run
@@ -623,10 +619,10 @@ void turn_off_station(byte sid, ulong curr_time) {
 
     // upon turning off station, process RF station
     // if the station is a RF station
-    if(os.rfstn_bits[bid]&(1<<s)) {
+    /*if(os.rfstn_bits[bid]&(1<<s)) {
       // turn off station
       os.send_rfstation_signal(sid, false);
-    }
+    }*/
   }
 
   // reset program run-time data variables
@@ -806,7 +802,7 @@ const char *log_type_names[] = {
   "wl"
 };
 
-void log_statistics(time_t curr_time) {
+/*void log_statistics(time_t curr_time) {
   static byte stat_n = 0;
   static ulong stat_lasttime = 0;
   // update statistics once 15 minutes
@@ -823,7 +819,7 @@ void log_statistics(time_t curr_time) {
       stat_n = 0;
     }
   }
-}
+}*/
 
 // write run record to log on SD card
 void write_log(byte type, ulong curr_time) {
@@ -879,16 +875,13 @@ void write_log(byte type, ulong curr_time) {
     strcat_P(tmp_buffer, PSTR("\","));
     switch(type) {
       case LOGDATA_RAINSENSE:
-        //str += (curr_time - os.rainsense_start_time);
         ultoa((curr_time - os.rainsense_start_time), tmp_buffer+strlen(tmp_buffer), 10);
         break;
       case LOGDATA_RAINDELAY:
-        //str += (curr_time - os.raindelay_start_time);
         ultoa((curr_time - os.raindelay_start_time), tmp_buffer+strlen(tmp_buffer), 10);
         break;
       case LOGDATA_WATERLEVEL:
-        //str += os.water_percent_avg;
-        itoa(os.water_percent_avg, tmp_buffer+strlen(tmp_buffer), 10);
+        itoa(os.options[OPTION_WATER_PERCENTAGE].value, tmp_buffer+strlen(tmp_buffer), 10);
         break;
     }
   }

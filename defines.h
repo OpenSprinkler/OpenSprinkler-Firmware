@@ -25,11 +25,11 @@
 #define _DEFINES_H
 
 /** Firmware version, hardware version, and maximal values */
-#define OS_FW_VERSION  215  // Firmware version: 215 means 2.1.5
+#define OS_FW_VERSION  216  // Firmware version: 216 means 2.1.6
                             // if this number is different from the one stored in non-volatile memory
                             // a device reset will be automatically triggered
 
-#define OS_FW_MINOR      1  // Firmware minor version
+#define OS_FW_MINOR      0  // Firmware minor version
 
 /** Hardware version base numbers */
 #define OS_HW_VERSION_BASE   0x00
@@ -46,29 +46,32 @@
 
 #define MAX_NUM_STATIONS  ((1+MAX_EXT_BOARDS)*8)  // maximum number of stations
 
-#define WEATHER_OPTS_FILENAME "wtopts.txt"    // the file where weather options are stored
+/** File names */
+#define WEATHER_OPTS_FILENAME "wtopts.txt"    // weather options file
+#define STATION_ATTR_FILENAME "stns.dat"      // station attributes data file
 
+#define MAX_STATION_SPECIAL_DATA  16
 /** Non-volatile memory (NVM) defines */
 #if defined(ARDUINO) 
 
 /** 2KB NVM data structure:
-  * |     |              |     |---STRING PARAMETERS---|               |----STATION ATTRIBUTES-----  |          |
-  * | UID | PROGRAM_DATA | CON | PWD | LOC | URL | KEY | STATION_NAMES | MAS | IGR | MAS2 | DIS | SEQ | OPTIONS  |
-  * | (8) |    (996)     | (8) |(32) |(48) |(64) |(32) | (6*8*16)=768  | (6) | (6) | (6)  | (6) | (6) |  (62)    |
-  * |     |              |     |     |     |     |     |               |     |     |      |     |     |          |
-  * 0     8            1004  1012   1044  1092  1156  1188            1956  1962  1968   1974 1980   1986       2048
+  * |         |     |  ---STRING PARAMETERS---      |           |   ----STATION ATTRIBUTES-----      |          |
+  * | PROGRAM | CON | PWD | LOC | JURL | WURL | KEY | STN_NAMES | MAS | IGR | MAS2 | DIS | SEQ | SPE | OPTIONS  |
+  * |  (996)  | (8) |(32) |(48) | (40) | (40) |(32) |   (768)   | (6) | (6) |  (6) | (6) | (6) | (6) |   (54)   |
+  * |         |     |     |     |      |      |     |           |     |     |      |     |     |     |          |
+  * 0        996  1004   1036  1084  1124   1164   1196        1964  1970  1976   1982  1988  1994  2000      2048
   */
 
   #define NVM_SIZE            2048  // For AVR, nvm data is stored in EEPROM
                                     // ATmega644 has 2KB EEPROM
   #define STATION_NAME_SIZE   16    // maximum number of characters in each station name
   
-  #define MAX_UIDDATA         8     // unique ID, 8 bytes max
   #define MAX_PROGRAMDATA     996   // program data, 996 bytes max
   #define MAX_NVCONDATA       8     // non-volatile controller data, 8 bytes max
   #define MAX_USER_PASSWORD   32    // user password, 32 bytes max
   #define MAX_LOCATION        48    // location string, 48 bytes max
-  #define MAX_SCRIPTURL       64    // javascript url, 64 bytes max
+  #define MAX_JAVASCRIPTURL   40    // javascript url, 40 bytes max
+  #define MAX_WEATHERURL      40    // weather script url, 40 bytes max
   #define MAX_WEATHER_KEY     32    // weather api key, 32 bytes max
   
 #else // NVM defines for RPI/BBB/LINUX
@@ -79,38 +82,39 @@
   #define NVM_SIZE            2048 // impose a file size limit: 64KB
   #define STATION_NAME_SIZE   16    // maximum number of characters in each station name
   
-  #define MAX_UIDDATA         8     // unique ID, 8 bytes max
   #define MAX_PROGRAMDATA     996  // program data, 3984 bytes max
   #define MAX_NVCONDATA       8     // non-volatile controller data, 8 bytes max
   #define MAX_USER_PASSWORD   32    // user password, 32 bytes max
   #define MAX_LOCATION        48    // location string, 48 bytes max
-  #define MAX_SCRIPTURL       64    // javascript url, 64 bytes max
+  #define MAX_JAVASCRIPTURL   40    // javascript url, 40 bytes max
+  #define MAX_WEATHERURL      40    // weather script url, 40 bytes max
   #define MAX_WEATHER_KEY     32    // weather api key, 32 bytes max
     
 #endif  // end of NVM defines
 
 /** NVM data addresses */
-#define ADDR_NVM_UID           0
-#define ADDR_NVM_PROGRAMS      (ADDR_NVM_UID+MAX_UIDDATA)   // program starting address
+#define ADDR_NVM_PROGRAMS      (0)   // program starting address
 #define ADDR_NVM_NVCONDATA     (ADDR_NVM_PROGRAMS+MAX_PROGRAMDATA)
 #define ADDR_NVM_PASSWORD      (ADDR_NVM_NVCONDATA+MAX_NVCONDATA)
 #define ADDR_NVM_LOCATION      (ADDR_NVM_PASSWORD+MAX_USER_PASSWORD)
-#define ADDR_NVM_SCRIPTURL     (ADDR_NVM_LOCATION+MAX_LOCATION)
-#define ADDR_NVM_WEATHER_KEY   (ADDR_NVM_SCRIPTURL+MAX_SCRIPTURL)
+#define ADDR_NVM_JAVASCRIPTURL (ADDR_NVM_LOCATION+MAX_LOCATION)
+#define ADDR_NVM_WEATHERURL    (ADDR_NVM_JAVASCRIPTURL+MAX_JAVASCRIPTURL)
+#define ADDR_NVM_WEATHER_KEY   (ADDR_NVM_WEATHERURL+MAX_WEATHERURL)
 #define ADDR_NVM_STN_NAMES     (ADDR_NVM_WEATHER_KEY+MAX_WEATHER_KEY)
 #define ADDR_NVM_MAS_OP        (ADDR_NVM_STN_NAMES+MAX_NUM_STATIONS*STATION_NAME_SIZE) // master op bits
 #define ADDR_NVM_IGNRAIN       (ADDR_NVM_MAS_OP+(MAX_EXT_BOARDS+1))  // ignore rain bits 
 #define ADDR_NVM_MAS_OP_2      (ADDR_NVM_IGNRAIN+(MAX_EXT_BOARDS+1)) // master2 op bits
 #define ADDR_NVM_STNDISABLE    (ADDR_NVM_MAS_OP_2+(MAX_EXT_BOARDS+1))// station disable bits
 #define ADDR_NVM_STNSEQ        (ADDR_NVM_STNDISABLE+(MAX_EXT_BOARDS+1))// station sequential bits
-#define ADDR_NVM_OPTIONS       (ADDR_NVM_STNSEQ+(MAX_EXT_BOARDS+1))  // options
+#define ADDR_NVM_STNSPE        (ADDR_NVM_STNSEQ+(MAX_EXT_BOARDS+1)) // station special bits (i.e. non-standard stations)
+#define ADDR_NVM_OPTIONS       (ADDR_NVM_STNSPE+(MAX_EXT_BOARDS+1))  // options
 
 /** Default password, location string, weather key, script urls */
 #define DEFAULT_PASSWORD          "opendoor"
 #define DEFAULT_LOCATION          "Boston,MA"
 #define DEFAULT_WEATHER_KEY       ""
-#define DEFAULT_JAVASCRIPT_URL    "https://ui.opensprinkler.com/js"
-#define WEATHER_SCRIPT_HOST       "weather.opensprinkler.com"
+#define DEFAULT_JAVASCRIPT_URL    "http://ui.opensprinkler.com/js"
+#define DEFAULT_WEATHER_URL       "weather.opensprinkler.com"
 
 /** Macro define of each option 
   * Refer to OpenSprinkler.cpp for details on each option

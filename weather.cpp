@@ -43,7 +43,7 @@ byte findKeyVal (const char *str,char *strbuf, uint8_t maxlen,const char *key,bo
 
 // The weather function calls getweather.py on remote server to retrieve weather data
 // the default script is WEATHER_SCRIPT_HOST/weather?.py
-static char website[] PROGMEM = WEATHER_SCRIPT_HOST ;
+//static char website[] PROGMEM = DEFAULT_WEATHER_URL ;
 
 static void getweather_callback(byte status, uint16_t off, uint16_t len) {
 #if defined(ARDUINO)
@@ -102,7 +102,8 @@ static void getweather_callback(byte status, uint16_t off, uint16_t len) {
 void GetWeather() {
   // check if we've already done dns lookup
   if(ether.hisip[0] == 0) {
-    ether.dnsLookup(website);
+    nvm_read_block(tmp_buffer, (void*)ADDR_NVM_WEATHERURL, MAX_WEATHERURL);
+    ether.dnsLookup(tmp_buffer, true);
   }
 
   //bfill=ether.tcpOffset();
@@ -137,7 +138,7 @@ void GetWeather() {
   
   uint16_t _port = ether.hisport; // save current port number
   ether.hisport = 80;
-  ether.browseUrl(PSTR("/weather"), dst, website, getweather_callback);
+  ether.browseUrl(PSTR("/weather"), dst, PSTR("*"), getweather_callback);
   ether.hisport = _port;
 }
 
@@ -175,7 +176,7 @@ void GetWeather() {
 
   static struct hostent *server = NULL;
   if (!server) {
-    strcpy(tmp_buffer, WEATHER_SCRIPT_HOST);
+    nvm_read_block(tmp_buffer, (void*)ADDR_NVM_WEATHERURL, MAX_WEATHERURL);
     server = gethostbyname(tmp_buffer);
     if (!server) {
       DEBUG_PRINTLN("can't resolve weather server");

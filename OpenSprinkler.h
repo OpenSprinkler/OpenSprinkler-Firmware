@@ -58,6 +58,12 @@ struct NVConData {
   uint32_t rd_stop_time;  // rain delay stop time
 };
 
+/** Station special attribute data */
+struct StationSpecialData {
+  byte type;
+  byte data[MAX_STATION_SPECIAL_DATA];
+};
+
 /** Volatile controller status bits */
 struct ConStatus {
   byte enabled:1;           // operation enable (when set, controller operation is enabled)
@@ -101,12 +107,12 @@ public:
                                   // first byte-> master controller, second byte-> ext. board 1, and so on
   // station attributes
   static byte masop_bits[];       // master operation bits. each byte corresponds to a board (8 stations)
-  static byte ignrain_bits[];     // ignore rain bits. each byte corresponds to a board (8 stations)
-  static byte masop2_bits[];      // master2 operation bits. each byte corresponds to a board (8 stations)
-  static byte stndis_bits[];      // station disable bits. each byte corresponds to a board (8 stations)
-  static byte rfstn_bits[];       // RF station flags. each byte corresponds to a board (8 stations)
-  static byte stnseq_bits[];      // station sequential bits. each byte corresponds to a board (8 stations)
-
+  static byte ignrain_bits[];     // ignore rain bits.
+  static byte masop2_bits[];      // master2 operation bits.
+  static byte stndis_bits[];      // station disable bits.
+  static byte stnseq_bits[];      // station sequential bits.
+  static byte stnspe_bits[];      // station special bits. the bit marks if this is a non-standard station.
+  
   // variables for time keeping
   static ulong rainsense_start_time;  // time when the most recent rain sensor activation was detected
   static ulong raindelay_start_time;  // time when the most recent rain delay started
@@ -116,7 +122,6 @@ public:
   static ulong checkwt_success_lasttime; // time when weather check was successful
   static ulong network_lasttime;      // time when network was checked
   static ulong external_ip;           // external ip address
-  static byte  water_percent_avg;     // average water percentage over a day
 
   // member functions
   // -- setup
@@ -131,11 +136,10 @@ public:
   static void get_station_name(byte sid, char buf[]); // get station name
   static void set_station_name(byte sid, char buf[]); // set station name
   static uint16_t get_station_name_rf(byte sid, ulong *on, ulong *off); // get station name and parse into RF code
-  static void update_rfstation_bits();
   static void send_rfstation_signal(byte sid, bool status);
   static void station_attrib_bits_save(int addr, byte bits[]); // save station attribute bits to nvm
   static void station_attrib_bits_load(int addr, byte bits[]); // load station attribute bits from nvm
-
+  
   // -- options and data storeage
   static void nvdata_load();
   static void nvdata_save();
