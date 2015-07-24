@@ -57,7 +57,7 @@ void check_weather(time_t curr_time);
 void perform_ntp_sync(time_t curr_time);
 void log_statistics(time_t curr_time);
 void delete_log(char *name);
-void analyze_get_url(char *p);
+void handle_ether_request(char *p);
 void reset_all_stations_immediate();
 void reset_all_stations();
 void make_logfile_name(char *name);
@@ -810,7 +810,7 @@ byte server_json_controller(char *p)
 }
 
 /** Output homepage */
-byte server_home(char *p)
+byte server_home()
 {
   print_html_standard_header();
   bfill.emit_p(PSTR("<!DOCTYPE html>\n<html>\n<head>\n$F</head>\n<body>\n<script>"), htmlMobileHeader);
@@ -1333,60 +1333,70 @@ URLStruct urls[] = {
 
 };
 
-// analyze the current url
-void analyze_get_url(char *p)
+// handle Ethernet request
+void handle_web_request(char *p)
 {
 #if defined(ARDUINO)
   ether.httpServerReplyAck();
 #endif
   rewind_ether_buffer();
 
-  // the tcp packet usually starts with 'GET /' -> 5 chars
-  char *str = p+5;
+  char *com = p;
+  char *dat = NULL;
+  // check if this is GET or POST request
+  if (strncmp(p, "GET", 3)==0) {  // this is GET request
+    com = p+5;
+    dat = com+3;
+  } else {  // this is POST request
+    com = p+6;
+    dat = com;
+    bool clb = true;
+    char c;
+    while(*dat) {
+      c = *dat;
+      if(c=='\n' && clb) {
+        dat++;
+        break;
+      }
+      if(c=='\n') {
+        clb = true;
+      } else if (c!='\r') {
+        clb = false;
+      }
+      dat++;
+    }
+  }
 
-  if(str[0]==' ') {
-    server_home(str);  // home page handler
+  if(com[0]==' ') {
+    server_home();  // home page handler
     send_packet(true);
   } else {
     // server funtion handlers
     byte i;
-    // scan to see if there is a / in the name
-    char *ss = str;
-    while(*ss &&  *ss!=' ' && *ss!='\n' && *ss != '?' && *ss != '/') {
-      ss++;
-    }
-    // if a '/' is encountered this is requesting a file
-    i = 0;
-    if (*ss == '/') {
-      i = sizeof(urls)/sizeof(URLStruct);
-    }
-    for(;i<sizeof(urls)/sizeof(URLStruct);i++) {
-      if(pgm_read_byte(urls[i].url)==str[0]
-       &&pgm_read_byte(urls[i].url+1)==str[1]) {
+    for(i=0;i<sizeof(urls)/sizeof(URLStruct);i++) {
+      if(pgm_read_byte(urls[i].url)==com[0]
+       &&pgm_read_byte(urls[i].url+1)==com[1]) {
 
         // check password
         byte ret = HTML_UNAUTHORIZED;
 
-        if (str[0]=='s' && str[1]=='u') { // for /su do not require password
-          str+=3;
-          ret = (urls[i].handler)(str);
-        } else if (str[0]=='j' && str[1]=='o')  { // for /jo page we output fwv if password fails
-          str+=3;
-          if(check_password(str)==false) {
+        if (com[0]=='s' && com[1]=='u') { // for /su do not require password
+          ret = (urls[i].handler)(dat);
+        } else if (com[0]=='j' && com[1]=='o')  { // for /jo page we output fwv if password fails
+          if(check_password(dat)==false) {
             print_json_header_with_bracket();
             bfill.emit_p(PSTR("\"$F\":$D}"),
                    os.options[0].json_str, os.options[0].value);
             ret = HTML_OK;
           } else {
-            ret = (urls[i].handler)(str);
+            ret = (urls[i].handler)(dat);
           }
         } else {
           // first check password
-          str+=3;
-          if(check_password(str)==false) {
+          if(check_password(dat)==false) {
             ret = HTML_UNAUTHORIZED;
           } else {
-            ret = (urls[i].handler)(str);
+            ret = (urls[i].handler)(dat);
           }
         }
         switch(ret) {

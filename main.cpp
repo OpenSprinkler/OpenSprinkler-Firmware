@@ -52,7 +52,6 @@ EthernetClient *m_client = 0;
 #define NTP_SYNC_TIMEOUT        86403L  // NYP sync timeout, 24 hrs
 #define RTC_SYNC_INTERVAL       60      // RTC sync interval, 60 secs
 #define CHECK_NETWORK_TIMEOUT   59      // Network checking timeout, 59 secs
-#define STAT_UPDATE_TIMEOUT     900     // Statistics update timeout: 15 mins
 #define CHECK_WEATHER_TIMEOUT   3601    // Weather check interval: 1 hour
 #define CHECK_WEATHER_SUCCESS_TIMEOUT 86433L // Weather check success interval: 24 hrs
 #define LCD_BACKLIGHT_TIMEOUT   15      // LCD backlight timeout: 15 secs
@@ -263,14 +262,13 @@ void check_network();
 void check_weather();
 void perform_ntp_sync();
 void delete_log(char *name);
-void analyze_get_url(char *p);
+void handle_web_request(char *p);
 
 /** Main Loop */
 void do_loop()
 {
   static ulong last_time = 0;
   static ulong last_minute = 0;
-  static uint16_t pos;
 
   byte bid, sid, s, pid, bitvalue;
   ProgramStruct prog;
@@ -280,9 +278,9 @@ void do_loop()
   time_t curr_time = os.now_tz();
   // ====== Process Ethernet packets ======
 #if defined(ARDUINO)  // Process Ethernet packets for Arduino
-  pos=ether.packetLoop(ether.packetReceive());
+  uint16_t pos=ether.packetLoop(ether.packetReceive());
   if (pos>0) {  // packet received
-    analyze_get_url((char*)Ethernet::buffer+pos);
+    handle_web_request((char*)Ethernet::buffer+pos);
   }
   wdt_reset();  // reset watchdog timer
   wdt_timeout = 0;
@@ -302,7 +300,8 @@ void do_loop()
         }
       } else {
         m_client = &client;
-        analyze_get_url(ether_buffer);
+        ether_buffer[len] = 0;  // put a zero at the end of the packet
+        handle_web_request(ether_buffer);
         m_client = 0;
         break;
       }
@@ -801,25 +800,6 @@ const char *log_type_names[] = {
   "rd",
   "wl"
 };
-
-/*void log_statistics(time_t curr_time) {
-  static byte stat_n = 0;
-  static ulong stat_lasttime = 0;
-  // update statistics once 15 minutes
-  if (curr_time > stat_lasttime + STAT_UPDATE_TIMEOUT) {
-    stat_lasttime = curr_time;
-    ulong wp_total = os.water_percent_avg;
-    wp_total = wp_total * stat_n;
-    wp_total += os.options[OPTION_WATER_PERCENTAGE].value;
-    stat_n ++;
-    os.water_percent_avg = byte(wp_total / stat_n);
-    // writes every 4*24 times (1 day)
-    if (stat_n == 96) {
-      write_log(LOGDATA_WATERLEVEL, curr_time);
-      stat_n = 0;
-    }
-  }
-}*/
 
 // write run record to log on SD card
 void write_log(byte type, ulong curr_time) {
