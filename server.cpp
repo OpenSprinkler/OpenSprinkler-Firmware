@@ -109,7 +109,8 @@ static prog_uchar htmlReturnHome[] PROGMEM =
   "<script>window.location=\"/\";</script>\n"
 ;
 
-extern const char wtopts_name[];
+extern const char wtopts_filename[];
+extern const char stns_filename[];
 
 #if defined(ARDUINO)
 void print_html_standard_header() {
@@ -792,7 +793,7 @@ void server_json_controller_main() {
     }
   }
 
-  if(read_from_file(wtopts_name, tmp_buffer)) {
+  if(read_from_file(wtopts_filename, tmp_buffer)) {
     bfill.emit_p(PSTR(",\"wto\":{$S}"), tmp_buffer);
   }
   bfill.emit_p(PSTR("}"));
@@ -998,7 +999,7 @@ byte server_change_options(char *p)
     urlDecode(tmp_buffer);
     tmp_buffer[TMP_BUFFER_SIZE]=0;
     // store weather key
-    write_to_file(wtopts_name, tmp_buffer);
+    write_to_file(wtopts_filename, tmp_buffer, strlen(tmp_buffer));
     weather_change = true;
   }
   if (err) {

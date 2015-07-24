@@ -49,8 +49,14 @@
 /** File names */
 #define WEATHER_OPTS_FILENAME "wtopts.txt"    // weather options file
 #define STATION_ATTR_FILENAME "stns.dat"      // station attributes data file
-
 #define MAX_STATION_SPECIAL_DATA  16
+
+/** Station type macro defines */
+#define STN_TYPE_STANDARD    0x00
+#define STN_TYPE_RF          0x01
+#define STN_TYPE_REMOTE      0x02
+#define STN_TYPE_OTHER       0xFF
+
 /** Non-volatile memory (NVM) defines */
 #if defined(ARDUINO) 
 
@@ -299,7 +305,7 @@ typedef enum {
   #define ETHER_BUFFER_SIZE   16384
     
   #define DEBUG_BEGIN(x)          {}  /** Serial debug functions */
-  //#define ENABLE_DEBUG
+  #define ENABLE_DEBUG
   #if defined(ENABLE_DEBUG)
     inline  void DEBUG_PRINT(int x) {printf("%d", x);}
     inline  void DEBUG_PRINT(const char*s) {printf("%s", s);}

@@ -52,9 +52,11 @@ ulong OpenSprinkler::external_ip;
 char tmp_buffer[TMP_BUFFER_SIZE+1];       // scratch buffer
 
 #if defined(ARDUINO)
-  prog_char wtopts_name[] PROGMEM = WEATHER_OPTS_FILENAME;
+  prog_char wtopts_filename[] PROGMEM = WEATHER_OPTS_FILENAME;
+  prog_char stns_filename[]   PROGMEM = STATION_ATTR_FILENAME;
 #else
-  char wtopts_name[] = WEATHER_OPTS_FILENAME;
+  char wtopts_filename[] = WEATHER_OPTS_FILENAME;
+  char stns_filename[]   = STATION_ATTR_FILENAME;
 #endif
 
 #if defined(ARDUINO)
@@ -536,6 +538,8 @@ void OpenSprinkler::begin() {
   if (RTC.detect()==0) {
     status.has_rtc = 1;
   }
+#else
+  DEBUG_PRINTLN(get_runtime_path());
 #endif
 }
 
@@ -824,19 +828,17 @@ void OpenSprinkler::options_setup() {
       nvm_write_block(tmp_buffer, (void*)i, nbytes);
     }
 
-    // 1. write program data default parameters
-
-    // 2. write non-volatile controller status
+    // 1. write non-volatile controller status
     nvdata_save();
 
-    // 3. write string parameters
+    // 2. write string parameters
     nvm_write_block(DEFAULT_PASSWORD, (void*)ADDR_NVM_PASSWORD, strlen(DEFAULT_PASSWORD)+1);
     nvm_write_block(DEFAULT_LOCATION, (void*)ADDR_NVM_LOCATION, strlen(DEFAULT_LOCATION)+1);
     nvm_write_block(DEFAULT_JAVASCRIPT_URL, (void*)ADDR_NVM_JAVASCRIPTURL, strlen(DEFAULT_JAVASCRIPT_URL)+1);
     nvm_write_block(DEFAULT_WEATHER_URL, (void*)ADDR_NVM_WEATHERURL, strlen(DEFAULT_WEATHER_URL)+1);    
     nvm_write_block(DEFAULT_WEATHER_KEY, (void*)ADDR_NVM_WEATHER_KEY, strlen(DEFAULT_WEATHER_KEY)+1);
 
-    // 4. reset station names, default Sxx
+    // 3. reset station names and special attributes, default Sxx
     tmp_buffer[0]='S';
     tmp_buffer[3]=0;
     for(i=ADDR_NVM_STN_NAMES, sn=1; i<ADDR_NVM_MAS_OP; i+=STATION_NAME_SIZE, sn++) {
@@ -845,7 +847,13 @@ void OpenSprinkler::options_setup() {
       nvm_write_block(tmp_buffer, (void*)i, strlen(tmp_buffer)+1);
     }
 
-    // 5. reset station attributes
+    DEBUG_PRINTLN("write special data");
+    tmp_buffer[0]=STN_TYPE_STANDARD;
+    int stepsize=sizeof(StationSpecialData);
+    for(i=0;i<MAX_NUM_STATIONS;i++) {
+        write_to_file(stns_filename, tmp_buffer, stepsize, i*stepsize, false);
+    }
+    // 4. reset station attribute bits
     // since we wiped out nvm, only non-zero attributes need to be initialized
     for(i=0;i<MAX_EXT_BOARDS+1;i++) {
       tmp_buffer[i]=0xff;
@@ -853,11 +861,12 @@ void OpenSprinkler::options_setup() {
     nvm_write_block(tmp_buffer, (void*)ADDR_NVM_MAS_OP, MAX_EXT_BOARDS+1);
     nvm_write_block(tmp_buffer, (void*)ADDR_NVM_STNSEQ, MAX_EXT_BOARDS+1);
 
+    // 5. delete sd file
+    remove_file(wtopts_filename);
+
     // 6. write options
     options_save(); // write default option values
     
-    // 7. delete sd files
-    remove_file(wtopts_name);
     //======== END OF NVM RESET CODE ========
 
     // restart after resetting NVM.

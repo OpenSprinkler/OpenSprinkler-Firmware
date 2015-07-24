@@ -31,7 +31,7 @@
 extern char ether_buffer[];
 #endif
 
-extern const char wtopts_name[];
+extern const char wtopts_filename[];
 
 #include "OpenSprinkler.h"
 #include "utils.h"
@@ -108,7 +108,7 @@ void GetWeather() {
 
   //bfill=ether.tcpOffset();
   char tmp[30];
-  read_from_file(wtopts_name, tmp, 30);
+  read_from_file(wtopts_filename, tmp, 30);
   BufferFiller bf = (uint8_t*)tmp_buffer;
   bf.emit_p(PSTR("$D.py?loc=$E&key=$E&fwv=$D&wto=$S"),
                 (int) os.options[OPTION_USE_WEATHER].value,
@@ -200,7 +200,7 @@ void GetWeather() {
 
   BufferFiller bf = tmp_buffer;
   char tmp[100];
-  read_from_file(wtopts_name, tmp, 100);
+  read_from_file(wtopts_filename, tmp, 100);
   bf.emit_p(PSTR("$D.py?loc=$E&key=$E&fwv=$D&wto=$S"),
                 (int) os.options[OPTION_USE_WEATHER].value,
                 ADDR_NVM_LOCATION,

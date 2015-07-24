@@ -31,18 +31,21 @@ extern char tmp_buffer[];
 #include "SdFat.h"
 extern SdFat sd;
 
-void write_to_file(const char *name, const char *data) {
+void write_to_file(const char *name, const char *data, int size, int pos, bool trunc) {
   if (!os.status.has_sd)  return;
   
   char *fn = tmp_buffer+TMP_BUFFER_SIZE-12;
   strcpy_P(fn, name);
   sd.chdir("/");
   SdFile file;
-  int ret = file.open(fn, O_CREAT | O_WRITE | O_TRUNC);
+  int flag = O_CREAT | O_WRITE;
+  if (trunc) flag |= O_TRUNC;
+  int ret = file.open(fn, flag);
   if(!ret) {
     return;
-  }    
-  file.write(data);
+  }
+  file.seekSet(pos);
+  file.write(data, size);
   file.close();  
 }
 
@@ -127,13 +130,21 @@ void nvm_write_byte(const byte *p, byte v) {
   }
 }
 
-void write_to_file(const char *name, const char *data) {
+void write_to_file(const char *name, const char *data, int size, int pos, bool trunc) {
   FILE *file;
-  file = fopen(name, "wb");
+  if(trunc) {
+    file = fopen(name, "wb");
+  } else {
+    file = fopen(name, "r+b");
+    if(!file) {
+        file = fopen(name, "wb");
+    }
+  }
 
   if (!file) { return; }
   
-  fwrite(data, 1, strlen(data), file);
+  fseek(file, pos, SEEK_SET);
+  fwrite(data, 1, size, file);
   fclose(file);
 }
 
@@ -163,6 +174,20 @@ bool read_from_file(const char *name, char *data, int maxsize) {
 
 void remove_file(const char *name) {
   remove(name);
+}
+
+char* get_runtime_path() {
+  static char path[PATH_MAX];
+  if(readlink("/proc/self/exe", path, PATH_MAX ) <= 0) {
+    return NULL;
+  }
+  char* path_end = strrchr(path, '/');
+  if(path_end == NULL) {
+    return NULL;
+  }
+  path_end++;
+  *path_end=0;
+  return path;
 }
 
 #if defined(OSPI)
