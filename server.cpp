@@ -57,7 +57,6 @@ void check_weather(time_t curr_time);
 void perform_ntp_sync(time_t curr_time);
 void log_statistics(time_t curr_time);
 void delete_log(char *name);
-void handle_ether_request(char *p);
 void reset_all_stations_immediate();
 void reset_all_stations();
 void make_logfile_name(char *name);
@@ -122,7 +121,7 @@ void print_json_header() {
 }
 
 void print_json_header_with_bracket() {
-bfill.emit_p(PSTR("$F$F$F$F\r\n{"), html200OK, htmlContentJSON, htmlAccessControl, htmlNoCache);
+  bfill.emit_p(PSTR("$F$F$F$F\r\n{"), html200OK, htmlContentJSON, htmlAccessControl, htmlNoCache);
 }
 
 byte findKeyVal (const char *str,char *strbuf, uint8_t maxlen,const char *key,bool key_in_pgm=false,uint8_t *keyfound=NULL)
@@ -360,6 +359,12 @@ boolean check_password(char *p)
   return false;
 }
 
+// print ending character: either bracket, or comma
+void print_json_close(bool bracket=true) {
+  bfill.emit_p(bracket?PSTR("}"):PSTR(","));
+  if(bracket) delay(1);
+}
+
 void server_json_stations_attrib(const char* name, const byte* attrib)
 {
   bfill.emit_p(PSTR("\"$F\":["), name);
@@ -390,8 +395,7 @@ void server_json_stations_main()
       send_packet();
     }
   }
-  bfill.emit_p(PSTR("],\"maxlen\":$D}"), STATION_NAME_SIZE);
-  delay(1);
+  bfill.emit_p(PSTR("],\"maxlen\":$D"), STATION_NAME_SIZE);
 }
 
 /** Output station names and attributes */
@@ -399,6 +403,7 @@ byte server_json_stations(char *p)
 {
   print_json_header_with_bracket();
   server_json_stations_main();
+  print_json_close();
   return HTML_OK;
 }
 
@@ -686,7 +691,7 @@ void server_json_options_main() {
       bfill.emit_p(PSTR(","));
   }
 
-  bfill.emit_p(PSTR(",\"dexp\":$D,\"mexp\":$D,\"hwt\":$D}"), os.detect_exp(), MAX_EXT_BOARDS, os.hw_type);
+  bfill.emit_p(PSTR(",\"dexp\":$D,\"mexp\":$D,\"hwt\":$D"), os.detect_exp(), MAX_EXT_BOARDS, os.hw_type);
 }
 
 
@@ -695,13 +700,11 @@ byte server_json_options(char *p)
 {
   print_json_header_with_bracket();
   server_json_options_main();
+  print_json_close();
   return HTML_OK;
 }
 
-/** Output program data */
-byte server_json_programs(char *p)
-{
-  print_json_header_with_bracket();
+void server_json_programs_main() {
   bfill.emit_p(PSTR("\"nprogs\":$D,\"nboards\":$D,\"mnp\":$D,\"mnst\":$D,\"pnsize\":$D,\"pd\":["),
                pd.nprograms, os.nboards, MAX_NUMBER_PROGRAMS, MAX_NUM_STARTTIMES, PROGRAM_NAME_SIZE);
   byte pid, i;
@@ -739,8 +742,15 @@ byte server_json_programs(char *p)
       send_packet();
     }
   }
-  bfill.emit_p(PSTR("]}"));
-  delay(1);
+  bfill.emit_p(PSTR("]"));
+}
+
+/** Output program data */
+byte server_json_programs(char *p)
+{
+  print_json_header_with_bracket();
+  server_json_programs_main();
+  print_json_close();
   return HTML_OK;
 }
 
@@ -796,8 +806,6 @@ void server_json_controller_main() {
   if(read_from_file(wtopts_filename, tmp_buffer)) {
     bfill.emit_p(PSTR(",\"wto\":{$S}"), tmp_buffer);
   }
-  bfill.emit_p(PSTR("}"));
-  delay(1);
 }
 
 
@@ -806,6 +814,7 @@ byte server_json_controller(char *p)
 {
   print_json_header_with_bracket();
   server_json_controller_main();
+  print_json_close();
   return HTML_OK;
 }
 
@@ -1061,7 +1070,7 @@ void server_json_status_main()
     bfill.emit_p(PSTR("$D"), (os.station_bits[(sid>>3)]>>(sid&0x07))&1);
     if(sid!=os.nstations-1) bfill.emit_p(PSTR(","));
   }
-  bfill.emit_p(PSTR("],\"nstations\":$D}"), os.nstations);
+  bfill.emit_p(PSTR("],\"nstations\":$D"), os.nstations);
 }
 
 /**
@@ -1071,6 +1080,7 @@ byte server_json_status(char *p)
 {
   print_json_header_with_bracket();
   server_json_status_main();
+  print_json_close();
   return HTML_OK;
 }
 
@@ -1269,6 +1279,26 @@ byte server_delete_log(char *p) {
   return HTML_SUCCESS;
 }
 
+/** Output all JSON data, including jc, jp, jo, js, jn */
+byte server_json_all(char *p) {
+  print_json_header_with_bracket();
+  server_json_controller_main();
+  print_json_close(false);
+  send_packet();
+  server_json_programs_main();
+  print_json_close(false);
+  send_packet();
+  server_json_options_main();
+  print_json_close(false);
+  send_packet();
+  server_json_status_main();
+  print_json_close(false);
+  send_packet();
+  server_json_stations_main();
+  print_json_close();
+  return HTML_OK;
+}
+
 struct URLStruct{
   PGM_P PROGMEM url;
   byte (*handler)(char*);
@@ -1302,6 +1332,7 @@ prog_char _url_dl [] PROGMEM = "dl";
 prog_char _url_su [] PROGMEM = "su";
 prog_char _url_cu [] PROGMEM = "cu";
 
+prog_char _url_ja [] PROGMEM = "ja";
 
 // Server function handlers
 URLStruct urls[] = {
@@ -1331,6 +1362,8 @@ URLStruct urls[] = {
   {_url_su,server_view_scripturl},
   {_url_cu,server_change_scripturl},
 
+  {_url_ja,server_json_all},
+
 };
 
 // handle Ethernet request
@@ -1341,13 +1374,14 @@ void handle_web_request(char *p)
 #endif
   rewind_ether_buffer();
 
-  char *com = p;
-  char *dat = NULL;
+  char *com = p;  // command name
+  char *dat = NULL; // data
   // check if this is GET or POST request
   if (strncmp(p, "GET", 3)==0) {  // this is GET request
     com = p+5;
     dat = com+3;
   } else {  // this is POST request
+    // find the start of POST data
     com = p+6;
     dat = com;
     bool clb = true;
@@ -1382,7 +1416,8 @@ void handle_web_request(char *p)
 
         if (com[0]=='s' && com[1]=='u') { // for /su do not require password
           ret = (urls[i].handler)(dat);
-        } else if (com[0]=='j' && com[1]=='o')  { // for /jo page we output fwv if password fails
+        } else if ((com[0]=='j' && com[1]=='o') ||
+                   (com[0]=='j' && com[1]=='a'))  { // for /jo and /ja we output fwv if password fails
           if(check_password(dat)==false) {
             print_json_header_with_bracket();
             bfill.emit_p(PSTR("\"$F\":$D}"),
