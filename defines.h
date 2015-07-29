@@ -42,10 +42,6 @@
 #define HW_TYPE_DC           0xDC   // DC powered, for both DC and 24VAC solenoids, with boost converter and MOSFETs
 #define HW_TYPE_LATCH        0x1A   // DC powered, for DC latching solenoids only, with boost converter and H-bridges
 
-#define MAX_EXT_BOARDS   5  // maximum number of exp. boards (each expands 8 stations)
-
-#define MAX_NUM_STATIONS  ((1+MAX_EXT_BOARDS)*8)  // maximum number of stations
-
 /** File names */
 #define WEATHER_OPTS_FILENAME "wtopts.txt"    // weather options file
 #define STATION_ATTR_FILENAME "stns.dat"      // station attributes data file
@@ -60,7 +56,7 @@
 /** Non-volatile memory (NVM) defines */
 #if defined(ARDUINO) 
 
-/** 2KB NVM data structure:
+/** 2KB NVM (ATmega644) data structure:
   * |         |     |  ---STRING PARAMETERS---      |           |   ----STATION ATTRIBUTES-----      |          |
   * | PROGRAM | CON | PWD | LOC | JURL | WURL | KEY | STN_NAMES | MAS | IGR | MAS2 | DIS | SEQ | SPE | OPTIONS  |
   * |  (996)  | (8) |(32) |(48) | (40) | (40) |(32) |   (768)   | (6) | (6) |  (6) | (6) | (6) | (6) |   (54)   |
@@ -68,34 +64,68 @@
   * 0        996  1004   1036  1084  1124   1164   1196        1964  1970  1976   1982  1988  1994  2000      2048
   */
 
-  #define NVM_SIZE            2048  // For AVR, nvm data is stored in EEPROM
-                                    // ATmega644 has 2KB EEPROM
-  #define STATION_NAME_SIZE   16    // maximum number of characters in each station name
-  
-  #define MAX_PROGRAMDATA     996   // program data, 996 bytes max
-  #define MAX_NVCONDATA       8     // non-volatile controller data, 8 bytes max
-  #define MAX_USER_PASSWORD   32    // user password, 32 bytes max
-  #define MAX_LOCATION        48    // location string, 48 bytes max
-  #define MAX_JAVASCRIPTURL   40    // javascript url, 40 bytes max
-  #define MAX_WEATHERURL      40    // weather script url, 40 bytes max
-  #define MAX_WEATHER_KEY     32    // weather api key, 32 bytes max
+/** 4KB NVM (ATmega1284) data structure:
+  * |         |     |  ---STRING PARAMETERS---      |           |   ----STATION ATTRIBUTES-----      |          |
+  * | PROGRAM | CON | PWD | LOC | JURL | WURL | KEY | STN_NAMES | MAS | IGR | MAS2 | DIS | SEQ | SPE | OPTIONS  |
+  * |  (2438) | (8) |(32) |(48) | (48) | (48) |(32) |   (1344)  | (7) | (7) |  (7) | (7) | (7) | (7) |   (56)   |
+  * |         |     |     |     |      |      |     |           |     |     |      |     |     |     |          |
+  * 0       2438  2446   2478  2526  2574   2622   2654        3998  4005  4012   4019  4026  4033  4040      4096
+  */
+
+  #if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__) // for 4KB NVM
+
+    #define MAX_EXT_BOARDS    6  // maximum number of exp. boards (each expands 8 stations)
+    #define MAX_NUM_STATIONS  ((1+MAX_EXT_BOARDS)*8)  // maximum number of stations
+
+    #define NVM_SIZE            4096  // For AVR, nvm data is stored in EEPROM, ATmega1284 has 4K EEPROM
+    #define STATION_NAME_SIZE   24    // maximum number of characters in each station name
+
+    #define MAX_PROGRAMDATA     2438  // program data
+    #define MAX_NVCONDATA       8     // non-volatile controller data
+    #define MAX_USER_PASSWORD   32    // user password
+    #define MAX_LOCATION        48    // location string
+    #define MAX_JAVASCRIPTURL   48    // javascript url
+    #define MAX_WEATHERURL      48    // weather script url
+    #define MAX_WEATHER_KEY     32    // weather api key
+
+  #else
+
+    #define MAX_EXT_BOARDS    5  // maximum number of exp. boards (each expands 8 stations)
+    #define MAX_NUM_STATIONS  ((1+MAX_EXT_BOARDS)*8)  // maximum number of stations
+
+    #define NVM_SIZE            2048  // For AVR, nvm data is stored in EEPROM, ATmega644 has 2K EEPROM
+    #define STATION_NAME_SIZE   16    // maximum number of characters in each station name
+
+    #define MAX_PROGRAMDATA     996   // program data
+    #define MAX_NVCONDATA       8     // non-volatile controller data
+    #define MAX_USER_PASSWORD   32    // user password
+    #define MAX_LOCATION        48    // location string
+    #define MAX_JAVASCRIPTURL   40    // javascript url
+    #define MAX_WEATHERURL      40    // weather script url
+    #define MAX_WEATHER_KEY     32    // weather api key,
+
+  #endif
   
 #else // NVM defines for RPI/BBB/LINUX
 
   // These are kept the same as AVR for compatibility
   // But these can be increased if needed
   #define NVM_FILENAME        "nvm.dat" // for RPI/BBB, nvm data is stored in a file
-  #define NVM_SIZE            2048 // impose a file size limit: 64KB
-  #define STATION_NAME_SIZE   16    // maximum number of characters in each station name
-  
-  #define MAX_PROGRAMDATA     996  // program data, 3984 bytes max
-  #define MAX_NVCONDATA       8     // non-volatile controller data, 8 bytes max
-  #define MAX_USER_PASSWORD   32    // user password, 32 bytes max
-  #define MAX_LOCATION        48    // location string, 48 bytes max
-  #define MAX_JAVASCRIPTURL   40    // javascript url, 40 bytes max
-  #define MAX_WEATHERURL      40    // weather script url, 40 bytes max
-  #define MAX_WEATHER_KEY     32    // weather api key, 32 bytes max
-    
+
+  #define MAX_EXT_BOARDS    6  // maximum number of exp. boards (each expands 8 stations)
+  #define MAX_NUM_STATIONS  ((1+MAX_EXT_BOARDS)*8)  // maximum number of stations
+
+  #define NVM_SIZE            4096
+  #define STATION_NAME_SIZE   24    // maximum number of characters in each station name
+
+  #define MAX_PROGRAMDATA     2438  // program data
+  #define MAX_NVCONDATA       8     // non-volatile controller data
+  #define MAX_USER_PASSWORD   32    // user password
+  #define MAX_LOCATION        48    // location string
+  #define MAX_JAVASCRIPTURL   48    // javascript url
+  #define MAX_WEATHERURL      48    // weather script url
+  #define MAX_WEATHER_KEY     32    // weather api key
+
 #endif  // end of NVM defines
 
 /** NVM data addresses */

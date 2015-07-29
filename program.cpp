@@ -32,9 +32,9 @@
 
 // Declare static data members
 byte ProgramData::nprograms = 0;
-ulong ProgramData::scheduled_start_time[(MAX_EXT_BOARDS+1)*8];
-ulong ProgramData::scheduled_stop_time[(MAX_EXT_BOARDS+1)*8];
-byte ProgramData::scheduled_program_index[(MAX_EXT_BOARDS+1)*8];
+byte ProgramData::nqueue = 0;
+RuntimeQueueStruct ProgramData::queue[RUNTIME_QUEUE_SIZE];
+byte ProgramData::station_qid[MAX_NUM_STATIONS];
 LogStruct ProgramData::lastrun;
 ulong ProgramData::last_seq_stop_time;
 
@@ -44,12 +44,43 @@ void ProgramData::init() {
 }
 
 void ProgramData::reset_runtime() {
-  for (byte i=0; i<MAX_NUM_STATIONS; i++) {
-    scheduled_start_time[i] = 0;
-    scheduled_stop_time[i] = 0;
-    scheduled_program_index[i] = 0;
-  }
+  memset(station_qid, 0xFF, MAX_NUM_STATIONS);  // reset station qid to 0xFF
+  nqueue = 0;
   last_seq_stop_time = 0;
+}
+
+// this returns a pointer to the next available element in the queue
+RuntimeQueueStruct* ProgramData::enqueue() {
+  if (nqueue < RUNTIME_QUEUE_SIZE) {
+    nqueue ++;
+    return queue + (nqueue-1);
+  } else {
+    return NULL;
+  }
+}
+
+// this removes an element from the queue
+void ProgramData::dequeue(byte qid) {
+  if (qid>=nqueue)  return;
+  if (qid<nqueue-1) {
+    queue[qid] = queue[nqueue-1]; // copy the last element to the dequeud element to fill the space
+    if(station_qid[queue[qid].sid] == nqueue-1) // fix queue index if necessary
+      station_qid[queue[qid].sid] = qid;
+  }
+  nqueue--;
+
+  RuntimeQueueStruct *q = queue;
+  DEBUG_PRINT("de:");
+  for(;q<queue+nqueue;q++) {
+    DEBUG_PRINT("[");
+    DEBUG_PRINT(q->sid);
+    DEBUG_PRINT(",");
+    DEBUG_PRINT(q->dur);
+    DEBUG_PRINT(",");
+    DEBUG_PRINT(q->st);
+    DEBUG_PRINT("]");
+  }
+  DEBUG_PRINTLN("");
 }
 
 // load program count from NVM
@@ -167,33 +198,24 @@ int16_t ProgramStruct::starttime_decode(int16_t t) {
   return t;
 }
 
-// Check if a given time matches program schedule
-byte ProgramStruct::check_match(time_t t) {
+// Check if a given time matches the program's start day
+byte ProgramStruct::check_day_match(time_t t) {
 
 #if defined(ARDUINO) // get current time from Arduino
-  unsigned int hour_t = hour(t);
-  unsigned int minute_t = minute(t);
   byte weekday_t = weekday(t);        // weekday ranges from [0,6] within Sunday being 1
   byte day_t = day(t);
   byte month_t = month(t);
 #else // get current time from RPI/BBB
   time_t ct = t;
   struct tm *ti = gmtime(&ct);
-  unsigned int hour_t = ti->tm_hour;
-  unsigned int minute_t = ti->tm_min;
   byte weekday_t = (ti->tm_wday+1)%7;  // tm_wday ranges from [0,6] with Sunday being 0
   byte day_t = ti->tm_mday;
   byte month_t = ti->tm_mon+1;   // tm_mon ranges from [0,11]
 #endif // get current time
 
-  unsigned int current_minute = hour_t*60+minute_t;
-  
-  // check program enable status
-  if (!enabled) return 0;
- 
   byte wd = (weekday_t+5)%7;
   byte dt = day_t;
-  byte i;
+
   // check day match
   switch(type) {
     case PROGRAM_TYPE_WEEKLY:
@@ -201,19 +223,19 @@ byte ProgramStruct::check_match(time_t t) {
       if (!(days[0] & (1<<wd)))
         return 0;
     break;
-    
+
     case PROGRAM_TYPE_BIWEEKLY:
       // todo
     break;
-    
+
     case PROGRAM_TYPE_MONTHLY:
       if (dt != (days[0]&0b11111))
         return 0;
     break;
-    
+
     case PROGRAM_TYPE_INTERVAL:
       // this is an inverval program
-      if (((t/SECS_PER_DAY)%days[1]) != days[0])  return 0;      
+      if (((t/SECS_PER_DAY)%days[1]) != days[0])  return 0;
     break;
   }
 
@@ -229,46 +251,56 @@ byte ProgramStruct::check_match(time_t t) {
     else if (dt==29 && month_t==2)  return 0;
     else if ((dt%2)!=1)  return 0;
   }
-  
-  // check start time match
-  if (!starttime_type) {
-    // repeating type
-    int16_t start = starttime_decode(starttimes[0]);
-    int16_t repeat = starttimes[1];
-    int16_t interval = starttimes[2];
-    // if current time is prior to start time, return false
-    if (current_minute < start)
-      return 0;
-      
-    // if this is a single run program
-    if (!repeat) {
-      return (current_minute == start) ? 1 : 0;
-    }
-    
-    // if this is a multiple-run program
-    // first ensure the interval is non-zero
-    if (!interval) {
-      return 0;
-    }
+  return 1;
+}
 
-    // check if we are on any interval match
-    int16_t c = (current_minute - start) / interval;
-    if ((c * interval == (current_minute - start)) && c <= repeat) {
-      return 1;
+// Check if a given time matches program's start time
+// this also checks for programs that started the previous
+// day and ran over night
+byte ProgramStruct::check_match(time_t t) {
+
+  // check program enable status
+  if (!enabled) return 0;
+
+  int16_t start = starttime_decode(starttimes[0]);
+  int16_t repeat = starttimes[1];
+  int16_t interval = starttimes[2];
+  unsigned int current_minute = (t%86400L)/60;
+
+  // first assume program starts today
+  if (check_day_match(t)) {
+    // t matches the program's start day
+
+    if (starttime_type) {
+      // given start time type
+      for(byte i=0;i<MAX_NUM_STARTTIMES;i++) {
+        if (current_minute == starttime_decode(starttimes[i]))  return 1; // if curren_minute matches any of the given start time, return 1
+      }
+      return 0; // otherwise return 0
+    } else {
+      // repeating type
+      // if current_minute matches start time, return 1
+      if (current_minute == start) return 1;
+
+      // otherwise, current_minute must be larger than start time, and interval must be non-zero
+      if (current_minute > start && interval) {
+        // check if we are on any interval match
+        int16_t c = (current_minute - start) / interval;
+        if ((c * interval == (current_minute - start)) && c <= repeat) {
+          return 1;
+        }
+      }
     }
-    
-    // check previous day in case the repeating start times went over night
-    // this needs to be fixed because we have to check if yesterday
-    // is a valid starting day
-    /*c = (current_minute - start + 1440) / interval;
+  }
+  // to proceed, program has to be repeating type, and interval and repeat must be non-zero
+  if (starttime_type || !interval)  return 0;
+
+  // next, assume program started the previous day and ran over night
+  if (check_day_match(t-86400L)) {
+    // t-86400L matches the program's start day
+    int16_t c = (current_minute - start + 1440) / interval;
     if ((c * interval == (current_minute - start + 1440)) && c <= repeat) {
       return 1;
-    }*/
-    
-  } else {
-    // given start time type
-    for(i=0;i<MAX_NUM_STARTTIMES;i++) {
-      if (current_minute == starttime_decode(starttimes[i]))  return 1;
     }
   }
   return 0;

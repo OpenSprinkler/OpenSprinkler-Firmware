@@ -517,9 +517,14 @@ byte server_change_runonce(char *p) {
     // if non-zero duration is given
     // and if the station has not been disabled
     if (dur>0 && !(os.stndis_bits[bid]&(1<<s))) {
-      pd.scheduled_stop_time[sid] = water_time_resolve(dur);
-      pd.scheduled_program_index[sid] = 254;
-      match_found = true;
+      RuntimeQueueStruct *q = pd.enqueue();
+      if (q) {
+        q->st = 0;
+        q->dur = water_time_resolve(dur);
+        q->pid = 254;
+        q->sid = sid;
+        match_found = true;
+      }
     }
   }
   if(match_found) {
@@ -790,10 +795,13 @@ void server_json_controller_main() {
   // print ps
   for(sid=0;sid<os.nstations;sid++) {
     unsigned long rem = 0;
-    if (pd.scheduled_program_index[sid] > 0) {
-      rem = (curr_time >= pd.scheduled_start_time[sid]) ? (pd.scheduled_stop_time[sid]-curr_time) : (pd.scheduled_stop_time[sid]-pd.scheduled_start_time[sid]);
+    byte qid = pd.station_qid[sid];
+    RuntimeQueueStruct *q = pd.queue + qid;
+    if (qid<255) {
+      rem = (curr_time >= q->st) ? (q->st+q->dur-curr_time) : q->dur;
+      if(rem>65535) rem = 0;
     }
-    bfill.emit_p(PSTR("[$D,$L,$L]"), pd.scheduled_program_index[sid], rem, pd.scheduled_start_time[sid]);
+    bfill.emit_p(PSTR("[$D,$L,$L]"), (qid<255)?q->pid:0, rem, (qid<255)?q->st:0);
     bfill.emit_p((sid<os.nstations-1)?PSTR(","):PSTR("]"));
 
     // if available ether buffer is getting small
@@ -1126,12 +1134,13 @@ byte server_change_manual(char *p) {
       if ((os.status.mas==sid+1) || (os.status.mas2==sid+1) || (os.station_bits[bid]&(1<<s)))
         return HTML_NOT_PERMITTED;
 
-      // if the station doesn't already have a scheduled stop time
-      if (!pd.scheduled_stop_time[sid]) {
-        // initialize schedule data by storing water time temporarily in stop_time
-        // water time is scaled by watering percentage
-        pd.scheduled_stop_time[sid] = timer;
-        pd.scheduled_program_index[sid] = 99;   // testing stations are assigned program index 99
+      RuntimeQueueStruct *q = pd.enqueue();
+      // if the queue is not full
+      if (q) {
+        q->st = 0;
+        q->dur = timer;
+        q->sid = sid;
+        q->pid = 99;  // testing stations are assigned program index 99
         schedule_all_stations(curr_time);
       } else {
         return HTML_NOT_PERMITTED;
