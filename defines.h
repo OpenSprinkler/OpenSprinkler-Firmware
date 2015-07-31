@@ -18,7 +18,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see
- * <http://www.gnu.org/licenses/>. 
+ * <http://www.gnu.org/licenses/>.
  */
 
 #ifndef _DEFINES_H
@@ -54,7 +54,7 @@
 #define STN_TYPE_OTHER       0xFF
 
 /** Non-volatile memory (NVM) defines */
-#if defined(ARDUINO) 
+#if defined(ARDUINO)
 
 /** 2KB NVM (ATmega644) data structure:
   * |         |     |  ---STRING PARAMETERS---      |           |   ----STATION ATTRIBUTES-----      |          |
@@ -105,7 +105,7 @@
     #define MAX_WEATHER_KEY     32    // weather api key,
 
   #endif
-  
+
 #else // NVM defines for RPI/BBB/LINUX
 
   // These are kept the same as AVR for compatibility
@@ -138,7 +138,7 @@
 #define ADDR_NVM_WEATHER_KEY   (ADDR_NVM_WEATHERURL+MAX_WEATHERURL)
 #define ADDR_NVM_STN_NAMES     (ADDR_NVM_WEATHER_KEY+MAX_WEATHER_KEY)
 #define ADDR_NVM_MAS_OP        (ADDR_NVM_STN_NAMES+MAX_NUM_STATIONS*STATION_NAME_SIZE) // master op bits
-#define ADDR_NVM_IGNRAIN       (ADDR_NVM_MAS_OP+(MAX_EXT_BOARDS+1))  // ignore rain bits 
+#define ADDR_NVM_IGNRAIN       (ADDR_NVM_MAS_OP+(MAX_EXT_BOARDS+1))  // ignore rain bits
 #define ADDR_NVM_MAS_OP_2      (ADDR_NVM_IGNRAIN+(MAX_EXT_BOARDS+1)) // master2 op bits
 #define ADDR_NVM_STNDISABLE    (ADDR_NVM_MAS_OP_2+(MAX_EXT_BOARDS+1))// station disable bits
 #define ADDR_NVM_STNSEQ        (ADDR_NVM_STNDISABLE+(MAX_EXT_BOARDS+1))// station sequential bits
@@ -149,10 +149,10 @@
 #define DEFAULT_PASSWORD          "opendoor"
 #define DEFAULT_LOCATION          "Boston,MA"
 #define DEFAULT_WEATHER_KEY       ""
-#define DEFAULT_JAVASCRIPT_URL    "http://ui.opensprinkler.com/js"
+#define DEFAULT_JAVASCRIPT_URL    "https://ui.opensprinkler.com/js"
 #define DEFAULT_WEATHER_URL       "weather.opensprinkler.com"
 
-/** Macro define of each option 
+/** Macro define of each option
   * Refer to OpenSprinkler.cpp for details on each option
   */
 typedef enum {
@@ -210,7 +210,7 @@ typedef enum {
 #undef OS_HW_VERSION
 
 /** Hardware defines */
-#if defined(ARDUINO) 
+#if defined(ARDUINO)
 
   #if F_CPU==8000000L
     #define OS_HW_VERSION (OS_HW_VERSION_BASE+20)
@@ -227,15 +227,15 @@ typedef enum {
   // hardware pins
   #define PIN_BUTTON_1      31    // button 1
   #define PIN_BUTTON_2      30    // button 2
-  #define PIN_BUTTON_3      29    // button 3 
-  #define PIN_RF_DATA       28    // RF data pin 
+  #define PIN_BUTTON_3      29    // button 3
+  #define PIN_RF_DATA       28    // RF data pin
   #define PORT_RF        PORTA
   #define PINX_RF        PINA3
   #define PIN_SR_LATCH       3    // shift register latch pin
   #define PIN_SR_DATA       21    // shift register data pin
   #define PIN_SR_CLOCK      22    // shift register clock pin
   #define PIN_SR_OE          1    // shift register output enable pin
-  
+
   // regular 16x2 LCD pin defines
   #define PIN_LCD_RS        19    // LCD rs pin
   #define PIN_LCD_EN        18    // LCD enable pin
@@ -245,11 +245,11 @@ typedef enum {
   #define PIN_LCD_D7        23    // LCD d7 pin
   #define PIN_LCD_BACKLIGHT 12    // LCD backlight pin
   #define PIN_LCD_CONTRAST  13    // LCD contrast pin
-  
+
   // DC controller pin defines
   #define PIN_BOOST         20    // booster pin
   #define PIN_BOOST_EN      23    // boost voltage enable pin
-  
+
   #define PIN_ETHER_CS       4    // Ethernet controller chip select pin
   #define PIN_SD_CS          0    // SD card chip select pin
   #define PIN_RAINSENSOR    11    // rain sensor is connected to pin D3
@@ -298,11 +298,11 @@ typedef enum {
   #define PIN_RF_DATA       15    // RF transmitter pin
   #define PIN_BUTTON_1      23    // button 1
   #define PIN_BUTTON_2      24    // button 2
-  #define PIN_BUTTON_3      25    // button 3   
-  
+  #define PIN_BUTTON_3      25    // button 3
+
   /** BBB pin defines */
   #elif defined(OSBO)
-  
+
   #define OS_HW_VERSION    OSBO_HW_VERSION_BASE
   // these are gpio pin numbers, refer to
   // https://github.com/mkaczanowski/BeagleBoneBlack-GPIO/blob/master/GPIO/GPIOConst.cpp
@@ -313,13 +313,13 @@ typedef enum {
   #define PIN_RAINSENSOR    48    // P9_15, rain sensor is connected to pin D3
   //#define PIN_RELAY         51    // P9_16, mini relay is connected to pin D14, relay support is now retired
   #define PIN_RF_DATA       51    // RF transmitter pin
-  
+
   #else
     // For Linux or other software simulators
     // use fake hardware pins
     #if defined(DEMO)
       #define OS_HW_VERSION 255   // assign hardware number 255 to DEMO firmware
-    #else    
+    #else
       #define OS_HW_VERSION SIM_HW_VERSION_BASE
     #endif
     #define PIN_SR_LATCH    0
@@ -329,11 +329,11 @@ typedef enum {
     #define PIN_RAINSENSOR  0
     //#define PIN_RELAY       0
     #define PIN_RF_DATA     0
-    
+
   #endif
-  
+
   #define ETHER_BUFFER_SIZE   16384
-    
+
   #define DEBUG_BEGIN(x)          {}  /** Serial debug functions */
   #define ENABLE_DEBUG
   #if defined(ENABLE_DEBUG)
@@ -349,13 +349,13 @@ typedef enum {
   inline void ultoa(unsigned long v,char *s,int b) {sprintf(s,"%lu",v);}
   #define now()       time(0)
   #define delay(x)    {}
-  
+
   /** Re-define avr-specific (e.g. PGM) types to use standard types */
   #define pgm_read_byte(x) *(x)
   #define PSTR(x)      x
   #define strcat_P     strcat
   #define strcpy_P     strcpy
-  #define PROGMEM 
+  #define PROGMEM
   typedef const char prog_char;
   typedef const char prog_uchar;
   typedef const char* PGM_P;
@@ -363,7 +363,7 @@ typedef enum {
   typedef short           int16_t;
   typedef unsigned short  uint16_t;
   typedef bool boolean;
-  
+
 #endif  // end of Hardawre defines
 
 #define TMP_BUFFER_SIZE     120  // scratch buffer size
