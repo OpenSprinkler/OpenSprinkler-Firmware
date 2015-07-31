@@ -615,7 +615,7 @@ void OpenSprinkler::rainsensor_status() {
   status.rain_sensed = (digitalRead(PIN_RAINSENSOR) == options[OPTION_RAINSENSOR_TYPE].value ? 0 : 1);
 }
 
-//#if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
+#if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
 uint16_t OpenSprinkler::read_current() {
   if(status.has_curr_sense) {
     return (uint16_t)(analogRead(PIN_CURR_SENSE) * 14.65);
@@ -623,7 +623,7 @@ uint16_t OpenSprinkler::read_current() {
     return 0;
   }
 }
-//#endif
+#endif
 
 int OpenSprinkler::detect_exp() { // AVR has capability to detect number of expansion boards
 #if defined(ARDUINO)
