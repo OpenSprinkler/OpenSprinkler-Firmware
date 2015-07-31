@@ -254,6 +254,8 @@ typedef enum {
   #define PIN_SD_CS          0    // SD card chip select pin
   #define PIN_RAINSENSOR    11    // rain sensor is connected to pin D3
   #define PIN_EXP_SENSE      4    // expansion board sensing pin (A4)
+  #define PIN_CURR_SENSE     7    // current sensing pin (A7)
+  #define PIN_CURR_DIGITAL  24    // digital pin index for A7
 
   // Ethernet buffer size
   #if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)

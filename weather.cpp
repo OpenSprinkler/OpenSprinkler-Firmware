@@ -50,6 +50,7 @@ static void getweather_callback(byte status, uint16_t off, uint16_t len) {
   char *p = (char*)Ethernet::buffer + off;
 #else
   char *p = ether_buffer;
+  DEBUG_PRINTLN(p);
 #endif
   /* scan the buffer until the first & symbol */
   while(*p && *p!='&') {
@@ -172,24 +173,21 @@ void peel_http_header() { // remove the HTTP header
 void GetWeather() {
   EthernetClient client;
 
-  static struct hostent *server = NULL;
+  struct hostent *server;
+  nvm_read_block(tmp_buffer, (void*)ADDR_NVM_WEATHERURL, MAX_WEATHERURL);
+  server = gethostbyname(tmp_buffer);
   if (!server) {
-    // fix me
-    nvm_read_block(tmp_buffer, (void*)ADDR_NVM_WEATHERURL, MAX_WEATHERURL);
-    server = gethostbyname(tmp_buffer);
-    if (!server) {
-      DEBUG_PRINTLN("can't resolve weather server");
-      return;    
-    }
-    DEBUG_PRINT("weather server ip:");
-    DEBUG_PRINT(((uint8_t*)server->h_addr)[0]);
-    DEBUG_PRINT(":");
-    DEBUG_PRINT(((uint8_t*)server->h_addr)[1]);
-    DEBUG_PRINT(":");
-    DEBUG_PRINT(((uint8_t*)server->h_addr)[2]);
-    DEBUG_PRINT(":");
-    DEBUG_PRINTLN(((uint8_t*)server->h_addr)[3]);
+    DEBUG_PRINTLN("can't resolve weather server");
+    return;
   }
+  DEBUG_PRINT("weather server ip:");
+  DEBUG_PRINT(((uint8_t*)server->h_addr)[0]);
+  DEBUG_PRINT(":");
+  DEBUG_PRINT(((uint8_t*)server->h_addr)[1]);
+  DEBUG_PRINT(":");
+  DEBUG_PRINT(((uint8_t*)server->h_addr)[2]);
+  DEBUG_PRINT(":");
+  DEBUG_PRINTLN(((uint8_t*)server->h_addr)[3]);
 
   if (!client.connect((uint8_t*)server->h_addr, 80)) {
     DEBUG_PRINTLN("failed to connect to weather server");
@@ -231,6 +229,7 @@ void GetWeather() {
   strcat(urlBuffer, dst);
   strcat(urlBuffer, " HTTP/1.0\r\nHOST: weather.opensprinkler.com\r\n\r\n");
   
+  DEBUG_PRINTLN(urlBuffer);
   client.write((uint8_t *)urlBuffer, strlen(urlBuffer));
   
   bzero(ether_buffer, ETHER_BUFFER_SIZE);

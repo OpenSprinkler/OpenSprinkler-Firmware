@@ -70,7 +70,7 @@ struct ConStatus {
   byte rain_delayed:1;      // rain delay bit (when set, rain delay is applied)
   byte rain_sensed:1;       // rain sensor bit (when set, it indicates that rain is detected)
   byte program_busy:1;      // HIGH means a program is being executed currently
-  byte has_rtc:1;           // HIGH means the controller has a DS1307 RTC
+  byte has_curr_sense:1;    // HIGH means the controller has a current sensing pin
   byte has_sd:1;            // HIGH means a microSD card is detected
   byte safe_reboot:1;       // HIGH means a safe reboot has been marked
   byte has_hwmac:1;         // has hardware MAC chip
@@ -156,6 +156,9 @@ public:
   static void raindelay_start();  // start raindelay
   static void raindelay_stop();   // stop rain delay
   static void rainsensor_status();// update rainsensor status
+#if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
+  static uint16_t read_current(); // read current sensing value
+#endif
   static int detect_exp();        // detect the number of expansion boards
   static byte weekday_today();    // returns index of today's weekday (Monday is 0)
 

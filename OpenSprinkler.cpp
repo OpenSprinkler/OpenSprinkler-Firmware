@@ -460,7 +460,13 @@ void OpenSprinkler::begin() {
       digitalWrite(PIN_BOOST, LOW);
 
       pinMode(PIN_BOOST_EN, OUTPUT);
-      digitalWrite(PIN_BOOST_EN, LOW);        
+      digitalWrite(PIN_BOOST_EN, LOW);
+
+      // detect if current sensing pin is present
+      pinMode(PIN_CURR_DIGITAL, INPUT);
+      digitalWrite(PIN_CURR_DIGITAL, HIGH); // enable internal pullup
+      status.has_curr_sense = digitalRead(PIN_CURR_DIGITAL) ? 0 : 1;
+      digitalWrite(PIN_CURR_DIGITAL, LOW);
     }
   #endif
 
@@ -534,10 +540,8 @@ void OpenSprinkler::begin() {
   digitalWrite(PIN_BUTTON_2, HIGH);
   digitalWrite(PIN_BUTTON_3, HIGH);
 
-  // detect if DS1307 RTC exists
-  if (RTC.detect()==0) {
-    status.has_rtc = 1;
-  }
+  // detect and check RTC type
+  RTC.detect();
 #else
   DEBUG_PRINTLN(get_runtime_path());
 #endif
@@ -611,6 +615,16 @@ void OpenSprinkler::rainsensor_status() {
   status.rain_sensed = (digitalRead(PIN_RAINSENSOR) == options[OPTION_RAINSENSOR_TYPE].value ? 0 : 1);
 }
 
+//#if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
+uint16_t OpenSprinkler::read_current() {
+  if(status.has_curr_sense) {
+    return (uint16_t)(analogRead(PIN_CURR_SENSE) * 14.65);
+  } else {
+    return 0;
+  }
+}
+//#endif
+
 int OpenSprinkler::detect_exp() { // AVR has capability to detect number of expansion boards
 #if defined(ARDUINO)
   unsigned int v = analogRead(PIN_EXP_SENSE);
@@ -619,8 +633,8 @@ int OpenSprinkler::detect_exp() { // AVR has capability to detect number of expa
   // each expansion board (8 stations) has 10K pull-down connected in parallel;
   // so the exact ADC value for n expansion boards is:
   //    ADC = 1024 * 10 / (10 + 1.5 * n)
-  // For  0,   1,   2,   3,   4,   5 expansion boards, the ADC values are:
-  //   1024, 890, 787, 706, 640, 585
+  // For  0,   1,   2,   3,   4,   5,  6 expansion boards, the ADC values are:
+  //   1024, 890, 787, 706, 640, 585, 539
   // Actual threshold is taken as the midpoint between, to account for errors
   int n = -1;
   if (v > 957) { // 0
@@ -635,6 +649,8 @@ int OpenSprinkler::detect_exp() { // AVR has capability to detect number of expa
     n = 4;
   } else if (v > 562) { // 5
     n = 5;
+  } else if (v > 520) { // 6
+    n = 6;
   } else {  // cannot determine
   }
   return n;

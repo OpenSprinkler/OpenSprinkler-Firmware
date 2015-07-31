@@ -198,7 +198,7 @@ void do_setup() {
 
   setSyncInterval(RTC_SYNC_INTERVAL);  // RTC sync interval
   // if rtc exists, sets it as time sync source
-  setSyncProvider(os.status.has_rtc ? RTC.get : NULL);
+  setSyncProvider(RTC.get);
   delay(500);
   os.lcd_print_time(os.now_tz());  // display time to LCD
 
@@ -469,10 +469,10 @@ void do_loop()
               // fix me
               // upon turning on station, process RF
               // if the station is a RF station
-              /*if(os.rfstn_bits[bid]&(1<<s)) {
+              if(os.stnspe_bits[bid]&(1<<s)) {
                 // send RF on signal
                 os.send_rfstation_signal(sid, true);
-              }*/
+              }
             } //if curr_time > scheduled_start_time
           } // if current station is not running
         }//end_s
@@ -663,10 +663,10 @@ void turn_off_station(byte sid, ulong curr_time) {
     // upon turning off station, process RF station
     // if the station is a RF station
     // fix me
-    /*if(os.rfstn_bits[bid]&(1<<s)) {
+    if(os.stnspe_bits[(sid>>3)]&(1<<(sid&0x07))) {
       // turn off station
       os.send_rfstation_signal(sid, false);
-    }*/
+    }
   }
 
   // dequeue the element
@@ -1010,7 +1010,7 @@ void perform_ntp_sync() {
     ulong t = getNtpTime();
     if (t>0) {
       setTime(t);
-      if (os.status.has_rtc) RTC.set(t); // if rtc exists, update rtc
+      RTC.set(t);
     }
   }
 #else

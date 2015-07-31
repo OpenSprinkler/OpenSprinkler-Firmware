@@ -793,6 +793,11 @@ void server_json_controller_main() {
   if(read_from_file(wtopts_filename, tmp_buffer)) {
     bfill.emit_p(PSTR(",\"wto\":{$S}"), tmp_buffer);
   }
+#if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
+  if(os.status.has_curr_sense) {
+    bfill.emit_p(PSTR(",\"curr\":$D"), os.read_current());
+  }
+#endif
   bfill.emit_p(PSTR("}"));
   delay(1);
 }
@@ -992,7 +997,7 @@ byte server_change_options(char *p)
     reset_all_stations_immediate();
 #if defined(ARDUINO)
     setTime(t);
-    if (os.status.has_rtc) RTC.set(t); // if rtc exists, update rtc
+    RTC.set(t);
 #endif
   }
   if(findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("wto"), true)) {
