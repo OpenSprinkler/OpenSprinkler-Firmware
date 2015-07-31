@@ -677,7 +677,6 @@ void turn_off_station(byte sid, ulong curr_time) {
 void process_dynamic_events(ulong curr_time) {
   // check if rain is detected
   bool rain = false;
-  bool en = os.status.enabled ? true : false;
   if (os.status.rain_delayed || (os.options[OPTION_USE_RAINSENSOR].value && os.status.rain_sensed)) {
     rain = true;
   }

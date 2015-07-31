@@ -590,7 +590,7 @@ void OpenSprinkler::apply_all_station_bits() {
     DEBUG_PRINTLN(F("engage booster"));
     // boost voltage
     digitalWrite(PIN_BOOST, HIGH);
-    delay(250);
+    delay((int)options[OPTION_BOOST_TIME].value<<2);
     digitalWrite(PIN_BOOST, LOW);
    
     // enable boosted voltage for a short period of time

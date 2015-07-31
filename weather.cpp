@@ -100,11 +100,9 @@ static void getweather_callback(byte status, uint16_t off, uint16_t len) {
 
 #if defined(ARDUINO)  // for AVR
 void GetWeather() {
-  // check if we've already done dns lookup
-  if(ether.hisip[0] == 0) {
-    nvm_read_block(tmp_buffer, (void*)ADDR_NVM_WEATHERURL, MAX_WEATHERURL);
-    ether.dnsLookup(tmp_buffer, true);
-  }
+  // perform DNS lookup for every query
+  nvm_read_block(tmp_buffer, (void*)ADDR_NVM_WEATHERURL, MAX_WEATHERURL);
+  ether.dnsLookup(tmp_buffer, true);
 
   //bfill=ether.tcpOffset();
   char tmp[30];
@@ -176,6 +174,7 @@ void GetWeather() {
 
   static struct hostent *server = NULL;
   if (!server) {
+    // fix me
     nvm_read_block(tmp_buffer, (void*)ADDR_NVM_WEATHERURL, MAX_WEATHERURL);
     server = gethostbyname(tmp_buffer);
     if (!server) {

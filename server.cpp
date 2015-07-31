@@ -116,12 +116,9 @@ void print_html_standard_header() {
   bfill.emit_p(PSTR("$F$F$F$F\r\n"), html200OK, htmlContentHTML, htmlNoCache, htmlAccessControl);
 }
 
-void print_json_header() {
+void print_json_header(bool bracket=true) {
   bfill.emit_p(PSTR("$F$F$F$F\r\n"), html200OK, htmlContentJSON, htmlAccessControl, htmlNoCache);
-}
-
-void print_json_header_with_bracket() {
-  bfill.emit_p(PSTR("$F$F$F$F\r\n{"), html200OK, htmlContentJSON, htmlAccessControl, htmlNoCache);
+  if(bracket) bfill.emit_p(PSTR("{"));
 }
 
 byte findKeyVal (const char *str,char *strbuf, uint8_t maxlen,const char *key,bool key_in_pgm=false,uint8_t *keyfound=NULL)
@@ -205,20 +202,13 @@ void print_html_standard_header() {
   m_client->write((const uint8_t *)"\r\n", 2);
 }
 
-void print_json_header() {
+void print_json_header(bool bracket=true) {
   m_client->write((const uint8_t *)html200OK, strlen(html200OK));
   m_client->write((const uint8_t *)htmlContentJSON, strlen(htmlContentJSON));
   m_client->write((const uint8_t *)htmlNoCache, strlen(htmlNoCache));
   m_client->write((const uint8_t *)htmlAccessControl, strlen(htmlAccessControl));
-  m_client->write((const uint8_t *)"\r\n", 2);
-}
-
-void print_json_header_with_bracket() {
-  m_client->write((const uint8_t *)html200OK, strlen(html200OK));
-  m_client->write((const uint8_t *)htmlContentJSON, strlen(htmlContentJSON));
-  m_client->write((const uint8_t *)htmlNoCache, strlen(htmlNoCache));
-  m_client->write((const uint8_t *)htmlAccessControl, strlen(htmlAccessControl));
-  m_client->write((const uint8_t *)"\r\n{", 3);
+  if(bracket) m_client->write((const uint8_t *)"\r\n{", 3);
+  else m_client->write((const uint8_t *)"\r\n", 2);
 }
 
 byte findKeyVal (const char *str,char *strbuf, uint8_t maxlen,const char *key,bool key_in_pgm=false,uint8_t *keyfound=NULL)
@@ -359,12 +349,6 @@ boolean check_password(char *p)
   return false;
 }
 
-// print ending character: either bracket, or comma
-void print_json_close(bool bracket=true) {
-  bfill.emit_p(bracket?PSTR("}"):PSTR(","));
-  if(bracket) delay(1);
-}
-
 void server_json_stations_attrib(const char* name, const byte* attrib)
 {
   bfill.emit_p(PSTR("\"$F\":["), name);
@@ -395,15 +379,14 @@ void server_json_stations_main()
       send_packet();
     }
   }
-  bfill.emit_p(PSTR("],\"maxlen\":$D"), STATION_NAME_SIZE);
+  bfill.emit_p(PSTR("],\"maxlen\":$D}"), STATION_NAME_SIZE);
+  delay(1);
 }
 
-/** Output station names and attributes */
-byte server_json_stations(char *p)
-{
-  print_json_header_with_bracket();
+/** Output Stations */
+byte server_json_stations(char *p) {
+  print_json_header();
   server_json_stations_main();
-  print_json_close();
   return HTML_OK;
 }
 
@@ -696,16 +679,14 @@ void server_json_options_main() {
       bfill.emit_p(PSTR(","));
   }
 
-  bfill.emit_p(PSTR(",\"dexp\":$D,\"mexp\":$D,\"hwt\":$D"), os.detect_exp(), MAX_EXT_BOARDS, os.hw_type);
+  bfill.emit_p(PSTR(",\"dexp\":$D,\"mexp\":$D,\"hwt\":$D}"), os.detect_exp(), MAX_EXT_BOARDS, os.hw_type);
+  delay(1);
 }
 
-
-/** Output options */
-byte server_json_options(char *p)
-{
-  print_json_header_with_bracket();
+/** Output Options */
+byte server_json_options(char *p) {
+  print_json_header();
   server_json_options_main();
-  print_json_close();
   return HTML_OK;
 }
 
@@ -747,15 +728,13 @@ void server_json_programs_main() {
       send_packet();
     }
   }
-  bfill.emit_p(PSTR("]"));
+  bfill.emit_p(PSTR("]}"));
 }
 
 /** Output program data */
-byte server_json_programs(char *p)
-{
-  print_json_header_with_bracket();
+byte server_json_programs(char *p) {
+  print_json_header();
   server_json_programs_main();
-  print_json_close();
   return HTML_OK;
 }
 
@@ -812,17 +791,15 @@ void server_json_controller_main() {
   }
 
   if(read_from_file(wtopts_filename, tmp_buffer)) {
-    bfill.emit_p(PSTR(",\"wto\":{$S}"), tmp_buffer);
+    bfill.emit_p(PSTR(",\"wto\":{$S}}"), tmp_buffer);
   }
+  delay(1);
 }
 
-
 /** Output controller variables in json */
-byte server_json_controller(char *p)
-{
-  print_json_header_with_bracket();
+byte server_json_controller(char *p) {
+  print_json_header();
   server_json_controller_main();
-  print_json_close();
   return HTML_OK;
 }
 
@@ -965,6 +942,11 @@ byte server_change_options(char *p)
 		    if (oid==OPTION_STATION_DELAY_TIME) {
 		      v=water_time_encode_signed((int16_t)v);
 		    } // encode station delay time
+        #if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
+        if(os.hw_type==HW_TYPE_DC && oid==OPTION_BOOST_TIME) {
+           v>>=2;
+        }
+        #endif
 		    if (v>=0 && v<=os.options[oid].max) {
 		      os.options[oid].value = v;
 		    } else {
@@ -1069,8 +1051,7 @@ byte server_change_password(char *p)
   return HTML_DATA_MISSING;
 }
 
-void server_json_status_main()
-{
+void server_json_status_main() {
   bfill.emit_p(PSTR("\"sn\":["));
   byte sid;
 
@@ -1078,17 +1059,15 @@ void server_json_status_main()
     bfill.emit_p(PSTR("$D"), (os.station_bits[(sid>>3)]>>(sid&0x07))&1);
     if(sid!=os.nstations-1) bfill.emit_p(PSTR(","));
   }
-  bfill.emit_p(PSTR("],\"nstations\":$D"), os.nstations);
+  bfill.emit_p(PSTR("],\"nstations\":$D}"), os.nstations);
+  delay(1);
 }
 
-/**
-  Output station status
-*/
+/** Output station status */
 byte server_json_status(char *p)
 {
-  print_json_header_with_bracket();
+  print_json_header();
   server_json_status_main();
-  print_json_close();
   return HTML_OK;
 }
 
@@ -1203,7 +1182,7 @@ byte server_json_log(char *p) {
   if (findKeyVal(p, type, 4, PSTR("type"), true))
     type_specified = true;
 
-  print_json_header();
+  print_json_header(false);
   bfill.emit_p(PSTR("["));
 
   bool first = true;
@@ -1290,21 +1269,22 @@ byte server_delete_log(char *p) {
 
 /** Output all JSON data, including jc, jp, jo, js, jn */
 byte server_json_all(char *p) {
-  print_json_header_with_bracket();
+  print_json_header();
+  bfill.emit_p(PSTR("\"settings\":{"));
   server_json_controller_main();
-  print_json_close(false);
   send_packet();
+  bfill.emit_p(PSTR(",\"programs\":{"));
   server_json_programs_main();
-  print_json_close(false);
   send_packet();
+  bfill.emit_p(PSTR(",\"options\":{"));
   server_json_options_main();
-  print_json_close(false);
   send_packet();
+  bfill.emit_p(PSTR(",\"status\":{"));
   server_json_status_main();
-  print_json_close(false);
   send_packet();
+  bfill.emit_p(PSTR(",\"stations\":{"));
   server_json_stations_main();
-  print_json_close();
+  bfill.emit_p(PSTR("}"));
   return HTML_OK;
 }
 
@@ -1428,7 +1408,7 @@ void handle_web_request(char *p)
         } else if ((com[0]=='j' && com[1]=='o') ||
                    (com[0]=='j' && com[1]=='a'))  { // for /jo and /ja we output fwv if password fails
           if(check_password(dat)==false) {
-            print_json_header_with_bracket();
+            print_json_header();
             bfill.emit_p(PSTR("\"$F\":$D}"),
                    os.options[0].json_str, os.options[0].value);
             ret = HTML_OK;
@@ -1452,7 +1432,7 @@ void handle_web_request(char *p)
           break;
         default:
           print_json_header();
-          bfill.emit_p(PSTR("{\"result\":$D}"), ret);
+          bfill.emit_p(PSTR("\"result\":$D}"), ret);
         }
         break;
       }
@@ -1461,7 +1441,7 @@ void handle_web_request(char *p)
     if(i==sizeof(urls)/sizeof(URLStruct)) {
       // no server funtion found
       print_json_header();
-      bfill.emit_p(PSTR("{\"result\":$D}"), HTML_PAGE_NOT_FOUND);
+      bfill.emit_p(PSTR("\"result\":$D}"), HTML_PAGE_NOT_FOUND);
     }
     send_packet(true);
   }
