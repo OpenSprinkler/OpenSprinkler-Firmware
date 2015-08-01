@@ -96,6 +96,17 @@ static void getweather_callback(byte status, uint16_t off, uint16_t len) {
   if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("eip"), true)) {
     os.external_ip = atol(tmp_buffer);
   }
+
+  if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("rd"), true)) {
+    v = atoi(tmp_buffer);
+    if (v>0) {
+      os.nvdata.rd_stop_time = os.now_tz() + (unsigned long) v * 3600;
+      os.raindelay_start();
+    } else if (v==0) {
+      os.raindelay_stop();
+    }
+  }
+
   os.checkwt_success_lasttime = os.now_tz();
 }
 

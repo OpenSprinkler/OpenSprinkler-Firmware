@@ -190,7 +190,7 @@ OptionStruct OpenSprinkler::options[NUM_OPTIONS] = {
   {1,   1,   _str_den,  _json_den},   // device enable
   {0,   1,   _str_ipas, _json_ipas},  // 1: ignore password; 0: use password
   {0,   255, _str_devid,_json_devid}, // device id
-  {110, 255, _str_con,  _json_con},   // lcd contrast
+  {130, 255, _str_con,  _json_con},   // lcd contrast
   {100, 255, _str_lit,  _json_lit},   // lcd backlight
   {15,  255, _str_dim,  _json_dim},   // lcd dimming
   {60,  250, _str_bst,  _json_bst},   // boost time (only valid to DC and LATCH type)
@@ -616,6 +616,9 @@ void OpenSprinkler::rainsensor_status() {
 }
 
 #if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
+// OpenSprinkler DC uses a 0.22 ohm current sensing resistor
+// Therefore the conversion from analog reading to milli-amp is:
+// (r/1024)*3.3*1000/0.22
 uint16_t OpenSprinkler::read_current() {
   if(status.has_curr_sense) {
     return (uint16_t)(analogRead(PIN_CURR_SENSE) * 14.65);
