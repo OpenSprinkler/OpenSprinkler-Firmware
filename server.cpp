@@ -30,6 +30,7 @@
 #include "SdFat.h"
 extern SdFat sd;
 static uint8_t ntpclientportL = 123; // Default NTP client port
+extern ulong flow_count;
 
 #else
 
@@ -349,8 +350,10 @@ boolean check_password(char *p)
   return false;
 }
 
-void server_json_stations_attrib(const char* name, const byte* attrib)
+void server_json_stations_attrib(const char* name, int addr)
 {
+  byte *attrib = (byte*)tmp_buffer;
+  os.station_attrib_bits_load(addr, attrib);
   bfill.emit_p(PSTR("\"$F\":["), name);
   for(byte i=0;i<os.nboards;i++) {
     bfill.emit_p(PSTR("$D"), attrib[i]);
@@ -362,12 +365,12 @@ void server_json_stations_attrib(const char* name, const byte* attrib)
 
 void server_json_stations_main()
 {
-  server_json_stations_attrib(PSTR("masop"), os.masop_bits);
-  server_json_stations_attrib(PSTR("ignore_rain"), os.ignrain_bits);
-  server_json_stations_attrib(PSTR("masop2"), os.masop2_bits);
-  server_json_stations_attrib(PSTR("stn_dis"), os.stndis_bits);
-  server_json_stations_attrib(PSTR("stn_seq"), os.stnseq_bits);
-  server_json_stations_attrib(PSTR("stn_spe"), os.stnspe_bits);
+  server_json_stations_attrib(PSTR("masop"), ADDR_NVM_MAS_OP);
+  server_json_stations_attrib(PSTR("ignore_rain"), ADDR_NVM_IGNRAIN);
+  server_json_stations_attrib(PSTR("masop2"), ADDR_NVM_MAS_OP_2);
+  server_json_stations_attrib(PSTR("stn_dis"), ADDR_NVM_STNDISABLE);
+  server_json_stations_attrib(PSTR("stn_seq"), ADDR_NVM_STNSEQ);
+  server_json_stations_attrib(PSTR("stn_spe"), ADDR_NVM_STNSPE);
   bfill.emit_p(PSTR("\"snames\":["));
   byte sid;
   for(sid=0;sid<os.nstations;sid++) {
@@ -390,8 +393,10 @@ byte server_json_stations(char *p) {
   return HTML_OK;
 }
 
-void server_change_stations_attrib(char *p, char header, byte *attrib)
+void server_change_stations_attrib(char *p, char header, int addr)
 {
+  byte attrib[MAX_EXT_BOARDS+1];
+  os.station_attrib_bits_load(addr, attrib);
   char tbuf2[3] = {0, 0, 0};
   byte bid;
   tbuf2[0]=header;
@@ -401,6 +406,7 @@ void server_change_stations_attrib(char *p, char header, byte *attrib)
       attrib[bid] = atoi(tmp_buffer);
     }
   }
+  os.station_attrib_bits_save(addr, attrib);
 }
 
 /**
@@ -427,23 +433,12 @@ byte server_change_stations(char *p)
     }
   }
 
-  server_change_stations_attrib(p, 'm', os.masop_bits); // master1
-  os.station_attrib_bits_save(ADDR_NVM_MAS_OP, os.masop_bits);
-
-  server_change_stations_attrib(p, 'i', os.ignrain_bits); // ignore rain
-  os.station_attrib_bits_save(ADDR_NVM_IGNRAIN, os.ignrain_bits);
-
-  server_change_stations_attrib(p, 'n', os.masop2_bits); // master2
-  os.station_attrib_bits_save(ADDR_NVM_MAS_OP_2, os.masop2_bits);
-
-  server_change_stations_attrib(p, 'd', os.stndis_bits); // disable
-  os.station_attrib_bits_save(ADDR_NVM_STNDISABLE, os.stndis_bits);
-
-  server_change_stations_attrib(p, 'q', os.stnseq_bits); // sequential
-  os.station_attrib_bits_save(ADDR_NVM_STNSEQ, os.stnseq_bits);
-
-  server_change_stations_attrib(p, 'p', os.stnseq_bits); // special
-  os.station_attrib_bits_save(ADDR_NVM_STNSPE, os.stnspe_bits);
+  server_change_stations_attrib(p, 'm', ADDR_NVM_MAS_OP); // master1
+  server_change_stations_attrib(p, 'i', ADDR_NVM_IGNRAIN); // ignore rain
+  server_change_stations_attrib(p, 'n', ADDR_NVM_MAS_OP_2); // master2
+  server_change_stations_attrib(p, 'd', ADDR_NVM_STNDISABLE); // disable
+  server_change_stations_attrib(p, 'q', ADDR_NVM_STNSEQ); // sequential
+  server_change_stations_attrib(p, 'p', ADDR_NVM_STNSPE); // special
 
   return HTML_SUCCESS;
 }
@@ -499,7 +494,7 @@ byte server_change_runonce(char *p) {
     s=sid&0x07;
     // if non-zero duration is given
     // and if the station has not been disabled
-    if (dur>0 && !(os.stndis_bits[bid]&(1<<s))) {
+    if (dur>0 && !(os.station_attrib_bits_read(ADDR_NVM_STNDISABLE+bid)&(1<<s))) {
       RuntimeQueueStruct *q = pd.enqueue();
       if (q) {
         q->st = 0;
@@ -760,7 +755,7 @@ void server_json_controller_main() {
               ADDR_NVM_WEATHER_KEY,
               os.nvdata.sunrise_time,
               os.nvdata.sunset_time,
-              os.external_ip,
+              os.nvdata.external_ip,
               os.checkwt_lasttime,
               os.checkwt_success_lasttime,
               pd.lastrun.station,
@@ -1014,7 +1009,7 @@ byte server_change_options(char *p)
   os.options_save();
 
   if(time_change) {
-    os.ntpsync_lasttime = 0;
+    os.status.req_ntpsync = 1;
   }
 
   if(weather_change) {
@@ -1369,32 +1364,10 @@ void handle_web_request(char *p)
 #endif
   rewind_ether_buffer();
 
-  char *com = p;  // command name
-  char *dat = NULL; // data
-  // check if this is GET or POST request
-  if (strncmp(p, "GET", 3)==0) {  // this is GET request
-    com = p+5;
-    dat = com+3;
-  } else {  // this is POST request
-    // find the start of POST data
-    com = p+6;
-    dat = com;
-    bool clb = true;
-    char c;
-    while(*dat) {
-      c = *dat;
-      if(c=='\n' && clb) {
-        dat++;
-        break;
-      }
-      if(c=='\n') {
-        clb = true;
-      } else if (c!='\r') {
-        clb = false;
-      }
-      dat++;
-    }
-  }
+  // assume this is a GET request
+  // GET /xx?xxxx
+  char *com = p+5;
+  char *dat = com+3;
 
   if(com[0]==' ') {
     server_home();  // home page handler

@@ -53,23 +53,29 @@
 #define STN_TYPE_REMOTE      0x02
 #define STN_TYPE_OTHER       0xFF
 
+/** Sensor type macro defines */
+#define SENSOR_TYPE_NONE    0x00
+#define SENSOR_TYPE_RAIN    0x01
+#define SENSOR_TYPE_FLOW    0x02
+#define SENSOR_TYPE_OTHER   0xFF
+
 /** Non-volatile memory (NVM) defines */
 #if defined(ARDUINO)
 
 /** 2KB NVM (ATmega644) data structure:
   * |         |     |  ---STRING PARAMETERS---      |           |   ----STATION ATTRIBUTES-----      |          |
   * | PROGRAM | CON | PWD | LOC | JURL | WURL | KEY | STN_NAMES | MAS | IGR | MAS2 | DIS | SEQ | SPE | OPTIONS  |
-  * |  (996)  | (8) |(32) |(48) | (40) | (40) |(32) |   (768)   | (6) | (6) |  (6) | (6) | (6) | (6) |   (54)   |
+  * |  (996)  |(12) |(32) |(48) | (40) | (40) |(32) |   (768)   | (6) | (6) |  (6) | (6) | (6) | (6) |  (44)    |
   * |         |     |     |     |      |      |     |           |     |     |      |     |     |     |          |
-  * 0        996  1004   1036  1084  1124   1164   1196        1964  1970  1976   1982  1988  1994  2000      2048
+  * 0        996  1008   1040  1088  1128   1168   1200        1968  1974  1980   1986  1992  1998  2004      2048
   */
 
 /** 4KB NVM (ATmega1284) data structure:
   * |         |     |  ---STRING PARAMETERS---      |           |   ----STATION ATTRIBUTES-----      |          |
   * | PROGRAM | CON | PWD | LOC | JURL | WURL | KEY | STN_NAMES | MAS | IGR | MAS2 | DIS | SEQ | SPE | OPTIONS  |
-  * |  (2438) | (8) |(32) |(48) | (48) | (48) |(32) |   (1344)  | (7) | (7) |  (7) | (7) | (7) | (7) |   (56)   |
+  * |  (2438) |(12) |(32) |(48) | (48) | (48) |(32) |   (1344)  | (7) | (7) |  (7) | (7) | (7) | (7) |   (52)   |
   * |         |     |     |     |      |      |     |           |     |     |      |     |     |     |          |
-  * 0       2438  2446   2478  2526  2574   2622   2654        3998  4005  4012   4019  4026  4033  4040      4096
+  * 0       2438  2450   2482  2530  2578   2626   2658        4002  4009  4016   4023  4030  4037  4044      4096
   */
 
   #if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__) // for 4KB NVM
@@ -81,7 +87,7 @@
     #define STATION_NAME_SIZE   24    // maximum number of characters in each station name
 
     #define MAX_PROGRAMDATA     2438  // program data
-    #define MAX_NVCONDATA       8     // non-volatile controller data
+    #define MAX_NVCONDATA       12    // non-volatile controller data
     #define MAX_USER_PASSWORD   32    // user password
     #define MAX_LOCATION        48    // location string
     #define MAX_JAVASCRIPTURL   48    // javascript url
@@ -97,7 +103,7 @@
     #define STATION_NAME_SIZE   16    // maximum number of characters in each station name
 
     #define MAX_PROGRAMDATA     996   // program data
-    #define MAX_NVCONDATA       8     // non-volatile controller data
+    #define MAX_NVCONDATA       12     // non-volatile controller data
     #define MAX_USER_PASSWORD   32    // user password
     #define MAX_LOCATION        48    // location string
     #define MAX_JAVASCRIPTURL   40    // javascript url
@@ -119,7 +125,7 @@
   #define STATION_NAME_SIZE   24    // maximum number of characters in each station name
 
   #define MAX_PROGRAMDATA     2438  // program data
-  #define MAX_NVCONDATA       8     // non-volatile controller data
+  #define MAX_NVCONDATA       12     // non-volatile controller data
   #define MAX_USER_PASSWORD   32    // user password
   #define MAX_LOCATION        48    // location string
   #define MAX_JAVASCRIPTURL   48    // javascript url
@@ -177,7 +183,7 @@ typedef enum {
   OPTION_MASTER_STATION,
   OPTION_MASTER_ON_ADJ,
   OPTION_MASTER_OFF_ADJ,
-  OPTION_USE_RAINSENSOR,
+  OPTION_SENSOR_TYPE,
   OPTION_RAINSENSOR_TYPE,
   OPTION_WATER_PERCENTAGE,
   OPTION_DEVICE_ENABLE,
@@ -197,6 +203,8 @@ typedef enum {
   OPTION_MASTER_ON_ADJ_2,
   OPTION_MASTER_OFF_ADJ_2,
   OPTION_FW_MINOR,
+  OPTION_PULSE_RATE_0,
+  OPTION_PULSE_RATE_1,
   OPTION_RESET,
   NUM_OPTIONS	// total number of options
 } OS_OPTION_t;
@@ -253,6 +261,8 @@ typedef enum {
   #define PIN_ETHER_CS       4    // Ethernet controller chip select pin
   #define PIN_SD_CS          0    // SD card chip select pin
   #define PIN_RAINSENSOR    11    // rain sensor is connected to pin D3
+  #define PIN_FLOWSENSOR    11    // flow sensor (currently shared with rain sensor, change if using a different pin)
+  #define PIN_FLOWSENSOR_INT 1    // flow sensor interrupt pin (INT1)
   #define PIN_EXP_SENSE      4    // expansion board sensing pin (A4)
   #define PIN_CURR_SENSE     7    // current sensing pin (A7)
   #define PIN_CURR_DIGITAL  24    // digital pin index for A7
@@ -296,7 +306,7 @@ typedef enum {
   #define PIN_SR_CLOCK       4    // shift register clock pin
   #define PIN_SR_OE         17    // shift register output enable pin
   #define PIN_RAINSENSOR    14    // rain sensor
-  //#define PIN_RELAY         15    // mini relay, relay support is now retired
+  #define PIN_FLOWSENSOR    14    // flow sensor (currently shared with rain sensor, change if using a different pin)
   #define PIN_RF_DATA       15    // RF transmitter pin
   #define PIN_BUTTON_1      23    // button 1
   #define PIN_BUTTON_2      24    // button 2
@@ -313,7 +323,7 @@ typedef enum {
   #define PIN_SR_CLOCK      31    // P9_13, shift register clock pin
   #define PIN_SR_OE         50    // P9_14, shift register output enable pin
   #define PIN_RAINSENSOR    48    // P9_15, rain sensor is connected to pin D3
-  //#define PIN_RELAY         51    // P9_16, mini relay is connected to pin D14, relay support is now retired
+  #define PIN_FLOWSENSOR    48    // flow sensor (currently shared with rain sensor, change if using a different pin)
   #define PIN_RF_DATA       51    // RF transmitter pin
 
   #else
@@ -329,7 +339,7 @@ typedef enum {
     #define PIN_SR_CLOCK    0
     #define PIN_SR_OE       0
     #define PIN_RAINSENSOR  0
-    //#define PIN_RELAY       0
+    #define PIN_FLOWSENSOR  0
     #define PIN_RF_DATA     0
 
   #endif

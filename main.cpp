@@ -49,9 +49,9 @@ EthernetClient *m_client = 0;
 // to avoid two events happening too clost to each other
 // This is because Arduino is not good at handling multiple
 // web requests at the same time
-#define NTP_SYNC_TIMEOUT        86403L  // NYP sync timeout, 24 hrs
+#define NTP_SYNC_INTERVAL       86403L  // NYP sync interval, 24 hrs
 #define RTC_SYNC_INTERVAL       60      // RTC sync interval, 60 secs
-#define CHECK_NETWORK_TIMEOUT   59      // Network checking timeout, 59 secs
+#define CHECK_NETWORK_INTERVAL  601     // Network checking timeout, 10 minutes
 #define CHECK_WEATHER_TIMEOUT   3601    // Weather check interval: 1 hour
 #define CHECK_WEATHER_SUCCESS_TIMEOUT 86433L // Weather check success interval: 24 hrs
 #define LCD_BACKLIGHT_TIMEOUT   15      // LCD backlight timeout: 15 secs
@@ -121,7 +121,7 @@ void ui_state_machine() {
     case BUTTON_2:
       if (button & BUTTON_FLAG_HOLD) {  // holding B2: reboot
         if (digitalRead(PIN_BUTTON_1)==0) { // if B1 is pressed while holding B2, display external IP
-          os.lcd_print_ip((byte*)(&os.external_ip), 1);
+          os.lcd_print_ip((byte*)(&os.nvdata.external_ip), 1);
           os.lcd.setCursor(0, 1);
           os.lcd_print_pgm(PSTR("(eip)"));
           ui_state = UI_STATE_DISP_IP;
@@ -181,6 +181,15 @@ void ui_state_machine() {
   }
 }
 
+volatile ulong flow_count = 0;
+// Flow sensor interrupt service routine
+void flow_isr() {
+  ulong curr = millis();
+  if(curr-os.sensor_lasttime < 50) return;  // debounce threshold: 50ms
+  flow_count++;
+  os.sensor_lasttime = curr;
+}
+
 // ======================
 // Setup Function
 // ======================
@@ -190,7 +199,6 @@ void do_setup() {
 
   DEBUG_BEGIN(9600);
   DEBUG_PRINTLN("started.");
-  
   os.begin();          // OpenSprinkler init
   os.options_setup();  // Setup options
 
@@ -212,11 +220,17 @@ void do_setup() {
   /* Enable the WD interrupt (note no reset). */
   WDTCSR |= _BV(WDIE);
 
+  // set up flow sensor
+  if (os.options[OPTION_SENSOR_TYPE].value==SENSOR_TYPE_FLOW) {
+    attachInterrupt(PIN_FLOWSENSOR_INT, flow_isr, FALLING);
+  }
   if (os.start_network()) {  // initialize network
     os.status.network_fails = 0;
   } else {
     os.status.network_fails = 1;
   }
+  os.status.req_network = 0;
+  os.status.req_ntpsync = 1;
   delay(500);
 
   os.apply_all_station_bits(); // reset station bits
@@ -238,6 +252,7 @@ ISR(WDT_vect)
     sysReset();
   }
 }
+
 #else
 void do_setup() {
   os.begin();          // OpenSprinkler init
@@ -251,6 +266,7 @@ void do_setup() {
     DEBUG_PRINTLN("network failed.");
     os.status.network_fails = 1;
   }
+  os.status.req_network = 0;
 }
 #endif
 
@@ -330,9 +346,6 @@ void do_loop()
       }
     }
 
-    // ====== Check rain sensor status ======
-    os.rainsensor_status();
-
     // ====== Check controller status changes and write log ======
     if (os.old_status.rain_delayed != os.status.rain_delayed) {
       if (os.status.rain_delayed) {
@@ -344,10 +357,12 @@ void do_loop()
       }
       os.old_status.rain_delayed = os.status.rain_delayed;
     }
+    // ====== Check rain sensor status ======
+    os.rainsensor_status();
     if (os.old_status.rain_sensed != os.status.rain_sensed) {
       if (os.status.rain_sensed) {
         // rain sensor on, record time
-        os.rainsense_start_time = curr_time;
+        os.sensor_lasttime = curr_time;
       } else {
         // rain sensor off, write log
         write_log(LOGDATA_RAINSENSE, curr_time);
@@ -372,14 +387,12 @@ void do_loop()
           for(sid=0;sid<os.nstations;sid++) {
             bid=sid>>3;
             s=sid&0x07;
-            // skip if the station is:
-            // - master station (because master cannot be scheduled independently
-            // - disabled
-            if ((os.status.mas==sid+1) || (os.status.mas2==sid+1) || (os.stndis_bits[bid]&(1<<s)))
+            // skip if the station is a master station (because master cannot be scheduled independently
+            if ((os.status.mas==sid+1) || (os.status.mas2==sid+1))
               continue;
 
-            // if station has non-zero water time
-            if (prog.durations[sid]) {
+            // if station has non-zero water time and the station is not disabled
+            if (prog.durations[sid] && !(os.station_attrib_bits_read(ADDR_NVM_STNDISABLE+bid)&(1<<s))) {
               // water time is scaled by watering percentage
               ulong water_time = water_time_resolve(water_time_decode(prog.durations[sid]));
               // if the program is set to use weather scaling
@@ -469,7 +482,7 @@ void do_loop()
               // fix me
               // upon turning on station, process RF
               // if the station is a RF station
-              if(os.stnspe_bits[bid]&(1<<s)) {
+              if(os.station_attrib_bits_read(ADDR_NVM_STNSPE+bid)&(1<<s)) {
                 // send RF on signal
                 os.send_rfstation_signal(sid, true);
               }
@@ -503,7 +516,7 @@ void do_loop()
         // and the stop time must be larger than curr_time
         sst = q->st + q->dur;
         if (sst>curr_time) {
-          if (os.stnseq_bits[bid]&(1<<s)) {   // only need to update last_seq_stop_time for sequential stations
+          if (os.station_attrib_bits_read(ADDR_NVM_STNSEQ+bid)&(1<<s)) {   // only need to update last_seq_stop_time for sequential stations
             pd.last_seq_stop_time = (sst>pd.last_seq_stop_time ) ? sst : pd.last_seq_stop_time;
           }
         }
@@ -531,13 +544,14 @@ void do_loop()
       byte mas_on_adj = os.options[OPTION_MASTER_ON_ADJ].value;
       byte mas_off_adj= os.options[OPTION_MASTER_OFF_ADJ].value;
       byte masbit = 0;
+      os.station_attrib_bits_load(ADDR_NVM_MAS_OP, (byte*)tmp_buffer);  // tmp_buffer now stores masop_bits
       for(sid=0;sid<os.nstations;sid++) {
         // skip if this is the master station
         if (os.status.mas == sid+1) continue;
         bid = sid>>3;
         s = sid&0x07;
         // if this station is running and is set to activate master
-        if ((os.station_bits[bid]&(1<<s)) && (os.masop_bits[bid]&(1<<s))) {
+        if ((os.station_bits[bid]&(1<<s)) && (tmp_buffer[bid]&(1<<s))) {
           q=pd.queue+pd.station_qid[sid];
           // check if timing is within the acceptable range
           if (curr_time >= q->st + mas_on_adj &&
@@ -554,13 +568,14 @@ void do_loop()
       byte mas_on_adj_2 = os.options[OPTION_MASTER_ON_ADJ_2].value;
       byte mas_off_adj_2= os.options[OPTION_MASTER_OFF_ADJ_2].value;
       byte masbit2 = 0;
+      os.station_attrib_bits_load(ADDR_NVM_MAS_OP_2, (byte*)tmp_buffer);  // tmp_buffer now stores masop2_bits
       for(sid=0;sid<os.nstations;sid++) {
         // skip if this is the master station
         if (os.status.mas2 == sid+1) continue;
         bid = sid>>3;
         s = sid&0x07;
         // if this station is running and is set to activate master
-        if ((os.station_bits[bid]&(1<<s)) && (os.masop2_bits[bid]&(1<<s))) {
+        if ((os.station_bits[bid]&(1<<s)) && (tmp_buffer[bid]&(1<<s))) {
           q=pd.queue+pd.station_qid[sid];
           // check if timing is within the acceptable range
           if (curr_time >= q->st + mas_on_adj_2 &&
@@ -605,9 +620,13 @@ void do_loop()
 #endif
 
     // perform ntp sync
+    if (curr_time % NTP_SYNC_INTERVAL == 0)
+      os.status.req_ntpsync = 1;
     perform_ntp_sync();
 
     // check network connection
+    if (curr_time % CHECK_NETWORK_INTERVAL==0)
+      os.status.req_network = 1;
     check_network();
 
     // check weather
@@ -663,7 +682,9 @@ void turn_off_station(byte sid, ulong curr_time) {
     // upon turning off station, process RF station
     // if the station is a RF station
     // fix me
-    if(os.stnspe_bits[(sid>>3)]&(1<<(sid&0x07))) {
+    byte bid = sid>>3;
+    byte s = sid&0x07;
+    if(os.station_attrib_bits_read(ADDR_NVM_STNSPE+bid)&(1<<s)) {
       // turn off station
       os.send_rfstation_signal(sid, false);
     }
@@ -677,13 +698,13 @@ void turn_off_station(byte sid, ulong curr_time) {
 void process_dynamic_events(ulong curr_time) {
   // check if rain is detected
   bool rain = false;
-  if (os.status.rain_delayed || (os.options[OPTION_USE_RAINSENSOR].value && os.status.rain_sensed)) {
+  if (os.status.rain_delayed || (os.status.rain_sensed && os.options[OPTION_SENSOR_TYPE].value == SENSOR_TYPE_RAIN)) {
     rain = true;
   }
 
   byte sid, s, bid, rbits, sbits;
   for(bid=0;bid<os.nboards;bid++) {
-    rbits = os.ignrain_bits[bid];
+    rbits = os.station_attrib_bits_read(ADDR_NVM_IGNRAIN+bid);
     sbits = os.station_bits[bid];
     for(s=0;s<8;s++) {
       sid=bid*8+s;
@@ -733,7 +754,7 @@ void schedule_all_stations(ulong curr_time) {
     byte s=sid&0x07;
 
     // check if this is a sequential station
-    if (os.stnseq_bits[bid]&(1<<s)) {
+    if (os.station_attrib_bits_read(ADDR_NVM_STNSEQ+bid)&(1<<s)) {
       // sequential scheduling
       q->st = seq_start_time;
       seq_start_time += q->dur;
@@ -789,7 +810,7 @@ void manual_start_program(byte pid) {
     else if(pid>0)
       dur = water_time_resolve(water_time_decode(prog.durations[sid]));
     RuntimeQueueStruct *q = pd.enqueue();
-    if (q && dur>0 && !(os.stndis_bits[bid]&(1<<s))) {
+    if (q && dur>0 && !(os.station_attrib_bits_read(ADDR_NVM_STNDISABLE+bid)&(1<<s))) {
       q->st = 0;
       q->dur = dur;
       q->sid = sid;
@@ -883,7 +904,7 @@ void write_log(byte type, ulong curr_time) {
     strcat_P(tmp_buffer, PSTR("\","));
     switch(type) {
       case LOGDATA_RAINSENSE:
-        ultoa((curr_time - os.rainsense_start_time), tmp_buffer+strlen(tmp_buffer), 10);
+        ultoa((curr_time - os.sensor_lasttime), tmp_buffer+strlen(tmp_buffer), 10);
         break;
       case LOGDATA_RAINDELAY:
         ultoa((curr_time - os.raindelay_start_time), tmp_buffer+strlen(tmp_buffer), 10);
@@ -945,17 +966,9 @@ void check_network() {
   // do not perform network checking if the controller has just started, or if a program is running
   if (os.status.program_busy) {return;}
 
-  /*if (!os.network_lasttime) {
-    os.start_network();
-  }*/
-
   // check network condition periodically
-  // check interval depends on the fail times
-  // the more time it fails, the longer the gap between two checks
-  ulong timeout = 1 << (os.status.network_fails);
-  timeout *= CHECK_NETWORK_TIMEOUT;
-  if (now() > os.network_lasttime + timeout) {
-    os.network_lasttime = now();
+  if (os.status.req_network) {
+    os.status.req_network = 0;
     // change LCD icon to indicate it's checking network
     if (!ui_state) {
       os.lcd.setCursor(15, 1);
@@ -1002,8 +1015,8 @@ void perform_ntp_sync() {
   // do not perform sync if this option is disabled, or if network is not available, or if a program is running
   if (!os.options[OPTION_USE_NTP].value || os.status.network_fails>0 || os.status.program_busy) return;
 
-  if (!os.ntpsync_lasttime || (os.now_tz() > os.ntpsync_lasttime+NTP_SYNC_TIMEOUT)) {
-    os.ntpsync_lasttime = os.now_tz();
+  if (os.status.req_ntpsync) {
+    os.status.req_ntpsync = 0;
     if (!ui_state) {
       os.lcd_print_line_clear_pgm(PSTR("NTP Syncing..."),1);
     }

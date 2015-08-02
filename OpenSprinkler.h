@@ -56,6 +56,7 @@ struct NVConData {
   uint16_t sunrise_time;  // sunrise time (in minutes)
   uint16_t sunset_time;   // sunset time (in minutes)
   uint32_t rd_stop_time;  // rain delay stop time
+  uint32_t external_ip;   // external ip
 };
 
 /** Station special attribute data */
@@ -74,8 +75,10 @@ struct ConStatus {
   byte has_sd:1;            // HIGH means a microSD card is detected
   byte safe_reboot:1;       // HIGH means a safe reboot has been marked
   byte has_hwmac:1;         // has hardware MAC chip
-  byte display_board:4;     // the board that is being displayed onto the lcd
-  byte network_fails:4;     // number of network fails
+  byte req_ntpsync:1;       // request ntpsync
+  byte req_network:1;       // request check network
+  byte display_board:3;     // the board that is being displayed onto the lcd
+  byte network_fails:3;     // number of network fails
   byte mas:8;               // master station index
   byte mas2:8;              // master2 station index
 };
@@ -105,24 +108,13 @@ public:
 
   static byte station_bits[];     // station activation bits. each byte corresponds to a board (8 stations)
                                   // first byte-> master controller, second byte-> ext. board 1, and so on
-  // station attributes
-  static byte masop_bits[];       // master operation bits. each byte corresponds to a board (8 stations)
-  static byte ignrain_bits[];     // ignore rain bits.
-  static byte masop2_bits[];      // master2 operation bits.
-  static byte stndis_bits[];      // station disable bits.
-  static byte stnseq_bits[];      // station sequential bits.
-  static byte stnspe_bits[];      // station special bits. the bit marks if this is a non-standard station.
   
   // variables for time keeping
-  static ulong rainsense_start_time;  // time when the most recent rain sensor activation was detected
+  static ulong sensor_lasttime;  // time when the most recent sensor reading was performed
   static ulong raindelay_start_time;  // time when the most recent rain delay started
   static byte  button_timeout;        // button timeout
-  static ulong ntpsync_lasttime;      // time when ntp sync was performed
   static ulong checkwt_lasttime;      // time when weather was checked
   static ulong checkwt_success_lasttime; // time when weather check was successful
-  static ulong network_lasttime;      // time when network was checked
-  static ulong external_ip;           // external ip address
-
   // member functions
   // -- setup
   static void reboot_dev();   // reboot the microcontroller
@@ -139,6 +131,7 @@ public:
   static void send_rfstation_signal(byte sid, bool status);
   static void station_attrib_bits_save(int addr, byte bits[]); // save station attribute bits to nvm
   static void station_attrib_bits_load(int addr, byte bits[]); // load station attribute bits from nvm
+  static byte station_attrib_bits_read(int addr); // read one station attribte byte from nvm
   
   // -- options and data storeage
   static void nvdata_load();

@@ -71,6 +71,11 @@ static void getweather_callback(byte status, uint16_t off, uint16_t len) {
       os.nvdata.sunset_time = v;
     }
   }
+
+  if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("eip"), true)) {
+    os.nvdata.external_ip = atol(tmp_buffer);
+  }
+
   os.nvdata_save(); // save non-volatile memory
 
   if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("scale"), true)) {
@@ -93,10 +98,6 @@ static void getweather_callback(byte status, uint16_t off, uint16_t len) {
     }
   }
   
-  if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("eip"), true)) {
-    os.external_ip = atol(tmp_buffer);
-  }
-
   if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("rd"), true)) {
     v = atoi(tmp_buffer);
     if (v>0) {

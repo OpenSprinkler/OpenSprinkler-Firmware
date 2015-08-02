@@ -33,21 +33,12 @@ byte OpenSprinkler::hw_type;
 byte OpenSprinkler::nboards;
 byte OpenSprinkler::nstations;
 byte OpenSprinkler::station_bits[MAX_EXT_BOARDS+1];
-byte OpenSprinkler::masop_bits[MAX_EXT_BOARDS+1];
-byte OpenSprinkler::ignrain_bits[MAX_EXT_BOARDS+1];
-byte OpenSprinkler::masop2_bits[MAX_EXT_BOARDS+1];
-byte OpenSprinkler::stndis_bits[MAX_EXT_BOARDS+1];
-byte OpenSprinkler::stnseq_bits[MAX_EXT_BOARDS+1];
-byte OpenSprinkler::stnspe_bits[MAX_EXT_BOARDS+1];
 
-ulong OpenSprinkler::rainsense_start_time;
+ulong OpenSprinkler::sensor_lasttime;
 ulong OpenSprinkler::raindelay_start_time;
 byte OpenSprinkler::button_timeout;
-ulong OpenSprinkler::ntpsync_lasttime;
 ulong OpenSprinkler::checkwt_lasttime;
 ulong OpenSprinkler::checkwt_success_lasttime;
-ulong OpenSprinkler::network_lasttime;
-ulong OpenSprinkler::external_ip;
 
 char tmp_buffer[TMP_BUFFER_SIZE+1];       // scratch buffer
 
@@ -92,7 +83,7 @@ static prog_char _json_sdt [] PROGMEM = "sdt";
 static prog_char _json_mas [] PROGMEM = "mas";
 static prog_char _json_mton[] PROGMEM = "mton";
 static prog_char _json_mtof[] PROGMEM = "mtof";
-static prog_char _json_urs [] PROGMEM = "urs";
+static prog_char _json_sf  [] PROGMEM = "urs";
 static prog_char _json_rso [] PROGMEM = "rso";
 static prog_char _json_wl  [] PROGMEM = "wl";
 static prog_char _json_den [] PROGMEM = "den";
@@ -112,6 +103,8 @@ static prog_char _json_mas2[] PROGMEM = "mas2";
 static prog_char _json_mton2[]PROGMEM = "mton2";
 static prog_char _json_mtof2[]PROGMEM = "mtof2";
 static prog_char _json_fwm[]  PROGMEM = "fwm";
+static prog_char _json_fpr0[] PROGMEM = "fpr0";
+static prog_char _json_fpr1[] PROGMEM = "fpr1";
 static prog_char _json_reset[] PROGMEM = "reset";
 
 /** Option names */
@@ -124,18 +117,14 @@ static prog_char _str_ip2 [] PROGMEM = ".ip2:";
 static prog_char _str_ip3 [] PROGMEM = ".ip3:";
 static prog_char _str_ip4 [] PROGMEM = ".ip4:";
 static prog_char _str_gw1 [] PROGMEM = "GW.ip1:";
-static prog_char _str_gw2 [] PROGMEM = ".ip2:";
-static prog_char _str_gw3 [] PROGMEM = ".ip3:";
-static prog_char _str_gw4 [] PROGMEM = ".ip4:";
-static prog_char _str_hp0 [] PROGMEM = "Port:";
-static prog_char _str_hp1 [] PROGMEM = "";
+static prog_char _str_hp  [] PROGMEM = "Port:";
 static prog_char _str_hwv [] PROGMEM = "HW: ";
 static prog_char _str_ext [] PROGMEM = "Exp. board:";
 static prog_char _str_sdt [] PROGMEM = "Stn delay:";
 static prog_char _str_mas [] PROGMEM = "Mas1:";
 static prog_char _str_mton[] PROGMEM = "Mas1  on adj:";
 static prog_char _str_mtof[] PROGMEM = "Mas1 off adj:";
-static prog_char _str_urs [] PROGMEM = "Rain sensor:";
+static prog_char _str_sf  [] PROGMEM = "Sensor:";
 static prog_char _str_rso [] PROGMEM = "Normally open?";
 static prog_char _str_wl  [] PROGMEM = "% Watering:";
 static prog_char _str_den [] PROGMEM = "Dev. enable?";
@@ -155,6 +144,7 @@ static prog_char _str_mas2[] PROGMEM = "Mas2:";
 static prog_char _str_mton2[]PROGMEM = "Mas2  on adj:";
 static prog_char _str_mtof2[]PROGMEM = "Mas2 off adj:";
 static prog_char _str_fwm[]  PROGMEM = "FWm:";
+static prog_char _str_fpr [] PROGMEM = "Pulse rate:";
 static prog_char _str_reset[] PROGMEM = "Reset all?";
 
 OptionStruct OpenSprinkler::options[NUM_OPTIONS] = {
@@ -167,15 +157,15 @@ OptionStruct OpenSprinkler::options[NUM_OPTIONS] = {
   {0,   255, _str_ip3,  _json_ip3},
   {0,   255, _str_ip4,  _json_ip4},
   {0,   255, _str_gw1,  _json_gw1},   // this and next 3 bytes define static gateway ip
-  {0,   255, _str_gw2,  _json_gw2},
-  {0,   255, _str_gw3,  _json_gw3},
-  {0,   255, _str_gw4,  _json_gw4},
+  {0,   255, _str_ip2,  _json_gw2},
+  {0,   255, _str_ip3,  _json_gw3},
+  {0,   255, _str_ip4,  _json_gw4},
 #if defined(ARDUINO)                  // on AVR, the default HTTP port is 80
-  {80,  255, _str_hp0,  _json_hp0},   // this and next byte define http port number
-  {0,   255, _str_hp1,  _json_hp1},
+  {80,  255, _str_hp,   _json_hp0},   // this and next byte define http port number
+  {0,   255, 0,         _json_hp1},
 #else                                 // on RPI/BBB/LINUX, the default HTTP port is 8080
-  {144, 255, _str_hp0,  _json_hp0},   // this and next byte define http port number
-  {31,  255, _str_hp1,  _json_hp1},
+  {144, 255, _str_hp,   _json_hp0},   // this and next byte define http port number
+  {31,  255, 0,         _json_hp1},
 #endif
   {OS_HW_VERSION, 0, _str_hwv, _json_hwv},
   {0,   MAX_EXT_BOARDS, _str_ext, _json_ext}, // number of extension board. 0: no extension boards
@@ -184,7 +174,7 @@ OptionStruct OpenSprinkler::options[NUM_OPTIONS] = {
   {0,   MAX_NUM_STATIONS, _str_mas,  _json_mas},   // index of master station. 0: no master station
   {0,   60,  _str_mton, _json_mton},  // master on time [0,60] seconds
   {60,  120, _str_mtof, _json_mtof},  // master off time [-60,60] seconds
-  {0,   1,   _str_urs,  _json_urs},   // rain sensor control bit. 1: use rain sensor input; 0: ignore
+  {0,   255, _str_sf,   _json_sf},    // sensor function (see SENSOR_TYPE macro defines)
   {1,   1,   _str_rso,  _json_rso},   // rain sensor type. 0: normally closed; 1: normally open.
   {100, 250, _str_wl,   _json_wl},    // water level (default 100%),
   {1,   1,   _str_den,  _json_den},   // device enable
@@ -193,7 +183,7 @@ OptionStruct OpenSprinkler::options[NUM_OPTIONS] = {
   {130, 255, _str_con,  _json_con},   // lcd contrast
   {100, 255, _str_lit,  _json_lit},   // lcd backlight
   {15,  255, _str_dim,  _json_dim},   // lcd dimming
-  {60,  250, _str_bst,  _json_bst},   // boost time (only valid to DC and LATCH type)
+  {80,  250, _str_bst,  _json_bst},   // boost time (only valid to DC and LATCH type)
   {0,   255, _str_uwt,  _json_uwt},   // weather algorithm (0 means not using weather algorithm)
   {50,  255, _str_ntp1, _json_ntp1},  // this and the next three bytes define the ntp server ip
   {97,  255, _str_ntp2, _json_ntp2},
@@ -204,6 +194,8 @@ OptionStruct OpenSprinkler::options[NUM_OPTIONS] = {
   {0,   60,  _str_mton2,_json_mton2},
   {60,  120, _str_mtof2,_json_mtof2}, 
   {OS_FW_MINOR, 0, _str_fwm, _json_fwm}, // firmware version  
+  {100, 255, _str_fpr,  _json_fpr0},
+  {0,   255, 0,         _json_fpr1},
   {0,   1,   _str_reset,_json_reset}
 };
 
@@ -259,8 +251,6 @@ void(* resetFunc) (void) = 0; // AVR software reset function
 byte OpenSprinkler::start_network() {
 
   lcd_print_line_clear_pgm(PSTR("Connecting..."), 1);
-
-  network_lasttime = now();
 
   // new from 2.2: read hardware MAC
   if(!read_hardware_mac())
@@ -612,6 +602,7 @@ void OpenSprinkler::apply_all_station_bits() {
 
 void OpenSprinkler::rainsensor_status() {
   // options[OPTION_RS_TYPE]: 0 if normally closed, 1 if normally open
+  if(options[OPTION_SENSOR_TYPE].value!=SENSOR_TYPE_RAIN) return;
   status.rain_sensed = (digitalRead(PIN_RAINSENSOR) == options[OPTION_RAINSENSOR_TYPE].value ? 0 : 1);
 }
 
@@ -718,6 +709,10 @@ void OpenSprinkler::station_attrib_bits_save(int addr, byte bits[]) {
 
 void OpenSprinkler::station_attrib_bits_load(int addr, byte bits[]) {
   nvm_read_block(bits, (void*)addr, MAX_EXT_BOARDS+1);
+}
+
+byte OpenSprinkler::station_attrib_bits_read(int addr) {
+  return nvm_read_byte((byte*)addr);
 }
 
 // verify if a string matches password
@@ -897,17 +892,10 @@ void OpenSprinkler::options_setup() {
 
   {
     // load ram parameters from nvm
-    // 1. load options
+    // load options
     options_load();
-    // 2. station attributes
-    station_attrib_bits_load(ADDR_NVM_MAS_OP, masop_bits);
-    station_attrib_bits_load(ADDR_NVM_IGNRAIN, ignrain_bits);
-    station_attrib_bits_load(ADDR_NVM_MAS_OP_2, masop2_bits);
-    station_attrib_bits_load(ADDR_NVM_STNDISABLE, stndis_bits);
-    station_attrib_bits_load(ADDR_NVM_STNSEQ, stnseq_bits);
-    station_attrib_bits_load(ADDR_NVM_STNSPE, stnspe_bits);
     
-    // 3. load non-volatile controller data
+    // load non-volatile controller data
     nvdata_load();
   }
 
@@ -1132,7 +1120,7 @@ void OpenSprinkler::lcd_print_station(byte line, char c) {
 	}
 	lcd_print_pgm(PSTR("    "));
 	lcd.setCursor(13, 1);
-  if(status.rain_delayed || (status.rain_sensed && options[OPTION_USE_RAINSENSOR].value))
+  if(status.rain_delayed || (status.rain_sensed && options[OPTION_SENSOR_TYPE].value==SENSOR_TYPE_RAIN))
   {
     lcd.write(3);
   }
@@ -1194,6 +1182,15 @@ void OpenSprinkler::lcd_print_option(int i) {
     break;
   case OPTION_HTTPPORT_0:
     lcd.print((unsigned int)(options[i+1].value<<8)+options[i].value);
+    break;
+  case OPTION_PULSE_RATE_0:
+    {
+    uint16_t fpr = (unsigned int)(options[i+1].value<<8)+options[i].value;
+    lcd.print(fpr/100);
+    lcd_print_pgm(PSTR("."));
+    lcd.print((fpr/10)%10);
+    lcd.print(fpr%10);
+    }
     break;
   case OPTION_STATION_DELAY_TIME:
     lcd.print(water_time_decode_signed(options[i].value));
@@ -1295,13 +1292,15 @@ void OpenSprinkler::ui_set_options(int oid)
     switch (button & BUTTON_MASK) {
     case BUTTON_1:
       if (i==OPTION_FW_VERSION || i==OPTION_HW_VERSION || i==OPTION_FW_MINOR ||
-          i==OPTION_HTTPPORT_0 || i==OPTION_HTTPPORT_1) break; // ignore non-editable options
+          i==OPTION_HTTPPORT_0 || i==OPTION_HTTPPORT_1 ||
+          i==OPTION_PULSE_RATE_0 || i==OPTION_PULSE_RATE_1) break; // ignore non-editable options
       if (options[i].max != options[i].value) options[i].value ++;
       break;
 
     case BUTTON_2:
       if (i==OPTION_FW_VERSION || i==OPTION_HW_VERSION || i==OPTION_FW_MINOR ||
-          i==OPTION_HTTPPORT_0 || i==OPTION_HTTPPORT_1) break; // ignore non-editable options
+          i==OPTION_HTTPPORT_0 || i==OPTION_HTTPPORT_1 ||
+          i==OPTION_PULSE_RATE_0 || i==OPTION_PULSE_RATE_1) break; // ignore non-editable options
       if (options[i].value != 0) options[i].value --;
       break;
 
@@ -1320,7 +1319,8 @@ void OpenSprinkler::ui_set_options(int oid)
         // click, move to the next option
         if (i==OPTION_USE_DHCP && options[i].value) i += 9; // if use DHCP, skip static ip set
         else if(i==OPTION_HTTPPORT_0) i+=2; // skip OPTION_HTTPPORT_1
-        else if(i==OPTION_USE_RAINSENSOR && options[i].value==0) i+=2; // if not using rain sensor, skip rain sensor type
+        else if(i==OPTION_PULSE_RATE_0) i+=2; // skip OPTION_PULSE_RATE_1
+        else if(i==OPTION_SENSOR_TYPE && options[i].value!=SENSOR_TYPE_RAIN) i+=2; // if not using rain sensor, skip rain sensor type
         else if(i==OPTION_MASTER_STATION && options[i].value==0) i+=3; // if not using master station, skip master on/off adjust
         else if(i==OPTION_MASTER_STATION_2&& options[i].value==0) i+=3; // if not using master2, skip master2 on/off adjust
         else  {
