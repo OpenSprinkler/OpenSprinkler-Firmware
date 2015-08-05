@@ -1,5 +1,5 @@
 #! /bin/bash
 
 git pull
-./build.sh ospi
+./build.sh -s ospi
 /etc/init.d/OpenSprinkler.sh restart

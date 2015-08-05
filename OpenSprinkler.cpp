@@ -342,7 +342,9 @@ void OpenSprinkler::reboot_dev() {
 
 #include <stdlib.h>
 void OpenSprinkler::update_dev() {
-  system("updater.sh");
+  char cmd[1024];
+  sprintf(cmd, "cd %s & ./updater.sh", get_runtime_path());
+  system(cmd);
 }
 #endif // end network init functions
 
