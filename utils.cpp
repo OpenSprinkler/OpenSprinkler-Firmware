@@ -18,7 +18,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see
- * <http://www.gnu.org/licenses/>. 
+ * <http://www.gnu.org/licenses/>.
  */
 
 #include "utils.h"
@@ -33,7 +33,7 @@ extern SdFat sd;
 
 void write_to_file(const char *name, const char *data, int size, int pos, bool trunc) {
   if (!os.status.has_sd)  return;
-  
+
   char *fn = tmp_buffer+TMP_BUFFER_SIZE-12;
   strcpy_P(fn, name);
   sd.chdir("/");
@@ -46,13 +46,13 @@ void write_to_file(const char *name, const char *data, int size, int pos, bool t
   }
   file.seekSet(pos);
   file.write(data, size);
-  file.close();  
+  file.close();
 }
 
 bool read_from_file(const char *name, char *data, int maxsize) {
   if (!os.status.has_sd)  { data[0]=0; return false; }
-  
-  char *fn = tmp_buffer+TMP_BUFFER_SIZE-12;  
+
+  char *fn = tmp_buffer+TMP_BUFFER_SIZE-12;
   strcpy_P(fn, name);
   sd.chdir("/");
   SdFile file;
@@ -70,7 +70,7 @@ bool read_from_file(const char *name, char *data, int maxsize) {
 void remove_file(const char *name) {
   if (!os.status.has_sd)  return;
 
-  char *fn = tmp_buffer+TMP_BUFFER_SIZE-12;  
+  char *fn = tmp_buffer+TMP_BUFFER_SIZE-12;
   strcpy_P(fn, name);
   sd.chdir("/");
   DEBUG_PRINTLN(fn);
@@ -142,7 +142,7 @@ void write_to_file(const char *name, const char *data, int size, int pos, bool t
   }
 
   if (!file) { return; }
-  
+
   fseek(file, pos, SEEK_SET);
   fwrite(data, 1, size, file);
   fclose(file);
@@ -166,7 +166,7 @@ bool read_from_file(const char *name, char *data, int maxsize) {
   if (res <= 0) {
     data[0] = 0;
   }
-      
+
   data[maxsize-1]=0;
   fclose(file);
   return true;
@@ -225,7 +225,7 @@ byte strcmp_to_nvm(const char* src, int _addr) {
     c1 = nvm_read_byte(addr++);
     c2 = *src++;
     if (c1==0 || c2==0)
-      break;      
+      break;
     if (c1!=c2)  return 1;
   }
   return (c1==c2) ? 0 : 1;
@@ -257,7 +257,7 @@ byte water_time_encode(uint16_t i) {
     return 255;
   } else {
     return 254;
-  } 
+  }
 }
 
 // decode a 8-bit byte to a 16-bit unsigned water time
