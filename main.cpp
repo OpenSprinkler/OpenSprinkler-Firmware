@@ -719,6 +719,7 @@ void schedule_all_stations(ulong curr_time) {
       // concurrent scheduling
       pd.scheduled_start_time[sid] = con_start_time;
       pd.scheduled_stop_time[sid] = con_start_time + pd.scheduled_stop_time[sid];
+      con_start_time++; // stagger concurrent stations by 1 second
       /*DEBUG_PRINT("[");
       DEBUG_PRINT(sid);
       DEBUG_PRINT(":");

@@ -101,11 +101,8 @@ static void getweather_callback(byte status, uint16_t off, uint16_t len) {
 #if defined(ARDUINO)  // for AVR
 void GetWeather() {
   // check if we've already done dns lookup
-  if(ether.hisip[0] == 0) {
-    ether.dnsLookup(website);
-  }
-
-  //bfill=ether.tcpOffset();
+  ether.dnsLookup(website);
+   
   char tmp[30];
   read_from_file(wtopts_name, tmp, 30);
   BufferFiller bf = (uint8_t*)tmp_buffer;
@@ -174,22 +171,20 @@ void GetWeather() {
   EthernetClient client;
 
   static struct hostent *server = NULL;
+  strcpy(tmp_buffer, WEATHER_SCRIPT_HOST);
+  server = gethostbyname(tmp_buffer);
   if (!server) {
-    strcpy(tmp_buffer, WEATHER_SCRIPT_HOST);
-    server = gethostbyname(tmp_buffer);
-    if (!server) {
-      DEBUG_PRINTLN("can't resolve weather server");
-      return;    
-    }
-    DEBUG_PRINT("weather server ip:");
-    DEBUG_PRINT(((uint8_t*)server->h_addr)[0]);
-    DEBUG_PRINT(":");
-    DEBUG_PRINT(((uint8_t*)server->h_addr)[1]);
-    DEBUG_PRINT(":");
-    DEBUG_PRINT(((uint8_t*)server->h_addr)[2]);
-    DEBUG_PRINT(":");
-    DEBUG_PRINTLN(((uint8_t*)server->h_addr)[3]);
+    DEBUG_PRINTLN("can't resolve weather server");
+    return;    
   }
+  DEBUG_PRINT("weather server ip:");
+  DEBUG_PRINT(((uint8_t*)server->h_addr)[0]);
+  DEBUG_PRINT(":");
+  DEBUG_PRINT(((uint8_t*)server->h_addr)[1]);
+  DEBUG_PRINT(":");
+  DEBUG_PRINT(((uint8_t*)server->h_addr)[2]);
+  DEBUG_PRINT(":");
+  DEBUG_PRINTLN(((uint8_t*)server->h_addr)[3]);
 
   if (!client.connect((uint8_t*)server->h_addr, 80)) {
     DEBUG_PRINTLN("failed to connect to weather server");

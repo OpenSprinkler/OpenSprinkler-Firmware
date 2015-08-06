@@ -585,16 +585,17 @@ void OpenSprinkler::apply_all_station_bits() {
   #if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
   if((hw_type==HW_TYPE_DC) && engage_booster) {
     DEBUG_PRINTLN(F("engage booster"));
-    // boost voltage
+    // disable boost voltage output first
+    digitalWrite(PIN_BOOST_EN, LOW);
+    delay(10);
+    // enable power to boost converter
     digitalWrite(PIN_BOOST, HIGH);
     delay(250);
     digitalWrite(PIN_BOOST, LOW);
    
-    // enable boosted voltage for a short period of time
-    digitalWrite(PIN_BOOST_EN, HIGH);
+    // enable boost voltage output
     digitalWrite(PIN_SR_LATCH, HIGH);
-    delay(500);
-    digitalWrite(PIN_BOOST_EN, LOW);
+    digitalWrite(PIN_BOOST_EN, HIGH);
   } else {
     digitalWrite(PIN_SR_LATCH, HIGH);
   }
@@ -783,7 +784,7 @@ void OpenSprinkler::update_rfstation_bits() {
 void send_rfsignal(ulong code, ulong len) {
   ulong len3 = len * 3;
   ulong len31 = len * 31;
-  for(byte n=0;n<24;n++) {
+  for(byte n=0;n<15;n++) {
     int i=23;
     // send code
     while(i>=0) {
@@ -803,7 +804,7 @@ void OpenSprinkler::send_rfstation_signal(byte sid, bool turnon) {
   ulong on, off;
   uint16_t length = get_station_name_rf(sid, &on, &off);
 #if defined(ARDUINO)
-  length = (length>>1)+(length>>2);   // due to internal call delay, scale time down to 75%
+  length = length - (length>>5);   // due to internal call delay, scale time down to 97%
 #else
   length = (length>>2)+(length>>3);   // on RPi and BBB, there is even more overhead, scale to 37.5%
 #endif
