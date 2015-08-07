@@ -44,6 +44,10 @@ char ether_buffer[ETHER_BUFFER_SIZE];
 EthernetServer *m_server = 0;
 EthernetClient *m_client = 0;
 #endif
+#if defined(RAINPGM1)
+void manual_start_program(byte pid);
+void reset_all_stations();
+#endif
 
 // Some perturbations have been added to the timing values below
 // to avoid two events happening too clost to each other
@@ -350,9 +354,16 @@ void do_loop()
       if (os.status.rain_sensed) {
         // rain sensor on, record time
         os.rainsense_start_time = curr_time;
+        #if defined(RAINPGM1) // Rain sensor triggers manual run of first program
+        // reset_all_stations(); // Ensure any interrupted stations are logged; fail!
+        manual_start_program(1); // Replace this with method that doesn't interrupt logging!
+        #endif
       } else {
         // rain sensor off, write log
         write_log(LOGDATA_RAINSENSE, curr_time);
+        #if defined(RAINPGM1) // Rain sensor off calls manual stop
+        reset_all_stations(); // Will stop other programs if manual run already stopped!
+        #endif
       }
       os.old_status.rain_sensed = os.status.rain_sensed;
     }
@@ -602,6 +613,11 @@ void check_weather() {
 }
 
 void turn_off_station(byte sid, ulong curr_time) {
+  DEBUG_PRINT("turn_off_station(");
+  DEBUG_PRINT(sid);
+  DEBUG_PRINT(", ");
+  DEBUG_PRINT(curr_time);
+  DEBUG_PRINTLN(") called");
   byte bid = sid>>3;
   byte s = sid&0x07;
   os.set_station_bit(sid, 0);
@@ -637,6 +653,7 @@ void turn_off_station(byte sid, ulong curr_time) {
 }
 
 void process_dynamic_events(ulong curr_time) {
+#if !defined(RAINPGM1) // Normal rain sensor operation
   // check if rain is detected
   bool rain = false;
   bool en = os.status.enabled ? true : false;
@@ -672,6 +689,7 @@ void process_dynamic_events(ulong curr_time) {
       }
     }
   }
+#endif
 }
 
 void schedule_all_stations(ulong curr_time) {
@@ -733,6 +751,7 @@ void schedule_all_stations(ulong curr_time) {
 }
 
 void reset_all_stations_immediate() {
+  DEBUG_PRINTLN("reset_all_stations_immediate() called");
   os.clear_all_station_bits();
   os.apply_all_station_bits();
   pd.reset_runtime();
@@ -740,6 +759,7 @@ void reset_all_stations_immediate() {
 
 void reset_all_stations() {
   // stop all running and scheduled stations
+  DEBUG_PRINTLN("reset_all_stations() called");
   ulong curr_time = os.now_tz();
   for(byte sid=0;sid<os.nstations;sid++) {
     if(pd.scheduled_program_index[sid] > 0) {
@@ -754,6 +774,9 @@ void reset_all_stations() {
 // If pid==255, this is a short test program (2 second per station)
 // If pid > 0. run program pid-1
 void manual_start_program(byte pid) {
+  DEBUG_PRINT("manual_start_program(");
+  DEBUG_PRINT(pid);
+  DEBUG_PRINTLN(") called");
   boolean match_found = false;
   reset_all_stations_immediate();
   ProgramStruct prog;
