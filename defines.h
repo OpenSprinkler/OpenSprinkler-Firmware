@@ -45,7 +45,7 @@
 /** File names */
 #define WEATHER_OPTS_FILENAME "wtopts.txt"    // weather options file
 #define STATION_ATTR_FILENAME "stns.dat"      // station attributes data file
-#define MAX_STATION_SPECIAL_DATA  16
+#define STATION_SPECIAL_DATA_SIZE  16
 
 /** Station type macro defines */
 #define STN_TYPE_STANDARD    0x00
@@ -65,17 +65,17 @@
 /** 2KB NVM (ATmega644) data structure:
   * |         |     |  ---STRING PARAMETERS---      |           |   ----STATION ATTRIBUTES-----      |          |
   * | PROGRAM | CON | PWD | LOC | JURL | WURL | KEY | STN_NAMES | MAS | IGR | MAS2 | DIS | SEQ | SPE | OPTIONS  |
-  * |  (996)  |(12) |(32) |(48) | (40) | (40) |(32) |   (768)   | (6) | (6) |  (6) | (6) | (6) | (6) |  (44)    |
+  * |  (996)  |(12) |(36) |(48) | (40) | (40) |(24) |   (768)   | (6) | (6) |  (6) | (6) | (6) | (6) |  (48)    |
   * |         |     |     |     |      |      |     |           |     |     |      |     |     |     |          |
-  * 0        996  1008   1040  1088  1128   1168   1200        1968  1974  1980   1986  1992  1998  2004      2048
+  * 0        996  1008   1044  1092  1132   1172   1196        1964  1970  1976   1982  1988  1994  2000      2048
   */
 
 /** 4KB NVM (ATmega1284) data structure:
   * |         |     |  ---STRING PARAMETERS---      |           |   ----STATION ATTRIBUTES-----      |          |
   * | PROGRAM | CON | PWD | LOC | JURL | WURL | KEY | STN_NAMES | MAS | IGR | MAS2 | DIS | SEQ | SPE | OPTIONS  |
-  * |  (2438) |(12) |(32) |(48) | (48) | (48) |(32) |   (1344)  | (7) | (7) |  (7) | (7) | (7) | (7) |   (52)   |
+  * |  (2438) |(12) |(36) |(48) | (48) | (48) |(24) |   (1344)  | (7) | (7) |  (7) | (7) | (7) | (7) |   (56)   |
   * |         |     |     |     |      |      |     |           |     |     |      |     |     |     |          |
-  * 0       2438  2450   2482  2530  2578   2626   2658        4002  4009  4016   4023  4030  4037  4044      4096
+  * 0       2438  2450   2486  2534  2582   2630   2654        3998  4005  4012   4019  4026  4033  4040      4096
   */
 
   #if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__) // for 4KB NVM
@@ -88,11 +88,11 @@
 
     #define MAX_PROGRAMDATA     2438  // program data
     #define MAX_NVCONDATA       12    // non-volatile controller data
-    #define MAX_USER_PASSWORD   32    // user password
+    #define MAX_USER_PASSWORD   36    // user password
     #define MAX_LOCATION        48    // location string
     #define MAX_JAVASCRIPTURL   48    // javascript url
     #define MAX_WEATHERURL      48    // weather script url
-    #define MAX_WEATHER_KEY     32    // weather api key
+    #define MAX_WEATHER_KEY     24    // weather api key
 
   #else
 
@@ -104,11 +104,11 @@
 
     #define MAX_PROGRAMDATA     996   // program data
     #define MAX_NVCONDATA       12     // non-volatile controller data
-    #define MAX_USER_PASSWORD   32    // user password
+    #define MAX_USER_PASSWORD   36    // user password
     #define MAX_LOCATION        48    // location string
     #define MAX_JAVASCRIPTURL   40    // javascript url
     #define MAX_WEATHERURL      40    // weather script url
-    #define MAX_WEATHER_KEY     32    // weather api key,
+    #define MAX_WEATHER_KEY     24    // weather api key,
 
   #endif
 
@@ -126,11 +126,11 @@
 
   #define MAX_PROGRAMDATA     2438  // program data
   #define MAX_NVCONDATA       12     // non-volatile controller data
-  #define MAX_USER_PASSWORD   32    // user password
+  #define MAX_USER_PASSWORD   36    // user password
   #define MAX_LOCATION        48    // location string
   #define MAX_JAVASCRIPTURL   48    // javascript url
   #define MAX_WEATHERURL      48    // weather script url
-  #define MAX_WEATHER_KEY     32    // weather api key
+  #define MAX_WEATHER_KEY     24    // weather api key
 
 #endif  // end of NVM defines
 

@@ -477,15 +477,10 @@ void do_loop()
           // if current station is not running, check if we should turn it on
           if(!((bitvalue>>s)&1)) {
             if (curr_time >= q->st && curr_time < q->st+q->dur) {
+
+              //turn_on_station(sid);
               os.set_station_bit(sid, 1);
 
-              // fix me
-              // upon turning on station, process RF
-              // if the station is a RF station
-              if(os.station_attrib_bits_read(ADDR_NVM_STNSPE+bid)&(1<<s)) {
-                // send RF on signal
-                os.send_rfstation_signal(sid, true);
-              }
             } //if curr_time > scheduled_start_time
           } // if current station is not running
         }//end_s
@@ -681,13 +676,12 @@ void turn_off_station(byte sid, ulong curr_time) {
 
     // upon turning off station, process RF station
     // if the station is a RF station
-    // fix me
-    byte bid = sid>>3;
+    /*byte bid = sid>>3;
     byte s = sid&0x07;
     if(os.station_attrib_bits_read(ADDR_NVM_STNSPE+bid)&(1<<s)) {
       // turn off station
-      os.send_rfstation_signal(sid, false);
-    }
+      //fix me os.send_rfstation_signal(sid, false);
+    }*/
   }
 
   // dequeue the element
@@ -762,6 +756,8 @@ void schedule_all_stations(ulong curr_time) {
     } else {
       // concurrent scheduling
       q->st = con_start_time;
+      // stagger concurrent stations by 1 second
+      con_start_time++;
     }
     DEBUG_PRINT("[");
     DEBUG_PRINT(sid);

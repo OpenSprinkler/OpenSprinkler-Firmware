@@ -49,7 +49,7 @@ void write_to_file(const char *name, const char *data, int size, int pos, bool t
   file.close();  
 }
 
-bool read_from_file(const char *name, char *data, int maxsize) {
+bool read_from_file(const char *name, char *data, int maxsize, int pos) {
   if (!os.status.has_sd)  { data[0]=0; return false; }
   
   char *fn = tmp_buffer+TMP_BUFFER_SIZE-12;  
@@ -148,7 +148,7 @@ void write_to_file(const char *name, const char *data, int size, int pos, bool t
   fclose(file);
 }
 
-bool read_from_file(const char *name, char *data, int maxsize) {
+bool read_from_file(const char *name, char *data, int maxsize, int pos) {
 
   FILE *file;
   file = fopen(name, "rb");

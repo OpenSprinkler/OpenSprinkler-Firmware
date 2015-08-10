@@ -62,7 +62,15 @@ struct NVConData {
 /** Station special attribute data */
 struct StationSpecialData {
   byte type;
-  byte data[MAX_STATION_SPECIAL_DATA];
+  byte data[STATION_SPECIAL_DATA_SIZE];
+};
+
+/** Remote station data structure */
+// this must fit in STATION_SPECIAL_DATA_SIZE
+struct RemoteStationData {
+  byte ip[4];
+  uint16_t port;
+  byte sid;
 };
 
 /** Volatile controller status bits */
@@ -127,8 +135,9 @@ public:
   // -- station names and attributes
   static void get_station_name(byte sid, char buf[]); // get station name
   static void set_station_name(byte sid, char buf[]); // set station name
-  static uint16_t get_station_name_rf(byte sid, ulong *on, ulong *off); // get station name and parse into RF code
-  static void send_rfstation_signal(byte sid, bool status);
+  static uint16_t parse_rfstation_code(byte *code, ulong *on, ulong *off); // parse rf code into on/off/time sections
+  static void switch_rfstation(byte *code, bool turnon);  // switch rf station
+  static void switch_remotestation(byte *code, bool turnon); // switch remote station
   static void station_attrib_bits_save(int addr, byte bits[]); // save station attribute bits to nvm
   static void station_attrib_bits_load(int addr, byte bits[]); // load station attribute bits from nvm
   static byte station_attrib_bits_read(int addr); // read one station attribte byte from nvm
@@ -155,7 +164,8 @@ public:
   static int detect_exp();        // detect the number of expansion boards
   static byte weekday_today();    // returns index of today's weekday (Monday is 0)
 
-  static void set_station_bit(byte sid, byte value); // set station bit of one station (sid->station index, value->0/1)
+  static byte set_station_bit(byte sid, byte value); // set station bit of one station (sid->station index, value->0/1)
+  static void switch_special_station(byte sid, byte value); // swtich special station
   static void clear_all_station_bits(); // clear all station bits
   static void apply_all_station_bits(); // apply all station bits (activate/deactive values)
 
@@ -184,6 +194,9 @@ private:
   static void lcd_print_2digit(int v);  // print a integer in 2 digits
   static void lcd_start();
   static byte button_read_busy(byte pin_butt, byte waitmode, byte butt, byte is_holding);
+#if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
+  static byte engage_booster;
+#endif
 #endif // LCD functions
 };
 

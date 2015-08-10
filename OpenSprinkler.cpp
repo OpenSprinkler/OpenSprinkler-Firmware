@@ -33,6 +33,9 @@ byte OpenSprinkler::hw_type;
 byte OpenSprinkler::nboards;
 byte OpenSprinkler::nstations;
 byte OpenSprinkler::station_bits[MAX_EXT_BOARDS+1];
+#if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
+byte OpenSprinkler::engage_booster;
+#endif
 
 ulong OpenSprinkler::sensor_lasttime;
 ulong OpenSprinkler::raindelay_start_time;
@@ -542,13 +545,11 @@ void OpenSprinkler::begin() {
 void OpenSprinkler::apply_all_station_bits() {
   digitalWrite(PIN_SR_LATCH, LOW);
   byte bid, s, sbits;
-
-  bool engage_booster = false;
   
-  #if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
+  /*#if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
   // old station bits
   static byte old_station_bits[MAX_EXT_BOARDS+1];
-  #endif
+  #endif*/
   
   // Shift out all station bit values
   // from the highest bit to the lowest
@@ -558,7 +559,7 @@ void OpenSprinkler::apply_all_station_bits() {
     else
       sbits = 0;
     
-    #if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
+    /*#if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
     // check if any station is changing from 0 to 1
     // take the bit inverse of the old status
     // and with the new status
@@ -566,7 +567,7 @@ void OpenSprinkler::apply_all_station_bits() {
       engage_booster = true;
     }
     old_station_bits[MAX_EXT_BOARDS-bid] = sbits;
-    #endif
+    #endif*/
           
     for(s=0;s<8;s++) {
       digitalWrite(PIN_SR_CLOCK, LOW);
@@ -583,15 +584,15 @@ void OpenSprinkler::apply_all_station_bits() {
   if((hw_type==HW_TYPE_DC) && engage_booster) {
     DEBUG_PRINTLN(F("engage booster"));
     // boost voltage
-    digitalWrite(PIN_BOOST, HIGH);
-    delay((int)options[OPTION_BOOST_TIME].value<<2);
-    digitalWrite(PIN_BOOST, LOW);
+    digitalWrite(PIN_BOOST_EN, LOW);  // disable output path
+    digitalWrite(PIN_BOOST, HIGH);    // enable boost converter
+    delay((int)options[OPTION_BOOST_TIME].value<<2);  // wait for capacitor to charge
+    digitalWrite(PIN_BOOST, LOW);     // disable boost converter
    
     // enable boosted voltage for a short period of time
-    digitalWrite(PIN_BOOST_EN, HIGH);
+    digitalWrite(PIN_BOOST_EN, HIGH); // enable output path
     digitalWrite(PIN_SR_LATCH, HIGH);
-    delay(500);
-    digitalWrite(PIN_BOOST_EN, LOW);
+    engage_booster = 0;
   } else {
     digitalWrite(PIN_SR_LATCH, HIGH);
   }
@@ -607,12 +608,12 @@ void OpenSprinkler::rainsensor_status() {
 }
 
 #if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
-// OpenSprinkler DC uses a 0.22 ohm current sensing resistor
+// OpenSprinkler DC uses a 0.2 ohm current sensing resistor
 // Therefore the conversion from analog reading to milli-amp is:
-// (r/1024)*3.3*1000/0.22
+// (r/1024)*3.3*1000/0.2
 uint16_t OpenSprinkler::read_current() {
   if(status.has_curr_sense) {
-    return (uint16_t)(analogRead(PIN_CURR_SENSE) * 14.65);
+    return (uint16_t)(analogRead(PIN_CURR_SENSE) * 16.11);
   } else {
     return 0;
   }
@@ -653,12 +654,11 @@ int OpenSprinkler::detect_exp() { // AVR has capability to detect number of expa
 #endif
 }
 
-static ulong nvm_hex2ulong(byte *addr, byte len) {
+static ulong hex2ulong(byte *code, byte len) {
   char c;
   ulong v = 0;
-  nvm_read_block(tmp_buffer, (void*)addr, len);
   for(byte i=0;i<len;i++) {
-    c = tmp_buffer[i];
+    c = code[i];
     v <<= 4;
     if(c>='0' && c<='9') {
       v += (c-'0');
@@ -673,17 +673,16 @@ static ulong nvm_hex2ulong(byte *addr, byte len) {
   return v;
 }
 
-// Get station name from nvm and parse into RF code
-uint16_t OpenSprinkler::get_station_name_rf(byte sid, ulong* on, ulong *off) {
-  byte *start = (byte *)(ADDR_NVM_STN_NAMES) + (int)sid * STATION_NAME_SIZE;
+// Parse RF code into on/off/timeing sections
+uint16_t OpenSprinkler::parse_rfstation_code(byte *code, ulong* on, ulong *off) {
   ulong v;
-  v = nvm_hex2ulong(start, 6);
+  v = hex2ulong(code, 6);
   if (!v) return 0;
   if (on) *on = v;
-  v = nvm_hex2ulong(start+6, 6);
+  v = hex2ulong(code+6, 6);
   if (!v) return 0;
   if (off) *off = v;
-  v = nvm_hex2ulong(start+12, 4);
+  v = hex2ulong(code+12, 4);
   if (!v) return 0;
   return v;
 }
@@ -750,23 +749,60 @@ byte OpenSprinkler::weekday_today() {
 #endif
 }
 
+// Switch special station
+void OpenSprinkler::switch_special_station(byte sid, byte value) {
+  // check station special bit
+  if(station_attrib_bits_read(ADDR_NVM_STNSPE+(sid>>3))&(1<<(sid&0x07))) {
+    // read station special data from sd card
+    int stepsize=sizeof(StationSpecialData);
+    read_from_file(stns_filename, tmp_buffer, stepsize, sid*stepsize);
+    StationSpecialData *stn = (StationSpecialData *)tmp_buffer;
+    // check station type
+    if(stn->type==STN_TYPE_RF) {
+      // transmit RF signal
+      switch_rfstation(stn->data, value);
+    } else if(stn->type==STN_TYPE_REMOTE) {
+      // request remote station
+    }
+  }
+}
+
 // Set station bit
-void OpenSprinkler::set_station_bit(byte sid, byte value) {
-  byte bid = (sid>>3);  // board index
-  byte s = sid&0x07;    // station bit index
+byte OpenSprinkler::set_station_bit(byte sid, byte value) {
+  byte *data = station_bits+(sid>>3);  // pointer to the station byte
+  byte mask = (byte)1<<(sid&0x07); // mask
   if (value) {
-    station_bits[bid] = station_bits[bid] | ((byte)1<<s);
+    if((*data)&mask) return 0;  // if bit is already set, return no change
+    else {
+      (*data) = (*data) | mask;
+#if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
+      engage_booster = true; // if bit is changing from 0 to 1, set engage_booster
+#endif
+      switch_special_station(sid, 1);
+      return 1;
+    }
+    //station_bits[bid] = station_bits[bid] | ((byte)1<<s);
+  } else {
+    if(!((*data)&mask)) return 0; // if bit is already reset, return no change
+    else {
+      (*data) = (*data) & (~mask);
+      switch_special_station(sid, 0);
+      return 255;
+    }
+    //station_bits[bid] = station_bits[bid] &~((byte)1<<s);
   }
-  else {
-    station_bits[bid] = station_bits[bid] &~((byte)1<<s);
-  }
+  return 0;
 }
 
 // Clear all station bits
 void OpenSprinkler::clear_all_station_bits() {
-  byte bid;
+  /*byte bid;
   for(bid=0;bid<=MAX_EXT_BOARDS;bid++) {
     station_bits[bid] = 0;
+  }*/
+  byte sid;
+  for(sid=0;sid<=MAX_NUM_STATIONS;sid++) {
+    set_station_bit(sid, 0);
   }
 }
 
@@ -787,7 +823,7 @@ void transmit_rfbit(ulong lenH, ulong lenL) {
 void send_rfsignal(ulong code, ulong len) {
   ulong len3 = len * 3;
   ulong len31 = len * 31;
-  for(byte n=0;n<24;n++) {
+  for(byte n=0;n<15;n++) {
     int i=23;
     // send code
     while(i>=0) {
@@ -803,17 +839,40 @@ void send_rfsignal(ulong code, ulong len) {
   }
 }
 
-void OpenSprinkler::send_rfstation_signal(byte sid, bool turnon) {
+void OpenSprinkler::switch_rfstation(byte *code, bool turnon) {
   ulong on, off;
-  uint16_t length = get_station_name_rf(sid, &on, &off);
+  uint16_t length = parse_rfstation_code(code, &on, &off);
 #if defined(ARDUINO)
-  length = (length>>1)+(length>>2);   // due to internal call delay, scale time down to 75%
+  length = length - (length>>5);   // due to internal call delay, scale time down to 97%
 #else
   length = (length>>2)+(length>>3);   // on RPi and BBB, there is even more overhead, scale to 37.5%
 #endif
   send_rfsignal(turnon ? on : off, length);
 }
 
+static void switchremote_callback(byte status, uint16_t off, uint16_t len) {
+  /* do nothing */
+}
+
+void OpenSprinkler::switch_remotestation(byte *code, bool turnon) {
+#if defined(ARDUINO)
+  // construct string
+  ulong ip = hex2ulong(code, 8);
+  ether.hisip[0] = ip>>24;
+  ether.hisip[1] = (ip>>16)&0xff;
+  ether.hisip[3] = (ip>>8)&0xff;
+  ether.hisip[4] = ip&0xff;
+
+  uint16_t _port = ether.hisport; // save current port number
+  ether.hisport = hex2ulong(code+8, 4);
+
+  char *p = tmp_buffer + sizeof(StationSpecialData);
+  BufferFiller bf = (byte*)p;
+  bf.emit_p(PSTR("cm?pw=$E&sid=$D&en=$D&t=65535"), ADDR_NVM_PASSWORD, (int)hex2ulong(code+12,2), turnon);
+  ether.browseUrl(PSTR("/"), p, PSTR("*"), switchremote_callback);
+  ether.hisport = _port;
+#endif
+}
 
 /** Options Functions */
 void OpenSprinkler::options_setup() {

@@ -966,7 +966,7 @@ byte server_change_options(char *p)
 
   if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("loc"), true)) {
     urlDecode(tmp_buffer);
-    tmp_buffer[MAX_LOCATION]=0;   // make sure we don't exceed the maximum size
+    tmp_buffer[MAX_LOCATION-1]=0;   // make sure we don't exceed the maximum size
     if (strcmp_to_nvm(tmp_buffer, ADDR_NVM_LOCATION)) { // if location has changed
       nvm_write_block(tmp_buffer, (void*)ADDR_NVM_LOCATION, strlen(tmp_buffer)+1);
       weather_change = true;
@@ -975,7 +975,7 @@ byte server_change_options(char *p)
   uint8_t keyfound = 0;
   if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("wtkey"), true, &keyfound)) {
     urlDecode(tmp_buffer);
-    tmp_buffer[MAX_WEATHER_KEY]=0;
+    tmp_buffer[MAX_WEATHER_KEY-1]=0;
     if (strcmp_to_nvm(tmp_buffer, ADDR_NVM_WEATHER_KEY)) {  // if weather key has changed
       nvm_write_block(tmp_buffer, (void*)ADDR_NVM_WEATHER_KEY, strlen(tmp_buffer)+1);
       weather_change = true;
@@ -1040,10 +1040,8 @@ byte server_change_password(char *p)
         return HTML_SUCCESS;
       #endif
       urlDecode(tmp_buffer);
-      tmp_buffer[MAX_USER_PASSWORD]=0;  // make sure we don't exceed the maximum size
-      byte size = strlen(tmp_buffer)+1;
-      if(size >= MAX_USER_PASSWORD) size = MAX_USER_PASSWORD;
-      nvm_write_block(tmp_buffer, (void*)ADDR_NVM_PASSWORD, size);
+      tmp_buffer[MAX_USER_PASSWORD-1]=0;  // make sure we don't exceed the maximum size
+      nvm_write_block(tmp_buffer, (void*)ADDR_NVM_PASSWORD, strlen(tmp_buffer)+1);
       return HTML_SUCCESS;
     } else {
       return HTML_MISMATCH;
