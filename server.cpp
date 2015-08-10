@@ -665,7 +665,7 @@ void server_json_options_main() {
     #else
     if (oid==OPTION_BOOST_TIME) continue;
     #endif
-   
+
     if (os.options[oid].json_str==0) continue;
     if (oid==OPTION_DEVICE_ID && os.status.has_hwmac) continue; // do not send DEVICE ID if hardware MAC exists
     bfill.emit_p(PSTR("\"$F\":$D"),
@@ -834,6 +834,15 @@ byte server_change_values(char *p)
     reset_all_stations();
   }
 
+#ifndef ARDUINO
+    if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("update"), true) && atoi(tmp_buffer) > 0) {
+        print_html_standard_header();
+        //bfill.emit_p(PSTR("Updating..."));
+        send_packet(true);
+        os.update_dev();
+    }
+#endif
+
 #define TIME_REBOOT_DELAY  20
   if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("rbt"), true) && atoi(tmp_buffer) > 0) {
     print_html_standard_header();
@@ -890,7 +899,7 @@ byte server_change_scripturl(char *p)
     // trim unwanted space characters
     string_remove_space(tmp_buffer);
     nvm_write_block(tmp_buffer, (void *)ADDR_NVM_JAVASCRIPTURL, strlen(tmp_buffer)+1);
-  } 
+  }
   if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("wsp"), true)) {
     urlDecode(tmp_buffer);
     tmp_buffer[MAX_WEATHERURL]=0;

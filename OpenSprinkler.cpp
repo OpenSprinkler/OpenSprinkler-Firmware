@@ -195,8 +195,8 @@ OptionStruct OpenSprinkler::options[NUM_OPTIONS] = {
   {1,   1,   _str_log,  _json_log},   // enable logging: 0: disable; 1: enable.
   {0,   MAX_NUM_STATIONS, _str_mas2, _json_mas2},  // index of master 2. 0: no master2 station
   {0,   60,  _str_mton2,_json_mton2},
-  {60,  120, _str_mtof2,_json_mtof2}, 
-  {OS_FW_MINOR, 0, _str_fwm, _json_fwm}, // firmware version  
+  {60,  120, _str_mtof2,_json_mtof2},
+  {OS_FW_MINOR, 0, _str_fwm, _json_fwm}, // firmware version
   {100, 255, _str_fpr,  _json_fpr0},
   {0,   255, 0,         _json_fpr1},
   {0,   1,   _str_reset,_json_reset}
@@ -283,7 +283,7 @@ byte OpenSprinkler::start_network() {
     options[OPTION_STATIC_IP1].value = ip[0];
     options[OPTION_STATIC_IP2].value = ip[1];
     options[OPTION_STATIC_IP3].value = ip[2];
-    options[OPTION_STATIC_IP4].value = ip[3];            
+    options[OPTION_STATIC_IP4].value = ip[3];
 
     ip = ether.gwip;
     options[OPTION_GATEWAY_IP1].value = ip[0];
@@ -291,7 +291,7 @@ byte OpenSprinkler::start_network() {
     options[OPTION_GATEWAY_IP3].value = ip[2];
     options[OPTION_GATEWAY_IP4].value = ip[3];
     options_save();
-    
+
   } else {
     // set up static IP
     byte staticip[] = {
@@ -328,7 +328,7 @@ byte OpenSprinkler::start_network() {
     delete m_server;
     m_server = 0;
   }
-  
+
   m_server = new EthernetServer(port);
   return m_server->begin();
 }
@@ -336,13 +336,19 @@ byte OpenSprinkler::start_network() {
 #include <sys/reboot.h>
 void OpenSprinkler::reboot_dev() {
 #if defined(DEMO)
-  // do nothingb
+  // do nothing
 #else
   sync(); // add sync to prevent file corruption
 	reboot(RB_AUTOBOOT);
 #endif
 }
 
+#include <stdlib.h>
+void OpenSprinkler::update_dev() {
+  char cmd[1024];
+  sprintf(cmd, "cd %s & ./updater.sh", get_runtime_path());
+  system(cmd);
+}
 #endif // end network init functions
 
 #if defined(ARDUINO)
@@ -375,12 +381,12 @@ void OpenSprinkler::begin() {
   digitalWrite(PIN_SR_LATCH, HIGH);
 
   pinMode(PIN_SR_CLOCK, OUTPUT);
-  
+
 #if defined(OSPI)
   pin_sr_data = PIN_SR_DATA;
   // detect RPi revision
   unsigned int rev = detect_rpi_rev();
-  if (rev==0x0002 || rev==0x0003) 
+  if (rev==0x0002 || rev==0x0003)
     pin_sr_data = PIN_SR_DATA_ALT;
   // if this is revision 1, use PIN_SR_DATA_ALT
   pinMode(pin_sr_data, OUTPUT);
@@ -409,7 +415,7 @@ void OpenSprinkler::begin() {
   // so only need to initialize non-zero ones
   status.enabled = 1;
   status.safe_reboot = 0;
-  
+
   old_status = status;
 
   nvdata.sunrise_time = 360;  // 6:00am default sunrise
@@ -447,7 +453,7 @@ void OpenSprinkler::begin() {
         // hardware type is not assigned
       }
     }
-    
+
     if (hw_type == HW_TYPE_DC) {
       pinMode(PIN_BOOST, OUTPUT);
       digitalWrite(PIN_BOOST, LOW);
@@ -477,12 +483,12 @@ void OpenSprinkler::begin() {
   _icon[6] = B00101;
   _icon[7] = B10101;
   lcd.createChar(1, _icon);
-  
+
   _icon[1]=0;
   _icon[2]=0;
   _icon[3]=1;
   lcd.createChar(0, _icon);
-  
+
   // uSD card icon
   _icon[0] = B00000;
   _icon[1] = B00000;
@@ -492,8 +498,8 @@ void OpenSprinkler::begin() {
   _icon[5] = B10001;
   _icon[6] = B10011;
   _icon[7] = B11110;
-  lcd.createChar(2, _icon);  
-  
+  lcd.createChar(2, _icon);
+
   // Rain icon
   _icon[0] = B00000;
   _icon[1] = B00000;
@@ -504,7 +510,7 @@ void OpenSprinkler::begin() {
   _icon[6] = B10101;
   _icon[7] = B10101;
   lcd.createChar(3, _icon);
-  
+
   // Connect icon
   _icon[0] = B00000;
   _icon[1] = B00000;
@@ -558,7 +564,7 @@ void OpenSprinkler::apply_all_station_bits() {
       sbits = station_bits[MAX_EXT_BOARDS-bid];
     else
       sbits = 0;
-    
+
     /*#if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
     // check if any station is changing from 0 to 1
     // take the bit inverse of the old status
@@ -568,18 +574,18 @@ void OpenSprinkler::apply_all_station_bits() {
     }
     old_station_bits[MAX_EXT_BOARDS-bid] = sbits;
     #endif*/
-          
+
     for(s=0;s<8;s++) {
       digitalWrite(PIN_SR_CLOCK, LOW);
 #if defined(OSPI) // if OSPi, use dynamically assigned pin_sr_data
       digitalWrite(pin_sr_data, (sbits & ((byte)1<<(7-s))) ? HIGH : LOW );
-#else      
+#else
       digitalWrite(PIN_SR_DATA, (sbits & ((byte)1<<(7-s))) ? HIGH : LOW );
 #endif
       digitalWrite(PIN_SR_CLOCK, HIGH);
     }
   }
-  
+
   #if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
   if((hw_type==HW_TYPE_DC) && engage_booster) {
     DEBUG_PRINTLN(F("engage booster"));
@@ -908,7 +914,7 @@ void OpenSprinkler::options_setup() {
     nvm_write_block(DEFAULT_PASSWORD, (void*)ADDR_NVM_PASSWORD, strlen(DEFAULT_PASSWORD)+1);
     nvm_write_block(DEFAULT_LOCATION, (void*)ADDR_NVM_LOCATION, strlen(DEFAULT_LOCATION)+1);
     nvm_write_block(DEFAULT_JAVASCRIPT_URL, (void*)ADDR_NVM_JAVASCRIPTURL, strlen(DEFAULT_JAVASCRIPT_URL)+1);
-    nvm_write_block(DEFAULT_WEATHER_URL, (void*)ADDR_NVM_WEATHERURL, strlen(DEFAULT_WEATHER_URL)+1);    
+    nvm_write_block(DEFAULT_WEATHER_URL, (void*)ADDR_NVM_WEATHERURL, strlen(DEFAULT_WEATHER_URL)+1);
     nvm_write_block(DEFAULT_WEATHER_KEY, (void*)ADDR_NVM_WEATHER_KEY, strlen(DEFAULT_WEATHER_KEY)+1);
 
     // 3. reset station names and special attributes, default Sxx
@@ -939,7 +945,7 @@ void OpenSprinkler::options_setup() {
 
     // 6. write options
     options_save(); // write default option values
-    
+
     //======== END OF NVM RESET CODE ========
 
     // restart after resetting NVM.
@@ -953,7 +959,7 @@ void OpenSprinkler::options_setup() {
     // load ram parameters from nvm
     // load options
     options_load();
-    
+
     // load non-volatile controller data
     nvdata_load();
   }
@@ -994,7 +1000,7 @@ void OpenSprinkler::options_setup() {
   // turn on LCD backlight and contrast
   lcd_set_brightness();
   lcd_set_contrast();
-  
+
   if (!button) {
     // flash screen
     lcd_print_line_clear_pgm(PSTR(" OpenSprinkler"),0);
@@ -1417,7 +1423,7 @@ void OpenSprinkler::lcd_set_brightness(byte value) {
     if (value) {
       analogWrite(PIN_LCD_BACKLIGHT, 255-options[OPTION_LCD_BACKLIGHT].value);
     } else {
-      analogWrite(PIN_LCD_BACKLIGHT, 255-options[OPTION_LCD_DIMMING].value);    
+      analogWrite(PIN_LCD_BACKLIGHT, 255-options[OPTION_LCD_DIMMING].value);
     }
   }
 }

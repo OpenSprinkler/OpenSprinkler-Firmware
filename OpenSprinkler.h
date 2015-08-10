@@ -116,7 +116,7 @@ public:
 
   static byte station_bits[];     // station activation bits. each byte corresponds to a board (8 stations)
                                   // first byte-> master controller, second byte-> ext. board 1, and so on
-  
+
   // variables for time keeping
   static ulong sensor_lasttime;  // time when the most recent sensor reading was performed
   static ulong raindelay_start_time;  // time when the most recent rain delay started
@@ -125,6 +125,7 @@ public:
   static ulong checkwt_success_lasttime; // time when weather check was successful
   // member functions
   // -- setup
+  static void update_dev();   // update software for Linux instances
   static void reboot_dev();   // reboot the microcontroller
   static void begin();        // initialization, must call this function before calling other functions
   static byte start_network();  // initialize network with the given mac and port
@@ -141,7 +142,7 @@ public:
   static void station_attrib_bits_save(int addr, byte bits[]); // save station attribute bits to nvm
   static void station_attrib_bits_load(int addr, byte bits[]); // load station attribute bits from nvm
   static byte station_attrib_bits_read(int addr); // read one station attribte byte from nvm
-  
+
   // -- options and data storeage
   static void nvdata_load();
   static void nvdata_save();
