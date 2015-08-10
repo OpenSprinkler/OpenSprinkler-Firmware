@@ -836,9 +836,7 @@ byte server_change_values(char *p)
 
 #ifndef ARDUINO
     if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("update"), true) && atoi(tmp_buffer) > 0) {
-        print_html_standard_header();
         //bfill.emit_p(PSTR("Updating..."));
-        send_packet(true);
         os.update_dev();
     }
 #endif
