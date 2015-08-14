@@ -393,6 +393,35 @@ byte server_json_stations(char *p) {
   return HTML_OK;
 }
 
+/**
+ * Output Station Special Attribute
+ * Command: /je?sid=x
+ *
+ * sid: station index (starting from 0)
+ */
+byte server_json_station_special(char *p) {
+#if defined(ARDUINO)
+  // if no sd card, return false
+  if (!os.status.has_sd)  return HTML_PAGE_NOT_FOUND;
+#endif
+  int sid;
+  if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("sid"), true)) {
+    sid = atoi(tmp_buffer);
+    if (sid< 0 || sid >= os.nstations) return HTML_DATA_OUTOFBOUND;
+
+    print_json_header();
+
+    int stepsize=sizeof(StationSpecialData);
+    read_from_file(stns_filename, tmp_buffer, stepsize, sid*stepsize);
+    StationSpecialData *stn = (StationSpecialData *)tmp_buffer;
+    bfill.emit_p(PSTR("\"st\":$D,\"sd\":$S}"), stn->type, stn->data);
+    delay(1);
+    return HTML_OK;
+  } else {
+    return HTML_DATA_MISSING;
+  }
+}
+
 void server_change_stations_attrib(char *p, char header, int addr)
 {
   byte attrib[MAX_EXT_BOARDS+1];
@@ -410,16 +439,18 @@ void server_change_stations_attrib(char *p, char header, int addr)
 }
 
 /**
-  Change Station Name and Attributes
-  Command: /cs?pw=xxx&s?=x&m?=x&i?=x&n?=x&d?=x
-
-  pw: password
-  s?: station name (? is station index, starting from 0)
-  m?: master operation bit field (? is board index, starting from 0)
-  i?: ignore rain bit field
-  n?: master2 operation bit field
-  d?: disable sation bit field
-*/
+ * Change Station Name and Attributes
+ * Command: /cs?pw=xxx&s?=x&m?=x&i?=x&n?=x&d?=x
+ *
+ * pw: password
+ * s?: station name (? is station index, starting from 0)
+ * m?: master operation bit field (? is board index, starting from 0)
+ * i?: ignore rain bit field
+ * n?: master2 operation bit field
+ * d?: disable sation bit field
+ * q?: station sequeitnal bit field
+ * p?: station special flag bit field
+ */
 byte server_change_stations(char *p)
 {
   byte sid;
@@ -440,6 +471,20 @@ byte server_change_stations(char *p)
   server_change_stations_attrib(p, 'q', ADDR_NVM_STNSEQ); // sequential
   server_change_stations_attrib(p, 'p', ADDR_NVM_STNSPE); // special
 
+  /* handle special data */
+  if(findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("sid"), true)) {
+    sid = atoi(tmp_buffer);
+    if(sid<0 || sid>os.nstations) return HTML_DATA_OUTOFBOUND;
+    if(findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("st"), true) &&
+       findKeyVal(p, tmp_buffer+1, TMP_BUFFER_SIZE, PSTR("sd"), true)) {
+      int stepsize=sizeof(StationSpecialData);
+      tmp_buffer[0]-='0';
+      tmp_buffer[stepsize-1] = 0;
+      write_to_file(stns_filename, tmp_buffer, strlen(tmp_buffer)+1, stepsize*sid, false);
+    } else {
+      return HTML_DATA_MISSING;
+    }
+  }
   return HTML_SUCCESS;
 }
 
@@ -461,12 +506,12 @@ uint16_t parse_listdata(char **p) {
 }
 
 /**
-  Change run-once program
-  Command: /cr?pw=xxx&t=[x,x,x...]
-
-  pw: password
-  t:  station water time
-*/
+ * Change run-once program
+ * Command: /cr?pw=xxx&t=[x,x,x...]
+ *
+ * pw: password
+ * t:  station water time
+ */
 byte server_change_runonce(char *p) {
   // decode url first
   urlDecode(p);
@@ -515,12 +560,12 @@ byte server_change_runonce(char *p) {
 
 
 /**
-  Delete a program
-  Command: /dp?pw=xxx&pid=xxx
-
-  pw: password
-  pid:program index (-1 will delete all programs)
-*/
+ * Delete a program
+ * Command: /dp?pw=xxx&pid=xxx
+ *
+ * pw: password
+ * pid:program index (-1 will delete all programs)
+ */
 byte server_delete_program(char *p) {
   if (!findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("pid"), true))
     return HTML_DATA_MISSING;
@@ -538,11 +583,11 @@ byte server_delete_program(char *p) {
 }
 
 /**
-  Move up a program
-  Command: /up?pw=xxx&pid=xxx
-
-  pw: password
-  pid:program index
+ * Move up a program
+ * Command: /up?pw=xxx&pid=xxx
+ *
+ * pw:  password
+ * pid: program index (must be 1 or larger, because we can't move up program 0)
 */
 byte server_moveup_program(char *p) {
   if (!findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("pid"), true)) {
@@ -557,15 +602,15 @@ byte server_moveup_program(char *p) {
 }
 
 /**
-  Change a program
-  Command: /cp?pw=xxx&pid=x&v=[flag,days0,days1,[start0,start1,start2,start3],[dur0,dur1,dur2..]]&name=x
-
-  pw:    password
-  pid:   program index
-  flag:  program flag
-  start?:up to 4 start times
-  dur?:  station water time
-  name:  program name
+ * Change a program
+ * Command: /cp?pw=xxx&pid=x&v=[flag,days0,days1,[start0,start1,start2,start3],[dur0,dur1,dur2..]]&name=x
+ *
+ * pw:    password
+ * pid:   program index
+ * flag:  program flag
+ * start?:up to 4 start times
+ * dur?:  station water time
+ * name:  program name
 */
 prog_char _str_program[] PROGMEM = "Program ";
 byte server_change_program(char *p) {
@@ -818,15 +863,15 @@ byte server_home()
 }
 
 /**
-  Change controller variables
-  Command: /cv?pw=xxx&rsn=x&rbt=x&en=x&rd=x
-
-  pw:  password
-  rsn: reset all stations (0 or 1)
-  rbt: reboot controller (0 or 1)
-  en:  enable (0 or 1)
-  rd:  rain delay hours (0 turns off rain delay)
-*/
+ * Change controller variables
+ * Command: /cv?pw=xxx&rsn=x&rbt=x&en=x&rd=x
+ *
+ * pw:  password
+ * rsn: reset all stations (0 or 1)
+ * rbt: reboot controller (0 or 1)
+ * en:  enable (0 or 1)
+ * rd:  rain delay hours (0 turns off rain delay)
+ */
 
 byte server_change_values(char *p)
 {
@@ -880,12 +925,12 @@ void string_remove_space(char *src) {
 }
 
 /**
-  Change script url
-  Command: /cu?pw=xxx&jsp=x
-
-  pw:  password
-  jsp: Javascript path
-*/
+ * Change script url
+ * Command: /cu?pw=xxx&jsp=x
+ *
+ * pw:  password
+ * jsp: Javascript path
+ */
 byte server_change_scripturl(char *p)
 {
 #if defined(DEMO)
@@ -908,15 +953,15 @@ byte server_change_scripturl(char *p)
 }
 
 /**
-  Change options
-  Command: /co?pw=xxx&o?=x&loc=x&wtkey=x&ttt=x
-
-  pw:  password
-  o?:  option name (? is option index)
-  loc: location
-  wtkey: weather underground api key
-  ttt: manual time (applicable only if ntp=0)
-*/
+ * Change options
+ * Command: /co?pw=xxx&o?=x&loc=x&wtkey=x&ttt=x
+ *
+ * pw:  password
+ * o?:  option name (? is option index)
+ * loc: location
+ * wtkey: weather underground api key
+ * ttt: manual time (applicable only if ntp=0)
+ */
 byte server_change_options(char *p)
 {
   // temporarily save some old options values
@@ -1031,13 +1076,13 @@ byte server_change_options(char *p)
 }
 
 /**
-  Change password
-  Command: /sp?pw=xxx&npw=x&cpw=x
-
-  pw:  password
-  npw: new password
-  cpw: confirm new password
-*/
+ * Change password
+ * Command: /sp?pw=xxx&npw=x&cpw=x
+ *
+ * pw:  password
+ * npw: new password
+ * cpw: confirm new password
+ */
 byte server_change_password(char *p)
 {
   if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("npw"), true)) {
@@ -1078,14 +1123,14 @@ byte server_json_status(char *p)
 }
 
 /**
-  Test station (previously manual operation)
-  Command: /cm?pw=xxx&sid=x&en=x&t=x
-
-  pw: password
-  sid:station name (starting from 0)
-  en: enable (0 or 1)
-  t:  timer (required if en=1)
-*/
+ * Test station (previously manual operation)
+ * Command: /cm?pw=xxx&sid=x&en=x&t=x
+ *
+ * pw: password
+ * sid:station name (starting from 0)
+ * en: enable (0 or 1)
+ * t:  timer (required if en=1)
+ */
 byte server_change_manual(char *p) {
   int sid=-1;
   if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("sid"), true)) {
@@ -1140,18 +1185,18 @@ byte server_change_manual(char *p) {
 }
 
 /**
-  Get log data
-  Command: /jl?start=x&end=x&hist=x&type=x
-
-  hist:  history (past n days)
-         when hist is speceified, the start
-         and end parameters below will be ignored
-  start: start time (epoch time)
-  end:   end time (epoch time)
-  type:  type of log records (optional)
-         rs, rd, wl
-         if unspecified, output all records
-*/
+ * Get log data
+ * Command: /jl?start=x&end=x&hist=x&type=x
+ *
+ * hist:  history (past n days)
+ *        when hist is speceified, the start
+ *        and end parameters below will be ignored
+ * start: start time (epoch time)
+ * end:   end time (epoch time)
+ * type:  type of log records (optional)
+ *        rs, rd, wl
+ *        if unspecified, output all records
+ */
 byte server_json_log(char *p) {
 
 #if defined(ARDUINO)
@@ -1255,14 +1300,14 @@ byte server_json_log(char *p) {
   return HTML_OK;
 }
 /**
-  Delete log
-  Command: /dl?pw=xxx&day=xxx
-           /dl?pw=xxx&day=all
-
-  pw: password
-  day:day (epoch time / 86400)
-  if day=all: delete all log files)
-*/
+ * Delete log
+ * Command: /dl?pw=xxx&day=xxx
+ *          /dl?pw=xxx&day=all
+ *
+ * pw: password
+ * day:day (epoch time / 86400)
+ * if day=all: delete all log files)
+ */
 byte server_delete_log(char *p) {
 
   if (!findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("day"), true))
@@ -1320,6 +1365,7 @@ prog_char _url_cm [] PROGMEM = "cm";
 
 prog_char _url_cs [] PROGMEM = "cs";
 prog_char _url_jn [] PROGMEM = "jn";
+prog_char _url_je [] PROGMEM = "je";
 
 prog_char _url_jl [] PROGMEM = "jl";
 prog_char _url_dl [] PROGMEM = "dl";
@@ -1350,6 +1396,7 @@ URLStruct urls[] = {
 
   {_url_cs,server_change_stations},
   {_url_jn,server_json_stations},
+  {_url_je,server_json_station_special},
 
   {_url_jl,server_json_log},
   {_url_dl,server_delete_log},
@@ -1369,6 +1416,7 @@ void handle_web_request(char *p)
 #endif
   rewind_ether_buffer();
 
+  DEBUG_PRINTLN(p);
   // assume this is a GET request
   // GET /xx?xxxx
   char *com = p+5;

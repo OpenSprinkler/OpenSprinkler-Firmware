@@ -183,7 +183,7 @@ OptionStruct OpenSprinkler::options[NUM_OPTIONS] = {
   {1,   1,   _str_den,  _json_den},   // device enable
   {0,   1,   _str_ipas, _json_ipas},  // 1: ignore password; 0: use password
   {0,   255, _str_devid,_json_devid}, // device id
-  {130, 255, _str_con,  _json_con},   // lcd contrast
+  {140, 255, _str_con,  _json_con},   // lcd contrast
   {100, 255, _str_lit,  _json_lit},   // lcd backlight
   {15,  255, _str_dim,  _json_dim},   // lcd dimming
   {80,  250, _str_bst,  _json_bst},   // boost time (only valid to DC and LATCH type)
@@ -360,7 +360,13 @@ void OpenSprinkler::lcd_start() {
   if (lcd.type() == LCD_STD) {
     // this is standard 16x2 LCD
     // set PWM frequency for adjustable LCD backlight and contrast
+#if OS_HW_VERSION==(OS_HW_VERSION_BASE+20)  // 8MHz
     TCCR1B = 0x01;
+#elif OS_HW_VERSION==(OS_HW_VERSION_BASE+21)  // 12MHz
+    TCCR1B = 0x02;  // increase division factor for faster clock
+#else // 16MHz
+    TCCR1B = 0x03;  // increase division factor for faster clock
+#endif
     // turn on LCD backlight and contrast
     lcd_set_brightness();
     lcd_set_contrast();
@@ -769,6 +775,7 @@ void OpenSprinkler::switch_special_station(byte sid, byte value) {
       switch_rfstation(stn->data, value);
     } else if(stn->type==STN_TYPE_REMOTE) {
       // request remote station
+      switch_remotestation(stn->data, value);
     }
   }
 }
@@ -858,6 +865,7 @@ void OpenSprinkler::switch_rfstation(byte *code, bool turnon) {
 
 static void switchremote_callback(byte status, uint16_t off, uint16_t len) {
   /* do nothing */
+  DEBUG_PRINTLN(off);
 }
 
 void OpenSprinkler::switch_remotestation(byte *code, bool turnon) {
@@ -866,17 +874,33 @@ void OpenSprinkler::switch_remotestation(byte *code, bool turnon) {
   ulong ip = hex2ulong(code, 8);
   ether.hisip[0] = ip>>24;
   ether.hisip[1] = (ip>>16)&0xff;
-  ether.hisip[3] = (ip>>8)&0xff;
-  ether.hisip[4] = ip&0xff;
+  ether.hisip[2] = (ip>>8)&0xff;
+  ether.hisip[3] = ip&0xff;
+
+  DEBUG_PRINT(ether.hisip[0]);
+  DEBUG_PRINT(":");
+  DEBUG_PRINT(ether.hisip[1]);
+  DEBUG_PRINT(":");
+  DEBUG_PRINT(ether.hisip[2]);
+  DEBUG_PRINT(":");
+  DEBUG_PRINT(ether.hisip[3]);
+  DEBUG_PRINT(":");
 
   uint16_t _port = ether.hisport; // save current port number
   ether.hisport = hex2ulong(code+8, 4);
 
+  DEBUG_PRINTLN(ether.hisport);
+
   char *p = tmp_buffer + sizeof(StationSpecialData);
   BufferFiller bf = (byte*)p;
-  bf.emit_p(PSTR("cm?pw=$E&sid=$D&en=$D&t=65535"), ADDR_NVM_PASSWORD, (int)hex2ulong(code+12,2), turnon);
-  ether.browseUrl(PSTR("/"), p, PSTR("*"), switchremote_callback);
+  bf.emit_p(PSTR("?pw=$E&sid=$D&en=$D&t=64800"), ADDR_NVM_PASSWORD, (int)hex2ulong(code+12,2), turnon);
+  DEBUG_PRINTLN(p);
+  ether.browseUrl(PSTR("/cm"), p, PSTR("*"), switchremote_callback);
+  for(int l=0;l<100;l++) {
+    ether.packetLoop(ether.packetReceive());
+  }
   ether.hisport = _port;
+
 #endif
 }
 
@@ -928,6 +952,8 @@ void OpenSprinkler::options_setup() {
 
     DEBUG_PRINTLN("write special data");
     tmp_buffer[0]=STN_TYPE_STANDARD;
+    tmp_buffer[1]='0';
+    tmp_buffer[2]=0;
     int stepsize=sizeof(StationSpecialData);
     for(i=0;i<MAX_NUM_STATIONS;i++) {
         write_to_file(stns_filename, tmp_buffer, stepsize, i*stepsize, false);

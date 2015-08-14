@@ -61,6 +61,7 @@ bool read_from_file(const char *name, char *data, int maxsize, int pos) {
     data[0]=0;
     return true;  // return true but with empty string
   }
+  file.seekSet(pos);
   ret = file.fgets(data, maxsize);
   data[maxsize-1]=0;
   file.close();
