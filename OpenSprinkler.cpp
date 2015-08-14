@@ -558,11 +558,6 @@ void OpenSprinkler::apply_all_station_bits() {
   digitalWrite(PIN_SR_LATCH, LOW);
   byte bid, s, sbits;
   
-  /*#if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
-  // old station bits
-  static byte old_station_bits[MAX_EXT_BOARDS+1];
-  #endif*/
-  
   // Shift out all station bit values
   // from the highest bit to the lowest
   for(bid=0;bid<=MAX_EXT_BOARDS;bid++) {
@@ -570,16 +565,6 @@ void OpenSprinkler::apply_all_station_bits() {
       sbits = station_bits[MAX_EXT_BOARDS-bid];
     else
       sbits = 0;
-
-    /*#if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
-    // check if any station is changing from 0 to 1
-    // take the bit inverse of the old status
-    // and with the new status
-    if ((~old_station_bits[MAX_EXT_BOARDS-bid]) & sbits) {
-      engage_booster = true;
-    }
-    old_station_bits[MAX_EXT_BOARDS-bid] = sbits;
-    #endif*/
 
     for(s=0;s<8;s++) {
       digitalWrite(PIN_SR_CLOCK, LOW);
@@ -598,10 +583,9 @@ void OpenSprinkler::apply_all_station_bits() {
     // boost voltage
     digitalWrite(PIN_BOOST_EN, LOW);  // disable output path
     digitalWrite(PIN_BOOST, HIGH);    // enable boost converter
-    delay((int)options[OPTION_BOOST_TIME].value<<2);  // wait for capacitor to charge
+    delay((int)options[OPTION_BOOST_TIME].value<<2);  // wait for booster to charge
     digitalWrite(PIN_BOOST, LOW);     // disable boost converter
    
-    // enable boosted voltage for a short period of time
     digitalWrite(PIN_BOOST_EN, HIGH); // enable output path
     digitalWrite(PIN_SR_LATCH, HIGH);
     engage_booster = 0;
@@ -611,6 +595,14 @@ void OpenSprinkler::apply_all_station_bits() {
   #else
   digitalWrite(PIN_SR_LATCH, HIGH);
   #endif
+
+  // handle refresh of rf and remote stations
+  // each time apply_all_station_bits is called
+  // we refresh the station whose index is the time modulo MAX_NUM_STATIONS
+  byte sid = now() % MAX_NUM_STATIONS;
+  bid=sid>>3;
+  s=sid&0x07;
+  switch_special_station(sid, (station_bits[bid]>>s)&0x01);
 }
 
 void OpenSprinkler::rainsensor_status() {
@@ -794,7 +786,6 @@ byte OpenSprinkler::set_station_bit(byte sid, byte value) {
       switch_special_station(sid, 1);
       return 1;
     }
-    //station_bits[bid] = station_bits[bid] | ((byte)1<<s);
   } else {
     if(!((*data)&mask)) return 0; // if bit is already reset, return no change
     else {
@@ -802,7 +793,6 @@ byte OpenSprinkler::set_station_bit(byte sid, byte value) {
       switch_special_station(sid, 0);
       return 255;
     }
-    //station_bits[bid] = station_bits[bid] &~((byte)1<<s);
   }
   return 0;
 }

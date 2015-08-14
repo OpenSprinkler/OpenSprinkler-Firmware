@@ -347,7 +347,7 @@ typedef enum {
   #define ETHER_BUFFER_SIZE   16384
 
   #define DEBUG_BEGIN(x)          {}  /** Serial debug functions */
-  //#define ENABLE_DEBUG
+  #define ENABLE_DEBUG
   #if defined(ENABLE_DEBUG)
     inline  void DEBUG_PRINT(int x) {printf("%d", x);}
     inline  void DEBUG_PRINT(const char*s) {printf("%s", s);}
