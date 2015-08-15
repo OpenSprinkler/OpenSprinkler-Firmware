@@ -159,6 +159,7 @@ bool read_from_file(const char *name, char *data, int maxsize, int pos) {
   }
 
   int res;
+  fseek(file, pos, SEEK_SET);
   if(fgets(data, maxsize, file)) {
     res = strlen(data);
   } else {
