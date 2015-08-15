@@ -317,7 +317,14 @@ void OpenSprinkler::reboot_dev() {
 
 #else // RPI/BBB/LINUX network init functions
 
+#include "etherport.h"
+#include <sys/reboot.h>
+#include <stdlib.h>
+#include "utils.h"
+#include "server.h"
+
 extern EthernetServer *m_server;
+extern char ether_buffer[];
 
 byte OpenSprinkler::start_network() {
   unsigned int port = (unsigned int)(options[OPTION_HTTPPORT_1].value<<8) + (unsigned int)options[OPTION_HTTPPORT_0].value;
@@ -333,7 +340,6 @@ byte OpenSprinkler::start_network() {
   return m_server->begin();
 }
 
-#include <sys/reboot.h>
 void OpenSprinkler::reboot_dev() {
 #if defined(DEMO)
   // do nothing
@@ -343,7 +349,6 @@ void OpenSprinkler::reboot_dev() {
 #endif
 }
 
-#include <stdlib.h>
 void OpenSprinkler::update_dev() {
   char cmd[1024];
   sprintf(cmd, "cd %s & ./updater.sh", get_runtime_path());
@@ -855,7 +860,6 @@ void OpenSprinkler::switch_rfstation(byte *code, bool turnon) {
 
 static void switchremote_callback(byte status, uint16_t off, uint16_t len) {
   /* do nothing */
-  DEBUG_PRINTLN(off);
 }
 
 void OpenSprinkler::switch_remotestation(byte *code, bool turnon) {
@@ -867,19 +871,8 @@ void OpenSprinkler::switch_remotestation(byte *code, bool turnon) {
   ether.hisip[2] = (ip>>8)&0xff;
   ether.hisip[3] = ip&0xff;
 
-  DEBUG_PRINT(ether.hisip[0]);
-  DEBUG_PRINT(":");
-  DEBUG_PRINT(ether.hisip[1]);
-  DEBUG_PRINT(":");
-  DEBUG_PRINT(ether.hisip[2]);
-  DEBUG_PRINT(":");
-  DEBUG_PRINT(ether.hisip[3]);
-  DEBUG_PRINT(":");
-
   uint16_t _port = ether.hisport; // save current port number
   ether.hisport = hex2ulong(code+8, 4);
-
-  DEBUG_PRINTLN(ether.hisport);
 
   char *p = tmp_buffer + sizeof(StationSpecialData);
   BufferFiller bf = (byte*)p;
@@ -890,7 +883,49 @@ void OpenSprinkler::switch_remotestation(byte *code, bool turnon) {
     ether.packetLoop(ether.packetReceive());
   }
   ether.hisport = _port;
+#else
+  EthernetClient client;
 
+  uint8_t hisip[4];
+  uint16_t hisport;
+  ulong ip = hex2ulong(code, 8);
+  hisip[0] = ip>>24;
+  hisip[1] = (ip>>16)&0xff;
+  hisip[2] = (ip>>8)&0xff;
+  hisip[3] = ip&0xff;
+  hisport = hex2ulong(code+8, 4);
+
+  if (!client.connect(hisip, hisport)) {
+    DEBUG_PRINTLN("failed to connect to remote controller");
+    client.stop();
+    return;
+  }
+
+  char *p = tmp_buffer + sizeof(StationSpecialData);
+  BufferFiller bf = p;
+  bf.emit_p(PSTR("GET /cm?pw=$E&sid=$D&en=$D&t=64800"),
+            ADDR_NVM_PASSWORD,
+            (int)hex2ulong(code+12,2),
+            turnon);
+  bf.emit_p(PSTR(" HTTP/1.0\r\nHOST: *\r\n\r\n"));
+
+  DEBUG_PRINTLN(p);
+  client.write((uint8_t *)p, strlen(p));
+
+  bzero(ether_buffer, ETHER_BUFFER_SIZE);
+
+  time_t timeout = now() + 5; // 5 seconds timeout
+  while(now() < timeout) {
+    int len=client.read((uint8_t *)ether_buffer, ETHER_BUFFER_SIZE);
+    if (len<=0) {
+      if(!client.connected())
+        break;
+      else
+        continue;
+    }
+    switchremote_callback(0, 0, ETHER_BUFFER_SIZE);
+  }
+  client.stop();
 #endif
 }
 
