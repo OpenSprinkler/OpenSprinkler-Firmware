@@ -414,7 +414,7 @@ byte server_json_station_special(char *p) {
     int stepsize=sizeof(StationSpecialData);
     read_from_file(stns_filename, tmp_buffer, stepsize, sid*stepsize);
     StationSpecialData *stn = (StationSpecialData *)tmp_buffer;
-    bfill.emit_p(PSTR("\"st\":$D,\"sd\":$S}"), stn->type, stn->data);
+    bfill.emit_p(PSTR("\"st\":$D,\"sd\":\"$S\"}"), stn->type, stn->data);
     delay(1);
     return HTML_OK;
   } else {
