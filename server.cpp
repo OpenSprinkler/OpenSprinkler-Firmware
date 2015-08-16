@@ -875,13 +875,15 @@ byte server_home()
 
 /**
  * Change controller variables
- * Command: /cv?pw=xxx&rsn=x&rbt=x&en=x&rd=x
+ * Command: /cv?pw=xxx&rsn=x&rbt=x&en=x&rd=x&sl=x
  *
  * pw:  password
  * rsn: reset all stations (0 or 1)
  * rbt: reboot controller (0 or 1)
  * en:  enable (0 or 1)
  * rd:  rain delay hours (0 turns off rain delay)
+ * sl:  slave mode
+ * update: launch update script (for OSPi/OSBo/Linux only)
  */
 
 byte server_change_values(char *p)
@@ -920,6 +922,15 @@ byte server_change_values(char *p)
     } else  return HTML_DATA_OUTOFBOUND;
   }
 
+  if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("sl"), true)) {
+    if (tmp_buffer[0]=='1' && !os.options[OPTION_SLAVE_MODE].value) {
+      os.options[OPTION_SLAVE_MODE].value = 1;
+      os.options_save();
+    } else if(tmp_buffer[0]=='0' && os.options[OPTION_SLAVE_MODE].value) {
+      os.options[OPTION_SLAVE_MODE].value = 0;
+      os.options_save();
+    }
+  }
   return HTML_SUCCESS;
 }
 
@@ -988,10 +999,11 @@ byte server_change_options(char *p)
   for (byte oid=0; oid<NUM_OPTIONS; oid++) {
     //if ((os.options[oid].flag&OPFLAG_WEB_EDIT)==0) continue;
 
-    // skip options that cannot be set through web UI
+    // skip options that cannot be set through /co command
     if (oid==OPTION_RESET || oid==OPTION_DEVICE_ENABLE ||
         oid==OPTION_FW_VERSION || oid==OPTION_HW_VERSION ||
-        oid==OPTION_FW_MINOR || oid==OPTION_SEQUENTIAL_RETIRED)
+        oid==OPTION_FW_MINOR || oid==OPTION_SEQUENTIAL_RETIRED ||
+        oid==OPTION_SLAVE_MODE)
       continue;
     prev_value = os.options[oid].value;
     if (os.options[oid].max==1)  os.options[oid].value = 0;  // set a bool variable to 0 first

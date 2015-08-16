@@ -504,6 +504,7 @@ void do_loop()
       // check through runtime queue, calculate the last stop time of sequential stations
       pd.last_seq_stop_time = 0;
       ulong sst;
+      byte slave=os.options[OPTION_SLAVE_MODE].value;
       q = pd.queue;
       for(;q<pd.queue+pd.nqueue;q++) {
         sid = q->sid;
@@ -513,7 +514,8 @@ void do_loop()
         // and the stop time must be larger than curr_time
         sst = q->st + q->dur;
         if (sst>curr_time) {
-          if (os.station_attrib_bits_read(ADDR_NVM_STNSEQ+bid)&(1<<s)) {   // only need to update last_seq_stop_time for sequential stations
+          // only need to update last_seq_stop_time for sequential stations
+          if (os.station_attrib_bits_read(ADDR_NVM_STNSEQ+bid)&(1<<s) && !slave) {
             pd.last_seq_stop_time = (sst>pd.last_seq_stop_time ) ? sst : pd.last_seq_stop_time;
           }
         }
@@ -637,8 +639,11 @@ void do_loop()
 }
 
 void check_weather() {
-  // do not check weather if the Use Weather option is disabled, or if network is not available, or if a program is running
-  if (os.status.network_fails>0 || os.status.program_busy) return;
+  // do not check weather if
+  // - network check has failed, or
+  // - a program is currently running
+  // - the controller is in slave mode
+  if (os.status.network_fails>0 || os.status.program_busy || os.options[OPTION_SLAVE_MODE].value) return;
 
   ulong ntz = os.now_tz();
   if (os.checkwt_success_lasttime && (ntz > os.checkwt_success_lasttime + CHECK_WEATHER_SUCCESS_TIMEOUT)) {
@@ -651,7 +656,7 @@ void check_weather() {
   if (!os.checkwt_lasttime || (ntz > os.checkwt_lasttime + CHECK_WEATHER_TIMEOUT)) {
     os.checkwt_lasttime = ntz;
     GetWeather();
-    write_log(LOGDATA_WATERLEVEL, ntz); // warning: water level may update a few seconds after getweather is called
+    write_log(LOGDATA_WATERLEVEL, ntz);
   }
 }
 
@@ -741,6 +746,7 @@ void schedule_all_stations(ulong curr_time) {
   }
 
   RuntimeQueueStruct *q = pd.queue;
+  byte slave = os.options[OPTION_SLAVE_MODE].value;
   // go through runtime queue and calculate start time of each station
   for(;q<pd.queue+pd.nqueue;q++) {
     if(q->st) continue; // if this queue element has already been scheduled, skip
@@ -749,14 +755,15 @@ void schedule_all_stations(ulong curr_time) {
     byte bid=sid>>3;
     byte s=sid&0x07;
 
-    // check if this is a sequential station
-    if (os.station_attrib_bits_read(ADDR_NVM_STNSEQ+bid)&(1<<s)) {
+    // if this is a sequential station and the controller is not in slave mode
+    // use sequential scheduling. station delay time apples
+    if (os.station_attrib_bits_read(ADDR_NVM_STNSEQ+bid)&(1<<s) && !slave) {
       // sequential scheduling
       q->st = seq_start_time;
       seq_start_time += q->dur;
       seq_start_time += station_delay; // add station delay time
     } else {
-      // concurrent scheduling
+      // otherwise, concurrent scheduling
       q->st = con_start_time;
       // stagger concurrent stations by 1 second
       con_start_time++;

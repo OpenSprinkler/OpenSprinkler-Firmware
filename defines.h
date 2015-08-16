@@ -205,6 +205,7 @@ typedef enum {
   OPTION_FW_MINOR,
   OPTION_PULSE_RATE_0,
   OPTION_PULSE_RATE_1,
+  OPTION_SLAVE_MODE,
   OPTION_RESET,
   NUM_OPTIONS	// total number of options
 } OS_OPTION_t;
