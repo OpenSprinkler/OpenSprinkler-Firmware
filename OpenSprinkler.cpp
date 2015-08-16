@@ -604,10 +604,14 @@ void OpenSprinkler::apply_all_station_bits() {
   // handle refresh of rf and remote stations
   // each time apply_all_station_bits is called
   // we refresh the station whose index is the time modulo MAX_NUM_STATIONS
+  static byte last_sid = 0;
   byte sid = now() % MAX_NUM_STATIONS;
-  bid=sid>>3;
-  s=sid&0x07;
-  switch_special_station(sid, (station_bits[bid]>>s)&0x01);
+  if (sid != last_sid) {
+    last_sid = sid;
+    bid=sid>>3;
+    s=sid&0x07;
+    switch_special_station(sid, (station_bits[bid]>>s)&0x01);
+  }
 }
 
 void OpenSprinkler::rainsensor_status() {
@@ -876,7 +880,10 @@ void OpenSprinkler::switch_remotestation(byte *code, bool turnon) {
 
   char *p = tmp_buffer + sizeof(StationSpecialData);
   BufferFiller bf = (byte*)p;
-  bf.emit_p(PSTR("?pw=$E&sid=$D&en=$D&t=64800"), ADDR_NVM_PASSWORD, (int)hex2ulong(code+12,2), turnon);
+  bf.emit_p(PSTR("?pw=$E&sid=$D&en=$D&t=$D"),
+            ADDR_NVM_PASSWORD,
+            (int)hex2ulong(code+12,2),
+            turnon, 2*MAX_NUM_STATIONS);  // MAX_NUM_STATIONS is the refresh cycle
   DEBUG_PRINTLN(p);
   ether.browseUrl(PSTR("/cm"), p, PSTR("*"), switchremote_callback);
   for(int l=0;l<100;l++) {
@@ -896,20 +903,18 @@ void OpenSprinkler::switch_remotestation(byte *code, bool turnon) {
   hisport = hex2ulong(code+8, 4);
 
   if (!client.connect(hisip, hisport)) {
-    DEBUG_PRINTLN("failed to connect to remote controller");
     client.stop();
     return;
   }
 
   char *p = tmp_buffer + sizeof(StationSpecialData);
   BufferFiller bf = p;
-  bf.emit_p(PSTR("GET /cm?pw=$E&sid=$D&en=$D&t=64800"),
+  bf.emit_p(PSTR("GET /cm?pw=$E&sid=$D&en=$D&t=$D"),
             ADDR_NVM_PASSWORD,
             (int)hex2ulong(code+12,2),
-            turnon);
+            turnon, 2*MAX_NUM_STATIONS);  // MAX_NUM_STATIONS is the refresh cycle
   bf.emit_p(PSTR(" HTTP/1.0\r\nHOST: *\r\n\r\n"));
 
-  DEBUG_PRINTLN(p);
   client.write((uint8_t *)p, strlen(p));
 
   bzero(ether_buffer, ETHER_BUFFER_SIZE);

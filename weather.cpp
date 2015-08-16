@@ -202,7 +202,6 @@ void GetWeather() {
   DEBUG_PRINTLN(((uint8_t*)server->h_addr)[3]);
 
   if (!client.connect((uint8_t*)server->h_addr, 80)) {
-    DEBUG_PRINTLN("failed to connect to weather server");
     client.stop();
     return;
   }

@@ -370,7 +370,13 @@ void server_json_stations_main()
   server_json_stations_attrib(PSTR("masop2"), ADDR_NVM_MAS_OP_2);
   server_json_stations_attrib(PSTR("stn_dis"), ADDR_NVM_STNDISABLE);
   server_json_stations_attrib(PSTR("stn_seq"), ADDR_NVM_STNSEQ);
+#if defined(ARDUINO)  // only output stn_spe if it's supported
+  if (os.status.has_sd) {
+    server_json_stations_attrib(PSTR("stn_spe"), ADDR_NVM_STNSPE);
+  }
+#else
   server_json_stations_attrib(PSTR("stn_spe"), ADDR_NVM_STNSPE);
+#endif
   bfill.emit_p(PSTR("\"snames\":["));
   byte sid;
   for(sid=0;sid<os.nstations;sid++) {
@@ -469,8 +475,13 @@ byte server_change_stations(char *p)
   server_change_stations_attrib(p, 'n', ADDR_NVM_MAS_OP_2); // master2
   server_change_stations_attrib(p, 'd', ADDR_NVM_STNDISABLE); // disable
   server_change_stations_attrib(p, 'q', ADDR_NVM_STNSEQ); // sequential
+#if defined(ARDUINO)  // only parse station special bits if it's supported
+  if(os.status.has_sd) {
+    server_change_stations_attrib(p, 'p', ADDR_NVM_STNSPE); // special
+  }
+#else
   server_change_stations_attrib(p, 'p', ADDR_NVM_STNSPE); // special
-
+#endif
   /* handle special data */
   if(findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("sid"), true)) {
     sid = atoi(tmp_buffer);
@@ -1156,15 +1167,21 @@ byte server_change_manual(char *p) {
         return HTML_DATA_OUTOFBOUND;
       }
       // schedule manual station
-      // skip if the station is:
-      // - master station (because master cannot be scheduled independently
-      // - currently running (cannot handle overlapping schedules of the same station)
+      // skip if the station is a master station
+      // (because master cannot be scheduled independently)
       byte bid = sid>>3;
       byte s = sid&0x07;
-      if ((os.status.mas==sid+1) || (os.status.mas2==sid+1) || (os.station_bits[bid]&(1<<s)))
+      if ((os.status.mas==sid+1) || (os.status.mas2==sid+1))
         return HTML_NOT_PERMITTED;
 
-      RuntimeQueueStruct *q = pd.enqueue();
+      RuntimeQueueStruct *q = NULL;
+      byte sqi = pd.station_qid[sid];
+      // check if the station already has a schedule
+      if (sqi!=0xFF) {  // if we, we will overwrite the schedule
+        q = pd.queue+sqi;
+      } else {  // otherwise create a new queue element
+        q = pd.enqueue();
+      }
       // if the queue is not full
       if (q) {
         q->st = 0;
@@ -1416,7 +1433,6 @@ void handle_web_request(char *p)
 #endif
   rewind_ether_buffer();
 
-  DEBUG_PRINTLN(p);
   // assume this is a GET request
   // GET /xx?xxxx
   char *com = p+5;

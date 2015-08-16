@@ -490,7 +490,9 @@ void do_loop()
       int qi;
       for(qi=pd.nqueue-1;qi>=0;qi--) {
         q=pd.queue+qi;
-        if(!q->dur || curr_time>=q->st+q->dur)  pd.dequeue(qi);
+        if(!q->dur || curr_time>=q->st+q->dur)  {
+          pd.dequeue(qi);
+        }
       }
 
       // process dynamic events
@@ -765,7 +767,8 @@ void schedule_all_stations(ulong curr_time) {
     DEBUG_PRINT(q->st);
     DEBUG_PRINT(",");
     DEBUG_PRINT(q->dur);
-    DEBUG_PRINTLN("]");
+    DEBUG_PRINT("]");
+    DEBUG_PRINTLN(pd.nqueue);
     os.status.program_busy = 1;  // set program busy bit
   }
 }
