@@ -415,7 +415,7 @@ byte server_json_station_special(char *p) {
       read_from_file(stns_filename, (char*)stn, stepsize, sid*stepsize);
       if (comma) bfill.emit_p(PSTR(","));
       else {comma=1;}
-      bfill.emit_p(PSTR("$D:{\"st\":$D,\"sd\":\"$S\"}"), sid, stn->type, stn->data);
+      bfill.emit_p(PSTR("\"$D\":{\"st\":$D,\"sd\":\"$S\"}"), sid, stn->type, stn->data);
     }
   }
   bfill.emit_p(PSTR("}"));
