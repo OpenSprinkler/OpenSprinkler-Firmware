@@ -504,7 +504,7 @@ void do_loop()
       // check through runtime queue, calculate the last stop time of sequential stations
       pd.last_seq_stop_time = 0;
       ulong sst;
-      byte slave=os.options[OPTION_SLAVE_MODE].value;
+      byte slave=os.options[OPTION_REMOTE_EXT_MODE].value;
       q = pd.queue;
       for(;q<pd.queue+pd.nqueue;q++) {
         sid = q->sid;
@@ -643,7 +643,7 @@ void check_weather() {
   // - network check has failed, or
   // - a program is currently running
   // - the controller is in slave mode
-  if (os.status.network_fails>0 || os.status.program_busy || os.options[OPTION_SLAVE_MODE].value) return;
+  if (os.status.network_fails>0 || os.status.program_busy || os.options[OPTION_REMOTE_EXT_MODE].value) return;
 
   ulong ntz = os.now_tz();
   if (os.checkwt_success_lasttime && (ntz > os.checkwt_success_lasttime + CHECK_WEATHER_SUCCESS_TIMEOUT)) {
@@ -746,7 +746,7 @@ void schedule_all_stations(ulong curr_time) {
   }
 
   RuntimeQueueStruct *q = pd.queue;
-  byte slave = os.options[OPTION_SLAVE_MODE].value;
+  byte slave = os.options[OPTION_REMOTE_EXT_MODE].value;
   // go through runtime queue and calculate start time of each station
   for(;q<pd.queue+pd.nqueue;q++) {
     if(q->st) continue; // if this queue element has already been scheduled, skip

@@ -108,7 +108,7 @@ static prog_char _json_mtof2[]PROGMEM = "mtof2";
 static prog_char _json_fwm[]  PROGMEM = "fwm";
 static prog_char _json_fpr0[] PROGMEM = "fpr0";
 static prog_char _json_fpr1[] PROGMEM = "fpr1";
-static prog_char _json_slave[]PROGMEM = "sl";
+static prog_char _json_slave[]PROGMEM = "re";
 static prog_char _json_reset[] PROGMEM = "reset";
 
 /** Option names */
@@ -149,7 +149,7 @@ static prog_char _str_mton2[]PROGMEM = "Mas2  on adj:";
 static prog_char _str_mtof2[]PROGMEM = "Mas2 off adj:";
 static prog_char _str_fwm[]  PROGMEM = "FWm:";
 static prog_char _str_fpr [] PROGMEM = "Pulse rate:";
-static prog_char _str_slave[]PROGMEM = "Slave mode:";
+static prog_char _str_slave[]PROGMEM = "As remote ext.:";
 static prog_char _str_reset[] PROGMEM = "Reset all?";
 
 OptionStruct OpenSprinkler::options[NUM_OPTIONS] = {

@@ -882,7 +882,7 @@ byte server_home()
  * rbt: reboot controller (0 or 1)
  * en:  enable (0 or 1)
  * rd:  rain delay hours (0 turns off rain delay)
- * sl:  slave mode
+ * re:  remote extension mode
  * update: launch update script (for OSPi/OSBo/Linux only)
  */
 
@@ -922,12 +922,12 @@ byte server_change_values(char *p)
     } else  return HTML_DATA_OUTOFBOUND;
   }
 
-  if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("sl"), true)) {
-    if (tmp_buffer[0]=='1' && !os.options[OPTION_SLAVE_MODE].value) {
-      os.options[OPTION_SLAVE_MODE].value = 1;
+  if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("re"), true)) {
+    if (tmp_buffer[0]=='1' && !os.options[OPTION_REMOTE_EXT_MODE].value) {
+      os.options[OPTION_REMOTE_EXT_MODE].value = 1;
       os.options_save();
-    } else if(tmp_buffer[0]=='0' && os.options[OPTION_SLAVE_MODE].value) {
-      os.options[OPTION_SLAVE_MODE].value = 0;
+    } else if(tmp_buffer[0]=='0' && os.options[OPTION_REMOTE_EXT_MODE].value) {
+      os.options[OPTION_REMOTE_EXT_MODE].value = 0;
       os.options_save();
     }
   }
@@ -1003,7 +1003,7 @@ byte server_change_options(char *p)
     if (oid==OPTION_RESET || oid==OPTION_DEVICE_ENABLE ||
         oid==OPTION_FW_VERSION || oid==OPTION_HW_VERSION ||
         oid==OPTION_FW_MINOR || oid==OPTION_SEQUENTIAL_RETIRED ||
-        oid==OPTION_SLAVE_MODE)
+        oid==OPTION_REMOTE_EXT_MODE)
       continue;
     prev_value = os.options[oid].value;
     if (os.options[oid].max==1)  os.options[oid].value = 0;  // set a bool variable to 0 first
