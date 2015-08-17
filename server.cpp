@@ -399,33 +399,28 @@ byte server_json_stations(char *p) {
   return HTML_OK;
 }
 
-/**
- * Output Station Special Attribute
- * Command: /je?sid=x
- *
- * sid: station index (starting from 0)
- */
+/** Output Station Special Attribute */
 byte server_json_station_special(char *p) {
 #if defined(ARDUINO)
   // if no sd card, return false
   if (!os.status.has_sd)  return HTML_PAGE_NOT_FOUND;
 #endif
-  int sid;
-  if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("sid"), true)) {
-    sid = atoi(tmp_buffer);
-    if (sid< 0 || sid >= os.nstations) return HTML_DATA_OUTOFBOUND;
-
-    print_json_header();
-
-    int stepsize=sizeof(StationSpecialData);
-    read_from_file(stns_filename, tmp_buffer, stepsize, sid*stepsize);
-    StationSpecialData *stn = (StationSpecialData *)tmp_buffer;
-    bfill.emit_p(PSTR("\"st\":$D,\"sd\":\"$S\"}"), stn->type, stn->data);
-    delay(1);
-    return HTML_OK;
-  } else {
-    return HTML_DATA_MISSING;
+  byte sid;
+  byte comma=0;
+  int stepsize=sizeof(StationSpecialData);
+  StationSpecialData *stn = (StationSpecialData *)tmp_buffer;
+  print_json_header();
+  for(sid=0;sid<os.nstations;sid++) {
+    if(os.station_attrib_bits_read(ADDR_NVM_STNSPE+(sid>>3))&(1<<(sid&0x07))) {
+      read_from_file(stns_filename, (char*)stn, stepsize, sid*stepsize);
+      if (comma) bfill.emit_p(PSTR(","));
+      else {comma=1;}
+      bfill.emit_p(PSTR("$D:{\"st\":$D,\"sd\":\"$S\"}"), sid, stn->type, stn->data);
+    }
   }
+  bfill.emit_p(PSTR("}"));
+  delay(1);
+  return HTML_OK;
 }
 
 void server_change_stations_attrib(char *p, char header, int addr)
