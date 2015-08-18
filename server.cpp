@@ -1260,7 +1260,7 @@ byte server_json_log(char *p) {
   print_json_header(false);
   bfill.emit_p(PSTR("["));
 
-  bool first = true;
+  bool comma = 0;
   for(int i=start;i<=end;i++) {
     itoa(i, tmp_buffer, 10);
     make_logfile_name(tmp_buffer);
@@ -1296,25 +1296,24 @@ byte server_json_log(char *p) {
     #endif
 
       // remove the \n character
-      if (tmp_buffer[res-1] == '\n')  tmp_buffer[res-1] = 0;
+      //if (tmp_buffer[res-1] == '\n')  tmp_buffer[res-1] = 0;
 
       // check record type
       // special records are all in the form of [0,"xx",...]
       // where xx is the type name
       if (type_specified && strncmp(type, tmp_buffer+4, 2))
         continue;
-      // if type is not specified, output everything except "wl" records
-      if (!type_specified && !strncmp("wl", tmp_buffer+4, 2))
+      // if type is not specified, output everything except "wl" and "fl" records
+      if (!type_specified && (!strncmp("wl", tmp_buffer+4, 2) || !strncmp("fl", tmp_buffer+4, 2)))
         continue;
       // if this is the first record, do not print comma
-      if (first)  { bfill.emit_p(PSTR("$S"), tmp_buffer); first=false;}
-      else {  bfill.emit_p(PSTR(",$S"), tmp_buffer); }
-      //count ++;
+      if (comma)  bfill.emit_p(PSTR(","));
+      else {comma=1;}
+      bfill.emit_p(PSTR("$S"), tmp_buffer);
       // if the available ether buffer size is getting small
       // push out a packet
       if (available_ether_buffer() < 80) {
         send_packet();
-        //count = 0;
       }
     }
   }
@@ -1363,73 +1362,63 @@ byte server_json_all(char *p) {
   return HTML_OK;
 }
 
-struct URLStruct{
+typedef byte (*URLHandler)(char*);
+/*struct URLStruct{
   PGM_P PROGMEM url;
-  byte (*handler)(char*);
-};
+
+};*/
 
 
-// Server function urls
-// !!!Important!!!: to save space, each url must be two characters long
-prog_char _url_cv [] PROGMEM = "cv";
-prog_char _url_jc [] PROGMEM = "jc";
-
-prog_char _url_dp [] PROGMEM = "dp";
-prog_char _url_cp [] PROGMEM = "cp";
-prog_char _url_cr [] PROGMEM = "cr";
-prog_char _url_up [] PROGMEM = "up";
-prog_char _url_jp [] PROGMEM = "jp";
-
-prog_char _url_co [] PROGMEM = "co";
-prog_char _url_jo [] PROGMEM = "jo";
-prog_char _url_sp [] PROGMEM = "sp";
-
-prog_char _url_js [] PROGMEM = "js";
-prog_char _url_cm [] PROGMEM = "cm";
-
-prog_char _url_cs [] PROGMEM = "cs";
-prog_char _url_jn [] PROGMEM = "jn";
-prog_char _url_je [] PROGMEM = "je";
-
-prog_char _url_jl [] PROGMEM = "jl";
-prog_char _url_dl [] PROGMEM = "dl";
-
-prog_char _url_su [] PROGMEM = "su";
-prog_char _url_cu [] PROGMEM = "cu";
-
-prog_char _url_ja [] PROGMEM = "ja";
+/* Server function urls
+ * To save RAM space, each GET command keyword is exactly
+ * 2 characters long, with no ending 0
+ * The order must exactly match the order of the
+ * handler functions below
+ */
+prog_char _url_keys[] PROGMEM =
+  "cv"
+  "jc"
+  "dp"
+  "cp"
+  "cr"
+  "up"
+  "jp"
+  "co"
+  "jo"
+  "sp"
+  "js"
+  "cm"
+  "cs"
+  "jn"
+  "je"
+  "jl"
+  "dl"
+  "su"
+  "cu"
+  "ja";
 
 // Server function handlers
-URLStruct urls[] = {
-  {_url_cv,server_change_values},
-  {_url_jc,server_json_controller},
-
-  {_url_dp,server_delete_program},
-  {_url_cp,server_change_program},
-  {_url_cr,server_change_runonce},
-  {_url_up,server_moveup_program},
-  {_url_jp,server_json_programs},
-
-
-  {_url_co,server_change_options},
-  {_url_jo,server_json_options},
-  {_url_sp,server_change_password},
-
-  {_url_js,server_json_status},
-  {_url_cm,server_change_manual},
-
-  {_url_cs,server_change_stations},
-  {_url_jn,server_json_stations},
-  {_url_je,server_json_station_special},
-
-  {_url_jl,server_json_log},
-  {_url_dl,server_delete_log},
-
-  {_url_su,server_view_scripturl},
-  {_url_cu,server_change_scripturl},
-
-  {_url_ja,server_json_all},
-
+URLHandler urls[] = {
+  server_change_values,   // cv
+  server_json_controller, // jc
+  server_delete_program,  // dp
+  server_change_program,  // cp
+  server_change_runonce,  // cr
+  server_moveup_program,  // up
+  server_json_programs,   // jp
+  server_change_options,  // co
+  server_json_options,    // jo
+  server_change_password, // sp
+  server_json_status,     // js
+  server_change_manual,   // cm
+  server_change_stations, // cs
+  server_json_stations,   // jn
+  server_json_station_special,// je
+  server_json_log,        // jl
+  server_delete_log,      // dl
+  server_view_scripturl,  // su
+  server_change_scripturl,// cu
+  server_json_all         // ja
 };
 
 // handle Ethernet request
@@ -1451,15 +1440,15 @@ void handle_web_request(char *p)
   } else {
     // server funtion handlers
     byte i;
-    for(i=0;i<sizeof(urls)/sizeof(URLStruct);i++) {
-      if(pgm_read_byte(urls[i].url)==com[0]
-       &&pgm_read_byte(urls[i].url+1)==com[1]) {
+    for(i=0;i<sizeof(urls)/sizeof(URLHandler);i++) {
+      if(pgm_read_byte(_url_keys+2*i)==com[0]
+       &&pgm_read_byte(_url_keys+2*i+1)==com[1]) {
 
         // check password
         byte ret = HTML_UNAUTHORIZED;
 
         if (com[0]=='s' && com[1]=='u') { // for /su do not require password
-          ret = (urls[i].handler)(dat);
+          ret = (urls[i])(dat);
         } else if ((com[0]=='j' && com[1]=='o') ||
                    (com[0]=='j' && com[1]=='a'))  { // for /jo and /ja we output fwv if password fails
           if(check_password(dat)==false) {
@@ -1468,14 +1457,14 @@ void handle_web_request(char *p)
                    os.options[0].json_str, os.options[0].value);
             ret = HTML_OK;
           } else {
-            ret = (urls[i].handler)(dat);
+            ret = (urls[i])(dat);
           }
         } else {
           // first check password
           if(check_password(dat)==false) {
             ret = HTML_UNAUTHORIZED;
           } else {
-            ret = (urls[i].handler)(dat);
+            ret = (urls[i])(dat);
           }
         }
         switch(ret) {
@@ -1493,7 +1482,7 @@ void handle_web_request(char *p)
       }
     }
 
-    if(i==sizeof(urls)/sizeof(URLStruct)) {
+    if(i==sizeof(urls)/sizeof(URLHandler)) {
       // no server funtion found
       print_json_header();
       bfill.emit_p(PSTR("\"result\":$D}"), HTML_PAGE_NOT_FOUND);

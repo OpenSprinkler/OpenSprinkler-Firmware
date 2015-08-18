@@ -531,6 +531,9 @@ void do_loop()
         pd.reset_runtime();
         // reset program busy bit
         os.status.program_busy = 0;
+        // log flow sensor reading
+        DEBUG_PRINTLN("log flow count");
+        write_log(LOGDATA_FLOWSENSE, curr_time);
 
         // in case some options have changed while executing the program
         os.status.mas = os.options[OPTION_MASTER_STATION].value; // update master station
@@ -736,6 +739,7 @@ void process_dynamic_events(ulong curr_time) {
 }
 
 void schedule_all_stations(ulong curr_time) {
+  DEBUG_PRINTLN(curr_time);
   ulong con_start_time = curr_time + 1;   // concurrent start time
   ulong seq_start_time = con_start_time;  // sequential start time
 
@@ -776,7 +780,12 @@ void schedule_all_stations(ulong curr_time) {
     DEBUG_PRINT(q->dur);
     DEBUG_PRINT("]");
     DEBUG_PRINTLN(pd.nqueue);
-    os.status.program_busy = 1;  // set program busy bit
+    if (!os.status.program_busy) {
+      os.status.program_busy = 1;  // set program busy bit
+      // start flow count
+      os.flowcount_start = flow_count;
+      DEBUG_PRINTLN("flow count started");
+    }
   }
 }
 
@@ -849,12 +858,17 @@ void make_logfile_name(char *name) {
   strcat_P(tmp_buffer, PSTR(".txt"));
 }
 
-const char *log_type_names[] = {
-  "",
-  "rs",
-  "rd",
-  "wl"
-};
+/* To save RAM space, we store log type names
+ * in program memory, and each name
+ * must be strictly two characters with an ending 0
+ * so each name is 3 characters total
+ */
+static prog_char log_type_names[] PROGMEM =
+    "  \0"
+    "rs\0"
+    "rd\0"
+    "wl\0"
+    "fl\0";
 
 // write run record to log on SD card
 void write_log(byte type, ulong curr_time) {
@@ -906,19 +920,24 @@ void write_log(byte type, ulong curr_time) {
     itoa(pd.lastrun.duration, tmp_buffer+strlen(tmp_buffer), 10);
   } else {
     strcat_P(tmp_buffer, PSTR("0,\""));
-    strcat(tmp_buffer, log_type_names[type]);
+    strcat_P(tmp_buffer, log_type_names+type*3);
     strcat_P(tmp_buffer, PSTR("\","));
+    ulong logvalue = 0;
     switch(type) {
       case LOGDATA_RAINSENSE:
-        ultoa((curr_time - os.sensor_lasttime), tmp_buffer+strlen(tmp_buffer), 10);
+        logvalue = (curr_time>os.sensor_lasttime)?(curr_time-os.sensor_lasttime):0;
         break;
       case LOGDATA_RAINDELAY:
-        ultoa((curr_time - os.raindelay_start_time), tmp_buffer+strlen(tmp_buffer), 10);
+        logvalue = (curr_time>os.raindelay_start_time)?(curr_time-os.raindelay_start_time):0;
         break;
       case LOGDATA_WATERLEVEL:
-        itoa(os.options[OPTION_WATER_PERCENTAGE].value, tmp_buffer+strlen(tmp_buffer), 10);
+        logvalue = os.options[OPTION_WATER_PERCENTAGE].value;
+        break;
+      case LOGDATA_FLOWSENSE:
+        logvalue = (flow_count>os.flowcount_start)?(flow_count-os.flowcount_start):0;
         break;
     }
+    ultoa(logvalue, tmp_buffer+strlen(tmp_buffer), 10);
   }
   strcat_P(tmp_buffer, PSTR(","));
   ultoa(curr_time, tmp_buffer+strlen(tmp_buffer), 10);

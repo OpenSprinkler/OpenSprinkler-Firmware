@@ -119,6 +119,7 @@ public:
 
   // variables for time keeping
   static ulong sensor_lasttime;  // time when the most recent sensor reading was performed
+  static ulong flowcount_start; // starting flow count
   static ulong raindelay_start_time;  // time when the most recent rain delay started
   static byte  button_timeout;        // button timeout
   static ulong checkwt_lasttime;      // time when weather was checked

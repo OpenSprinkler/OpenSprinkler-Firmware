@@ -38,6 +38,7 @@ byte OpenSprinkler::engage_booster;
 #endif
 
 ulong OpenSprinkler::sensor_lasttime;
+ulong OpenSprinkler::flowcount_start;
 ulong OpenSprinkler::raindelay_start_time;
 byte OpenSprinkler::button_timeout;
 ulong OpenSprinkler::checkwt_lasttime;
@@ -206,23 +207,14 @@ OptionStruct OpenSprinkler::options[NUM_OPTIONS] = {
 };
 
 /** Weekday display strings */
-static prog_char str_day0[] PROGMEM = "Mon";
-static prog_char str_day1[] PROGMEM = "Tue";
-static prog_char str_day2[] PROGMEM = "Wed";
-static prog_char str_day3[] PROGMEM = "Thu";
-static prog_char str_day4[] PROGMEM = "Fri";
-static prog_char str_day5[] PROGMEM = "Sat";
-static prog_char str_day6[] PROGMEM = "Sun";
-
-prog_char* days_str[7] = {
-  str_day0,
-  str_day1,
-  str_day2,
-  str_day3,
-  str_day4,
-  str_day5,
-  str_day6
-};
+static prog_char days_str[] PROGMEM =
+  "Mon\0"
+  "Tue\0"
+  "Wed\0"
+  "Thu\0"
+  "Fri\0"
+  "Sat\0"
+  "Sun\0";
 
 // return local time (UTC time plus time zone offset)
 time_t OpenSprinkler::now_tz() {
@@ -504,7 +496,6 @@ void OpenSprinkler::begin() {
   lcd.createChar(0, _icon);
 
   // uSD card icon
-  _icon[0] = B00000;
   _icon[1] = B00000;
   _icon[2] = B11111;
   _icon[3] = B10001;
@@ -515,8 +506,6 @@ void OpenSprinkler::begin() {
   lcd.createChar(2, _icon);
 
   // Rain icon
-  _icon[0] = B00000;
-  _icon[1] = B00000;
   _icon[2] = B00110;
   _icon[3] = B01001;
   _icon[4] = B11111;
@@ -526,8 +515,6 @@ void OpenSprinkler::begin() {
   lcd.createChar(3, _icon);
 
   // Connect icon
-  _icon[0] = B00000;
-  _icon[1] = B00000;
   _icon[2] = B00111;
   _icon[3] = B00011;
   _icon[4] = B00101;
@@ -535,6 +522,24 @@ void OpenSprinkler::begin() {
   _icon[6] = B10000;
   _icon[7] = B00000;
   lcd.createChar(4, _icon);
+
+  // Remote extension icon
+  _icon[2] = B00000;
+  _icon[3] = B00111;
+  _icon[4] = B01000;
+  _icon[5] = B10011;
+  _icon[6] = B10100;
+  _icon[7] = B10101;
+  lcd.createChar(5, _icon);
+
+  // Flow sensor icon
+  _icon[2] = B01110;
+  _icon[3] = B00100;
+  _icon[4] = B01110;
+  _icon[5] = B11011;
+  _icon[6] = B11011;
+  _icon[7] = B01110;
+  lcd.createChar(6, _icon);
 
   // set sd cs pin high to release SD
   pinMode(PIN_SD_CS, OUTPUT);
@@ -1184,7 +1189,8 @@ void OpenSprinkler::lcd_print_time(time_t t)
   lcd_print_pgm(PSTR(":"));
   lcd_print_2digit(minute(t));
   lcd_print_pgm(PSTR("  "));
-  lcd_print_pgm(days_str[weekday_today()]);
+  // each weekday string has 3 characters + ending 0
+  lcd_print_pgm(days_str+4*weekday_today());
   lcd_print_pgm(PSTR(" "));
   lcd_print_2digit(month(t));
   lcd_print_pgm(PSTR("-"));
@@ -1243,10 +1249,16 @@ void OpenSprinkler::lcd_print_station(byte line, char c) {
 	  }
 	}
 	lcd_print_pgm(PSTR("    "));
+  lcd.setCursor(12, 1);
+  if(options[OPTION_REMOTE_EXT_MODE].value) {
+    lcd.write(5);
+  }
 	lcd.setCursor(13, 1);
-  if(status.rain_delayed || (status.rain_sensed && options[OPTION_SENSOR_TYPE].value==SENSOR_TYPE_RAIN))
-  {
+  if(status.rain_delayed || (status.rain_sensed && options[OPTION_SENSOR_TYPE].value==SENSOR_TYPE_RAIN))  {
     lcd.write(3);
+  }
+  if(options[OPTION_SENSOR_TYPE].value==SENSOR_TYPE_FLOW) {
+    lcd.write(6);
   }
   lcd.setCursor(14, 1);
   if (status.has_sd)  lcd.write(2);

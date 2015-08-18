@@ -215,6 +215,7 @@ typedef enum {
 #define LOGDATA_RAINSENSE  0x01
 #define LOGDATA_RAINDELAY  0x02
 #define LOGDATA_WATERLEVEL 0x03
+#define LOGDATA_FLOWSENSE  0x04
 
 #undef OS_HW_VERSION
 
@@ -292,7 +293,7 @@ typedef enum {
 
   #endif
   typedef unsigned char   uint8_t;
-  typedef unsigned int uint16_t;
+  typedef unsigned int    uint16_t;
   typedef int int16_t;
 
 #else // Hardware defines for RPI/BBB
