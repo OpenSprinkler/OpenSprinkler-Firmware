@@ -185,9 +185,9 @@ volatile ulong flow_count = 0;
 // Flow sensor interrupt service routine
 void flow_isr() {
   ulong curr = millis();
-  if(curr-os.sensor_lasttime < 50) return;  // debounce threshold: 50ms
+  if(curr-os.flowcount_time_ms < 50) return;  // debounce threshold: 50ms
   flow_count++;
-  os.sensor_lasttime = curr;
+  os.flowcount_time_ms = curr;
 }
 
 // ======================
@@ -254,6 +254,8 @@ ISR(WDT_vect)
 }
 
 #else
+volatile ulong flow_count = 0;
+
 void do_setup() {
   os.begin();          // OpenSprinkler init
   os.options_setup();  // Setup options
@@ -358,18 +360,23 @@ void do_loop()
       os.old_status.rain_delayed = os.status.rain_delayed;
     }
     // ====== Check rain sensor status ======
-    os.rainsensor_status();
-    if (os.old_status.rain_sensed != os.status.rain_sensed) {
-      if (os.status.rain_sensed) {
-        // rain sensor on, record time
-        os.sensor_lasttime = curr_time;
-      } else {
-        // rain sensor off, write log
-        write_log(LOGDATA_RAINSENSE, curr_time);
+    if (os.options[OPTION_SENSOR_TYPE].value == SENSOR_TYPE_RAIN) {
+      os.rainsensor_status();
+      if (os.old_status.rain_sensed != os.status.rain_sensed) {
+        if (os.status.rain_sensed) {
+          // rain sensor on, record time
+          os.sensor_lasttime = curr_time;
+        } else {
+          // rain sensor off, write log
+          if (curr_time>os.sensor_lasttime+10) {  // add a 10 second threshold
+                                                  // to avoid faulty rain sensors generating
+                                                  // too many log records
+            write_log(LOGDATA_RAINSENSE, curr_time);
+          }
+        }
+        os.old_status.rain_sensed = os.status.rain_sensed;
       }
-      os.old_status.rain_sensed = os.status.rain_sensed;
     }
-
     // ====== Schedule program data ======
     ulong curr_minute = curr_time / 60;
     boolean match_found = false;
@@ -532,7 +539,6 @@ void do_loop()
         // reset program busy bit
         os.status.program_busy = 0;
         // log flow sensor reading
-        DEBUG_PRINTLN("log flow count");
         write_log(LOGDATA_FLOWSENSE, curr_time);
 
         // in case some options have changed while executing the program
@@ -783,7 +789,10 @@ void schedule_all_stations(ulong curr_time) {
     if (!os.status.program_busy) {
       os.status.program_busy = 1;  // set program busy bit
       // start flow count
-      os.flowcount_start = flow_count;
+      if(os.options[OPTION_SENSOR_TYPE].value == SENSOR_TYPE_FLOW) {
+        os.flowcount_start = flow_count;
+        os.sensor_lasttime = curr_time;
+      }
       DEBUG_PRINTLN("flow count started");
     }
   }
@@ -919,25 +928,30 @@ void write_log(byte type, ulong curr_time) {
     strcat_P(tmp_buffer, PSTR(","));
     itoa(pd.lastrun.duration, tmp_buffer+strlen(tmp_buffer), 10);
   } else {
-    strcat_P(tmp_buffer, PSTR("0,\""));
+    ulong lvalue;
+    if(type==LOGDATA_FLOWSENSE) {
+      lvalue = (flow_count>os.flowcount_start)?(flow_count-os.flowcount_start):0;
+    } else {
+      lvalue = 0;
+    }
+    ultoa(lvalue, tmp_buffer+strlen(tmp_buffer), 10);
+    strcat_P(tmp_buffer, PSTR(",\""));
     strcat_P(tmp_buffer, log_type_names+type*3);
     strcat_P(tmp_buffer, PSTR("\","));
-    ulong logvalue = 0;
+
     switch(type) {
       case LOGDATA_RAINSENSE:
-        logvalue = (curr_time>os.sensor_lasttime)?(curr_time-os.sensor_lasttime):0;
+      case LOGDATA_FLOWSENSE:
+        lvalue = (curr_time>os.sensor_lasttime)?(curr_time-os.sensor_lasttime):0;
         break;
       case LOGDATA_RAINDELAY:
-        logvalue = (curr_time>os.raindelay_start_time)?(curr_time-os.raindelay_start_time):0;
+        lvalue = (curr_time>os.raindelay_start_time)?(curr_time-os.raindelay_start_time):0;
         break;
       case LOGDATA_WATERLEVEL:
-        logvalue = os.options[OPTION_WATER_PERCENTAGE].value;
-        break;
-      case LOGDATA_FLOWSENSE:
-        logvalue = (flow_count>os.flowcount_start)?(flow_count-os.flowcount_start):0;
+        lvalue = os.options[OPTION_WATER_PERCENTAGE].value;
         break;
     }
-    ultoa(logvalue, tmp_buffer+strlen(tmp_buffer), 10);
+    ultoa(lvalue, tmp_buffer+strlen(tmp_buffer), 10);
   }
   strcat_P(tmp_buffer, PSTR(","));
   ultoa(curr_time, tmp_buffer+strlen(tmp_buffer), 10);

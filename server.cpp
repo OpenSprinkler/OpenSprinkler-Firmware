@@ -791,17 +791,22 @@ byte server_view_scripturl(char *p) {
   return HTML_OK;
 }
 
+extern ulong flow_count;
 void server_json_controller_main() {
   byte bid, sid;
   ulong curr_time = os.now_tz();
   //os.nvm_string_get(ADDR_NVM_LOCATION, tmp_buffer);
-  bfill.emit_p(PSTR("\"devt\":$L,\"nbrd\":$D,\"en\":$D,\"rd\":$D,\"rs\":$D,\"rdst\":$L,\"loc\":\"$E\",\"wtkey\":\"$E\",\"sunrise\":$D,\"sunset\":$D,\"eip\":$L,\"lwc\":$L,\"lswc\":$L,\"lrun\":[$D,$D,$D,$L],\"sbits\":["),
+  bfill.emit_p(PSTR("\"devt\":$L,\"nbrd\":$D,\"en\":$D,\"rd\":$D,\"rs\":$D,\"rdst\":$L,\"flt\":$L,\"flc\":$L,"
+                    "\"loc\":\"$E\",\"wtkey\":\"$E\",\"sunrise\":$D,\"sunset\":$D,\"eip\":$L,\"lwc\":$L,\"lswc\":$L,"
+                    "\"lrun\":[$D,$D,$D,$L],\"sbits\":["),
               curr_time,
               os.nboards,
               os.status.enabled,
               os.status.rain_delayed,
               os.status.rain_sensed,
               os.nvdata.rd_stop_time,
+              (os.options[OPTION_SENSOR_TYPE].value==SENSOR_TYPE_FLOW)?os.flowcount_time_ms:0,
+              (os.options[OPTION_SENSOR_TYPE].value==SENSOR_TYPE_FLOW)?flow_count:0,
               ADDR_NVM_LOCATION,
               ADDR_NVM_WEATHER_KEY,
               os.nvdata.sunrise_time,
@@ -1294,17 +1299,22 @@ byte server_json_log(char *p) {
         break;
       }
     #endif
-
-      // remove the \n character
-      //if (tmp_buffer[res-1] == '\n')  tmp_buffer[res-1] = 0;
-
       // check record type
-      // special records are all in the form of [0,"xx",...]
-      // where xx is the type name
-      if (type_specified && strncmp(type, tmp_buffer+4, 2))
+      // records are all in the form of [x,"xx",...]
+      // where x is program index (>0) if this is a station record
+      // and "xx" is the type name if this is a special record (e.g. wl, fl, rs)
+
+      // search string until we find the first comma
+      char *ptype = tmp_buffer;
+      tmp_buffer[TMP_BUFFER_SIZE-1]=0; // make sure the search will end
+      while(*ptype && *ptype != ',') ptype++;
+      if(*ptype != ',') continue; // didn't find comma, move on
+      ptype++;  // move past comma
+
+      if (type_specified && strncmp(type, ptype+1, 2))
         continue;
       // if type is not specified, output everything except "wl" and "fl" records
-      if (!type_specified && (!strncmp("wl", tmp_buffer+4, 2) || !strncmp("fl", tmp_buffer+4, 2)))
+      if (!type_specified && (!strncmp("wl", ptype+1, 2) || !strncmp("fl", ptype+1, 2)))
         continue;
       // if this is the first record, do not print comma
       if (comma)  bfill.emit_p(PSTR(","));

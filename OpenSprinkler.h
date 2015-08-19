@@ -118,8 +118,9 @@ public:
                                   // first byte-> master controller, second byte-> ext. board 1, and so on
 
   // variables for time keeping
-  static ulong sensor_lasttime;  // time when the most recent sensor reading was performed
-  static ulong flowcount_start; // starting flow count
+  static ulong sensor_lasttime;  // time when the last sensor reading is recorded
+  static ulong flowcount_time_ms;// time stamp when new flow sensor click is received (in milliseconds)
+  static ulong flowcount_start;  // starting flow count
   static ulong raindelay_start_time;  // time when the most recent rain delay started
   static byte  button_timeout;        // button timeout
   static ulong checkwt_lasttime;      // time when weather was checked

@@ -39,6 +39,7 @@ byte OpenSprinkler::engage_booster;
 
 ulong OpenSprinkler::sensor_lasttime;
 ulong OpenSprinkler::flowcount_start;
+ulong OpenSprinkler::flowcount_time_ms;
 ulong OpenSprinkler::raindelay_start_time;
 byte OpenSprinkler::button_timeout;
 ulong OpenSprinkler::checkwt_lasttime;
@@ -181,7 +182,7 @@ OptionStruct OpenSprinkler::options[NUM_OPTIONS] = {
   {0,   60,  _str_mton, _json_mton},  // master on time [0,60] seconds
   {60,  120, _str_mtof, _json_mtof},  // master off time [-60,60] seconds
   {0,   255, _str_sf,   _json_sf},    // sensor function (see SENSOR_TYPE macro defines)
-  {1,   1,   _str_rso,  _json_rso},   // rain sensor type. 0: normally closed; 1: normally open.
+  {0,   1,   _str_rso,  _json_rso},   // rain sensor type. 0: normally closed; 1: normally open.
   {100, 250, _str_wl,   _json_wl},    // water level (default 100%),
   {1,   1,   _str_den,  _json_den},   // device enable
   {0,   1,   _str_ipas, _json_ipas},  // 1: ignore password; 0: use password
@@ -525,20 +526,20 @@ void OpenSprinkler::begin() {
 
   // Remote extension icon
   _icon[2] = B00000;
-  _icon[3] = B00111;
-  _icon[4] = B01000;
-  _icon[5] = B10011;
-  _icon[6] = B10100;
-  _icon[7] = B10101;
+  _icon[3] = B10001;
+  _icon[4] = B01011;
+  _icon[5] = B00101;
+  _icon[6] = B01001;
+  _icon[7] = B11110;
   lcd.createChar(5, _icon);
 
   // Flow sensor icon
-  _icon[2] = B01110;
-  _icon[3] = B00100;
-  _icon[4] = B01110;
-  _icon[5] = B11011;
-  _icon[6] = B11011;
-  _icon[7] = B01110;
+  _icon[2] = B00000;
+  _icon[3] = B11010;
+  _icon[4] = B10010;
+  _icon[5] = B11010;
+  _icon[6] = B10011;
+  _icon[7] = B00000;
   lcd.createChar(6, _icon);
 
   // set sd cs pin high to release SD
