@@ -801,7 +801,7 @@ void server_json_controller_main() {
   byte bid, sid;
   ulong curr_time = os.now_tz();
   //os.nvm_string_get(ADDR_NVM_LOCATION, tmp_buffer);
-  bfill.emit_p(PSTR("\"devt\":$L,\"nbrd\":$D,\"en\":$D,\"rd\":$D,\"rs\":$D,\"rdst\":$L,\"flt\":$L,\"flc\":$L,"
+  bfill.emit_p(PSTR("\"devt\":$L,\"nbrd\":$D,\"en\":$D,\"rd\":$D,\"rs\":$D,\"rdst\":$L,\"flcrt\":$L,\"flwrt\":$D,"
                     "\"loc\":\"$E\",\"wtkey\":\"$E\",\"sunrise\":$D,\"sunset\":$D,\"eip\":$L,\"lwc\":$L,\"lswc\":$L,"
                     "\"lrun\":[$D,$D,$D,$L],\"sbits\":["),
               curr_time,
@@ -810,8 +810,8 @@ void server_json_controller_main() {
               os.status.rain_delayed,
               os.status.rain_sensed,
               os.nvdata.rd_stop_time,
-              (os.options[OPTION_SENSOR_TYPE]==SENSOR_TYPE_FLOW)?os.flowcount_time_ms:0,
-              (os.options[OPTION_SENSOR_TYPE]==SENSOR_TYPE_FLOW)?flow_count:0,
+              (os.options[OPTION_SENSOR_TYPE]==SENSOR_TYPE_FLOW)?os.flowcount_rt:0,
+              FLOWCOUNT_RT_WINDOW,
               ADDR_NVM_LOCATION,
               ADDR_NVM_WEATHER_KEY,
               os.nvdata.sunrise_time,

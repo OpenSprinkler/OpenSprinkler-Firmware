@@ -47,6 +47,8 @@
 #define STATION_ATTR_FILENAME "stns.dat"      // station attributes data file
 #define STATION_SPECIAL_DATA_SIZE  23
 
+#define FLOWCOUNT_RT_WINDOW  300      // flow count window (for computing real-time flow rate), 5 minutes
+
 /** Station type macro defines */
 #define STN_TYPE_STANDARD    0x00
 #define STN_TYPE_RF          0x01

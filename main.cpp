@@ -627,6 +627,15 @@ void do_loop()
     }
 #endif
 
+    // real-time flow rate
+    static ulong flowcount_rt_start = 0;
+    if (os.options[OPTION_SENSOR_TYPE]==SENSOR_TYPE_FLOW) {
+      if (curr_time % FLOWCOUNT_RT_WINDOW == 0) {
+        os.flowcount_rt = (flow_count > flowcount_rt_start) ? flow_count - flowcount_rt_start: 0;
+        flowcount_rt_start = flow_count;
+      }
+    }
+
     // perform ntp sync
     if (curr_time % NTP_SYNC_INTERVAL == 0) os.status.req_ntpsync = 1;
     perform_ntp_sync();
@@ -637,6 +646,7 @@ void do_loop()
 
     // check weather
     check_weather();
+
   }
 
   #if !defined(ARDUINO)
@@ -793,7 +803,7 @@ void schedule_all_stations(ulong curr_time) {
       os.status.program_busy = 1;  // set program busy bit
       // start flow count
       if(os.options[OPTION_SENSOR_TYPE] == SENSOR_TYPE_FLOW) {  // if flow sensor is connected
-        os.flowcount_start = flow_count;
+        os.flowcount_log_start = flow_count;
         os.sensor_lasttime = curr_time;
       }
     }
@@ -944,7 +954,7 @@ void write_log(byte type, ulong curr_time) {
   } else {
     ulong lvalue;
     if(type==LOGDATA_FLOWSENSE) {
-      lvalue = (flow_count>os.flowcount_start)?(flow_count-os.flowcount_start):0;
+      lvalue = (flow_count>os.flowcount_log_start)?(flow_count-os.flowcount_log_start):0;
     } else {
       lvalue = 0;
     }

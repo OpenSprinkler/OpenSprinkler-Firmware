@@ -38,7 +38,8 @@ byte OpenSprinkler::engage_booster;
 #endif
 
 ulong OpenSprinkler::sensor_lasttime;
-ulong OpenSprinkler::flowcount_start;
+ulong OpenSprinkler::flowcount_log_start;
+ulong OpenSprinkler::flowcount_rt;
 ulong OpenSprinkler::flowcount_time_ms;
 ulong OpenSprinkler::raindelay_start_time;
 byte OpenSprinkler::button_timeout;
