@@ -49,7 +49,10 @@ void ProgramData::reset_runtime() {
   last_seq_stop_time = 0;
 }
 
-// this returns a pointer to the next available element in the queue
+/** Insert a new element to the queue
+ * This function returns pointer to the next available element in the queue
+ * and returns NULL if the queue is full
+ */
 RuntimeQueueStruct* ProgramData::enqueue() {
   if (nqueue < RUNTIME_QUEUE_SIZE) {
     nqueue ++;
@@ -59,6 +62,11 @@ RuntimeQueueStruct* ProgramData::enqueue() {
   }
 }
 
+/** Remove an element from the queue
+ * This function copies the last element of
+ * the queue to overwrite the requested
+ * element, therefore removing the requested element.
+ */
 // this removes an element from the queue
 void ProgramData::dequeue(byte qid) {
   if (qid>=nqueue)  return;
@@ -83,23 +91,23 @@ void ProgramData::dequeue(byte qid) {
   DEBUG_PRINTLN("");
 }
 
-// load program count from NVM
+/** Load program count from NVM */
 void ProgramData::load_count() {
   nprograms = nvm_read_byte((byte *) ADDR_PROGRAMCOUNTER);
 }
 
-// save program count to NVM
+/** Save program count to NVM */
 void ProgramData::save_count() {
   nvm_write_byte((byte *) ADDR_PROGRAMCOUNTER, nprograms);
 }
 
-// erase all program data
+/** Erase all program data */
 void ProgramData::eraseall() {
   nprograms = 0;
   save_count();
 }
 
-// read a program
+/** Read a program from NVM*/
 void ProgramData::read(byte pid, ProgramStruct *buf) {
   if (pid >= nprograms) return;
   if (0) {
@@ -110,7 +118,7 @@ void ProgramData::read(byte pid, ProgramStruct *buf) {
   }
 }
 
-// add a program
+/** Add a program */
 byte ProgramData::add(ProgramStruct *buf) {
   if (0) {
     // todo: handle SD card
@@ -124,7 +132,7 @@ byte ProgramData::add(ProgramStruct *buf) {
   return 1;
 }
 
-// move a program up (i.e. swap a program with the one above it)
+/** Move a program up (i.e. swap a program with the one above it) */
 void ProgramData::moveup(byte pid) {
   if(pid >= nprograms || pid == 0) return;
 
@@ -151,7 +159,7 @@ void ProgramData::moveup(byte pid) {
   }
 }
 
-// modify a program
+/** Modify a program */
 byte ProgramData::modify(byte pid, ProgramStruct *buf) {
   if (pid >= nprograms)  return 0;
   if (0) {
@@ -163,7 +171,7 @@ byte ProgramData::modify(byte pid, ProgramStruct *buf) {
   return 1;
 }
 
-// delete program(s)
+/** Delete program(s) */
 byte ProgramData::del(byte pid) {
   if (pid >= nprograms)  return 0;
   if (nprograms == 0) return 0;
@@ -183,7 +191,7 @@ byte ProgramData::del(byte pid) {
   return 1;
 }
 
-// decode a sunrise/sunset start time to actual start time
+/** Decode a sunrise/sunset start time to actual start time */
 int16_t ProgramStruct::starttime_decode(int16_t t) {
   if((t>>15)&1) return -1;
   int16_t offset = t&0x7ff;
@@ -198,7 +206,7 @@ int16_t ProgramStruct::starttime_decode(int16_t t) {
   return t;
 }
 
-// Check if a given time matches the program's start day
+/** Check if a given time matches the program's start day */
 byte ProgramStruct::check_day_match(time_t t) {
 
 #if defined(ARDUINO) // get current time from Arduino

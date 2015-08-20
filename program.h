@@ -140,9 +140,9 @@ public:
 class ProgramData {
 public:  
   static RuntimeQueueStruct queue[];
-  static byte nqueue;
-  static byte station_qid[];
-  static byte nprograms;     // number of programs
+  static byte nqueue;         // number of queue elements
+  static byte station_qid[];  // this array stores the queue element index for each scheduled station
+  static byte nprograms;      // number of programs
   static LogStruct lastrun;
   static ulong last_seq_stop_time;  // the last stop time of a sequential station
   

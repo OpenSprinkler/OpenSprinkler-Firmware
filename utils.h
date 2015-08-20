@@ -32,6 +32,7 @@
 #endif
 #include "defines.h"
 
+void strncpy_P0(char* dest, const char* src, int n);
 byte strcmp_to_nvm(const char* src, int addr);
 byte water_time_encode(uint16_t i);
 uint16_t water_time_decode(byte i);

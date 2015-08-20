@@ -114,8 +114,8 @@
 
 #else // NVM defines for RPI/BBB/LINUX
 
-  // These are kept the same as AVR for compatibility
-  // But these can be increased if needed
+  // These are kept the same as AVR for compatibility reasons
+  // But they can be increased if needed
   #define NVM_FILENAME        "nvm.dat" // for RPI/BBB, nvm data is stored in a file
 
   #define MAX_EXT_BOARDS    6  // maximum number of exp. boards (each expands 8 stations)
@@ -273,7 +273,7 @@ typedef enum {
   #if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
     #define ETHER_BUFFER_SIZE   1500 // ATmega1284 has 16K RAM, so use a bigger buffer
   #else
-    #define ETHER_BUFFER_SIZE   850  // ATmega644 has 4K RAM, so use a smaller buffer
+    #define ETHER_BUFFER_SIZE   960  // ATmega644 has 4K RAM, so use a smaller buffer
   #endif
 
   #define 	wdt_reset()   __asm__ __volatile__ ("wdr")  // watchdog timer reset
@@ -380,7 +380,7 @@ typedef enum {
 
 #endif  // end of Hardawre defines
 
-#define TMP_BUFFER_SIZE     120  // scratch buffer size
+#define TMP_BUFFER_SIZE     128  // scratch buffer size
 
 /** Other defines */
 // button values

@@ -80,9 +80,9 @@ static void getweather_callback(byte status, uint16_t off, uint16_t len) {
 
   if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("scale"), true)) {
     v = atoi(tmp_buffer);
-    if (v>=0 && v<=250 && v != os.options[OPTION_WATER_PERCENTAGE].value) {
+    if (v>=0 && v<=250 && v != os.options[OPTION_WATER_PERCENTAGE]) {
       // only save if the value has changed
-      os.options[OPTION_WATER_PERCENTAGE].value = v;
+      os.options[OPTION_WATER_PERCENTAGE] = v;
       os.options_save();
     }
   }
@@ -90,9 +90,9 @@ static void getweather_callback(byte status, uint16_t off, uint16_t len) {
   if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("tz"), true)) {
     v = atoi(tmp_buffer);
     if (v>=0 && v<= 96) {
-      if (v != os.options[OPTION_TIMEZONE].value) {
+      if (v != os.options[OPTION_TIMEZONE]) {
         // if timezone changed, save change and force ntp sync
-        os.options[OPTION_TIMEZONE].value = v;
+        os.options[OPTION_TIMEZONE] = v;
         os.options_save();
       }
     }
@@ -122,10 +122,10 @@ void GetWeather() {
   read_from_file(wtopts_filename, tmp, 30);
   BufferFiller bf = (uint8_t*)tmp_buffer;
   bf.emit_p(PSTR("$D.py?loc=$E&key=$E&fwv=$D&wto=$S"),
-                (int) os.options[OPTION_USE_WEATHER].value,
+                (int) os.options[OPTION_USE_WEATHER],
                 ADDR_NVM_LOCATION,
                 ADDR_NVM_WEATHER_KEY,
-                (int)os.options[OPTION_FW_VERSION].value,
+                (int)os.options[OPTION_FW_VERSION],
                 tmp);
   // copy string to tmp_buffer, replacing all spaces with _
   char *src=tmp_buffer+strlen(tmp_buffer);
@@ -210,10 +210,10 @@ void GetWeather() {
   char tmp[100];
   read_from_file(wtopts_filename, tmp, 100);
   bf.emit_p(PSTR("$D.py?loc=$E&key=$E&fwv=$D&wto=$S"),
-                (int) os.options[OPTION_USE_WEATHER].value,
+                (int) os.options[OPTION_USE_WEATHER],
                 ADDR_NVM_LOCATION,
                 ADDR_NVM_WEATHER_KEY,
-                (int)os.options[OPTION_FW_VERSION].value,
+                (int)os.options[OPTION_FW_VERSION],
                 tmp);    
 
   char *src=tmp_buffer+strlen(tmp_buffer);

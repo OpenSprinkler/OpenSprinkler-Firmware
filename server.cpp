@@ -48,6 +48,8 @@ extern BufferFiller bfill;
 extern char tmp_buffer[];
 extern OpenSprinkler os;
 extern ProgramData pd;
+extern char op_json_names[];
+extern char op_max[];
 
 void write_log(byte type, ulong curr_time);
 void schedule_all_stations(ulong curr_time);
@@ -190,6 +192,7 @@ void send_packet(bool final=false) {
   }
 }
 
+/* Check available space (number of bytes) in the Ethernet buffer */
 int available_ether_buffer() {
   return ETHER_BUFFER_SIZE - (int)bfill.position();
 }
@@ -306,7 +309,7 @@ int available_ether_buffer() {
 }
 #endif
 
-// convert a single hex digit character to its integer value
+/** Convert a single hex digit character to its integer value */
 unsigned char h2int(char c)
 {
     if (c >= '0' && c <='9'){
@@ -321,7 +324,7 @@ unsigned char h2int(char c)
     return(0);
 }
 
-// decode a url string e.g "hello%20joe" or "hello+joe" becomes "hello joe"
+/** Decode a url string e.g "hello%20joe" or "hello+joe" becomes "hello joe" */
 void urlDecode (char *urlbuf)
 {
     char c;
@@ -341,7 +344,7 @@ void urlDecode (char *urlbuf)
 /** Check and verify password */
 boolean check_password(char *p)
 {
-  if (os.options[OPTION_IGNORE_PASSWORD].value)  return true;
+  if (os.options[OPTION_IGNORE_PASSWORD])  return true;
   if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("pw"), true)) {
     urlDecode(tmp_buffer);
     if (os.password_verify(tmp_buffer))
@@ -392,14 +395,14 @@ void server_json_stations_main()
   delay(1);
 }
 
-/** Output Stations */
+/** Output stations data */
 byte server_json_stations(char *p) {
   print_json_header();
   server_json_stations_main();
   return HTML_OK;
 }
 
-/** Output Station Special Attribute */
+/** Output station special attribute */
 byte server_json_station_special(char *p) {
 #if defined(ARDUINO)
   // if no sd card, return false
@@ -705,7 +708,7 @@ void server_json_options_main() {
         oid==OPTION_GATEWAY_IP1 || oid==OPTION_GATEWAY_IP2 || oid==OPTION_GATEWAY_IP3 || oid==OPTION_GATEWAY_IP4)
         continue;
     #endif
-    int32_t v=os.options[oid].value;
+    int32_t v=os.options[oid];
     if (oid==OPTION_MASTER_OFF_ADJ || oid==OPTION_MASTER_OFF_ADJ_2) {v-=60;}
     if (oid==OPTION_STATION_DELAY_TIME) {v=water_time_decode_signed(v);}
     #if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
@@ -717,10 +720,12 @@ void server_json_options_main() {
     if (oid==OPTION_BOOST_TIME) continue;
     #endif
 
-    if (os.options[oid].json_str==0) continue;
+    if (oid==OPTION_SEQUENTIAL_RETIRED) continue;
     if (oid==OPTION_DEVICE_ID && os.status.has_hwmac) continue; // do not send DEVICE ID if hardware MAC exists
-    bfill.emit_p(PSTR("\"$F\":$D"),
-                 os.options[oid].json_str, v);
+    // each json name takes 5 characters
+    strncpy_P0(tmp_buffer, op_json_names+oid*5, 5);
+    bfill.emit_p(PSTR("\"$S\":$D"),
+                 tmp_buffer, v);
     if(oid!=NUM_OPTIONS-1)
       bfill.emit_p(PSTR(","));
   }
@@ -805,8 +810,8 @@ void server_json_controller_main() {
               os.status.rain_delayed,
               os.status.rain_sensed,
               os.nvdata.rd_stop_time,
-              (os.options[OPTION_SENSOR_TYPE].value==SENSOR_TYPE_FLOW)?os.flowcount_time_ms:0,
-              (os.options[OPTION_SENSOR_TYPE].value==SENSOR_TYPE_FLOW)?flow_count:0,
+              (os.options[OPTION_SENSOR_TYPE]==SENSOR_TYPE_FLOW)?os.flowcount_time_ms:0,
+              (os.options[OPTION_SENSOR_TYPE]==SENSOR_TYPE_FLOW)?flow_count:0,
               ADDR_NVM_LOCATION,
               ADDR_NVM_WEATHER_KEY,
               os.nvdata.sunrise_time,
@@ -868,7 +873,7 @@ byte server_home()
 
   // send server variables and javascript packets
   bfill.emit_p(PSTR("var ver=$D,ipas=$D;</script>\n"),
-               OS_FW_VERSION, os.options[OPTION_IGNORE_PASSWORD].value);
+               OS_FW_VERSION, os.options[OPTION_IGNORE_PASSWORD]);
   bfill.emit_p(PSTR("<script src=\"$E/home.js\"></script>\n</body>\n</html>"), ADDR_NVM_JAVASCRIPTURL);
   return HTML_OK;
 }
@@ -923,11 +928,11 @@ byte server_change_values(char *p)
   }
 
   if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("re"), true)) {
-    if (tmp_buffer[0]=='1' && !os.options[OPTION_REMOTE_EXT_MODE].value) {
-      os.options[OPTION_REMOTE_EXT_MODE].value = 1;
+    if (tmp_buffer[0]=='1' && !os.options[OPTION_REMOTE_EXT_MODE]) {
+      os.options[OPTION_REMOTE_EXT_MODE] = 1;
       os.options_save();
-    } else if(tmp_buffer[0]=='0' && os.options[OPTION_REMOTE_EXT_MODE].value) {
-      os.options[OPTION_REMOTE_EXT_MODE].value = 0;
+    } else if(tmp_buffer[0]=='0' && os.options[OPTION_REMOTE_EXT_MODE]) {
+      os.options[OPTION_REMOTE_EXT_MODE] = 0;
       os.options_save();
     }
   }
@@ -996,6 +1001,7 @@ byte server_change_options(char *p)
   // process option values
   byte err = 0;
   byte prev_value;
+  byte max_value;
   for (byte oid=0; oid<NUM_OPTIONS; oid++) {
     //if ((os.options[oid].flag&OPFLAG_WEB_EDIT)==0) continue;
 
@@ -1005,13 +1011,14 @@ byte server_change_options(char *p)
         oid==OPTION_FW_MINOR || oid==OPTION_SEQUENTIAL_RETIRED ||
         oid==OPTION_REMOTE_EXT_MODE)
       continue;
-    prev_value = os.options[oid].value;
-    if (os.options[oid].max==1)  os.options[oid].value = 0;  // set a bool variable to 0 first
+    prev_value = os.options[oid];
+    max_value = pgm_read_byte(op_max+oid);
+    if (max_value==1)  os.options[oid] = 0;  // set a bool variable to 0 first
     char tbuf2[5] = {'o', 0, 0, 0, 0};
     itoa(oid, tbuf2+1, 10);
     if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, tbuf2)) {
-      if (os.options[oid].max==1) {
-        os.options[oid].value = 1;  // if the bool variable is detected, set to 1
+      if (max_value==1) {
+        os.options[oid] = 1;  // if the bool variable is detected, set to 1
       } else {
 		    int32_t v = atol(tmp_buffer);
 		    if (oid==OPTION_MASTER_OFF_ADJ || oid==OPTION_MASTER_OFF_ADJ_2) {v+=60;} // master off time
@@ -1023,14 +1030,14 @@ byte server_change_options(char *p)
            v>>=2;
         }
         #endif
-		    if (v>=0 && v<=os.options[oid].max) {
-		      os.options[oid].value = v;
+        if (v>=0 && v<=max_value) {
+          os.options[oid] = v;
 		    } else {
 		      err = 1;
 		    }
 		  }
     }
-    if (os.options[oid].value != prev_value) {	// if value has changed
+    if (os.options[oid] != max_value) {	// if value has changed
     	if (oid==OPTION_TIMEZONE || oid==OPTION_USE_NTP)    time_change = true;
     	if (oid>=OPTION_NTP_IP1 && oid<=OPTION_NTP_IP4)     time_change = true;
     	if (oid>=OPTION_USE_DHCP && oid<=OPTION_HTTPPORT_1) network_change = true;
@@ -1060,7 +1067,7 @@ byte server_change_options(char *p)
     nvm_write_block(tmp_buffer, (void*)ADDR_NVM_WEATHER_KEY, strlen(tmp_buffer)+1);
   }
   // if not using NTP and manually setting time
-  if (!os.options[OPTION_USE_NTP].value && findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("ttt"), true)) {
+  if (!os.options[OPTION_USE_NTP] && findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("ttt"), true)) {
     unsigned long t;
     t = atol(tmp_buffer);
     // before chaging time, reset all stations to avoid messing up with timing
@@ -1464,7 +1471,7 @@ void handle_web_request(char *p)
           if(check_password(dat)==false) {
             print_json_header();
             bfill.emit_p(PSTR("\"$F\":$D}"),
-                   os.options[0].json_str, os.options[0].value);
+                   op_json_names+0, os.options[0]);
             ret = HTML_OK;
           } else {
             ret = (urls[i])(dat);
@@ -1504,14 +1511,14 @@ void handle_web_request(char *p)
 
 
 #if defined(ARDUINO)
-// NTP sync
+/** NTP sync request */
 unsigned long getNtpTime()
 {
   byte ntpip[4] = {
-    os.options[OPTION_NTP_IP1].value,
-    os.options[OPTION_NTP_IP2].value,
-    os.options[OPTION_NTP_IP3].value,
-    os.options[OPTION_NTP_IP4].value};
+    os.options[OPTION_NTP_IP1],
+    os.options[OPTION_NTP_IP2],
+    os.options[OPTION_NTP_IP3],
+    os.options[OPTION_NTP_IP4]};
   uint32_t time;
   byte tick=0;
   unsigned long expire;

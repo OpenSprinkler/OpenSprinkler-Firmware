@@ -43,14 +43,6 @@
 #include "defines.h"
 #include "utils.h"
 
-/** Option data structure */
-struct OptionStruct{
-  byte value;     // each option value is stored as a byte
-  byte max;       // maximum value of the option
-  const char* str;      // full name
-  const char* json_str; // json name
-};
-
 /** Non-volatile data */
 struct NVConData {
   uint16_t sunrise_time;  // sunrise time (in minutes)
@@ -112,7 +104,7 @@ public:
   static byte nboards, nstations;
   static byte hw_type;           // hardware type
 
-  static OptionStruct options[];  // option values, max, name, and flag
+  static byte options[];  // option values, max, name, and flag
 
   static byte station_bits[];     // station activation bits. each byte corresponds to a board (8 stations)
                                   // first byte-> master controller, second byte-> ext. board 1, and so on

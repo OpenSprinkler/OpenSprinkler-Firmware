@@ -219,6 +219,16 @@ unsigned int detect_rpi_rev() {
 
 #endif
 
+// copy n-character string from program memory with ending 0
+void strncpy_P0(char* dest, const char* src, int n) {
+  byte i;
+  for(i=0;i<n;i++) {
+    *dest=pgm_read_byte(src++);
+    dest++;
+  }
+  *dest=0;
+}
+
 // compare a string to nvm
 byte strcmp_to_nvm(const char* src, int _addr) {
   byte c1, c2;
