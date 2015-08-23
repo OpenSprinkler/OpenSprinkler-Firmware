@@ -29,6 +29,8 @@
 #else // headers for RPI/BBB
   #include <stdio.h>
   #include <limits.h>
+  #include <sys/time.h>
+
 #endif
 #include "defines.h"
 
@@ -53,6 +55,12 @@ void remove_file(const char *name);
   byte nvm_read_byte(const byte *p);
   void nvm_write_byte(const byte *p, byte v);
   char* get_runtime_path();
+  void delay(ulong ms);
+  void delayMicroseconds(ulong us);
+  void delayMicrosecondsHard(ulong us);
+  ulong millis();
+  ulong micros();
+  void initialiseEpoch();
 #if defined(OSPI)
   unsigned int detect_rpi_rev();
 #endif

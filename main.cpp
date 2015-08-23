@@ -40,6 +40,7 @@ void manual_start_program(byte pid);
 #include <sys/stat.h>
 #include "etherport.h"
 #include "server.h"
+#include "gpio.h"
 char ether_buffer[ETHER_BUFFER_SIZE];
 EthernetServer *m_server = 0;
 EthernetClient *m_client = 0;
@@ -61,6 +62,15 @@ BufferFiller bfill;             // buffer filler
 // ====== Object defines ======
 OpenSprinkler os; // OpenSprinkler object
 ProgramData pd;   // ProgramdData object
+
+volatile ulong flow_count = 0;
+/** Flow sensor interrupt service routine */
+void flow_isr() {
+  ulong curr = millis();
+  if(curr-os.flowcount_time_ms < 50) return;  // debounce threshold: 50ms
+  flow_count++;
+  os.flowcount_time_ms = curr;
+}
 
 #if defined(ARDUINO)
 // ====== UI defines ======
@@ -178,15 +188,6 @@ void ui_state_machine() {
   }
 }
 
-volatile ulong flow_count = 0;
-/** Flow sensor interrupt service routine */
-void flow_isr() {
-  ulong curr = millis();
-  if(curr-os.flowcount_time_ms < 50) return;  // debounce threshold: 50ms
-  flow_count++;
-  os.flowcount_time_ms = curr;
-}
-
 // ======================
 // Setup Function
 // ======================
@@ -249,13 +250,18 @@ ISR(WDT_vect)
 }
 
 #else
-volatile ulong flow_count = 0;
 
 void do_setup() {
+  initialiseEpoch();   // initialize time reference for millis() and micros()
   os.begin();          // OpenSprinkler init
   os.options_setup();  // Setup options
 
   pd.init();            // ProgramData init
+
+  if (os.options[OPTION_SENSOR_TYPE]==SENSOR_TYPE_FLOW) {
+    attachInterrupt(PIN_FLOWSENSOR, "falling", flow_isr);
+  }
+
   if (os.start_network()) {  // initialize network
     DEBUG_PRINTLN("network established.");
     os.status.network_fails = 0;
@@ -627,7 +633,7 @@ void do_loop()
     }
 #endif
 
-    // real-time flow rate
+    // real-time flow count
     static ulong flowcount_rt_start = 0;
     if (os.options[OPTION_SENSOR_TYPE]==SENSOR_TYPE_FLOW) {
       if (curr_time % FLOWCOUNT_RT_WINDOW == 0) {
@@ -650,7 +656,7 @@ void do_loop()
   }
 
   #if !defined(ARDUINO)
-    usleep(1000); // For OSPI/OSBO/LINUX, sleep 1 ms to minimize CPU usage
+    delay(1); // For OSPI/OSBO/LINUX, sleep 1 ms to minimize CPU usage
   #endif
 }
 

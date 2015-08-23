@@ -921,9 +921,9 @@ void transmit_rfbit(ulong lenH, ulong lenL) {
   delayMicroseconds(lenL);
 #else
   digitalWrite(PIN_RF_DATA, 1);
-  usleep(lenH);
+  delayMicrosecondsHard(lenH);
   digitalWrite(PIN_RF_DATA, 0);
-  usleep(lenL);
+  delayMicrosecondsHard(lenL);
 #endif
 }
 

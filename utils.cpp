@@ -80,7 +80,6 @@ void remove_file(const char *name) {
 }
 
 #else // RPI/BBB/LINUX
-
 void nvm_read_block(void *dst, const void *src, int len) {
   FILE *fp = fopen(NVM_FILENAME, "rb");
   if(fp) {
@@ -216,6 +215,81 @@ unsigned int detect_rpi_rev() {
   return rev;
 }
 #endif
+
+void delay(ulong howLong)
+{
+  struct timespec sleeper, dummy ;
+
+  sleeper.tv_sec  = (time_t)(howLong / 1000) ;
+  sleeper.tv_nsec = (long)(howLong % 1000) * 1000000 ;
+
+  nanosleep (&sleeper, &dummy) ;
+}
+
+void delayMicrosecondsHard (ulong howLong)
+{
+  struct timeval tNow, tLong, tEnd ;
+
+  gettimeofday (&tNow, NULL) ;
+  tLong.tv_sec  = howLong / 1000000 ;
+  tLong.tv_usec = howLong % 1000000 ;
+  timeradd (&tNow, &tLong, &tEnd) ;
+
+  while (timercmp (&tNow, &tEnd, <))
+    gettimeofday (&tNow, NULL) ;
+}
+
+void delayMicroseconds (ulong howLong)
+{
+  struct timespec sleeper ;
+  unsigned int uSecs = howLong % 1000000 ;
+  unsigned int wSecs = howLong / 1000000 ;
+
+  /**/ if (howLong ==   0)
+    return ;
+  else if (howLong  < 100)
+    delayMicrosecondsHard (howLong) ;
+  else
+  {
+    sleeper.tv_sec  = wSecs ;
+    sleeper.tv_nsec = (long)(uSecs * 1000L) ;
+    nanosleep (&sleeper, NULL) ;
+  }
+}
+
+static uint64_t epochMilli, epochMicro ;
+
+void initialiseEpoch()
+{
+  struct timeval tv ;
+
+  gettimeofday (&tv, NULL) ;
+  epochMilli = (uint64_t)tv.tv_sec * (uint64_t)1000    + (uint64_t)(tv.tv_usec / 1000) ;
+  epochMicro = (uint64_t)tv.tv_sec * (uint64_t)1000000 + (uint64_t)(tv.tv_usec) ;
+}
+
+ulong millis (void)
+{
+  struct timeval tv ;
+  uint64_t now ;
+
+  gettimeofday (&tv, NULL) ;
+  now  = (uint64_t)tv.tv_sec * (uint64_t)1000 + (uint64_t)(tv.tv_usec / 1000) ;
+
+  return (uint32_t)(now - epochMilli) ;
+}
+
+ulong micros (void)
+{
+  struct timeval tv ;
+  uint64_t now ;
+
+  gettimeofday (&tv, NULL) ;
+  now  = (uint64_t)tv.tv_sec * (uint64_t)1000000 + (uint64_t)tv.tv_usec ;
+
+  return (uint32_t)(now - epochMicro) ;
+}
+
 
 #endif
 

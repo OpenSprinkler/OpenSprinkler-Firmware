@@ -35,5 +35,7 @@
 void pinMode(int pin, byte mode);
 void digitalWrite(int pin, byte value);
 byte digitalRead(int pin);
+// mode can be any of 'rising', 'falling', 'both'
+void attachInterrupt(int pin, const char* mode, void (*isr)(void));
 
 #endif
