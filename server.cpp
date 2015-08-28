@@ -801,17 +801,15 @@ void server_json_controller_main() {
   byte bid, sid;
   ulong curr_time = os.now_tz();
   //os.nvm_string_get(ADDR_NVM_LOCATION, tmp_buffer);
-  bfill.emit_p(PSTR("\"devt\":$L,\"nbrd\":$D,\"en\":$D,\"rd\":$D,\"rs\":$D,\"rdst\":$L,\"flcrt\":$L,\"flwrt\":$D,"
+  bfill.emit_p(PSTR("\"devt\":$L,\"nbrd\":$D,\"en\":$D,\"rd\":$D,\"rs\":$D,\"rdst\":$L,"
                     "\"loc\":\"$E\",\"wtkey\":\"$E\",\"sunrise\":$D,\"sunset\":$D,\"eip\":$L,\"lwc\":$L,\"lswc\":$L,"
-                    "\"lrun\":[$D,$D,$D,$L],\"sbits\":["),
+                    "\"lrun\":[$D,$D,$D,$L],"),
               curr_time,
               os.nboards,
               os.status.enabled,
               os.status.rain_delayed,
               os.status.rain_sensed,
               os.nvdata.rd_stop_time,
-              (os.options[OPTION_SENSOR_TYPE]==SENSOR_TYPE_FLOW)?os.flowcount_rt:0,
-              FLOWCOUNT_RT_WINDOW,
               ADDR_NVM_LOCATION,
               ADDR_NVM_WEATHER_KEY,
               os.nvdata.sunrise_time,
@@ -823,6 +821,17 @@ void server_json_controller_main() {
               pd.lastrun.program,
               pd.lastrun.duration,
               pd.lastrun.endtime);
+
+#if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
+  if(os.status.has_curr_sense) {
+    bfill.emit_p(PSTR("\"curr\":$D,"), os.read_current());
+  }
+#endif
+  if(os.options[OPTION_SENSOR_TYPE]==SENSOR_TYPE_FLOW) {
+    bfill.emit_p(PSTR("\"flcrt\":$L,\"flwrt\":$D,"), os.flowcount_rt, FLOWCOUNT_RT_WINDOW);
+  }
+
+  bfill.emit_p(PSTR("\"sbits\":["));
   // print sbits
   for(bid=0;bid<os.nboards;bid++)
     bfill.emit_p(PSTR("$D,"), os.station_bits[bid]);
@@ -849,11 +858,6 @@ void server_json_controller_main() {
   if(read_from_file(wtopts_filename, tmp_buffer)) {
     bfill.emit_p(PSTR(",\"wto\":{$S}"), tmp_buffer);
   }
-#if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
-  if(os.status.has_curr_sense) {
-    bfill.emit_p(PSTR(",\"curr\":$D"), os.read_current());
-  }
-#endif
   bfill.emit_p(PSTR("}"));
   delay(1);
 }

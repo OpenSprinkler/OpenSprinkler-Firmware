@@ -476,6 +476,7 @@ void do_loop()
           // skip master station
           if (os.status.mas == sid+1) continue;
           if (os.status.mas2== sid+1) continue;
+          if (pd.station_qid[sid]==255) continue;
 
           q = pd.queue + pd.station_qid[sid];
           // check if this station is scheduled, either running or waiting to run
