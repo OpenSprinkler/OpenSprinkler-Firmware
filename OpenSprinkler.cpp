@@ -914,17 +914,6 @@ void OpenSprinkler::clear_all_station_bits() {
 
 #if !defined(ARDUINO)
 int rf_gpio_fd = -1;
-void OpenSprinkler::calibrate_rf_timing() {
-  char code0[] = "0000000000000000";  // signal with 0 timing
-  char code1[] = "0000000000000100";  // signal with 0x100 timing
-  ulong start = micros();
-  switch_rfstation((byte*)code0, 0);
-  DEBUG_PRINTLN(micros()-start);
-  start = micros();
-  switch_rfstation((byte*)code1, 0);
-  DEBUG_PRINTLN(micros()-start);
-}
-
 #endif
 
 /** Transmit one RF signal bit */
@@ -974,9 +963,9 @@ void OpenSprinkler::switch_rfstation(byte *code, bool turnon) {
   length = length - (length>>5);   // due to internal call delay, scale time down to 97%
   send_rfsignal(turnon ? on : off, length);
 #else
-  length = (length>>2)+(length>>3);   // on RPi and BBB, there is even more overhead, scale to 37.5%
+  //length = (length>>2)+(length>>3);   // on RPi and BBB, there is even more overhead, scale to 37.5%
   // pre-open gpio file to minimize overhead
-  int rf_gpio_fd = gpio_fd_open(PIN_RF_DATA);
+  rf_gpio_fd = gpio_fd_open(PIN_RF_DATA);
   send_rfsignal(turnon ? on : off, length);
   gpio_fd_close(rf_gpio_fd);
   rf_gpio_fd = -1;

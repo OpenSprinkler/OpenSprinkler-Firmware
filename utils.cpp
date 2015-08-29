@@ -74,7 +74,6 @@ void remove_file(const char *name) {
   char *fn = tmp_buffer+TMP_BUFFER_SIZE-12;
   strcpy_P(fn, name);
   sd.chdir("/");
-  DEBUG_PRINTLN(fn);
   if (!sd.exists(fn))  return;
   sd.remove(fn);
 }
