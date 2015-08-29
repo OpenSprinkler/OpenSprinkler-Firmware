@@ -724,14 +724,14 @@ void turn_off_station(byte sid, ulong curr_time) {
 void process_dynamic_events(ulong curr_time) {
   // check if rain is detected
   bool rain = false;
+  bool en = os.status.enabled ? true : false;
   if (os.status.rain_delayed || (os.status.rain_sensed && os.options[OPTION_SENSOR_TYPE] == SENSOR_TYPE_RAIN)) {
     rain = true;
   }
 
-  byte sid, s, bid, rbits, sbits;
+  byte sid, s, bid, qid, rbits;
   for(bid=0;bid<os.nboards;bid++) {
     rbits = os.station_attrib_bits_read(ADDR_NVM_IGNRAIN+bid);
-    sbits = os.station_bits[bid];
     for(s=0;s<8;s++) {
       sid=bid*8+s;
 
@@ -742,20 +742,13 @@ void process_dynamic_events(ulong curr_time) {
       // and either the controller is disabled, or
       // if raining and ignore rain bit is cleared
       // FIX ME
-      /*
-      if ((pd.scheduled_program_index[sid]<99) &&
-          (!en || (rain && !(rbits&(1<<s)))) ) {
-        if (sbits&(1<<s)) { // if station is currently running
-          turn_off_station(sid, curr_time);
+      qid = pd.station_qid[sid];
+      if(qid==255) continue;
+      RuntimeQueueStruct *q = pd.queue + qid;
 
-        } else if (pd.scheduled_program_index[sid] > 0) { // if station is currently not running but is waiting to run
-
-          // reset program data variables
-          pd.scheduled_start_time[sid] = 0;
-          pd.scheduled_stop_time[sid] = 0;
-          pd.scheduled_program_index[sid] = 0;
-        }
-      }*/
+      if ((q->pid<99) && (!en || (rain && !(rbits&(1<<s)))) ) {
+        turn_off_station(sid, curr_time);
+      }
     }
   }
 }

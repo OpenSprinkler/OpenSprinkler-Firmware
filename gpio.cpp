@@ -27,7 +27,6 @@
 
 #elif defined(OSPI) || defined(OSBO)
 
-#include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/ioctl.h>
 #include <fcntl.h>
@@ -37,7 +36,6 @@
 #include <string.h>
 #include <poll.h>
 #include <pthread.h>
-#include <fcntl.h>
 
 #define BUFFER_MAX 64
 #define GPIO_MAX   64
@@ -136,16 +134,31 @@ void pinMode(int pin, byte mode) {
   return;
 }
 
-/** Read digital value */
-byte digitalRead(int pin) {
+/** Open file for digital pin */
+int gpio_fd_open(int pin, int mode) {
   char path[BUFFER_MAX];
-  char value_str[3];
   int fd;
 
   snprintf(path, BUFFER_MAX, "/sys/class/gpio/gpio%d/value", pin);
-  fd = open(path, O_RDONLY);
+  fd = open(path, mode);
   if (fd < 0) {
-    DEBUG_PRINTLN("failed to open gpio value for reading");
+    DEBUG_PRINTLN("failed to open gpio");
+    return -1;
+  }
+  return fd;
+}
+
+/** Close file */
+void gpio_fd_close(int fd) {
+  close(fd);
+}
+
+/** Read digital value */
+byte digitalRead(int pin) {
+  char value_str[3];
+
+  int fd = gpio_fd_open(pin, O_RDONLY);
+  if (fd < 0) {
     return 0;
   }
 
@@ -158,26 +171,22 @@ byte digitalRead(int pin) {
   return atoi(value_str);
 }
 
-/** Write digital value */
-void digitalWrite(int pin, byte value) {
+/** Write digital value given file descriptor */
+void gpio_write(int fd, byte value) {
   static const char value_str[] = "01";
 
-  char path[BUFFER_MAX];
-  int fd;
-
-  snprintf(path, BUFFER_MAX, "/sys/class/gpio/gpio%d/value", pin);
-  fd = open(path, O_WRONLY);
-  if (fd < 0) {
-    DEBUG_PRINTLN("failed to open gpio value for writing");
-    return;
-  }
-
   if (1 != write(fd, &value_str[LOW==value?0:1], 1)) {
-    DEBUG_PRINTLN("failed to write value");
-    DEBUG_PRINTLN(pin);
+    DEBUG_PRINT("failed to write value on pin ");
+  }
+}
+
+/** Write digital value */
+void digitalWrite(int pin, byte value) {
+  int fd = gpio_fd_open(pin);
+  if (fd < 0) {
     return;
   }
-
+  gpio_write(fd, value);
   close(fd);
 }
 

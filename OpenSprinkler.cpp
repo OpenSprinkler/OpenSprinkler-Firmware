@@ -730,27 +730,27 @@ int OpenSprinkler::detect_exp() {
 #if defined(ARDUINO)
   unsigned int v = analogRead(PIN_EXP_SENSE);
   // OpenSprinkler uses voltage divider to detect expansion boards
-  // Master controller has a 1.5K pull-up;
+  // Master controller has a 1.6K pull-up;
   // each expansion board (8 stations) has 10K pull-down connected in parallel;
   // so the exact ADC value for n expansion boards is:
-  //    ADC = 1024 * 10 / (10 + 1.5 * n)
+  //    ADC = 1024 * 10 / (10 + 1.6 * n)
   // For  0,   1,   2,   3,   4,   5,  6 expansion boards, the ADC values are:
-  //   1024, 890, 787, 706, 640, 585, 539
+  //   1024, 882, 775, 691, 624, 568, 522
   // Actual threshold is taken as the midpoint between, to account for errors
   int n = -1;
-  if (v > 957) { // 0
+  if (v > 953) { // 0
     n = 0;
-  } else if (v > 838) { // 1
+  } else if (v > 828) { // 1
     n = 1;
-  } else if (v > 746) { // 2
+  } else if (v > 733) { // 2
     n = 2;
-  } else if (v > 673) { // 3
+  } else if (v > 657) { // 3
     n = 3;
-  } else if (v > 612) { // 4
+  } else if (v > 596) { // 4
     n = 4;
-  } else if (v > 562) { // 5
+  } else if (v > 545) { // 5
     n = 5;
-  } else if (v > 520) { // 6
+  } else if (v > 502) { // 6
     n = 6;
   } else {  // cannot determine
   }
@@ -912,6 +912,21 @@ void OpenSprinkler::clear_all_station_bits() {
   }
 }
 
+#if !defined(ARDUINO)
+int rf_gpio_fd = -1;
+void OpenSprinkler::calibrate_rf_timing() {
+  char code0[] = "0000000000000000";  // signal with 0 timing
+  char code1[] = "0000000000000100";  // signal with 0x100 timing
+  ulong start = micros();
+  switch_rfstation((byte*)code0, 0);
+  DEBUG_PRINTLN(micros()-start);
+  start = micros();
+  switch_rfstation((byte*)code1, 0);
+  DEBUG_PRINTLN(micros()-start);
+}
+
+#endif
+
 /** Transmit one RF signal bit */
 void transmit_rfbit(ulong lenH, ulong lenL) {
 #if defined(ARDUINO)
@@ -920,9 +935,9 @@ void transmit_rfbit(ulong lenH, ulong lenL) {
   PORT_RF &=~(1<<PINX_RF);
   delayMicroseconds(lenL);
 #else
-  digitalWrite(PIN_RF_DATA, 1);
+  gpio_write(rf_gpio_fd, 1);
   delayMicrosecondsHard(lenH);
-  digitalWrite(PIN_RF_DATA, 0);
+  gpio_write(rf_gpio_fd, 0);
   delayMicrosecondsHard(lenL);
 #endif
 }
@@ -957,10 +972,16 @@ void OpenSprinkler::switch_rfstation(byte *code, bool turnon) {
   uint16_t length = parse_rfstation_code(code, &on, &off);
 #if defined(ARDUINO)
   length = length - (length>>5);   // due to internal call delay, scale time down to 97%
+  send_rfsignal(turnon ? on : off, length);
 #else
   length = (length>>2)+(length>>3);   // on RPi and BBB, there is even more overhead, scale to 37.5%
-#endif
+  // pre-open gpio file to minimize overhead
+  int rf_gpio_fd = gpio_fd_open(PIN_RF_DATA);
   send_rfsignal(turnon ? on : off, length);
+  gpio_fd_close(rf_gpio_fd);
+  rf_gpio_fd = -1;
+#endif
+
 }
 
 /** Callback function for remote station calls */

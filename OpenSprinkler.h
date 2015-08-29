@@ -131,6 +131,9 @@ public:
   // -- station names and attributes
   static void get_station_name(byte sid, char buf[]); // get station name
   static void set_station_name(byte sid, char buf[]); // set station name
+#if !defined(ARDUINO)
+  static void calibrate_rf_timing(); // for RPi/BBB, we calibrate the RF timing to account for pin switching overhead
+#endif
   static uint16_t parse_rfstation_code(byte *code, ulong *on, ulong *off); // parse rf code into on/off/time sections
   static void switch_rfstation(byte *code, bool turnon);  // switch rf station
   static void switch_remotestation(byte *code, bool turnon); // switch remote station
