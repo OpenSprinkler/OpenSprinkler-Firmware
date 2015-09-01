@@ -458,6 +458,7 @@ void OpenSprinkler::lcd_start() {
 }
 #endif
 
+extern void flow_isr();
 /** Initialize pins, controller variables, LCD */
 void OpenSprinkler::begin() {
 
@@ -492,11 +493,16 @@ void OpenSprinkler::begin() {
   // Rain sensor port set up
   pinMode(PIN_RAINSENSOR, INPUT);
 
+  // Set up sensors
 #if defined(ARDUINO)
   digitalWrite(PIN_RAINSENSOR, HIGH); // enabled internal pullup on rain sensor
+  attachInterrupt(PIN_FLOWSENSOR_INT, flow_isr, FALLING);
 #else
   // OSPI and OSBO use external pullups
+  attachInterrupt(PIN_FLOWSENSOR, "falling", flow_isr);
 #endif
+
+
 
   // Default controller status variables
   // Static variables are assigned 0 by default
@@ -960,10 +966,8 @@ void OpenSprinkler::switch_rfstation(byte *code, bool turnon) {
   ulong on, off;
   uint16_t length = parse_rfstation_code(code, &on, &off);
 #if defined(ARDUINO)
-  length = length - (length>>5);   // due to internal call delay, scale time down to 97%
   send_rfsignal(turnon ? on : off, length);
 #else
-  //length = (length>>2)+(length>>3);   // on RPi and BBB, there is even more overhead, scale to 37.5%
   // pre-open gpio file to minimize overhead
   rf_gpio_fd = gpio_fd_open(PIN_RF_DATA);
   send_rfsignal(turnon ? on : off, length);

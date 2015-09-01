@@ -288,5 +288,8 @@ void pinMode(int pin, byte mode) {}
 void digitalWrite(int pin, byte value) {}
 byte digitalRead(int pin) {return 0;}
 void attachInterrupt(int pin, const char* mode, void (*isr)(void)) {}
+int gpio_fd_open(int pin, int mode) {return 0;}
+void gpio_fd_close(int fd) {}
+void gpio_write(int fd, byte value) {}
 
 #endif

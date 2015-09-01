@@ -780,6 +780,7 @@ void server_json_programs_main() {
     }
   }
   bfill.emit_p(PSTR("]}"));
+  delay(1);
 }
 
 /** Output program data */
@@ -1041,12 +1042,12 @@ byte server_change_options(char *p)
 		    }
 		  }
     }
-    if (os.options[oid] != max_value) {	// if value has changed
+    if (os.options[oid] != prev_value) {	// if value has changed
     	if (oid==OPTION_TIMEZONE || oid==OPTION_USE_NTP)    time_change = true;
     	if (oid>=OPTION_NTP_IP1 && oid<=OPTION_NTP_IP4)     time_change = true;
     	if (oid>=OPTION_USE_DHCP && oid<=OPTION_HTTPPORT_1) network_change = true;
     	if (oid==OPTION_DEVICE_ID)  network_change = true;
-    	if (oid==OPTION_USE_WEATHER)       weather_change = true;
+      if (oid==OPTION_USE_WEATHER) weather_change = true;
     }
   }
 
@@ -1106,6 +1107,7 @@ byte server_change_options(char *p)
     // network related options have changed
     // this would require a restart to take effect
   }
+
   return HTML_SUCCESS;
 }
 
@@ -1380,6 +1382,7 @@ byte server_json_all(char *p) {
   bfill.emit_p(PSTR(",\"stations\":{"));
   server_json_stations_main();
   bfill.emit_p(PSTR("}"));
+  delay(1);
   return HTML_OK;
 }
 

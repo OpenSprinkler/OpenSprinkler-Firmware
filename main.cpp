@@ -66,6 +66,7 @@ ProgramData pd;   // ProgramdData object
 volatile ulong flow_count = 0;
 /** Flow sensor interrupt service routine */
 void flow_isr() {
+  if(os.options[OPTION_SENSOR_TYPE]!=SENSOR_TYPE_FLOW) return;
   ulong curr = millis();
   if(curr-os.flowcount_time_ms < 50) return;  // debounce threshold: 50ms
   flow_count++;
@@ -217,10 +218,6 @@ void do_setup() {
   /* Enable the WD interrupt (note no reset). */
   WDTCSR |= _BV(WDIE);
 
-  // Set up flow sensor ISR
-  if (os.options[OPTION_SENSOR_TYPE]==SENSOR_TYPE_FLOW) {
-    attachInterrupt(PIN_FLOWSENSOR_INT, flow_isr, FALLING);
-  }
   if (os.start_network()) {  // initialize network
     os.status.network_fails = 0;
   } else {
@@ -257,10 +254,6 @@ void do_setup() {
   os.options_setup();  // Setup options
 
   pd.init();            // ProgramData init
-
-  if (os.options[OPTION_SENSOR_TYPE]==SENSOR_TYPE_FLOW) {
-    attachInterrupt(PIN_FLOWSENSOR, "falling", flow_isr);
-  }
 
   if (os.start_network()) {  // initialize network
     DEBUG_PRINTLN("network established.");
@@ -950,7 +943,8 @@ void write_log(byte type, ulong curr_time) {
     strcat_P(tmp_buffer, PSTR(","));
     itoa(pd.lastrun.station, tmp_buffer+strlen(tmp_buffer), 10);
     strcat_P(tmp_buffer, PSTR(","));
-    itoa(pd.lastrun.duration, tmp_buffer+strlen(tmp_buffer), 10);
+    // duration is unsigned integer
+    ultoa((ulong)pd.lastrun.duration, tmp_buffer+strlen(tmp_buffer), 10);
   } else {
     ulong lvalue;
     if(type==LOGDATA_FLOWSENSE) {
