@@ -551,13 +551,13 @@ void OpenSprinkler::begin() {
 
       pinMode(PIN_BOOST_EN, OUTPUT);
       digitalWrite(PIN_BOOST_EN, LOW);
-
-      // detect if current sensing pin is present
-      pinMode(PIN_CURR_DIGITAL, INPUT);
-      digitalWrite(PIN_CURR_DIGITAL, HIGH); // enable internal pullup
-      status.has_curr_sense = digitalRead(PIN_CURR_DIGITAL) ? 0 : 1;
-      digitalWrite(PIN_CURR_DIGITAL, LOW);
     }
+
+    // detect if current sensing pin is present
+    pinMode(PIN_CURR_DIGITAL, INPUT);
+    digitalWrite(PIN_CURR_DIGITAL, HIGH); // enable internal pullup
+    status.has_curr_sense = digitalRead(PIN_CURR_DIGITAL) ? 0 : 1;
+    digitalWrite(PIN_CURR_DIGITAL, LOW);
   #endif
 
   lcd_start();
@@ -716,14 +716,21 @@ void OpenSprinkler::rainsensor_status() {
 }
 
 /** Read current sensing value
- * OpenSprinkler DC has a 0.2 ohm current sensing resistor.
+ * OpenSprinkler has a 0.2 ohm current sensing resistor.
  * Therefore the conversion from analog reading to milli-amp is:
  * (r/1024)*3.3*1000/0.2
+ * Newer AC controller has a 0.2 ohm curent sensing resistor
+ * with op-amp to sense the peak current. Therefore the actual
+ * current is discounted by 0.707
  */
 #if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
 uint16_t OpenSprinkler::read_current() {
   if(status.has_curr_sense) {
-    return (uint16_t)(analogRead(PIN_CURR_SENSE) * 16.11);
+    if (hw_type == HW_TYPE_DC) {
+      return (uint16_t)(analogRead(PIN_CURR_SENSE) * 16.11);
+    } else {
+      return (uint16_t)(analogRead(PIN_CURR_SENSE) * 11.39);
+    }
   } else {
     return 0;
   }
