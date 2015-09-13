@@ -24,7 +24,6 @@
 #include "utils.h"
 #include "OpenSprinkler.h"
 extern OpenSprinkler os;
-extern char tmp_buffer[];
 
 #if defined(ARDUINO)  // AVR
 #include <avr/eeprom.h>
@@ -34,7 +33,7 @@ extern SdFat sd;
 void write_to_file(const char *name, const char *data, int size, int pos, bool trunc) {
   if (!os.status.has_sd)  return;
 
-  char *fn = tmp_buffer+TMP_BUFFER_SIZE-12;
+  char fn[12];
   strcpy_P(fn, name);
   sd.chdir("/");
   SdFile file;
@@ -52,7 +51,7 @@ void write_to_file(const char *name, const char *data, int size, int pos, bool t
 bool read_from_file(const char *name, char *data, int maxsize, int pos) {
   if (!os.status.has_sd)  { data[0]=0; return false; }
 
-  char *fn = tmp_buffer+TMP_BUFFER_SIZE-12;
+  char fn[12];
   strcpy_P(fn, name);
   sd.chdir("/");
   SdFile file;
@@ -71,7 +70,7 @@ bool read_from_file(const char *name, char *data, int maxsize, int pos) {
 void remove_file(const char *name) {
   if (!os.status.has_sd)  return;
 
-  char *fn = tmp_buffer+TMP_BUFFER_SIZE-12;
+  char fn[12];
   strcpy_P(fn, name);
   sd.chdir("/");
   if (!sd.exists(fn))  return;

@@ -673,7 +673,6 @@ void check_weather() {
   if (!os.checkwt_lasttime || (ntz > os.checkwt_lasttime + CHECK_WEATHER_TIMEOUT)) {
     os.checkwt_lasttime = ntz;
     GetWeather();
-    write_log(LOGDATA_WATERLEVEL, ntz);
   }
 }
 

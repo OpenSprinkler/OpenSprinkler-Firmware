@@ -40,6 +40,7 @@ extern const char wtopts_filename[];
 extern OpenSprinkler os; // OpenSprinkler object
 extern char tmp_buffer[];
 byte findKeyVal (const char *str,char *strbuf, uint8_t maxlen,const char *key,bool key_in_pgm=false,uint8_t *keyfound=NULL);
+void write_log(byte type, ulong curr_time);
 
 // The weather function calls getweather.py on remote server to retrieve weather data
 // the default script is WEATHER_SCRIPT_HOST/weather?.py
@@ -50,8 +51,8 @@ static void getweather_callback(byte status, uint16_t off, uint16_t len) {
   char *p = (char*)Ethernet::buffer + off;
 #else
   char *p = ether_buffer;
-  DEBUG_PRINTLN(p);
 #endif
+  DEBUG_PRINTLN(p);
   /* scan the buffer until the first & symbol */
   while(*p && *p!='&') {
     p++;
@@ -109,6 +110,7 @@ static void getweather_callback(byte status, uint16_t off, uint16_t len) {
   }
 
   os.checkwt_success_lasttime = os.now_tz();
+  write_log(LOGDATA_WATERLEVEL, os.checkwt_success_lasttime);
 }
 
 #if defined(ARDUINO)  // for AVR
@@ -129,7 +131,7 @@ void GetWeather() {
                 tmp);
   // copy string to tmp_buffer, replacing all spaces with _
   char *src=tmp_buffer+strlen(tmp_buffer);
-  char *dst=tmp_buffer+TMP_BUFFER_SIZE-1;
+  char *dst=tmp_buffer+TMP_BUFFER_SIZE-12;
   
   char c;
   // url encode. convert SPACE to %20
@@ -217,7 +219,7 @@ void GetWeather() {
                 tmp);    
 
   char *src=tmp_buffer+strlen(tmp_buffer);
-  char *dst=tmp_buffer+TMP_BUFFER_SIZE-1;
+  char *dst=tmp_buffer+TMP_BUFFER_SIZE-12;
   
   char c;
   // url encode. convert SPACE to %20
@@ -256,6 +258,7 @@ void GetWeather() {
     }
     peel_http_header();
     getweather_callback(0, 0, ETHER_BUFFER_SIZE);
+    break;
   }
   client.stop();
 }

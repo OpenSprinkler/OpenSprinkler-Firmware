@@ -264,7 +264,7 @@ byte OpenSprinkler::options[] = {
   1,  // device enable
   0,  // 1: ignore password; 0: use password
   0,  // device id
-  140,// lcd contrast
+  150,// lcd contrast
   100,// lcd backlight
   15, // lcd dimming
   80, // boost time (only valid to DC and LATCH type)
@@ -442,12 +442,10 @@ void OpenSprinkler::lcd_start() {
   if (lcd.type() == LCD_STD) {
     // this is standard 16x2 LCD
     // set PWM frequency for adjustable LCD backlight and contrast
-#if OS_HW_VERSION==(OS_HW_VERSION_BASE+20)  // 8MHz
+#if OS_HW_VERSION==(OS_HW_VERSION_BASE+20) || OS_HW_VERSION==(OS_HW_VERSION_BASE+21)  // 8MHz and 12MHz
     TCCR1B = 0x01;
-#elif OS_HW_VERSION==(OS_HW_VERSION_BASE+21)  // 12MHz
-    TCCR1B = 0x02;  // increase division factor for faster clock
 #else // 16MHz
-    TCCR1B = 0x03;  // increase division factor for faster clock
+    TCCR1B = 0x02;  // increase division factor for faster clock
 #endif
     // turn on LCD backlight and contrast
     lcd_set_brightness();
