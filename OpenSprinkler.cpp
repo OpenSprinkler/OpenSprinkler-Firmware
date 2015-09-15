@@ -403,7 +403,7 @@ extern char ether_buffer[];
 byte OpenSprinkler::start_network() {
   unsigned int port = (unsigned int)(options[OPTION_HTTPPORT_1]<<8) + (unsigned int)options[OPTION_HTTPPORT_0];
 #if defined(DEMO)
-  port = 8080;
+  port = 80;
 #endif
   if(m_server)  {
     delete m_server;
@@ -654,7 +654,7 @@ void OpenSprinkler::begin() {
 void OpenSprinkler::apply_all_station_bits() {
   digitalWrite(PIN_SR_LATCH, LOW);
   byte bid, s, sbits;
-  
+
   // Shift out all station bit values
   // from the highest bit to the lowest
   for(bid=0;bid<=MAX_EXT_BOARDS;bid++) {
@@ -682,7 +682,7 @@ void OpenSprinkler::apply_all_station_bits() {
     digitalWrite(PIN_BOOST, HIGH);    // enable boost converter
     delay((int)options[OPTION_BOOST_TIME]<<2);  // wait for booster to charge
     digitalWrite(PIN_BOOST, LOW);     // disable boost converter
-   
+
     digitalWrite(PIN_BOOST_EN, HIGH); // enable output path
     digitalWrite(PIN_SR_LATCH, HIGH);
     engage_booster = 0;

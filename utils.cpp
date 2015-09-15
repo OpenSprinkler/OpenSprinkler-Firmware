@@ -179,6 +179,11 @@ char* get_runtime_path() {
   static char path[PATH_MAX];
   static byte query = 1;
 
+  #ifdef __APPLE__
+    strcpy(path, "./");
+    return path;
+  #endif
+
   if(query) {
     if(readlink("/proc/self/exe", path, PATH_MAX ) <= 0) {
       return NULL;
