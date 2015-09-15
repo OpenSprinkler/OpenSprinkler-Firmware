@@ -79,7 +79,7 @@ void remove_file(const char *name) {
 
 #else // RPI/BBB/LINUX
 void nvm_read_block(void *dst, const void *src, int len) {
-  FILE *fp = fopen(NVM_FILENAME, "rb");
+  FILE *fp = fopen(get_filename_fullpath(NVM_FILENAME), "rb");
   if(fp) {
     fseek(fp, (unsigned int)src, SEEK_SET);
     fread(dst, 1, len, fp);
@@ -88,9 +88,9 @@ void nvm_read_block(void *dst, const void *src, int len) {
 }
 
 void nvm_write_block(const void *src, void *dst, int len) {
-  FILE *fp = fopen(NVM_FILENAME, "rb+");
+  FILE *fp = fopen(get_filename_fullpath(NVM_FILENAME), "rb+");
   if(!fp) {
-    fp = fopen(NVM_FILENAME, "wb");
+    fp = fopen(get_filename_fullpath(NVM_FILENAME), "wb");
   }
   if(fp) {
     fseek(fp, (unsigned int)dst, SEEK_SET);
@@ -102,7 +102,7 @@ void nvm_write_block(const void *src, void *dst, int len) {
 }
 
 byte nvm_read_byte(const byte *p) {
-  FILE *fp = fopen(NVM_FILENAME, "rb");
+  FILE *fp = fopen(get_filename_fullpath(NVM_FILENAME), "rb");
   byte v = 0;
   if(fp) {
     fseek(fp, (unsigned int)p, SEEK_SET);
@@ -115,9 +115,9 @@ byte nvm_read_byte(const byte *p) {
 }
 
 void nvm_write_byte(const byte *p, byte v) {
-  FILE *fp = fopen(NVM_FILENAME, "rb+");
+  FILE *fp = fopen(get_filename_fullpath(NVM_FILENAME), "rb+");
   if(!fp) {
-    fp = fopen(NVM_FILENAME, "wb");
+    fp = fopen(get_filename_fullpath(NVM_FILENAME), "wb");
   }
   if(fp) {
     fseek(fp, (unsigned int)p, SEEK_SET);
@@ -131,11 +131,11 @@ void nvm_write_byte(const byte *p, byte v) {
 void write_to_file(const char *name, const char *data, int size, int pos, bool trunc) {
   FILE *file;
   if(trunc) {
-    file = fopen(name, "wb");
+    file = fopen(get_filename_fullpath(name), "wb");
   } else {
-    file = fopen(name, "r+b");
+    file = fopen(get_filename_fullpath(name), "r+b");
     if(!file) {
-        file = fopen(name, "wb");
+        file = fopen(get_filename_fullpath(name), "wb");
     }
   }
 
@@ -149,7 +149,7 @@ void write_to_file(const char *name, const char *data, int size, int pos, bool t
 bool read_from_file(const char *name, char *data, int maxsize, int pos) {
 
   FILE *file;
-  file = fopen(name, "rb");
+  file = fopen(get_filename_fullpath(name), "rb");
   if(!file) {
     data[0] = 0;
     return true;
@@ -172,21 +172,33 @@ bool read_from_file(const char *name, char *data, int maxsize, int pos) {
 }
 
 void remove_file(const char *name) {
-  remove(name);
+  remove(get_filename_fullpath(name));
 }
 
 char* get_runtime_path() {
   static char path[PATH_MAX];
-  if(readlink("/proc/self/exe", path, PATH_MAX ) <= 0) {
-    return NULL;
+  static byte query = 1;
+
+  if(query) {
+    if(readlink("/proc/self/exe", path, PATH_MAX ) <= 0) {
+      return NULL;
+    }
+    char* path_end = strrchr(path, '/');
+    if(path_end == NULL) {
+      return NULL;
+    }
+    path_end++;
+    *path_end=0;
+    query = 0;
   }
-  char* path_end = strrchr(path, '/');
-  if(path_end == NULL) {
-    return NULL;
-  }
-  path_end++;
-  *path_end=0;
   return path;
+}
+
+char* get_filename_fullpath(const char *filename) {
+  static char fullpath[PATH_MAX];
+  strcpy(fullpath, get_runtime_path());
+  strcat(fullpath, filename);
+  return fullpath;
 }
 
 #if defined(OSPI)

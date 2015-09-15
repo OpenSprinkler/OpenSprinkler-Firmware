@@ -921,15 +921,15 @@ void write_log(byte type, ulong curr_time) {
   }
 #else // prepare log folder for RPI/BBB
   struct stat st;
-  if(stat(LOG_PREFIX, &st)) {
-    if(mkdir(LOG_PREFIX, S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IWGRP | S_IXGRP | S_IROTH | S_IWOTH | S_IXOTH)) {
+  if(stat(get_filename_fullpath(LOG_PREFIX), &st)) {
+    if(mkdir(get_filename_fullpath(LOG_PREFIX), S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IWGRP | S_IXGRP | S_IROTH | S_IWOTH | S_IXOTH)) {
       return;
     }
   }
   FILE *file;
-  file = fopen(tmp_buffer, "rb+");
+  file = fopen(get_filename_fullpath(tmp_buffer), "rb+");
   if(!file) {
-    file = fopen(tmp_buffer, "wb");
+    file = fopen(get_filename_fullpath(tmp_buffer), "wb");
     if (!file)  return;
   }
   fseek(file, 0, SEEK_END);
@@ -1009,11 +1009,11 @@ void delete_log(char *name) {
 #else // delete_log implementation for RPI/BBB
   if (strncmp(name, "all", 3) == 0) {
     // delete the log folder
-    rmdir(LOG_PREFIX);
+    rmdir(get_filename_fullpath(LOG_PREFIX));
     return;
   } else {
     make_logfile_name(name);
-    remove(tmp_buffer);
+    remove(get_filename_fullpath(tmp_buffer));
   }
 #endif
 }

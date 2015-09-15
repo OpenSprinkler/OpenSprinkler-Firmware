@@ -55,6 +55,7 @@ void remove_file(const char *name);
   byte nvm_read_byte(const byte *p);
   void nvm_write_byte(const byte *p, byte v);
   char* get_runtime_path();
+  char* get_filename_fullpath(const char *filename);
   void delay(ulong ms);
   void delayMicroseconds(ulong us);
   void delayMicrosecondsHard(ulong us);

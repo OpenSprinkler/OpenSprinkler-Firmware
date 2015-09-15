@@ -1289,7 +1289,7 @@ byte server_json_log(char *p) {
     file.open(tmp_buffer, O_READ);
 #else // prepare to open log file for RPI/BBB
     FILE *file;
-    file = fopen(tmp_buffer, "rb");
+    file = fopen(get_filename_fullpath(tmp_buffer), "rb");
     if(!file) continue;
 #endif // prepare to open log file
 
