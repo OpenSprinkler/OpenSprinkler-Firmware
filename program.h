@@ -26,7 +26,20 @@
 #define _PROGRAM_H
 
 #define MAX_NUM_STARTTIMES  4
-#define PROGRAM_NAME_SIZE   12
+
+#if defined(ARDUINO)
+  #if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__) // for 4KB NVM
+    #define PROGRAM_NAME_SIZE   20
+    #define RUNTIME_QUEUE_SIZE  MAX_NUM_STATIONS
+  #else
+    #define PROGRAM_NAME_SIZE   12
+    #define RUNTIME_QUEUE_SIZE  MAX_NUM_STATIONS
+  #endif
+#else
+  #define PROGRAM_NAME_SIZE   20
+  #define RUNTIME_QUEUE_SIZE  MAX_NUM_STATIONS
+#endif
+
 #include "OpenSprinkler.h"
 
 /** Log data structure */
@@ -98,6 +111,9 @@ public:
 
   byte check_match(time_t t);
   int16_t starttime_decode(int16_t t);  
+protected:
+  byte check_day_match(time_t t);
+
 };
 
 /** Program data nvm addresses */
@@ -113,17 +129,28 @@ extern OpenSprinkler os;
 
 #define PROGRAM_TYPE_VERSION  11
 
+class RuntimeQueueStruct {
+public:
+  ulong    st;  // start time
+  uint16_t dur; // water time
+  byte  sid;
+  byte  pid;
+};
+
 class ProgramData {
 public:  
-  static ulong scheduled_start_time[];// scheduled start time for each station
-  static ulong scheduled_stop_time[]; // scheduled stop time for each station
-  static byte scheduled_program_index[]; // scheduled program index
-  static byte  nprograms;     // number of programs
+  static RuntimeQueueStruct queue[];
+  static byte nqueue;         // number of queue elements
+  static byte station_qid[];  // this array stores the queue element index for each scheduled station
+  static byte nprograms;      // number of programs
   static LogStruct lastrun;
   static ulong last_seq_stop_time;  // the last stop time of a sequential station
   
-  static void init();
   static void reset_runtime();
+  static RuntimeQueueStruct* enqueue(); // this returns a pointer to the next available slot in the queue
+  static void dequeue(byte qid);  // this removes an element from the queue
+
+  static void init();
   static void eraseall();
   static void read(byte pid, ProgramStruct *buf);
   static byte add(ProgramStruct *buf);

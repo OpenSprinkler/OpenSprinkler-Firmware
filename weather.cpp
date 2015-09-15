@@ -31,7 +31,7 @@
 extern char ether_buffer[];
 #endif
 
-extern const char wtopts_name[];
+extern const char wtopts_filename[];
 
 #include "OpenSprinkler.h"
 #include "utils.h"
@@ -40,10 +40,11 @@ extern const char wtopts_name[];
 extern OpenSprinkler os; // OpenSprinkler object
 extern char tmp_buffer[];
 byte findKeyVal (const char *str,char *strbuf, uint8_t maxlen,const char *key,bool key_in_pgm=false,uint8_t *keyfound=NULL);
+void write_log(byte type, ulong curr_time);
 
 // The weather function calls getweather.py on remote server to retrieve weather data
 // the default script is WEATHER_SCRIPT_HOST/weather?.py
-static char website[] PROGMEM = WEATHER_SCRIPT_HOST ;
+//static char website[] PROGMEM = DEFAULT_WEATHER_URL ;
 
 static void getweather_callback(byte status, uint16_t off, uint16_t len) {
 #if defined(ARDUINO)
@@ -51,6 +52,7 @@ static void getweather_callback(byte status, uint16_t off, uint16_t len) {
 #else
   char *p = ether_buffer;
 #endif
+  DEBUG_PRINTLN(p);
   /* scan the buffer until the first & symbol */
   while(*p && *p!='&') {
     p++;
@@ -70,13 +72,18 @@ static void getweather_callback(byte status, uint16_t off, uint16_t len) {
       os.nvdata.sunset_time = v;
     }
   }
+
+  if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("eip"), true)) {
+    os.nvdata.external_ip = atol(tmp_buffer);
+  }
+
   os.nvdata_save(); // save non-volatile memory
 
   if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("scale"), true)) {
     v = atoi(tmp_buffer);
-    if (v>=0 && v<=250 && v != os.options[OPTION_WATER_PERCENTAGE].value) {
+    if (v>=0 && v<=250 && v != os.options[OPTION_WATER_PERCENTAGE]) {
       // only save if the value has changed
-      os.options[OPTION_WATER_PERCENTAGE].value = v;
+      os.options[OPTION_WATER_PERCENTAGE] = v;
       os.options_save();
     }
   }
@@ -84,37 +91,47 @@ static void getweather_callback(byte status, uint16_t off, uint16_t len) {
   if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("tz"), true)) {
     v = atoi(tmp_buffer);
     if (v>=0 && v<= 96) {
-      if (v != os.options[OPTION_TIMEZONE].value) {
+      if (v != os.options[OPTION_TIMEZONE]) {
         // if timezone changed, save change and force ntp sync
-        os.options[OPTION_TIMEZONE].value = v;
+        os.options[OPTION_TIMEZONE] = v;
         os.options_save();
       }
     }
   }
   
-  if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("eip"), true)) {
-    os.external_ip = atol(tmp_buffer);
+  if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("rd"), true)) {
+    v = atoi(tmp_buffer);
+    if (v>0) {
+      os.nvdata.rd_stop_time = os.now_tz() + (unsigned long) v * 3600;
+      os.raindelay_start();
+    } else if (v==0) {
+      os.raindelay_stop();
+    }
   }
+
   os.checkwt_success_lasttime = os.now_tz();
+  write_log(LOGDATA_WATERLEVEL, os.checkwt_success_lasttime);
 }
 
 #if defined(ARDUINO)  // for AVR
 void GetWeather() {
-  // check if we've already done dns lookup
-  ether.dnsLookup(website);
-   
+  // perform DNS lookup for every query
+  nvm_read_block(tmp_buffer, (void*)ADDR_NVM_WEATHERURL, MAX_WEATHERURL);
+  ether.dnsLookup(tmp_buffer, true);
+
+  //bfill=ether.tcpOffset();
   char tmp[30];
-  read_from_file(wtopts_name, tmp, 30);
+  read_from_file(wtopts_filename, tmp, 30);
   BufferFiller bf = (uint8_t*)tmp_buffer;
   bf.emit_p(PSTR("$D.py?loc=$E&key=$E&fwv=$D&wto=$S"),
-                (int) os.options[OPTION_USE_WEATHER].value,
+                (int) os.options[OPTION_USE_WEATHER],
                 ADDR_NVM_LOCATION,
                 ADDR_NVM_WEATHER_KEY,
-                (int)os.options[OPTION_FW_VERSION].value,
+                (int)os.options[OPTION_FW_VERSION],
                 tmp);
   // copy string to tmp_buffer, replacing all spaces with _
   char *src=tmp_buffer+strlen(tmp_buffer);
-  char *dst=tmp_buffer+TMP_BUFFER_SIZE-1;
+  char *dst=tmp_buffer+TMP_BUFFER_SIZE-12;
   
   char c;
   // url encode. convert SPACE to %20
@@ -134,7 +151,7 @@ void GetWeather() {
   
   uint16_t _port = ether.hisport; // save current port number
   ether.hisport = 80;
-  ether.browseUrl(PSTR("/weather"), dst, website, getweather_callback);
+  ether.browseUrl(PSTR("/weather"), dst, PSTR("*"), getweather_callback);
   ether.hisport = _port;
 }
 
@@ -170,12 +187,12 @@ void peel_http_header() { // remove the HTTP header
 void GetWeather() {
   EthernetClient client;
 
-  static struct hostent *server = NULL;
-  strcpy(tmp_buffer, WEATHER_SCRIPT_HOST);
+  struct hostent *server;
+  nvm_read_block(tmp_buffer, (void*)ADDR_NVM_WEATHERURL, MAX_WEATHERURL);
   server = gethostbyname(tmp_buffer);
   if (!server) {
     DEBUG_PRINTLN("can't resolve weather server");
-    return;    
+    return;
   }
   DEBUG_PRINT("weather server ip:");
   DEBUG_PRINT(((uint8_t*)server->h_addr)[0]);
@@ -187,23 +204,22 @@ void GetWeather() {
   DEBUG_PRINTLN(((uint8_t*)server->h_addr)[3]);
 
   if (!client.connect((uint8_t*)server->h_addr, 80)) {
-    DEBUG_PRINTLN("failed to connect to weather server");
     client.stop();
     return;
   }
 
   BufferFiller bf = tmp_buffer;
   char tmp[100];
-  read_from_file(wtopts_name, tmp, 100);
+  read_from_file(wtopts_filename, tmp, 100);
   bf.emit_p(PSTR("$D.py?loc=$E&key=$E&fwv=$D&wto=$S"),
-                (int) os.options[OPTION_USE_WEATHER].value,
+                (int) os.options[OPTION_USE_WEATHER],
                 ADDR_NVM_LOCATION,
                 ADDR_NVM_WEATHER_KEY,
-                (int)os.options[OPTION_FW_VERSION].value,
+                (int)os.options[OPTION_FW_VERSION],
                 tmp);    
 
   char *src=tmp_buffer+strlen(tmp_buffer);
-  char *dst=tmp_buffer+TMP_BUFFER_SIZE-1;
+  char *dst=tmp_buffer+TMP_BUFFER_SIZE-12;
   
   char c;
   // url encode. convert SPACE to %20
@@ -226,6 +242,7 @@ void GetWeather() {
   strcat(urlBuffer, dst);
   strcat(urlBuffer, " HTTP/1.0\r\nHOST: weather.opensprinkler.com\r\n\r\n");
   
+  DEBUG_PRINTLN(urlBuffer);
   client.write((uint8_t *)urlBuffer, strlen(urlBuffer));
   
   bzero(ether_buffer, ETHER_BUFFER_SIZE);
@@ -241,6 +258,7 @@ void GetWeather() {
     }
     peel_http_header();
     getweather_callback(0, 0, ETHER_BUFFER_SIZE);
+    break;
   }
   client.stop();
 }

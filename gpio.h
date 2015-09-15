@@ -27,6 +27,8 @@
 
 #else
 
+#include <sys/stat.h>
+#include <fcntl.h>
 #define OUTPUT 0
 #define INPUT  1
 #define HIGH   1
@@ -34,6 +36,11 @@
 
 void pinMode(int pin, byte mode);
 void digitalWrite(int pin, byte value);
+int gpio_fd_open(int pin, int mode = O_WRONLY);
+void gpio_fd_close(int fd);
+void gpio_write(int fd, byte value);
 byte digitalRead(int pin);
+// mode can be any of 'rising', 'falling', 'both'
+void attachInterrupt(int pin, const char* mode, void (*isr)(void));
 
 #endif

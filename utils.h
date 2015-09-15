@@ -28,17 +28,21 @@
 
 #else // headers for RPI/BBB
   #include <stdio.h>
+  #include <limits.h>
+  #include <sys/time.h>
+
 #endif
 #include "defines.h"
 
+void strncpy_P0(char* dest, const char* src, int n);
 byte strcmp_to_nvm(const char* src, int addr);
 byte water_time_encode(uint16_t i);
 uint16_t water_time_decode(byte i);
 ulong water_time_resolve(uint16_t v);
 byte water_time_encode_signed(int16_t i);
 int16_t water_time_decode_signed(byte i);
-void write_to_file(const char *name, const char *data);
-bool read_from_file(const char *name, char *data, int maxsize=TMP_BUFFER_SIZE);
+void write_to_file(const char *name, const char *data, int size, int pos=0, bool trunc=true);
+bool read_from_file(const char *name, char *data, int maxsize=TMP_BUFFER_SIZE, int pos=0);
 void remove_file(const char *name);
 #if defined(ARDUINO)
   #define nvm_read_block  eeprom_read_block
@@ -50,6 +54,14 @@ void remove_file(const char *name);
   void nvm_write_block(const void *src, void *dst, int len);
   byte nvm_read_byte(const byte *p);
   void nvm_write_byte(const byte *p, byte v);
+  char* get_runtime_path();
+  char* get_filename_fullpath(const char *filename);
+  void delay(ulong ms);
+  void delayMicroseconds(ulong us);
+  void delayMicrosecondsHard(ulong us);
+  ulong millis();
+  ulong micros();
+  void initialiseEpoch();
 #if defined(OSPI)
   unsigned int detect_rpi_rev();
 #endif

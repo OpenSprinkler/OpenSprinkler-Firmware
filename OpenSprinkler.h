@@ -43,19 +43,26 @@
 #include "defines.h"
 #include "utils.h"
 
-/** Option data structure */
-struct OptionStruct{
-  byte value;     // each option value is stored as a byte
-  byte max;       // maximum value of the option
-  const char* str;      // full name
-  const char* json_str; // json name
-};
-
 /** Non-volatile data */
 struct NVConData {
   uint16_t sunrise_time;  // sunrise time (in minutes)
   uint16_t sunset_time;   // sunset time (in minutes)
   uint32_t rd_stop_time;  // rain delay stop time
+  uint32_t external_ip;   // external ip
+};
+
+/** Station special attribute data */
+struct StationSpecialData {
+  byte type;
+  byte data[STATION_SPECIAL_DATA_SIZE];
+};
+
+/** Remote station data structure */
+// this must fit in STATION_SPECIAL_DATA_SIZE
+struct RemoteStationData {
+  byte ip[4];
+  uint16_t port;
+  byte sid;
 };
 
 /** Volatile controller status bits */
@@ -64,12 +71,14 @@ struct ConStatus {
   byte rain_delayed:1;      // rain delay bit (when set, rain delay is applied)
   byte rain_sensed:1;       // rain sensor bit (when set, it indicates that rain is detected)
   byte program_busy:1;      // HIGH means a program is being executed currently
-  byte has_rtc:1;           // HIGH means the controller has a DS1307 RTC
+  byte has_curr_sense:1;    // HIGH means the controller has a current sensing pin
   byte has_sd:1;            // HIGH means a microSD card is detected
   byte safe_reboot:1;       // HIGH means a safe reboot has been marked
   byte has_hwmac:1;         // has hardware MAC chip
-  byte display_board:4;     // the board that is being displayed onto the lcd
-  byte network_fails:4;     // number of network fails
+  byte req_ntpsync:1;       // request ntpsync
+  byte req_network:1;       // request check network
+  byte display_board:3;     // the board that is being displayed onto the lcd
+  byte network_fails:3;     // number of network fails
   byte mas:8;               // master station index
   byte mas2:8;              // master2 station index
 };
@@ -95,31 +104,23 @@ public:
   static byte nboards, nstations;
   static byte hw_type;           // hardware type
 
-  static OptionStruct options[];  // option values, max, name, and flag
+  static byte options[];  // option values, max, name, and flag
 
   static byte station_bits[];     // station activation bits. each byte corresponds to a board (8 stations)
                                   // first byte-> master controller, second byte-> ext. board 1, and so on
-  // station attributes
-  static byte masop_bits[];       // master operation bits. each byte corresponds to a board (8 stations)
-  static byte ignrain_bits[];     // ignore rain bits. each byte corresponds to a board (8 stations)
-  static byte masop2_bits[];      // master2 operation bits. each byte corresponds to a board (8 stations)
-  static byte stndis_bits[];      // station disable bits. each byte corresponds to a board (8 stations)
-  static byte rfstn_bits[];       // RF station flags. each byte corresponds to a board (8 stations)
-  static byte stnseq_bits[];      // station sequential bits. each byte corresponds to a board (8 stations)
 
   // variables for time keeping
-  static ulong rainsense_start_time;  // time when the most recent rain sensor activation was detected
+  static ulong sensor_lasttime;  // time when the last sensor reading is recorded
+  static ulong flowcount_time_ms;// time stamp when new flow sensor click is received (in milliseconds)
+  static ulong flowcount_rt;     // flow count (for computing real-time flow rate)
+  static ulong flowcount_log_start; // starting flow count (for logging)
   static ulong raindelay_start_time;  // time when the most recent rain delay started
   static byte  button_timeout;        // button timeout
-  static ulong ntpsync_lasttime;      // time when ntp sync was performed
   static ulong checkwt_lasttime;      // time when weather was checked
   static ulong checkwt_success_lasttime; // time when weather check was successful
-  static ulong network_lasttime;      // time when network was checked
-  static ulong external_ip;           // external ip address
-  static byte  water_percent_avg;     // average water percentage over a day
-
   // member functions
   // -- setup
+  static void update_dev();   // update software for Linux instances
   static void reboot_dev();   // reboot the microcontroller
   static void begin();        // initialization, must call this function before calling other functions
   static byte start_network();  // initialize network with the given mac and port
@@ -130,11 +131,12 @@ public:
   // -- station names and attributes
   static void get_station_name(byte sid, char buf[]); // get station name
   static void set_station_name(byte sid, char buf[]); // set station name
-  static uint16_t get_station_name_rf(byte sid, ulong *on, ulong *off); // get station name and parse into RF code
-  static void update_rfstation_bits();
-  static void send_rfstation_signal(byte sid, bool status);
+  static uint16_t parse_rfstation_code(byte *code, ulong *on, ulong *off); // parse rf code into on/off/time sections
+  static void switch_rfstation(byte *code, bool turnon);  // switch rf station
+  static void switch_remotestation(byte *code, bool turnon); // switch remote station
   static void station_attrib_bits_save(int addr, byte bits[]); // save station attribute bits to nvm
   static void station_attrib_bits_load(int addr, byte bits[]); // load station attribute bits from nvm
+  static byte station_attrib_bits_read(int addr); // read one station attribte byte from nvm
 
   // -- options and data storeage
   static void nvdata_load();
@@ -152,10 +154,14 @@ public:
   static void raindelay_start();  // start raindelay
   static void raindelay_stop();   // stop rain delay
   static void rainsensor_status();// update rainsensor status
+#if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
+  static uint16_t read_current(); // read current sensing value
+#endif
   static int detect_exp();        // detect the number of expansion boards
   static byte weekday_today();    // returns index of today's weekday (Monday is 0)
 
-  static void set_station_bit(byte sid, byte value); // set station bit of one station (sid->station index, value->0/1)
+  static byte set_station_bit(byte sid, byte value); // set station bit of one station (sid->station index, value->0/1)
+  static void switch_special_station(byte sid, byte value); // swtich special station
   static void clear_all_station_bits(); // clear all station bits
   static void apply_all_station_bits(); // apply all station bits (activate/deactive values)
 
@@ -184,6 +190,9 @@ private:
   static void lcd_print_2digit(int v);  // print a integer in 2 digits
   static void lcd_start();
   static byte button_read_busy(byte pin_butt, byte waitmode, byte butt, byte is_holding);
+#if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
+  static byte engage_booster;
+#endif
 #endif // LCD functions
 };
 

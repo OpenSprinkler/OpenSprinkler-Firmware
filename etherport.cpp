@@ -135,8 +135,8 @@ int EthernetClient::connect(uint8_t ip[4], uint16_t port)
 	m_sock = socket(AF_INET, SOCK_STREAM, 0);
 	if (::connect(m_sock, (struct sockaddr *) &sin, sizeof(sin)) < 0)
 	{
-		DEBUG_PRINTLN("error connecting to weather server");
-		return false;
+    DEBUG_PRINTLN("error connecting to server");
+    return 0;
 	}
 	m_connected = true;
 	return 1;
