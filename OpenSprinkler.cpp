@@ -49,8 +49,8 @@ ulong OpenSprinkler::checkwt_success_lasttime;
 char tmp_buffer[TMP_BUFFER_SIZE+1];       // scratch buffer
 
 #if defined(ARDUINO)
-  prog_char wtopts_filename[] PROGMEM = WEATHER_OPTS_FILENAME;
-  prog_char stns_filename[]   PROGMEM = STATION_ATTR_FILENAME;
+  extern prog_char wtopts_filename[] PROGMEM = WEATHER_OPTS_FILENAME;
+  extern prog_char stns_filename[]   PROGMEM = STATION_ATTR_FILENAME;
 #else
   char wtopts_filename[] = WEATHER_OPTS_FILENAME;
   char stns_filename[]   = STATION_ATTR_FILENAME;
@@ -73,7 +73,7 @@ char tmp_buffer[TMP_BUFFER_SIZE+1];       // scratch buffer
 // with 0 fillings if less
 #define OP_JSON_NAME_STEPSIZE 5
 #if defined(ARDUINO)
-prog_char op_json_names[] PROGMEM =
+extern prog_char op_json_names[] PROGMEM =
 #else
 char op_json_names[] =
 #endif
@@ -179,7 +179,7 @@ char op_promopts[] =
 
 /** Option maximum values (stored in progmem) */
 #if defined(ARDUINO)
-prog_char op_max[] PROGMEM = {
+extern prog_char op_max[] PROGMEM = {
 #else
 char op_max[] = {
 #endif
