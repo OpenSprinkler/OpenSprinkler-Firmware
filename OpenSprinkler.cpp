@@ -49,11 +49,11 @@ ulong OpenSprinkler::checkwt_success_lasttime;
 char tmp_buffer[TMP_BUFFER_SIZE+1];       // scratch buffer
 
 #if defined(ARDUINO)
-  prog_char wtopts_filename[] PROGMEM = WEATHER_OPTS_FILENAME;
-  prog_char stns_filename[]   PROGMEM = STATION_ATTR_FILENAME;
+  const prog_char wtopts_filename[] PROGMEM = WEATHER_OPTS_FILENAME;
+  const prog_char stns_filename[]   PROGMEM = STATION_ATTR_FILENAME;
 #else
-  char wtopts_filename[] = WEATHER_OPTS_FILENAME;
-  char stns_filename[]   = STATION_ATTR_FILENAME;
+  const char wtopts_filename[] = WEATHER_OPTS_FILENAME;
+  const char stns_filename[]   = STATION_ATTR_FILENAME;
 #endif
 
 #if defined(ARDUINO)
@@ -73,9 +73,9 @@ char tmp_buffer[TMP_BUFFER_SIZE+1];       // scratch buffer
 // with 0 fillings if less
 #define OP_JSON_NAME_STEPSIZE 5
 #if defined(ARDUINO)
-prog_char op_json_names[] PROGMEM =
+const prog_char op_json_names[] PROGMEM =
 #else
-char op_json_names[] =
+const char op_json_names[] =
 #endif
     "fwv\0\0"
     "tz\0\0\0"
@@ -127,7 +127,7 @@ char op_json_names[] =
 // Each string is strictly 16 characters
 // with SPACE fillings if less
 #if defined(ARDUINO)
-prog_char op_prompts[] PROGMEM =
+const prog_char op_prompts[] PROGMEM =
 #else
 char op_promopts[] =
 #endif
@@ -179,9 +179,9 @@ char op_promopts[] =
 
 /** Option maximum values (stored in progmem) */
 #if defined(ARDUINO)
-prog_char op_max[] PROGMEM = {
+const prog_char op_max[] PROGMEM = {
 #else
-char op_max[] = {
+const char op_max[] = {
 #endif
   0,
   108,
@@ -285,7 +285,7 @@ byte OpenSprinkler::options[] = {
 };
 
 /** Weekday strings (stored in progmem, for LCD display) */
-static prog_char days_str[] PROGMEM =
+static const prog_char days_str[] PROGMEM =
   "Mon\0"
   "Tue\0"
   "Wed\0"

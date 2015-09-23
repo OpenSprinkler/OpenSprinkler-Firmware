@@ -888,7 +888,7 @@ void make_logfile_name(char *name) {
  * must be strictly two characters with an ending 0
  * so each name is 3 characters total
  */
-static prog_char log_type_names[] PROGMEM =
+static const prog_char log_type_names[] PROGMEM =
     "  \0"
     "rs\0"
     "rd\0"

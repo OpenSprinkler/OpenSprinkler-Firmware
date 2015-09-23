@@ -48,8 +48,6 @@ extern BufferFiller bfill;
 extern char tmp_buffer[];
 extern OpenSprinkler os;
 extern ProgramData pd;
-extern char op_json_names[];
-extern char op_max[];
 
 void write_log(byte type, ulong curr_time);
 void schedule_all_stations(ulong curr_time);
@@ -78,41 +76,38 @@ int available_ether_buffer();
 #define HTML_NOT_PERMITTED     0x30
 #define HTML_REDIRECT_HOME     0xFF
 
-static prog_uchar html200OK[] PROGMEM =
+static const prog_uchar html200OK[] PROGMEM =
   "HTTP/1.1 200 OK\r\n"
 ;
 
-static prog_uchar htmlCacheCtrl[] PROGMEM =
+static const prog_uchar htmlCacheCtrl[] PROGMEM =
   "Cache-Control: max-age=604800, public\r\n"
 ;
 
-static prog_uchar htmlNoCache[] PROGMEM =
+static const prog_uchar htmlNoCache[] PROGMEM =
   "Cache-Control: max-age=0, no-cache, no-store, must-revalidate\r\n"
 ;
 
-static prog_uchar htmlContentHTML[] PROGMEM =
+static const prog_uchar htmlContentHTML[] PROGMEM =
   "Content-Type: text/html\r\n"
 ;
 
-static prog_uchar htmlAccessControl[] PROGMEM =
+static const prog_uchar htmlAccessControl[] PROGMEM =
   "Access-Control-Allow-Origin: *\r\n"
 ;
 
-static prog_uchar htmlContentJSON[] PROGMEM =
+static const prog_uchar htmlContentJSON[] PROGMEM =
   "Content-Type: application/json\r\n"
   "Connection: close\r\n"
 ;
 
-static prog_uchar htmlMobileHeader[] PROGMEM =
+static const prog_uchar htmlMobileHeader[] PROGMEM =
   "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1.0,minimum-scale=1.0,user-scalable=no\">\r\n"
 ;
 
-static prog_uchar htmlReturnHome[] PROGMEM =
+static const prog_uchar htmlReturnHome[] PROGMEM =
   "<script>window.location=\"/\";</script>\n"
 ;
-
-extern const char wtopts_filename[];
-extern const char stns_filename[];
 
 #if defined(ARDUINO)
 void print_html_standard_header() {
@@ -621,7 +616,7 @@ byte server_moveup_program(char *p) {
  * dur?:  station water time
  * name:  program name
 */
-prog_char _str_program[] PROGMEM = "Program ";
+const prog_char _str_program[] PROGMEM = "Program ";
 byte server_change_program(char *p) {
   byte i;
 
@@ -1399,7 +1394,7 @@ typedef byte (*URLHandler)(char*);
  * The order must exactly match the order of the
  * handler functions below
  */
-prog_char _url_keys[] PROGMEM =
+const prog_char _url_keys[] PROGMEM =
   "cv"
   "jc"
   "dp"
