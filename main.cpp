@@ -641,7 +641,7 @@ void do_loop()
     perform_ntp_sync();
 
     // check network connection
-    if (curr_time % CHECK_NETWORK_INTERVAL==0)  os.status.req_network = 1;
+    if (curr_time && (curr_time % CHECK_NETWORK_INTERVAL==0))  os.status.req_network = 1;
     check_network();
 
     // check weather

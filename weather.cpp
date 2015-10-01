@@ -90,7 +90,7 @@ static void getweather_callback(byte status, uint16_t off, uint16_t len) {
   
   if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("tz"), true)) {
     v = atoi(tmp_buffer);
-    if (v>=0 && v<= 96) {
+    if (v>=0 && v<= 108) {
       if (v != os.options[OPTION_TIMEZONE]) {
         // if timezone changed, save change and force ntp sync
         os.options[OPTION_TIMEZONE] = v;
@@ -148,7 +148,6 @@ void GetWeather() {
     }
   };
   *dst = *src;
-  
   uint16_t _port = ether.hisport; // save current port number
   ether.hisport = 80;
   ether.browseUrl(PSTR("/weather"), dst, PSTR("*"), getweather_callback);
