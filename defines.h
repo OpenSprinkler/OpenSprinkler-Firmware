@@ -53,6 +53,7 @@
 #define STN_TYPE_STANDARD    0x00
 #define STN_TYPE_RF          0x01
 #define STN_TYPE_REMOTE      0x02
+#define STN_TYPE_GPIO        0x03	// Support for raw connection of station to GPIO pin
 #define STN_TYPE_OTHER       0xFF
 
 /** Sensor type macro defines */

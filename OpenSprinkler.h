@@ -134,6 +134,7 @@ public:
   static uint16_t parse_rfstation_code(byte *code, ulong *on, ulong *off); // parse rf code into on/off/time sections
   static void switch_rfstation(byte *code, bool turnon);  // switch rf station
   static void switch_remotestation(byte *code, bool turnon); // switch remote station
+  static void switch_gpiostation(byte *code, bool turnon); // switch gpio station
   static void station_attrib_bits_save(int addr, byte bits[]); // save station attribute bits to nvm
   static void station_attrib_bits_load(int addr, byte bits[]); // load station attribute bits from nvm
   static byte station_attrib_bits_read(int addr); // read one station attribte byte from nvm

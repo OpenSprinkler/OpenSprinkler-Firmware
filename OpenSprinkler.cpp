@@ -882,6 +882,9 @@ void OpenSprinkler::switch_special_station(byte sid, byte value) {
     } else if(stn->type==STN_TYPE_REMOTE) {
       // request remote station
       switch_remotestation(stn->data, value);
+    } else if(stn->type==STN_TYPE_GPIO) {
+      // set GPIO pin
+      switch_gpiostation(stn->data, value);
     }
   }
 }
@@ -980,6 +983,22 @@ void OpenSprinkler::switch_rfstation(byte *code, bool turnon) {
   rf_gpio_fd = -1;
 #endif
 
+}
+
+/** Switch GPIO station
+ * Special data for GPIO Station is three bytes of ascii decimal (not hex)
+ * First two bytes are zero padded GPIO pin number.
+ * Third byte is either 0 or 1 for active low (GND) or high (+5V) relays
+ */
+void OpenSprinkler::switch_gpiostation(byte *code, bool turnon) {
+  byte gpio = (*code - '0') * 10 + *(code+1) - '0';
+  byte activeState = *(code+2) - '0';
+
+  pinMode(gpio, OUTPUT);
+  if (turnon)
+    digitalWrite(gpio, activeState);
+  else
+    digitalWrite(gpio, 1-activeState);
 }
 
 /** Callback function for remote station calls */
