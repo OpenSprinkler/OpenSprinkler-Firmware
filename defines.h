@@ -53,6 +53,7 @@
 #define STN_TYPE_STANDARD    0x00
 #define STN_TYPE_RF          0x01
 #define STN_TYPE_REMOTE      0x02
+#define STN_TYPE_GPIO        0x03	// Support for raw connection of station to GPIO pin
 #define STN_TYPE_OTHER       0xFF
 
 /** Sensor type macro defines */
@@ -316,6 +317,8 @@ typedef enum {
   #define PIN_BUTTON_2      24    // button 2
   #define PIN_BUTTON_3      25    // button 3
 
+  #define PIN_FREE_LIST		{5,6,7,8,9,10,11,12,13,16,18,19,20,21,23,24,25,26}
+  
   /** BBB pin defines */
   #elif defined(OSBO)
 

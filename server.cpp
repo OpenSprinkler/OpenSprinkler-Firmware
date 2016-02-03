@@ -489,6 +489,23 @@ byte server_change_stations(char *p)
       int stepsize=sizeof(StationSpecialData);
       tmp_buffer[0]-='0';
       tmp_buffer[stepsize-1] = 0;
+
+	  if(tmp_buffer[0] == STN_TYPE_GPIO) {
+#if defined(OSPI) // check that pin does not clash with OSPi pins
+		  byte gpio = (tmp_buffer[1] - '0') * 10 + tmp_buffer[2] - '0';
+		  byte activeState = tmp_buffer[3] - '0';
+
+		  byte gpioList[] = PIN_FREE_LIST;
+		  bool found = false;
+		  for (int i = 0; i < sizeof(gpioList) && found == false; i++) {
+			  if (gpioList[i] == gpio) found = true;
+		  }
+		  if (!found || activeState > 1) return HTML_DATA_OUTOFBOUND;
+#else	 // only allow GPIO stations if OSPi
+		  return HTML_NOT_PERMITTED;
+#endif
+	  }
+
       write_to_file(stns_filename, tmp_buffer, strlen(tmp_buffer)+1, stepsize*sid, false);
     } else {
       return HTML_DATA_MISSING;
