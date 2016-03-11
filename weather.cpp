@@ -120,8 +120,8 @@ void GetWeather() {
   ether.dnsLookup(tmp_buffer, true);
 
   //bfill=ether.tcpOffset();
-  char tmp[30];
-  read_from_file(wtopts_filename, tmp, 30);
+  char tmp[60];
+  read_from_file(wtopts_filename, tmp, 60);
   BufferFiller bf = (uint8_t*)tmp_buffer;
   bf.emit_p(PSTR("$D.py?loc=$E&key=$E&fwv=$D&wto=$S"),
                 (int) os.options[OPTION_USE_WEATHER],
