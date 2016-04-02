@@ -25,7 +25,7 @@
 #define _DEFINES_H
 
 /** Firmware version, hardware version, and maximal values */
-#define OS_FW_VERSION  216  // Firmware version: 216 means 2.1.6
+#define OS_FW_VERSION  217  // Firmware version: 217 means 2.1.7
                             // if this number is different from the one stored in non-volatile memory
                             // a device reset will be automatically triggered
 
