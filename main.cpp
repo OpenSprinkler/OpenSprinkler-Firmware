@@ -847,13 +847,15 @@ void manual_start_program(byte pid) {
     if(pid==255)  dur=2;
     else if(pid>0)
       dur = water_time_resolve(water_time_decode(prog.durations[sid]));
-    RuntimeQueueStruct *q = pd.enqueue();
-    if (q && dur>0 && !(os.station_attrib_bits_read(ADDR_NVM_STNDISABLE+bid)&(1<<s))) {
-      q->st = 0;
-      q->dur = dur;
-      q->sid = sid;
-      q->pid = 254;
-      match_found = true;
+    if(dur>0 && !(os.station_attrib_bits_read(ADDR_NVM_STNDISABLE+bid)&(1<<s))) {
+      RuntimeQueueStruct *q = pd.enqueue();
+      if (q) {
+        q->st = 0;
+        q->dur = dur;
+        q->sid = sid;
+        q->pid = 254;
+        match_found = true;
+      }
     }
   }
   if(match_found) {
@@ -1079,6 +1081,10 @@ void perform_ntp_sync() {
   if (!os.options[OPTION_USE_NTP] || os.status.network_fails>0 || os.status.program_busy) return;
 
   if (os.status.req_ntpsync) {
+    // check if rtc is uninitialized
+    // 978307200 is Jan 1, 2001, 00:00:00
+    boolean rtc_zero = (now()<=978307200);
+    
     os.status.req_ntpsync = 0;
     if (!ui_state) {
       os.lcd_print_line_clear_pgm(PSTR("NTP Syncing..."),1);
@@ -1087,6 +1093,11 @@ void perform_ntp_sync() {
     if (t>0) {
       setTime(t);
       RTC.set(t);
+      // if rtc was uninitialized and now it is, restart
+      if(rtc_zero && now()>978307200) {
+        os.reboot_dev();
+      }
+      
     }
   }
 #else
