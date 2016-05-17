@@ -185,24 +185,37 @@ void peel_http_header() { // remove the HTTP header
 
 void GetWeather() {
   EthernetClient client;
-
+  uint16_t port = 80;
+  char * delim;
   struct hostent *server;
+  
   nvm_read_block(tmp_buffer, (void*)ADDR_NVM_WEATHERURL, MAX_WEATHERURL);
+
+  // Check to see if url specifies a port number to use
+  delim = strchr(tmp_buffer, ':');
+  if (delim != NULL) {
+        *delim = 0;
+        port = atoi(delim+1);
+  }
+
   server = gethostbyname(tmp_buffer);
   if (!server) {
-    DEBUG_PRINTLN("can't resolve weather server");
+    DEBUG_PRINT("can't resolve weather server - ");
+    DEBUG_PRINTLN(tmp_buffer);
     return;
   }
-  DEBUG_PRINT("weather server ip:");
+  DEBUG_PRINT("weather server ip:port - ");
   DEBUG_PRINT(((uint8_t*)server->h_addr)[0]);
-  DEBUG_PRINT(":");
+  DEBUG_PRINT(".");
   DEBUG_PRINT(((uint8_t*)server->h_addr)[1]);
-  DEBUG_PRINT(":");
+  DEBUG_PRINT(".");
   DEBUG_PRINT(((uint8_t*)server->h_addr)[2]);
+  DEBUG_PRINT(".");
+  DEBUG_PRINT(((uint8_t*)server->h_addr)[3]);
   DEBUG_PRINT(":");
-  DEBUG_PRINTLN(((uint8_t*)server->h_addr)[3]);
+  DEBUG_PRINTLN(port);
 
-  if (!client.connect((uint8_t*)server->h_addr, 80)) {
+  if (!client.connect((uint8_t*)server->h_addr, port)) {
     client.stop();
     return;
   }
@@ -239,7 +252,9 @@ void GetWeather() {
   char urlBuffer[255];
   strcpy(urlBuffer, "GET /weather");
   strcat(urlBuffer, dst);
-  strcat(urlBuffer, " HTTP/1.0\r\nHOST: weather.opensprinkler.com\r\n\r\n");
+  strcat(urlBuffer, " HTTP/1.0\r\nHOST: ");
+  strcat(urlBuffer, server->h_name);
+  strcat(urlBuffer, "\r\n\r\n");
   
   DEBUG_PRINTLN(urlBuffer);
   client.write((uint8_t *)urlBuffer, strlen(urlBuffer));
