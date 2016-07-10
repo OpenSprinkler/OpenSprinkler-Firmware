@@ -797,13 +797,13 @@ static ulong hex2ulong(byte *code, byte len) {
 /** Parse RF code into on/off/timeing sections */
 uint16_t OpenSprinkler::parse_rfstation_code(RFStationData *data, ulong* on, ulong *off) {
   ulong v;
-  v = hex2ulong(data->on, sizeof(RFStationData::on));
+  v = hex2ulong(data->on, sizeof(data->on));
   if (!v) return 0;
   if (on) *on = v;
-	v = hex2ulong(data->off, sizeof(RFStationData::off));
+	v = hex2ulong(data->off, sizeof(data->off));
   if (!v) return 0;
   if (off) *off = v;
-	v = hex2ulong(data->timing, sizeof(RFStationData::timing));
+	v = hex2ulong(data->timing, sizeof(data->timing));
   if (!v) return 0;
   return v;
 }
@@ -1022,20 +1022,20 @@ static void switchremote_callback(byte status, uint16_t off, uint16_t len) {
 void OpenSprinkler::switch_remotestation(RemoteStationData *data, bool turnon) {
 #if defined(ARDUINO)
   // construct string
-  ulong ip = hex2ulong(data->ip, sizeof(RemoteStationData::ip));
+  ulong ip = hex2ulong(data->ip, sizeof(data->ip));
   ether.hisip[0] = ip>>24;
   ether.hisip[1] = (ip>>16)&0xff;
   ether.hisip[2] = (ip>>8)&0xff;
   ether.hisip[3] = ip&0xff;
 
   uint16_t _port = ether.hisport; // save current port number
-  ether.hisport = hex2ulong(data->port, sizeof(RemoteStationData::port));
+  ether.hisport = hex2ulong(data->port, sizeof(data->port));
 
   char *p = tmp_buffer + sizeof(RemoteStationData) + 1;
   BufferFiller bf = (byte*)p;
   bf.emit_p(PSTR("?pw=$E&sid=$D&en=$D&t=$D"),
             ADDR_NVM_PASSWORD,
-            (int)hex2ulong(data->sid,sizeof(RemoteStationData::sid)),
+            (int)hex2ulong(data->sid,sizeof(data->sid)),
             turnon, 2*MAX_NUM_STATIONS);  // MAX_NUM_STATIONS is the refresh cycle
   DEBUG_PRINTLN(p);
   ether.browseUrl(PSTR("/cm"), p, PSTR("*"), switchremote_callback);
@@ -1048,12 +1048,12 @@ void OpenSprinkler::switch_remotestation(RemoteStationData *data, bool turnon) {
 
   uint8_t hisip[4];
   uint16_t hisport;
-  ulong ip = hex2ulong(data->ip, sizeof(RemoteStationData::ip));
+  ulong ip = hex2ulong(data->ip, sizeof(data->ip));
   hisip[0] = ip>>24;
   hisip[1] = (ip>>16)&0xff;
   hisip[2] = (ip>>8)&0xff;
   hisip[3] = ip&0xff;
-  hisport = hex2ulong(data->port, sizeof(RemoteStationData::port));
+  hisport = hex2ulong(data->port, sizeof(data->port));
 
   if (!client.connect(hisip, hisport)) {
     client.stop();
@@ -1064,7 +1064,7 @@ void OpenSprinkler::switch_remotestation(RemoteStationData *data, bool turnon) {
   BufferFiller bf = p;
   bf.emit_p(PSTR("GET /cm?pw=$E&sid=$D&en=$D&t=$D"),
             ADDR_NVM_PASSWORD,
-            (int)hex2ulong(data->sid, sizeof(RemoteStationData::sid)),
+            (int)hex2ulong(data->sid, sizeof(data->sid)),
             turnon, 2*MAX_NUM_STATIONS);  // MAX_NUM_STATIONS is the refresh cycle
   bf.emit_p(PSTR(" HTTP/1.0\r\nHOST: *\r\n\r\n"));
 
