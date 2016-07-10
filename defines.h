@@ -158,7 +158,7 @@
 #define ADDR_NVM_OPTIONS       (ADDR_NVM_STNSPE+(MAX_EXT_BOARDS+1))  // options
 
 /** Default password, location string, weather key, script urls */
-#define DEFAULT_PASSWORD          "opendoor"
+#define DEFAULT_PASSWORD          "a6d82bced638de3def1e9bbb4983225c"
 #define DEFAULT_LOCATION          "Boston,MA"
 #define DEFAULT_WEATHER_KEY       ""
 #define DEFAULT_JAVASCRIPT_URL    "https://ui.opensprinkler.com/js"
@@ -377,8 +377,6 @@ typedef enum {
   #define strcat_P     strcat
   #define strcpy_P     strcpy
   #define PROGMEM
-  typedef const char prog_char;
-  typedef const char prog_uchar;
   typedef const char* PGM_P;
   typedef unsigned char   uint8_t;
   typedef short           int16_t;

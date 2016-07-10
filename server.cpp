@@ -76,36 +76,36 @@ int available_ether_buffer();
 #define HTML_NOT_PERMITTED     0x30
 #define HTML_REDIRECT_HOME     0xFF
 
-static const prog_uchar html200OK[] PROGMEM =
+static const char html200OK[] PROGMEM =
   "HTTP/1.1 200 OK\r\n"
 ;
 
-static const prog_uchar htmlCacheCtrl[] PROGMEM =
+static const char htmlCacheCtrl[] PROGMEM =
   "Cache-Control: max-age=604800, public\r\n"
 ;
 
-static const prog_uchar htmlNoCache[] PROGMEM =
+static const char htmlNoCache[] PROGMEM =
   "Cache-Control: max-age=0, no-cache, no-store, must-revalidate\r\n"
 ;
 
-static const prog_uchar htmlContentHTML[] PROGMEM =
+static const char htmlContentHTML[] PROGMEM =
   "Content-Type: text/html\r\n"
 ;
 
-static const prog_uchar htmlAccessControl[] PROGMEM =
+static const char htmlAccessControl[] PROGMEM =
   "Access-Control-Allow-Origin: *\r\n"
 ;
 
-static const prog_uchar htmlContentJSON[] PROGMEM =
+static const char htmlContentJSON[] PROGMEM =
   "Content-Type: application/json\r\n"
   "Connection: close\r\n"
 ;
 
-static const prog_uchar htmlMobileHeader[] PROGMEM =
+static const char htmlMobileHeader[] PROGMEM =
   "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1.0,minimum-scale=1.0,user-scalable=no\">\r\n"
 ;
 
-static const prog_uchar htmlReturnHome[] PROGMEM =
+static const char htmlReturnHome[] PROGMEM =
   "<script>window.location=\"/\";</script>\n"
 ;
 
@@ -638,7 +638,7 @@ byte server_moveup_program(char *p) {
  * dur?:  station water time
  * name:  program name
 */
-const prog_char _str_program[] PROGMEM = "Program ";
+const char _str_program[] PROGMEM = "Program ";
 byte server_change_program(char *p) {
   byte i;
 
@@ -1416,7 +1416,7 @@ typedef byte (*URLHandler)(char*);
  * The order must exactly match the order of the
  * handler functions below
  */
-const prog_char _url_keys[] PROGMEM =
+const char _url_keys[] PROGMEM =
   "cv"
   "jc"
   "dp"

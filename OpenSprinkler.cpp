@@ -52,8 +52,8 @@ ulong OpenSprinkler::checkwt_success_lasttime;
 char tmp_buffer[TMP_BUFFER_SIZE+1];       // scratch buffer
 
 #if defined(ARDUINO)
-  const prog_char wtopts_filename[] PROGMEM = WEATHER_OPTS_FILENAME;
-  const prog_char stns_filename[]   PROGMEM = STATION_ATTR_FILENAME;
+  const char wtopts_filename[] PROGMEM = WEATHER_OPTS_FILENAME;
+  const char stns_filename[]   PROGMEM = STATION_ATTR_FILENAME;
 #else
   const char wtopts_filename[] = WEATHER_OPTS_FILENAME;
   const char stns_filename[]   = STATION_ATTR_FILENAME;
@@ -76,7 +76,7 @@ char tmp_buffer[TMP_BUFFER_SIZE+1];       // scratch buffer
 // with 0 fillings if less
 #define OP_JSON_NAME_STEPSIZE 5
 #if defined(ARDUINO)
-const prog_char op_json_names[] PROGMEM =
+const char op_json_names[] PROGMEM =
 #else
 const char op_json_names[] =
 #endif
@@ -130,7 +130,7 @@ const char op_json_names[] =
 // Each string is strictly 16 characters
 // with SPACE fillings if less
 #if defined(ARDUINO)
-const prog_char op_prompts[] PROGMEM =
+const char op_prompts[] PROGMEM =
 #else
 char op_promopts[] =
 #endif
@@ -182,7 +182,7 @@ char op_promopts[] =
 
 /** Option maximum values (stored in progmem) */
 #if defined(ARDUINO)
-const prog_char op_max[] PROGMEM = {
+const char op_max[] PROGMEM = {
 #else
 const char op_max[] = {
 #endif
@@ -288,7 +288,7 @@ byte OpenSprinkler::options[] = {
 };
 
 /** Weekday strings (stored in progmem, for LCD display) */
-static const prog_char days_str[] PROGMEM =
+static const char days_str[] PROGMEM =
   "Mon\0"
   "Tue\0"
   "Wed\0"
