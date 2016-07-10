@@ -20,6 +20,9 @@
  * along with this program.  If not, see
  * <http://www.gnu.org/licenses/>.
  */
+#if not defined(ARDUINO)
+#include <netdb.h>
+#endif
 
 #include "OpenSprinkler.h"
 #include "gpio.h"
@@ -792,15 +795,15 @@ static ulong hex2ulong(byte *code, byte len) {
 }
 
 /** Parse RF code into on/off/timeing sections */
-uint16_t OpenSprinkler::parse_rfstation_code(byte *code, ulong* on, ulong *off) {
+uint16_t OpenSprinkler::parse_rfstation_code(RFStationData *data, ulong* on, ulong *off) {
   ulong v;
-  v = hex2ulong(code, 6);
+  v = hex2ulong(data->on, sizeof(RFStationData::on));
   if (!v) return 0;
   if (on) *on = v;
-  v = hex2ulong(code+6, 6);
+	v = hex2ulong(data->off, sizeof(RFStationData::off));
   if (!v) return 0;
   if (off) *off = v;
-  v = hex2ulong(code+12, 4);
+	v = hex2ulong(data->timing, sizeof(RFStationData::timing));
   if (!v) return 0;
   return v;
 }
@@ -878,13 +881,16 @@ void OpenSprinkler::switch_special_station(byte sid, byte value) {
     // check station type
     if(stn->type==STN_TYPE_RF) {
       // transmit RF signal
-      switch_rfstation(stn->data, value);
+      switch_rfstation((RFStationData *)stn->data, value);
     } else if(stn->type==STN_TYPE_REMOTE) {
       // request remote station
-      switch_remotestation(stn->data, value);
+      switch_remotestation((RemoteStationData *)stn->data, value);
     } else if(stn->type==STN_TYPE_GPIO) {
       // set GPIO pin
-      switch_gpiostation(stn->data, value);
+      switch_gpiostation((GPIOStationData *)stn->data, value);
+    } else if(stn->type==STN_TYPE_HTTP) {
+      // send GET command
+      switch_httpstation((HTTPStationData *)stn->data, value);
     }
   }
 }
@@ -970,9 +976,9 @@ void send_rfsignal(ulong code, ulong len) {
  * parses it into signals and timing,
  * and sends it out through RF transmitter.
  */
-void OpenSprinkler::switch_rfstation(byte *code, bool turnon) {
+void OpenSprinkler::switch_rfstation(RFStationData *data, bool turnon) {
   ulong on, off;
-  uint16_t length = parse_rfstation_code(code, &on, &off);
+  uint16_t length = parse_rfstation_code(data, &on, &off);
 #if defined(ARDUINO)
   send_rfsignal(turnon ? on : off, length);
 #else
@@ -990,9 +996,9 @@ void OpenSprinkler::switch_rfstation(byte *code, bool turnon) {
  * First two bytes are zero padded GPIO pin number.
  * Third byte is either 0 or 1 for active low (GND) or high (+5V) relays
  */
-void OpenSprinkler::switch_gpiostation(byte *code, bool turnon) {
-  byte gpio = (*code - '0') * 10 + *(code+1) - '0';
-  byte activeState = *(code+2) - '0';
+void OpenSprinkler::switch_gpiostation(GPIOStationData *data, bool turnon) {
+  byte gpio = (data->pin[0] - '0') * 10 + (data->pin[1] - '0');
+  byte activeState = data->active - '0';
 
   pinMode(gpio, OUTPUT);
   if (turnon)
@@ -1013,23 +1019,23 @@ static void switchremote_callback(byte status, uint16_t off, uint16_t len) {
  * The remote controller is assumed to have the same
  * password as the main controller
  */
-void OpenSprinkler::switch_remotestation(byte *code, bool turnon) {
+void OpenSprinkler::switch_remotestation(RemoteStationData *data, bool turnon) {
 #if defined(ARDUINO)
   // construct string
-  ulong ip = hex2ulong(code, 8);
+  ulong ip = hex2ulong(data->ip, sizeof(RemoteStationData::ip));
   ether.hisip[0] = ip>>24;
   ether.hisip[1] = (ip>>16)&0xff;
   ether.hisip[2] = (ip>>8)&0xff;
   ether.hisip[3] = ip&0xff;
 
   uint16_t _port = ether.hisport; // save current port number
-  ether.hisport = hex2ulong(code+8, 4);
+  ether.hisport = hex2ulong(data->port, sizeof(RemoteStationData::port));
 
-  char *p = tmp_buffer + sizeof(StationSpecialData);
+  char *p = tmp_buffer + sizeof(RemoteStationData) + 1;
   BufferFiller bf = (byte*)p;
   bf.emit_p(PSTR("?pw=$E&sid=$D&en=$D&t=$D"),
             ADDR_NVM_PASSWORD,
-            (int)hex2ulong(code+12,2),
+            (int)hex2ulong(data->sid,sizeof(RemoteStationData::sid)),
             turnon, 2*MAX_NUM_STATIONS);  // MAX_NUM_STATIONS is the refresh cycle
   DEBUG_PRINTLN(p);
   ether.browseUrl(PSTR("/cm"), p, PSTR("*"), switchremote_callback);
@@ -1042,23 +1048,23 @@ void OpenSprinkler::switch_remotestation(byte *code, bool turnon) {
 
   uint8_t hisip[4];
   uint16_t hisport;
-  ulong ip = hex2ulong(code, 8);
+  ulong ip = hex2ulong(data->ip, sizeof(RemoteStationData::ip));
   hisip[0] = ip>>24;
   hisip[1] = (ip>>16)&0xff;
   hisip[2] = (ip>>8)&0xff;
   hisip[3] = ip&0xff;
-  hisport = hex2ulong(code+8, 4);
+  hisport = hex2ulong(data->port, sizeof(RemoteStationData::port));
 
   if (!client.connect(hisip, hisport)) {
     client.stop();
     return;
   }
 
-  char *p = tmp_buffer + sizeof(StationSpecialData);
+  char *p = tmp_buffer + sizeof(RemoteStationData) + 1;
   BufferFiller bf = p;
   bf.emit_p(PSTR("GET /cm?pw=$E&sid=$D&en=$D&t=$D"),
             ADDR_NVM_PASSWORD,
-            (int)hex2ulong(code+12,2),
+            (int)hex2ulong(data->sid, sizeof(RemoteStationData::sid)),
             turnon, 2*MAX_NUM_STATIONS);  // MAX_NUM_STATIONS is the refresh cycle
   bf.emit_p(PSTR(" HTTP/1.0\r\nHOST: *\r\n\r\n"));
 
@@ -1077,6 +1083,71 @@ void OpenSprinkler::switch_remotestation(byte *code, bool turnon) {
     }
     switchremote_callback(0, 0, ETHER_BUFFER_SIZE);
   }
+  client.stop();
+#endif
+}
+
+/** Callback function for http station calls */
+static void switchhttp_callback(byte status, uint16_t off, uint16_t len) {
+  /* do nothing */
+}
+
+/** Switch http station
+ * This function takes an http station code,
+ * parses it into a server name and two HTTP GET requests.
+ */
+void OpenSprinkler::switch_httpstation(HTTPStationData *data, bool turnon) {
+
+  char * server = strtok((char *)data->data, ",");
+  char * port = strtok(NULL, ",");
+  char * on_cmd = strtok(NULL, ",");
+  char * off_cmd = strtok(NULL, ",");
+  char * cmd = turnon ? on_cmd : off_cmd;
+
+#if defined(ARDUINO)
+  int _port = ether.hisport;
+
+  ether.hisport = atoi(port);
+  ether.browseUrl(PSTR("/"), cmd, server, switchhttp_callback);
+  for(int l=0;l<100;l++) {
+    ether.packetLoop(ether.packetReceive());
+  }
+
+  ether.hisport = _port;
+#else
+  EthernetClient client;
+  struct hostent *host;
+
+  host = gethostbyname(server);
+  if (!host) {
+    DEBUG_PRINT("can't resolve http station - ");
+    DEBUG_PRINTLN(server);
+    return;
+  }
+
+  if (!client.connect((uint8_t*)host->h_addr, atoi(port))) {
+    client.stop();
+    return;
+  }
+
+  char getBuffer[255];
+  sprintf(getBuffer, "GET /%s HTTP/1.0\r\nHOST: %s\r\n\r\n", cmd, host->h_name);
+  client.write((uint8_t *)getBuffer, strlen(getBuffer));
+
+  bzero(ether_buffer, ETHER_BUFFER_SIZE);
+
+  time_t timeout = now() + 5; // 5 seconds timeout
+  while(now() < timeout) {
+    int len=client.read((uint8_t *)ether_buffer, ETHER_BUFFER_SIZE);
+    if (len<=0) {
+      if(!client.connected())
+        break;
+      else
+        continue;
+    }
+    switchhttp_callback(0, 0, ETHER_BUFFER_SIZE);
+  }
+
   client.stop();
 #endif
 }

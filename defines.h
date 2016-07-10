@@ -24,6 +24,8 @@
 #ifndef _DEFINES_H
 #define _DEFINES_H
 
+#define TMP_BUFFER_SIZE      128    // scratch buffer size
+
 /** Firmware version, hardware version, and maximal values */
 #define OS_FW_VERSION  216  // Firmware version: 216 means 2.1.6
                             // if this number is different from the one stored in non-volatile memory
@@ -45,7 +47,7 @@
 /** File names */
 #define WEATHER_OPTS_FILENAME "wtopts.txt"    // weather options file
 #define STATION_ATTR_FILENAME "stns.dat"      // station attributes data file
-#define STATION_SPECIAL_DATA_SIZE  23
+#define STATION_SPECIAL_DATA_SIZE  (TMP_BUFFER_SIZE - 8)
 
 #define FLOWCOUNT_RT_WINDOW   30    // flow count window (for computing real-time flow rate), 30 seconds
 
@@ -54,6 +56,7 @@
 #define STN_TYPE_RF          0x01
 #define STN_TYPE_REMOTE      0x02
 #define STN_TYPE_GPIO        0x03	// Support for raw connection of station to GPIO pin
+#define STN_TYPE_HTTP        0x04	// Support for HTTP Get connection
 #define STN_TYPE_OTHER       0xFF
 
 /** Sensor type macro defines */
@@ -383,8 +386,6 @@ typedef enum {
   typedef bool boolean;
 
 #endif  // end of Hardawre defines
-
-#define TMP_BUFFER_SIZE     128  // scratch buffer size
 
 /** Other defines */
 // button values

@@ -485,7 +485,7 @@ byte server_change_stations(char *p)
     sid = atoi(tmp_buffer);
     if(sid<0 || sid>os.nstations) return HTML_DATA_OUTOFBOUND;
     if(findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("st"), true) &&
-       findKeyVal(p, tmp_buffer+1, TMP_BUFFER_SIZE, PSTR("sd"), true)) {
+       findKeyVal(p, tmp_buffer+1, TMP_BUFFER_SIZE-1, PSTR("sd"), true)) {
       int stepsize=sizeof(StationSpecialData);
       tmp_buffer[0]-='0';
       tmp_buffer[stepsize-1] = 0;
@@ -504,6 +504,11 @@ byte server_change_stations(char *p)
 #else	 // only allow GPIO stations if OSPi
 		  return HTML_NOT_PERMITTED;
 #endif
+	  } else if (tmp_buffer[0] == STN_TYPE_HTTP) {
+		  urlDecode(tmp_buffer + 1); // Unwind any url encoding of special data
+		  if (strlen(tmp_buffer+1) > sizeof(HTTPStationData)) {
+			  return HTML_DATA_OUTOFBOUND;
+		  }
 	  }
 
       write_to_file(stns_filename, tmp_buffer, strlen(tmp_buffer)+1, stepsize*sid, false);
