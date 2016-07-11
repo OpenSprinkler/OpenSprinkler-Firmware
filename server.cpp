@@ -770,12 +770,14 @@ void server_json_options_main() {
 
     if (oid==OPTION_SEQUENTIAL_RETIRED) continue;
     if (oid==OPTION_DEVICE_ID && os.status.has_hwmac) continue; // do not send DEVICE ID if hardware MAC exists
-    
+   
+#if defined(ARDUINO) 
     if (os.lcd.type() == LCD_I2C) {
       // for I2C type LCD, we can't adjust contrast or backlight
       if(oid==OPTION_LCD_CONTRAST || oid==OPTION_LCD_BACKLIGHT) continue;
     }
-    
+#endif
+
     // each json name takes 5 characters
     strncpy_P0(tmp_buffer, op_json_names+oid*5, 5);
     bfill.emit_p(PSTR("\"$S\":$D"),

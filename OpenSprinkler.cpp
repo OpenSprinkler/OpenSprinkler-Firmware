@@ -269,7 +269,7 @@ byte OpenSprinkler::options[] = {
   0,  // device id
   150,// lcd contrast
   100,// lcd backlight
-  15, // lcd dimming
+  50, // lcd dimming
   80, // boost time (only valid to DC and LATCH type)
   0,  // weather algorithm (0 means not using weather algorithm)
   50, // this and the next three bytes define the ntp server ip
@@ -634,6 +634,14 @@ void OpenSprinkler::begin() {
   if(sd.begin(PIN_SD_CS, SPI_HALF_SPEED)) {
     status.has_sd = 1;
   }
+  
+  #if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
+  if(!status.has_sd) {
+    lcd.setCursor(0, 0);
+    lcd_print_pgm(PSTR("Error Code: 0x2D"));
+    while(1){}
+  }
+  #endif
 
   // set button pins
   // enable internal pullup
