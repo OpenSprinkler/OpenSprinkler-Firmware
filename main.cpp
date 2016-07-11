@@ -35,7 +35,7 @@ SdFat sd;                                 // SD card object
 
 void reset_all_stations();
 unsigned long getNtpTime();
-void manual_start_program(byte pid);
+void manual_start_program(byte, byte);
 #else // header and defs for RPI/BBB
 #include <sys/stat.h>
 #include "etherport.h"
@@ -108,7 +108,7 @@ void ui_state_machine() {
     case BUTTON_1:
       if (button & BUTTON_FLAG_HOLD) {  // holding B1: stop all stations
         if (digitalRead(PIN_BUTTON_3)==0) { // if B3 is pressed while holding B1, run a short test (internal test)
-          manual_start_program(255);
+          manual_start_program(255, 0);
         } else if (digitalRead(PIN_BUTTON_2)==0) { // if B2 is pressed while holding B1, display gateway IP
           os.lcd_print_ip(ether.gwip, 0);
           os.lcd.setCursor(0, 1);
@@ -167,7 +167,7 @@ void ui_state_machine() {
     if ((button & BUTTON_MASK)==BUTTON_3) {
       if (button & BUTTON_FLAG_HOLD) {
         // start
-        manual_start_program(ui_state_runprog);
+        manual_start_program(ui_state_runprog, 0);
         ui_state = UI_STATE_DEFAULT;
       } else {
         ui_state_runprog = (ui_state_runprog+1) % (pd.nprograms+1);
@@ -831,7 +831,7 @@ void reset_all_stations() {
  * If pid==255, this is a short test program (2 second per station)
  * If pid > 0. run program pid-1
  */
-void manual_start_program(byte pid) {
+void manual_start_program(byte pid, byte uwt) {
   boolean match_found = false;
   reset_all_stations_immediate();
   ProgramStruct prog;
@@ -847,6 +847,9 @@ void manual_start_program(byte pid) {
     if(pid==255)  dur=2;
     else if(pid>0)
       dur = water_time_resolve(water_time_decode(prog.durations[sid]));
+    if(uwt) {
+      dur = dur * os.options[OPTION_WATER_PERCENTAGE] / 100;
+    }
     if(dur>0 && !(os.station_attrib_bits_read(ADDR_NVM_STNDISABLE+bid)&(1<<s))) {
       RuntimeQueueStruct *q = pd.enqueue();
       if (q) {

@@ -531,6 +531,37 @@ uint16_t parse_listdata(char **p) {
   return (uint16_t)atol(tmp_buffer);
 }
 
+void manual_start_program(byte, byte);
+/** Manual start program
+ * Command: /mp?pw=xxx&pid=xxx&uwt=xxx
+ *
+ * pw:  password
+ * pid: program index (0 refers to the first program)
+ * uwt: use weather (i.e. watering percentage)
+ */
+byte server_manual_program(char *p) {
+  if (!findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("pid"), true))
+    return HTML_DATA_MISSING;
+
+  int pid=atoi(tmp_buffer);
+  if (pid < 0 || pid >= pd.nprograms) {
+    return HTML_DATA_OUTOFBOUND;
+  }
+
+  byte uwt = 0;
+  if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("uwt"), true)) {
+    if(tmp_buffer[0]=='1') uwt = 1;
+  }
+
+  // reset all stations and prepare to run one-time program
+  reset_all_stations_immediate();
+
+  manual_start_program(pid+1, uwt);
+
+  return HTML_SUCCESS;
+
+}
+
 /**
  * Change run-once program
  * Command: /cr?pw=xxx&t=[x,x,x...]
@@ -739,6 +770,12 @@ void server_json_options_main() {
 
     if (oid==OPTION_SEQUENTIAL_RETIRED) continue;
     if (oid==OPTION_DEVICE_ID && os.status.has_hwmac) continue; // do not send DEVICE ID if hardware MAC exists
+    
+    if (os.lcd.type() == LCD_I2C) {
+      // for I2C type LCD, we can't adjust contrast or backlight
+      if(oid==OPTION_LCD_CONTRAST || oid==OPTION_LCD_BACKLIGHT) continue;
+    }
+    
     // each json name takes 5 characters
     strncpy_P0(tmp_buffer, op_json_names+oid*5, 5);
     bfill.emit_p(PSTR("\"$S\":$D"),
@@ -1422,6 +1459,7 @@ const char _url_keys[] PROGMEM =
   "dp"
   "cp"
   "cr"
+  "mp"
   "up"
   "jp"
   "co"
@@ -1445,6 +1483,7 @@ URLHandler urls[] = {
   server_delete_program,  // dp
   server_change_program,  // cp
   server_change_runonce,  // cr
+  server_manual_program,  // mp  
   server_moveup_program,  // up
   server_json_programs,   // jp
   server_change_options,  // co

@@ -1701,7 +1701,12 @@ void OpenSprinkler::lcd_set_brightness(byte value) {
   #if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
   if (lcd.type()==LCD_I2C) {
     if (value) lcd.backlight();
-    else lcd.noBacklight();
+    else {
+      // turn off LCD backlight
+      // only if dimming value is set to 0
+      if(!options[OPTION_LCD_DIMMING])  lcd.noBacklight();
+      else lcd.backlight();
+    }
   }
   #endif
   if (lcd.type()==LCD_STD) {
