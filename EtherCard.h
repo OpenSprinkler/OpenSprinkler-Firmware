@@ -40,6 +40,9 @@
 #include "enc28j60.h"
 #include "net.h"
 
+#undef PGM_P
+#define PGM_P const char*
+
 /** This type definition defines the structure of a UDP server event handler callback funtion */
 typedef void (*UdpServerCallback)(
     uint16_t dest_port,    ///< Port the packet was sent to

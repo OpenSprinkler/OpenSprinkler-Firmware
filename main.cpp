@@ -396,7 +396,7 @@ void do_loop()
             // if station has non-zero water time and the station is not disabled
             if (prog.durations[sid] && !(os.station_attrib_bits_read(ADDR_NVM_STNDISABLE+bid)&(1<<s))) {
               // water time is scaled by watering percentage
-              ulong water_time = water_time_resolve(water_time_decode(prog.durations[sid]));
+              ulong water_time = water_time_resolve(prog.durations[sid]);
               // if the program is set to use weather scaling
               if (prog.use_weather) {
                 byte wl = os.options[OPTION_WATER_PERCENTAGE];
@@ -549,8 +549,8 @@ void do_loop()
 
     // handle master
     if (os.status.mas>0) {
-      byte mas_on_adj = os.options[OPTION_MASTER_ON_ADJ];
-      byte mas_off_adj= os.options[OPTION_MASTER_OFF_ADJ];
+      int16_t mas_on_adj = water_time_decode_signed(os.options[OPTION_MASTER_ON_ADJ]);
+      int16_t mas_off_adj= water_time_decode_signed(os.options[OPTION_MASTER_OFF_ADJ]);
       byte masbit = 0;
       os.station_attrib_bits_load(ADDR_NVM_MAS_OP, (byte*)tmp_buffer);  // tmp_buffer now stores masop_bits
       for(sid=0;sid<os.nstations;sid++) {
@@ -563,7 +563,7 @@ void do_loop()
           q=pd.queue+pd.station_qid[sid];
           // check if timing is within the acceptable range
           if (curr_time >= q->st + mas_on_adj &&
-              curr_time <= q->st + q->dur + mas_off_adj - 60) {
+              curr_time <= q->st + q->dur + mas_off_adj) {
             masbit = 1;
             break;
           }
@@ -573,8 +573,8 @@ void do_loop()
     }
     // handle master2
     if (os.status.mas2>0) {
-      byte mas_on_adj_2 = os.options[OPTION_MASTER_ON_ADJ_2];
-      byte mas_off_adj_2= os.options[OPTION_MASTER_OFF_ADJ_2];
+      int16_t mas_on_adj_2 = water_time_decode_signed(os.options[OPTION_MASTER_ON_ADJ_2]);
+      int16_t mas_off_adj_2= water_time_decode_signed(os.options[OPTION_MASTER_OFF_ADJ_2]);
       byte masbit2 = 0;
       os.station_attrib_bits_load(ADDR_NVM_MAS_OP_2, (byte*)tmp_buffer);  // tmp_buffer now stores masop2_bits
       for(sid=0;sid<os.nstations;sid++) {
@@ -587,7 +587,7 @@ void do_loop()
           q=pd.queue+pd.station_qid[sid];
           // check if timing is within the acceptable range
           if (curr_time >= q->st + mas_on_adj_2 &&
-              curr_time <= q->st + q->dur + mas_off_adj_2 - 60) {
+              curr_time <= q->st + q->dur + mas_off_adj_2) {
             masbit2 = 1;
             break;
           }
@@ -846,7 +846,7 @@ void manual_start_program(byte pid, byte uwt) {
     dur = 60;
     if(pid==255)  dur=2;
     else if(pid>0)
-      dur = water_time_resolve(water_time_decode(prog.durations[sid]));
+      dur = water_time_resolve(prog.durations[sid]);
     if(uwt) {
       dur = dur * os.options[OPTION_WATER_PERCENTAGE] / 100;
     }

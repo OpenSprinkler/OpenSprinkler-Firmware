@@ -27,11 +27,11 @@
 #define TMP_BUFFER_SIZE      128    // scratch buffer size
 
 /** Firmware version, hardware version, and maximal values */
-#define OS_FW_VERSION  216  // Firmware version: 216 means 2.1.6
+#define OS_FW_VERSION  217  // Firmware version: 217 means 2.1.7
                             // if this number is different from the one stored in non-volatile memory
                             // a device reset will be automatically triggered
 
-#define OS_FW_MINOR      3  // Firmware minor version
+#define OS_FW_MINOR      0  // Firmware minor version
 
 /** Hardware version base numbers */
 #define OS_HW_VERSION_BASE   0x00
@@ -43,6 +43,7 @@
 #define HW_TYPE_AC           0xAC   // standard 24VAC for 24VAC solenoids only, with triacs
 #define HW_TYPE_DC           0xDC   // DC powered, for both DC and 24VAC solenoids, with boost converter and MOSFETs
 #define HW_TYPE_LATCH        0x1A   // DC powered, for DC latching solenoids only, with boost converter and H-bridges
+#define HW_TYPE_UNIV         0x15   // DC powered, universal driver
 
 /** File names */
 #define WEATHER_OPTS_FILENAME "wtopts.txt"    // weather options file
@@ -59,10 +60,17 @@
 #define STN_TYPE_HTTP        0x04	// Support for HTTP Get connection
 #define STN_TYPE_OTHER       0xFF
 
+#define PUSH_ENABLE_BIT_STATIONS   1
+#define PUSH_ENABLE_BIT_WEATHER    2
+#define PUSH_ENABLE_BIT_RAINSENSE  3
+#define PUSH_ENABLE_BIT_FLOWSENSE  4
+#define PUSH_ENABLE_BIT_RESTART    5
+
 /** Sensor type macro defines */
 #define SENSOR_TYPE_NONE    0x00
-#define SENSOR_TYPE_RAIN    0x01
-#define SENSOR_TYPE_FLOW    0x02
+#define SENSOR_TYPE_RAIN    0x01  // rain sensor
+#define SENSOR_TYPE_FLOW    0x02  // flow sensor
+#define SENSOR_TYPE_PSWITCH 0xF0  // program switch
 #define SENSOR_TYPE_OTHER   0xFF
 
 /** Non-volatile memory (NVM) defines */
@@ -71,17 +79,17 @@
 /** 2KB NVM (ATmega644) data structure:
   * |         |     |  ---STRING PARAMETERS---      |           |   ----STATION ATTRIBUTES-----      |          |
   * | PROGRAM | CON | PWD | LOC | JURL | WURL | KEY | STN_NAMES | MAS | IGR | MAS2 | DIS | SEQ | SPE | OPTIONS  |
-  * |  (996)  |(12) |(36) |(48) | (40) | (40) |(24) |   (768)   | (6) | (6) |  (6) | (6) | (6) | (6) |  (48)    |
+  * |  (986)  |(12) |(36) |(48) | (40) | (40) |(24) |   (768)   | (6) | (6) |  (6) | (6) | (6) | (6) |  (58)    |
   * |         |     |     |     |      |      |     |           |     |     |      |     |     |     |          |
-  * 0        996  1008   1044  1092  1132   1172   1196        1964  1970  1976   1982  1988  1994  2000      2048
+  * 0        986  998   1034  1082  1122   1162   1186        1954  1960  1966   1972  1978  1984  1990      2048
   */
 
 /** 4KB NVM (ATmega1284) data structure:
   * |         |     |  ---STRING PARAMETERS---      |           |   ----STATION ATTRIBUTES-----      |          |
   * | PROGRAM | CON | PWD | LOC | JURL | WURL | KEY | STN_NAMES | MAS | IGR | MAS2 | DIS | SEQ | SPE | OPTIONS  |
-  * |  (2438) |(12) |(36) |(48) | (48) | (48) |(24) |   (1344)  | (7) | (7) |  (7) | (7) | (7) | (7) |   (56)   |
+  * |  (2433) |(12) |(36) |(48) | (48) | (48) |(24) |   (1344)  | (7) | (7) |  (7) | (7) | (7) | (7) |   (61)   |
   * |         |     |     |     |      |      |     |           |     |     |      |     |     |     |          |
-  * 0       2438  2450   2486  2534  2582   2630   2654        3998  4005  4012   4019  4026  4033  4040      4096
+  * 0       2433  2445   2481  2529  2577   2625   2649        3993  4000  4007   4014  4021  4028  4035      4096
   */
 
   #if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__) // for 4KB NVM
@@ -92,7 +100,7 @@
     #define NVM_SIZE            4096  // For AVR, nvm data is stored in EEPROM, ATmega1284 has 4K EEPROM
     #define STATION_NAME_SIZE   24    // maximum number of characters in each station name
 
-    #define MAX_PROGRAMDATA     2438  // program data
+    #define MAX_PROGRAMDATA     2433  // program data
     #define MAX_NVCONDATA       12    // non-volatile controller data
     #define MAX_USER_PASSWORD   36    // user password
     #define MAX_LOCATION        48    // location string
@@ -108,7 +116,7 @@
     #define NVM_SIZE            2048  // For AVR, nvm data is stored in EEPROM, ATmega644 has 2K EEPROM
     #define STATION_NAME_SIZE   16    // maximum number of characters in each station name
 
-    #define MAX_PROGRAMDATA     996   // program data
+    #define MAX_PROGRAMDATA     986   // program data
     #define MAX_NVCONDATA       12     // non-volatile controller data
     #define MAX_USER_PASSWORD   36    // user password
     #define MAX_LOCATION        48    // location string
@@ -130,7 +138,7 @@
   #define NVM_SIZE            4096
   #define STATION_NAME_SIZE   24    // maximum number of characters in each station name
 
-  #define MAX_PROGRAMDATA     2438  // program data
+  #define MAX_PROGRAMDATA     2433  // program data
   #define MAX_NVCONDATA       12     // non-volatile controller data
   #define MAX_USER_PASSWORD   36    // user password
   #define MAX_LOCATION        48    // location string
@@ -158,7 +166,7 @@
 #define ADDR_NVM_OPTIONS       (ADDR_NVM_STNSPE+(MAX_EXT_BOARDS+1))  // options
 
 /** Default password, location string, weather key, script urls */
-#define DEFAULT_PASSWORD          "a6d82bced638de3def1e9bbb4983225c"
+#define DEFAULT_PASSWORD          "a6d82bced638de3def1e9bbb4983225c"  // md5 of 'opendoor'
 #define DEFAULT_LOCATION          "Boston,MA"
 #define DEFAULT_WEATHER_KEY       ""
 #define DEFAULT_JAVASCRIPT_URL    "https://ui.opensprinkler.com/js"
@@ -212,6 +220,12 @@ typedef enum {
   OPTION_PULSE_RATE_0,
   OPTION_PULSE_RATE_1,
   OPTION_REMOTE_EXT_MODE,
+  OPTION_DNS_IP1,
+  OPTION_DNS_IP2,
+  OPTION_DNS_IP3,
+  OPTION_DNS_IP4,
+  OPTION_SPE_AUTO_REFRESH,
+  OPTION_PUSHING_ENABLE,
   OPTION_RESET,
   NUM_OPTIONS	// total number of options
 } OS_OPTION_t;
@@ -277,7 +291,7 @@ typedef enum {
 
   // Ethernet buffer size
   #if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
-    #define ETHER_BUFFER_SIZE   1200 // ATmega1284 has 16K RAM, so use a bigger buffer
+    #define ETHER_BUFFER_SIZE   1300 // ATmega1284 has 16K RAM, so use a bigger buffer
   #else
     #define ETHER_BUFFER_SIZE   950  // ATmega644 has 4K RAM, so use a smaller buffer
   #endif

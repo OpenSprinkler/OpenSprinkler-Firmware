@@ -721,7 +721,7 @@ byte server_change_program(char *p) {
   pv++; // this should be a '['
   for (i=0;i<os.nstations;i++) {
     uint16_t pre = parse_listdata(&pv);
-    prog.durations[i] = water_time_encode(pre);
+    prog.durations[i] = pre;
   }
   pv++; // this should be a ']'
   pv++; // this should be a ']'
@@ -757,8 +757,11 @@ void server_json_options_main() {
         continue;
     #endif
     int32_t v=os.options[oid];
-    if (oid==OPTION_MASTER_OFF_ADJ || oid==OPTION_MASTER_OFF_ADJ_2) {v-=60;}
-    if (oid==OPTION_STATION_DELAY_TIME) {v=water_time_decode_signed(v);}
+    if (oid==OPTION_MASTER_OFF_ADJ || oid==OPTION_MASTER_OFF_ADJ_2 ||
+        oid==OPTION_MASTER_ON_ADJ  || oid==OPTION_MASTER_ON_ADJ_2 ||
+        oid==OPTION_STATION_DELAY_TIME) {
+      v=water_time_decode_signed(v);
+    }
     #if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
     if (oid==OPTION_BOOST_TIME) {
       if (os.hw_type==HW_TYPE_AC) continue;
@@ -817,9 +820,9 @@ void server_json_programs_main() {
     bfill.emit_p(PSTR("$D],["), prog.starttimes[i]);  // this is the last element
     // station water time
     for (i=0; i<os.nstations-1; i++) {
-      bfill.emit_p(PSTR("$L,"),(unsigned long)water_time_decode(prog.durations[i]));
+      bfill.emit_p(PSTR("$L,"),(unsigned long)prog.durations[i]);
     }
-    bfill.emit_p(PSTR("$L],\""),(unsigned long)water_time_decode(prog.durations[i])); // this is the last element
+    bfill.emit_p(PSTR("$L],\""),(unsigned long)prog.durations[i]); // this is the last element
     // program name
     strncpy(tmp_buffer, prog.name, PROGRAM_NAME_SIZE);
     tmp_buffer[PROGRAM_NAME_SIZE] = 0;  // make sure the string ends
@@ -1082,9 +1085,10 @@ byte server_change_options(char *p)
         os.options[oid] = 1;  // if the bool variable is detected, set to 1
       } else {
 		    int32_t v = atol(tmp_buffer);
-		    if (oid==OPTION_MASTER_OFF_ADJ || oid==OPTION_MASTER_OFF_ADJ_2) {v+=60;} // master off time
-		    if (oid==OPTION_STATION_DELAY_TIME) {
-		      v=water_time_encode_signed((int16_t)v);
+		    if (oid==OPTION_MASTER_OFF_ADJ || oid==OPTION_MASTER_OFF_ADJ_2 ||
+		        oid==OPTION_MASTER_ON_ADJ  || oid==OPTION_MASTER_ON_ADJ_2  ||
+		        oid==OPTION_STATION_DELAY_TIME) {
+		      v=water_time_encode_signed(v);
 		    } // encode station delay time
         #if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
         if(os.hw_type==HW_TYPE_DC && oid==OPTION_BOOST_TIME) {

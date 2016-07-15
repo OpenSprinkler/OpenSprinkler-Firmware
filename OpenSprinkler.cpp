@@ -124,6 +124,12 @@ const char op_json_names[] =
     "fpr0\0"
     "fpr1\0"
     "re\0\0\0"
+    "dns1\0"
+    "dns2\0"
+    "dns3\0"
+    "dns4\0"
+    "sar\0\0"
+    "pbe\0\0"
     "reset";
 
 /** Option promopts (stored in progmem, for LCD display) */
@@ -178,6 +184,12 @@ char op_promopts[] =
     "Pulse rate:     "
     "----------------"
     "As remote ext.? "
+    "DNS server.ip1: "
+    "DNS server.ip2: "
+    "DNS server.ip3: "
+    "DNS server.ip4: "
+    "Special Refresh?"
+    "Pushing Enable: "
     "Factory reset?  ";
 
 /** Option maximum values (stored in progmem) */
@@ -203,10 +215,10 @@ const char op_max[] = {
   0,
   MAX_EXT_BOARDS,
   1,
-  247,
+  255,
   MAX_NUM_STATIONS,
-  60,
-  120,
+  255,
+  255,
   255,
   1,
   250,
@@ -224,12 +236,18 @@ const char op_max[] = {
   255,
   1,
   MAX_NUM_STATIONS,
-  60,
-  120,
+  255,
+  255,
   0,
   255,
   255,
   1,
+  255,
+  255,
+  255,
+  255,
+  1,
+  255,
   1
 };
 
@@ -257,10 +275,10 @@ byte OpenSprinkler::options[] = {
   OS_HW_VERSION,
   0,  // number of 8-station extension board. 0: no extension boards
   1,  // the option 'sequential' is now retired
-  128,// station delay time (-59 minutes to 59 minutes).
+  120,// station delay time (-10 minutes to 10 minutes).
   0,  // index of master station. 0: no master station
-  0,  // master on time [0,60] seconds
-  60, // master off time [-60,60] seconds
+  120,// master on time adjusted time (-10 minutes to 10 minutes)
+  120,// master off adjusted time (-10 minutes to 10 minutes)
   0,  // sensor function (see SENSOR_TYPE macro defines)
   0,  // rain sensor type. 0: normally closed; 1: normally open.
   100,// water level (default 100%),
@@ -277,13 +295,19 @@ byte OpenSprinkler::options[] = {
   210,
   169,
   1,  // enable logging: 0: disable; 1: enable.
-  0,  // index of master 2. 0: no master2 station
-  0,
-  60,
+  0,  // index of master2. 0: no master2 station
+  120,// master2 on adjusted time
+  120,// master2 off adjusted time
   OS_FW_MINOR, // firmware minor version
   100,// this and next byte define flow pulse rate (100x)
-  0,
+  0,  // default is 1.00 (100)
   0,  // set as remote extension
+  8,  // this and the next three bytes define the custom dns server ip
+  8,
+  8,
+  8,
+  0,  // special station auto refresh
+  0,  // pushing box enable bits
   0   // reset
 };
 
@@ -370,18 +394,10 @@ byte OpenSprinkler::start_network() {
 
   } else {
     // set up static IP
-    byte staticip[] = {
-      options[OPTION_STATIC_IP1],
-      options[OPTION_STATIC_IP2],
-      options[OPTION_STATIC_IP3],
-      options[OPTION_STATIC_IP4]};
-
-    byte gateway[] = {
-      options[OPTION_GATEWAY_IP1],
-      options[OPTION_GATEWAY_IP2],
-      options[OPTION_GATEWAY_IP3],
-      options[OPTION_GATEWAY_IP4]};
-    if (!ether.staticSetup(staticip, gateway, gateway))  return 0;
+    byte *staticip = options+OPTION_STATIC_IP1;
+    byte *gateway  = options+OPTION_GATEWAY_IP1;
+    byte *dns      = options+OPTION_DNS_IP1;
+    if (!ether.staticSetup(staticip, gateway, dns))  return 0;
   }
   return 1;
 }
@@ -704,16 +720,18 @@ void OpenSprinkler::apply_all_station_bits() {
   digitalWrite(PIN_SR_LATCH, HIGH);
   #endif
 
-  // handle refresh of RF and remote stations
-  // each time apply_all_station_bits is called
-  // we refresh the station whose index is the current time modulo MAX_NUM_STATIONS
-  static byte last_sid = 0;
-  byte sid = now() % MAX_NUM_STATIONS;
-  if (sid != last_sid) {  // avoid refreshing the same station twice in a roll
-    last_sid = sid;
-    bid=sid>>3;
-    s=sid&0x07;
-    switch_special_station(sid, (station_bits[bid]>>s)&0x01);
+  if(options[OPTION_SPE_AUTO_REFRESH]) {
+    // handle refresh of RF and remote stations
+    // each time apply_all_station_bits is called
+    // we refresh the station whose index is the current time modulo MAX_NUM_STATIONS
+    static byte last_sid = 0;
+    byte sid = now() % MAX_NUM_STATIONS;
+    if (sid != last_sid) {  // avoid refreshing the same station twice in a roll
+      last_sid = sid;
+      bid=sid>>3;
+      s=sid&0x07;
+      switch_special_station(sid, (station_bits[bid]>>s)&0x01);
+    }
   }
 }
 
@@ -1041,10 +1059,12 @@ void OpenSprinkler::switch_remotestation(RemoteStationData *data, bool turnon) {
 
   char *p = tmp_buffer + sizeof(RemoteStationData) + 1;
   BufferFiller bf = (byte*)p;
+  // MAX_NUM_STATIONS is the refresh cycle
+  uint16_t timer = options[OPTION_SPE_AUTO_REFRESH]?2*MAX_NUM_STATIONS:65535;
   bf.emit_p(PSTR("?pw=$E&sid=$D&en=$D&t=$D"),
             ADDR_NVM_PASSWORD,
             (int)hex2ulong(data->sid,sizeof(data->sid)),
-            turnon, 2*MAX_NUM_STATIONS);  // MAX_NUM_STATIONS is the refresh cycle
+            turnon, timer);
   DEBUG_PRINTLN(p);
   ether.browseUrl(PSTR("/cm"), p, PSTR("*"), switchremote_callback);
   for(int l=0;l<100;l++) {
@@ -1070,10 +1090,12 @@ void OpenSprinkler::switch_remotestation(RemoteStationData *data, bool turnon) {
 
   char *p = tmp_buffer + sizeof(RemoteStationData) + 1;
   BufferFiller bf = p;
+  // MAX_NUM_STATIONS is the refresh cycle
+  uint16_t timer = options[OPTION_SPE_AUTO_REFRESH]?2*MAX_NUM_STATIONS:65535;  
   bf.emit_p(PSTR("GET /cm?pw=$E&sid=$D&en=$D&t=$D"),
             ADDR_NVM_PASSWORD,
             (int)hex2ulong(data->sid, sizeof(data->sid)),
-            turnon, 2*MAX_NUM_STATIONS);  // MAX_NUM_STATIONS is the refresh cycle
+            turnon, timer);
   bf.emit_p(PSTR(" HTTP/1.0\r\nHOST: *\r\n\r\n"));
 
   client.write((uint8_t *)p, strlen(p));
@@ -1529,13 +1551,14 @@ void OpenSprinkler::lcd_print_option(int i) {
     break;
   case OPTION_MASTER_ON_ADJ:
   case OPTION_MASTER_ON_ADJ_2:
-    lcd_print_pgm(PSTR("+"));
-    lcd.print((int)options[i]);
-    break;
   case OPTION_MASTER_OFF_ADJ:
   case OPTION_MASTER_OFF_ADJ_2:
-    if(options[i]>=60)  lcd_print_pgm(PSTR("+"));
-    lcd.print((int)options[i]-60);
+  case OPTION_STATION_DELAY_TIME:
+    {
+    int16_t t=water_time_decode_signed(options[i]);
+    if(t>=0)  lcd_print_pgm(PSTR("+"));
+    lcd.print(t);    
+    }
     break;
   case OPTION_HTTPPORT_0:
     lcd.print((unsigned int)(options[i+1]<<8)+options[i]);
@@ -1548,9 +1571,6 @@ void OpenSprinkler::lcd_print_option(int i) {
     lcd.print((fpr/10)%10);
     lcd.print(fpr%10);
     }
-    break;
-  case OPTION_STATION_DELAY_TIME:
-    lcd.print(water_time_decode_signed(options[i]));
     break;
   case OPTION_LCD_CONTRAST:
     lcd_set_contrast();
@@ -1675,15 +1695,19 @@ void OpenSprinkler::ui_set_options(int oid)
       else {
         // click, move to the next option
         if (i==OPTION_USE_DHCP && options[i]) i += 9; // if use DHCP, skip static ip set
-        else if(i==OPTION_HTTPPORT_0) i+=2; // skip OPTION_HTTPPORT_1
-        else if(i==OPTION_PULSE_RATE_0) i+=2; // skip OPTION_PULSE_RATE_1
-        else if(i==OPTION_SENSOR_TYPE && options[i]!=SENSOR_TYPE_RAIN) i+=2; // if not using rain sensor, skip rain sensor type
-        else if(i==OPTION_MASTER_STATION && options[i]==0) i+=3; // if not using master station, skip master on/off adjust
-        else if(i==OPTION_MASTER_STATION_2&& options[i]==0) i+=3; // if not using master2, skip master2 on/off adjust
+        else if (i==OPTION_HTTPPORT_0) i+=2; // skip OPTION_HTTPPORT_1
+        else if (i==OPTION_PULSE_RATE_0) i+=2; // skip OPTION_PULSE_RATE_1
+        else if (i==OPTION_SENSOR_TYPE && options[i]!=SENSOR_TYPE_RAIN) i+=2; // if not using rain sensor, skip rain sensor type
+        else if (i==OPTION_MASTER_STATION && options[i]==0) i+=3; // if not using master station, skip master on/off adjust
+        else if (i==OPTION_MASTER_STATION_2&& options[i]==0) i+=3; // if not using master2, skip master2 on/off adjust
         else  {
           i = (i+1) % NUM_OPTIONS;
         }
         if(i==OPTION_SEQUENTIAL_RETIRED) i++;
+        #if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
+        else if (hw_type==HW_TYPE_AC && i==OPTION_BOOST_TIME) i++;  // skip boost time for non-DC controller
+        else if (lcd.type()==LCD_I2C && i==OPTION_LCD_CONTRAST) i+=2;
+        #endif      
       }
       break;
     }
