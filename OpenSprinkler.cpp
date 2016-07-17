@@ -1122,6 +1122,13 @@ static void switchhttp_callback(byte status, uint16_t off, uint16_t len) {
   /* do nothing */
 }
 
+bool isNumber(const char* str) {
+  for(byte i=0;i<strlen(str);i++) {
+    if(!isdigit(str[i]))  return false;
+  }
+  return true;
+}
+
 /** Switch http station
  * This function takes an http station code,
  * parses it into a server name and two HTTP GET requests.
@@ -1138,7 +1145,22 @@ void OpenSprinkler::switch_httpstation(HTTPStationData *data, bool turnon) {
   int _port = ether.hisport;
 
   ether.hisport = atoi(port);
-  ether.browseUrl(PSTR("/"), cmd, server, switchhttp_callback);
+
+  char *ip0 = strtok(server, ".");
+  char *ip1 = strtok(NULL, ".");
+  char *ip2 = strtok(NULL, ".");
+  char *ip3 = strtok(NULL, ".");
+  
+  if(ip0 && ip1 && ip2 && ip3 && isNumber(ip0) && isNumber(ip1) && isNumber(ip2) && isNumber(ip3)) {
+    ether.hisip[0] = atoi(ip0);
+    ether.hisip[1] = atoi(ip1);
+    ether.hisip[2] = atoi(ip2);
+    ether.hisip[3] = atoi(ip3);
+  } else {
+    ether.dnsLookup(tmp_buffer, true);
+  } 
+  
+  ether.browseUrl(PSTR("/"), cmd, PSTR("*"), switchhttp_callback);
   for(int l=0;l<100;l++) {
     ether.packetLoop(ether.packetReceive());
   }

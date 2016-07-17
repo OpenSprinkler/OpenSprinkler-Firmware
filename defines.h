@@ -249,6 +249,7 @@ typedef enum {
   #elif F_CPU==16000000L
     #if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
       #define OS_HW_VERSION (OS_HW_VERSION_BASE+23)
+      #define PIN_FREE_LIST		{2,10,12,13,14,15,18,19}
     #else
       #define OS_HW_VERSION (OS_HW_VERSION_BASE+22)
     #endif
