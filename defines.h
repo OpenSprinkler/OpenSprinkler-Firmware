@@ -305,12 +305,14 @@ typedef enum {
     #define DEBUG_BEGIN(x)   Serial.begin(x)
     #define DEBUG_PRINT(x)   Serial.print(x)
     #define DEBUG_PRINTLN(x) Serial.println(x)
+    #define DEBUG_PRINTIP(m,x) ether.printIp(m,x)
 
   #else
 
     #define DEBUG_BEGIN(x)   {}
     #define DEBUG_PRINT(x)   {}
     #define DEBUG_PRINTLN(x) {}
+    #define DEBUG_PRINTIP(x,m) {}
 
   #endif
   typedef unsigned char   uint8_t;

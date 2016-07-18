@@ -311,6 +311,15 @@ public:
                            const char *hoststr,
                            void (*callback)(uint8_t,uint16_t,uint16_t));
 
+    /** Ray: modified browseUrl, allows hoststr to be defined as RAM string */
+    static void browseUrlRamHost (const char *urlbuf, const char *urlbuf_varpart,
+                           const char *hoststr,
+                           void (*callback)(uint8_t,uint16_t,uint16_t));
+
+    static void browseUrlRamHost (const char *urlbuf, const char *urlbuf_varpart,
+                           const char *hoststr, const char *additionalheaderline,
+                           void (*callback)(uint8_t,uint16_t,uint16_t));
+
     /**   @brief  Prepare HTTP post message
     *     @param  urlbuf Pointer to c-string URL folder
     *     @param  hoststr Pointer to c-string hostname

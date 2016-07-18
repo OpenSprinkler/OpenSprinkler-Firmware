@@ -391,7 +391,7 @@ byte OpenSprinkler::start_network() {
     options[OPTION_GATEWAY_IP3] = ip[2];
     options[OPTION_GATEWAY_IP4] = ip[3];
     options_save();
-
+    
   } else {
     // set up static IP
     byte *staticip = options+OPTION_STATIC_IP1;
@@ -911,13 +911,17 @@ void OpenSprinkler::switch_special_station(byte sid, byte value) {
     } else if(stn->type==STN_TYPE_REMOTE) {
       // request remote station
       switch_remotestation((RemoteStationData *)stn->data, value);
-    } else if(stn->type==STN_TYPE_GPIO) {
+    }
+#if !defined(ARDUINO) || defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
+    // GPIO and HTTP stations are only available for OS23 or OSPi
+    else if(stn->type==STN_TYPE_GPIO) {
       // set GPIO pin
       switch_gpiostation((GPIOStationData *)stn->data, value);
     } else if(stn->type==STN_TYPE_HTTP) {
       // send GET command
       switch_httpstation((HTTPStationData *)stn->data, value);
     }
+#endif    
   }
 }
 
@@ -1033,9 +1037,12 @@ void OpenSprinkler::switch_gpiostation(GPIOStationData *data, bool turnon) {
     digitalWrite(gpio, 1-activeState);
 }
 
-/** Callback function for remote station calls */
-static void switchremote_callback(byte status, uint16_t off, uint16_t len) {
-  /* do nothing */
+/** Callback function for browseUrl calls */
+static void httpget_callback(byte status, uint16_t off, uint16_t len) {
+#if defined(SERIAL_DEBUG)
+  Ethernet::buffer[off+ETHER_BUFFER_SIZE-1] = 0;
+  DEBUG_PRINTLN((const char*) Ethernet::buffer + off);
+#endif
 }
 
 /** Switch remote station
@@ -1065,8 +1072,7 @@ void OpenSprinkler::switch_remotestation(RemoteStationData *data, bool turnon) {
             ADDR_NVM_PASSWORD,
             (int)hex2ulong(data->sid,sizeof(data->sid)),
             turnon, timer);
-  DEBUG_PRINTLN(p);
-  ether.browseUrl(PSTR("/cm"), p, PSTR("*"), switchremote_callback);
+  ether.browseUrl(PSTR("/cm"), p, PSTR("*"), httpget_callback);
   for(int l=0;l<100;l++) {
     ether.packetLoop(ether.packetReceive());
   }
@@ -1111,22 +1117,10 @@ void OpenSprinkler::switch_remotestation(RemoteStationData *data, bool turnon) {
       else
         continue;
     }
-    switchremote_callback(0, 0, ETHER_BUFFER_SIZE);
+    httpget_callback(0, 0, ETHER_BUFFER_SIZE);
   }
   client.stop();
 #endif
-}
-
-/** Callback function for http station calls */
-static void switchhttp_callback(byte status, uint16_t off, uint16_t len) {
-  /* do nothing */
-}
-
-bool isNumber(const char* str) {
-  for(byte i=0;i<strlen(str);i++) {
-    if(!isdigit(str[i]))  return false;
-  }
-  return true;
 }
 
 /** Switch http station
@@ -1135,38 +1129,40 @@ bool isNumber(const char* str) {
  */
 void OpenSprinkler::switch_httpstation(HTTPStationData *data, bool turnon) {
 
-  char * server = strtok((char *)data->data, ",");
+  static HTTPStationData copy;
+  // make a copy of the HTTP station data and work with it
+  memcpy((char*)&copy, (char*)data, sizeof(HTTPStationData));
+  char * server = strtok((char *)copy.data, ",");
   char * port = strtok(NULL, ",");
   char * on_cmd = strtok(NULL, ",");
   char * off_cmd = strtok(NULL, ",");
   char * cmd = turnon ? on_cmd : off_cmd;
 
 #if defined(ARDUINO)
-  int _port = ether.hisport;
 
+  if(!ether.dnsLookup(server, true)) {
+    char *ip0 = strtok(server, ".");
+    char *ip1 = strtok(NULL, ".");
+    char *ip2 = strtok(NULL, ".");
+    char *ip3 = strtok(NULL, ".");
+  
+    ether.hisip[0] = ip0 ? atoi(ip0) : 0;
+    ether.hisip[1] = ip1 ? atoi(ip1) : 0;
+    ether.hisip[2] = ip2 ? atoi(ip2) : 0;
+    ether.hisip[3] = ip3 ? atoi(ip3) : 0;
+  }
+
+  uint16_t _port = ether.hisport;
   ether.hisport = atoi(port);
-
-  char *ip0 = strtok(server, ".");
-  char *ip1 = strtok(NULL, ".");
-  char *ip2 = strtok(NULL, ".");
-  char *ip3 = strtok(NULL, ".");
-  
-  if(ip0 && ip1 && ip2 && ip3 && isNumber(ip0) && isNumber(ip1) && isNumber(ip2) && isNumber(ip3)) {
-    ether.hisip[0] = atoi(ip0);
-    ether.hisip[1] = atoi(ip1);
-    ether.hisip[2] = atoi(ip2);
-    ether.hisip[3] = atoi(ip3);
-  } else {
-    ether.dnsLookup(tmp_buffer, true);
-  } 
-  
-  ether.browseUrl(PSTR("/"), cmd, PSTR("*"), switchhttp_callback);
-  for(int l=0;l<100;l++) {
+  ether.browseUrlRamHost(PSTR("/"), cmd, server, httpget_callback);
+  for(int l=0;l<200;l++) {
     ether.packetLoop(ether.packetReceive());
   }
 
   ether.hisport = _port;
+
 #else
+
   EthernetClient client;
   struct hostent *host;
 
@@ -1197,7 +1193,7 @@ void OpenSprinkler::switch_httpstation(HTTPStationData *data, bool turnon) {
       else
         continue;
     }
-    switchhttp_callback(0, 0, ETHER_BUFFER_SIZE);
+    httpget_callback(0, 0, ETHER_BUFFER_SIZE);
   }
 
   client.stop();
