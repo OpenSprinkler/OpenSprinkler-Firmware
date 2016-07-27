@@ -54,9 +54,11 @@ char tmp_buffer[TMP_BUFFER_SIZE+1];       // scratch buffer
 #if defined(ARDUINO)
   const char wtopts_filename[] PROGMEM = WEATHER_OPTS_FILENAME;
   const char stns_filename[]   PROGMEM = STATION_ATTR_FILENAME;
+  const char pbkey_filename[]  PROGMEM = PUSHINGBOX_KEY_FILENAME;
 #else
   const char wtopts_filename[] = WEATHER_OPTS_FILENAME;
   const char stns_filename[]   = STATION_ATTR_FILENAME;
+  const char pbkey_filename[]  = PUSHINGBOX_KEY_FILENAME;  
 #endif
 
 #if defined(ARDUINO)
@@ -379,17 +381,9 @@ byte OpenSprinkler::start_network() {
     // register with domain name "OS-xx" where xx is the last byte of the MAC address
     if (!ether.dhcpSetup()) return 0;
     // once we have valid DHCP IP, we write these into static IP / gateway IP
-    byte *ip = ether.myip;
-    options[OPTION_STATIC_IP1] = ip[0];
-    options[OPTION_STATIC_IP2] = ip[1];
-    options[OPTION_STATIC_IP3] = ip[2];
-    options[OPTION_STATIC_IP4] = ip[3];
-
-    ip = ether.gwip;
-    options[OPTION_GATEWAY_IP1] = ip[0];
-    options[OPTION_GATEWAY_IP2] = ip[1];
-    options[OPTION_GATEWAY_IP3] = ip[2];
-    options[OPTION_GATEWAY_IP4] = ip[3];
+    memcpy(options+OPTION_STATIC_IP1, ether.myip, 4);
+    memcpy(options+OPTION_GATEWAY_IP1, ether.gwip,4);
+    memcpy(options+OPTION_DNS_IP1, ether.dnsip, 4);
     options_save();
     
   } else {
@@ -1038,7 +1032,7 @@ void OpenSprinkler::switch_gpiostation(GPIOStationData *data, bool turnon) {
 }
 
 /** Callback function for browseUrl calls */
-static void httpget_callback(byte status, uint16_t off, uint16_t len) {
+void httpget_callback(byte status, uint16_t off, uint16_t len) {
 #if defined(SERIAL_DEBUG)
   Ethernet::buffer[off+ETHER_BUFFER_SIZE-1] = 0;
   DEBUG_PRINTLN((const char*) Ethernet::buffer + off);
@@ -1073,9 +1067,7 @@ void OpenSprinkler::switch_remotestation(RemoteStationData *data, bool turnon) {
             (int)hex2ulong(data->sid,sizeof(data->sid)),
             turnon, timer);
   ether.browseUrl(PSTR("/cm"), p, PSTR("*"), httpget_callback);
-  for(int l=0;l<100;l++) {
-    ether.packetLoop(ether.packetReceive());
-  }
+  for(int l=0;l<100;l++)  ether.packetLoop(ether.packetReceive());
   ether.hisport = _port;
 #else
   EthernetClient client;
@@ -1155,10 +1147,7 @@ void OpenSprinkler::switch_httpstation(HTTPStationData *data, bool turnon) {
   uint16_t _port = ether.hisport;
   ether.hisport = atoi(port);
   ether.browseUrlRamHost(PSTR("/"), cmd, server, httpget_callback);
-  for(int l=0;l<200;l++) {
-    ether.packetLoop(ether.packetReceive());
-  }
-
+  for(int l=0;l<100;l++)  ether.packetLoop(ether.packetReceive());
   ether.hisport = _port;
 
 #else
@@ -1246,6 +1235,7 @@ void OpenSprinkler::options_setup() {
       nvm_write_block(tmp_buffer, (void*)i, strlen(tmp_buffer)+1);
     }
 
+    remove_file(stns_filename);
     tmp_buffer[0]=STN_TYPE_STANDARD;
     tmp_buffer[1]='0';
     tmp_buffer[2]=0;

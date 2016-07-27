@@ -24,7 +24,11 @@
 #ifndef _DEFINES_H
 #define _DEFINES_H
 
-#define TMP_BUFFER_SIZE      128    // scratch buffer size
+#if !defined(ARDUINO) || defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
+  #define TMP_BUFFER_SIZE      255   // scratch buffer size
+#else
+  #define TMP_BUFFER_SIZE      128   // scratch buffer size
+#endif
 
 /** Firmware version, hardware version, and maximal values */
 #define OS_FW_VERSION  217  // Firmware version: 217 means 2.1.7
@@ -49,6 +53,7 @@
 #define WEATHER_OPTS_FILENAME "wtopts.txt"    // weather options file
 #define STATION_ATTR_FILENAME "stns.dat"      // station attributes data file
 #define STATION_SPECIAL_DATA_SIZE  (TMP_BUFFER_SIZE - 8)
+#define PUSHINGBOX_KEY_FILENAME "pbkey.txt"
 
 #define FLOWCOUNT_RT_WINDOW   30    // flow count window (for computing real-time flow rate), 30 seconds
 
@@ -60,11 +65,13 @@
 #define STN_TYPE_HTTP        0x04	// Support for HTTP Get connection
 #define STN_TYPE_OTHER       0xFF
 
-#define PUSH_ENABLE_BIT_STATIONS   1
-#define PUSH_ENABLE_BIT_WEATHER    2
-#define PUSH_ENABLE_BIT_RAINSENSE  3
-#define PUSH_ENABLE_BIT_FLOWSENSE  4
-#define PUSH_ENABLE_BIT_RESTART    5
+#define PB_ENABLE_STATION_OPEN    0x01
+#define PB_ENABLE_STATION_CLOSED  0x02
+#define PB_ENABLE_PROGRAM_START   0x04
+#define PB_ENABLE_RAINSENSOR      0x08
+#define PB_ENABLE_FLOWSENSOR      0x10
+#define PB_ENABLE_WEATHER_CHANGE  0x20
+#define PB_ENABLE_RESTART         0x40
 
 /** Sensor type macro defines */
 #define SENSOR_TYPE_NONE    0x00
@@ -171,6 +178,7 @@
 #define DEFAULT_WEATHER_KEY       ""
 #define DEFAULT_JAVASCRIPT_URL    "https://ui.opensprinkler.com/js"
 #define DEFAULT_WEATHER_URL       "weather.opensprinkler.com"
+#define DEFAULT_PUSHING_URL       "api.pushingbox.com"
 
 /** Macro define of each option
   * Refer to OpenSprinkler.cpp for details on each option
@@ -292,27 +300,27 @@ typedef enum {
 
   // Ethernet buffer size
   #if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
-    #define ETHER_BUFFER_SIZE   1300 // ATmega1284 has 16K RAM, so use a bigger buffer
+    #define ETHER_BUFFER_SIZE   1400 // ATmega1284 has 16K RAM, so use a bigger buffer
   #else
     #define ETHER_BUFFER_SIZE   950  // ATmega644 has 4K RAM, so use a smaller buffer
   #endif
 
   #define 	wdt_reset()   __asm__ __volatile__ ("wdr")  // watchdog timer reset
 
-  //#define SERIAL_DEBUG
+  #define SERIAL_DEBUG
   #if defined(SERIAL_DEBUG) /** Serial debug functions */
 
     #define DEBUG_BEGIN(x)   Serial.begin(x)
     #define DEBUG_PRINT(x)   Serial.print(x)
     #define DEBUG_PRINTLN(x) Serial.println(x)
-    #define DEBUG_PRINTIP(m,x) ether.printIp(m,x)
+    #define DEBUG_PRINTIP(x) ether.printIp("IP:",x)
 
   #else
 
     #define DEBUG_BEGIN(x)   {}
     #define DEBUG_PRINT(x)   {}
     #define DEBUG_PRINTLN(x) {}
-    #define DEBUG_PRINTIP(x,m) {}
+    #define DEBUG_PRINTIP(x) {}
 
   #endif
   typedef unsigned char   uint8_t;

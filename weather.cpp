@@ -52,7 +52,6 @@ static void getweather_callback(byte status, uint16_t off, uint16_t len) {
 #else
   char *p = ether_buffer;
 #endif
-  DEBUG_PRINTLN(p);
   /* scan the buffer until the first & symbol */
   while(*p && *p!='&') {
     p++;

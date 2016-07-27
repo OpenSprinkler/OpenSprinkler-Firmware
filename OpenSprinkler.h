@@ -100,11 +100,13 @@ struct ConStatus {
 #if defined(ARDUINO)
 extern const char wtopts_filename[];
 extern const char stns_filename[];
+extern const char pbkey_filename[];
 extern const char op_max[];
 extern const char op_json_names[];
 #else
 extern const char wtopts_filename[];
 extern const char stns_filename[];
+extern const char pbkey_filename[];
 extern const char op_max[];
 extern const char op_json_names[];
 #endif

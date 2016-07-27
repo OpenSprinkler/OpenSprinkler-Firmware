@@ -36,6 +36,8 @@ SdFat sd;                                 // SD card object
 void reset_all_stations();
 unsigned long getNtpTime();
 void manual_start_program(byte, byte);
+void httpget_callback(byte, uint16_t, uint16_t);
+void push_message(const char*);
 #else // header and defs for RPI/BBB
 #include <sys/stat.h>
 #include "etherport.h"
@@ -621,6 +623,7 @@ void do_loop()
           }
         }
         if (!willrun) {
+          push_message("Reboot");
           os.reboot_dev();
         }
       }
@@ -864,6 +867,45 @@ void manual_start_program(byte pid, byte uwt) {
   if(match_found) {
     schedule_all_stations(os.now_tz());
   }
+}
+
+// ==========================================
+// ====== PUSH NOTIFICATION FUNCTIONS =======
+// ==========================================
+void push_message(const char* msg) {
+
+  static const char* server = DEFAULT_PUSHING_URL;
+  static char cmd[TMP_BUFFER_SIZE];
+     
+  DEBUG_PRINTLN(server);
+#if defined(ARDUINO)
+
+  if(!ether.dnsLookup(server, true)) {
+    // if DNS lookup fails, use default pushingbox IP
+    ether.hisip[0] = 213;
+    ether.hisip[1] = 186;
+    ether.hisip[2] =  33;
+    ether.hisip[3] =  19;
+  }
+
+  DEBUG_PRINTIP(ether.hisip);
+  
+  uint16_t _port = ether.hisport;
+  ether.hisport = 80;
+  read_from_file(pbkey_filename, cmd);
+  strcat(cmd, "&m=");
+  strcat(cmd, msg);
+  cmd[TMP_BUFFER_SIZE-1]=0;
+  DEBUG_PRINTLN(cmd);
+  ether.browseUrlRamHost(PSTR("/pushingbox?devid="), cmd, server, httpget_callback);
+  for(int l=0;l<100;l++)  ether.packetLoop(ether.packetReceive());
+  ether.hisport = _port;
+  
+#else
+
+
+
+#endif
 }
 
 // ================================
