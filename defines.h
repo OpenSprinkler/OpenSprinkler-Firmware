@@ -346,7 +346,7 @@ typedef enum {
   #define PIN_BUTTON_3      25    // button 3
 
   #define PIN_FREE_LIST		{5,6,7,8,9,10,11,12,13,16,18,19,20,21,23,24,25,26}
-  
+
   /** BBB pin defines */
   #elif defined(OSBO)
 
@@ -376,6 +376,7 @@ typedef enum {
     #define PIN_RAINSENSOR  0
     #define PIN_FLOWSENSOR  0
     #define PIN_RF_DATA     0
+	#define PIN_FREE_LIST	{}
 
   #endif
 
