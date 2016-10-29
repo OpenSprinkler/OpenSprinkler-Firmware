@@ -36,6 +36,7 @@ extern const char wtopts_filename[];
 #include "OpenSprinkler.h"
 #include "utils.h"
 #include "server.h"
+#include "weather.h"
 
 extern OpenSprinkler os; // OpenSprinkler object
 extern char tmp_buffer[];
@@ -63,6 +64,7 @@ static void getweather_callback(byte status, uint16_t off, uint16_t len) {
     if (v>=0 && v<=1440 && v != os.nvdata.sunrise_time) {
       os.nvdata.sunrise_time = v;
       os.nvdata_save();
+      os.weather_update_flag |= WEATHER_UPDATE_SUNRISE;
     }
   }
 
@@ -71,6 +73,7 @@ static void getweather_callback(byte status, uint16_t off, uint16_t len) {
     if (v>=0 && v<=1440 && v != os.nvdata.sunset_time) {
       os.nvdata.sunset_time = v;
       os.nvdata_save();
+      os.weather_update_flag |= WEATHER_UPDATE_SUNSET;      
     }
   }
 
@@ -79,7 +82,7 @@ static void getweather_callback(byte status, uint16_t off, uint16_t len) {
     if(l != os.nvdata.external_ip) {
       os.nvdata.external_ip = atol(tmp_buffer);
       os.nvdata_save();
-      os.weather_update_flag = 1;
+      os.weather_update_flag |= WEATHER_UPDATE_EIP;
     }
   }
 
@@ -88,8 +91,8 @@ static void getweather_callback(byte status, uint16_t off, uint16_t len) {
     if (v>=0 && v<=250 && v != os.options[OPTION_WATER_PERCENTAGE]) {
       // only save if the value has changed
       os.options[OPTION_WATER_PERCENTAGE] = v;
-      os.weather_update_flag = 1;
       os.options_save();
+      os.weather_update_flag |= WEATHER_UPDATE_WL;      
     }
   }
   
@@ -100,6 +103,7 @@ static void getweather_callback(byte status, uint16_t off, uint16_t len) {
         // if timezone changed, save change and force ntp sync
         os.options[OPTION_TIMEZONE] = v;
         os.options_save();
+        os.weather_update_flag |= WEATHER_UPDATE_TZ;
       }
     }
   }

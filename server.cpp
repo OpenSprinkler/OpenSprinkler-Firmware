@@ -49,7 +49,6 @@ extern char tmp_buffer[];
 extern OpenSprinkler os;
 extern ProgramData pd;
 
-void write_log(byte type, ulong curr_time);
 void schedule_all_stations(ulong curr_time);
 void turn_off_station(byte sid, ulong curr_time);
 void process_dynamic_events(ulong curr_time);

@@ -349,9 +349,11 @@ void do_loop()
       if (os.status.rain_delayed) {
         // rain delay started, record time
         os.raindelay_start_time = curr_time;
+        push_message(IFTTT_RAINSENSOR, LOGDATA_RAINDELAY, 1);
       } else {
         // rain delay stopped, write log
         write_log(LOGDATA_RAINDELAY, curr_time);
+        push_message(IFTTT_RAINSENSOR, LOGDATA_RAINDELAY, 0);
       }
       os.old_status.rain_delayed = os.status.rain_delayed;
     }
@@ -363,12 +365,14 @@ void do_loop()
         if (os.status.rain_sensed) {
           // rain sensor on, record time
           os.sensor_lasttime = curr_time;
+          push_message(IFTTT_RAINSENSOR, LOGDATA_RAINSENSE, 1);
         } else {
           // rain sensor off, write log
           if (curr_time>os.sensor_lasttime+10) {  // add a 10 second threshold
                                                   // to avoid faulty rain sensors generating
                                                   // too many log records
             write_log(LOGDATA_RAINSENSE, curr_time);
+            push_message(IFTTT_RAINSENSOR, LOGDATA_RAINSENSE, 0);
           }
         }
         os.old_status.rain_sensed = os.status.rain_sensed;
@@ -542,6 +546,7 @@ void do_loop()
         // log flow sensor reading if flow sensor is used
         if(os.options[OPTION_SENSOR_TYPE]==SENSOR_TYPE_FLOW) {
           write_log(LOGDATA_FLOWSENSE, curr_time);
+          push_message(IFTTT_FLOWSENSOR, (flow_count>os.flowcount_log_start)?(flow_count-os.flowcount_log_start):0);
         }
 
         // in case some options have changed while executing the program
@@ -624,7 +629,6 @@ void do_loop()
           }
         }
         if (!willrun) {
-          push_message(IFTTT_REBOOT);
           os.reboot_dev();
         }
       }
@@ -651,9 +655,16 @@ void do_loop()
     // check weather
     check_weather();
 
-    if(os.weather_update_flag == 1) {
+    byte wuf = os.weather_update_flag;
+    if(wuf) {
+      push_message(IFTTT_WEATHER_UPDATE, (wuf&WEATHER_UPDATE_EIP)?os.nvdata.external_ip:0,
+                                         (wuf&WEATHER_UPDATE_WL)?os.options[OPTION_WATER_PERCENTAGE]:-1);
       os.weather_update_flag = 0;
-      push_message(IFTTT_WEATHER_UPDATE, os.nvdata.external_ip, os.options[OPTION_WATER_PERCENTAGE]);
+    }
+    static byte reboot_notification = 1;
+    if(reboot_notification) {
+      reboot_notification = 0;
+      push_message(IFTTT_REBOOT);
     }
 
   }
@@ -882,6 +893,13 @@ void manual_start_program(byte pid, byte uwt) {
 // ==========================================
 // ====== PUSH NOTIFICATION FUNCTIONS =======
 // ==========================================
+void ip2string(char* str, byte ip[4]) {
+  for(byte i=0;i<4;i++) {
+    itoa(ip[i], str+strlen(str), 10);
+    if(i!=3) strcat(str, ".");
+  }
+}
+
 void push_message(byte type, uint32_t lval, float fval, const char* sval) {
 
 #if !defined(ARDUINO) || defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
@@ -891,7 +909,7 @@ void push_message(byte type, uint32_t lval, float fval, const char* sval) {
   static char postval[TMP_BUFFER_SIZE];
 
   // check if this type of event is enabled for push notification
-  if(os.options[OPTION_IFTTT_ENABLE]&type == 0) return;
+  if((os.options[OPTION_IFTTT_ENABLE]&type) == 0) return;
   key[0] = 0;
   read_from_file(ifkey_filename, key);
   key[IFTTT_KEY_MAXSIZE-1]=0;
@@ -928,35 +946,49 @@ void push_message(byte type, uint32_t lval, float fval, const char* sval) {
       itoa((int)lval+1, postval+strlen(postval), 10);
       strcat_P(postval, PSTR(" scheduled. Water Level: "));
       itoa((int)fval, postval+strlen(postval), 10);
-      strcat_P(postval, PSTR(" %."));
+      strcat_P(postval, PSTR("%."));
       break;
 
     case IFTTT_RAINSENSOR:
 
-      strcat_P(postval, PSTR("Rain sensor "));
-      strcat_P(postval, lval?PSTR("activated."):PSTR("de-activated"));
+      strcat_P(postval, (lval==LOGDATA_RAINDELAY) ? PSTR("Rain delay ") : PSTR("Rain sensor "));
+      strcat_P(postval, ((int)fval)?PSTR("activated."):PSTR("de-activated"));
 
       break;
 
     case IFTTT_FLOWSENSOR:
-      strcat_P(postval, PSTR("Flow sensor "));
+      strcat_P(postval, PSTR("Flow count: "));
+      itoa(lval, postval+strlen(postval), 10);
+      strcat_P(postval, PSTR(", volume: "));
+      {
+      uint32_t volume = os.options[OPTION_PULSE_RATE_1];
+      volume = (volume<<8)+os.options[OPTION_PULSE_RATE_0];
+      volume = lval*volume;
+      itoa(volume/100, postval+strlen(postval), 10);
+      strcat(postval, ".");
+      itoa(volume%100, postval+strlen(postval), 10);
+      }
       break;
 
     case IFTTT_WEATHER_UPDATE:
-      strcat_P(postval, PSTR("Water level: "));
-      itoa((int)fval, postval+strlen(postval), 10);
-      strcat_P(postval, PSTR(" %, external IP: "));
-      itoa((lval>>24)&0xFF, postval+strlen(postval), 10);
-      strcat(postval, ".");
-      itoa((lval>>16)&0xFF, postval+strlen(postval), 10);
-      strcat(postval, ".");
-      itoa((lval>>8)&0xFF, postval+strlen(postval), 10);
-      strcat(postval, ".");
-      itoa(lval&0xFF, postval+strlen(postval), 10);
+      if(lval>0) {
+        strcat_P(postval, PSTR("External IP: "));
+        byte ip[4] = {(lval>>24)&0xFF,(lval>>16)&0xFF,(lval>>8)&0xFF,lval&0xFF};
+        ip2string(postval, ip);
+      }
+      if(fval>=0) {
+        strcat_P(postval, PSTR("Water level: "));
+        itoa((int)fval, postval+strlen(postval), 10);
+        strcat_P(postval, PSTR("%."));
+      }
+        
       break;
 
     case IFTTT_REBOOT:
-      strcat_P(postval, PSTR("Device restarted."));
+      strcat_P(postval, PSTR("Rebooted. Device IP: "));
+      ip2string(postval, ether.myip);
+      strcat(postval, ":");
+      itoa(_port, postval+strlen(postval), 10);
       break;
   }
 
