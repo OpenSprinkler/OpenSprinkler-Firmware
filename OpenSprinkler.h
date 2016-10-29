@@ -185,6 +185,7 @@ public:
   static void raindelay_start();  // start raindelay
   static void raindelay_stop();   // stop rain delay
   static void rainsensor_status();// update rainsensor status
+  static bool programswitch_status(ulong); // get program switch status
 #if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
   static uint16_t read_current(); // read current sensing value
 #endif

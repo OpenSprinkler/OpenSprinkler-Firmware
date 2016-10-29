@@ -1239,7 +1239,7 @@ byte server_json_status(char *p)
  * Command: /cm?pw=xxx&sid=x&en=x&t=x
  *
  * pw: password
- * sid:station name (starting from 0)
+ * sid:station index (starting from 0)
  * en: enable (0 or 1)
  * t:  timer (required if en=1)
  */

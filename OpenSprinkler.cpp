@@ -737,6 +737,18 @@ void OpenSprinkler::rainsensor_status() {
   status.rain_sensed = (digitalRead(PIN_RAINSENSOR) == options[OPTION_RAINSENSOR_TYPE] ? 0 : 1);
 }
 
+/** Return program switch status */
+bool OpenSprinkler::programswitch_status(ulong curr_time) {
+  if(options[OPTION_SENSOR_TYPE]!=SENSOR_TYPE_PSWITCH) return false;
+  static ulong keydown_time = 0;
+  byte val = digitalRead(PIN_RAINSENSOR);
+  if(!val && !keydown_time) keydown_time = curr_time;
+  else if(val && keydown_time && (curr_time > keydown_time)) {
+    keydown_time = 0;
+    return true;
+  }
+  return false;
+}
 /** Read current sensing value
  * OpenSprinkler has a 0.2 ohm current sensing resistor.
  * Therefore the conversion from analog reading to milli-amp is:

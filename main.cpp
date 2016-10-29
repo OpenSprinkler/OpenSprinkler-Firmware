@@ -34,6 +34,7 @@ byte Ethernet::buffer[ETHER_BUFFER_SIZE]; // Ethernet packet buffer
 SdFat sd;                                 // SD card object
 
 void reset_all_stations();
+void reset_all_stations_immediate();
 unsigned long getNtpTime();
 void manual_start_program(byte, byte);
 void httpget_callback(byte, uint16_t, uint16_t);
@@ -378,6 +379,13 @@ void do_loop()
         os.old_status.rain_sensed = os.status.rain_sensed;
       }
     }
+
+    // ===== Check program switch status =====
+    if (os.programswitch_status(curr_time)) {
+      reset_all_stations_immediate(); // immediately stop all stations
+      if(pd.nprograms > 0)  manual_start_program(1, 0);
+    }
+
     // ====== Schedule program data ======
     ulong curr_minute = curr_time / 60;
     boolean match_found = false;
@@ -859,7 +867,7 @@ void manual_start_program(byte pid, byte uwt) {
   byte sid, bid, s;
   if ((pid>0)&&(pid<255)) {
     pd.read(pid-1, &prog);
-    push_message(IFTTT_PROGRAM_SCHED, pid-1, uwt ? os.options[OPTION_WATER_PERCENTAGE] : 100);
+    push_message(IFTTT_PROGRAM_SCHED, pid-1, uwt ? os.options[OPTION_WATER_PERCENTAGE] : 100, "");
   }
   for(sid=0;sid<os.nstations;sid++) {
     bid=sid>>3;
@@ -936,17 +944,23 @@ void push_message(byte type, uint32_t lval, float fval, const char* sval) {
     case IFTTT_STATION_CLOSE:
       
       strcat_P(postval, PSTR("Station "));
-      itoa((int)lval+1, postval+strlen(postval), 10);
-      strcat_P(postval, type==IFTTT_STATION_OPEN?PSTR(" opened."):PSTR(" closed"));
+      os.get_station_name(lval, postval+strlen(postval));
+      strcat_P(postval, type==IFTTT_STATION_OPEN?PSTR(" opened."):PSTR(" closed."));
       break;
 
     case IFTTT_PROGRAM_SCHED:
 
+      if(sval) strcat_P(postval, PSTR("Manually scheduled "));
+      else strcat_P(postval, PSTR("Automatically scheduled "));
       strcat_P(postval, PSTR("Program "));
-      itoa((int)lval+1, postval+strlen(postval), 10);
-      strcat_P(postval, PSTR(" scheduled. Water Level: "));
+      {
+        ProgramStruct prog;
+        pd.read(lval, &prog);
+        if(lval<pd.nprograms) strcat(postval, prog.name);
+      }
+      strcat_P(postval, PSTR(" with "));
       itoa((int)fval, postval+strlen(postval), 10);
-      strcat_P(postval, PSTR("%."));
+      strcat_P(postval, PSTR("% water level."));
       break;
 
     case IFTTT_RAINSENSOR:
@@ -972,12 +986,12 @@ void push_message(byte type, uint32_t lval, float fval, const char* sval) {
 
     case IFTTT_WEATHER_UPDATE:
       if(lval>0) {
-        strcat_P(postval, PSTR("External IP: "));
+        strcat_P(postval, PSTR("External IP updated: "));
         byte ip[4] = {(lval>>24)&0xFF,(lval>>16)&0xFF,(lval>>8)&0xFF,lval&0xFF};
         ip2string(postval, ip);
       }
       if(fval>=0) {
-        strcat_P(postval, PSTR("Water level: "));
+        strcat_P(postval, PSTR("Water level updated: "));
         itoa((int)fval, postval+strlen(postval), 10);
         strcat_P(postval, PSTR("%."));
       }
