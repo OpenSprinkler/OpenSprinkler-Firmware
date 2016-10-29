@@ -436,7 +436,7 @@ void do_loop()
               }// if water_time
             }// if prog.durations[sid]
           }// for sid
-          push_message(IFTTT_PROGRAM_SCHED, pid, prog.use_weather ? os.options[OPTION_WATER_PERCENTAGE] : 100);
+          if(match_found) push_message(IFTTT_PROGRAM_SCHED, pid, prog.use_weather ? os.options[OPTION_WATER_PERCENTAGE] : 100);
         }// if check_match
       }// for pid
 
@@ -729,6 +729,7 @@ void turn_off_station(byte sid, ulong curr_time) {
 
       // log station run
       write_log(LOGDATA_STATION, curr_time);
+      push_message(IFTTT_STATION_CLOSE, sid, pd.lastrun.duration);
     }
   }
 
@@ -940,12 +941,18 @@ void push_message(byte type, uint32_t lval, float fval, const char* sval) {
   strcpy_P(postval, PSTR("{\"value1\":\""));
 
   switch(type) {
-    case IFTTT_STATION_OPEN:
+    case IFTTT_STATION_OPEN:  // not supported
+      break;
+
     case IFTTT_STATION_CLOSE:
       
       strcat_P(postval, PSTR("Station "));
       os.get_station_name(lval, postval+strlen(postval));
-      strcat_P(postval, type==IFTTT_STATION_OPEN?PSTR(" opened."):PSTR(" closed."));
+      strcat_P(postval, PSTR(" closed. It ran for "));
+      itoa((int)fval/60, postval+strlen(postval), 10);
+      strcat_P(postval, PSTR(" minutes "));
+      itoa((int)fval%60, postval+strlen(postval), 10);
+      strcat_P(postval, PSTR(" seconds."));
       break;
 
     case IFTTT_PROGRAM_SCHED:
