@@ -37,7 +37,7 @@ void reset_all_stations();
 unsigned long getNtpTime();
 void manual_start_program(byte, byte);
 void httpget_callback(byte, uint16_t, uint16_t);
-void push_message(const char*);
+void push_message(byte type, uint32_t lval=0, float fval=0.f, const char* sval=NULL);
 #else // header and defs for RPI/BBB
 #include <sys/stat.h>
 #include "etherport.h"
@@ -424,6 +424,7 @@ void do_loop()
               }// if water_time
             }// if prog.durations[sid]
           }// for sid
+          push_message(IFTTT_PROGRAM_SCHED, pid, prog.use_weather ? os.options[OPTION_WATER_PERCENTAGE] : 100);
         }// if check_match
       }// for pid
 
@@ -623,7 +624,7 @@ void do_loop()
           }
         }
         if (!willrun) {
-          push_message("Reboot");
+          push_message(IFTTT_REBOOT);
           os.reboot_dev();
         }
       }
@@ -649,6 +650,11 @@ void do_loop()
 
     // check weather
     check_weather();
+
+    if(os.weather_update_flag == 1) {
+      os.weather_update_flag = 0;
+      push_message(IFTTT_WEATHER_UPDATE, os.nvdata.external_ip, os.options[OPTION_WATER_PERCENTAGE]);
+    }
 
   }
 
@@ -842,10 +848,14 @@ void manual_start_program(byte pid, byte uwt) {
   byte sid, bid, s;
   if ((pid>0)&&(pid<255)) {
     pd.read(pid-1, &prog);
+    push_message(IFTTT_PROGRAM_SCHED, pid-1, uwt ? os.options[OPTION_WATER_PERCENTAGE] : 100);
   }
   for(sid=0;sid<os.nstations;sid++) {
     bid=sid>>3;
     s=sid&0x07;
+    // skip if the station is a master station (because master cannot be scheduled independently
+    if ((os.status.mas==sid+1) || (os.status.mas2==sid+1))
+      continue;    
     dur = 60;
     if(pid==255)  dur=2;
     else if(pid>0)
@@ -872,16 +882,22 @@ void manual_start_program(byte pid, byte uwt) {
 // ==========================================
 // ====== PUSH NOTIFICATION FUNCTIONS =======
 // ==========================================
-void push_message(const char* msg) {
+void push_message(byte type, uint32_t lval, float fval, const char* sval) {
 
-#if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
-  
+#if !defined(ARDUINO) || defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
+
   static const char* server = DEFAULT_IFTTT_URL;
   static char key[IFTTT_KEY_MAXSIZE];
   static char postval[TMP_BUFFER_SIZE];
-  
-  DEBUG_PRINTLN(server);
 
+  // check if this type of event is enabled for push notification
+  if(os.options[OPTION_IFTTT_ENABLE]&type == 0) return;
+  key[0] = 0;
+  read_from_file(ifkey_filename, key);
+  key[IFTTT_KEY_MAXSIZE-1]=0;
+  if(strlen(key)==0) return;
+
+  
   if(!ether.dnsLookup(server, true)) {
     // if DNS lookup fails, use default IP
     ether.hisip[0] = 54;
@@ -894,22 +910,64 @@ void push_message(const char* msg) {
   
   uint16_t _port = ether.hisport;
   ether.hisport = 80;
-  read_from_file(ifkey_filename, key);
-  key[IFTTT_KEY_MAXSIZE-1]=0;
 
   strcpy_P(postval, PSTR("{\"value1\":\""));
-  strcat(postval, msg);
-  strcat(postval, "\"}");
+
+  switch(type) {
+    case IFTTT_STATION_OPEN:
+    case IFTTT_STATION_CLOSE:
+      
+      strcat_P(postval, PSTR("Station "));
+      itoa((int)lval+1, postval+strlen(postval), 10);
+      strcat_P(postval, type==IFTTT_STATION_OPEN?PSTR(" opened."):PSTR(" closed"));
+      break;
+
+    case IFTTT_PROGRAM_SCHED:
+
+      strcat_P(postval, PSTR("Program "));
+      itoa((int)lval+1, postval+strlen(postval), 10);
+      strcat_P(postval, PSTR(" scheduled. Water Level: "));
+      itoa((int)fval, postval+strlen(postval), 10);
+      strcat_P(postval, PSTR(" %."));
+      break;
+
+    case IFTTT_RAINSENSOR:
+
+      strcat_P(postval, PSTR("Rain sensor "));
+      strcat_P(postval, lval?PSTR("activated."):PSTR("de-activated"));
+
+      break;
+
+    case IFTTT_FLOWSENSOR:
+      strcat_P(postval, PSTR("Flow sensor "));
+      break;
+
+    case IFTTT_WEATHER_UPDATE:
+      strcat_P(postval, PSTR("Water level: "));
+      itoa((int)fval, postval+strlen(postval), 10);
+      strcat_P(postval, PSTR(" %, external IP: "));
+      itoa((lval>>24)&0xFF, postval+strlen(postval), 10);
+      strcat(postval, ".");
+      itoa((lval>>16)&0xFF, postval+strlen(postval), 10);
+      strcat(postval, ".");
+      itoa((lval>>8)&0xFF, postval+strlen(postval), 10);
+      strcat(postval, ".");
+      itoa(lval&0xFF, postval+strlen(postval), 10);
+      break;
+
+    case IFTTT_REBOOT:
+      strcat_P(postval, PSTR("Device restarted."));
+      break;
+  }
+
+  strcat_P(postval, PSTR("\"}"));
 
   DEBUG_PRINTLN(postval);
-  
+
   ether.httpPostVar(PSTR("/trigger/sprinkler/with/key/"), PSTR(DEFAULT_IFTTT_URL), key, postval, httpget_callback);
   for(int l=0;l<100;l++)  ether.packetLoop(ether.packetReceive());
   ether.hisport = _port;
   
-#elif !defined(ARDUINO)
-
-
 #endif
 }
 

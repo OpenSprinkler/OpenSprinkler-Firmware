@@ -48,6 +48,7 @@ ulong OpenSprinkler::raindelay_start_time;
 byte OpenSprinkler::button_timeout;
 ulong OpenSprinkler::checkwt_lasttime;
 ulong OpenSprinkler::checkwt_success_lasttime;
+byte OpenSprinkler::weather_update_flag;
 
 char tmp_buffer[TMP_BUFFER_SIZE+1];       // scratch buffer
 

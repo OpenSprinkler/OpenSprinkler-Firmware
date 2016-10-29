@@ -146,6 +146,7 @@ public:
   static byte  button_timeout;        // button timeout
   static ulong checkwt_lasttime;      // time when weather was checked
   static ulong checkwt_success_lasttime; // time when weather check was successful
+  static byte  weather_update_flag; 
   // member functions
   // -- setup
   static void update_dev();   // update software for Linux instances

@@ -66,13 +66,13 @@
 #define STN_TYPE_HTTP        0x04	// Support for HTTP Get connection
 #define STN_TYPE_OTHER       0xFF
 
-#define IFTTT_ENABLE_STATION_OPEN    0x01
-#define IFTTT_ENABLE_STATION_CLOSED  0x02
-#define IFTTT_ENABLE_PROGRAM_START   0x04
-#define IFTTT_ENABLE_RAINSENSOR      0x08
-#define IFTTT_ENABLE_FLOWSENSOR      0x10
-#define IFTTT_ENABLE_WEATHER_CHANGE  0x20
-#define IFTTT_ENABLE_RESTART         0x40
+#define IFTTT_STATION_OPEN    0x01
+#define IFTTT_STATION_CLOSE   0x02
+#define IFTTT_PROGRAM_SCHED   0x04
+#define IFTTT_RAINSENSOR      0x08
+#define IFTTT_FLOWSENSOR      0x10
+#define IFTTT_WEATHER_UPDATE  0x20
+#define IFTTT_REBOOT          0x40
 
 /** Sensor type macro defines */
 #define SENSOR_TYPE_NONE    0x00
