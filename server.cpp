@@ -922,8 +922,8 @@ void server_json_controller_main() {
     bfill.emit_p(PSTR(",\"wto\":{$S}"), tmp_buffer);
   }
   
-  if(read_from_file(pbkey_filename, tmp_buffer)) {
-    bfill.emit_p(PSTR(",\"pbkey\":\"$S\""), tmp_buffer);
+  if(read_from_file(ifkey_filename, tmp_buffer)) {
+    bfill.emit_p(PSTR(",\"ifkey\":\"$S\""), tmp_buffer);
   }
 
   bfill.emit_p(PSTR("}"));
@@ -1140,13 +1140,13 @@ byte server_change_options(char *p)
     nvm_write_block(tmp_buffer, (void*)ADDR_NVM_WEATHER_KEY, strlen(tmp_buffer)+1);
   }
   keyfound = 0;
-  if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("pbkey"), true, &keyfound)) {
+  if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("ifkey"), true, &keyfound)) {
     urlDecode(tmp_buffer);
     tmp_buffer[TMP_BUFFER_SIZE-1]=0;
-    write_to_file(pbkey_filename, tmp_buffer, strlen(tmp_buffer));
+    write_to_file(ifkey_filename, tmp_buffer, strlen(tmp_buffer));
   } else if (keyfound) {
     tmp_buffer[0]=0;
-    write_to_file(pbkey_filename, tmp_buffer, strlen(tmp_buffer));
+    write_to_file(ifkey_filename, tmp_buffer, strlen(tmp_buffer));
   }  
   // if not using NTP and manually setting time
   if (!os.options[OPTION_USE_NTP] && findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("ttt"), true)) {

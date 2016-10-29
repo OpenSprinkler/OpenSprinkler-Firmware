@@ -510,14 +510,16 @@ static uint16_t www_client_internal_datafill_cb(uint8_t fd) {
                          client_hoststr, client_additionalheaderline);
         } else {
             const char* ahl = client_additionalheaderline;
-            bfill.emit_p(PSTR("POST $F HTTP/1.0\r\n"
+            const char* var = client_urlbuf_var;
+            bfill.emit_p(PSTR("POST $F$S HTTP/1.0\r\n"
                               "Host: $F\r\n"
                               "$F$S"
                               "Accept: */*\r\n"
                               "Content-Length: $D\r\n"
-                              "Content-Type: application/x-www-form-urlencoded\r\n"
+                              "Content-Type: application/json\r\n"
                               "\r\n"
                               "$S"), client_urlbuf,
+                         var ? var : "",
                          client_hoststr,
                          ahl != 0 ? ahl : PSTR(""),
                          ahl != 0 ? "\r\n" : "",
@@ -540,14 +542,16 @@ static uint16_t www_client_internal_datafill_cb_ramhost(uint8_t fd) {
                          client_hoststr, client_additionalheaderline);
         } else {
             const char* ahl = client_additionalheaderline;
-            bfill.emit_p(PSTR("POST $F HTTP/1.0\r\n"
+            const char* var = client_urlbuf_var;            
+            bfill.emit_p(PSTR("POST $F$S HTTP/1.0\r\n"
                               "Host: $S\r\n"
                               "$F$S"
                               "Accept: */*\r\n"
                               "Content-Length: $D\r\n"
-                              "Content-Type: application/x-www-form-urlencoded\r\n"
+                              "Content-Type: application/json\r\n"
                               "\r\n"
                               "$S"), client_urlbuf,
+                         var ? var : "",            
                          client_hoststr,
                          ahl != 0 ? ahl : PSTR(""),
                          ahl != 0 ? "\r\n" : "",
@@ -598,8 +602,19 @@ void EtherCard::browseUrlRamHost (const char *urlbuf, const char *urlbuf_varpart
 
 void EtherCard::httpPost (const char *urlbuf, const char *hoststr, const char *additionalheaderline, const char *postval, void (*callback)(uint8_t,uint16_t,uint16_t)) {
     client_urlbuf = urlbuf;
+    client_urlbuf_var = 0;    
     client_hoststr = hoststr;
     client_additionalheaderline = additionalheaderline;
+    client_postval = postval;
+    client_browser_cb = callback;
+    www_fd = clientTcpReq(&www_client_internal_result_cb,&www_client_internal_datafill_cb,hisport);
+}
+
+void EtherCard::httpPostVar (const char *urlbuf, const char *hoststr, const char *urlbuf_varpart, const char *postval, void (*callback)(uint8_t,uint16_t,uint16_t)) {
+    client_urlbuf = urlbuf;
+    client_urlbuf_var = urlbuf_varpart;    
+    client_hoststr = hoststr;
+    client_additionalheaderline = 0;    
     client_postval = postval;
     client_browser_cb = callback;
     www_fd = clientTcpReq(&www_client_internal_result_cb,&www_client_internal_datafill_cb,hisport);

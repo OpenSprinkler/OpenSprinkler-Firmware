@@ -874,35 +874,40 @@ void manual_start_program(byte pid, byte uwt) {
 // ==========================================
 void push_message(const char* msg) {
 
-  static const char* server = DEFAULT_PUSHING_URL;
-  static char cmd[TMP_BUFFER_SIZE];
-     
+#if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
+  
+  static const char* server = DEFAULT_IFTTT_URL;
+  static char key[IFTTT_KEY_MAXSIZE];
+  static char postval[TMP_BUFFER_SIZE];
+  
   DEBUG_PRINTLN(server);
-#if defined(ARDUINO)
 
   if(!ether.dnsLookup(server, true)) {
-    // if DNS lookup fails, use default pushingbox IP
-    ether.hisip[0] = 213;
-    ether.hisip[1] = 186;
-    ether.hisip[2] =  33;
-    ether.hisip[3] =  19;
+    // if DNS lookup fails, use default IP
+    ether.hisip[0] = 54;
+    ether.hisip[1] = 172;
+    ether.hisip[2] = 244;
+    ether.hisip[3] = 116;
   }
 
   DEBUG_PRINTIP(ether.hisip);
   
   uint16_t _port = ether.hisport;
   ether.hisport = 80;
-  read_from_file(pbkey_filename, cmd);
-  strcat(cmd, "&m=");
-  strcat(cmd, msg);
-  cmd[TMP_BUFFER_SIZE-1]=0;
-  DEBUG_PRINTLN(cmd);
-  ether.browseUrlRamHost(PSTR("/pushingbox?devid="), cmd, server, httpget_callback);
+  read_from_file(ifkey_filename, key);
+  key[IFTTT_KEY_MAXSIZE-1]=0;
+
+  strcpy_P(postval, PSTR("{\"value1\":\""));
+  strcat(postval, msg);
+  strcat(postval, "\"}");
+
+  DEBUG_PRINTLN(postval);
+  
+  ether.httpPostVar(PSTR("/trigger/sprinkler/with/key/"), PSTR(DEFAULT_IFTTT_URL), key, postval, httpget_callback);
   for(int l=0;l<100;l++)  ether.packetLoop(ether.packetReceive());
   ether.hisport = _port;
   
-#else
-
+#elif !defined(ARDUINO)
 
 
 #endif

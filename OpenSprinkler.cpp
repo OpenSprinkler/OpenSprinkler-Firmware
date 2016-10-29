@@ -54,11 +54,11 @@ char tmp_buffer[TMP_BUFFER_SIZE+1];       // scratch buffer
 #if defined(ARDUINO)
   const char wtopts_filename[] PROGMEM = WEATHER_OPTS_FILENAME;
   const char stns_filename[]   PROGMEM = STATION_ATTR_FILENAME;
-  const char pbkey_filename[]  PROGMEM = PUSHINGBOX_KEY_FILENAME;
+  const char ifkey_filename[]  PROGMEM = IFTTT_KEY_FILENAME;
 #else
   const char wtopts_filename[] = WEATHER_OPTS_FILENAME;
   const char stns_filename[]   = STATION_ATTR_FILENAME;
-  const char pbkey_filename[]  = PUSHINGBOX_KEY_FILENAME;  
+  const char ifkey_filename[]  = IFTTT_KEY_FILENAME;  
 #endif
 
 #if defined(ARDUINO)
@@ -131,7 +131,7 @@ const char op_json_names[] =
     "dns3\0"
     "dns4\0"
     "sar\0\0"
-    "pbe\0\0"
+    "ife\0\0"
     "reset";
 
 /** Option promopts (stored in progmem, for LCD display) */
@@ -191,7 +191,7 @@ char op_promopts[] =
     "DNS server.ip3: "
     "DNS server.ip4: "
     "Special Refresh?"
-    "Pushing Enable: "
+    "IFTTT Enable: "
     "Factory reset?  ";
 
 /** Option maximum values (stored in progmem) */
@@ -309,7 +309,7 @@ byte OpenSprinkler::options[] = {
   8,
   8,
   0,  // special station auto refresh
-  0,  // pushing box enable bits
+  0,  // ifttt enable bits
   0   // reset
 };
 

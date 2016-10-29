@@ -332,6 +332,10 @@ public:
                           const char *additionalheaderline, const char *postval,
                           void (*callback)(uint8_t,uint16_t,uint16_t));
 
+    static void httpPostVar (const char *urlbuf, const char *hoststr,
+                          const char *urlbuf_varpart, const char *postval,
+                          void (*callback)(uint8_t,uint16_t,uint16_t));
+
     /**   @brief  Send NTP request
     *     @param  ntpip IP address of NTP server
     *     @param  srcport IP port to send from

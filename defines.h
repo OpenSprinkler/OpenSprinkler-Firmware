@@ -53,7 +53,8 @@
 #define WEATHER_OPTS_FILENAME "wtopts.txt"    // weather options file
 #define STATION_ATTR_FILENAME "stns.dat"      // station attributes data file
 #define STATION_SPECIAL_DATA_SIZE  (TMP_BUFFER_SIZE - 8)
-#define PUSHINGBOX_KEY_FILENAME "pbkey.txt"
+#define IFTTT_KEY_FILENAME "ifkey.txt"
+#define IFTTT_KEY_MAXSIZE   128
 
 #define FLOWCOUNT_RT_WINDOW   30    // flow count window (for computing real-time flow rate), 30 seconds
 
@@ -65,13 +66,13 @@
 #define STN_TYPE_HTTP        0x04	// Support for HTTP Get connection
 #define STN_TYPE_OTHER       0xFF
 
-#define PB_ENABLE_STATION_OPEN    0x01
-#define PB_ENABLE_STATION_CLOSED  0x02
-#define PB_ENABLE_PROGRAM_START   0x04
-#define PB_ENABLE_RAINSENSOR      0x08
-#define PB_ENABLE_FLOWSENSOR      0x10
-#define PB_ENABLE_WEATHER_CHANGE  0x20
-#define PB_ENABLE_RESTART         0x40
+#define IFTTT_ENABLE_STATION_OPEN    0x01
+#define IFTTT_ENABLE_STATION_CLOSED  0x02
+#define IFTTT_ENABLE_PROGRAM_START   0x04
+#define IFTTT_ENABLE_RAINSENSOR      0x08
+#define IFTTT_ENABLE_FLOWSENSOR      0x10
+#define IFTTT_ENABLE_WEATHER_CHANGE  0x20
+#define IFTTT_ENABLE_RESTART         0x40
 
 /** Sensor type macro defines */
 #define SENSOR_TYPE_NONE    0x00
@@ -178,7 +179,7 @@
 #define DEFAULT_WEATHER_KEY       ""
 #define DEFAULT_JAVASCRIPT_URL    "https://ui.opensprinkler.com/js"
 #define DEFAULT_WEATHER_URL       "weather.opensprinkler.com"
-#define DEFAULT_PUSHING_URL       "api.pushingbox.com"
+#define DEFAULT_IFTTT_URL         "maker.ifttt.com"
 
 /** Macro define of each option
   * Refer to OpenSprinkler.cpp for details on each option
@@ -233,7 +234,7 @@ typedef enum {
   OPTION_DNS_IP3,
   OPTION_DNS_IP4,
   OPTION_SPE_AUTO_REFRESH,
-  OPTION_PUSHING_ENABLE,
+  OPTION_IFTTT_ENABLE,
   OPTION_RESET,
   NUM_OPTIONS	// total number of options
 } OS_OPTION_t;
