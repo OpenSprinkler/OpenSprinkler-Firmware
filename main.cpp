@@ -26,28 +26,35 @@
 #include "OpenSprinkler.h"
 #include "program.h"
 #include "weather.h"
+#include "server.h"
 
 #if defined(ARDUINO)
+
 #include "SdFat.h"
 #include "Wire.h"
 byte Ethernet::buffer[ETHER_BUFFER_SIZE]; // Ethernet packet buffer
 SdFat sd;                                 // SD card object
 
-void reset_all_stations();
-void reset_all_stations_immediate();
 unsigned long getNtpTime();
-void manual_start_program(byte, byte);
-void httpget_callback(byte, uint16_t, uint16_t);
-void push_message(byte type, uint32_t lval=0, float fval=0.f, const char* sval=NULL);
+
 #else // header and defs for RPI/BBB
+
 #include <sys/stat.h>
+#include <netdb.h>
 #include "etherport.h"
-#include "server.h"
 #include "gpio.h"
 char ether_buffer[ETHER_BUFFER_SIZE];
 EthernetServer *m_server = 0;
 EthernetClient *m_client = 0;
+
 #endif
+
+void reset_all_stations();
+void reset_all_stations_immediate();
+void push_message(byte type, uint32_t lval=0, float fval=0.f, const char* sval=NULL);
+void manual_start_program(byte, byte);
+void httpget_callback(byte, uint16_t, uint16_t);
+
 
 // Small variations have been added to the timing values below
 // to minimize conflicting events
@@ -665,8 +672,12 @@ void do_loop()
 
     byte wuf = os.weather_update_flag;
     if(wuf) {
-      push_message(IFTTT_WEATHER_UPDATE, (wuf&WEATHER_UPDATE_EIP)?os.nvdata.external_ip:0,
+      if((wuf&WEATHER_UPDATE_EIP) | (wuf&WEATHER_UPDATE_WL)) {
+        // at the moment, we only send notification if water level or external IP changed
+        // the other changes, such as sunrise, sunset changes are ignored for notification
+        push_message(IFTTT_WEATHER_UPDATE, (wuf&WEATHER_UPDATE_EIP)?os.nvdata.external_ip:0,
                                          (wuf&WEATHER_UPDATE_WL)?os.options[OPTION_WATER_PERCENTAGE]:-1);
+      }
       os.weather_update_flag = 0;
     }
     static byte reboot_notification = 1;
@@ -686,9 +697,8 @@ void do_loop()
 void check_weather() {
   // do not check weather if
   // - network check has failed, or
-  // - a program is currently running
   // - the controller is in remote extension mode
-  if (os.status.network_fails>0 || os.status.program_busy || os.options[OPTION_REMOTE_EXT_MODE]) return;
+  if (os.status.network_fails>0 || os.options[OPTION_REMOTE_EXT_MODE]) return;
 
   ulong ntz = os.now_tz();
   if (os.checkwt_success_lasttime && (ntz > os.checkwt_success_lasttime + CHECK_WEATHER_SUCCESS_TIMEOUT)) {
@@ -729,7 +739,7 @@ void turn_off_station(byte sid, ulong curr_time) {
 
       // log station run
       write_log(LOGDATA_STATION, curr_time);
-      push_message(IFTTT_STATION_CLOSE, sid, pd.lastrun.duration);
+      push_message(IFTTT_STATION_RUN, sid, pd.lastrun.duration);
     }
   }
 
@@ -922,29 +932,19 @@ void push_message(byte type, uint32_t lval, float fval, const char* sval) {
   key[0] = 0;
   read_from_file(ifkey_filename, key);
   key[IFTTT_KEY_MAXSIZE-1]=0;
+
   if(strlen(key)==0) return;
 
-  
-  if(!ether.dnsLookup(server, true)) {
-    // if DNS lookup fails, use default IP
-    ether.hisip[0] = 54;
-    ether.hisip[1] = 172;
-    ether.hisip[2] = 244;
-    ether.hisip[3] = 116;
-  }
-
-  DEBUG_PRINTIP(ether.hisip);
-  
-  uint16_t _port = ether.hisport;
-  ether.hisport = 80;
+  #if defined(ARDUINO)
+    uint16_t _port = ether.hisport; // make a copy of the original port
+    ether.hisport = 80;
+  #endif
 
   strcpy_P(postval, PSTR("{\"value1\":\""));
 
   switch(type) {
-    case IFTTT_STATION_OPEN:  // not supported
-      break;
 
-    case IFTTT_STATION_CLOSE:
+    case IFTTT_STATION_RUN:
       
       strcat_P(postval, PSTR("Station "));
       os.get_station_name(lval, postval+strlen(postval));
@@ -992,6 +992,9 @@ void push_message(byte type, uint32_t lval, float fval, const char* sval) {
       break;
 
     case IFTTT_WEATHER_UPDATE:
+      DEBUG_PRINTLN("WEATHER UPDATE");
+      DEBUG_PRINTLN(lval);
+      DEBUG_PRINTLN(fval);
       if(lval>0) {
         strcat_P(postval, PSTR("External IP updated: "));
         byte ip[4] = {(lval>>24)&0xFF,(lval>>16)&0xFF,(lval>>8)&0xFF,lval&0xFF};
@@ -1006,10 +1009,14 @@ void push_message(byte type, uint32_t lval, float fval, const char* sval) {
       break;
 
     case IFTTT_REBOOT:
-      strcat_P(postval, PSTR("Rebooted. Device IP: "));
-      ip2string(postval, ether.myip);
-      strcat(postval, ":");
-      itoa(_port, postval+strlen(postval), 10);
+      #if defined(ARDUINO)
+        strcat_P(postval, PSTR("Rebooted. Device IP: "));
+        ip2string(postval, ether.myip);
+        strcat(postval, ":");
+        itoa(_port, postval+strlen(postval), 10);
+      #else
+        strcat_P(postval, PSTR("Process restarted."));
+      #endif
       break;
   }
 
@@ -1017,9 +1024,63 @@ void push_message(byte type, uint32_t lval, float fval, const char* sval) {
 
   DEBUG_PRINTLN(postval);
 
+#if defined(ARDUINO)
+
+  if(!ether.dnsLookup(server, true)) {
+    // if DNS lookup fails, use default IP
+    ether.hisip[0] = 54;
+    ether.hisip[1] = 172;
+    ether.hisip[2] = 244;
+    ether.hisip[3] = 116;
+  }
+
   ether.httpPostVar(PSTR("/trigger/sprinkler/with/key/"), PSTR(DEFAULT_IFTTT_URL), key, postval, httpget_callback);
   for(int l=0;l<100;l++)  ether.packetLoop(ether.packetReceive());
   ether.hisport = _port;
+
+#else
+
+  EthernetClient client;
+  struct hostent *host;
+
+  host = gethostbyname(server);
+  if (!host) {
+    DEBUG_PRINT("can't resolve http station - ");
+    DEBUG_PRINTLN(server);
+    return;
+  }
+
+  if (!client.connect((uint8_t*)host->h_addr, 80)) {
+    client.stop();
+    return;
+  }
+
+  char postBuffer[1500];
+  sprintf(postBuffer, "POST /trigger/sprinkler/with/key/%s HTTP/1.0\r\n"
+                      "Host: %s\r\n"
+                      "Accept: */*\r\n"
+                      "Content-Length: %d\r\n"
+                      "Content-Type: application/json\r\n"
+                      "\r\n%s", key, host->h_name, strlen(postval), postval);
+  client.write((uint8_t *)postBuffer, strlen(postBuffer));
+
+  bzero(ether_buffer, ETHER_BUFFER_SIZE);
+
+  time_t timeout = now() + 5; // 5 seconds timeout
+  while(now() < timeout) {
+    int len=client.read((uint8_t *)ether_buffer, ETHER_BUFFER_SIZE);
+    if (len<=0) {
+      if(!client.connected())
+        break;
+      else
+        continue;
+    }
+    httpget_callback(0, 0, ETHER_BUFFER_SIZE);
+  }
+
+  client.stop();
+
+#endif
   
 #endif
 }

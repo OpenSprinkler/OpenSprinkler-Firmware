@@ -66,13 +66,12 @@
 #define STN_TYPE_HTTP        0x04	// Support for HTTP Get connection
 #define STN_TYPE_OTHER       0xFF
 
-#define IFTTT_STATION_OPEN    0x01
-#define IFTTT_STATION_CLOSE   0x02
-#define IFTTT_PROGRAM_SCHED   0x04
-#define IFTTT_RAINSENSOR      0x08
-#define IFTTT_FLOWSENSOR      0x10
-#define IFTTT_WEATHER_UPDATE  0x20
-#define IFTTT_REBOOT          0x40
+#define IFTTT_PROGRAM_SCHED   0x01
+#define IFTTT_RAINSENSOR      0x02
+#define IFTTT_FLOWSENSOR      0x04
+#define IFTTT_WEATHER_UPDATE  0x08
+#define IFTTT_REBOOT          0x10
+#define IFTTT_STATION_RUN     0x20
 
 /** Sensor type macro defines */
 #define SENSOR_TYPE_NONE    0x00
@@ -308,7 +307,7 @@ typedef enum {
 
   #define 	wdt_reset()   __asm__ __volatile__ ("wdr")  // watchdog timer reset
 
-  #define SERIAL_DEBUG
+  //#define SERIAL_DEBUG
   #if defined(SERIAL_DEBUG) /** Serial debug functions */
 
     #define DEBUG_BEGIN(x)   Serial.begin(x)
