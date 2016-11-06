@@ -921,9 +921,11 @@ void server_json_controller_main() {
     bfill.emit_p(PSTR(",\"wto\":{$S}"), tmp_buffer);
   }
   
+#if !defined(ARDUINO) || defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
   if(read_from_file(ifkey_filename, tmp_buffer)) {
     bfill.emit_p(PSTR(",\"ifkey\":\"$S\""), tmp_buffer);
   }
+#endif
 
   bfill.emit_p(PSTR("}"));
   delay(1);

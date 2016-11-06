@@ -73,14 +73,32 @@ BufferFiller bfill;             // buffer filler
 OpenSprinkler os; // OpenSprinkler object
 ProgramData pd;   // ProgramdData object
 
+/* ====== Robert Hillman (RAH)'s implementation of flow sensor ======
+ * flow_begin - time when valve turns on
+ * flow_start - time when flow starts being measured (i.e. 2 mins after flow_begin approx
+ * flow_stop - time when valve turns off (last rising edge pulse detected before off)
+ * flow_gallons - total # of gallons+1 from flow_start to flow_stop
+ * flow_last_gpm - last flow rate measured (averaged over flow_gallons) from last valve stopped (used to write to log file). */
+ulong flow_begin, flow_start, flow_stop, flow_gallons;
+float flow_last_gpm=0;
+
 volatile ulong flow_count = 0;
 /** Flow sensor interrupt service routine */
 void flow_isr() {
   if(os.options[OPTION_SENSOR_TYPE]!=SENSOR_TYPE_FLOW) return;
   ulong curr = millis();
+
   if(curr-os.flowcount_time_ms < 50) return;  // debounce threshold: 50ms
   flow_count++;
   os.flowcount_time_ms = curr;
+
+  /* RAH implementation of flow sensor */
+  if (flow_start==0) { flow_gallons=0; flow_start=curr;}  // if first pulse, record time
+  if ((curr-flow_start)<90000) { flow_gallons=0; } // wait 90 seconds before recording flow_begin
+  else {  if (flow_gallons==1)  {  flow_begin = curr;}}
+  flow_stop = curr; // get time in ms for stop
+  flow_gallons++;  // increment gallon count for each interrupt
+  /* End of RAH implementation of flow sensor */
 }
 
 #if defined(ARDUINO)
@@ -443,7 +461,7 @@ void do_loop()
               }// if water_time
             }// if prog.durations[sid]
           }// for sid
-          if(match_found) push_message(IFTTT_PROGRAM_SCHED, pid, prog.use_weather ? os.options[OPTION_WATER_PERCENTAGE] : 100);
+          if(match_found) push_message(IFTTT_PROGRAM_SCHED, pid, prog.use_weather?os.options[OPTION_WATER_PERCENTAGE]:100);
         }// if check_match
       }// for pid
 
@@ -507,6 +525,9 @@ void do_loop()
 
               //turn_on_station(sid);
               os.set_station_bit(sid, 1);
+
+              // RAH implementation of flow sensor
+              flow_start=0;
 
             } //if curr_time > scheduled_start_time
           } // if current station is not running
@@ -725,6 +746,10 @@ void turn_off_station(byte sid, ulong curr_time) {
   // ignore if we are turning off a station that's not running or scheduled to run
   if (qid>=pd.nqueue)  return;
 
+  // RAH implementation of flow sensor
+  if (flow_gallons>1) {flow_last_gpm = (float) 60000/(float)((flow_stop-flow_begin)/(flow_gallons-1));  }// RAH calculate GPM, 1 pulse per gallon
+  else {flow_last_gpm = 0;}  // RAH if not one gallon (two pulses) measured then record 0 gpm
+
   RuntimeQueueStruct *q = pd.queue+qid;
 
   // check if the current time is past the scheduled start time,
@@ -878,7 +903,7 @@ void manual_start_program(byte pid, byte uwt) {
   byte sid, bid, s;
   if ((pid>0)&&(pid<255)) {
     pd.read(pid-1, &prog);
-    push_message(IFTTT_PROGRAM_SCHED, pid-1, uwt ? os.options[OPTION_WATER_PERCENTAGE] : 100, "");
+    push_message(IFTTT_PROGRAM_SCHED, pid-1, uwt?os.options[OPTION_WATER_PERCENTAGE]:100, "");
   }
   for(sid=0;sid<os.nstations;sid++) {
     bid=sid>>3;
@@ -953,6 +978,10 @@ void push_message(byte type, uint32_t lval, float fval, const char* sval) {
       strcat_P(postval, PSTR(" minutes "));
       itoa((int)fval%60, postval+strlen(postval), 10);
       strcat_P(postval, PSTR(" seconds."));
+      if(os.options[OPTION_SENSOR_TYPE]==SENSOR_TYPE_FLOW) {
+        strcat_P(postval, PSTR(" Flow rate: "));
+        dtostrf(flow_last_gpm,5,2,postval+strlen(postval));
+      }
       break;
 
     case IFTTT_PROGRAM_SCHED:
@@ -992,9 +1021,6 @@ void push_message(byte type, uint32_t lval, float fval, const char* sval) {
       break;
 
     case IFTTT_WEATHER_UPDATE:
-      DEBUG_PRINTLN("WEATHER UPDATE");
-      DEBUG_PRINTLN(lval);
-      DEBUG_PRINTLN(fval);
       if(lval>0) {
         strcat_P(postval, PSTR("External IP updated: "));
         byte ip[4] = {(lval>>24)&0xFF,(lval>>16)&0xFF,(lval>>8)&0xFF,lval&0xFF};
@@ -1196,6 +1222,11 @@ void write_log(byte type, ulong curr_time) {
   }
   strcat_P(tmp_buffer, PSTR(","));
   ultoa(curr_time, tmp_buffer+strlen(tmp_buffer), 10);
+  if((os.options[OPTION_SENSOR_TYPE]==SENSOR_TYPE_FLOW) && (type==LOGDATA_STATION)) {
+    // RAH implementation of flow sensor
+    strcat_P(tmp_buffer, PSTR(","));
+    dtostrf(flow_last_gpm,5,2,tmp_buffer+strlen(tmp_buffer));
+  }
   strcat_P(tmp_buffer, PSTR("]\r\n"));
 
 #if defined(ARDUINO)

@@ -638,6 +638,16 @@ void OpenSprinkler::begin() {
   _icon[7] = B00000;
   lcd.createChar(6, _icon);
 
+  // Program switch icon
+  _icon[1] = B11100;
+  _icon[2] = B10100;
+  _icon[3] = B11100;
+  _icon[4] = B10010;
+  _icon[5] = B10110;
+  _icon[6] = B00010;
+  _icon[7] = B00111;
+  lcd.createChar(7, _icon);  
+
   // set sd cs pin high to release SD
   pinMode(PIN_SD_CS, OUTPUT);
   digitalWrite(PIN_SD_CS, HIGH);
@@ -1521,6 +1531,9 @@ void OpenSprinkler::lcd_print_station(byte line, char c) {
   }
   if(options[OPTION_SENSOR_TYPE]==SENSOR_TYPE_FLOW) {
     lcd.write(6);
+  }
+  if(options[OPTION_SENSOR_TYPE]==SENSOR_TYPE_PSWITCH) {
+    lcd.write(7);
   }
   lcd.setCursor(14, 1);
   if (status.has_sd)  lcd.write(2);
