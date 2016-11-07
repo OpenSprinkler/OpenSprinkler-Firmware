@@ -980,7 +980,11 @@ void push_message(byte type, uint32_t lval, float fval, const char* sval) {
       strcat_P(postval, PSTR(" seconds."));
       if(os.options[OPTION_SENSOR_TYPE]==SENSOR_TYPE_FLOW) {
         strcat_P(postval, PSTR(" Flow rate: "));
+        #if defined(ARDUINO)
         dtostrf(flow_last_gpm,5,2,postval+strlen(postval));
+        #else
+        sprintf(tmp_buffer+strlen(tmp_buffer), "%5.2f", flow_last_gpm);
+        #endif
       }
       break;
 
@@ -1225,7 +1229,11 @@ void write_log(byte type, ulong curr_time) {
   if((os.options[OPTION_SENSOR_TYPE]==SENSOR_TYPE_FLOW) && (type==LOGDATA_STATION)) {
     // RAH implementation of flow sensor
     strcat_P(tmp_buffer, PSTR(","));
+    #if defined(ARDUINO)
     dtostrf(flow_last_gpm,5,2,tmp_buffer+strlen(tmp_buffer));
+    #else
+    sprintf(tmp_buffer+strlen(tmp_buffer), "%5.2f", flow_last_gpm);
+    #endif
   }
   strcat_P(tmp_buffer, PSTR("]\r\n"));
 
