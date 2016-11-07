@@ -2,32 +2,13 @@
 ==== OpenSprinkler AVR/RPI/BBB Firmware ====
 ============================================
 
-This is a unified OpenSprinkler firmware for
-Arduino, RPi, BBB based OpenSprinklers.
+This is a unified OpenSprinkler firmware for Arduino, and Linux-based OpenSprinklers such as OpenSprinkler Pi.
 
---------------------------------------------
 For OS (Arduino-based OpenSprinkler) 2.x:
+https://opensprinkler.freshdesk.com/solution/articles/5000165132-how-to-compile-opensprinkler-firmware
 
-Option 1: install Arduino make, then open
-Makefile and modify the path to your Arduino
-installation folder accordingly. Next, run
-> make
-in command line.
-
-Option 2: install Arduino (1.0.6 recommended)
-and copy the OpenSprinkler folder to your
-Arduino's libraries folder. 
-
---------------------------------------------
-For OSPi (OpenSprinkler Pi):
-
-Run build script ./build.sh ospi
-
---------------------------------------------
-
-For OSBo (OpenSprinkler Beagle):
-
-Run build script ./build.sh osbo
+For OSPi/OSBO or other Linux-based OpenSprinkler:
+https://opensprinkler.freshdesk.com/support/solutions/articles/5000631599-installing-and-updating-the-unified-firmware
 
 ============================================
 Questions and comments:
