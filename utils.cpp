@@ -90,10 +90,10 @@ void nvm_read_block(void *dst, const void *src, int len) {
 void nvm_write_block(const void *src, void *dst, int len) {
   FILE *fp = fopen(get_filename_fullpath(NVM_FILENAME), "rb+");
   if(!fp) {
-    fp = fopen(get_filename_fullpath(NVM_FILENAME), "wb");
+    fp = fopen(get_filename_fullpath(NVM_FILENAME), "wb+"); //This will open the file for editting after creation
   }
   if(fp) {
-    fseek(fp, (unsigned int)dst, SEEK_SET);
+    fseek(fp, (unsigned int)dst, SEEK_SET); //this fails silently without the above change
     fwrite(src, 1, len, fp);
     fclose(fp);
   } else {
@@ -117,10 +117,10 @@ byte nvm_read_byte(const byte *p) {
 void nvm_write_byte(const byte *p, byte v) {
   FILE *fp = fopen(get_filename_fullpath(NVM_FILENAME), "rb+");
   if(!fp) {
-    fp = fopen(get_filename_fullpath(NVM_FILENAME), "wb");
+    fp = fopen(get_filename_fullpath(NVM_FILENAME), "wb+"); //This will open the file for editting after creation
   }
   if(fp) {
-    fseek(fp, (unsigned int)p, SEEK_SET);
+    fseek(fp, (unsigned int)p, SEEK_SET); //This fails silently without above change
     fwrite(&v, 1, 1, fp);
     fclose(fp);
   } else {
