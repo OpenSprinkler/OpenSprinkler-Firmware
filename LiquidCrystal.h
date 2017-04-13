@@ -52,7 +52,8 @@
 
 #define LCD_STD 0     // Standard LCD
 #define LCD_I2C 1     // I2C LCD
-#define LCD_I2C_ADDR  0x27
+#define LCD_I2C_ADDR1 0x27 // type using PCF8574,  at address 0x27
+#define LCD_I2C_ADDR2 0x3F // type using PCF8574A, at address 0x3F
 
 class LiquidCrystal : public Print {
 public:

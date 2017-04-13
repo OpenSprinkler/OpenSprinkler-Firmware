@@ -164,13 +164,17 @@ void LiquidCrystal::init(uint8_t fourbitmode, uint8_t rs, uint8_t rw, uint8_t en
   _type = LCD_STD;
   #if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
   // detect I2C and assign _type variable accordingly
-  Wire.beginTransmission(LCD_I2C_ADDR);
-  Wire.write(0x00);
-  uint8_t ret = Wire.endTransmission();
-  if (!ret)  _type = LCD_I2C;  
-  
+  Wire.beginTransmission(LCD_I2C_ADDR1);  // check type 1
+  //Wire.write(0x00);
+  uint8_t ret1 = Wire.endTransmission();
+  Wire.beginTransmission(LCD_I2C_ADDR2);  // check type 2
+  //Wire.write(0x00);
+  uint8_t ret2 = Wire.endTransmission();
+
+  if (!ret1 || !ret2)  _type = LCD_I2C;  
   if (_type == LCD_I2C) {
-	  _addr = LCD_I2C_ADDR;
+    if(!ret1) _addr = LCD_I2C_ADDR1;
+    else _addr = LCD_I2C_ADDR2;
 	  _cols = 16;
 	  _rows = 2;
 	  _charsize = LCD_5x8DOTS;
