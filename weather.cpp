@@ -36,6 +36,7 @@ extern const char wtopts_filename[];
 #include "OpenSprinkler.h"
 #include "utils.h"
 #include "server.h"
+#include "weather.h"
 
 extern OpenSprinkler os; // OpenSprinkler object
 extern char tmp_buffer[];
@@ -52,7 +53,6 @@ static void getweather_callback(byte status, uint16_t off, uint16_t len) {
 #else
   char *p = ether_buffer;
 #endif
-  DEBUG_PRINTLN(p);
   /* scan the buffer until the first & symbol */
   while(*p && *p!='&') {
     p++;
@@ -61,23 +61,30 @@ static void getweather_callback(byte status, uint16_t off, uint16_t len) {
   int v;
   if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("sunrise"), true)) {
     v = atoi(tmp_buffer);
-    if (v>=0 && v<=1440) {
+    if (v>=0 && v<=1440 && v != os.nvdata.sunrise_time) {
       os.nvdata.sunrise_time = v;
+      os.nvdata_save();
+      os.weather_update_flag |= WEATHER_UPDATE_SUNRISE;
     }
   }
 
   if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("sunset"), true)) {
     v = atoi(tmp_buffer);
-    if (v>=0 && v<=1440) {
+    if (v>=0 && v<=1440 && v != os.nvdata.sunset_time) {
       os.nvdata.sunset_time = v;
+      os.nvdata_save();
+      os.weather_update_flag |= WEATHER_UPDATE_SUNSET;      
     }
   }
 
   if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("eip"), true)) {
-    os.nvdata.external_ip = atol(tmp_buffer);
+    uint32_t l = atol(tmp_buffer);
+    if(l != os.nvdata.external_ip) {
+      os.nvdata.external_ip = atol(tmp_buffer);
+      os.nvdata_save();
+      os.weather_update_flag |= WEATHER_UPDATE_EIP;
+    }
   }
-
-  os.nvdata_save(); // save non-volatile memory
 
   if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("scale"), true)) {
     v = atoi(tmp_buffer);
@@ -85,6 +92,7 @@ static void getweather_callback(byte status, uint16_t off, uint16_t len) {
       // only save if the value has changed
       os.options[OPTION_WATER_PERCENTAGE] = v;
       os.options_save();
+      os.weather_update_flag |= WEATHER_UPDATE_WL;      
     }
   }
   
@@ -95,6 +103,7 @@ static void getweather_callback(byte status, uint16_t off, uint16_t len) {
         // if timezone changed, save change and force ntp sync
         os.options[OPTION_TIMEZONE] = v;
         os.options_save();
+        os.weather_update_flag |= WEATHER_UPDATE_TZ;
       }
     }
   }

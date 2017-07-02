@@ -90,10 +90,10 @@ void nvm_read_block(void *dst, const void *src, int len) {
 void nvm_write_block(const void *src, void *dst, int len) {
   FILE *fp = fopen(get_filename_fullpath(NVM_FILENAME), "rb+");
   if(!fp) {
-    fp = fopen(get_filename_fullpath(NVM_FILENAME), "wb");
+    fp = fopen(get_filename_fullpath(NVM_FILENAME), "wb+"); //This will open the file for editting after creation
   }
   if(fp) {
-    fseek(fp, (unsigned int)dst, SEEK_SET);
+    fseek(fp, (unsigned int)dst, SEEK_SET); //this fails silently without the above change
     fwrite(src, 1, len, fp);
     fclose(fp);
   } else {
@@ -117,10 +117,10 @@ byte nvm_read_byte(const byte *p) {
 void nvm_write_byte(const byte *p, byte v) {
   FILE *fp = fopen(get_filename_fullpath(NVM_FILENAME), "rb+");
   if(!fp) {
-    fp = fopen(get_filename_fullpath(NVM_FILENAME), "wb");
+    fp = fopen(get_filename_fullpath(NVM_FILENAME), "wb+"); //This will open the file for editting after creation
   }
   if(fp) {
-    fseek(fp, (unsigned int)p, SEEK_SET);
+    fseek(fp, (unsigned int)p, SEEK_SET); //This fails silently without above change
     fwrite(&v, 1, 1, fp);
     fclose(fp);
   } else {
@@ -332,54 +332,11 @@ byte strcmp_to_nvm(const char* src, int _addr) {
   return (c1==c2) ? 0 : 1;
 }
 
-// ================================================
-// ====== Data Encoding / Decoding Functions ======
-// ================================================
-// encode a 16-bit unsigned water time to 8-bit byte
-/* encoding scheme:
-   byte value : water time
-     [0.. 59]  : [0..59]  (seconds)
-    [60..238]  : [1..179] (minutes), or 60 to 10740 seconds
-   [239..252]  : [3..16]  (hours),   or 10800 to 57600 seconds
-         253   : unused
-         254   : sunrise to sunset
-         255   : sunset to sunrise
-*/
-byte water_time_encode(uint16_t i) {
-  if (i<60) {
-    return (byte)(i);
-  } else if (i<10800) {
-    return (byte)(i/60+59);
-  } else if (i<=57600) {
-    return (byte)(i/3600+236);
-  } else if(i==65534) {
-    return 254;
-  } else if(i==65535) {
-    return 255;
-  } else {
-    return 254;
-  }
-}
-
-// decode a 8-bit byte to a 16-bit unsigned water time
-uint16_t water_time_decode(byte i) {
-  uint16_t ii = i;
-  if (i<60) {
-    return ii;
-  } else if (i<239) {
-    return (ii-59)*60;
-  } else if (i<=252) {
-    return (ii-236)*3600;
-  } else if (i==254) {
-    return 65534;
-  } else if (i==255) {
-    return 65535;
-  } else {
-    return 65534;
-  }
-}
-
 // resolve water time
+/* special values:
+ * 65534: sunrise to sunset duration
+ * 65535: sunset to sunrise duration
+ */
 ulong water_time_resolve(uint16_t v) {
   if(v==65534) {
     return (os.nvdata.sunset_time-os.nvdata.sunrise_time) * 60L;
@@ -390,18 +347,19 @@ ulong water_time_resolve(uint16_t v) {
   }
 }
 
-// encode a 16-bit signed water time to 8-bit unsigned byte (leading bit is the sign)
+// encode a 16-bit signed water time (-600 to 600)
+// to unsigned byte (0 to 240)
 byte water_time_encode_signed(int16_t i) {
-  byte ret = water_time_encode(i>=0?i : -i);
-  return ((i>=0) ? (128+ret) : (128-ret));
+  i=(i>600)?600:i;
+  i=(i<-600)?-600:i;
+  return (i+600)/5;
 }
 
-// decode a 8-bit unsigned byte (leading bit is the sign) into a 16-bit signed water time
+// decode a 8-bit unsigned byte (0 to 240)
+// to a 16-bit signed water time (-600 to 600)
 int16_t water_time_decode_signed(byte i) {
-  int16_t ret = i;
-  ret -= 128;
-  ret = water_time_decode(ret>=0?ret:-ret);
-  return (i>=128 ? ret : -ret);
+  i=(i>240)?240:i;
+  return ((int16_t)i-120)*5;
 }
 
 

@@ -40,6 +40,9 @@
 #include "enc28j60.h"
 #include "net.h"
 
+#undef PGM_P
+#define PGM_P const char*
+
 /** This type definition defines the structure of a UDP server event handler callback funtion */
 typedef void (*UdpServerCallback)(
     uint16_t dest_port,    ///< Port the packet was sent to
@@ -308,6 +311,15 @@ public:
                            const char *hoststr,
                            void (*callback)(uint8_t,uint16_t,uint16_t));
 
+    /** Ray: modified browseUrl, allows hoststr to be defined as RAM string */
+    static void browseUrlRamHost (const char *urlbuf, const char *urlbuf_varpart,
+                           const char *hoststr,
+                           void (*callback)(uint8_t,uint16_t,uint16_t));
+
+    static void browseUrlRamHost (const char *urlbuf, const char *urlbuf_varpart,
+                           const char *hoststr, const char *additionalheaderline,
+                           void (*callback)(uint8_t,uint16_t,uint16_t));
+
     /**   @brief  Prepare HTTP post message
     *     @param  urlbuf Pointer to c-string URL folder
     *     @param  hoststr Pointer to c-string hostname
@@ -318,6 +330,10 @@ public:
     */
     static void httpPost (const char *urlbuf, const char *hoststr,
                           const char *additionalheaderline, const char *postval,
+                          void (*callback)(uint8_t,uint16_t,uint16_t));
+
+    static void httpPostVar (const char *urlbuf, const char *hoststr,
+                          const char *urlbuf_varpart, const char *postval,
                           void (*callback)(uint8_t,uint16_t,uint16_t));
 
     /**   @brief  Send NTP request

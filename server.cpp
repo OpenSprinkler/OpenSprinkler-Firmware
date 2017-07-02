@@ -49,7 +49,6 @@ extern char tmp_buffer[];
 extern OpenSprinkler os;
 extern ProgramData pd;
 
-void write_log(byte type, ulong curr_time);
 void schedule_all_stations(ulong curr_time);
 void turn_off_station(byte sid, ulong curr_time);
 void process_dynamic_events(ulong curr_time);
@@ -485,30 +484,33 @@ byte server_change_stations(char *p)
       tmp_buffer[0]-='0';
       tmp_buffer[stepsize-1] = 0;
 
-	  if(tmp_buffer[0] == STN_TYPE_GPIO) {
-#if defined(OSPI) // check that pin does not clash with OSPi pins
-		  byte gpio = (tmp_buffer[1] - '0') * 10 + tmp_buffer[2] - '0';
-		  byte activeState = tmp_buffer[3] - '0';
+#if !defined(ARDUINO) || defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
+      // only process GPIO and HTTP stations for OS 2.3 and OSPi
+	    if(tmp_buffer[0] == STN_TYPE_GPIO) {
+        // check that pin does not clash with OSPi pins
+		    byte gpio = (tmp_buffer[1] - '0') * 10 + tmp_buffer[2] - '0';
+		    byte activeState = tmp_buffer[3] - '0';
 
-		  byte gpioList[] = PIN_FREE_LIST;
-		  bool found = false;
-		  for (int i = 0; i < sizeof(gpioList) && found == false; i++) {
-			  if (gpioList[i] == gpio) found = true;
-		  }
-		  if (!found || activeState > 1) return HTML_DATA_OUTOFBOUND;
-#else	 // only allow GPIO stations if OSPi
-		  return HTML_NOT_PERMITTED;
+		    byte gpioList[] = PIN_FREE_LIST;
+		    bool found = false;
+		    for (int i = 0; i < sizeof(gpioList) && found == false; i++) {
+			    if (gpioList[i] == gpio) found = true;
+		    }
+		    if (!found || activeState > 1) return HTML_DATA_OUTOFBOUND;
+	    } else if (tmp_buffer[0] == STN_TYPE_HTTP) {
+		    urlDecode(tmp_buffer + 1); // Unwind any url encoding of special data
+		    if (strlen(tmp_buffer+1) > sizeof(HTTPStationData)) {
+			    return HTML_DATA_OUTOFBOUND;
+		    }
+	    }
 #endif
-	  } else if (tmp_buffer[0] == STN_TYPE_HTTP) {
-		  urlDecode(tmp_buffer + 1); // Unwind any url encoding of special data
-		  if (strlen(tmp_buffer+1) > sizeof(HTTPStationData)) {
-			  return HTML_DATA_OUTOFBOUND;
-		  }
-	  }
 
       write_to_file(stns_filename, tmp_buffer, strlen(tmp_buffer)+1, stepsize*sid, false);
+
     } else {
+
       return HTML_DATA_MISSING;
+
     }
   }
   return HTML_SUCCESS;
@@ -721,7 +723,7 @@ byte server_change_program(char *p) {
   pv++; // this should be a '['
   for (i=0;i<os.nstations;i++) {
     uint16_t pre = parse_listdata(&pv);
-    prog.durations[i] = water_time_encode(pre);
+    prog.durations[i] = pre;
   }
   pv++; // this should be a ']'
   pv++; // this should be a ']'
@@ -757,8 +759,11 @@ void server_json_options_main() {
         continue;
     #endif
     int32_t v=os.options[oid];
-    if (oid==OPTION_MASTER_OFF_ADJ || oid==OPTION_MASTER_OFF_ADJ_2) {v-=60;}
-    if (oid==OPTION_STATION_DELAY_TIME) {v=water_time_decode_signed(v);}
+    if (oid==OPTION_MASTER_OFF_ADJ || oid==OPTION_MASTER_OFF_ADJ_2 ||
+        oid==OPTION_MASTER_ON_ADJ  || oid==OPTION_MASTER_ON_ADJ_2 ||
+        oid==OPTION_STATION_DELAY_TIME) {
+      v=water_time_decode_signed(v);
+    }
     #if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
     if (oid==OPTION_BOOST_TIME) {
       if (os.hw_type==HW_TYPE_AC) continue;
@@ -817,9 +822,9 @@ void server_json_programs_main() {
     bfill.emit_p(PSTR("$D],["), prog.starttimes[i]);  // this is the last element
     // station water time
     for (i=0; i<os.nstations-1; i++) {
-      bfill.emit_p(PSTR("$L,"),(unsigned long)water_time_decode(prog.durations[i]));
+      bfill.emit_p(PSTR("$L,"),(unsigned long)prog.durations[i]);
     }
-    bfill.emit_p(PSTR("$L],\""),(unsigned long)water_time_decode(prog.durations[i])); // this is the last element
+    bfill.emit_p(PSTR("$L],\""),(unsigned long)prog.durations[i]); // this is the last element
     // program name
     strncpy(tmp_buffer, prog.name, PROGRAM_NAME_SIZE);
     tmp_buffer[PROGRAM_NAME_SIZE] = 0;  // make sure the string ends
@@ -915,6 +920,13 @@ void server_json_controller_main() {
   if(read_from_file(wtopts_filename, tmp_buffer)) {
     bfill.emit_p(PSTR(",\"wto\":{$S}"), tmp_buffer);
   }
+  
+#if !defined(ARDUINO) || defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
+  if(read_from_file(ifkey_filename, tmp_buffer)) {
+    bfill.emit_p(PSTR(",\"ifkey\":\"$S\""), tmp_buffer);
+  }
+#endif
+
   bfill.emit_p(PSTR("}"));
   delay(1);
 }
@@ -1082,9 +1094,10 @@ byte server_change_options(char *p)
         os.options[oid] = 1;  // if the bool variable is detected, set to 1
       } else {
 		    int32_t v = atol(tmp_buffer);
-		    if (oid==OPTION_MASTER_OFF_ADJ || oid==OPTION_MASTER_OFF_ADJ_2) {v+=60;} // master off time
-		    if (oid==OPTION_STATION_DELAY_TIME) {
-		      v=water_time_encode_signed((int16_t)v);
+		    if (oid==OPTION_MASTER_OFF_ADJ || oid==OPTION_MASTER_OFF_ADJ_2 ||
+		        oid==OPTION_MASTER_ON_ADJ  || oid==OPTION_MASTER_ON_ADJ_2  ||
+		        oid==OPTION_STATION_DELAY_TIME) {
+		      v=water_time_encode_signed(v);
 		    } // encode station delay time
         #if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
         if(os.hw_type==HW_TYPE_DC && oid==OPTION_BOOST_TIME) {
@@ -1127,6 +1140,15 @@ byte server_change_options(char *p)
     tmp_buffer[0]=0;
     nvm_write_block(tmp_buffer, (void*)ADDR_NVM_WEATHER_KEY, strlen(tmp_buffer)+1);
   }
+  keyfound = 0;
+  if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("ifkey"), true, &keyfound)) {
+    urlDecode(tmp_buffer);
+    tmp_buffer[TMP_BUFFER_SIZE-1]=0;
+    write_to_file(ifkey_filename, tmp_buffer, strlen(tmp_buffer));
+  } else if (keyfound) {
+    tmp_buffer[0]=0;
+    write_to_file(ifkey_filename, tmp_buffer, strlen(tmp_buffer));
+  }  
   // if not using NTP and manually setting time
   if (!os.options[OPTION_USE_NTP] && findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("ttt"), true)) {
     unsigned long t;
@@ -1219,7 +1241,7 @@ byte server_json_status(char *p)
  * Command: /cm?pw=xxx&sid=x&en=x&t=x
  *
  * pw: password
- * sid:station name (starting from 0)
+ * sid:station index (starting from 0)
  * en: enable (0 or 1)
  * t:  timer (required if en=1)
  */

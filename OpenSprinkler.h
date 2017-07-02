@@ -100,11 +100,13 @@ struct ConStatus {
 #if defined(ARDUINO)
 extern const char wtopts_filename[];
 extern const char stns_filename[];
+extern const char ifkey_filename[];
 extern const char op_max[];
 extern const char op_json_names[];
 #else
 extern const char wtopts_filename[];
 extern const char stns_filename[];
+extern const char ifkey_filename[];
 extern const char op_max[];
 extern const char op_json_names[];
 #endif
@@ -144,6 +146,7 @@ public:
   static byte  button_timeout;        // button timeout
   static ulong checkwt_lasttime;      // time when weather was checked
   static ulong checkwt_success_lasttime; // time when weather check was successful
+  static byte  weather_update_flag; 
   // member functions
   // -- setup
   static void update_dev();   // update software for Linux instances
@@ -182,6 +185,7 @@ public:
   static void raindelay_start();  // start raindelay
   static void raindelay_stop();   // stop rain delay
   static void rainsensor_status();// update rainsensor status
+  static bool programswitch_status(ulong); // get program switch status
 #if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
   static uint16_t read_current(); // read current sensing value
 #endif
