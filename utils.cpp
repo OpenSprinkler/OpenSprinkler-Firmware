@@ -79,7 +79,7 @@ void remove_file(const char *name) {
 
 #else // RPI/BBB/LINUX
 void nvm_read_block(void *dst, const void *src, int len) {
-  FILE *fp = fopen(get_filename_fullpath(NVM_FILENAME), "rb");
+  FILE *fp = fopen(NVM_FILENAME, "rb");
   if(fp) {
     fseek(fp, (unsigned int)src, SEEK_SET);
     fread(dst, 1, len, fp);
@@ -88,9 +88,9 @@ void nvm_read_block(void *dst, const void *src, int len) {
 }
 
 void nvm_write_block(const void *src, void *dst, int len) {
-  FILE *fp = fopen(get_filename_fullpath(NVM_FILENAME), "rb+");
+  FILE *fp = fopen(NVM_FILENAME, "rb+");
   if(!fp) {
-    fp = fopen(get_filename_fullpath(NVM_FILENAME), "wb+"); //This will open the file for editting after creation
+    fp = fopen(NVM_FILENAME, "wb+"); //This will open the file for editting after creation
   }
   if(fp) {
     fseek(fp, (unsigned int)dst, SEEK_SET); //this fails silently without the above change
@@ -102,7 +102,7 @@ void nvm_write_block(const void *src, void *dst, int len) {
 }
 
 byte nvm_read_byte(const byte *p) {
-  FILE *fp = fopen(get_filename_fullpath(NVM_FILENAME), "rb");
+  FILE *fp = fopen(NVM_FILENAME, "rb");
   byte v = 0;
   if(fp) {
     fseek(fp, (unsigned int)p, SEEK_SET);
@@ -115,9 +115,9 @@ byte nvm_read_byte(const byte *p) {
 }
 
 void nvm_write_byte(const byte *p, byte v) {
-  FILE *fp = fopen(get_filename_fullpath(NVM_FILENAME), "rb+");
+  FILE *fp = fopen(NVM_FILENAME, "rb+");
   if(!fp) {
-    fp = fopen(get_filename_fullpath(NVM_FILENAME), "wb+"); //This will open the file for editting after creation
+    fp = fopen(NVM_FILENAME, "wb+"); //This will open the file for editting after creation
   }
   if(fp) {
     fseek(fp, (unsigned int)p, SEEK_SET); //This fails silently without above change
@@ -131,11 +131,11 @@ void nvm_write_byte(const byte *p, byte v) {
 void write_to_file(const char *name, const char *data, int size, int pos, bool trunc) {
   FILE *file;
   if(trunc) {
-    file = fopen(get_filename_fullpath(name), "wb");
+    file = fopen(name, "wb");
   } else {
-    file = fopen(get_filename_fullpath(name), "r+b");
+    file = fopen(name, "r+b");
     if(!file) {
-        file = fopen(get_filename_fullpath(name), "wb");
+        file = fopen(name, "wb");
     }
   }
 
@@ -149,7 +149,7 @@ void write_to_file(const char *name, const char *data, int size, int pos, bool t
 bool read_from_file(const char *name, char *data, int maxsize, int pos) {
 
   FILE *file;
-  file = fopen(get_filename_fullpath(name), "rb");
+  file = fopen(name, "rb");
   if(!file) {
     data[0] = 0;
     return true;
@@ -172,7 +172,7 @@ bool read_from_file(const char *name, char *data, int maxsize, int pos) {
 }
 
 void remove_file(const char *name) {
-  remove(get_filename_fullpath(name));
+  remove(name);
 }
 
 char* get_runtime_path() {
@@ -197,13 +197,6 @@ char* get_runtime_path() {
     query = 0;
   }
   return path;
-}
-
-char* get_filename_fullpath(const char *filename) {
-  static char fullpath[PATH_MAX];
-  strcpy(fullpath, get_runtime_path());
-  strcat(fullpath, filename);
-  return fullpath;
 }
 
 #if defined(OSPI)
