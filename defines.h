@@ -361,6 +361,8 @@ typedef enum {
   #define PIN_FLOWSENSOR    48    // flow sensor (currently shared with rain sensor, change if using a different pin)
   #define PIN_RF_DATA       51    // RF transmitter pin
 
+  #define PIN_FREE_LIST     {38,39,34,35,45,44,26,47,27,65,63,62,37,36,33,32,61,86,88,87,89,76,77,74,72,73,70,71}
+
   #else
     // For Linux or other software simulators
     // use fake hardware pins
