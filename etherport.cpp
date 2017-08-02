@@ -50,12 +50,12 @@ EthernetServer::~EthernetServer()
 
 bool EthernetServer::begin()
 {
-	struct sockaddr_in sin = {0};
-	sin.sin_family = AF_INET;
-	sin.sin_port = htons(m_port);
-	sin.sin_addr.s_addr = INADDR_ANY;
+	struct sockaddr_in6 sin = {0};
+	sin.sin6_family = AF_INET6;
+	sin.sin6_port = htons(m_port);
+	sin.sin6_addr = in6addr_any;
 
-	if ((m_sock = socket(AF_INET, SOCK_STREAM, 0)) < 0)
+	if ((m_sock = socket(PF_INET6, SOCK_STREAM, 0)) < 0)
 	{
 		DEBUG_PRINTLN("can't create shell listen socket");
 		return false;
@@ -63,7 +63,13 @@ bool EthernetServer::begin()
 	int on = 1;
 	if (setsockopt(m_sock, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on)) < 0)
 	{
-		DEBUG_PRINTLN("can't setsockopt");
+		DEBUG_PRINTLN("can't setsockopt SO_REUSEADDR");
+		return false;
+	}
+	int off = 0;
+	if (setsockopt(m_sock, IPPROTO_IPV6, IPV6_V6ONLY, &off, sizeof(off)) < 0)
+	{
+		DEBUG_PRINTLN("can't setsockopt IPV6_V6ONLY");
 		return false;
 	}
 	if (bind(m_sock, (struct sockaddr *) &sin, sizeof(sin)) < 0)
@@ -100,7 +106,7 @@ EthernetClient EthernetServer::available()
 	if (FD_ISSET(m_sock, &sock_set))
 	{
 		int client_sock = 0;
-		struct sockaddr_in cli_addr;
+		struct sockaddr_in6 cli_addr;
 		unsigned int clilen = sizeof(cli_addr);
 		if ((client_sock = accept(m_sock, (struct sockaddr *) &cli_addr, &clilen)) <= 0)
 			return EthernetClient(0);
