@@ -166,7 +166,12 @@ byte findKeyVal (const char *str,char *strbuf, uint8_t maxlen,const char *key,bo
       str++;
       strbuf++;
     }
-    *strbuf='\0';
+    if (!(*str) || *str == ' ' || *str == '\n' || *str == '&') {
+      *strbuf = '\0';
+    } else {
+      found = 0;  // Ignore partial values i.e. value length is larger than maxlen
+      i = 0;
+    }
   }
   // return the length of the value
   if (keyfound) *keyfound = found;
@@ -238,7 +243,12 @@ byte findKeyVal (const char *str,char *strbuf, uint8_t maxlen,const char *key,bo
       str++;
       strbuf++;
     }
-    *strbuf='\0';
+    if (!(*str) ||  *str == ' ' || *str == '\n' || *str == '&') {
+      *strbuf = '\0';
+    } else {
+      found = 0;  // Ignore partial values i.e. value length is larger than maxlen
+      i = 0;
+    }
   }
   // return the length of the value
   if (keyfound) *keyfound = found;
