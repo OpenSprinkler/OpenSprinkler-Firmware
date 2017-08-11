@@ -13,6 +13,7 @@
 // See http://www.gnu.org/licenses/gpl.html
 
 //#define DHCPDEBUG
+#ifndef ESP8266
 
 #include "EtherCard.h"
 #include "net.h"
@@ -382,5 +383,4 @@ void EtherCard::DhcpStateMachine (uint16_t len) {
     }
 }
 
-
-
+#endif

@@ -12,7 +12,9 @@
 
 #include <inttypes.h>
 
+#ifndef ESP8266
 typedef unsigned long time_t;
+#endif
 
 typedef enum {timeNotSet, timeNeedsSync, timeSet
 }  timeStatus_t ;

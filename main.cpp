@@ -30,10 +30,18 @@
 
 #if defined(ARDUINO)
 
-#include "SdFat.h"
 #include "Wire.h"
-byte Ethernet::buffer[ETHER_BUFFER_SIZE]; // Ethernet packet buffer
-SdFat sd;                                 // SD card object
+
+#ifdef ESP8266
+  #include <FS.h>
+  #include "gpio.h"
+  #include "espconnect.h"
+  char ether_buffer[ETHER_BUFFER_SIZE];
+#else
+  #include <SdFat.h>
+  byte Ethernet::buffer[ETHER_BUFFER_SIZE]; // Ethernet packet buffer
+  SdFat sd;                                 // SD card object
+#endif
 
 unsigned long getNtpTime();
 
@@ -67,8 +75,12 @@ void httpget_callback(byte, uint16_t, uint16_t);
 #define PING_TIMEOUT            200     // Ping test timeout: 200 ms
 
 extern char tmp_buffer[];       // scratch buffer
-BufferFiller bfill;             // buffer filler
 
+#ifdef ESP8266
+ESP8266WebServer *wifi_server = NULL;
+static uint16_t led_blink_ms = LED_FAST_BLINK;
+ulong restart_timeout = 0;
+#endif
 // ====== Object defines ======
 OpenSprinkler os; // OpenSprinkler object
 ProgramData pd;   // ProgramdData object
@@ -79,12 +91,16 @@ ProgramData pd;   // ProgramdData object
  * flow_stop - time when valve turns off (last rising edge pulse detected before off)
  * flow_gallons - total # of gallons+1 from flow_start to flow_stop
  * flow_last_gpm - last flow rate measured (averaged over flow_gallons) from last valve stopped (used to write to log file). */
-ulong flow_begin, flow_start, flow_stop, flow_gallons;
-float flow_last_gpm=0;
-
+volatile ulong flow_begin, flow_start, flow_stop, flow_gallons;
 volatile ulong flow_count = 0;
+float flow_last_gpm=0;
 /** Flow sensor interrupt service routine */
-void flow_isr() {
+#ifdef ESP8266
+ICACHE_RAM_ATTR void flow_isr() // for ESP8266, ISR must be marked ICACHE_RAM_ATTR
+#else
+void flow_isr()
+#endif
+{
   if(os.options[OPTION_SENSOR_TYPE]!=SENSOR_TYPE_FLOW) return;
   ulong curr = millis();
 
@@ -114,6 +130,17 @@ static byte ui_state = UI_STATE_DEFAULT;
 static byte ui_state_runprog = 0;
 
 void ui_state_machine() {
+ 
+#ifdef ESP8266
+  // process screen led
+  static ulong led_toggle_timeout = 0;
+  if(led_blink_ms) {
+    if(millis()>led_toggle_timeout) {
+      os.toggle_screen_led();
+      led_toggle_timeout = millis() + led_blink_ms;
+    }
+  }
+#endif  
 
   if (!os.button_timeout) {
     os.lcd_set_brightness(0);
@@ -135,10 +162,17 @@ void ui_state_machine() {
     switch (button & BUTTON_MASK) {
     case BUTTON_1:
       if (button & BUTTON_FLAG_HOLD) {  // holding B1: stop all stations
-        if (digitalRead(PIN_BUTTON_3)==0) { // if B3 is pressed while holding B1, run a short test (internal test)
+        if (digitalReadExt(PIN_BUTTON_3)==0) { // if B3 is pressed while holding B1, run a short test (internal test)
           manual_start_program(255, 0);
-        } else if (digitalRead(PIN_BUTTON_2)==0) { // if B2 is pressed while holding B1, display gateway IP
+        } else if (digitalReadExt(PIN_BUTTON_2)==0) { // if B2 is pressed while holding B1, display gateway IP
+          #ifdef ESP8266
+          os.lcd.clear(0, 1);
+          os.lcd.setCursor(0, 0);
+          os.lcd.print(WiFi.gatewayIP());
+          #else
+          os.lcd.clear();
           os.lcd_print_ip(ether.gwip, 0);
+          #endif
           os.lcd.setCursor(0, 1);
           os.lcd_print_pgm(PSTR("(gwip)"));
           ui_state = UI_STATE_DISP_IP;
@@ -146,23 +180,34 @@ void ui_state_machine() {
           reset_all_stations();
         }
       } else {  // clicking B1: display device IP and port
+        #ifdef ESP8266
+        os.lcd.clear(0, 1);        
+        os.lcd.setCursor(0, 0);
+        os.lcd.print(WiFi.localIP());
+        os.lcd.setCursor(0, 1);
+        os.lcd_print_pgm(PSTR(":"));
+        uint16_t httpport = (uint16_t)(os.options[OPTION_HTTPPORT_1]<<8) + (uint16_t)os.options[OPTION_HTTPPORT_0];
+        os.lcd.print(httpport);
+        #else
+        os.lcd.clear();
         os.lcd_print_ip(ether.myip, 0);
         os.lcd.setCursor(0, 1);
         os.lcd_print_pgm(PSTR(":"));
         os.lcd.print(ether.hisport);
-        os.lcd_print_pgm(PSTR(" (osip)"));
+        #endif
+        os.lcd_print_pgm(PSTR(" (ip:port)"));
         ui_state = UI_STATE_DISP_IP;
       }
       break;
     case BUTTON_2:
       if (button & BUTTON_FLAG_HOLD) {  // holding B2: reboot
-        if (digitalRead(PIN_BUTTON_1)==0) { // if B1 is pressed while holding B2, display external IP
+        if (digitalReadExt(PIN_BUTTON_1)==0) { // if B1 is pressed while holding B2, display external IP
           os.lcd_print_ip((byte*)(&os.nvdata.external_ip), 1);
           os.lcd.setCursor(0, 1);
           os.lcd_print_pgm(PSTR("(eip)"));
           ui_state = UI_STATE_DISP_IP;
-        } else if (digitalRead(PIN_BUTTON_3)==0) {  // if B3 is pressed while holding B2, display last successful weather call
-          os.lcd.clear();
+        } else if (digitalReadExt(PIN_BUTTON_3)==0) {  // if B3 is pressed while holding B2, display last successful weather call
+          //os.lcd.clear(0, 1);
           os.lcd_print_time(os.checkwt_success_lasttime);
           os.lcd.setCursor(0, 1);
           os.lcd_print_pgm(PSTR("(lswc)"));
@@ -170,9 +215,16 @@ void ui_state_machine() {
         } else { 
           os.reboot_dev();
         }
-      } else {  // clicking B2: display MAC and gate way IP
+      } else {  // clicking B2: display MAC
+        #ifdef ESP8266
+        os.lcd.clear(0, 1);
+        byte mac[6];
+        WiFi.macAddress(mac);
+        os.lcd_print_mac(mac);
+        #else
         os.lcd.clear();
         os.lcd_print_mac(ether.mymac);
+        #endif
         ui_state = UI_STATE_DISP_GW;
       }
       break;
@@ -222,10 +274,16 @@ void ui_state_machine() {
 // ======================
 void do_setup() {
   /* Clear WDT reset flag. */
+#ifdef ESP8266
+  if(wifi_server) { delete wifi_server; wifi_server = NULL; }
+  WiFi.persistent(false);
+  led_blink_ms = LED_FAST_BLINK;
+#else
   MCUSR &= ~(1<<WDRF);
+#endif
 
-  DEBUG_BEGIN(9600);
-  DEBUG_PRINTLN("started.");
+  DEBUG_BEGIN(115200);
+  delay(1000);
   os.begin();          // OpenSprinkler init
   os.options_setup();  // Setup options
 
@@ -236,6 +294,7 @@ void do_setup() {
   setSyncProvider(RTC.get);
   os.lcd_print_time(os.now_tz());  // display time to LCD
 
+#ifndef ESP8266
   // enable WDT
   /* In order to change WDE or the prescaler, we need to
    * set WDCE (This will allow updates for 4 clock cycles).
@@ -245,6 +304,7 @@ void do_setup() {
   WDTCSR = 1<<WDP3 | 1<<WDP0;  // 8.0 seconds
   /* Enable the WD interrupt (note no reset). */
   WDTCSR |= _BV(WDIE);
+#endif
 
   if (os.start_network()) {  // initialize network
     os.status.network_fails = 0;
@@ -262,6 +322,7 @@ void do_setup() {
 // Arduino software reset function
 void(* sysReset) (void) = 0;
 
+#ifndef ESP8266
 volatile byte wdt_timeout = 0;
 /** WDT interrupt service routine */
 ISR(WDT_vect)
@@ -273,6 +334,7 @@ ISR(WDT_vect)
     sysReset();
   }
 }
+#endif
 
 #else
 
@@ -302,7 +364,13 @@ void check_network();
 void check_weather();
 void perform_ntp_sync();
 void delete_log(char *name);
+
+#ifdef ESP8266
+void start_server_ap();
+void start_server_client();
+#else
 void handle_web_request(char *p);
+#endif
 
 /** Main Loop */
 void do_loop()
@@ -318,13 +386,79 @@ void do_loop()
   time_t curr_time = os.now_tz();
   // ====== Process Ethernet packets ======
 #if defined(ARDUINO)  // Process Ethernet packets for Arduino
+  #ifdef ESP8266
+  static ulong connecting_timeout;
+  switch(os.state) {
+  case OS_STATE_INITIAL:
+    // ray todo: better handling
+    if(os.get_wifi_mode()==WIFI_MODE_AP) {
+      start_server_ap();
+      os.state = OS_STATE_CONNECTED;
+    } else {
+      led_blink_ms = LED_SLOW_BLINK;
+      start_network_sta(os.wifi_config.ssid.c_str(), os.wifi_config.pass.c_str());
+      os.state = OS_STATE_CONNECTING;
+      connecting_timeout = millis() + 60000;
+      os.lcd.setCursor(0, -1);
+      os.lcd.print(F("Connecting to..."));      
+      os.lcd.setCursor(0, 2);
+      os.lcd.print(os.wifi_config.ssid);
+    }
+    break;
+    
+  case OS_STATE_TRY_CONNECT:
+    led_blink_ms = LED_SLOW_BLINK;  
+    start_network_sta_with_ap(os.wifi_config.ssid.c_str(), os.wifi_config.pass.c_str());    
+    os.state = OS_STATE_CONNECTED;
+    break;
+   
+  case OS_STATE_CONNECTING:
+    if(WiFi.status() == WL_CONNECTED) {
+      led_blink_ms = 0;
+      os.set_screen_led(LOW);
+      os.lcd.clear();
+      start_server_client();
+      os.state = OS_STATE_CONNECTED;
+      DEBUG_PRINTLN(WiFi.localIP());
+    } else {
+      if(millis()>connecting_timeout) {
+        os.state = OS_STATE_INITIAL;
+        DEBUG_PRINTLN(F("timeout"));
+      }
+    }
+    break;
+    
+  case OS_STATE_CONNECTED:
+    if(os.get_wifi_mode() == WIFI_MODE_AP)
+      wifi_server->handleClient();
+    else {
+      if(WiFi.status() == WL_CONNECTED) {
+        wifi_server->handleClient();
+      } else {
+        os.state = OS_STATE_INITIAL;
+      }
+    }
+    break;
+    
+  case OS_STATE_RESTART:
+    wifi_server->handleClient();
+    if(millis() > restart_timeout) {
+      os.state = OS_STATE_INITIAL;
+      os.reboot_dev();
+    }
+    break;
+  }
+  
+  #else // AVR
+  
   uint16_t pos=ether.packetLoop(ether.packetReceive());
   if (pos>0) {  // packet received
     handle_web_request((char*)Ethernet::buffer+pos);
   }
   wdt_reset();  // reset watchdog timer
   wdt_timeout = 0;
-
+  #endif
+    
   ui_state_machine();
 
 #else // Process Ethernet packets for RPI/BBB
@@ -350,7 +484,7 @@ void do_loop()
 #endif  // Process Ethernet packets
 
   // if 1 second has passed
-  if (last_time != curr_time) {
+  if (curr_time != last_time) {
     last_time = curr_time;
     if (os.button_timeout) os.button_timeout--;
     
@@ -721,6 +855,10 @@ void check_weather() {
   // - the controller is in remote extension mode
   if (os.status.network_fails>0 || os.options[OPTION_REMOTE_EXT_MODE]) return;
 
+#ifdef ESP8266
+  if (os.get_wifi_mode()!=WIFI_MODE_STA || WiFi.status()!=WL_CONNECTED || os.state!=OS_STATE_CONNECTED) return;
+#endif
+
   ulong ntz = os.now_tz();
   if (os.checkwt_success_lasttime && (ntz > os.checkwt_success_lasttime + CHECK_WEATHER_SUCCESS_TIMEOUT)) {
     // if weather check has failed to return for too long, restart network
@@ -946,7 +1084,7 @@ void ip2string(char* str, byte ip[4]) {
 
 void push_message(byte type, uint32_t lval, float fval, const char* sval) {
 
-#if !defined(ARDUINO) || defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
+#if !defined(ARDUINO) || defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__) || defined(ESP8266)
 
   static const char* server = DEFAULT_IFTTT_URL;
   static char key[IFTTT_KEY_MAXSIZE];
@@ -960,7 +1098,7 @@ void push_message(byte type, uint32_t lval, float fval, const char* sval) {
 
   if(strlen(key)==0) return;
 
-  #if defined(ARDUINO)
+  #if defined(ARDUINO) && !defined(ESP8266)
     uint16_t _port = ether.hisport; // make a copy of the original port
     ether.hisport = 80;
   #endif
@@ -1027,7 +1165,10 @@ void push_message(byte type, uint32_t lval, float fval, const char* sval) {
     case IFTTT_WEATHER_UPDATE:
       if(lval>0) {
         strcat_P(postval, PSTR("External IP updated: "));
-        byte ip[4] = {(lval>>24)&0xFF,(lval>>16)&0xFF,(lval>>8)&0xFF,lval&0xFF};
+        byte ip[4] = {(byte)((lval>>24)&0xFF),
+                      (byte)((lval>>16)&0xFF),
+                      (byte)((lval>>8)&0xFF),
+                      (byte)(lval&0xFF)};
         ip2string(postval, ip);
       }
       if(fval>=0) {
@@ -1041,9 +1182,17 @@ void push_message(byte type, uint32_t lval, float fval, const char* sval) {
     case IFTTT_REBOOT:
       #if defined(ARDUINO)
         strcat_P(postval, PSTR("Rebooted. Device IP: "));
+        #ifdef ESP8266
+        {
+          IPAddress _ip = WiFi.localIP();
+          byte ip[4] = {_ip[0], _ip[1], _ip[2], _ip[3]};
+          ip2string(postval, ip);
+        }
+        #else
         ip2string(postval, ether.myip);
-        strcat(postval, ":");
-        itoa(_port, postval+strlen(postval), 10);
+        #endif
+        //strcat(postval, ":");
+        //itoa(_port, postval+strlen(postval), 10);
       #else
         strcat_P(postval, PSTR("Process restarted."));
       #endif
@@ -1052,10 +1201,36 @@ void push_message(byte type, uint32_t lval, float fval, const char* sval) {
 
   strcat_P(postval, PSTR("\"}"));
 
-  DEBUG_PRINTLN(postval);
+  //DEBUG_PRINTLN(postval);
 
 #if defined(ARDUINO)
 
+  #ifdef ESP8266
+  WiFiClient client;
+  if(!client.connect(server, 80)) return;
+  
+  char postBuffer[1500];
+  sprintf(postBuffer, "POST /trigger/sprinkler/with/key/%s HTTP/1.0\r\n"
+                      "Host: %s\r\n"
+                      "Accept: */*\r\n"
+                      "Content-Length: %d\r\n"
+                      "Content-Type: application/json\r\n"
+                      "\r\n%s", key, server, strlen(postval), postval);
+  client.write((uint8_t *)postBuffer, strlen(postBuffer));
+
+  time_t timeout = os.now_tz() + 5; // 5 seconds timeout
+  while(!client.available() && os.now_tz() < timeout) {
+  }
+
+  bzero(ether_buffer, ETHER_BUFFER_SIZE);
+  
+  while(client.available()) {
+    client.read((uint8_t*)ether_buffer, ETHER_BUFFER_SIZE);
+  }
+  client.stop();
+  //DEBUG_PRINTLN(ether_buffer);
+    
+  #else
   if(!ether.dnsLookup(server, true)) {
     // if DNS lookup fails, use default IP
     ether.hisip[0] = 54;
@@ -1067,7 +1242,8 @@ void push_message(byte type, uint32_t lval, float fval, const char* sval) {
   ether.httpPostVar(PSTR("/trigger/sprinkler/with/key/"), PSTR(DEFAULT_IFTTT_URL), key, postval, httpget_callback);
   for(int l=0;l<100;l++)  ether.packetLoop(ether.packetReceive());
   ether.hisport = _port;
-
+  #endif
+  
 #else
 
   EthernetClient client;
@@ -1129,7 +1305,9 @@ char LOG_PREFIX[] = "./logs/";
  */
 void make_logfile_name(char *name) {
 #if defined(ARDUINO)
+  #ifndef ESP8266
   sd.chdir("/");
+  #endif
 #endif
   strcpy(tmp_buffer+TMP_BUFFER_SIZE-10, name);
   strcpy(tmp_buffer, LOG_PREFIX);
@@ -1151,15 +1329,26 @@ static const char log_type_names[] PROGMEM =
 
 /** write run record to log on SD card */
 void write_log(byte type, ulong curr_time) {
+
   if (!os.options[OPTION_ENABLE_LOGGING]) return;
 
   // file name will be logs/xxxxx.tx where xxxxx is the day in epoch time
   ultoa(curr_time / 86400, tmp_buffer, 10);
   make_logfile_name(tmp_buffer);
 
+  // Step 1: open file if exists, or create new otherwise, 
+  // and move file pointer to the end  
 #if defined(ARDUINO) // prepare log folder for Arduino
   if (!os.status.has_sd)  return;
 
+  #ifdef ESP8266
+  File file = SPIFFS.open(tmp_buffer, "r+");
+  if(!file) {
+    file = SPIFFS.open(tmp_buffer, "w");
+    if(!file) return;
+  }
+  file.seek(0, SeekEnd);
+  #else
   sd.chdir("/");
   if (sd.chdir(LOG_PREFIX) == false) {
     // create dir if it doesn't exist yet
@@ -1173,6 +1362,8 @@ void write_log(byte type, ulong curr_time) {
   if(!ret) {
     return;
   }
+  #endif
+  
 #else // prepare log folder for RPI/BBB
   struct stat st;
   if(stat(get_filename_fullpath(LOG_PREFIX), &st)) {
@@ -1188,7 +1379,8 @@ void write_log(byte type, ulong curr_time) {
   }
   fseek(file, 0, SEEK_END);
 #endif  // prepare log folder
-
+  
+  // Step 2: prepare data buffer
   strcpy_P(tmp_buffer, PSTR("["));
 
   if(type == LOGDATA_STATION) {
@@ -1238,7 +1430,11 @@ void write_log(byte type, ulong curr_time) {
   strcat_P(tmp_buffer, PSTR("]\r\n"));
 
 #if defined(ARDUINO)
+  #ifdef ESP8266
+  file.write((byte*)tmp_buffer, strlen(tmp_buffer));
+  #else
   file.write(tmp_buffer);
+  #endif
   file.close();
 #else
   fwrite(tmp_buffer, 1, strlen(tmp_buffer), file);
@@ -1255,6 +1451,20 @@ void delete_log(char *name) {
 #if defined(ARDUINO)
   if (!os.status.has_sd) return;
 
+  #ifdef ESP8266
+  if (strncmp(name, "all", 3) == 0) {
+    // delete all log files
+    Dir dir = SPIFFS.openDir(LOG_PREFIX);
+    while (dir.next()) {
+      SPIFFS.remove(dir.fileName());
+    }
+  } else {
+    // delete a single log file
+    make_logfile_name(name);
+    if(!SPIFFS.exists(tmp_buffer)) return;
+    SPIFFS.remove(tmp_buffer);
+  }
+  #else
   if (strncmp(name, "all", 3) == 0) {
     // delete the log folder
     SdFile file;
@@ -1263,12 +1473,14 @@ void delete_log(char *name) {
       // delete the whole log folder
       sd.vwd()->rmRfStar();
     }
-    return;
   } else {
+    // delete a single log file
     make_logfile_name(name);
     if (!sd.exists(tmp_buffer))  return;
     sd.remove(tmp_buffer);
   }
+  #endif
+  
 #else // delete_log implementation for RPI/BBB
   if (strncmp(name, "all", 3) == 0) {
     // delete the log folder
@@ -1287,7 +1499,7 @@ void delete_log(char *name) {
  * If not, it re-initializes Ethernet controller.
  */
 void check_network() {
-#if defined(ARDUINO)
+#if defined(ARDUINO) && !defined(ESP8266)
   // do not perform network checking if the controller has just started, or if a program is running
   if (os.status.program_busy) {return;}
 
@@ -1330,8 +1542,7 @@ void check_network() {
     }
   }
 #else
-  // nothing to do here
-  // Linux will do this for you
+  // nothing to do for other platforms
 #endif
 }
 
@@ -1339,7 +1550,12 @@ void check_network() {
 void perform_ntp_sync() {
 #if defined(ARDUINO)
   // do not perform sync if this option is disabled, or if network is not available, or if a program is running
-  if (!os.options[OPTION_USE_NTP] || os.status.network_fails>0 || os.status.program_busy) return;
+  if (!os.options[OPTION_USE_NTP] || os.status.program_busy) return;
+  #ifdef ESP8266
+  if (os.get_wifi_mode()!=WIFI_MODE_STA || WiFi.status()!=WL_CONNECTED || os.state!=OS_STATE_CONNECTED) return;
+  #else
+  if (os.status.network_fails>0) return;
+  #endif
 
   if (os.status.req_ntpsync) {
     // check if rtc is uninitialized

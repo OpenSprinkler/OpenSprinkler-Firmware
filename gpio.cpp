@@ -25,6 +25,73 @@
 
 #if defined(ARDUINO)
 
+#if defined(ESP8266)
+// read a byte from PCF8574
+byte pcf_read(int addr) {
+  Wire.beginTransmission(addr);
+  Wire.requestFrom(addr, 1);
+  byte data = Wire.read();
+  Wire.endTransmission();
+  return data;
+}
+
+// write a byte to PCF8574
+void pcf_write(int addr, byte data) {
+  Wire.beginTransmission(addr);
+  Wire.write(data);
+  Wire.endTransmission();
+}
+
+// read a uint16_t from PCF8575
+uint16_t pcf_read16(int addr) {
+  Wire.beginTransmission(addr);
+  Wire.requestFrom(addr, 2);
+  uint16_t data0 = Wire.read();
+  uint16_t data1 = Wire.read();
+  Wire.endTransmission();
+  return data0+(data1<<8);
+}
+
+// write a uint16_t to PCF8575
+void pcf_write16(int addr, uint16_t data) {
+  Wire.beginTransmission(addr);
+  Wire.write(data&0xff);
+  Wire.write(data>>8);
+  Wire.endTransmission();
+}
+
+void pinModeExt(byte pin, byte mode) {
+  if(pin>=IOEXP_PIN) {
+    // PCF8574 does not require explicit pin mode
+    // nothing to do
+  } else {
+    pinMode(pin, mode);
+  }
+}
+
+void digitalWriteExt(byte pin, byte value) {
+  if(pin>=IOEXP_PIN) {
+    // a pin on IO expander
+    byte data=pcf_read(MAIN_I2CADDR);
+    if(value) data|=(1<<(pin-IOEXP_PIN));
+    else     data&=~(1<<(pin-IOEXP_PIN));
+    data |= MAIN_INPUTMASK; // make sure to enforce 1 for input pins
+    pcf_write(MAIN_I2CADDR, data);
+  } else {
+    digitalWrite(pin, value);
+  }
+}
+
+byte digitalReadExt(byte pin) {
+  if(pin>=IOEXP_PIN) {
+    // a pin on IO expander
+    return pcf_read(MAIN_I2CADDR)&(1<<(pin-IOEXP_PIN));
+  } else {
+    return digitalRead(pin);
+  }
+}
+#endif
+
 #elif defined(OSPI) || defined(OSBO)
 
 #include <sys/types.h>

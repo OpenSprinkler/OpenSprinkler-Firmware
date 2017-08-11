@@ -8,6 +8,8 @@
 //
 // 2010-05-20 <jc@wippler.nl>
 
+#ifndef ESP8266
+
 #if ARDUINO >= 100
 #include <Arduino.h> // Arduino 1.0
 #else
@@ -628,3 +630,4 @@ uint8_t ENC28J60::doBIST ( byte csPin) {
     return macResult == bitsResult;
 }
 
+#endif

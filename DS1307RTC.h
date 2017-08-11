@@ -3,6 +3,8 @@
  * This library is intended to be uses with Arduino Time.h library functions
  */
 
+#ifndef ESP8266
+
 #ifndef DS1307RTC_h
 #define DS1307RTC_h
 
@@ -30,4 +32,4 @@ extern DS1307RTC RTC;
 
 #endif
  
-
+#endif

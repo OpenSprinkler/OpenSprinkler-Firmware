@@ -1,6 +1,6 @@
 /*
   time.c - low level time and date functions
-  Copyright (c) Michael Margolis 2009
+  Copyright (c) Michael Margolis 2009-2014
 
   This library is free software; you can redistribute it and/or
   modify it under the terms of the GNU Lesser General Public
@@ -16,26 +16,31 @@
   License along with this library; if not, write to the Free Software
   Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
   
-  6  Jan 2010 - initial release 
-  12 Feb 2010 - fixed leap year calculation error
-  1  Nov 2010 - fixed setTime bug (thanks to Korman for this)
+  1.0  6  Jan 2010 - initial release
+  1.1  12 Feb 2010 - fixed leap year calculation error
+  1.2  1  Nov 2010 - fixed setTime bug (thanks to Korman for this)
+  1.3  24 Mar 2012 - many edits by Paul Stoffregen: fixed timeStatus() to update
+                     status, updated examples for Arduino 1.0, fixed ARM
+                     compatibility issues, added TimeArduinoDue and TimeTeensy3
+                     examples, add error checking and messages to RTC examples,
+                     add examples to DS1307RTC library.
+  1.4  5  Sep 2014 - compatibility with Arduino 1.5.7
 */
 
-#if defined(ARDUINO) && ARDUINO >= 100
-#include "Arduino.h"
+#if ARDUINO >= 100
+#include <Arduino.h> 
 #else
-#include "WProgram.h"
+#include <WProgram.h> 
 #endif
 
-#include "Time.h"
+#include "TimeLib.h"
 
 static tmElements_t tm;          // a cache of time elements
-static time_t       cacheTime;   // the time the cache was updated
-static time_t       syncInterval = 3600;  // time sync will be attempted after this many seconds
+static time_t cacheTime;   // the time the cache was updated
+static uint32_t syncInterval = 300;  // time sync will be attempted after this many seconds
 
-void refreshCache( time_t t){
-  if( t != cacheTime)
-  {
+void refreshCache(time_t t) {
+  if (t != cacheTime) {
     breakTime(t, tm); 
     cacheTime = t; 
   }
@@ -143,15 +148,17 @@ int year(time_t t) { // the year for the given time
 
 static  const uint8_t monthDays[]={31,28,31,30,31,30,31,31,30,31,30,31}; // API starts months from 1, this array starts from 0
  
-void breakTime(time_t time, tmElements_t &tm){
+void breakTime(time_t timeInput, tmElements_t &tm){
 // break the given time_t into time components
 // this is a more compact version of the C library localtime function
 // note that year is offset from 1970 !!!
 
   uint8_t year;
   uint8_t month, monthLength;
+  uint32_t time;
   unsigned long days;
-  
+
+  time = (uint32_t)timeInput;
   tm.Second = time % 60;
   time /= 60; // now it is minutes
   tm.Minute = time % 60;
@@ -200,7 +207,7 @@ time_t makeTime(tmElements_t &tm){
 // previous version used full four digit year (or digits since 2000),i.e. 2009 was 2009 or 9
   
   int i;
-  time_t seconds;
+  uint32_t seconds;
 
   // seconds from 1970 till 1 jan 00:00:00 of the given year
   seconds= tm.Year*(SECS_PER_DAY * 365);
@@ -222,14 +229,14 @@ time_t makeTime(tmElements_t &tm){
   seconds+= tm.Hour * SECS_PER_HOUR;
   seconds+= tm.Minute * SECS_PER_MIN;
   seconds+= tm.Second;
-  return seconds; 
+  return (time_t)seconds; 
 }
 /*=====================================================*/	
 /* Low level system time functions  */
 
-static time_t sysTime = 0;
-static time_t prevMillis = 0;
-static time_t nextSyncTime = 0;
+static uint32_t sysTime = 0;
+static uint32_t prevMillis = 0;
+static uint32_t nextSyncTime = 0;
 static timeStatus_t Status = timeNotSet;
 
 getExternalTime getTimePtr;  // pointer to external sync function
@@ -240,41 +247,43 @@ time_t sysUnsyncedTime = 0; // the time sysTime unadjusted by sync
 #endif
 
 
-time_t now(){
-  while( millis() - prevMillis >= 1000){      
+time_t now() {
+	// calculate number of seconds passed since last call to now()
+  while (millis() - prevMillis >= 1000) {
+		// millis() and prevMillis are both unsigned ints thus the subtraction will always be the absolute value of the difference
     sysTime++;
     prevMillis += 1000;	
 #ifdef TIME_DRIFT_INFO
     sysUnsyncedTime++; // this can be compared to the synced time to measure long term drift     
-#endif	
+#endif
   }
-  if(nextSyncTime <= sysTime){
-	if(getTimePtr != 0){
-	  time_t t = getTimePtr();
-      if( t != 0) {
+  if (nextSyncTime <= sysTime) {
+    if (getTimePtr != 0) {
+      time_t t = getTimePtr();
+      if (t != 0) {
         setTime(t);
-			}
-      else {
-        Status = (Status == timeNotSet) ?  timeNotSet : timeNeedsSync;        
-			}
+      } else {
+        nextSyncTime = sysTime + syncInterval;
+        Status = (Status == timeNotSet) ?  timeNotSet : timeNeedsSync;
+      }
     }
   }  
-  return sysTime;
+  return (time_t)sysTime;
 }
 
-void setTime(time_t t){ 
+void setTime(time_t t) { 
 #ifdef TIME_DRIFT_INFO
  if(sysUnsyncedTime == 0) 
    sysUnsyncedTime = t;   // store the time of the first call to set a valid Time   
 #endif
 
-  sysTime = t;  
-  nextSyncTime = t + syncInterval;
-  Status = timeSet; 
+  sysTime = (uint32_t)t;  
+  nextSyncTime = (uint32_t)t + syncInterval;
+  Status = timeSet;
   prevMillis = millis();  // restart counting from now (thanks to Korman for this fix)
 } 
 
-void  setTime(int hr,int min,int sec,int dy, int mnth, int yr){
+void setTime(int hr,int min,int sec,int dy, int mnth, int yr){
  // year can be given as full four digit year or two digts (2010 or 10 for 2010);  
  //it is converted to years since 1970
   if( yr > 99)
@@ -290,11 +299,13 @@ void  setTime(int hr,int min,int sec,int dy, int mnth, int yr){
   setTime(makeTime(tm));
 }
 
-void adjustTime(long adjustment){
+void adjustTime(long adjustment) {
   sysTime += adjustment;
 }
 
-timeStatus_t timeStatus(){ // indicates if time has been set and recently synchronized
+// indicates if time has been set and recently synchronized
+timeStatus_t timeStatus() {
+  now(); // required to actually update the status
   return Status;
 }
 
@@ -305,5 +316,6 @@ void setSyncProvider( getExternalTime getTimeFunction){
 }
 
 void setSyncInterval(time_t interval){ // set the number of seconds between re-sync
-  syncInterval = interval;
+  syncInterval = (uint32_t)interval;
+  nextSyncTime = sysTime + syncInterval;
 }

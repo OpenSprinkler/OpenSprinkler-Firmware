@@ -25,7 +25,10 @@
 #define _UTILS_H
 
 #if defined(ARDUINO)
-
+  #ifdef ESP8266
+    typedef unsigned short uint16_t;
+    typedef short int16_t;
+  #endif
 #else // headers for RPI/BBB
   #include <stdio.h>
   #include <limits.h>
@@ -43,10 +46,17 @@ void write_to_file(const char *name, const char *data, int size, int pos=0, bool
 bool read_from_file(const char *name, char *data, int maxsize=TMP_BUFFER_SIZE, int pos=0);
 void remove_file(const char *name);
 #if defined(ARDUINO)
-  #define nvm_read_block  eeprom_read_block
-  #define nvm_write_block eeprom_write_block
-  #define nvm_read_byte   eeprom_read_byte
-  #define nvm_write_byte  eeprom_write_byte
+  #ifdef ESP8266
+    void nvm_read_block(void *dst, const void *src, int len);
+    void nvm_write_block(const void *src, void *dst, int len);
+    byte nvm_read_byte(const byte *p);
+    void nvm_write_byte(const byte *p, byte v);  
+  #else
+    #define nvm_read_block  eeprom_read_block
+    #define nvm_write_block eeprom_write_block
+    #define nvm_read_byte   eeprom_read_byte
+    #define nvm_write_byte  eeprom_write_byte
+  #endif
 #else // NVM functions for RPI/BBB
   void nvm_read_block(void *dst, const void *src, int len);
   void nvm_write_block(const void *src, void *dst, int len);

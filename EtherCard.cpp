@@ -9,6 +9,8 @@
 //
 // 2010-05-19 <jc@wippler.nl>
 
+#ifndef ESP8266
+
 #include <EtherCard.h>
 #include <stdarg.h>
 #include <avr/eeprom.h>
@@ -389,3 +391,5 @@ bool EtherCard::staticSetup (const uint8_t* my_ip,
     delaycnt = 0; //request gateway ARP lookup
     return true;
 }
+
+#endif
