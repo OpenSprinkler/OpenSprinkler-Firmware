@@ -88,6 +88,8 @@ public:
 #endif
   
 #else
+#include <stdarg.h>
+
 class BufferFiller {
     char *start; //!< Pointer to start of buffer
     char *ptr; //!< Pointer to cursor position
