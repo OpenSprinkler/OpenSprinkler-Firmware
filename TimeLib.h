@@ -8,14 +8,29 @@
 */     
 
 #ifndef _Time_h
+#ifdef __cplusplus
 #define _Time_h
 
 #include <inttypes.h>
+#ifndef __AVR__
+#include <sys/types.h> // for __time_t_defined, but avr libc lacks sys/types.h
+#endif
 
-#ifndef ESP8266
+
+#if !defined(__time_t_defined) // avoid conflict with newlib or other posix libc
 typedef unsigned long time_t;
 #endif
 
+
+// This ugly hack allows us to define C++ overloaded functions, when included
+// from within an extern "C", as newlib's sys/stat.h does.  Actually it is
+// intended to include "time.h" from the C library (on ARM, but AVR does not
+// have that file at all).  On Mac and Windows, the compiler will find this
+// "Time.h" instead of the C library "time.h", so we may cause other weird
+// and unpredictable effects by conflicting with the C library header "time.h",
+// but at least this hack lets us define C++ functions as intended.  Hopefully
+// nothing too terrible will result from overriding the C library header?!
+extern "C++" {
 typedef enum {timeNotSet, timeNeedsSync, timeSet
 }  timeStatus_t ;
 
@@ -45,6 +60,7 @@ typedef struct  {
 
 typedef time_t(*getExternalTime)();
 //typedef void  (*setExternalTime)(const time_t); // not used in this version
+
 
 /*==============================================================================*/
 /* Useful Constants */
@@ -122,5 +138,7 @@ void    setSyncInterval(time_t interval); // set the number of seconds between r
 void breakTime(time_t time, tmElements_t &tm);  // break time_t into elements
 time_t makeTime(tmElements_t &tm);  // convert time elements into time_t
 
+} // extern "C++"
+#endif // __cplusplus
 #endif /* _Time_h */
 

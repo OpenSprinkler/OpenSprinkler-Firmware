@@ -26,26 +26,50 @@
 extern OpenSprinkler os;
 
 #if defined(ARDUINO)  // AVR
-#include <avr/eeprom.h>
-#include "SdFat.h"
-extern SdFat sd;
+  #ifdef ESP8266
+    #include <FS.h>
+  #else
+    #include <avr/eeprom.h>
+    #include "SdFat.h"
+    extern SdFat sd;
+  #endif
 
 void write_to_file(const char *name, const char *data, int size, int pos, bool trunc) {
   if (!os.status.has_sd)  return;
 
   char fn[12];
   strcpy_P(fn, name);
-  sd.chdir("/");
-  SdFile file;
-  int flag = O_CREAT | O_WRITE;
-  if (trunc) flag |= O_TRUNC;
-  int ret = file.open(fn, flag);
-  if(!ret) {
-    return;
-  }
-  file.seekSet(pos);
-  file.write(data, size);
-  file.close();
+  
+  #ifdef ESP8266
+    File f;
+    if(trunc) {
+      f = SPIFFS.open(fn, "w");
+    } else {
+      f = SPIFFS.open(fn, "r+");
+      if(!f) f = SPIFFS.open(fn, "w");
+    }    
+    if(!f) {f.close(); return;}
+    if(pos) f.seek(pos, SeekSet);
+    if(size==0) {
+      f.write((byte*)" ", 1);  // hack to circumvent SPIFFS bug involving writing empty file
+    } else {
+      f.write((byte*)data, size);
+    }
+    f.close();
+  #else
+    sd.chdir("/");
+    SdFile file;
+    int flag = O_CREAT | O_WRITE;
+    if (trunc) flag |= O_TRUNC;
+    int ret = file.open(fn, flag);
+    if(!ret) {
+      file.close();
+      return;
+    }
+    file.seekSet(pos);
+    file.write(data, size);
+    file.close();
+  #endif
 }
 
 bool read_from_file(const char *name, char *data, int maxsize, int pos) {
@@ -53,18 +77,36 @@ bool read_from_file(const char *name, char *data, int maxsize, int pos) {
 
   char fn[12];
   strcpy_P(fn, name);
-  sd.chdir("/");
-  SdFile file;
-  int ret = file.open(fn, O_READ );
-  if(!ret) {
-    data[0]=0;
-    return true;  // return true but with empty string
-  }
-  file.seekSet(pos);
-  ret = file.fgets(data, maxsize);
-  data[maxsize-1]=0;
-  file.close();
-  return true;
+  
+  #ifdef ESP8266
+    File f = SPIFFS.open(fn, "r");
+    if(!f) {
+      data[0]=0;
+      f.close();
+      return true;  // return true but with empty string
+    }
+    if(pos)  f.seek(pos, SeekSet);
+    int len = f.read((byte*)data, maxsize);
+    if(len>0) data[len]=0;
+    if(len==1 && data[0]==' ') data[0] = 0;  // hack to circumvent SPIFFS bug involving writing empty file
+    data[maxsize-1]=0;
+    f.close();
+    return true;
+  #else
+    sd.chdir("/");
+    SdFile file;
+    int ret = file.open(fn, O_READ );
+    if(!ret) {
+      data[0]=0;
+      file.close();
+      return true;  // return true but with empty string
+    }
+    file.seekSet(pos);
+    ret = file.fgets(data, maxsize);
+    data[maxsize-1]=0;
+    file.close();
+    return true;
+  #endif
 }
 
 void remove_file(const char *name) {
@@ -72,10 +114,61 @@ void remove_file(const char *name) {
 
   char fn[12];
   strcpy_P(fn, name);
-  sd.chdir("/");
-  if (!sd.exists(fn))  return;
-  sd.remove(fn);
+  
+  #ifdef ESP8266
+    if(!SPIFFS.exists(fn)) return;
+    SPIFFS.remove(fn);
+  #else
+    sd.chdir("/");
+    if (!sd.exists(fn))  return;
+    sd.remove(fn);
+  #endif
 }
+
+#ifdef ESP8266
+// nvm functions for ESP8266
+// do not use File.readBytes or readBytesUntil because it's very slow
+void nvm_read_block(void *dst, const void *src, int len) {
+  File f = SPIFFS.open(NVM_FILENAME, "r");
+  if(f) {
+    f.seek((unsigned int)src, SeekSet);
+    f.read((byte*)dst, len);
+    f.close();
+  }
+}
+
+void nvm_write_block(const void *src, void *dst, int len) {
+  File f = SPIFFS.open(NVM_FILENAME, "r+");
+  if(!f) f = SPIFFS.open(NVM_FILENAME, "w");
+  if(f) {
+    f.seek((unsigned int)dst, SeekSet);
+    f.write((byte*)src, len);
+    f.close();
+  }
+}
+
+byte nvm_read_byte(const byte *p) {
+  File f = SPIFFS.open(NVM_FILENAME, "r");
+  byte v = 0;
+  if(f) {
+    f.seek((unsigned int)p, SeekSet);
+    f.read((byte*)&v, 1);
+    f.close();
+  }
+  return v;
+}
+
+void nvm_write_byte(const byte *p, byte v) {
+  File f = SPIFFS.open(NVM_FILENAME, "r+");
+  if(!f) f = SPIFFS.open(NVM_FILENAME, "w");
+  if(f) {
+    f.seek((unsigned int)p, SeekSet);
+    f.write(&v, 1);
+    f.close();  
+  }
+}
+
+#endif
 
 #else // RPI/BBB/LINUX
 void nvm_read_block(void *dst, const void *src, int len) {

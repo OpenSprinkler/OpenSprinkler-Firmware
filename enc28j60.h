@@ -10,6 +10,8 @@
 //
 // 2010-05-20 <jc@wippler.nl>
 
+#ifndef ESP8266
+
 #ifndef ENC28J60_H
 #define ENC28J60_H
 
@@ -110,5 +112,7 @@ public:
 };
 
 typedef ENC28J60 Ethernet; //!< Define alias Ethernet for ENC28J60
+
+#endif
 
 #endif

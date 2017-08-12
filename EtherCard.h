@@ -18,6 +18,8 @@
 //   SI  - Pin 11
 //   CS  - Pin  8
 //
+#ifndef ESP8266
+
 #ifndef __PROG_TYPES_COMPAT__
 #define __PROG_TYPES_COMPAT__
 #endif
@@ -558,5 +560,7 @@ public:
 };
 
 extern EtherCard ether; //!< Global presentation of EtherCard class
+
+#endif
 
 #endif

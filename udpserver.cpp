@@ -5,6 +5,8 @@
 // Copyright: GPL V2
 // See http://www.gnu.org/licenses/gpl.html
 
+#ifndef ESP8266
+
 #include "EtherCard.h"
 #include "net.h"
 
@@ -68,3 +70,5 @@ bool EtherCard::udpServerHasProcessedPacket(uint16_t plen) {
     }
     return packetProcessed;
 }
+
+#endif

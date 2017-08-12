@@ -1,35 +1,37 @@
 /*
- * DS1307RTC.h - library for DS1307 RTC
+ * I2CRTC.h - library for common I2C RTCs
  * This library is intended to be uses with Arduino Time.h library functions
  */
 
-#ifndef ESP8266
 
-#ifndef DS1307RTC_h
-#define DS1307RTC_h
+#ifndef I2CRTC_h
+#define I2CRTC_h
 
-#include "Time.h"
+#define DS1307_ADDR  0x68
+#define MCP7940_ADDR 0x6F
+#define PCF8563_ADDR 0x51
+
+#include "TimeLib.h"
 
 // library interface description
-class DS1307RTC
+class I2CRTC
 {
   // user-accessible "public" interface
   public:
-  DS1307RTC();
+  I2CRTC();
   static time_t get();
 	static void set(time_t t);
 	static void read(tmElements_t &tm);
 	static void write(tmElements_t &tm);
-  static uint8_t detect();
+  static bool detect();
   
   private:
 	static uint8_t dec2bcd(uint8_t num);
   static uint8_t bcd2dec(uint8_t num);
-  static int ctrl_id; // ray: added ctrl_id variable to store chip id
+  static uint8_t addr;
 };
 
-extern DS1307RTC RTC;
+extern I2CRTC RTC;
 
 #endif
  
-#endif

@@ -3,6 +3,7 @@
 // Copyright: GPL V2
 //
 // 2010-05-20 <jc@wippler.nl>
+#ifndef ESP8266
 
 #include "EtherCard.h"
 
@@ -221,3 +222,5 @@ void EtherCard::makeNetStr (char *resultstr,uint8_t *bytestr,uint8_t len,char se
 }
 
 // end of webutil.c
+
+#endif
