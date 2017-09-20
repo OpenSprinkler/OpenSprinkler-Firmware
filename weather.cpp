@@ -315,6 +315,7 @@ void GetWeather() {
         continue;
     }
     peel_http_header();
+    DEBUG_PRINTLN(ether_buffer);
     getweather_callback(0, 0, ETHER_BUFFER_SIZE);
     break;
   }

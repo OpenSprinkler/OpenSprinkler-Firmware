@@ -1219,6 +1219,18 @@ void server_json_controller_main() {
   if(read_from_file(ifkey_filename, tmp_buffer)) {
     bfill.emit_p(PSTR(",\"ifkey\":\"$S\""), tmp_buffer);
   }
+  if(read_from_file(ifttt_filename, tmp_buffer)) {
+    bfill.emit_p(PSTR(",\"ifttt\":{$S}"), tmp_buffer);
+  }
+  if (read_from_file(webhook_filename, tmp_buffer)) {
+	  bfill.emit_p(PSTR(",\"webhook\":{$S}"), tmp_buffer);
+  }
+  if (read_from_file(influx_filename, tmp_buffer)) {
+	  bfill.emit_p(PSTR(",\"influx\":{$S}"), tmp_buffer);
+  }
+  if (read_from_file(name_filename, tmp_buffer)) {
+	  bfill.emit_p(PSTR(",\"name\":\"$S\""), tmp_buffer);
+  }
 #endif
 
 #ifdef ESP8266
@@ -1478,7 +1490,43 @@ void server_change_options()
   } else if (keyfound) {
     tmp_buffer[0]=0;
     write_to_file(ifkey_filename, tmp_buffer, strlen(tmp_buffer));
-  }  
+  }
+  keyfound = 0;
+  if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("ifttt"), true, &keyfound)) {
+    urlDecode(tmp_buffer);
+    tmp_buffer[TMP_BUFFER_SIZE-1]=0;
+    write_to_file(ifttt_filename, tmp_buffer, strlen(tmp_buffer));
+  } else if (keyfound) {
+    tmp_buffer[0]=0;
+    write_to_file(ifttt_filename, tmp_buffer, strlen(tmp_buffer));
+  }
+  keyfound = 0;
+  if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("influx"), true, &keyfound)) {
+    urlDecode(tmp_buffer);
+    tmp_buffer[TMP_BUFFER_SIZE-1]=0;
+    write_to_file(influx_filename, tmp_buffer, strlen(tmp_buffer));
+  } else if (keyfound) {
+    tmp_buffer[0]=0;
+    write_to_file(influx_filename, tmp_buffer, strlen(tmp_buffer));
+  }
+  keyfound = 0;
+  if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("webhook"), true, &keyfound)) {
+    urlDecode(tmp_buffer);
+    tmp_buffer[TMP_BUFFER_SIZE-1]=0;
+    write_to_file(webhook_filename, tmp_buffer, strlen(tmp_buffer));
+  } else if (keyfound) {
+    tmp_buffer[0]=0;
+    write_to_file(webhook_filename, tmp_buffer, strlen(tmp_buffer));
+  }
+  keyfound = 0;
+  if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("name"), true, &keyfound)) {
+    urlDecode(tmp_buffer);
+    tmp_buffer[TMP_BUFFER_SIZE-1]=0;
+    write_to_file(name_filename, tmp_buffer, strlen(tmp_buffer));
+  } else if (keyfound) {
+    tmp_buffer[0]=0;
+    write_to_file(name_filename, tmp_buffer, strlen(tmp_buffer));
+  }
   // if not using NTP and manually setting time
   if (!os.options[OPTION_USE_NTP] && findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("ttt"), true)) {
     unsigned long t;
