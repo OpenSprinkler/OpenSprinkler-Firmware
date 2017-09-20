@@ -87,20 +87,20 @@ static bool checkForDnsAnswer (uint16_t plen) {
 }
 
 // use during setup, as this discards all incoming requests until it returns
-bool EtherCard::dnsLookup (const char* name, bool fromRam) {
+bool EtherCard::dnsLookup (const char* name, bool fromRam, uint32_t timeout) {
     word start = millis();
 
     while(!isLinkUp())
     {
         packetLoop(packetReceive());
-        if ((word) (millis() - start) >= 30000)
+        if ((word) (millis() - start) >= timeout)
             return false; //timeout waiting for link
     }
     start = millis();
     while(clientWaitingGw())
     {
         packetLoop(packetReceive());
-        if ((word) (millis() - start) >= 30000)
+        if ((word) (millis() - start) >= timeout)
             return false; //timeout waiting for gateway ARP
     }
 
@@ -109,7 +109,7 @@ bool EtherCard::dnsLookup (const char* name, bool fromRam) {
 
     start = millis();
     while (hisip[0] == 0) {
-        if ((word) (millis() - start) >= 30000)
+        if ((word) (millis() - start) >= timeout)
             return false; //timout waiting for dns response
         word len = packetReceive();
         if (len > 0 && packetLoop(len) == 0) //packet not handled by tcp/ip packet loop

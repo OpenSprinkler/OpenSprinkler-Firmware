@@ -180,7 +180,6 @@ int EthernetClient::connect(uint8_t ip[4], uint16_t port, uint16_t timeout)
 	// Use Select() to determine if connection within timeout period
 	if (select(m_sock + 1, NULL, &fdset, NULL, &tv) <= 0)
 	{
-		DEBUG_PRINTLN("error connecting to server");
 		return 0;
 	}
 

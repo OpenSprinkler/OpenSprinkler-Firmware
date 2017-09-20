@@ -334,6 +334,10 @@ public:
                           const char *additionalheaderline, const char *postval,
                           void (*callback)(uint8_t,uint16_t,uint16_t));
 
+    static void httpPostRam (const char *urlbuf, const char *hoststr,
+                          const char *additionalheaderline, const char *postval,
+                          void (*callback)(uint8_t,uint16_t,uint16_t));
+
     static void httpPostVar (const char *urlbuf, const char *hoststr,
                           const char *urlbuf_varpart, const char *postval,
                           void (*callback)(uint8_t,uint16_t,uint16_t));
@@ -474,11 +478,12 @@ public:
     /**   @brief  Perform DNS lookup
     *     @param  name Host name to lookup
     *     @param  fromRam Set true to look up cached name. Default = false
+    *     @param  timeout Maximum time to wait for response
     *     @return <i>bool</i> True on success.
     *     @note   Result is stored in <i>hisip</i> member
     */
-    static bool dnsLookup (const char* name, bool fromRam =false);
 
+    static bool dnsLookup(const char* name, bool fromRam = false, uint32_t timeout = 30000);
     // webutil.cpp
     /**   @brief  Copies an IP address
     *     @param  dst Pointer to the 4 byte destination

@@ -30,8 +30,9 @@
 #if defined(ARDUINO)
 #include "time.h"
 #include "SdFat.h"
-extern byte Ethernet::buffer[ETHER_BUFFER_SIZE]; // Ethernet packet buffer
-extern SdFat sd;                                 // SD card object
+extern SdFat sd;
+extern BufferFiller bfill;
+void httpget_callback(byte, uint16_t, uint16_t);
 #else // header and defs for RPI/BBB
 #include <sys/stat.h>
 #include <netdb.h>
@@ -41,6 +42,8 @@ extern char ether_buffer[ETHER_BUFFER_SIZE];
 #define sprintf_P sprintf
 #define sscanf_P sscanf
 #endif
+
+#define NOTIF_TIMEOUT              5    // TImeout in seconds for any network activity
 
 #if PROGRAM_NAME_SIZE > STATION_NAME_SIZE
 #define NAME_SIZE PROGRAM_NAME_SIZE
@@ -119,7 +122,7 @@ extern ProgramData pd;          // ProgramdData object
 extern char tmp_buffer[];       // scratch buffer
 static char post_buff[512];     // POST message - largest IFTTT message is approx 350 bytes as contains three versions of the message
 
-static void post_msg(const char * server, int port, const char * url, const char * var, const char * postval);
+static void post_msg(const char * server, int port, const char * path, const char * postval);
 static void strip_spaces(char * i);
 
 static void push_message(ulong timestamp, notification_t type, push_msg_t * msg);
@@ -290,9 +293,8 @@ void push_message(ulong timestamp, notification_t type, push_msg_t * msg) {
 // ==========================================
 
 void push_ifttt_message(ulong timestamp, notification_t type, push_msg_t * m) {
-  const char * server PROGMEM = DEFAULT_IFTTT_URL;
-  const char * path_str PROGMEM = "/trigger/%s/with/key/";
-  char path[sizeof(path_str)/sizeof(char) + IFTTT_EVENT_MAXSIZE + 1] = { 0 };
+  static const char path_format[] PROGMEM = "/trigger/%s/with/key/%s";
+  char path[sizeof(path_format)/sizeof(char) + IFTTT_EVENT_MAXSIZE + IFTTT_KEY_MAXSIZE + 1] = { 0 };
   char events[IFTTT_EVENT_MAXNUM][IFTTT_EVENT_MAXSIZE + 1] = { 0 };
   char key[IFTTT_KEY_MAXSIZE + 1] = { 0 };
 
@@ -303,14 +305,14 @@ void push_ifttt_message(ulong timestamp, notification_t type, push_msg_t * m) {
 
   read_from_file(ifttt_filename, tmp_buffer);
   if (strlen(tmp_buffer) == 0) {
-    sprintf_P(path, PSTR(path_str), "sprinkler", key);
+    sprintf_P(path, path_format, "sprinkler", key);
   } else {
     // File contains event endpoints in json format: "events":["events":["event1", ... ,"event8"]
     sscanf_P(tmp_buffer, PSTR("\"events\":[\"%[^\"]\",\"%[^\"]\",\"%[^\"]\",\"%[^\"]\",\"%[^\"]\",\"%[^\"]\",\"%[^\"]\",\"%[^\"]\""),
            events[0], events[1], events[2], events[3], events[4], events[5], events[6], events[7]);
 
     int pos = ffs(ifttt_map[type]) - 1;
-    sprintf_P(path, PSTR(path_str), events[pos]);
+    sprintf_P(path, path_format, events[pos], key);
   }
 
   // Populate all three parameters with: value1 = human text, value2 = full json, value3 = most applicable single value
@@ -321,17 +323,17 @@ void push_ifttt_message(ulong timestamp, notification_t type, push_msg_t * m) {
       strcat_P(post_buff, PSTR(",\"value3\":"));
       if (format_value_msg(post_buff + strlen(post_buff), timestamp, type, m) > 0) {
         strcat_P(post_buff, PSTR("}"));
-        DEBUG_PRINTLN(post_buff);
-        post_msg(server, 80, path, key, post_buff);
+        post_msg(DEFAULT_IFTTT_URL, 80, path, post_buff);
       }
     }
   }
 }
 
 void push_influxdb_message(ulong timestamp, notification_t type, push_msg_t * m) {
-  const char * path PROGMEM = "/write?db=";
+  static const char path_format[] PROGMEM = "/write?db=%s";
   char server[INFLUX_SERVER_MAXSIZE + 1] = { 0 };
   char db[INFLUX_DATABASE_MAXSIZE + 1] = { 0 };
+  char path[sizeof(path_format)/sizeof(char) + INFLUX_DATABASE_MAXSIZE + 1] = { 0 };
   int port = 0, enable= 0;
 
   // File contains server, port and database settings
@@ -340,9 +342,9 @@ void push_influxdb_message(ulong timestamp, notification_t type, push_msg_t * m)
   sscanf_P(tmp_buffer, PSTR("\"server\":\"%[^\"]\",\"port\":\%d,\"db\":\"%[^\"]\",\"enable\":\%d"), server, &port, db, &enable);
   if (enable == 0) return;
 
+  sprintf_P(path, path_format, db);
   if (format_influx_msg(post_buff, timestamp, type, m) > 0) {
-    DEBUG_PRINTLN(post_buff);
-    post_msg(server, port, path, db, post_buff);
+    post_msg(server, port, path, post_buff);
   }
 }
 
@@ -357,8 +359,7 @@ void push_webhook_message(ulong timestamp, notification_t type, push_msg_t * m) 
   if (enable == 0) return;
 
   if (format_json_msg(post_buff, timestamp, type, m) > 0) {
-    DEBUG_PRINTLN(post_buff);
-    post_msg(server, port, "", "", post_buff);
+    post_msg(server, port, "", post_buff);
   }
 }
 
@@ -661,23 +662,68 @@ int format_influx_msg(char * buff, ulong timestamp, notification_t type, push_ms
 // ==========================================
 // HELPER FUNCTIONS
 // ==========================================
-void post_msg(const char * server, int port, const char * path, const char * var, const char * postval)
+void check_return_code(const char * buff)
 {
+#if defined(SERIAL_DEBUG) || defined(ENABLE_DEBUG)
+  char ret_str[4] = { 0 };
+  strncpy(ret_str, buff + 9, 3);
+  int ret_code = atoi(ret_str);
+
+  if (ret_code < 200 || ret_code > 299) {
+    const char * resp = strstr(buff, "\r\n\r\n");
+
+    DEBUG_PRINT("Notification error (");
+    DEBUG_PRINT(ret_code);
+    DEBUG_PRINT("): ");
+    if (resp) DEBUG_PRINT(resp+4);
+    DEBUG_PRINTLN("");
+  }
+#endif
+}
+
 #if defined(ARDUINO)
+static bool post_completed = false;
+
+void post_callback(uint8_t status, uint16_t off, uint16_t len)
+{
+  post_completed = true;
+  check_return_code((const char *)(Ethernet::buffer + off));
+}
+#endif
+
+void post_msg(const char * server, int port, const char * path, const char * postval)
+{
+  DEBUG_PRINT("Sending notification: ");
+  DEBUG_PRINTLN(postval);
+
+#if defined(ARDUINO)
+
+  if (os.status.network_fails > 0) {
+    DEBUG_PRINTLN("Notification Aborted: No network connected");
+    return;
+  }
+
+  if (!ether.dnsLookup(server, true, NOTIF_TIMEOUT * 1000)) {
+    DEBUG_PRINT("Notification Aborted: Could not locate ");
+    DEBUG_PRINTLN(server);
+    return;
+  }
 
   uint16_t _port = ether.hisport; // make a copy of the original port
   ether.hisport = port;
 
-  if (!ether.dnsLookup(server, true)) {
-    DEBUG_PRINT("Push Server not found: ");
+  ether.httpPostRam(path, server, NULL, postval, post_callback);
+
+  unsigned long start = millis();
+  post_completed = false;
+  while ((millis() - start < NOTIF_TIMEOUT * 1000) && (post_completed == false))
+    ether.packetLoop(ether.packetReceive());
+
+  if (!post_completed) {
+    DEBUG_PRINT("Notification Error: Time out sending message to ");
     DEBUG_PRINTLN(server);
-    ether.hisport = _port;
-    return;
   }
 
-  ether.httpPostVar(path, server, var, postval, httpget_callback);
-  //PJB TODO: Make this use a timeout rather than loop
-  for (int l = 0; l < 100; l++)  ether.packetLoop(ether.packetReceive());
   ether.hisport = _port;
 
 #else
@@ -687,39 +733,48 @@ void post_msg(const char * server, int port, const char * path, const char * var
 
   host = gethostbyname(server);
   if (!host) {
-    DEBUG_PRINT("Push Server not found: ");
+    DEBUG_PRINT("Notification Aborted: Could not locate ");
     DEBUG_PRINTLN(server);
     return;
   }
 
   // Reduce the default timeout window from 2 minutes to 3 seconds (same as read timeout)
   // Protects against locking up if the server/internet is not available
-  if (!client.connect((uint8_t*)host->h_addr, port, 3)) {
+  if (!client.connect((uint8_t*)host->h_addr, port, NOTIF_TIMEOUT)) {
     client.stop();
+    DEBUG_PRINT("Notification Aborted: Timeout connecting to ");
+    DEBUG_PRINTLN(server);
     return;
   }
 
   char postBuffer[1500];
-  sprintf(postBuffer,  "POST %s%s HTTP/1.0\r\n"
+  sprintf(postBuffer,  "POST %s HTTP/1.0\r\n"
                        "Host: %s\r\n"
                        "Accept: */*\r\n"
                        "Content-Length: %lu\r\n"
                        "Content-Type: application/json\r\n"
                        "\r\n%s",
-                       path, var, host->h_name, strlen(postval), postval);
+                       path, host->h_name, strlen(postval), postval);
 
   client.write((uint8_t *)postBuffer, strlen(postBuffer));
   bzero(ether_buffer, ETHER_BUFFER_SIZE);
 
-  time_t timeout = now() + 5; // 5 seconds timeout
-  while (now() < timeout) {
+  unsigned long start = millis();
+  while (millis() - start < NOTIF_TIMEOUT * 1000) {
     int len = client.read((uint8_t *)ether_buffer, ETHER_BUFFER_SIZE);
     if (len <= 0) {
       if (!client.connected())
         break;
       else
         continue;
+    } else {
+      check_return_code(ether_buffer);
     }
+  }
+
+  if (millis() - start >= NOTIF_TIMEOUT * 1000) {
+    DEBUG_PRINT("Notification Error: Time out sending message to ");
+    DEBUG_PRINTLN(server);
   }
 
   client.stop();
