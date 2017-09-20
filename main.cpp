@@ -492,7 +492,7 @@ void do_loop()
   }
 #endif  // Process Ethernet packets
 
-  // if 1 second has passed
+  // if 1 second has passed - could be longer if network delay
   if (curr_time != last_time) {
     last_time = curr_time;
     if (os.button_timeout) os.button_timeout--;
@@ -835,32 +835,48 @@ void do_loop()
 #endif
 
     // real-time flow count
-    static ulong flowcount_rt_start = 0;
     if (os.options[OPTION_SENSOR_TYPE]==SENSOR_TYPE_FLOW) {
-      if (curr_time % FLOWCOUNT_RT_WINDOW == 0) {
-        os.flowcount_rt = (flow_count > flowcount_rt_start) ? flow_count - flowcount_rt_start: 0;
-        flowcount_rt_start = flow_count;
+      static ulong last_flow_time = curr_time, last_flow_count = 0;
+      if (curr_time - last_flow_time >= FLOWCOUNT_RT_WINDOW) {
+        ulong mutex_flow_count = flow_count;
+        os.flowcount_rt = mutex_flow_count - last_flow_count;
+        float volume = os.flowcount_rt * ((os.options[OPTION_PULSE_RATE_1] << 8) + os.options[OPTION_PULSE_RATE_0]) / 100.0;
+        push_flow_update(volume, curr_time - last_flow_time);
+        last_flow_time = curr_time;
+        last_flow_count = mutex_flow_count;
       }
     }
 
     // perform ntp sync
-    if (curr_time % NTP_SYNC_INTERVAL == 0) os.status.req_ntpsync = 1;
-    perform_ntp_sync();
+    {
+      static ulong last_ntp_sync = curr_time;
+      if (curr_time - last_ntp_sync >= NTP_SYNC_INTERVAL) {
+        os.status.req_ntpsync = 1;
+        perform_ntp_sync();
+        last_ntp_sync = curr_time;
+      }
+    }
 
     // check network connection
-    if (curr_time && (curr_time % CHECK_NETWORK_INTERVAL==0))  os.status.req_network = 1;
-    check_network();
+    {
+      static ulong last_network_check = curr_time;
+      if (curr_time && (curr_time - last_network_check >= CHECK_NETWORK_INTERVAL)) {
+        os.status.req_network = 1;
+        check_network();
+        last_network_check = curr_time;
+      }
+    }
 
     // check weather
     check_weather();
 
     {
-      static ulong last_weather_call = curr_time;
-      if (os.checkwt_lasttime > last_weather_call) {
+      static ulong last_published_weather_call = 0;
+      if (os.checkwt_lasttime > last_published_weather_call) {
         bool success = (os.checkwt_success_lasttime >= os.checkwt_lasttime) ? true : false;
         push_weather_update(success);
         if (success) push_waterlevel_update(os.options[OPTION_WATER_PERCENTAGE]);
-        last_weather_call = os.checkwt_lasttime;
+        last_published_weather_call = os.checkwt_lasttime;
       }
       if(os.weather_update_flag) {
         // at the moment, we only send notification if water level or external IP changed
