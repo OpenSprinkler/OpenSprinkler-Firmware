@@ -84,14 +84,14 @@ OpenSprinkler os; // OpenSprinkler object
 ProgramData pd;   // ProgramdData object
 
 /* ====== Robert Hillman (RAH)'s implementation of flow sensor ======
- * flow_begin - time when valve turns on
- * flow_start - time when flow starts being measured (i.e. 2 mins after flow_begin approx
+ * flow_start - time when valve turns on
+ * flow_begin - time when flow starts being measured (i.e. 90 sec after flow_start approx
  * flow_stop - time when valve turns off (last rising edge pulse detected before off)
  * flow_gallons - total # of gallons+1 from flow_start to flow_stop
  * flow_last_gpm - last flow rate measured (averaged over flow_gallons) from last valve stopped (used to write to log file). */
 volatile ulong flow_begin, flow_start, flow_stop, flow_gallons;
 volatile ulong flow_count = 0;
-float flow_last_gpm=0;
+volatile float flow_last_gpm=0;
 /** Flow sensor interrupt service routine */
 #ifdef ESP8266
 ICACHE_RAM_ATTR void flow_isr() // for ESP8266, ISR must be marked ICACHE_RAM_ATTR
@@ -509,7 +509,8 @@ void do_loop()
     // ====== Distribute Flow Count amonst running stations and programs ======
     if (os.options[OPTION_SENSOR_TYPE] == SENSOR_TYPE_FLOW) {
       static ulong last_flow_count = 0;
-      if (flow_count > last_flow_count) {
+      ulong mutex_flow_count = flow_count;
+      if (mutex_flow_count > last_flow_count) {
         RuntimeQueueStruct * q = NULL;
         int nrunning = 0;
         for (q = pd.queue; q < pd.queue + pd.nqueue; q++) {
@@ -517,12 +518,12 @@ void do_loop()
         }
         for(q = pd.queue; q < pd.queue + pd.nqueue; q++) {
           if (q->running) {
-            q->volume += (float)(flow_count - last_flow_count) / nrunning;
-            q->pgm->volume += (float)(flow_count - last_flow_count) / nrunning;
+            q->volume += (float)(mutex_flow_count - last_flow_count) / nrunning;
+            q->pgm->volume += (float)(mutex_flow_count - last_flow_count) / nrunning;
           }
         }
       }
-      last_flow_count = flow_count;
+      last_flow_count = mutex_flow_count;
     }
 
     // ====== Check raindelay status ======
@@ -1222,7 +1223,8 @@ void write_log(byte type, ulong curr_time) {
   } else {
     ulong lvalue;
     if(type==LOGDATA_FLOWSENSE) {
-      lvalue = (flow_count>os.flowcount_log_start)?(flow_count-os.flowcount_log_start):0;
+      ulong mutex_flow_count = flow_count;
+      lvalue = (mutex_flow_count>os.flowcount_log_start)?(mutex_flow_count-os.flowcount_log_start):0;
     } else {
       lvalue = 0;
     }
