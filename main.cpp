@@ -502,6 +502,25 @@ void do_loop()
       os.lcd_print_time(os.now_tz());       // print time
 #endif
 
+    // ====== Distribute Flow Count amonst running stations and programs ======
+    if (os.options[OPTION_SENSOR_TYPE] == SENSOR_TYPE_FLOW) {
+      static ulong last_flow_count = 0;
+      if (flow_count > last_flow_count) {
+        RuntimeQueueStruct * q = NULL;
+        int nrunning = 0;
+        for (q = pd.queue; q < pd.queue + pd.nqueue; q++) {
+          if (q->running) nrunning++;
+        }
+        for(q = pd.queue; q < pd.queue + pd.nqueue; q++) {
+          if (q->running) {
+            q->volume += (float)(flow_count - last_flow_count) / nrunning;
+            q->pgm->volume += (float)(flow_count - last_flow_count) / nrunning;
+          }
+        }
+      }
+      last_flow_count = flow_count;
+    }
+
     // ====== Check raindelay status ======
     if (os.status.rain_delayed) {
       if (curr_time >= os.nvdata.rd_stop_time) {  // rain delay is over
