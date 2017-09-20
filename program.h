@@ -131,10 +131,26 @@ extern OpenSprinkler os;
 
 class RuntimeQueueStruct {
 public:
+  ulong timestamp;
   ulong    st;  // start time
   uint16_t dur; // water time
   byte  sid;
   byte  pid;
+  byte wl;      // water level
+  float volume;
+  bool running;
+  class RuntimePgmStruct * pgm;
+};
+
+class RuntimePgmStruct {
+public:
+  ulong timestamp;
+  byte pid;
+  ulong st;
+  ulong et;
+  float volume;
+  byte count;
+  bool running;
 };
 
 class ProgramData {
@@ -147,8 +163,12 @@ public:
   static ulong last_seq_stop_time;  // the last stop time of a sequential station
   
   static void reset_runtime();
-  static RuntimeQueueStruct* enqueue(); // this returns a pointer to the next available slot in the queue
-  static void dequeue(byte qid);  // this removes an element from the queue
+  static boolean queue_full();
+  static RuntimeQueueStruct* enqueue(RuntimeQueueStruct* q); // this returns a pointer to the next available slot in the queue
+  static void dequeue(RuntimeQueueStruct* q);  // this removes an element from the queue
+  static void schedule(RuntimeQueueStruct * q, ulong st); // Schedule the elemt and fix various queues
+  static void cancel(RuntimeQueueStruct * q); // Cancel the run by setting duration to zero
+  static void print_queue(); // Print out the queue and pgm_queue for debugging
 
   static void init();
   static void eraseall();
@@ -159,9 +179,12 @@ public:
   static byte del(byte pid);
   static void drem_to_relative(byte days[2]); // absolute to relative reminder conversion
   static void drem_to_absolute(byte days[2]);
-private:  
+private:
   static void load_count();
   static void save_count();
+  static RuntimePgmStruct pgm_queue[];
+  static byte pgm_nqueue;
+  static byte program_qid[];  // this array stores the queue element index for each scheduled program
 };
 
 #endif  // _PROGRAM_H

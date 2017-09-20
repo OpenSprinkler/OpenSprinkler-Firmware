@@ -33,33 +33,68 @@
 // Declare static data members
 byte ProgramData::nprograms = 0;
 byte ProgramData::nqueue = 0;
+byte ProgramData::pgm_nqueue = 0;
 RuntimeQueueStruct ProgramData::queue[RUNTIME_QUEUE_SIZE];
+RuntimePgmStruct ProgramData::pgm_queue[RUNTIME_QUEUE_SIZE];
 byte ProgramData::station_qid[MAX_NUM_STATIONS];
+byte ProgramData::program_qid[256]; // FIX ME Size should be MAX_PROGRAM + 2 (i.e. for Manual (99) and Run-Once (254)
 LogStruct ProgramData::lastrun;
 ulong ProgramData::last_seq_stop_time;
 
 void ProgramData::init() {
-	reset_runtime();
+       reset_runtime();
   load_count();
 }
 
 void ProgramData::reset_runtime() {
   memset(station_qid, 0xFF, MAX_NUM_STATIONS);  // reset station qid to 0xFF
+  memset(program_qid, 0xFF, sizeof(program_qid));  // reset program qid to 0xFF
   nqueue = 0;
+  pgm_nqueue = 0;
   last_seq_stop_time = 0;
+}
+
+/** Add a new element to the queue
+ */
+boolean ProgramData::queue_full(void) {
+  return (nqueue < RUNTIME_QUEUE_SIZE ? 0 : 1);
 }
 
 /** Insert a new element to the queue
  * This function returns pointer to the next available element in the queue
  * and returns NULL if the queue is full
  */
-RuntimeQueueStruct* ProgramData::enqueue() {
-  if (nqueue < RUNTIME_QUEUE_SIZE) {
-    nqueue ++;
-    return queue + (nqueue-1);
-  } else {
-    return NULL;
+RuntimeQueueStruct* ProgramData::enqueue(RuntimeQueueStruct* q) {
+  RuntimePgmStruct * pgm = pgm_queue;
+
+  if (nqueue >= RUNTIME_QUEUE_SIZE) return NULL;
+
+  // Keep a record of the number of stations associated with a program
+  for (pgm = pgm_queue; pgm < pgm_queue + pgm_nqueue; pgm++) {
+    if (pgm->pid == q->pid && pgm->timestamp == q->timestamp) {
+      pgm->count++;
+      break;
+    }
   }
+
+  // If this is a new program then create a record on the program queue
+  if (pgm == pgm_queue + pgm_nqueue) {
+    pgm->timestamp = q->timestamp;
+    pgm->pid = q->pid;
+    pgm->st = -1;
+    pgm->et = 0;
+    pgm->volume = 0;
+	pgm->running = false;
+    pgm->count = 1;
+	pgm_nqueue++;
+  }
+
+  // Store the station run on the scheduler queue
+  queue[nqueue] = *q;
+  queue[nqueue].pgm = pgm;
+  nqueue++;
+
+  return &(queue[nqueue - 1]);
 }
 
 /** Remove an element from the queue
@@ -68,27 +103,131 @@ RuntimeQueueStruct* ProgramData::enqueue() {
  * element, therefore removing the requested element.
  */
 // this removes an element from the queue
-void ProgramData::dequeue(byte qid) {
-  if (qid>=nqueue)  return;
-  if (qid<nqueue-1) {
-    queue[qid] = queue[nqueue-1]; // copy the last element to the dequeud element to fill the space
-    if(station_qid[queue[qid].sid] == nqueue-1) // fix queue index if necessary
-      station_qid[queue[qid].sid] = qid;
+void ProgramData::dequeue(RuntimeQueueStruct * q) {
+  RuntimePgmStruct * pgm = q->pgm;
+  byte sid = q->sid;
+  byte pid = q->pid;
+
+  if (q >= queue + nqueue)  return;
+
+  // Remove the entry from the queue and fix up station_qid to match
+  if (q < queue + nqueue - 1) {
+    *q = queue[nqueue - 1]; // copy the last element to the dequeued element to fill the space
+    if (station_qid[q->sid] == nqueue - 1) // fix queue index if necessary
+      station_qid[q->sid] = q - queue;
   }
   nqueue--;
 
-  RuntimeQueueStruct *q = queue;
-  DEBUG_PRINT("de:");
-  for(;q<queue+nqueue;q++) {
-    DEBUG_PRINT("[");
-    DEBUG_PRINT(q->sid);
-    DEBUG_PRINT(",");
-    DEBUG_PRINT(q->dur);
-    DEBUG_PRINT(",");
-    DEBUG_PRINT(q->st);
-    DEBUG_PRINT("]");
+  station_qid[sid] = 0xFF;
+
+  // Check if there is an earlier scheduled run for the sid in the queue
+  ulong first = -1;
+  for (q = queue; q < queue + nqueue; q++) {
+    if (q->sid == sid && q->st < first) {
+      station_qid[sid] = q - queue;
+      first = q->st;
+    }
   }
-  DEBUG_PRINTLN("");
+
+  // Decrement the remaining stations associated with a scheduled program 
+  pgm->count--;
+
+  if (pgm->count == 0) {
+    // Remove the program from the queue if all stations have been dequeued
+    if (pgm < pgm_queue + pgm_nqueue - 1) {
+      *pgm = pgm_queue[pgm_nqueue - 1];
+      if (program_qid[pgm->pid] == pgm_nqueue - 1)
+        program_qid[pgm->pid] = pgm - pgm_queue;
+    }
+    pgm_nqueue--;
+    program_qid[pid] = 0xFF;
+  } else if (pgm->et == q->st + q->dur) {
+    // Fix the end-time of the program
+    q->pgm->et = 0;
+    for (q = queue; q < queue + nqueue; q++) {
+      if (q->pgm == pgm && q->st + q->dur > pgm->et)
+        pgm->et = q->st + q->dur;
+    }
+  }
+
+  // Check if there is another scheduled run for the pid in the queue
+  if (program_qid[pid] == 0xFF) {
+    ulong first = -1;
+    for (pgm = pgm_queue; pgm < pgm_queue + pgm_nqueue; pgm++) {
+      if (pgm->pid == pid && pgm->st < first) {
+        program_qid[pid] = pgm - pgm_queue;
+        first = pgm->st;
+      }
+    }
+  }
+}
+
+// Set the start time of the queue item and update the associated program
+void ProgramData::schedule(RuntimeQueueStruct * q, ulong st) {
+  RuntimePgmStruct * pgm = q->pgm;
+
+  if (q >= queue + nqueue)  return;
+  q->st = st;
+
+  if (q->st < q->pgm->st) q->pgm->st = q->st;
+  if (q->st + q->dur > q->pgm->et) q->pgm->et = q->st + q->dur;
+
+  if (station_qid[q->sid] == 0xFF || q->st < queue[station_qid[q->sid]].st)
+    station_qid[q->sid] = q - queue;
+  if (program_qid[pgm->pid] == 0xFF || pgm->st < pgm_queue[program_qid[pgm->pid]].st)
+    program_qid[pgm->pid] = pgm - pgm_queue;
+}
+
+// Reset queue duration to force dequeue on next loop
+void ProgramData::cancel(RuntimeQueueStruct * q) {
+  RuntimePgmStruct * pgm = q->pgm;
+
+  if (q >= queue + nqueue) return;
+
+  q->dur = os.now_tz() - q->st;
+
+  // Fix the end-time of the program
+  pgm->et = 0;
+  for (q = queue; q < queue + nqueue; q++) {
+    if (q->pgm == pgm && q->st + q->dur > pgm->et)
+      pgm->et = q->st + q->dur;
+  }
+}
+
+void ProgramData::print_queue() {
+  RuntimeQueueStruct * q;
+  RuntimePgmStruct * p;
+
+  DEBUG_PRINT("Scheduler - Queue:");
+  for (q = queue; q < queue + nqueue; q++) {
+    DEBUG_PRINT("[sid:");
+    DEBUG_PRINT(q->sid);
+    DEBUG_PRINT(", pid:");
+    DEBUG_PRINT(q->pid);
+    DEBUG_PRINT(", pgm:");
+    DEBUG_PRINT(q->pgm - pgm_queue);
+    DEBUG_PRINT(", st:");
+    DEBUG_PRINT(q->st);
+    DEBUG_PRINT(", dur:");
+    DEBUG_PRINT(q->dur);
+    DEBUG_PRINT("],");
+  }
+  DEBUG_PRINT("Count:");
+  DEBUG_PRINTLN(nqueue);
+  DEBUG_PRINT("Scheduler - Pgm:  ");
+  for (p = pgm_queue; p < pgm_queue + pgm_nqueue; p++) {
+    DEBUG_PRINT("[pid:");
+    DEBUG_PRINT(p->pid);
+    DEBUG_PRINT(", st:");
+    DEBUG_PRINT(p->st);
+    DEBUG_PRINT(", et:");
+    DEBUG_PRINT(p->et);
+    DEBUG_PRINT(", count:");
+    DEBUG_PRINT(p->count);
+    DEBUG_PRINT("],");
+  }
+  DEBUG_PRINT("Count:");
+  DEBUG_PRINTLN(pgm_nqueue);
 }
 
 /** Load program count from NVM */

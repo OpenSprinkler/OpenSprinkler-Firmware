@@ -548,7 +548,6 @@ void do_loop()
     // ====== Schedule program data ======
     ulong curr_minute = curr_time / 60;
     boolean match_found = false;
-    RuntimeQueueStruct *q;
     // since the granularity of start time is minute
     // we only need to check once every minute
     if (curr_minute != last_minute) {
@@ -582,12 +581,17 @@ void do_loop()
               if (water_time) {
                 // check if water time is still valid
                 // because it may end up being zero after scaling
-                q = pd.enqueue();
-                if (q) {
-                  q->st = 0;
-                  q->dur = water_time;
-                  q->sid = sid;
-                  q->pid = pid+1;
+                if (!pd.queue_full()) {
+                  RuntimeQueueStruct q = { 0 };
+                  q.timestamp = curr_time;
+                  q.sid = sid;
+                  q.pid = pid+1;
+                  q.st = 0;
+                  q.dur = water_time;
+                  q.wl = prog.use_weather ? os.options[OPTION_WATER_PERCENTAGE] : 100;
+                  q.volume = 0;
+                  q.running = false;
+                  pd.enqueue(&q);
                   match_found = true;
                 } else {
                   // queue is full
@@ -602,19 +606,7 @@ void do_loop()
       // calculate start and end time
       if (match_found) {
         schedule_all_stations(curr_time);
-
-        // For debugging: print out queued elements
-        DEBUG_PRINT("en:");
-        for(q=pd.queue;q<pd.queue+pd.nqueue;q++) {
-          DEBUG_PRINT("[");
-          DEBUG_PRINT(q->sid);
-          DEBUG_PRINT(",");
-          DEBUG_PRINT(q->dur);
-          DEBUG_PRINT(",");
-          DEBUG_PRINT(q->st);
-          DEBUG_PRINT("]");
-        }
-        DEBUG_PRINTLN("");
+        pd.print_queue();
       }
     }//if_check_current_minute
 
@@ -622,19 +614,7 @@ void do_loop()
     // Check if a program is running currently
     // If so, do station run-time keeping
     if (os.status.program_busy){
-      // first, go through run time queue to assign queue elements to stations
-      q = pd.queue;
-      qid=0;
-      for(;q<pd.queue+pd.nqueue;q++,qid++) {
-        sid=q->sid;
-        byte sqi=pd.station_qid[sid];
-        // skip if station is already assigned a queue element
-        // and that queue element has an earlier start time
-        if(sqi<255 && pd.queue[sqi].st<q->st) continue;
-        // otherwise assign the queue element to station
-        pd.station_qid[sid]=qid;
-      }
-      // next, go through the stations and perform time keeping
+      // next, go through the stations and turn scheduled stations off
       for(bid=0;bid<os.nboards; bid++) {
         bitvalue = os.station_bits[bid];
         for(s=0;s<8;s++) {
@@ -645,14 +625,28 @@ void do_loop()
           if (os.status.mas2== sid+1) continue;
           if (pd.station_qid[sid]==255) continue;
 
-          q = pd.queue + pd.station_qid[sid];
+          RuntimeQueueStruct * q = pd.queue + pd.station_qid[sid];
           // check if this station is scheduled, either running or waiting to run
           if (q->st > 0) {
             // if so, check if we should turn it off
             if (curr_time >= q->st+q->dur) {
               turn_off_station(sid, curr_time);
             }
-          }
+          } // if current station is not running
+        }//end_s
+      }//end_bid
+      // next, go through the stations and turn scheduled stations on
+      for(bid=0;bid<os.nboards; bid++) {
+        bitvalue = os.station_bits[bid];
+        for(s=0;s<8;s++) {
+          byte sid = bid*8+s;
+
+          // skip master station
+          if (os.status.mas == sid+1) continue;
+          if (os.status.mas2== sid+1) continue;
+          if (pd.station_qid[sid]==255) continue;
+
+          RuntimeQueueStruct * q = pd.queue + pd.station_qid[sid];
           // if current station is not running, check if we should turn it on
           if(!((bitvalue>>s)&1)) {
             if (curr_time >= q->st && curr_time < q->st+q->dur) {
@@ -671,9 +665,9 @@ void do_loop()
       // finally, go through the queue again and clear up elements marked for removal
       int qi;
       for(qi=pd.nqueue-1;qi>=0;qi--) {
-        q=pd.queue+qi;
+        RuntimeQueueStruct * q=pd.queue+qi;
         if(!q->dur || curr_time>=q->st+q->dur)  {
-          pd.dequeue(qi);
+          pd.dequeue(q);
         }
       }
 
@@ -687,7 +681,7 @@ void do_loop()
       pd.last_seq_stop_time = 0;
       ulong sst;
       byte re=os.options[OPTION_REMOTE_EXT_MODE];
-      q = pd.queue;
+      RuntimeQueueStruct * q = pd.queue;
       for(;q<pd.queue+pd.nqueue;q++) {
         sid = q->sid;
         bid = sid>>3;
@@ -738,7 +732,7 @@ void do_loop()
         s = sid&0x07;
         // if this station is running and is set to activate master
         if ((os.station_bits[bid]&(1<<s)) && (tmp_buffer[bid]&(1<<s))) {
-          q=pd.queue+pd.station_qid[sid];
+          RuntimeQueueStruct * q=pd.queue+pd.station_qid[sid];
           // check if timing is within the acceptable range
           if (curr_time >= q->st + mas_on_adj &&
               curr_time <= q->st + q->dur + mas_off_adj) {
@@ -762,7 +756,7 @@ void do_loop()
         s = sid&0x07;
         // if this station is running and is set to activate master
         if ((os.station_bits[bid]&(1<<s)) && (tmp_buffer[bid]&(1<<s))) {
-          q=pd.queue+pd.station_qid[sid];
+          RuntimeQueueStruct * q=pd.queue+pd.station_qid[sid];
           // check if timing is within the acceptable range
           if (curr_time >= q->st + mas_on_adj_2 &&
               curr_time <= q->st + q->dur + mas_off_adj_2) {
@@ -900,6 +894,8 @@ void turn_off_station(byte sid, ulong curr_time) {
       pd.lastrun.duration = curr_time - q->st;
       pd.lastrun.endtime = curr_time;
 
+      pd.cancel(q);
+
       // log station run
       write_log(LOGDATA_STATION, curr_time);
       push_message(IFTTT_STATION_RUN, sid, pd.lastrun.duration);
@@ -907,8 +903,7 @@ void turn_off_station(byte sid, ulong curr_time) {
   }
 
   // dequeue the element
-  pd.dequeue(qid);
-  pd.station_qid[sid] = 0xFF;
+  pd.dequeue(q);
 }
 
 /** Process dynamic events
@@ -976,12 +971,12 @@ void schedule_all_stations(ulong curr_time) {
     // use sequential scheduling. station delay time apples
     if (os.station_attrib_bits_read(ADDR_NVM_STNSEQ+bid)&(1<<s) && !re) {
       // sequential scheduling
-      q->st = seq_start_time;
+      pd.schedule(q, seq_start_time);
       seq_start_time += q->dur;
       seq_start_time += station_delay; // add station delay time
     } else {
       // otherwise, concurrent scheduling
-      q->st = con_start_time;
+      pd.schedule(q, con_start_time);
       // stagger concurrent stations by 1 second
       con_start_time++;
     }
@@ -1023,7 +1018,7 @@ void reset_all_stations() {
   RuntimeQueueStruct *q = pd.queue;
   // go through runtime queue and assign water time to 0
   for(;q<pd.queue+pd.nqueue;q++) {
-    q->dur = 0;
+    pd.cancel(q);
   }
 }
 
@@ -1038,11 +1033,9 @@ void manual_start_program(byte pid, byte uwt) {
   reset_all_stations_immediate();
   ProgramStruct prog;
   ulong dur;
-  byte sid, bid, s;
-  if ((pid>0)&&(pid<255)) {
-    pd.read(pid-1, &prog);
-    push_message(IFTTT_PROGRAM_SCHED, pid-1, uwt?os.options[OPTION_WATER_PERCENTAGE]:100, "");
-  }
+  byte sid, bid, s, p;
+  ulong timestamp = os.now_tz();
+
   for(sid=0;sid<os.nstations;sid++) {
     bid=sid>>3;
     s=sid&0x07;
@@ -1057,12 +1050,17 @@ void manual_start_program(byte pid, byte uwt) {
       dur = dur * os.options[OPTION_WATER_PERCENTAGE] / 100;
     }
     if(dur>0 && !(os.station_attrib_bits_read(ADDR_NVM_STNDISABLE+bid)&(1<<s))) {
-      RuntimeQueueStruct *q = pd.enqueue();
-      if (q) {
-        q->st = 0;
-        q->dur = dur;
-        q->sid = sid;
-        q->pid = 254;
+      if (!pd.queue_full()) {
+        RuntimeQueueStruct q = { 0 };
+        q.timestamp = timestamp;
+        q.sid = sid;
+        q.pid = 254;
+        q.st = 0;
+        q.dur = dur;
+        q.wl = (uwt) ? os.options[OPTION_WATER_PERCENTAGE] : 100;
+        q.volume = 0;
+        q.running = false;
+        pd.enqueue(&q);
         match_found = true;
       }
     }
