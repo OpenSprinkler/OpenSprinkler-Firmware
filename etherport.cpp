@@ -30,6 +30,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <fcntl.h> 
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/ioctl.h>
@@ -144,6 +145,44 @@ int EthernetClient::connect(uint8_t ip[4], uint16_t port)
     DEBUG_PRINTLN("error connecting to server");
     return 0;
 	}
+	m_connected = true;
+	return 1;
+}
+
+int EthernetClient::connect(uint8_t ip[4], uint16_t port, uint16_t timeout)
+{
+	struct sockaddr_in sin = { 0 };
+	struct timeval tv;
+	fd_set fdset;
+	int flags;
+
+	if (m_sock)
+		return 0;
+
+	sin.sin_family = AF_INET;
+	sin.sin_port = htons(port);
+	sin.sin_addr.s_addr = *(uint32_t*)(ip);
+
+	// Open the socket and initiate connection in non-blocking mode
+	m_sock = socket(AF_INET, SOCK_STREAM, 0);
+	flags = fcntl(m_sock, F_GETFL, 0);
+	fcntl(m_sock, F_SETFL, flags | O_NONBLOCK);
+	::connect(m_sock, (struct sockaddr *) &sin, sizeof(sin));
+
+	// Put socket back into Blocking mode to retain compatibility with read/write code
+	fcntl(m_sock, F_SETFL, flags & (~O_NONBLOCK));
+
+	FD_ZERO(&fdset);
+	FD_SET(m_sock, &fdset);
+	tv.tv_sec = timeout;
+	tv.tv_usec = 0;
+
+	// Use Select() to determine if connection within timeout period
+	if (select(m_sock + 1, NULL, &fdset, NULL, &tv) <= 0)
+	{
+		return 0;
+	}
+
 	m_connected = true;
 	return 1;
 }

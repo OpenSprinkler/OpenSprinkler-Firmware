@@ -836,6 +836,7 @@ void server_change_runonce() {
   byte sid, bid, s;
   uint16_t dur;
   boolean match_found = false;
+  ulong timestamp = os.now_tz();
   for(sid=0;sid<os.nstations;sid++) {
     dur=parse_listdata(&pv);
     bid=sid>>3;
@@ -843,12 +844,17 @@ void server_change_runonce() {
     // if non-zero duration is given
     // and if the station has not been disabled
     if (dur>0 && !(os.station_attrib_bits_read(ADDR_NVM_STNDISABLE+bid)&(1<<s))) {
-      RuntimeQueueStruct *q = pd.enqueue();
-      if (q) {
-        q->st = 0;
-        q->dur = water_time_resolve(dur);
-        q->pid = 254;
-        q->sid = sid;
+      if (!pd.queue_full()) {
+        RuntimeQueueStruct q = { 0 };
+        q.timestamp = timestamp;
+        q.sid = sid;
+        q.pid = 254;
+        q.st = 0;
+        q.dur = water_time_resolve(dur);
+		q.wl = 100;
+        q.volume = 0;
+        q.running = false;
+        pd.enqueue(&q);
         match_found = true;
       }
     }
@@ -1213,6 +1219,18 @@ void server_json_controller_main() {
   if(read_from_file(ifkey_filename, tmp_buffer)) {
     bfill.emit_p(PSTR(",\"ifkey\":\"$S\""), tmp_buffer);
   }
+  if(read_from_file(ifttt_filename, tmp_buffer)) {
+    bfill.emit_p(PSTR(",\"ifttt\":{$S}"), tmp_buffer);
+  }
+  if (read_from_file(webhook_filename, tmp_buffer)) {
+	  bfill.emit_p(PSTR(",\"webhook\":{$S}"), tmp_buffer);
+  }
+  if (read_from_file(influx_filename, tmp_buffer)) {
+	  bfill.emit_p(PSTR(",\"influx\":{$S}"), tmp_buffer);
+  }
+  if (read_from_file(site_filename, tmp_buffer)) {
+	  bfill.emit_p(PSTR(",\"site\":\"$S\""), tmp_buffer);
+  }
 #endif
 
 #ifdef ESP8266
@@ -1472,7 +1490,43 @@ void server_change_options()
   } else if (keyfound) {
     tmp_buffer[0]=0;
     write_to_file(ifkey_filename, tmp_buffer, strlen(tmp_buffer));
-  }  
+  }
+  keyfound = 0;
+  if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("ifttt"), true, &keyfound)) {
+    urlDecode(tmp_buffer);
+    tmp_buffer[TMP_BUFFER_SIZE-1]=0;
+    write_to_file(ifttt_filename, tmp_buffer, strlen(tmp_buffer));
+  } else if (keyfound) {
+    tmp_buffer[0]=0;
+    write_to_file(ifttt_filename, tmp_buffer, strlen(tmp_buffer));
+  }
+  keyfound = 0;
+  if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("influx"), true, &keyfound)) {
+    urlDecode(tmp_buffer);
+    tmp_buffer[TMP_BUFFER_SIZE-1]=0;
+    write_to_file(influx_filename, tmp_buffer, strlen(tmp_buffer));
+  } else if (keyfound) {
+    tmp_buffer[0]=0;
+    write_to_file(influx_filename, tmp_buffer, strlen(tmp_buffer));
+  }
+  keyfound = 0;
+  if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("webhook"), true, &keyfound)) {
+    urlDecode(tmp_buffer);
+    tmp_buffer[TMP_BUFFER_SIZE-1]=0;
+    write_to_file(webhook_filename, tmp_buffer, strlen(tmp_buffer));
+  } else if (keyfound) {
+    tmp_buffer[0]=0;
+    write_to_file(webhook_filename, tmp_buffer, strlen(tmp_buffer));
+  }
+  keyfound = 0;
+  if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("site"), true, &keyfound)) {
+    urlDecode(tmp_buffer);
+    tmp_buffer[TMP_BUFFER_SIZE-1]=0;
+    write_to_file(site_filename, tmp_buffer, strlen(tmp_buffer));
+  } else if (keyfound) {
+    tmp_buffer[0]=0;
+    write_to_file(site_filename, tmp_buffer, strlen(tmp_buffer));
+  }
   // if not using NTP and manually setting time
   if (!os.options[OPTION_USE_NTP] && findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("ttt"), true)) {
     unsigned long t;
@@ -1615,21 +1669,27 @@ void server_change_manual() {
       if ((os.status.mas==sid+1) || (os.status.mas2==sid+1))
         handle_return(HTML_NOT_PERMITTED);
 
-      RuntimeQueueStruct *q = NULL;
       byte sqi = pd.station_qid[sid];
       // check if the station already has a schedule
       if (sqi!=0xFF) {  // if we, we will overwrite the schedule
-        q = pd.queue+sqi;
-      } else {  // otherwise create a new queue element
-        q = pd.enqueue();
+        // Reset the end time to stop current station during the next scheduling loop
+        // Ensures any push notifications are sent correctly
+        turn_off_station(sid, curr_time);
       }
       // if the queue is not full
-      if (q) {
-        q->st = 0;
-        q->dur = timer;
-        q->sid = sid;
-        q->pid = 99;  // testing stations are assigned program index 99
+      if (!pd.queue_full()) {
+        RuntimeQueueStruct q = { 0 };
+        q.timestamp = curr_time;
+        q.sid = sid;
+        q.pid = 99;  // testing stations are assigned program index 99
+        q.st = 0;
+        q.dur = timer;
+        q.wl = 100;
+        q.volume = 0;
+        q.running = false;
+        pd.enqueue(&q);
         schedule_all_stations(curr_time);
+        pd.print_queue();
       } else {
         handle_return(HTML_NOT_PERMITTED);
       }

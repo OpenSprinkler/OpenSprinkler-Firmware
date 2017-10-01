@@ -23,6 +23,10 @@
  
 #include <OpenSprinkler.h>
 
+// Library headers to support IDE build process
+#include <Wire.h>
+#include <SDFat.h>
+
 extern OpenSprinkler os;
 
 void do_setup();

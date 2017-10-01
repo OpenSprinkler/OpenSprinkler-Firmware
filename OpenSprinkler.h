@@ -107,6 +107,10 @@ struct ConStatus {
 extern const char wtopts_filename[];
 extern const char stns_filename[];
 extern const char ifkey_filename[];
+extern const char ifttt_filename[];
+extern const char influx_filename[];
+extern const char webhook_filename[];
+extern const char site_filename[];
 extern const char op_max[];
 extern const char op_json_names[];
 #ifdef ESP8266

@@ -35,7 +35,7 @@
                             // if this number is different from the one stored in non-volatile memory
                             // a device reset will be automatically triggered
 
-#define OS_FW_MINOR      1  // Firmware minor version
+#define OS_FW_MINOR      2  // Firmware minor version
 
 /** Hardware version base numbers */
 #define OS_HW_VERSION_BASE   0x00
@@ -53,7 +53,10 @@
 #define STATION_ATTR_FILENAME "stns.dat"      // station attributes data file
 #define WIFI_FILENAME         "wifi.dat"      // wifi credentials file
 #define IFTTT_KEY_FILENAME    "ifkey.txt"
-#define IFTTT_KEY_MAXSIZE     128
+#define IFTTT_FILENAME       "ifttt.txt"   // Store IFTTT endpoint event names
+#define WEBHOOK_FILENAME     "webhook.txt" // Webhook requires server and port number
+#define INFLUX_FILENAME      "influx.txt"  // Influx requires server, port and database name
+#define SITE_FILENAME        "site.txt"    // Unique name of unit to send with notifications
 #define STATION_SPECIAL_DATA_SIZE  (TMP_BUFFER_SIZE - 8)
 
 #define FLOWCOUNT_RT_WINDOW   30    // flow count window (for computing real-time flow rate), 30 seconds
@@ -65,13 +68,6 @@
 #define STN_TYPE_GPIO        0x03	// Support for raw connection of station to GPIO pin
 #define STN_TYPE_HTTP        0x04	// Support for HTTP Get connection
 #define STN_TYPE_OTHER       0xFF
-
-#define IFTTT_PROGRAM_SCHED   0x01
-#define IFTTT_RAINSENSOR      0x02
-#define IFTTT_FLOWSENSOR      0x04
-#define IFTTT_WEATHER_UPDATE  0x08
-#define IFTTT_REBOOT          0x10
-#define IFTTT_STATION_RUN     0x20
 
 /** Sensor type macro defines */
 #define SENSOR_TYPE_NONE    0x00

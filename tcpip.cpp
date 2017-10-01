@@ -564,6 +564,38 @@ static uint16_t www_client_internal_datafill_cb_ramhost(uint8_t fd) {
     return bfill.position();
 }
 
+static uint16_t www_client_internal_datafill_cb_ramparams(uint8_t fd) {
+    BufferFiller bfill = EtherCard::tcpOffset();
+    if (fd==www_fd) {
+        if (client_postval == 0) {
+            bfill.emit_p(PSTR("GET $S$S HTTP/1.0\r\n"
+                              "Host: $S\r\n"
+                              "$S\r\n"
+                              "\r\n"), client_urlbuf,
+                         client_urlbuf_var,
+                         client_hoststr, client_additionalheaderline);
+        } else {
+            const char* ahl = client_additionalheaderline;
+            const char* var = client_urlbuf_var;            
+            bfill.emit_p(PSTR("POST $S$S HTTP/1.0\r\n"
+                              "Host: $S\r\n"
+                              "$S$S"
+                              "Accept: */*\r\n"
+                              "Content-Length: $D\r\n"
+                              "Content-Type: application/json\r\n"
+                              "\r\n"
+                              "$S"), client_urlbuf,
+                         var ? var : "",            
+                         client_hoststr,
+                         ahl != 0 ? ahl : PSTR(""),
+                         ahl != 0 ? "\r\n" : "",
+                         strlen(client_postval),
+                         client_postval);
+        }
+    }
+    return bfill.position();
+}
+
 static uint8_t www_client_internal_result_cb(uint8_t fd, uint8_t statuscode, uint16_t datapos, uint16_t len_of_data) {
     if (fd!=www_fd)
         (*client_browser_cb)(4,0,0);
@@ -610,6 +642,16 @@ void EtherCard::httpPost (const char *urlbuf, const char *hoststr, const char *a
     client_postval = postval;
     client_browser_cb = callback;
     www_fd = clientTcpReq(&www_client_internal_result_cb,&www_client_internal_datafill_cb,hisport);
+}
+
+void EtherCard::httpPostRam (const char *urlbuf, const char *hoststr, const char *additionalheaderline, const char *postval, void (*callback)(uint8_t,uint16_t,uint16_t)) {
+    client_urlbuf = urlbuf;
+    client_urlbuf_var = 0;    
+    client_hoststr = hoststr;
+    client_additionalheaderline = additionalheaderline;
+    client_postval = postval;
+    client_browser_cb = callback;
+    www_fd = clientTcpReq(&www_client_internal_result_cb,&www_client_internal_datafill_cb_ramparams,hisport);
 }
 
 void EtherCard::httpPostVar (const char *urlbuf, const char *hoststr, const char *urlbuf_varpart, const char *postval, void (*callback)(uint8_t,uint16_t,uint16_t)) {

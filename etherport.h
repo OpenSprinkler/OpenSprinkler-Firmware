@@ -46,6 +46,7 @@ public:
 	EthernetClient(int sock);
 	~EthernetClient();
 	int connect(uint8_t ip[4], uint16_t port);
+	int connect(uint8_t ip[4], uint16_t port, uint16_t timeout);
 	bool connected();
 	void stop();
 	int read(uint8_t *buf, size_t size);

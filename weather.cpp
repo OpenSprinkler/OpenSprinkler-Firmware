@@ -44,6 +44,7 @@ extern OpenSprinkler os; // OpenSprinkler object
 extern char tmp_buffer[];
 byte findKeyVal (const char *str,char *strbuf, uint8_t maxlen,const char *key,bool key_in_pgm=false,uint8_t *keyfound=NULL);
 void write_log(byte type, ulong curr_time);
+static bool get_completed = false;
 
 // The weather function calls getweather.py on remote server to retrieve weather data
 // the default script is WEATHER_SCRIPT_HOST/weather?.py
@@ -52,6 +53,8 @@ void write_log(byte type, ulong curr_time);
 static void getweather_callback(byte status, uint16_t off, uint16_t len) {
 #if defined(ARDUINO) && !defined(ESP8266)
   char *p = (char*)Ethernet::buffer + off;
+  get_completed = true;
+  DEBUG_PRINTLN(p);
 #else
   char *p = ether_buffer;
 #endif
@@ -222,6 +225,16 @@ void GetWeather() {
   uint16_t _port = ether.hisport; // save current port number
   ether.hisport = 80;
   ether.browseUrl(PSTR("/weather"), dst, PSTR("*"), getweather_callback);
+  DEBUG_PRINTLN(dst);
+
+  unsigned long start = millis();
+  get_completed = false;
+  while ((millis() - start < 5000) && (get_completed == false))
+    ether.packetLoop(ether.packetReceive());
+
+  if (!get_completed)
+    DEBUG_PRINTLN("Weather call timed out.");
+
   ether.hisport = _port;
 #endif
 }
@@ -315,6 +328,7 @@ void GetWeather() {
         continue;
     }
     peel_http_header();
+    DEBUG_PRINTLN(ether_buffer);
     getweather_callback(0, 0, ETHER_BUFFER_SIZE);
     break;
   }
