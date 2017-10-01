@@ -426,12 +426,13 @@ int format_value_msg(char * buff, ulong timestamp, notification_t type, push_msg
 }
 
 int format_text_msg(char * buff, ulong timestamp, notification_t type, push_msg_t * m) {
-  char unit[NAME_SIZE + 1] = { 0 };
+  char site[NAME_SIZE + 1] = { 0 };
   char * offset = buff;
 
-  read_from_file(name_filename, unit, sizeof(unit), 0);
-  if (strlen(unit) != 0)
-    offset = buff + sprintf_P(buff, PSTR("\"%s: "), unit);
+  offset += sprintf_P(buff, PSTR("\""));
+  read_from_file(site_filename, site, sizeof(site), 0);
+  if (strlen(site) != 0)
+    offset += sprintf_P(offset, PSTR("%s: "), site);
 
   switch(type) {
 
@@ -514,10 +515,11 @@ int format_text_msg(char * buff, ulong timestamp, notification_t type, push_msg_
 }
 
 int format_json_msg(char * buff, ulong timestamp, notification_t type, push_msg_t * m) {
-  char unit_name[NAME_SIZE+1] = { 0 };
+  char site[NAME_SIZE+1] = { 0 };
   char * offset = NULL;
 
-  read_from_file(name_filename, unit_name, sizeof(unit_name), 0);
+  read_from_file(site_filename, site, sizeof(site), 0);
+  if (site[0] == NULL) strcpy_P(site, PSTR("Site"));
   offset = buff + sprintf_P(buff, PSTR("{\"timestamp\":%lu,"), timestamp);
 
   switch(type) {
@@ -526,49 +528,49 @@ int format_json_msg(char * buff, ulong timestamp, notification_t type, push_msg_
     case NOTIF_PROGRAM_START:
     case NOTIF_STATION_SCHEDULE:
     case NOTIF_STATION_OPEN:
-      sprintf_P(offset, PSTR("\"type\":\"%s\",\"data\":{\"unit\":\"%s\",\"id\":%d,\"name\":\"%s\",\"start\":%lu,\"end\":%lu,\"duration\":%lu,\"water_level\":%d"),
+      sprintf_P(offset, PSTR("\"type\":\"%s\",\"data\":{\"site\":\"%s\",\"id\":%d,\"name\":\"%s\",\"start\":%lu,\"end\":%lu,\"duration\":%lu,\"water_level\":%d"),
         (type == NOTIF_PROGRAM_SCHEDULE) ? "program_schedule" : (type == NOTIF_PROGRAM_START) ? "program_start" : (type == NOTIF_STATION_SCHEDULE) ? "station_schedule" : "station_open",
-        unit_name, m->id, m->name, m->start, m->end, m->duration, m->water_level);
+        site, m->id, m->name, m->start, m->end, m->duration, m->water_level);
     break;
 
     case NOTIF_PROGRAM_STOP:
     case NOTIF_STATION_CLOSE:
-      sprintf_P(offset, PSTR("\"type\":\"%s\",\"data\":{\"unit\":\"%s\",\"id\":%d,\"name\":\"%s\",\"start\":%lu,\"end\":%lu,\"duration\":%lu,\"water_level\":%d,\"volume\":%d.%02d,\"flow\":%d.%02d"),
-        (type == NOTIF_PROGRAM_STOP) ? "program_stop" : "station_close", unit_name, m->id, m->name, m->start, m->end, m->duration, m->water_level,(int)m->volume, ((int)(m->volume * 100) % 100), (int)m->flow, ((int)(m->flow * 100) % 100));
+      sprintf_P(offset, PSTR("\"type\":\"%s\",\"data\":{\"site\":\"%s\",\"id\":%d,\"name\":\"%s\",\"start\":%lu,\"end\":%lu,\"duration\":%lu,\"water_level\":%d,\"volume\":%d.%02d,\"flow\":%d.%02d"),
+        (type == NOTIF_PROGRAM_STOP) ? "program_stop" : "station_close", site, m->id, m->name, m->start, m->end, m->duration, m->water_level,(int)m->volume, ((int)(m->volume * 100) % 100), (int)m->flow, ((int)(m->flow * 100) % 100));
     break;
 
     case NOTIF_RAINSENSOR_ON:
-      sprintf_P(offset, PSTR("\"type\":\"rain_sensor\",\"data\":{\"unit\":\"%s\",\"start\":%lu,\"status\":1"), unit_name, m->start);
+      sprintf_P(offset, PSTR("\"type\":\"rain_sensor\",\"data\":{\"site\":\"%s\",\"start\":%lu,\"status\":1"), site, m->start);
     break;
 
     case NOTIF_RAINSENSOR_OFF:
     case NOTIF_RAINDELAY_START:
     case NOTIF_RAINDELAY_STOP:
-      sprintf_P(offset, PSTR("\"type\":\"%s\",\"data\":{\"unit\":\"%s\",\"start\":%lu,\"end\":%lu,\"duration\":%lu,\"status\":%d"),
-        (type == NOTIF_RAINSENSOR_OFF) ? "rain_sensor" : "rain_delay", unit_name, m->start, m->end , m->duration, (type == NOTIF_RAINSENSOR_OFF) ? 0 : 1);
+      sprintf_P(offset, PSTR("\"type\":\"%s\",\"data\":{\"site\":\"%s\",\"start\":%lu,\"end\":%lu,\"duration\":%lu,\"status\":%d"),
+        (type == NOTIF_RAINSENSOR_OFF) ? "rain_sensor" : "rain_delay", site, m->start, m->end , m->duration, (type == NOTIF_RAINDELAY_START) ? 1 : 0);
     break;
 
     case NOTIF_FLOW_UPDATE:
-      sprintf_P(offset, PSTR("\"type\":\"flow\",\"data\":{\"unit\":\"%s\",\"start\":%lu,\"end\":%lu,\"duration\":%lu,\"volume\":%d.%02d,\"flow\":%d.%02d"),
-        unit_name, m->start, m->end , m->duration, (int)m->volume, ((int)(m->volume * 100) % 100), (int)m->flow, ((int)(m->flow * 100) % 100));
+      sprintf_P(offset, PSTR("\"type\":\"flow\",\"data\":{\"site\":\"%s\",\"start\":%lu,\"end\":%lu,\"duration\":%lu,\"volume\":%d.%02d,\"flow\":%d.%02d"),
+        site, m->start, m->end , m->duration, (int)m->volume, ((int)(m->volume * 100) % 100), (int)m->flow, ((int)(m->flow * 100) % 100));
     break;
 
     case NOTIF_WEATHERCALL_FAIL:
     case NOTIF_WEATHERCALL_SUCCESS:
-      sprintf_P(offset, PSTR("\"type\":\"weather_call\",\"data\":{\"unit\":\"%s\",\"start\":%lu,\"status\":%d"), unit_name, m->start, (type == NOTIF_WEATHERCALL_FAIL) ? 0 : 1);
+      sprintf_P(offset, PSTR("\"type\":\"weather_call\",\"data\":{\"site\":\"%s\",\"start\":%lu,\"status\":%d"), site, m->start, (type == NOTIF_WEATHERCALL_FAIL) ? 0 : 1);
     break;
 
     case NOTIF_WATERLEVEL_UPDATE:
-      sprintf_P(offset, PSTR("\"type\":\"water_level\",\"data\":{\"unit\":\"%s\",\"start\":%lu,\"level\":%d"), unit_name, m->start, m->water_level);
+      sprintf_P(offset, PSTR("\"type\":\"water_level\",\"data\":{\"site\":\"%s\",\"start\":%lu,\"level\":%d"), site, m->start, m->water_level);
     break;
 
     case NOTIF_IP_UPDATE:
-      sprintf_P(offset, PSTR("\"type\":\"ip_update\",\"data\":{\"unit\":\"%s\",\"start\":%lu,\"ip\":\"%d.%d.%d.%d\""),
-        unit_name, m->start, (byte)(m->ip >> 24) & 0xFF, (byte)(m->ip >> 16) & 0xFF, (byte)(m->ip >> 8) & 0xFF, (byte)m->ip & 0xFF);
+      sprintf_P(offset, PSTR("\"type\":\"ip_update\",\"data\":{\"site\":\"%s\",\"start\":%lu,\"ip\":\"%d.%d.%d.%d\""),
+        site, m->start, (byte)(m->ip >> 24) & 0xFF, (byte)(m->ip >> 16) & 0xFF, (byte)(m->ip >> 8) & 0xFF, (byte)m->ip & 0xFF);
     break;
 
     case NOTIF_REBOOT_COMPLETE:
-      sprintf_P(offset, PSTR("\"type\":\"reboot\",\"data\":{\"unit\":\"%s\",\"start\":%lu"), unit_name, m->start);
+      sprintf_P(offset, PSTR("\"type\":\"reboot\",\"data\":{\"site\":\"%s\",\"start\":%lu"), site, m->start);
     break;
 
     default:
@@ -580,15 +582,16 @@ int format_json_msg(char * buff, ulong timestamp, notification_t type, push_msg_
 }
 
 int format_influx_msg(char * buff, ulong timestamp, notification_t type, push_msg_t * m) {
-  char unit_tag[NAME_SIZE+1] = { 0 };    // InfluxDB Tag - Name of the device
-  char name_tag[NAME_SIZE+1] = { 0 };    // InfluxDB Tag - Name of the program or station
+  char site[NAME_SIZE+1] = { 0 };    // InfluxDB Tag - Name of the device site
+  char name[NAME_SIZE + 1] = { 0 };    // InfluxDB Tag - Name of the program or station
 
-  read_from_file(name_filename, unit_tag, sizeof(unit_tag), 0);
-  strcpy(name_tag, (m->name) ? m->name : "Unknown");
+  read_from_file(site_filename, site, sizeof(site), 0);
+  if (*site == NULL) strcpy_P(site, PSTR("Site"));
+  strcpy(name, m->name);
 
   // InfluxDB doesn't like spaces in tag names
-  strip_spaces(unit_tag);
-  strip_spaces(name_tag);
+  strip_spaces(site);
+  strip_spaces(name);
 
   switch (type) {
 
@@ -596,65 +599,57 @@ int format_influx_msg(char * buff, ulong timestamp, notification_t type, push_ms
     case NOTIF_PROGRAM_START:
     case NOTIF_STATION_SCHEDULE:
     case NOTIF_STATION_OPEN:
-      sprintf_P(buff, PSTR("%s,unit_tag=%s,name_tag=%s status=%d,id=%d,name=\"%s\",start=%lu000,end=%lu000,duration=%lu,water_level=%d"),
-        (type == NOTIF_PROGRAM_SCHEDULE || type == NOTIF_PROGRAM_START) ? "program" : "station", unit_tag, name_tag,
+      sprintf_P(buff, PSTR("%s,site_tag=%s,name_tag=%s,id_tag=%d status=%d,id=%d,name=\"%s\",start=%lu000,end=%lu000,duration=%lu,water_level=%d"),
+        (type == NOTIF_PROGRAM_SCHEDULE || type == NOTIF_PROGRAM_START) ? "program" : "station", site, name, m->id,
         (type == NOTIF_PROGRAM_SCHEDULE || type == NOTIF_STATION_SCHEDULE) ? 1 : 2, m->id,
         m->name, m->start, m->end, m->duration, m->water_level);
-    break;
+      break;
 
     case NOTIF_PROGRAM_STOP:
     case NOTIF_STATION_CLOSE:
-      sprintf_P(buff, PSTR("%s,unit_tag=%s,name_tag=%s status=0,id=%d,name=\"%s\",start=%lu000,end=%lu000,duration=%lu,water_level=%d,volume=%d.%02d,flow=%d.%02d"),
-        (type == NOTIF_PROGRAM_STOP) ? "program" : "station", unit_tag, name_tag, m->id, m->name, m->start, m->end, m->duration,
+      sprintf_P(buff, PSTR("%s,site_tag=%s,name_tag=%s,id_tag=%d status=0,id=%d,name=\"%s\",start=%lu000,end=%lu000,duration=%lu,water_level=%d,volume=%d.%02d,flow=%d.%02d"),
+        (type == NOTIF_PROGRAM_STOP) ? "program" : "station", site, name, m->id, m->id, m->name, m->start, m->end, m->duration,
         m->water_level, (int)m->volume, ((int)(m->volume * 100) % 100), (int)m->flow, ((int)(m->flow * 100) % 100));
     break;
 
     case NOTIF_RAINSENSOR_ON:
-    sprintf_P(buff, PSTR("rain_sensor,unit_tag=%s start=%lu000,status=1"), unit_tag, m->start);
+      sprintf_P(buff, PSTR("rain_sensor,site_tag=%s start=%lu000,status=1"), site, m->start);
     break;
 
     case NOTIF_RAINSENSOR_OFF:
     case NOTIF_RAINDELAY_START:
     case NOTIF_RAINDELAY_STOP:
-      sprintf_P(buff, PSTR("%s,unit_tag=%s start=%lu000,end=%lu000,duration=%lu,status=%d"),
+      sprintf_P(buff, PSTR("%s,site_tag=%s start=%lu000,end=%lu000,duration=%lu,status=%d"),
         (type == NOTIF_RAINSENSOR_OFF) ? "rain_sensor" : "rain_delay",
-        unit_tag, m->start, m->end, m->duration, (type == NOTIF_RAINSENSOR_OFF) ? 0 : 1);
+        site, m->start, m->end, m->duration, (type == NOTIF_RAINDELAY_START) ? 1 : 0);
     break;
 
     case NOTIF_FLOW_UPDATE:
-      sprintf_P(buff, PSTR("flow,unit_tag=%s start=%lu000,end=%lu000,duration=%lu,volume=%d.%02d,flow=%d.%02d"),
-        unit_tag, m->start, m->end , m->duration, (int)m->volume, ((int)(m->volume * 100) % 100), (int)m->flow, ((int)(m->flow * 100) % 100));
+      sprintf_P(buff, PSTR("flow,site_tag=%s start=%lu000,end=%lu000,duration=%lu,volume=%d.%02d,flow=%d.%02d"),
+        site, m->start, m->end , m->duration, (int)m->volume, ((int)(m->volume * 100) % 100), (int)m->flow, ((int)(m->flow * 100) % 100));
     break;
 
     case NOTIF_WEATHERCALL_FAIL:
     case NOTIF_WEATHERCALL_SUCCESS:
-      sprintf_P(buff, PSTR("weather_call,unit_tag=%s start=%lu000,status=%d"), unit_tag, m->start, (type == NOTIF_WEATHERCALL_FAIL) ? 0 : 1);
+      sprintf_P(buff, PSTR("weather_call,site_tag=%s start=%lu000,status=%d"), site, m->start, (type == NOTIF_WEATHERCALL_FAIL) ? 0 : 1);
     break;
 
     case NOTIF_WATERLEVEL_UPDATE:
-      sprintf_P(buff, PSTR("water_level,unit_tag=%s start=%lu000,level=%d"), unit_tag, m->start, m->water_level);
+      sprintf_P(buff, PSTR("water_level,site_tag=%s start=%lu000,level=%d"), site, m->start, m->water_level);
     break;
 
     case NOTIF_IP_UPDATE:
-      sprintf_P(buff, PSTR("ip_update,unit_tag=%s start=%lu000,ip=\"%d.%d.%d.%d\""),
-        unit_tag, m->start, (byte)(m->ip >> 24) & 0xFF, (byte)(m->ip >> 16) & 0xFF, (byte)(m->ip >> 8) & 0xFF, (byte)m->ip & 0xFF);
+      sprintf_P(buff, PSTR("ip_update,site_tag=%s start=%lu000,ip=\"%d.%d.%d.%d\""),
+        site, m->start, (byte)(m->ip >> 24) & 0xFF, (byte)(m->ip >> 16) & 0xFF, (byte)(m->ip >> 8) & 0xFF, (byte)m->ip & 0xFF);
     break;
 
     case NOTIF_REBOOT_COMPLETE:
-      sprintf_P(buff, PSTR("reboot,unit_tag=%s start=%lu000"), unit_tag, m->start);
+      sprintf_P(buff, PSTR("reboot,site_tag=%s start=%lu000"), site, m->start);
     break;
 
   default:
     return 0;
   }
-
-// Commented out the following to let InfluxDB set the timestamps as OS uses second granularity
-// but if multiple messages in the same main loop then all will have the same timestamp
-
-// InfluxDB uses unix epoch in nanoseconds
-//  strcat_P(buff, PSTR(" "));
-//  itoa(timestamp, buff + strlen(buff), 10);
-//  strcat_P(buff, PSTR("000000000"));
 
   return strlen(buff);
 }

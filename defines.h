@@ -35,7 +35,7 @@
                             // if this number is different from the one stored in non-volatile memory
                             // a device reset will be automatically triggered
 
-#define OS_FW_MINOR      1  // Firmware minor version
+#define OS_FW_MINOR      2  // Firmware minor version
 
 /** Hardware version base numbers */
 #define OS_HW_VERSION_BASE   0x00
@@ -56,7 +56,7 @@
 #define IFTTT_FILENAME       "ifttt.txt"   // Store IFTTT endpoint event names
 #define WEBHOOK_FILENAME     "webhook.txt" // Webhook requires server and port number
 #define INFLUX_FILENAME      "influx.txt"  // Influx requires server, port and database name
-#define NAME_FILENAME        "name.txt"    // Unique name of unit to send with notifications
+#define SITE_FILENAME        "site.txt"    // Unique name of unit to send with notifications
 #define STATION_SPECIAL_DATA_SIZE  (TMP_BUFFER_SIZE - 8)
 
 #define FLOWCOUNT_RT_WINDOW   30    // flow count window (for computing real-time flow rate), 30 seconds

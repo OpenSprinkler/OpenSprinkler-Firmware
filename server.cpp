@@ -1228,8 +1228,8 @@ void server_json_controller_main() {
   if (read_from_file(influx_filename, tmp_buffer)) {
 	  bfill.emit_p(PSTR(",\"influx\":{$S}"), tmp_buffer);
   }
-  if (read_from_file(name_filename, tmp_buffer)) {
-	  bfill.emit_p(PSTR(",\"name\":\"$S\""), tmp_buffer);
+  if (read_from_file(site_filename, tmp_buffer)) {
+	  bfill.emit_p(PSTR(",\"site\":\"$S\""), tmp_buffer);
   }
 #endif
 
@@ -1519,13 +1519,13 @@ void server_change_options()
     write_to_file(webhook_filename, tmp_buffer, strlen(tmp_buffer));
   }
   keyfound = 0;
-  if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("name"), true, &keyfound)) {
+  if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("site"), true, &keyfound)) {
     urlDecode(tmp_buffer);
     tmp_buffer[TMP_BUFFER_SIZE-1]=0;
-    write_to_file(name_filename, tmp_buffer, strlen(tmp_buffer));
+    write_to_file(site_filename, tmp_buffer, strlen(tmp_buffer));
   } else if (keyfound) {
     tmp_buffer[0]=0;
-    write_to_file(name_filename, tmp_buffer, strlen(tmp_buffer));
+    write_to_file(site_filename, tmp_buffer, strlen(tmp_buffer));
   }
   // if not using NTP and manually setting time
   if (!os.options[OPTION_USE_NTP] && findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("ttt"), true)) {

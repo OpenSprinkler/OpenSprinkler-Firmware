@@ -61,7 +61,7 @@ const char ifkey_filename[]   PROGMEM = IFTTT_KEY_FILENAME;
 const char ifttt_filename[]   PROGMEM = IFTTT_FILENAME;
 const char webhook_filename[] PROGMEM = WEBHOOK_FILENAME;
 const char influx_filename[]  PROGMEM = INFLUX_FILENAME;
-const char name_filename[]    PROGMEM = NAME_FILENAME;
+const char site_filename[]    PROGMEM = SITE_FILENAME;
 #ifdef ESP8266
 const char wifi_filename[]   PROGMEM = WIFI_FILENAME;
 byte OpenSprinkler::state = OS_STATE_INITIAL;
@@ -1532,7 +1532,7 @@ void OpenSprinkler::options_setup() {
 #ifndef ESP8266
     // 5. delete sd file
     remove_file(wtopts_filename);
-    remove_file(name_filename);
+    remove_file(site_filename);
     remove_file(ifkey_filename);
     remove_file(ifttt_filename);
     remove_file(influx_filename);
