@@ -161,7 +161,7 @@ void ui_state_machine() {
   case UI_STATE_DEFAULT:
     switch (button & BUTTON_MASK) {
     case BUTTON_1:
-      if (button & BUTTON_FLAG_HOLD) {  // holding B1: stop all stations
+      if (button & BUTTON_FLAG_HOLD) {  // holding B1
         if (digitalReadExt(PIN_BUTTON_3)==0) { // if B3 is pressed while holding B1, run a short test (internal test)
           manual_start_program(255, 0);
         } else if (digitalReadExt(PIN_BUTTON_2)==0) { // if B2 is pressed while holding B1, display gateway IP
@@ -176,7 +176,7 @@ void ui_state_machine() {
           os.lcd.setCursor(0, 1);
           os.lcd_print_pgm(PSTR("(gwip)"));
           ui_state = UI_STATE_DISP_IP;
-        } else {
+        } else {  // if no other button is clicked, stop all zones
           reset_all_stations();
         }
       } else {  // clicking B1: display device IP and port
@@ -200,7 +200,7 @@ void ui_state_machine() {
       }
       break;
     case BUTTON_2:
-      if (button & BUTTON_FLAG_HOLD) {  // holding B2: reboot
+      if (button & BUTTON_FLAG_HOLD) {  // holding B2
         if (digitalReadExt(PIN_BUTTON_1)==0) { // if B1 is pressed while holding B2, display external IP
           os.lcd_print_ip((byte*)(&os.nvdata.external_ip), 1);
           os.lcd.setCursor(0, 1);
@@ -212,7 +212,7 @@ void ui_state_machine() {
           os.lcd.setCursor(0, 1);
           os.lcd_print_pgm(PSTR("(lswc)"));
           ui_state = UI_STATE_DISP_IP;          
-        } else { 
+        } else {  // if no other button is clicked, reboot 
           os.reboot_dev();
         }
       } else {  // clicking B2: display MAC
@@ -229,10 +229,22 @@ void ui_state_machine() {
       }
       break;
     case BUTTON_3:
-      if (button & BUTTON_FLAG_HOLD) {  // holding B3: go to main menu
-        os.lcd_print_line_clear_pgm(PSTR("Run a Program:"), 0);
-        os.lcd_print_line_clear_pgm(PSTR("Click B3 to list"), 1);
-        ui_state = UI_STATE_RUNPROG;
+      if (button & BUTTON_FLAG_HOLD) {  // holding B3
+        if (digitalReadExt(PIN_BUTTON_1)==0) {  // if B1 is pressed while holding B3, display up time
+          os.lcd_print_time(os.powerup_lasttime);
+          os.lcd.setCursor(0, 1);
+          os.lcd_print_pgm(PSTR("(lupt)"));
+          ui_state = UI_STATE_DISP_IP;              
+        } else if(digitalReadExt(PIN_BUTTON_2)==0) {  // if B2 is pressed while holding B3, reset to AP and reboot
+          #ifdef ESP8266
+          os.reset_to_ap();
+          ui_state = UI_STATE_DISP_IP;     
+          #endif
+        } else {  // if no other button is clicked, go to Run Program main menu
+          os.lcd_print_line_clear_pgm(PSTR("Run a Program:"), 0);
+          os.lcd_print_line_clear_pgm(PSTR("Click B3 to list"), 1);
+          ui_state = UI_STATE_RUNPROG;
+        }
       } else {  // clicking B3: switch board display (cycle through master and all extension boards)
         os.status.display_board = (os.status.display_board + 1) % (os.nboards);
       }
@@ -293,7 +305,8 @@ void do_setup() {
   // if rtc exists, sets it as time sync source
   setSyncProvider(RTC.get);
   os.lcd_print_time(os.now_tz());  // display time to LCD
-
+  os.powerup_lasttime = os.now_tz();
+  
 #ifndef ESP8266
   // enable WDT
   /* In order to change WDE or the prescaler, we need to
@@ -390,13 +403,13 @@ void do_loop()
   static ulong connecting_timeout;
   switch(os.state) {
   case OS_STATE_INITIAL:
-    // ray todo: better handling
     if(os.get_wifi_mode()==WIFI_MODE_AP) {
       start_server_ap();
       os.state = OS_STATE_CONNECTED;
     } else {
       led_blink_ms = LED_SLOW_BLINK;
       start_network_sta(os.wifi_config.ssid.c_str(), os.wifi_config.pass.c_str());
+      os.config_ip();
       os.state = OS_STATE_CONNECTING;
       connecting_timeout = millis() + 60000;
       os.lcd.setCursor(0, -1);
@@ -408,7 +421,8 @@ void do_loop()
     
   case OS_STATE_TRY_CONNECT:
     led_blink_ms = LED_SLOW_BLINK;  
-    start_network_sta_with_ap(os.wifi_config.ssid.c_str(), os.wifi_config.pass.c_str());    
+    start_network_sta_with_ap(os.wifi_config.ssid.c_str(), os.wifi_config.pass.c_str());
+    os.config_ip();
     os.state = OS_STATE_CONNECTED;
     break;
    
@@ -815,7 +829,10 @@ void do_loop()
     }
 
     // perform ntp sync
-    if (curr_time % NTP_SYNC_INTERVAL == 0) os.status.req_ntpsync = 1;
+    // instead of using curr_time, which may change due to NTP sync itself
+    // we use Arduino's millis() method
+    //if (curr_time % NTP_SYNC_INTERVAL == 0) os.status.req_ntpsync = 1;
+    if((millis()/1000) % NTP_SYNC_INTERVAL==0) os.status.req_ntpsync = 1;
     perform_ntp_sync();
 
     // check network connection
@@ -1563,6 +1580,7 @@ void perform_ntp_sync() {
     boolean rtc_zero = (now()<=978307200);
     
     os.status.req_ntpsync = 0;
+    DEBUG_PRINTLN("NTP SYNCTING...");
     if (!ui_state) {
       os.lcd_print_line_clear_pgm(PSTR("NTP Syncing..."),1);
     }

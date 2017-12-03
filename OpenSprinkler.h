@@ -37,7 +37,6 @@
   #include <Wire.h>
   #include <FS.h>
   #include "SSD1306Display.h"
-  #include "Time.h"
   #include "i2crtc.h"
   #include "espconnect.h"
 #else // headers for RPI/BBB/LINUX
@@ -155,6 +154,7 @@ public:
   static byte  button_timeout;        // button timeout
   static ulong checkwt_lasttime;      // time when weather was checked
   static ulong checkwt_success_lasttime; // time when weather check was successful
+  static ulong powerup_lasttime;      // time when controller is powered up most recently
   static byte  weather_update_flag; 
   // member functions
   // -- setup
@@ -239,6 +239,8 @@ public:
   static void toggle_screen_led();
   static void set_screen_led(byte status);  
   static byte get_wifi_mode() {return wifi_config.mode;}
+  static void config_ip();
+  static void reset_to_ap();
   static byte state;
   #endif  
 private:

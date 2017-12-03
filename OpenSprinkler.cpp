@@ -51,6 +51,7 @@ ulong OpenSprinkler::raindelay_start_time;
 byte OpenSprinkler::button_timeout;
 ulong OpenSprinkler::checkwt_lasttime;
 ulong OpenSprinkler::checkwt_success_lasttime;
+ulong OpenSprinkler::powerup_lasttime;
 byte OpenSprinkler::weather_update_flag;
 
 char tmp_buffer[TMP_BUFFER_SIZE+1];       // scratch buffer
@@ -369,13 +370,6 @@ byte OpenSprinkler::start_network() {
   } else {
     uint16_t httpport = (uint16_t)(options[OPTION_HTTPPORT_1]<<8) + (uint16_t)options[OPTION_HTTPPORT_0];
     wifi_server = new ESP8266WebServer(httpport);
-    /*byte* _ip = options+OPTION_STATIC_IP1;
-    IPAddress ip(_ip[0], _ip[1], _ip[2], _ip[3]);
-    if(options[OPTION_USE_DHCP]) {
-      wifi_server = new ESP8266WebServer(httpport);
-    } else {
-      wifi_server = new ESP8266WebServer(ip, httpport);
-    }*/
   }
   status.has_hwmac = 1;
   
@@ -424,6 +418,7 @@ byte OpenSprinkler::start_network() {
 
 /** Reboot controller */
 void OpenSprinkler::reboot_dev() {
+  lcd_print_line_clear_pgm(PSTR("Rebooting..."), 0);
 #ifdef ESP8266
   ESP.restart();
 #else
@@ -2115,4 +2110,26 @@ void OpenSprinkler::set_screen_led(byte status) {
   lcd.setColor(WHITE);
 }
 
+void OpenSprinkler::reset_to_ap() {
+  wifi_config.mode = WIFI_MODE_AP;
+  options_save();
+  state = OS_STATE_RESTART;
+}
+
+void OpenSprinkler::config_ip() {
+  if(options[OPTION_USE_DHCP] == 0) {
+    byte *_ip = options+OPTION_STATIC_IP1;
+    IPAddress dvip(_ip[0], _ip[1], _ip[2], _ip[3]);
+    if(dvip==(uint32_t)0x00000000) return;
+    
+    _ip = options+OPTION_GATEWAY_IP1;
+    IPAddress gwip(_ip[0], _ip[1], _ip[2], _ip[3]);
+    if(gwip==(uint32_t)0x00000000) return;
+    
+    IPAddress subn(255,255,255,0);
+    _ip = options+OPTION_DNS_IP1;
+    IPAddress dnsip(_ip[0], _ip[1], _ip[2], _ip[3]);    
+    WiFi.config(dvip, gwip, subn, dnsip);
+  }
+}
 #endif

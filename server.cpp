@@ -254,6 +254,14 @@ void send_packet(bool final=false) {
     ether.httpServerReply_with_flags(bfill.position(), TCP_FLAGS_ACK_V);
     bfill=ether.tcpOffset();
   }
+#else
+  if(final || available_ether_buffer()<250) {
+    wifi_server->sendContent(ether_buffer);
+    if(final)
+      wifi_server->client().stop();      
+    else
+      rewind_ether_buffer();
+  }
 #endif
 }
 
@@ -1151,7 +1159,7 @@ void server_json_controller_main() {
   //os.nvm_string_get(ADDR_NVM_LOCATION, tmp_buffer);
   bfill.emit_p(PSTR("\"devt\":$L,\"nbrd\":$D,\"en\":$D,\"rd\":$D,\"rs\":$D,\"rdst\":$L,"
                     "\"loc\":\"$E\",\"wtkey\":\"$E\",\"sunrise\":$D,\"sunset\":$D,\"eip\":$L,\"lwc\":$L,\"lswc\":$L,"
-                    "\"lrun\":[$D,$D,$D,$L],"),
+                    "\"lupt\":$L,\"lrun\":[$D,$D,$D,$L],"),
               curr_time,
               os.nboards,
               os.status.enabled,
@@ -1165,6 +1173,7 @@ void server_json_controller_main() {
               os.nvdata.external_ip,
               os.checkwt_lasttime,
               os.checkwt_success_lasttime,
+              os.powerup_lasttime,
               pd.lastrun.station,
               pd.lastrun.program,
               pd.lastrun.duration,
@@ -1255,7 +1264,7 @@ void server_home()
 
 /**
  * Change controller variables
- * Command: /cv?pw=xxx&rsn=x&rbt=x&en=x&rd=x&sl=x
+ * Command: /cv?pw=xxx&rsn=x&rbt=x&en=x&rd=x&re=x&ap=x
  *
  * pw:  password
  * rsn: reset all stations (0 or 1)
@@ -1263,6 +1272,7 @@ void server_home()
  * en:  enable (0 or 1)
  * rd:  rain delay hours (0 turns off rain delay)
  * re:  remote extension mode
+ * ap:  reset to ap (ESP8266 only)
  * update: launch update script (for OSPi/OSBo/Linux only)
  */
 void server_change_values()
@@ -1321,6 +1331,12 @@ void server_change_values()
       os.options_save();
     }
   }
+  
+  #ifdef ESP8266
+  if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("ap"), true)) {
+    os.reset_to_ap();
+  }  
+  #endif
   handle_return(HTML_SUCCESS);
 }
 
@@ -1711,10 +1727,15 @@ void server_json_log() {
   if (findKeyVal(p, type, 4, PSTR("type"), true))
     type_specified = true;
 
-  print_json_header(false);
-
 #ifdef ESP8266
+  // as the log data can be large, we will use ESP8266's sendContent function to
+  // send multiple packets of data, instead of the standard way of using send().
   rewind_ether_buffer();
+  bfill.emit_p(PSTR("$F$F$F$F\r\n"), html200OK, htmlContentJSON, htmlAccessControl, htmlNoCache);
+  wifi_server->sendContent(ether_buffer);
+  rewind_ether_buffer();
+#else
+  print_json_header(false);
 #endif
 
   bfill.emit_p(PSTR("["));
@@ -1794,7 +1815,11 @@ void server_json_log() {
 
   bfill.emit_p(PSTR("]"));
   INSERT_DELAY(1);
+#ifdef ESP8266
+  send_packet(true);
+#else
   handle_return(HTML_OK);
+#endif
 }
 /**
  * Delete log
