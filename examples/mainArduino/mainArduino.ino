@@ -1,6 +1,6 @@
 #include <Wire.h>
 
-#ifndef(ESP8266)
+#ifndef ESP8266
 #include <SdFat.h>
 #endif
 

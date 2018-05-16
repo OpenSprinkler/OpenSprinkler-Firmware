@@ -25,7 +25,7 @@ LIBS ?= $(ESP_LIBS)/Wire \
 	.
 
 # Esp8266 Arduino git location
-ESP_ROOT ?= $(HOME)/esp8266_2.2.0/
+ESP_ROOT ?= $(HOME)/esp8266_2.2/
 # Output directory
 BUILD_ROOT ?= /tmp/$(MAIN_NAME)
 
@@ -33,6 +33,7 @@ UPLOAD_SPEED ?= 230400
 UPLOAD_VERB ?= -v
 UPLOAD_RESET ?= ck
 
+FLASH_MODE ?= dio
 FLASH_DEF ?= 4M1M
 
 # Include possible project makefile. This can be used to override the defaults below
