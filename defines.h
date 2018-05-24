@@ -24,6 +24,9 @@
 #ifndef _DEFINES_H
 #define _DEFINES_H
 
+typedef unsigned char byte;
+typedef unsigned long ulong;
+
 #if !defined(ARDUINO) || defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__) || defined(ESP8266)
   #define TMP_BUFFER_SIZE      255   // scratch buffer size
 #else
@@ -31,11 +34,11 @@
 #endif
 
 /** Firmware version, hardware version, and maximal values */
-#define OS_FW_VERSION  217  // Firmware version: 217 means 2.1.7
+#define OS_FW_VERSION  218  // Firmware version: 218 means 2.1.8
                             // if this number is different from the one stored in non-volatile memory
                             // a device reset will be automatically triggered
 
-#define OS_FW_MINOR      2  // Firmware minor version
+#define OS_FW_MINOR      0  // Firmware minor version
 
 /** Hardware version base numbers */
 #define OS_HW_VERSION_BASE   0x00
@@ -47,6 +50,7 @@
 #define HW_TYPE_AC           0xAC   // standard 24VAC for 24VAC solenoids only, with triacs
 #define HW_TYPE_DC           0xDC   // DC powered, for both DC and 24VAC solenoids, with boost converter and MOSFETs
 #define HW_TYPE_LATCH        0x1A   // DC powered, for DC latching solenoids only, with boost converter and H-bridges
+#define HW_TYPE_UNKNOWN      0xFF
 
 /** File names */
 #define WEATHER_OPTS_FILENAME "wtopts.txt"    // weather options file
@@ -90,7 +94,6 @@
 #define OS_STATE_CONNECTING     1
 #define OS_STATE_CONNECTED      2
 #define OS_STATE_TRY_CONNECT    3
-#define OS_STATE_RESTART        10
 
 #define LED_FAST_BLINK 100
 #define LED_SLOW_BLINK 500
@@ -152,17 +155,25 @@
 
 #else // NVM defines for RPI/BBB/LINUX/ESP8266
 
+/** 8KB NVM (RPI/BBB/LINUX/ESP8266) data structure:
+  * |         |     |  ---STRING PARAMETERS---      |           |   ----STATION ATTRIBUTES-----      |          |
+  * | PROGRAM | CON | PWD | LOC | JURL | WURL | KEY | STN_NAMES | MAS | IGR | MAS2 | DIS | SEQ | SPE | OPTIONS  |
+  * |  (6127) |(12) |(36) |(48) | (48) | (48) |(24) |   (1728)  | (9) | (9) |  (9) | (9) | (9) | (9) |   (67)   |
+  * |         |     |     |     |      |      |     |           |     |     |      |     |     |     |          |
+  * 0       6127  6139   6175  6223  6271   6319   6343        8071  8080  8089   8098  8107  8116  8125      8192
+  */
+
   // These are kept the same as AVR for compatibility reasons
   // But they can be increased if needed
   #define NVM_FILENAME        "nvm.dat" // for RPI/BBB, nvm data is stored in a file
 
-  #define MAX_EXT_BOARDS    6  // maximum number of exp. boards (each expands 8 stations)
+  #define MAX_EXT_BOARDS    8  // maximum number of 8-station exp. boards (a 16-station expander counts as 2)
   #define MAX_NUM_STATIONS  ((1+MAX_EXT_BOARDS)*8)  // maximum number of stations
 
-  #define NVM_SIZE            4096
+  #define NVM_SIZE            8192
   #define STATION_NAME_SIZE   24    // maximum number of characters in each station name
 
-  #define MAX_PROGRAMDATA     2433  // program data
+  #define MAX_PROGRAMDATA     6127  // program data
   #define MAX_NVCONDATA       12     // non-volatile controller data
   #define MAX_USER_PASSWORD   36    // user password
   #define MAX_LOCATION        48    // location string
@@ -222,8 +233,8 @@ typedef enum {
   OPTION_MASTER_STATION,
   OPTION_MASTER_ON_ADJ,
   OPTION_MASTER_OFF_ADJ,
-  OPTION_SENSOR_TYPE,
-  OPTION_RAINSENSOR_TYPE,
+  OPTION_SENSOR1_TYPE,
+  OPTION_SENSOR1_OPTION,
   OPTION_WATER_PERCENTAGE,
   OPTION_DEVICE_ENABLE,
   OPTION_IGNORE_PASSWORD,
@@ -251,6 +262,8 @@ typedef enum {
   OPTION_DNS_IP4,
   OPTION_SPE_AUTO_REFRESH,
   OPTION_IFTTT_ENABLE,
+  OPTION_SENSOR2_TYPE,
+  OPTION_SENSOR2_OPTION,
   OPTION_RESET,
   NUM_OPTIONS	// total number of options
 } OS_OPTION_t;
@@ -354,35 +367,66 @@ typedef enum {
     #define OS_HW_VERSION    (OS_HW_VERSION_BASE+30)
     #define IOEXP_PIN        0x80 // base for pins on main IO expander
     #define MAIN_I2CADDR     0x20 // main IO expander I2C address
-    #define MAIN_INPUTMASK   0b00001010 // main input pin mask
     #define ACDR_I2CADDR     0x21 // ac driver I2C address
     #define DCDR_I2CADDR     0x22 // dc driver I2C address
     #define LADR_I2CADDR     0x23 // latch driver I2C address
     #define EXP_I2CADDR_BASE 0x24 // base of expander I2C address
-    #define LCD_I2CADDR      0x3c // 128x64 OLED display I2C address
+    #define LCD_I2CADDR      0x3C // 128x64 OLED display I2C address
 
-    // pins on main PCF8574 IO expander have pin numbers IOEXP_PIN+i
-    #define PIN_BUTTON_1      IOEXP_PIN+1 // button 1
-    #define PIN_BUTTON_2      0           // button 2
-    #define PIN_BUTTON_3      IOEXP_PIN+3 // button 3
-    #define PIN_RFRX          14
-    #define PIN_PWR_RX        IOEXP_PIN+0
-    #define PIN_RFTX          16
-    #define PIN_PWR_TX        IOEXP_PIN+2
-
-    // DC controller pin defines
-    #define PIN_BOOST         IOEXP_PIN+6
-    #define PIN_BOOST_EN      IOEXP_PIN+7
-
-    #define PIN_SENSOR1       12 // sensor 1
-    #define PIN_RAINSENSOR    PIN_SENSOR1 // for this firmware, rain and flow sensors are both assumed on sensor 1
-    #define PIN_FLOWSENSOR    PIN_SENSOR1
-    #define PIN_SENSOR2       13 // sensor 2
     #define PIN_CURR_SENSE    A0
-    
     #define PIN_FREE_LIST     {} // no free GPIO pin at the moment
-  
     #define ETHER_BUFFER_SIZE   4096
+
+    /* To accommodate different OS30 versions, we use software defines pins */ 
+    extern byte PIN_BUTTON_1;
+    extern byte PIN_BUTTON_2;
+    extern byte PIN_BUTTON_3;
+    extern byte PIN_RFRX;
+    extern byte PIN_RFTX;
+    extern byte PIN_BOOST;
+    extern byte PIN_BOOST_EN;
+    extern byte PIN_LATCH_COM;
+    extern byte PIN_SENSOR1;
+    extern byte PIN_SENSOR2;
+    extern byte PIN_RAINSENSOR;
+    extern byte PIN_FLOWSENSOR;
+    extern byte PIN_IOEXP_INT;
+
+    /* Original OS30 pin defines */
+    //#define V0_MAIN_INPUTMASK 0b00001010 // main input pin mask
+    // pins on main PCF8574 IO expander have pin numbers IOEXP_PIN+i
+    #define V0_PIN_BUTTON_1      IOEXP_PIN+1 // button 1
+    #define V0_PIN_BUTTON_2      0           // button 2
+    #define V0_PIN_BUTTON_3      IOEXP_PIN+3 // button 3
+    #define V0_PIN_RFRX          14
+    #define V0_PIN_PWR_RX        IOEXP_PIN+0
+    #define V0_PIN_RFTX          16
+    #define V0_PIN_PWR_TX        IOEXP_PIN+2
+    #define V0_PIN_BOOST         IOEXP_PIN+6
+    #define V0_PIN_BOOST_EN      IOEXP_PIN+7
+    #define V0_PIN_SENSOR1       12 // sensor 1
+    #define V0_PIN_SENSOR2       13 // sensor 2
+    #define V0_PIN_RAINSENSOR    V0_PIN_SENSOR1 // for this firmware, rain and flow sensors are both assumed on sensor 1
+    #define V0_PIN_FLOWSENSOR    V0_PIN_SENSOR1
+
+    /* OS30 revision 1 pin defines */
+    // pins on PCA9555A IO expander have pin numbers IOEXP_PIN+i
+    #define V1_IO_CONFIG         0x1F00 // config bits
+    #define V1_IO_OUTPUT         0x1F00 // output bits
+    #define V1_PIN_BUTTON_1      IOEXP_PIN+10 // button 1
+    #define V1_PIN_BUTTON_2      IOEXP_PIN+11 // button 2
+    #define V1_PIN_BUTTON_3      IOEXP_PIN+12 // button 3
+    #define V1_PIN_RFRX          14
+    #define V1_PIN_RFTX          16
+    #define V1_PIN_IOEXP_INT     12
+    #define V1_PIN_BOOST         IOEXP_PIN+13
+    #define V1_PIN_BOOST_EN      IOEXP_PIN+14
+    #define V1_PIN_LATCH_COM     IOEXP_PIN+15
+    #define V1_PIN_SENSOR1       IOEXP_PIN+8 // sensor 1
+    #define V1_PIN_SENSOR2       IOEXP_PIN+9 // sensor 2
+    #define V1_PIN_RAINSENSOR    V1_PIN_SENSOR1 // for this firmware, rain and flow sensors are both assumed on sensor 1
+    #define V1_PIN_FLOWSENSOR    V1_PIN_SENSOR1
+
   /** OSPi pin defines */
   #elif defined(OSPI)
 
@@ -499,9 +543,6 @@ typedef enum {
 #define BUTTON_WAIT_HOLD       2  // wait until button hold time expires
 
 #define DISPLAY_MSG_MS      2000  // message display time (milliseconds)
-
-typedef unsigned char byte;
-typedef unsigned long ulong;
 
 #endif  // _DEFINES_H
 
