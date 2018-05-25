@@ -69,7 +69,7 @@ void httpget_callback(byte, uint16_t, uint16_t);
 #define NTP_SYNC_INTERVAL       86403L  // NYP sync interval, 24 hrs
 #define RTC_SYNC_INTERVAL       60      // RTC sync interval, 60 secs
 #define CHECK_NETWORK_INTERVAL  601     // Network checking timeout, 10 minutes
-#define CHECK_WEATHER_TIMEOUT   3601    // Weather check interval: 1 hour
+#define CHECK_WEATHER_TIMEOUT   7201    // Weather check interval: 2 hours
 #define CHECK_WEATHER_SUCCESS_TIMEOUT 86433L // Weather check success interval: 24 hrs
 #define LCD_BACKLIGHT_TIMEOUT   15      // LCD backlight timeout: 15 secs
 #define PING_TIMEOUT            200     // Ping test timeout: 200 ms
