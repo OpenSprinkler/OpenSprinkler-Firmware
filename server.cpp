@@ -35,7 +35,6 @@
     #define INSERT_DELAY(x) {}
     
     extern ESP8266WebServer *wifi_server;
-    extern ulong restart_timeout;
     extern char ether_buffer[];
 
     #define handle_return(x) {if(x==HTML_OK) server_send_html(ether_buffer); else server_send_result(x); return;}
@@ -484,7 +483,7 @@ static String scanned_ssids;
 
 void on_ap_home() {
   if(os.get_wifi_mode()!=WIFI_MODE_AP) return;
-  server_send_html(FPSTR(connect_html));
+  server_send_html(FPSTR(ap_home_html));
 }
 
 void on_ap_scan() {
@@ -494,55 +493,33 @@ void on_ap_scan() {
 
 void on_ap_change_config() {
   if(os.get_wifi_mode()!=WIFI_MODE_AP) return;
-  if(wifi_server->hasArg("ssid")) {
+  if(wifi_server->hasArg("ssid")&&wifi_server->arg("ssid").length()!=0) {
     os.wifi_config.ssid = wifi_server->arg("ssid");
     os.wifi_config.pass = wifi_server->arg("pass");
-    if(os.wifi_config.ssid.length() == 0) {
-      server_send_result(HTML_DATA_MISSING, "ssid");
-      return;
-    }
-    os.options_save();
+    os.options_save(true);
     server_send_result(HTML_SUCCESS);
     os.state = OS_STATE_TRY_CONNECT;
     os.lcd.setCursor(0, 2);
     os.lcd.print(F("Connecting..."));
-  }  
+  } else {
+    server_send_result(HTML_DATA_MISSING, "ssid");
+  }
 }
 
 void on_ap_try_connect() {
   if(os.get_wifi_mode()!=WIFI_MODE_AP) return;
-  String html;
-  html += "{";
+  String html = "{";
   ulong ip = (WiFi.status()==WL_CONNECTED)?(uint32_t)WiFi.localIP():0;
   append_key_value(html, "ip", ip);
   html.remove(html.length()-1);  
   html += "}";
   server_send_html(html);
   if(WiFi.status() == WL_CONNECTED && WiFi.localIP()) {
-    wifi_server->handleClient();
-    os.wifi_config.mode = WIFI_MODE_STA;
-    os.options_save();
-    os.lcd.setCursor(0, 2);
-    os.lcd.print(F("Rebooting."));
-    restart_timeout = millis()+2000;
-    os.state = OS_STATE_RESTART;
+    // IP received by client, restart
+    os.reboot_dev();
   }  
 }
 
-void start_server_ap() {
-  scanned_ssids = scan_network();
-  String ap_ssid = get_ap_ssid();
-  start_network_ap(ap_ssid.c_str(), NULL);
-  wifi_server->on("/", on_ap_home);
-  wifi_server->on("/js", on_ap_scan);
-  wifi_server->on("/cc", on_ap_change_config);
-  wifi_server->on("/jt", on_ap_try_connect);
-  wifi_server->begin();
-  os.lcd.setCursor(0, -1);
-  os.lcd.print("SSID:"+ap_ssid);
-  os.lcd.setCursor(0, 2);
-  os.lcd.print(WiFi.softAPIP());
-}
 #endif
 
 
@@ -735,7 +712,7 @@ void server_change_stations() {
 		    }
 		    if (!found || activeState > 1) handle_return(HTML_DATA_OUTOFBOUND);
 	    } else if (tmp_buffer[0] == STN_TYPE_HTTP) {
-		    urlDecode(tmp_buffer + 1); // Unwind any url encoding of special data
+		    //urlDecode(tmp_buffer + 1); // we don't decode url anymore since this would have to be re-encoded later
 		    if (strlen(tmp_buffer+1) > sizeof(HTTPStationData)) {
 			    handle_return(HTML_DATA_OUTOFBOUND);
 		    }
@@ -1043,7 +1020,7 @@ void server_json_options_main() {
     }
     #if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__) || defined(ESP8266)
     if (oid==OPTION_BOOST_TIME) {
-      if (os.hw_type==HW_TYPE_AC) continue;
+      if (os.hw_type==HW_TYPE_AC || os.hw_type==HW_TYPE_UNKNOWN) continue;
       else v<<=2;
     }
     #else
@@ -1182,11 +1159,11 @@ void server_json_controller_main() {
 #if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__) || defined(ESP8266)
   if(os.status.has_curr_sense) {
     uint16_t current = os.read_current();
-    if(!os.status.program_busy && current<os.baseline_current) current=0;
+    if((!os.status.program_busy) && (current<os.baseline_current)) current=0;
     bfill.emit_p(PSTR("\"curr\":$D,"), current);
   }
 #endif
-  if(os.options[OPTION_SENSOR_TYPE]==SENSOR_TYPE_FLOW) {
+  if(os.options[OPTION_SENSOR1_TYPE]==SENSOR_TYPE_FLOW) {
     bfill.emit_p(PSTR("\"flcrt\":$L,\"flwrt\":$D,"), os.flowcount_rt, FLOWCOUNT_RT_WINDOW);
   }
 
@@ -1279,6 +1256,7 @@ void server_change_values()
 {
 #ifdef ESP8266
   char* p = NULL;
+  extern unsigned long reboot_timer;
   if(!process_password()) return;
 #else
   char* p = get_buffer;
@@ -1296,8 +1274,7 @@ void server_change_values()
 
   if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("rbt"), true) && atoi(tmp_buffer) > 0) {
     #ifdef ESP8266
-      restart_timeout = millis()+2000;
-      os.state = OS_STATE_RESTART;
+      reboot_timer = millis() + 1000;
       handle_return(HTML_SUCCESS);
     #else
       print_html_standard_header();
@@ -1440,7 +1417,7 @@ void server_change_options()
 		      v=water_time_encode_signed(v);
 		    } // encode station delay time
         #if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__) || defined(ESP8266)
-        if(os.hw_type==HW_TYPE_DC && oid==OPTION_BOOST_TIME) {
+        if(oid==OPTION_BOOST_TIME) {
            v>>=2;
         }
         #endif
@@ -1930,8 +1907,13 @@ URLHandler urls[] = {
 
 // handle Ethernet request
 #ifdef ESP8266
+void on_ap_update() {
+  String html = FPSTR(ap_update_html);
+  server_send_html(html);
+}
+
 void on_sta_update() {
-  String html = FPSTR(update_html);
+  String html = FPSTR(sta_update_html);
   server_send_html(html);
 }
 
@@ -1946,19 +1928,21 @@ void on_sta_upload_fin() {
   }
   
   server_send_result(HTML_SUCCESS);
-  restart_timeout = millis();
-  os.state = OS_STATE_RESTART;
+  os.reboot_dev();
 }
+
+void on_ap_upload_fin() { on_sta_upload_fin(); }
 
 void on_sta_upload() {
   HTTPUpload& upload = wifi_server->upload();
   if(upload.status == UPLOAD_FILE_START){
     WiFiUDP::stopAll();
-    DEBUG_PRINT(F("prepare to upload: "));
+    DEBUG_PRINT(F("upload: "));
     DEBUG_PRINTLN(upload.filename);
     uint32_t maxSketchSpace = (ESP.getFreeSketchSpace()-0x1000)&0xFFFFF000;
     if(!Update.begin(maxSketchSpace)) {
-      DEBUG_PRINTLN(F("not enough space"));
+      DEBUG_PRINT(F("begin failed "));
+      DEBUG_PRINTLN(maxSketchSpace);
     }
     
   } else if(upload.status == UPLOAD_FILE_WRITE) {
@@ -1969,13 +1953,40 @@ void on_sta_upload() {
       
   } else if(upload.status == UPLOAD_FILE_END) {
     
-    DEBUG_PRINTLN(F("upload completed"));
+    DEBUG_PRINTLN(F("completed"));
    
   } else if(upload.status == UPLOAD_FILE_ABORTED){
     Update.end();
-    DEBUG_PRINTLN(F("upload aborted"));
+    DEBUG_PRINTLN(F("aborted"));
   }
   delay(0);    
+}
+
+void on_ap_upload() { 
+  HTTPUpload& upload = wifi_server->upload();
+  if(upload.status == UPLOAD_FILE_START){
+    DEBUG_PRINT(F("upload: "));
+    DEBUG_PRINTLN(upload.filename);
+    uint32_t maxSketchSpace = (ESP.getFreeSketchSpace()-0x1000)&0xFFFFF000;
+    if(!Update.begin(maxSketchSpace)) {
+      DEBUG_PRINTLN(F("begin failed"));
+      DEBUG_PRINTLN(maxSketchSpace);      
+    }
+  } else if(upload.status == UPLOAD_FILE_WRITE) {
+    DEBUG_PRINT(".");
+    if(Update.write(upload.buf, upload.currentSize) != upload.currentSize) {
+      DEBUG_PRINTLN(F("size mismatch"));
+    }
+      
+  } else if(upload.status == UPLOAD_FILE_END) {
+    
+    DEBUG_PRINTLN(F("completed"));
+       
+  } else if(upload.status == UPLOAD_FILE_ABORTED){
+    Update.end();
+    DEBUG_PRINTLN(F("aborted"));
+  }
+  delay(0);
 }
 
 void start_server_client() {
@@ -1995,6 +2006,39 @@ void start_server_client() {
   }
   wifi_server->begin();
 }
+
+void start_server_ap() {
+
+  scanned_ssids = scan_network();
+  String ap_ssid = get_ap_ssid();
+  start_network_ap(ap_ssid.c_str(), NULL);
+  delay(500);
+  wifi_server->on("/", on_ap_home);
+  wifi_server->on("/jsap", on_ap_scan);
+  wifi_server->on("/ccap", on_ap_change_config);
+  wifi_server->on("/jtap", on_ap_try_connect);
+  wifi_server->on("/update", HTTP_GET, on_ap_update);
+  wifi_server->on("/update", HTTP_POST, on_ap_upload_fin, on_ap_upload);
+  wifi_server->onNotFound(on_ap_home);
+
+  // set up all other handlers
+  char uri[4];
+  uri[0]='/';
+  uri[3]=0;
+  for(int i=0;i<sizeof(urls)/sizeof(URLHandler);i++) {
+    uri[1]=pgm_read_byte(_url_keys+2*i);
+    uri[2]=pgm_read_byte(_url_keys+2*i+1);
+    wifi_server->on(uri, urls[i]);
+  }
+  
+  wifi_server->begin();
+  os.lcd.setCursor(0, -1);
+  os.lcd.print(F("OSAP:"));
+  os.lcd.print(ap_ssid);
+  os.lcd.setCursor(0, 2);
+  os.lcd.print(WiFi.softAPIP());
+}
+
 #else
 void handle_web_request(char *p)
 {
@@ -2076,24 +2120,42 @@ void handle_web_request(char *p)
 
 #if defined(ARDUINO)
 /** NTP sync request */
-unsigned long getNtpTime()
+ulong getNtpTime()
 {
 #ifdef ESP8266
   static bool configured = false;
+    
   if (os.state!=OS_STATE_CONNECTED || WiFi.status()!=WL_CONNECTED) return 0;
   
   if(!configured) {
-    configTime(0, 0, "pool.ntp.org", "time.nist.org", NULL);
+    String ntpip = "";
+    ntpip+=os.options[OPTION_NTP_IP1];
+    ntpip+=".";
+    ntpip+=os.options[OPTION_NTP_IP2];
+    ntpip+=".";
+    ntpip+=os.options[OPTION_NTP_IP3];
+    ntpip+=".";
+    ntpip+=os.options[OPTION_NTP_IP4];
+    
+    configTime(0, 0, "pool.ntp.org", ntpip.c_str(), "time.nist.gov");
     delay(1000);
     configured = true;
   }
   ulong gt = 0;
   byte tick=0;
   do {
-    gt = time(NULL);
+    gt = time(nullptr);
     tick++;
-  } while(!gt && tick<100);
+    delay(1000);
+  } while(gt<978307200L && tick<20);
+  if(gt<978307200L)  {
+    DEBUG_PRINTLN(F("NTP failed!"));
+    gt=0;
+  } else {
+    DEBUG_PRINTLN(F("NTP done."));
+  }  
   return gt;
+  
 #else
   byte ntpip[4] = {
     os.options[OPTION_NTP_IP1],

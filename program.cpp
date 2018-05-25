@@ -77,6 +77,7 @@ void ProgramData::dequeue(byte qid) {
   }
   nqueue--;
 
+  /*
   RuntimeQueueStruct *q = queue;
   DEBUG_PRINT("de:");
   for(;q<queue+nqueue;q++) {
@@ -88,7 +89,7 @@ void ProgramData::dequeue(byte qid) {
     DEBUG_PRINT(q->st);
     DEBUG_PRINT("]");
   }
-  DEBUG_PRINTLN("");
+  DEBUG_PRINTLN("");*/
 }
 
 /** Load program count from NVM */

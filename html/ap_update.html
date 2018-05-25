@@ -1,0 +1,57 @@
+<head>
+  <title>OpenSprinkler Firmware Update</title>
+  <meta name='viewport' content='width=device-width, initial-scale=1'>
+</head>
+<body>
+<div id='page_update'>
+  <div><h3>OpenSprinkler AP-mode Firmware Update</h3></div>
+  <div>
+    <form method='POST' action='/update' id='fm' enctype='multipart/form-data'>
+    <table cellspacing=4>
+    <tr><td><input type='file' name='file' accept='.bin' id='file'></td></tr>
+    <tr><td><b>Device password: </b><input type='password' name='pw' size=36 maxlength=36 id='pw'></td></tr>
+    <tr><td><label id='msg'></label></td></tr>
+    </table>
+    <button id='btn_submit' style='height:48px;'>Submit</a>
+    </form>
+  </div>
+</div>
+<script>
+function id(s) {return document.getElementById(s);}
+function clear_msg() {id('msg').innerHTML='';}
+function show_msg(s,t,c) {
+  id('msg').innerHTML=s.fontcolor(c);
+  if(t>0) setTimeout(clear_msg, t);
+}
+id('btn_submit').addEventListener('click', function(e){
+  e.preventDefault();
+  var files= id('file').files;
+  if(files.length==0) {show_msg('Please select a file.',2000,'red'); return;}
+  if(id('pw').value=='') {
+    if(!confirm('You did not input a device key. Are you sure?')) return;
+  }
+  show_msg('Uploading. Please wait...',10000,'green');
+  var fd = new FormData();
+  var file = files[0];
+  fd.append('file', file, file.name);
+  fd.append('pw', id('pw').value);
+  var xhr = new XMLHttpRequest();
+  xhr.onreadystatechange = function() {
+    if(xhr.readyState==4 && xhr.status==200) {
+      var jd=JSON.parse(xhr.responseText);
+      if(jd.result==1) {
+        show_msg('Update is successful. Rebooting.',0,'green');
+        id('pw').value='';
+      } else if (jd.result==2) {
+        show_msg('Check device key and try again.', 10000, 'red');
+      } else {
+        show_msg('Update failed.',0,'red');
+      }
+    }
+  };
+  xhr.open('POST', 'update', true);
+  xhr.send(fd);
+});
+</script>
+</body>
+
