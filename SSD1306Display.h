@@ -19,6 +19,7 @@ public:
     for(byte i=0;i<8;i++) custom_chars[i]=NULL;
   }
   void begin() {
+    Wire.setClock(400000L); // lower clock to 400kHz
     flipScreenVertically();
     setFont(Monospaced_plain_13);
     fontWidth = 8;
@@ -50,7 +51,7 @@ public:
     setColor(WHITE);
 
     if(c<8 && custom_chars[c]!=NULL) {
-      drawXbm(cx, cy, fontWidth, fontHeight, custom_chars[c]);
+      drawXbm(cx, cy, fontWidth, fontHeight, (const byte*) custom_chars[c]);
     } else {
       drawString(cx, cy, String((char)c));
     }

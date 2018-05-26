@@ -36,6 +36,7 @@
 #elif defined(ESP8266) // headers for ESP8266
   #include <Wire.h>
   #include <FS.h>
+  #include <RCSwitch.h>
   #include "SSD1306Display.h"
   #include "i2crtc.h"
   #include "espconnect.h"
@@ -48,7 +49,8 @@
 
 #include "defines.h"
 #include "utils.h"
-
+#include "gpio.h"
+  
 /** Non-volatile data */
 struct NVConData {
   uint16_t sunrise_time;  // sunrise time (in minutes)
@@ -68,6 +70,13 @@ struct RFStationData {
   byte on[6];
   byte off[6];
   byte timing[4];
+};
+
+struct RFStationDataFull {
+  byte on[8];
+  byte off[8];
+  byte timing[4];
+  byte protocol[4];
 };
 
 struct RemoteStationData {
@@ -97,8 +106,8 @@ struct ConStatus {
   byte has_hwmac:1;         // has hardware MAC chip
   byte req_ntpsync:1;       // request ntpsync
   byte req_network:1;       // request check network
-  byte display_board:3;     // the board that is being displayed onto the lcd
-  byte network_fails:3;     // number of network fails
+  byte display_board:4;     // the board that is being displayed onto the lcd
+  byte network_fails:2;     // number of network fails
   byte mas:8;               // master station index
   byte mas2:8;              // master2 station index
 };
@@ -184,7 +193,7 @@ public:
 
   static void options_setup();
   static void options_load();
-  static void options_save();
+  static void options_save(bool savewifi=false);
 
   static byte password_verify(char *pw);  // verify password
   
@@ -235,6 +244,10 @@ public:
 
   #ifdef ESP8266
   static WiFiConfig wifi_config;
+  static IOEXP *mainio, *drio;
+  static IOEXP *expanders[];
+  static RCSwitch rfswitch;
+  static void detect_expanders();
   static void flash_screen();
   static void toggle_screen_led();
   static void set_screen_led(byte status);  

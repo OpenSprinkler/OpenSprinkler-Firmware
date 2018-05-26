@@ -63,6 +63,10 @@ const char ifkey_filename[]  PROGMEM = IFTTT_KEY_FILENAME;
 const char wifi_filename[]   PROGMEM = WIFI_FILENAME;
 byte OpenSprinkler::state = OS_STATE_INITIAL;
 WiFiConfig OpenSprinkler::wifi_config = {WIFI_MODE_AP, "", ""};
+IOEXP* OpenSprinkler::expanders[(MAX_EXT_BOARDS+1)/2];
+IOEXP* OpenSprinkler::mainio;
+IOEXP* OpenSprinkler::drio;
+RCSwitch OpenSprinkler::rfswitch;
 extern ESP8266WebServer *wifi_server;
 extern char ether_buffer[];
 #endif
@@ -108,8 +112,8 @@ const char op_json_names[] PROGMEM =
     "mas\0\0"
     "mton\0"
     "mtof\0"
-    "urs\0\0"
-    "rso\0\0"
+    "urs\0\0" // todo: rename to sn1t
+    "rso\0\0" // todo: rename to sn1o
     "wl\0\0\0"
     "den\0\0"
     "ipas\0"
@@ -137,6 +141,8 @@ const char op_json_names[] PROGMEM =
     "dns4\0"
     "sar\0\0"
     "ife\0\0"
+    "sn2t\0"
+    "sn2o\0"
     "reset";
 
 /** Option promopts (stored in progmem, for LCD display) */
@@ -164,7 +170,7 @@ const char op_prompts[] PROGMEM =
     "Master 1 (Mas1):"
     "Mas1  on adjust:"
     "Mas1 off adjust:"
-    "Sensor type:    "
+    "Sensor 1 type:  "
     "Normally open?  "
     "Watering level: "
     "Device enabled? "
@@ -193,6 +199,8 @@ const char op_prompts[] PROGMEM =
     "DNS server.ip4: "
     "Special Refresh?"
     "IFTTT Enable:   "
+    "Sensor 2 type:  "
+    "Normally open?  "
     "Factory reset?  ";
 
 /** Option maximum values (stored in progmem) */
@@ -247,6 +255,8 @@ const char op_max[] PROGMEM = {
   255,
   1,
   255,
+  255,
+  1,
   1
 };
 
@@ -278,8 +288,8 @@ byte OpenSprinkler::options[] = {
   0,  // index of master station. 0: no master station
   120,// master on time adjusted time (-10 minutes to 10 minutes)
   120,// master off adjusted time (-10 minutes to 10 minutes)
-  0,  // sensor function (see SENSOR_TYPE macro defines)
-  0,  // rain sensor type. 0: normally closed; 1: normally open.
+  0,  // sensor 1 type (see SENSOR_TYPE macro defines)
+  0,  // sensor 1 option. 0: normally closed; 1: normally open.
   100,// water level (default 100%),
   1,  // device enable
   0,  // 1: ignore password; 0: use password
@@ -307,6 +317,8 @@ byte OpenSprinkler::options[] = {
   8,
   0,  // special station auto refresh
   0,  // ifttt enable bits
+  0,  // sensor 2 type
+  0,  // sensor 2 option. 0: normally closed; 1: normally open.
   0   // reset
 };
 
@@ -329,7 +341,6 @@ time_t OpenSprinkler::now_tz() {
 
 bool detect_i2c(int addr) {
   Wire.beginTransmission(addr);
-  //Wire.write((uint8_t)0x00);  
   return (Wire.endTransmission()==0);
 }
 
@@ -508,16 +519,86 @@ extern void flow_isr();
 void OpenSprinkler::begin() {
 
 #if defined(ARDUINO)
-  // Init I2C
-  Wire.begin();
+  Wire.begin(); // init I2C
 #endif
 
+  hw_type = HW_TYPE_UNKNOWN;
+    
 #ifdef ESP8266
 
-  pcf_write(MAIN_I2CADDR, 0x0F);  // set lower four bits of main PCF8574 to high
-  digitalWriteExt(PIN_PWR_TX, 1); // turn on TX power
-  digitalWriteExt(PIN_PWR_RX, 1); // turn on RX power
+  if(detect_i2c(ACDR_I2CADDR)) hw_type = HW_TYPE_AC;
+  else if(detect_i2c(DCDR_I2CADDR)) hw_type = HW_TYPE_DC;
+  else if(detect_i2c(LADR_I2CADDR)) hw_type = HW_TYPE_LATCH;
   
+  /* detect hardware revision type */
+  if(detect_i2c(MAIN_I2CADDR)) {  // check if main PCF8574 exists
+    /* assign revision 0 pins */
+    PIN_BUTTON_1 = V0_PIN_BUTTON_1;
+    PIN_BUTTON_2 = V0_PIN_BUTTON_2;
+    PIN_BUTTON_3 = V0_PIN_BUTTON_3;
+    PIN_RFRX = V0_PIN_RFRX;
+    PIN_RFTX = V0_PIN_RFTX;
+    PIN_BOOST = V0_PIN_BOOST;
+    PIN_BOOST_EN = V0_PIN_BOOST_EN;
+    PIN_SENSOR1 = V0_PIN_SENSOR1;
+    PIN_SENSOR2 = V0_PIN_SENSOR2;
+    PIN_RAINSENSOR = V0_PIN_RAINSENSOR;
+    PIN_FLOWSENSOR = V0_PIN_FLOWSENSOR;
+    
+    // on revision 0, main IOEXP and driver IOEXP are two separate PCF8574 chips
+    if(hw_type==HW_TYPE_DC) {
+      drio = new PCF8574(DCDR_I2CADDR);
+    } else if(hw_type==HW_TYPE_LATCH) {
+      drio = new PCF8574(LADR_I2CADDR);
+    } else {
+      drio = new PCF8574(ACDR_I2CADDR);
+    }
+
+    mainio = new PCF8574(MAIN_I2CADDR);
+    mainio->i2c_write(0, 0x0F); // set lower four bits of main PCF8574 (8-ch) to high
+    /*pcf_write(MAIN_I2CADDR, 0x0F);*/
+    
+    digitalWriteExt(V0_PIN_PWR_TX, 1); // turn on TX power
+    digitalWriteExt(V0_PIN_PWR_RX, 1); // turn on RX power
+    pinModeExt(PIN_BUTTON_2, INPUT_PULLUP);
+    digitalWriteExt(PIN_BOOST, LOW);
+    digitalWriteExt(PIN_BOOST_EN, LOW);
+    digitalWriteExt(PIN_LATCH_COM, LOW);
+    
+  } else {
+    /* assign revision 1 pins */
+    PIN_BUTTON_1 = V1_PIN_BUTTON_1;
+    PIN_BUTTON_2 = V1_PIN_BUTTON_2;
+    PIN_BUTTON_3 = V1_PIN_BUTTON_3;
+    PIN_RFRX = V1_PIN_RFRX;
+    PIN_RFTX = V1_PIN_RFTX;
+    PIN_IOEXP_INT = V1_PIN_IOEXP_INT;
+    PIN_BOOST = V1_PIN_BOOST;
+    PIN_BOOST_EN = V1_PIN_BOOST_EN;
+    PIN_LATCH_COM = V1_PIN_LATCH_COM;
+    PIN_SENSOR1 = V1_PIN_SENSOR1;
+    PIN_SENSOR2 = V1_PIN_SENSOR2;
+    PIN_RAINSENSOR = V1_PIN_RAINSENSOR;
+    PIN_FLOWSENSOR = V1_PIN_FLOWSENSOR;    
+    
+    if(hw_type==HW_TYPE_DC) {
+      drio = new PCA9555(DCDR_I2CADDR);
+    } else if(hw_type==HW_TYPE_LATCH) {
+      drio = new PCA9555(LADR_I2CADDR);
+    } else {
+      drio = new PCA9555(ACDR_I2CADDR);
+    }
+    
+    // on revision 1, main IOEXP and driver IOEXP are combined into one single PCA9555 (16-ch) chip
+    mainio = drio;
+    mainio->i2c_write(NXP_CONFIG_REG, V1_IO_CONFIG);
+    mainio->i2c_write(NXP_OUTPUT_REG, V1_IO_OUTPUT);
+  }
+  
+  for(byte i=0;i<(MAX_EXT_BOARDS+1)/2;i++)
+    expanders[i] = NULL;
+  detect_expanders();
+
 #else
   // shift register setup
   pinMode(PIN_SR_OE, OUTPUT);
@@ -547,21 +628,27 @@ void OpenSprinkler::begin() {
   apply_all_station_bits();
 
 #ifdef ESP8266
-  pinMode(PIN_SENSOR1, INPUT_PULLUP);
-  pinMode(PIN_SENSOR2, INPUT_PULLUP);
+  pinModeExt(PIN_SENSOR1, INPUT_PULLUP);
+  pinModeExt(PIN_SENSOR2, INPUT_PULLUP);
 #else
   // pull shift register OE low to enable output
   digitalWrite(PIN_SR_OE, LOW);
   // Rain sensor port set up
-  pinMode(PIN_RAINSENSOR, INPUT);
+  pinMode(PIN_RAINSENSOR, INPUT_PULLUP);
 #endif
 
   // Set up sensors
 #if defined(ARDUINO)
   #ifdef ESP8266
-    attachInterrupt(PIN_FLOWSENSOR, flow_isr, FALLING);  
+    /* todo: handle two sensors */
+    if(mainio->type==IOEXP_TYPE_8574) {
+      attachInterrupt(PIN_FLOWSENSOR, flow_isr, FALLING);
+    } else if(mainio->type==IOEXP_TYPE_9555) {
+      mainio->i2c_read(NXP_INPUT_REG);  // do a read to clear out current interrupt flag
+      attachInterrupt(PIN_IOEXP_INT, flow_isr, FALLING);
+    }
   #else
-    digitalWrite(PIN_RAINSENSOR, HIGH); // enabled internal pullup on rain sensor
+    //digitalWrite(PIN_RAINSENSOR, HIGH); // enabled internal pullup on rain sensor
     attachInterrupt(PIN_FLOWSENSOR_INT, flow_isr, FALLING);
   #endif
 #else
@@ -585,10 +672,9 @@ void OpenSprinkler::begin() {
   nstations = 8;
 
   // set rf data pin
-  pinMode(PIN_RFTX, OUTPUT);
-  digitalWrite(PIN_RFTX, LOW);
+  pinModeExt(PIN_RFTX, OUTPUT);
+  digitalWriteExt(PIN_RFTX, LOW);
 
-  hw_type = HW_TYPE_AC;
 #if defined(ARDUINO)  // AVR SD and LCD functions
 
   #if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__) // OS 2.3 specific detections
@@ -623,18 +709,8 @@ void OpenSprinkler::begin() {
     baseline_current = 0;
     
   #elif defined(ESP8266)  // OS3.0 specific detections
-    // detect hardware type
-    hw_type = HW_TYPE_AC;
-    if(detect_i2c(DCDR_I2CADDR)) hw_type = HW_TYPE_DC;
-    if(detect_i2c(LADR_I2CADDR)) hw_type = HW_TYPE_LATCH;
-
-    if (hw_type == HW_TYPE_DC) {
-      digitalWriteExt(PIN_BOOST, LOW);
-      digitalWriteExt(PIN_BOOST_EN, LOW);
-    }
 
     status.has_curr_sense = 1;  // OS3.0 has current sensing capacility
-    
     // measure baseline current
     baseline_current = 100;
   #endif
@@ -738,7 +814,7 @@ void OpenSprinkler::begin() {
     lcd.print(F("Init file system"));
     lcd.setCursor(0,1);
     if(!SPIFFS.begin()) {
-      DEBUG_PRINTLN(F("failed to mount file system!"));
+      DEBUG_PRINTLN(F("SPIFFS failed"));
       status.has_sd = 0;
     } else {
       status.has_sd = 1;
@@ -757,20 +833,13 @@ void OpenSprinkler::begin() {
 
   // set button pins
   // enable internal pullup
-  #if !defined(ESP8266)
-    pinMode(PIN_BUTTON_1, INPUT);
-    pinMode(PIN_BUTTON_2, INPUT);
-    pinMode(PIN_BUTTON_3, INPUT);
-    digitalWrite(PIN_BUTTON_1, HIGH);
-    digitalWrite(PIN_BUTTON_2, HIGH);
-    digitalWrite(PIN_BUTTON_3, HIGH);
-  #else
-    pinMode(PIN_BUTTON_2, INPUT_PULLUP);
-    // button 1 and 3 are on IOEXP and hence do not need pullup setup
-  #endif
+  pinMode(PIN_BUTTON_1, INPUT_PULLUP);
+  pinMode(PIN_BUTTON_2, INPUT_PULLUP);
+  pinMode(PIN_BUTTON_3, INPUT_PULLUP);
   
   // detect and check RTC type
   RTC.detect();
+
 #else
   status.has_sd = 1;
   DEBUG_PRINTLN(get_runtime_path());
@@ -794,25 +863,30 @@ void OpenSprinkler::apply_all_station_bits() {
     engage_booster = 0;
   }
 
-  // OS3.0 uses PCF8574 / PCF8575 IO expanders
-  // Due to reverse logic (active low), all bits must be flipped
-  // handle main controller
-  if(hw_type == HW_TYPE_AC)
-    pcf_write(ACDR_I2CADDR, ~station_bits[0]);
-  else if(hw_type == HW_TYPE_DC)
-    pcf_write(DCDR_I2CADDR, ~station_bits[0]);
+  if(drio->type==IOEXP_TYPE_8574) {
+    /* revision 0 uses PCF8574 with active low logic, so all bits must be flipped */
+    drio->i2c_write(NXP_OUTPUT_REG, ~station_bits[0]);
+  } else if(drio->type==IOEXP_TYPE_9555) {
+    /* revision 1 uses PCA9555 with active high logic */
+    uint16_t reg = drio->i2c_read(NXP_OUTPUT_REG);  // read current output reg value
+    reg = (reg&0xFF00) | station_bits[0]; // output channels are the low 8-bit
+    drio->i2c_write(NXP_OUTPUT_REG, reg); // write value to register
+  }
     
-  // handle expander
-  // each board is assumed to be 8-station board
   for(int i=0;i<MAX_EXT_BOARDS/2;i++) {
     uint16_t data = station_bits[i*2+2];
     data = (data<<8) + station_bits[i*2+1];
-    pcf_write16(EXP_I2CADDR_BASE+i, ~data);
+    if(expanders[i]->type==IOEXP_TYPE_9555) {
+      expanders[i]->i2c_write(NXP_OUTPUT_REG, data);
+    } else {
+      expanders[i]->i2c_write(NXP_OUTPUT_REG, ~data);
+      //pcf_write16(EXP_I2CADDR_BASE+i, ~data);
+    }
   }
 
-  if((hw_type==HW_TYPE_DC) && engage_booster) {
+  /*if((hw_type==HW_TYPE_DC) && engage_booster) {
     // for DC controller: enable output path
-  }
+  }*/
   
   byte bid, s, sbits;  
 #else
@@ -876,15 +950,15 @@ void OpenSprinkler::apply_all_station_bits() {
 /** Read rain sensor status */
 void OpenSprinkler::rainsensor_status() {
   // options[OPTION_RS_TYPE]: 0 if normally closed, 1 if normally open
-  if(options[OPTION_SENSOR_TYPE]!=SENSOR_TYPE_RAIN) return;
-  status.rain_sensed = (digitalRead(PIN_RAINSENSOR) == options[OPTION_RAINSENSOR_TYPE] ? 0 : 1);
+  if(options[OPTION_SENSOR1_TYPE]!=SENSOR_TYPE_RAIN) return;
+  status.rain_sensed = (digitalReadExt(PIN_RAINSENSOR) == options[OPTION_SENSOR1_OPTION] ? 0 : 1);
 }
 
 /** Return program switch status */
 bool OpenSprinkler::programswitch_status(ulong curr_time) {
-  if(options[OPTION_SENSOR_TYPE]!=SENSOR_TYPE_PSWITCH) return false;
+  if(options[OPTION_SENSOR1_TYPE]!=SENSOR_TYPE_PSWITCH) return false;
   static ulong keydown_time = 0;
-  byte val = digitalRead(PIN_RAINSENSOR);
+  byte val = digitalReadExt(PIN_RAINSENSOR);
   if(!val && !keydown_time) keydown_time = curr_time;
   else if(val && keydown_time && (curr_time > keydown_time)) {
     keydown_time = 0;
@@ -1198,7 +1272,14 @@ void OpenSprinkler::switch_rfstation(RFStationData *data, bool turnon) {
   ulong on, off;
   uint16_t length = parse_rfstation_code(data, &on, &off);
 #if defined(ARDUINO)
+  #ifdef ESP8266
+  rfswitch.enableTransmit(PIN_RFTX);
+  rfswitch.setPulseLength(length);
+  rfswitch.setProtocol(1);
+  rfswitch.send(turnon ? on : off, 24);
+  #else
   send_rfsignal(turnon ? on : off, length);
+  #endif
 #else
   // pre-open gpio file to minimize overhead
   rf_gpio_fd = gpio_fd_open(PIN_RFTX);
@@ -1247,7 +1328,6 @@ void OpenSprinkler::switch_remotestation(RemoteStationData *data, bool turnon) {
   ulong port = hex2ulong(data->port, sizeof(data->port));
 
   #ifdef ESP8266
-  // todo tmp buffer
   WiFiClient client;
   
   char *p = tmp_buffer + sizeof(RemoteStationData) + 1;
@@ -1391,8 +1471,6 @@ void OpenSprinkler::switch_httpstation(HTTPStationData *data, bool turnon) {
     client.read((uint8_t*)ether_buffer, ETHER_BUFFER_SIZE);
   }
   client.stop();
-  //DEBUG_PRINTLN(ether_buffer);
-  //httpget_callback(0, 0, ETHER_BUFFER_SIZE);  
   
   #else
   
@@ -1469,14 +1547,14 @@ void OpenSprinkler::options_setup() {
     lcd_print_line_clear_pgm(PSTR("Resetting..."), 0);
     lcd_print_line_clear_pgm(PSTR("Please Wait..."), 1);
 #else
-    DEBUG_PRINT("Resetting Options...");
+    DEBUG_PRINT("resetting options...");
 #endif
     // ======== Reset NVM data ========
     int i, sn;
 
 #ifdef ESP8266
-    if(curr_ver!=0) // if SPIFFS has been written before, perform a full format
-      SPIFFS.format();  // perform a SPIFFS format
+    //if(curr_ver!=0) // if SPIFFS has been written before, perform a full format
+    SPIFFS.format();  // perform a SPIFFS format
 #endif
     // 0. wipe out nvm
     for(i=0;i<TMP_BUFFER_SIZE;i++) tmp_buffer[i]=0;
@@ -1520,14 +1598,14 @@ void OpenSprinkler::options_setup() {
     nvm_write_block(tmp_buffer, (void*)ADDR_NVM_MAS_OP, MAX_EXT_BOARDS+1);
     nvm_write_block(tmp_buffer, (void*)ADDR_NVM_STNSEQ, MAX_EXT_BOARDS+1);
 
-#ifndef ESP8266
+#ifndef ESP8266 // for ESP8266, the flash format will erase all files
     // 5. delete sd file
     remove_file(wtopts_filename);
     remove_file(ifkey_filename);
 #endif
 
     // 6. write options
-    options_save(); // write default option values
+    options_save(true); // write default option values
 
     //======== END OF NVM RESET CODE ========
 
@@ -1553,14 +1631,29 @@ void OpenSprinkler::options_setup() {
 	switch(button & BUTTON_MASK) {
 
   case BUTTON_1:
-  	// if BUTTON_2 is pressed during startup, go to 'reset all options'
+  	// if BUTTON_1 is pressed during startup, go to 'reset all options'
 		ui_set_options(OPTION_RESET);
     if (options[OPTION_RESET]) {
 			reboot_dev();
 		}
 		break;
 
-  case BUTTON_2:  // button 2 is used to enter bootloader
+  case BUTTON_2:
+  #ifdef ESP8266
+    // if BUTTON_2 is pressed during startup, go to Test OS mode
+    // only available for OS 3.0
+    lcd_print_line_clear_pgm(PSTR("===Test Mode==="), 0);
+    lcd_print_line_clear_pgm(PSTR("  B3:proceed"), 1);
+    do {
+      button = button_read(BUTTON_WAIT_NONE);
+    } while(!((button&BUTTON_MASK)==BUTTON_3 && (button&BUTTON_FLAG_DOWN)));
+    // set test mode parameters
+    wifi_config.mode = WIFI_MODE_STA;
+    wifi_config.ssid = "ostest";
+    wifi_config.pass = "opendoor";
+    button = 0;
+  #endif
+  
     break;
 
 	case BUTTON_3:
@@ -1603,7 +1696,7 @@ void OpenSprinkler::options_setup() {
     default:
       lcd_print_pgm(PSTR(" AC"));
     }
-    delay(1000);
+    delay(1500);
   }
 #endif
 }
@@ -1645,7 +1738,7 @@ void OpenSprinkler::options_load() {
 }
 
 /** Save options to internal NVM */
-void OpenSprinkler::options_save() {
+void OpenSprinkler::options_save(bool savewifi) {
   // save options in reverse order so version number is written the last
   for (int i=NUM_OPTIONS-1; i>=0; i--) {
     tmp_buffer[i] = options[i];
@@ -1655,13 +1748,15 @@ void OpenSprinkler::options_save() {
   nstations = nboards * 8;
   status.enabled = options[OPTION_DEVICE_ENABLE];
 #ifdef ESP8266
-  // save WiFi config
-  File file = SPIFFS.open(WIFI_FILENAME, "w");
-  if(file) {
-    file.println(wifi_config.mode);
-    file.println(wifi_config.ssid);
-    file.println(wifi_config.pass);
-    file.close();
+  if(savewifi) {
+    // save WiFi config
+    File file = SPIFFS.open(WIFI_FILENAME, "w");
+    if(file) {
+      file.println(wifi_config.mode);
+      file.println(wifi_config.ssid);
+      file.println(wifi_config.pass);
+      file.close();
+    }
   }
 #endif  
 }
@@ -1736,7 +1831,6 @@ void OpenSprinkler::lcd_print_2digit(int v)
 /** print time to a given line */
 void OpenSprinkler::lcd_print_time(time_t t)
 {
-#ifdef ESP8266
   lcd.setCursor(0, 0);
   lcd_print_2digit(hour(t));
   lcd_print_pgm(PSTR(":"));
@@ -1748,7 +1842,6 @@ void OpenSprinkler::lcd_print_time(time_t t)
   lcd_print_2digit(month(t));
   lcd_print_pgm(PSTR("-"));
   lcd_print_2digit(day(t));
-#endif
 }
 
 /** print ip address */
@@ -1797,11 +1890,11 @@ void OpenSprinkler::lcd_print_station(byte line, char c) {
 	    byte sid = (byte)status.display_board<<3;
 	    sid += (s+1);
       if (sid == options[OPTION_MASTER_STATION]) {
-	      lcd.print((bitvalue&1) ? (char)c : 'M'); // print master station
+	      lcd.print((bitvalue&1) ? c : 'M'); // print master station
       } else if (sid == options[OPTION_MASTER_STATION_2]) {
-	      lcd.print((bitvalue&1) ? (char)c : 'N'); // print master2 station
+	      lcd.print((bitvalue&1) ? c : 'N'); // print master2 station
 	    } else {
-	      lcd.print((bitvalue&1) ? (char)c : '_');
+	      lcd.print((bitvalue&1) ? c : '_');
 	    }
   	  bitvalue >>= 1;
 	  }
@@ -1812,13 +1905,13 @@ void OpenSprinkler::lcd_print_station(byte line, char c) {
     lcd.write(5);
   }
 	lcd.setCursor(13, 1);
-  if(status.rain_delayed || (status.rain_sensed && options[OPTION_SENSOR_TYPE]==SENSOR_TYPE_RAIN))  {
+  if(status.rain_delayed || (status.rain_sensed && options[OPTION_SENSOR1_TYPE]==SENSOR_TYPE_RAIN))  {
     lcd.write(3);
   }
-  if(options[OPTION_SENSOR_TYPE]==SENSOR_TYPE_FLOW) {
+  if(options[OPTION_SENSOR1_TYPE]==SENSOR_TYPE_FLOW) {
     lcd.write(6);
   }
-  if(options[OPTION_SENSOR_TYPE]==SENSOR_TYPE_PSWITCH) {
+  if(options[OPTION_SENSOR1_TYPE]==SENSOR_TYPE_PSWITCH) {
     lcd.write(7);
   }
   lcd.setCursor(14, 1);
@@ -2022,7 +2115,8 @@ void OpenSprinkler::ui_set_options(int oid)
         if (i==OPTION_USE_DHCP && options[i]) i += 9; // if use DHCP, skip static ip set
         else if (i==OPTION_HTTPPORT_0) i+=2; // skip OPTION_HTTPPORT_1
         else if (i==OPTION_PULSE_RATE_0) i+=2; // skip OPTION_PULSE_RATE_1
-        else if (i==OPTION_SENSOR_TYPE && options[i]!=SENSOR_TYPE_RAIN) i+=2; // if not using rain sensor, skip rain sensor type
+        else if (i==OPTION_SENSOR1_TYPE && options[i]!=SENSOR_TYPE_RAIN) i+=2; // if sensor1 is not rain sensor, skip sensor1 option
+        else if (i==OPTION_SENSOR2_TYPE && options[i]!=SENSOR_TYPE_RAIN) i+=2; // if sensor2 is not rain sensor, skip sensor2 option
         else if (i==OPTION_MASTER_STATION && options[i]==0) i+=3; // if not using master station, skip master on/off adjust
         else if (i==OPTION_MASTER_STATION_2&& options[i]==0) i+=3; // if not using master2, skip master2 on/off adjust
         else  {
@@ -2090,9 +2184,10 @@ void OpenSprinkler::lcd_set_brightness(byte value) {
 void OpenSprinkler::flash_screen() {
   lcd.setCursor(0, -1);
   lcd.print(F(" OpenSprinkler"));
-  lcd.drawXbm(34, 24, WiFi_Logo_width, WiFi_Logo_height, WiFi_Logo_image);
+  lcd.drawXbm(34, 24, WiFi_Logo_width, WiFi_Logo_height, (const byte*) WiFi_Logo_image);
+  lcd.setCursor(0, 2);  
   lcd.display();
-  delay(1000);
+  delay(1500);
   lcd.clear();
   lcd.display();
 }
@@ -2112,8 +2207,8 @@ void OpenSprinkler::set_screen_led(byte status) {
 
 void OpenSprinkler::reset_to_ap() {
   wifi_config.mode = WIFI_MODE_AP;
-  options_save();
-  state = OS_STATE_RESTART;
+  options_save(true);
+  reboot_dev();
 }
 
 void OpenSprinkler::config_ip() {
@@ -2128,8 +2223,24 @@ void OpenSprinkler::config_ip() {
     
     IPAddress subn(255,255,255,0);
     _ip = options+OPTION_DNS_IP1;
-    IPAddress dnsip(_ip[0], _ip[1], _ip[2], _ip[3]);    
+    IPAddress dnsip(_ip[0], _ip[1], _ip[2], _ip[3]);
     WiFi.config(dvip, gwip, subn, dnsip);
+  }
+}
+
+void OpenSprinkler::detect_expanders() {
+  for(byte i=0;i<(MAX_EXT_BOARDS+1)/2;i++) {
+    byte address = EXP_I2CADDR_BASE+i;
+    byte type = IOEXP::detectType(address);
+    if(expanders[i]!=NULL) delete expanders[i];
+    if(type==IOEXP_TYPE_9555) {
+      expanders[i] = new PCA9555(address);
+      expanders[i]->i2c_write(NXP_CONFIG_REG, 0); // set all channels to output
+    } else if(type==IOEXP_TYPE_8575){
+      expanders[i] = new PCF8575(address);
+    } else {
+      expanders[i] = new IOEXP(address);
+    }
   }
 }
 #endif
