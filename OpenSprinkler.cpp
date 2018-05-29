@@ -359,8 +359,7 @@ bool OpenSprinkler::read_hardware_mac() {
   Wire.beginTransmission(MAC_CTRL_ID);
   Wire.write(0xFA); // The address of the register we want
   Wire.endTransmission(); // Send the data
-  Wire.requestFrom(MAC_CTRL_ID, 6); // Request 6 bytes from the EEPROM
-  while (!Wire.available()); // Wait for the response
+  if(Wire.requestFrom(MAC_CTRL_ID, 6) != 6) return false; // Request 6 bytes from the EEPROM
   for (ret=0;ret<6;ret++) {
     tmp_buffer[ret] = Wire.read();
   }
@@ -685,7 +684,6 @@ void OpenSprinkler::begin() {
   	ret = detect_i2c(MAC_CTRL_ID);
   	if (!ret) {
     	Wire.requestFrom(MAC_CTRL_ID, 1);
-    	while(!Wire.available());
     	ret = Wire.read();
       if (ret == HW_TYPE_AC || ret == HW_TYPE_DC || ret == HW_TYPE_LATCH) {
         hw_type = ret;

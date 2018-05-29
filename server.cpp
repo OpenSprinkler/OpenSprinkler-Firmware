@@ -393,6 +393,7 @@ void server_send_result(byte code) {
   String html = F("{\"result\":");
   html += code;
   html += "}";
+  print_html_standard_header();
   server_send_json(html);
 }
 
@@ -403,6 +404,7 @@ void server_send_result(byte code, const char* item) {
   if(item) html += item;
   html += "\"";
   html += "}";
+  print_json_header();
   server_send_json(html);
 }
 
