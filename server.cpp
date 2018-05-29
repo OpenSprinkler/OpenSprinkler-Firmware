@@ -142,6 +142,7 @@ static const char htmlReturnHome[] PROGMEM =
 void print_html_standard_header() {
 #ifdef ESP8266
   wifi_server->sendHeader("Cache-Control", "max-age=0, no-cache, no-store, must-revalidate");
+  wifi_server->sendHeader("Access-Control-Allow-Origin", "*");
 #else
   bfill.emit_p(PSTR("$F$F$F$F\r\n"), html200OK, htmlContentHTML, htmlNoCache, htmlAccessControl);
 #endif
@@ -151,6 +152,7 @@ void print_json_header(bool bracket=true) {
 #ifdef ESP8266
   wifi_server->sendHeader("Cache-Control", "max-age=0, no-cache, no-store, must-revalidate");
   wifi_server->sendHeader("Content-Type", "application/json");
+  wifi_server->sendHeader("Access-Control-Allow-Origin", "*");
 #else
   bfill.emit_p(PSTR("$F$F$F$F\r\n"), html200OK, htmlContentJSON, htmlAccessControl, htmlNoCache);
 #endif

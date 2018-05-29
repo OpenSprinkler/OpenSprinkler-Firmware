@@ -28,6 +28,7 @@
 #include "server.h"
 #include "gpio.h"
 #include "images.h"
+#include "testmode.h"
 
 /** Declare static data members */
 NVConData OpenSprinkler::nvdata;
@@ -994,16 +995,12 @@ uint16_t OpenSprinkler::read_current() {
     }
     /* do an average */
     const byte K = 5;
-    //uint16_t sum = 0;
-    uint16_t min=65535;
+    uint16_t sum = 0;
     for(byte i=0;i<K;i++) {
-      //sum += analogRead(PIN_CURR_SENSE);
-      uint16_t r = analogRead(PIN_CURR_SENSE);
-      if(r<min) min=r;
+      sum += analogRead(PIN_CURR_SENSE);
       delay(2);
     }
-    //return (uint16_t)((sum/K)*scale);
-    return (uint16_t)(min*scale);
+    return (uint16_t)((sum/K)*scale);
   } else {
     return 0;
   }
@@ -1649,8 +1646,13 @@ void OpenSprinkler::options_setup() {
     } while(!((button&BUTTON_MASK)==BUTTON_3 && (button&BUTTON_FLAG_DOWN)));
     // set test mode parameters
     wifi_config.mode = WIFI_MODE_STA;
+    #ifdef TESTMODE_SSID
+    wifi_config.ssid = TESTMODE_SSID;
+    wifi_config.pass = TESTMODE_PASS;
+    #else
     wifi_config.ssid = "ostest";
     wifi_config.pass = "opendoor";
+    #endif
     button = 0;
   #endif
   
