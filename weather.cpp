@@ -63,7 +63,7 @@ static void getweather_callback(byte status, uint16_t off, uint16_t len) {
   int v;
   if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("sunrise"), true)) {
     v = atoi(tmp_buffer);
-    if (v>=0 && v<=1440 && v != os.nvdata.sunrise_time) {
+    if (v>=0 && v<=1440 && v != (int16_t) os.nvdata.sunrise_time) {
       os.nvdata.sunrise_time = v;
       os.nvdata_save();
       os.weather_update_flag |= WEATHER_UPDATE_SUNRISE;
@@ -72,7 +72,7 @@ static void getweather_callback(byte status, uint16_t off, uint16_t len) {
 
   if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("sunset"), true)) {
     v = atoi(tmp_buffer);
-    if (v>=0 && v<=1440 && v != os.nvdata.sunset_time) {
+    if (v>=0 && v<=1440 && v != (int16_t) os.nvdata.sunset_time) {
       os.nvdata.sunset_time = v;
       os.nvdata_save();
       os.weather_update_flag |= WEATHER_UPDATE_SUNSET;      

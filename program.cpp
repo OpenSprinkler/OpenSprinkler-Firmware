@@ -145,7 +145,7 @@ void ProgramData::moveup(byte pid) {
     unsigned int dst = src + PROGRAMSTRUCT_SIZE;
 #if defined(ARDUINO) // NVM write for Arduino
     byte tmp;
-    for(int i=0;i<PROGRAMSTRUCT_SIZE;i++,src++,dst++) {
+    for(unsigned int i=0;i<PROGRAMSTRUCT_SIZE;i++,src++,dst++) {
       tmp = nvm_read_byte((byte *)src);
       nvm_write_byte((byte *)src, nvm_read_byte((byte *)dst));
       nvm_write_byte((byte *)dst, tmp);
@@ -274,7 +274,7 @@ byte ProgramStruct::check_match(time_t t) {
   int16_t start = starttime_decode(starttimes[0]);
   int16_t repeat = starttimes[1];
   int16_t interval = starttimes[2];
-  unsigned int current_minute = (t%86400L)/60;
+  int16_t current_minute = (t%86400L)/60;
 
   // first assume program starts today
   if (check_day_match(t)) {
