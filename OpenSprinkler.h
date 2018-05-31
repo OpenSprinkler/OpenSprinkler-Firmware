@@ -115,7 +115,7 @@ struct ConStatus {
 extern const char wtopts_filename[];
 extern const char stns_filename[];
 extern const char ifkey_filename[];
-extern const char op_max[];
+extern const unsigned char op_max[];
 extern const char op_json_names[];
 #ifdef ESP8266
 struct WiFiConfig {

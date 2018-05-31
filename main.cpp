@@ -96,10 +96,12 @@ float flow_last_gpm=0;
 byte prev_flow_state = HIGH;
 
 void flow_poll() {
-  byte curr_flow_state = digitalReadExt(PIN_FLOWSENSOR);
+
   if(os.options[OPTION_SENSOR1_TYPE]!=SENSOR_TYPE_FLOW) return;
 
 #ifdef ESP8266  
+  byte curr_flow_state = digitalReadExt(PIN_FLOWSENSOR);
+
   if(!(prev_flow_state==HIGH && curr_flow_state==LOW)) {
     prev_flow_state = curr_flow_state;
     return;

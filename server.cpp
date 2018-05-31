@@ -1603,8 +1603,8 @@ void server_change_manual() {
       // schedule manual station
       // skip if the station is a master station
       // (because master cannot be scheduled independently)
-      byte bid = sid>>3;
-      byte s = sid&0x07;
+      // byte bid = sid>>3; // not used
+      // byte s = sid&0x07; // not used
       if ((os.status.mas==sid+1) || (os.status.mas2==sid+1))
         handle_return(HTML_NOT_PERMITTED);
 
@@ -1718,7 +1718,7 @@ void server_json_log() {
   bfill.emit_p(PSTR("["));
 
   bool comma = 0;
-  for(int i=start;i<=end;i++) {
+  for(unsigned int i=start;i<=end;i++) {
     itoa(i, tmp_buffer, 10);
     make_logfile_name(tmp_buffer);
 
