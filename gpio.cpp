@@ -370,7 +370,6 @@ static void *interruptHandler (void *arg) {
   return NULL ;
 }
 
-#include "utils.h"
 /** Attach an interrupt function to pin */
 void attachInterrupt(int pin, const char* mode, void (*isr)(void)) {
   if((pin<0)||(pin>GPIO_MAX)) {
