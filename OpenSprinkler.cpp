@@ -28,6 +28,7 @@
 #include "server.h"
 #include "gpio.h"
 #include "images.h"
+#include "testmode.h"
 
 /** Declare static data members */
 NVConData OpenSprinkler::nvdata;
@@ -358,8 +359,7 @@ bool OpenSprinkler::read_hardware_mac() {
   Wire.beginTransmission(MAC_CTRL_ID);
   Wire.write(0xFA); // The address of the register we want
   Wire.endTransmission(); // Send the data
-  Wire.requestFrom(MAC_CTRL_ID, 6); // Request 6 bytes from the EEPROM
-  while (!Wire.available()); // Wait for the response
+  if(Wire.requestFrom(MAC_CTRL_ID, 6) != 6) return false; // Request 6 bytes from the EEPROM
   for (ret=0;ret<6;ret++) {
     tmp_buffer[ret] = Wire.read();
   }
@@ -684,7 +684,6 @@ void OpenSprinkler::begin() {
   	ret = detect_i2c(MAC_CTRL_ID);
   	if (!ret) {
     	Wire.requestFrom(MAC_CTRL_ID, 1);
-    	while(!Wire.available());
     	ret = Wire.read();
       if (ret == HW_TYPE_AC || ret == HW_TYPE_DC || ret == HW_TYPE_LATCH) {
         hw_type = ret;
@@ -994,16 +993,12 @@ uint16_t OpenSprinkler::read_current() {
     }
     /* do an average */
     const byte K = 5;
-    //uint16_t sum = 0;
-    uint16_t min=65535;
+    uint16_t sum = 0;
     for(byte i=0;i<K;i++) {
-      //sum += analogRead(PIN_CURR_SENSE);
-      uint16_t r = analogRead(PIN_CURR_SENSE);
-      if(r<min) min=r;
+      sum += analogRead(PIN_CURR_SENSE);
       delay(2);
     }
-    //return (uint16_t)((sum/K)*scale);
-    return (uint16_t)(min*scale);
+    return (uint16_t)((sum/K)*scale);
   } else {
     return 0;
   }
@@ -1649,8 +1644,13 @@ void OpenSprinkler::options_setup() {
     } while(!((button&BUTTON_MASK)==BUTTON_3 && (button&BUTTON_FLAG_DOWN)));
     // set test mode parameters
     wifi_config.mode = WIFI_MODE_STA;
+    #ifdef TESTMODE_SSID
+    wifi_config.ssid = TESTMODE_SSID;
+    wifi_config.pass = TESTMODE_PASS;
+    #else
     wifi_config.ssid = "ostest";
     wifi_config.pass = "opendoor";
+    #endif
     button = 0;
   #endif
   
