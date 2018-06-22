@@ -27,18 +27,14 @@
 typedef unsigned char byte;
 typedef unsigned long ulong;
 
-#if !defined(ARDUINO) || defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__) || defined(ESP8266)
-  #define TMP_BUFFER_SIZE      255   // scratch buffer size
-#else
-  #define TMP_BUFFER_SIZE      128   // scratch buffer size
-#endif
+#define TMP_BUFFER_SIZE      255   // scratch buffer size
 
 /** Firmware version, hardware version, and maximal values */
-#define OS_FW_VERSION  218  // Firmware version: 218 means 2.1.8
+#define OS_FW_VERSION  219  // Firmware version: 219 means 2.1.9
                             // if this number is different from the one stored in non-volatile memory
                             // a device reset will be automatically triggered
 
-#define OS_FW_MINOR      1  // Firmware minor version
+#define OS_FW_MINOR      0  // Firmware minor version
 
 /** Hardware version base numbers */
 #define OS_HW_VERSION_BASE   0x00
@@ -103,14 +99,6 @@ typedef unsigned long ulong;
 /** Non-volatile memory (NVM) defines */
 #if defined(ARDUINO) && !defined(ESP8266)
 
-/** 2KB NVM (ATmega644) data structure:
-  * |         |     |  ---STRING PARAMETERS---      |           |   ----STATION ATTRIBUTES-----      |          |
-  * | PROGRAM | CON | PWD | LOC | JURL | WURL | KEY | STN_NAMES | MAS | IGR | MAS2 | DIS | SEQ | SPE | OPTIONS  |
-  * |  (986)  |(12) |(36) |(48) | (40) | (40) |(24) |   (768)   | (6) | (6) |  (6) | (6) | (6) | (6) |  (58)    |
-  * |         |     |     |     |      |      |     |           |     |     |      |     |     |     |          |
-  * 0        986  998   1034  1082  1122   1162   1186        1954  1960  1966   1972  1978  1984  1990      2048
-  */
-
 /** 4KB NVM (ATmega1284) data structure:
   * |         |     |  ---STRING PARAMETERS---      |           |   ----STATION ATTRIBUTES-----      |          |
   * | PROGRAM | CON | PWD | LOC | JURL | WURL | KEY | STN_NAMES | MAS | IGR | MAS2 | DIS | SEQ | SPE | OPTIONS  |
@@ -134,22 +122,6 @@ typedef unsigned long ulong;
     #define MAX_JAVASCRIPTURL   48    // javascript url
     #define MAX_WEATHERURL      48    // weather script url
     #define MAX_WEATHER_KEY     24    // weather api key
-
-  #else
-
-    #define MAX_EXT_BOARDS    5  // maximum number of exp. boards (each expands 8 stations)
-    #define MAX_NUM_STATIONS  ((1+MAX_EXT_BOARDS)*8)  // maximum number of stations
-
-    #define NVM_SIZE            2048  // For AVR, nvm data is stored in EEPROM, ATmega644 has 2K EEPROM
-    #define STATION_NAME_SIZE   16    // maximum number of characters in each station name
-
-    #define MAX_PROGRAMDATA     986   // program data
-    #define MAX_NVCONDATA       12     // non-volatile controller data
-    #define MAX_USER_PASSWORD   36    // user password
-    #define MAX_LOCATION        48    // location string
-    #define MAX_JAVASCRIPTURL   40    // javascript url
-    #define MAX_WEATHERURL      40    // weather script url
-    #define MAX_WEATHER_KEY     24    // weather api key,
 
   #endif
 
@@ -280,18 +252,8 @@ typedef enum {
 /** Hardware defines */
 #if defined(ARDUINO) && !defined(ESP8266)
 
-  #if F_CPU==8000000L // 8M for OS20
-    #define OS_HW_VERSION (OS_HW_VERSION_BASE+20)
-  #elif F_CPU==12000000L  // 12M for OS21
-    #define OS_HW_VERSION (OS_HW_VERSION_BASE+21)
-  #elif F_CPU==16000000L  // 16M for OS22 and OS23
-    #if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
-      #define OS_HW_VERSION (OS_HW_VERSION_BASE+23)
-      #define PIN_FREE_LIST		{2,10,12,13,14,15,18,19}  // Free GPIO pins
-    #else
-      #define OS_HW_VERSION (OS_HW_VERSION_BASE+22)
-    #endif
-  #endif
+  #define OS_HW_VERSION (OS_HW_VERSION_BASE+23)
+  #define PIN_FREE_LIST		{2,10,12,13,14,15,18,19}  // Free GPIO pins
 
   // hardware pins
   #define PIN_BUTTON_1      31    // button 1
@@ -328,16 +290,11 @@ typedef enum {
   #define PIN_CURR_SENSE     7    // current sensing pin (A7)
   #define PIN_CURR_DIGITAL  24    // digital pin index for A7
 
-  // Ethernet buffer size
-  #if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
-    #define ETHER_BUFFER_SIZE   1400 // ATmega1284 has 16K RAM, so use a bigger buffer
-  #else
-    #define ETHER_BUFFER_SIZE   950  // ATmega644 has 4K RAM, so use a smaller buffer
-  #endif
+  #define ETHER_BUFFER_SIZE   1400 // ATmega1284 has 16K RAM, so use a bigger buffer
 
   #define 	wdt_reset()   __asm__ __volatile__ ("wdr")  // watchdog timer reset
 
-  //#define SERIAL_DEBUG
+  #define SERIAL_DEBUG
   #if defined(SERIAL_DEBUG) /** Serial debug functions */
 
     #define DEBUG_BEGIN(x)   Serial.begin(x)
