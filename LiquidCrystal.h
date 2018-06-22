@@ -86,18 +86,15 @@ public:
   void command(uint8_t);
 
   inline uint8_t type() { return _type; }
-  #if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
   void noBacklight();
   void backlight();
-  #endif
-	 
+   
   using Print::write;	 
 private:
   void send(uint8_t, uint8_t);
   void write4bits(uint8_t);
   void pulseEnable();
 
-  #if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
   void expanderWrite(uint8_t);
   void pulseEnable(uint8_t);
   uint8_t _addr;
@@ -105,7 +102,6 @@ private:
   uint8_t _rows;
   uint8_t _charsize;
   uint8_t _backlightval;
-  #endif
 
   uint8_t _type;    // LCD type. 0: standard; 1: I2C
   uint8_t _rs_pin; // LOW: command.  HIGH: character.

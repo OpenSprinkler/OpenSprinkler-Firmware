@@ -23,7 +23,6 @@
 // LiquidCrystal constructor is called).
 
 void LiquidCrystal::begin() {
-  #if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
   if (_type == LCD_I2C) {
 	  _displayfunction = LCD_4BITMODE | LCD_2LINE | LCD_5x8DOTS;
 
@@ -73,7 +72,6 @@ void LiquidCrystal::begin() {
 	
 	  home();
 	}
-	#endif
 	
   if (_type == LCD_STD) {	
     _displayfunction |= LCD_2LINE;
@@ -162,7 +160,7 @@ void LiquidCrystal::init(uint8_t fourbitmode, uint8_t rs, uint8_t rw, uint8_t en
   
   Wire.begin();
   _type = LCD_STD;
-  #if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
+
   // detect I2C and assign _type variable accordingly
   Wire.beginTransmission(LCD_I2C_ADDR1);  // check type 1
   //Wire.write(0x00);
@@ -180,7 +178,6 @@ void LiquidCrystal::init(uint8_t fourbitmode, uint8_t rs, uint8_t rw, uint8_t en
 	  _charsize = LCD_5x8DOTS;
 	  _backlightval = LCD_BACKLIGHT;
 	}	  
-  #endif
 
   if (_type == LCD_STD) {
     pinMode(_rs_pin, OUTPUT);
@@ -211,13 +208,11 @@ void LiquidCrystal::home()
 void LiquidCrystal::setCursor(uint8_t col, uint8_t row)
 {
   int row_offsets[] = { 0x00, 0x40, 0x14, 0x54 };
-  #if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)  
   if (_type == LCD_I2C) {
     if (row > _rows) {
       row = _rows-1;    // we count rows starting w/0
     }
   }
-  #endif
   if (_type == LCD_STD) {
     if (row >= _numlines) {
       row = _numlines-1;
@@ -298,7 +293,6 @@ void LiquidCrystal::createChar(uint8_t location, uint8_t charmap[]) {
   }
 }
 
-#if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
 // Turn the (optional) backlight off/on
 void LiquidCrystal::noBacklight(void) {
   _backlightval=LCD_NOBACKLIGHT;
@@ -309,7 +303,6 @@ void LiquidCrystal::backlight(void) {
   _backlightval=LCD_BACKLIGHT;
   expanderWrite(0);
 }
-#endif
 
 /*********** mid level commands, for sending data/cmds */
 
@@ -326,14 +319,12 @@ inline size_t LiquidCrystal::write(uint8_t value) {
 
 // write either command or data
 void LiquidCrystal::send(uint8_t value, uint8_t mode) {
-  #if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
   if (_type == LCD_I2C) {
 	  uint8_t highnib=value&0xf0;
 	  uint8_t lownib=(value<<4)&0xf0;
 	  write4bits((highnib)|mode);
 	  write4bits((lownib)|mode); 
   } 
-  #endif
   if (_type == LCD_STD) {
     digitalWrite(_rs_pin, mode);
 
@@ -348,12 +339,10 @@ void LiquidCrystal::send(uint8_t value, uint8_t mode) {
 }
 
 void LiquidCrystal::write4bits(uint8_t value) {
-  #if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
   if (_type == LCD_I2C) {
 	  expanderWrite(value);
 	  pulseEnable(value);
   }
-  #endif
   if (_type == LCD_STD) {
     for (int i = 0; i < 4; i++) {
       pinMode(_data_pins[i], OUTPUT);
@@ -364,7 +353,6 @@ void LiquidCrystal::write4bits(uint8_t value) {
   }
 }
 
-#if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
 void LiquidCrystal::expanderWrite(uint8_t _data){                                        
 	Wire.beginTransmission(_addr);
 	Wire.write((int)(_data) | _backlightval);
@@ -378,7 +366,6 @@ void LiquidCrystal::pulseEnable(uint8_t _data){
 	expanderWrite(_data & ~En);	// En low
 	delayMicroseconds(50);		// commands need > 37us to settle
 }
-#endif
 
 void LiquidCrystal::pulseEnable(void) {
   digitalWrite(_enable_pin, LOW);
