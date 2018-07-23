@@ -716,7 +716,9 @@ void server_change_stations() {
 		    }
 		    if (!found || activeState > 1) handle_return(HTML_DATA_OUTOFBOUND);
 	    } else if (tmp_buffer[0] == STN_TYPE_HTTP) {
-		    //urlDecode(tmp_buffer + 1); // we don't decode url anymore since this would have to be re-encoded later
+        #if !defined(ESP8266)  // ESP8266 performs automatic decoding so no need to do it again
+		      urlDecode(tmp_buffer + 1);
+        #endif
 		    if (strlen(tmp_buffer+1) > sizeof(HTTPStationData)) {
 			    handle_return(HTML_DATA_OUTOFBOUND);
 		    }
