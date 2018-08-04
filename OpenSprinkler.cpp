@@ -205,7 +205,7 @@ const char op_prompts[] PROGMEM =
     "Factory reset?  ";
 
 /** Option maximum values (stored in progmem) */
-const char op_max[] PROGMEM = {
+const byte op_max[] PROGMEM = {
   0,
   108,
   1,

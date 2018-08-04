@@ -940,6 +940,20 @@ void server_change_program() {
   int pid=atoi(tmp_buffer);
   if (!(pid>=-1 && pid< pd.nprograms)) handle_return(HTML_DATA_OUTOFBOUND);
 
+  // check if "en" parameter is present
+  if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("en"), true)) {
+    if(pid<0) handle_return(HTML_DATA_OUTOFBOUND);
+    pd.set_flagbit(pid, PROGRAMSTRUCT_EN_BIT, (tmp_buffer[0]=='0')?0:1);
+    handle_return(HTML_SUCCESS);
+  }
+
+  // check if "uwt" parameter is present
+  if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("uwt"), true)) {
+    if(pid<0) handle_return(HTML_DATA_OUTOFBOUND);
+    pd.set_flagbit(pid, PROGRAMSTRUCT_UWT_BIT, (tmp_buffer[0]=='0')?0:1);
+    handle_return(HTML_SUCCESS);
+  }
+  
   // parse program name
   if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("name"), true)) {
     urlDecode(tmp_buffer);

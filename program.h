@@ -59,6 +59,8 @@ struct LogStruct {
 #define STARTTIME_SUNSET_BIT  13
 #define STARTTIME_SIGN_BIT    12
 
+#define PROGRAMSTRUCT_EN_BIT   0
+#define PROGRAMSTRUCT_UWT_BIT  1
 /** Program data structure */
 class ProgramStruct {
 public:
@@ -155,6 +157,7 @@ public:
   static void read(byte pid, ProgramStruct *buf);
   static byte add(ProgramStruct *buf);
   static byte modify(byte pid, ProgramStruct *buf);
+  static byte set_flagbit(byte pid, byte bid, byte value);
   static void moveup(byte pid);  
   static byte del(byte pid);
   static void drem_to_relative(byte days[2]); // absolute to relative reminder conversion
