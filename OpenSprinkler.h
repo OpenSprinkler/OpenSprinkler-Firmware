@@ -264,7 +264,15 @@ private:
 #if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__) || defined(ESP8266)
   static byte engage_booster;
 #endif
-
+#if defined(ESP8266)
+  static void latch_boost();
+  static void latch_open(byte sid);
+  static void latch_close(byte sid);
+  static void latch_setzonepin(byte sid, byte value);
+  static void latch_setallzonepins(byte value);
+  static void latch_apply_all_station_bits();
+  static byte prev_station_bits[];
+#endif
 #endif // LCD functions
 };
 
