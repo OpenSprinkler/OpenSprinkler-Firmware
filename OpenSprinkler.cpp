@@ -906,6 +906,7 @@ void OpenSprinkler::latch_open(byte sid) {
   latch_boost();  // boost voltage
   latch_setallzonepins(HIGH);       // set all switches to HIGH, including COM
   latch_setzonepin(sid, LOW); // set the specified switch to LOW
+  delay(1); // delay 1 ms for all gates to stablize
   digitalWriteExt(PIN_BOOST_EN, HIGH); // dump boosted voltage
   delay(100);                     // for 100ms
   latch_setzonepin(sid, HIGH);        // set the specified switch back to HIGH
@@ -916,6 +917,7 @@ void OpenSprinkler::latch_close(byte sid) {
   latch_boost();  // boost voltage
   latch_setallzonepins(LOW);        // set all switches to LOW, including COM
   latch_setzonepin(sid, HIGH);// set the specified switch to HIGH
+  delay(1); // delay 1 ms for all gates to stablize
   digitalWriteExt(PIN_BOOST_EN, HIGH); // dump boosted voltage
   delay(100);                     // for 100ms
   latch_setzonepin(sid, LOW);     // set the specified switch back to LOW
@@ -960,7 +962,7 @@ void OpenSprinkler::apply_all_station_bits() {
     // Handle DC booster
     if(hw_type==HW_TYPE_DC && engage_booster) {
       // for DC controller: boost voltage and enable output path
-      digitalWriteExt(PIN_BOOST_EN, LOW);  // disable output path
+      digitalWriteExt(PIN_BOOST_EN, LOW);  // disfable output path
       digitalWriteExt(PIN_BOOST, HIGH);    // enable boost converter
       delay((int)options[OPTION_BOOST_TIME]<<2);  // wait for booster to charge
       digitalWriteExt(PIN_BOOST, LOW);     // disable boost converter
