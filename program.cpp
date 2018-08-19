@@ -332,4 +332,20 @@ void ProgramData::drem_to_absolute(byte days[2]) {
   days[0] = (byte)(((os.now_tz()/SECS_PER_DAY) + rem_rel) % inv);
 }
 
+// set the enable bit
+byte ProgramData::set_flagbit(byte pid, byte bid, byte value) {
+  if (pid >= nprograms)  return 0;
+  if (0) {
+    // handle SD card
+  } else {
+    byte flag;
+    unsigned int addr = ADDR_PROGRAMDATA + (unsigned int)pid * PROGRAMSTRUCT_SIZE;
+    flag=nvm_read_byte((const byte *)addr);
+    if(value) flag|=(1<<bid);
+    else flag&=(~(1<<bid));
+    nvm_write_byte((const byte *)addr, flag);
+  }
+  return 1;  
+}
+
 
