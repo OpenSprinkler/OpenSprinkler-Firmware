@@ -1304,9 +1304,11 @@ byte OpenSprinkler::set_station_bit(byte sid, byte value) {
     if(!((*data)&mask)) return 0; // if bit is already reset, return no change
     else {
       (*data) = (*data) & (~mask);
+#if defined(ESP8266)      
       if(hw_type == HW_TYPE_LATCH) {
         engage_booster = true;  // if LATCH controller, engage booster when bit changes
       }
+#endif
       switch_special_station(sid, 0); // handle special stations
       return 255;
     }

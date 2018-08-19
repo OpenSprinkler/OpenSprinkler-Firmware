@@ -1533,6 +1533,10 @@ void server_change_options()
  * cpw: confirm new password
  */
 void server_change_password() {
+#if defined(DEMO)
+  handle_return(HTML_SUCCESS);  // do not allow chnaging password for demo
+#endif
+
 #ifdef ESP8266
   char* p = NULL;
   if(!process_password()) return;
@@ -1542,9 +1546,6 @@ void server_change_password() {
   if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("npw"), true)) {
     char tbuf2[TMP_BUFFER_SIZE];
     if (findKeyVal(p, tbuf2, TMP_BUFFER_SIZE, PSTR("cpw"), true) && strncmp(tmp_buffer, tbuf2, MAX_USER_PASSWORD) == 0) {
-      #if defined(DEMO)
-        handle_return(HTML_SUCCESS);
-      #endif
       urlDecode(tmp_buffer);
       tmp_buffer[MAX_USER_PASSWORD-1]=0;  // make sure we don't exceed the maximum size
       nvm_write_block(tmp_buffer, (void*)ADDR_NVM_PASSWORD, strlen(tmp_buffer)+1);
