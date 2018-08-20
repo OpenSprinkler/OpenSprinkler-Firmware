@@ -49,10 +49,13 @@ typedef unsigned long ulong;
 #define HW_TYPE_UNKNOWN      0xFF
 
 /** File names */
-#define WEATHER_OPTS_FILENAME "wtopts.txt"    // weather options file
 #define STATION_ATTR_FILENAME "stns.dat"      // station attributes data file
-#define WIFI_FILENAME         "wifi.dat"      // wifi credentials file
-#define IFTTT_KEY_FILENAME    "ifkey.txt"
+#define OPTIONS_FILENAME      "config.dat"
+
+//#define WEATHER_OPTS_FILENAME "wtopts.txt"  // weather options file
+//#define IFTTT_KEY_FILENAME    "ifkey.txt"
+//#define WIFI_FILENAME         "wifi.dat"    // wifi credentials file
+
 #define IFTTT_KEY_MAXSIZE     128
 #define STATION_SPECIAL_DATA_SIZE  (TMP_BUFFER_SIZE - 8)
 
