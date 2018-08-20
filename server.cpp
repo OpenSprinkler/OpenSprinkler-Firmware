@@ -716,7 +716,9 @@ void server_change_stations() {
 		    }
 		    if (!found || activeState > 1) handle_return(HTML_DATA_OUTOFBOUND);
 	    } else if (tmp_buffer[0] == STN_TYPE_HTTP) {
-		    //urlDecode(tmp_buffer + 1); // we don't decode url anymore since this would have to be re-encoded later
+        #if !defined(ESP8266)  // ESP8266 performs automatic decoding so no need to do it again
+		      urlDecode(tmp_buffer + 1);
+        #endif
 		    if (strlen(tmp_buffer+1) > sizeof(HTTPStationData)) {
 			    handle_return(HTML_DATA_OUTOFBOUND);
 		    }
@@ -938,6 +940,20 @@ void server_change_program() {
   int pid=atoi(tmp_buffer);
   if (!(pid>=-1 && pid< pd.nprograms)) handle_return(HTML_DATA_OUTOFBOUND);
 
+  // check if "en" parameter is present
+  if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("en"), true)) {
+    if(pid<0) handle_return(HTML_DATA_OUTOFBOUND);
+    pd.set_flagbit(pid, PROGRAMSTRUCT_EN_BIT, (tmp_buffer[0]=='0')?0:1);
+    handle_return(HTML_SUCCESS);
+  }
+
+  // check if "uwt" parameter is present
+  if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("uwt"), true)) {
+    if(pid<0) handle_return(HTML_DATA_OUTOFBOUND);
+    pd.set_flagbit(pid, PROGRAMSTRUCT_UWT_BIT, (tmp_buffer[0]=='0')?0:1);
+    handle_return(HTML_SUCCESS);
+  }
+  
   // parse program name
   if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("name"), true)) {
     urlDecode(tmp_buffer);
@@ -1517,6 +1533,10 @@ void server_change_options()
  * cpw: confirm new password
  */
 void server_change_password() {
+#if defined(DEMO)
+  handle_return(HTML_SUCCESS);  // do not allow chnaging password for demo
+#endif
+
 #ifdef ESP8266
   char* p = NULL;
   if(!process_password()) return;
@@ -1526,9 +1546,6 @@ void server_change_password() {
   if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("npw"), true)) {
     char tbuf2[TMP_BUFFER_SIZE];
     if (findKeyVal(p, tbuf2, TMP_BUFFER_SIZE, PSTR("cpw"), true) && strncmp(tmp_buffer, tbuf2, MAX_USER_PASSWORD) == 0) {
-      #if defined(DEMO)
-        handle_return(HTML_SUCCESS);
-      #endif
       urlDecode(tmp_buffer);
       tmp_buffer[MAX_USER_PASSWORD-1]=0;  // make sure we don't exceed the maximum size
       nvm_write_block(tmp_buffer, (void*)ADDR_NVM_PASSWORD, strlen(tmp_buffer)+1);

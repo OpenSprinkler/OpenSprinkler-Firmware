@@ -63,6 +63,7 @@ const char ifkey_filename[]  PROGMEM = IFTTT_KEY_FILENAME;
 #ifdef ESP8266
 const char wifi_filename[]   PROGMEM = WIFI_FILENAME;
 byte OpenSprinkler::state = OS_STATE_INITIAL;
+byte OpenSprinkler::prev_station_bits[MAX_EXT_BOARDS+1];
 WiFiConfig OpenSprinkler::wifi_config = {WIFI_MODE_AP, "", ""};
 IOEXP* OpenSprinkler::expanders[(MAX_EXT_BOARDS+1)/2];
 IOEXP* OpenSprinkler::mainio;
@@ -205,7 +206,7 @@ const char op_prompts[] PROGMEM =
     "Factory reset?  ";
 
 /** Option maximum values (stored in progmem) */
-const char op_max[] PROGMEM = {
+const byte op_max[] PROGMEM = {
   0,
   108,
   1,
@@ -845,48 +846,153 @@ void OpenSprinkler::begin() {
 #endif
 }
 
+#ifdef ESP8266
+/** LATCH boost voltage
+ *
+ */
+void OpenSprinkler::latch_boost() {
+  digitalWriteExt(PIN_BOOST, HIGH);    // enable boost converter
+  delay((int)options[OPTION_BOOST_TIME]<<2);  // wait for booster to charge
+  digitalWriteExt(PIN_BOOST, LOW);     // disable boost converter
+}
+
+/** Set all zones (for LATCH controller)
+ *  This function sets all zone pins (including COM) to a specified value
+ */
+void OpenSprinkler::latch_setallzonepins(byte value) {
+  digitalWriteExt(PIN_LATCH_COM, value);  // set latch com pin
+  // Handle driver board (on main controller)
+  if(drio->type==IOEXP_TYPE_9555) { // LATCH contorller only uses PCA9555, no other type
+    uint16_t reg = drio->i2c_read(NXP_OUTPUT_REG);  // read current output reg value
+    if(value) reg |= 0x00FF;  // first 8 zones are the lowest 8 bits of main driver board
+    else reg &= 0xFF00;
+    drio->i2c_write(NXP_OUTPUT_REG, reg); // write value to register
+  }
+  // Handle all expansion boards
+  for(byte i=0;i<MAX_EXT_BOARDS/2;i++) {  // 
+    if(expanders[i]->type==IOEXP_TYPE_9555) {
+      expanders[i]->i2c_write(NXP_OUTPUT_REG, value?0xFFFF:0x0000);
+    }
+  }
+}
+
+/** Set one zone (for LATCH controller)
+ *  This function sets one specified zone pin to a specified value
+ */
+void OpenSprinkler::latch_setzonepin(byte sid, byte value) {
+  if(sid<8) { // on main controller
+    if(drio->type==IOEXP_TYPE_9555) { // LATCH contorller only uses PCA9555, no other type
+      uint16_t reg = drio->i2c_read(NXP_OUTPUT_REG);  // read current output reg value
+      if(value) reg |= (1<<sid);
+      else reg &= (~(1<<sid));
+      drio->i2c_write(NXP_OUTPUT_REG, reg); // write value to register
+    }    
+  } else {  // on expander
+    byte bid=(sid-8)>>4;
+    uint16_t s=(sid-8)&0x0F;
+    if(expanders[bid]->type==IOEXP_TYPE_9555) {
+      uint16_t reg = expanders[bid]->i2c_read(NXP_OUTPUT_REG);  // read current output reg value
+      if(value) reg |= (1<<s);
+      else reg &= (~(1<<s));
+      expanders[bid]->i2c_write(NXP_OUTPUT_REG, reg);
+    }
+  }
+}
+
+/** LATCH open / close a station
+ *
+ */
+void OpenSprinkler::latch_open(byte sid) {
+  latch_boost();  // boost voltage
+  latch_setallzonepins(HIGH);       // set all switches to HIGH, including COM
+  latch_setzonepin(sid, LOW); // set the specified switch to LOW
+  delay(1); // delay 1 ms for all gates to stablize
+  digitalWriteExt(PIN_BOOST_EN, HIGH); // dump boosted voltage
+  delay(100);                     // for 100ms
+  latch_setzonepin(sid, HIGH);        // set the specified switch back to HIGH
+  digitalWriteExt(PIN_BOOST_EN, LOW);  // disable boosted voltage
+}
+
+void OpenSprinkler::latch_close(byte sid) {
+  latch_boost();  // boost voltage
+  latch_setallzonepins(LOW);        // set all switches to LOW, including COM
+  latch_setzonepin(sid, HIGH);// set the specified switch to HIGH
+  delay(1); // delay 1 ms for all gates to stablize
+  digitalWriteExt(PIN_BOOST_EN, HIGH); // dump boosted voltage
+  delay(100);                     // for 100ms
+  latch_setzonepin(sid, LOW);     // set the specified switch back to LOW
+  digitalWriteExt(PIN_BOOST_EN, LOW);  // disable boosted voltage
+  latch_setallzonepins(HIGH);               // set all switches back to HIGH
+}
+
+/**
+ * LATCH version of apply_all_station_bits
+ */
+void OpenSprinkler::latch_apply_all_station_bits() {
+  if(hw_type==HW_TYPE_LATCH && engage_booster) {
+    for(byte i=0;i<nstations;i++) {
+      byte bid=i>>3;
+      byte s=i&0x07;
+      byte mask=(byte)1<<s;
+      if(station_bits[bid] & mask) {
+        if(prev_station_bits[bid] & mask) continue; // already set
+        latch_open(i);
+      } else {
+        if(!(prev_station_bits[bid] & mask)) continue; // already reset
+        latch_close(i);
+      }
+    }
+    engage_booster = 0;
+    memcpy(prev_station_bits, station_bits, MAX_EXT_BOARDS+1);
+  }
+}
+#endif
+
 /** Apply all station bits
  * !!! This will activate/deactivate valves !!!
  */
 void OpenSprinkler::apply_all_station_bits() {
 
 #ifdef ESP8266
-  // Handle DC booster
-  if((hw_type==HW_TYPE_DC) && engage_booster) {
-    // for DC controller: boost voltage
-    digitalWriteExt(PIN_BOOST_EN, LOW);  // disable output path
-    digitalWriteExt(PIN_BOOST, HIGH);    // enable boost converter
-    delay((int)options[OPTION_BOOST_TIME]<<2);  // wait for booster to charge
-    digitalWriteExt(PIN_BOOST, LOW);     // disable boost converter
-    digitalWriteExt(PIN_BOOST_EN, HIGH); // enable output path
-    engage_booster = 0;
-  }
+  if(hw_type==HW_TYPE_LATCH) {
+    // if controller type is latching, the control mechanism is different
+    // hence will be handled separately
+    latch_apply_all_station_bits(); 
+  } else {
+    // Handle DC booster
+    if(hw_type==HW_TYPE_DC && engage_booster) {
+      // for DC controller: boost voltage and enable output path
+      digitalWriteExt(PIN_BOOST_EN, LOW);  // disfable output path
+      digitalWriteExt(PIN_BOOST, HIGH);    // enable boost converter
+      delay((int)options[OPTION_BOOST_TIME]<<2);  // wait for booster to charge
+      digitalWriteExt(PIN_BOOST, LOW);     // disable boost converter
+      digitalWriteExt(PIN_BOOST_EN, HIGH); // enable output path
+      engage_booster = 0;
+    }
 
-  if(drio->type==IOEXP_TYPE_8574) {
-    /* revision 0 uses PCF8574 with active low logic, so all bits must be flipped */
-    drio->i2c_write(NXP_OUTPUT_REG, ~station_bits[0]);
-  } else if(drio->type==IOEXP_TYPE_9555) {
-    /* revision 1 uses PCA9555 with active high logic */
-    uint16_t reg = drio->i2c_read(NXP_OUTPUT_REG);  // read current output reg value
-    reg = (reg&0xFF00) | station_bits[0]; // output channels are the low 8-bit
-    drio->i2c_write(NXP_OUTPUT_REG, reg); // write value to register
-  }
-    
-  for(int i=0;i<MAX_EXT_BOARDS/2;i++) {
-    uint16_t data = station_bits[i*2+2];
-    data = (data<<8) + station_bits[i*2+1];
-    if(expanders[i]->type==IOEXP_TYPE_9555) {
-      expanders[i]->i2c_write(NXP_OUTPUT_REG, data);
-    } else {
-      expanders[i]->i2c_write(NXP_OUTPUT_REG, ~data);
-      //pcf_write16(EXP_I2CADDR_BASE+i, ~data);
+    // Handle driver board (on main controller)
+    if(drio->type==IOEXP_TYPE_8574) {
+      /* revision 0 uses PCF8574 with active low logic, so all bits must be flipped */
+      drio->i2c_write(NXP_OUTPUT_REG, ~station_bits[0]);
+    } else if(drio->type==IOEXP_TYPE_9555) {
+      /* revision 1 uses PCA9555 with active high logic */
+      uint16_t reg = drio->i2c_read(NXP_OUTPUT_REG);  // read current output reg value
+      reg = (reg&0xFF00) | station_bits[0]; // output channels are the low 8-bit
+      drio->i2c_write(NXP_OUTPUT_REG, reg); // write value to register
+    }
+      
+    // Handle expansion boards
+    for(int i=0;i<MAX_EXT_BOARDS/2;i++) {
+      uint16_t data = station_bits[i*2+2];
+      data = (data<<8) + station_bits[i*2+1];
+      if(expanders[i]->type==IOEXP_TYPE_9555) {
+        expanders[i]->i2c_write(NXP_OUTPUT_REG, data);
+      } else {
+        expanders[i]->i2c_write(NXP_OUTPUT_REG, ~data);
+      }
     }
   }
-
-  /*if((hw_type==HW_TYPE_DC) && engage_booster) {
-    // for DC controller: enable output path
-  }*/
-  
+    
   byte bid, s, sbits;  
 #else
   digitalWrite(PIN_SR_LATCH, LOW);
@@ -933,7 +1039,6 @@ void OpenSprinkler::apply_all_station_bits() {
 
   if(options[OPTION_SPE_AUTO_REFRESH]) {
     // handle refresh of RF and remote stations
-    // each time apply_all_station_bits is called
     // we refresh the station whose index is the current time modulo MAX_NUM_STATIONS
     static byte last_sid = 0;
     byte sid = now() % MAX_NUM_STATIONS;
@@ -984,12 +1089,14 @@ uint16_t OpenSprinkler::read_current() {
       #else
       scale = 16.11;
       #endif
-    } else {
+    } else if (hw_type == HW_TYPE_AC) {
       #if defined(ESP8266)
       scale = 3.45;
       #else
       scale = 11.39;
       #endif     
+    } else {
+      scale = 0.0;  // for other controllers, current is 0
     }
     /* do an average */
     const byte K = 5;
@@ -1197,6 +1304,11 @@ byte OpenSprinkler::set_station_bit(byte sid, byte value) {
     if(!((*data)&mask)) return 0; // if bit is already reset, return no change
     else {
       (*data) = (*data) & (~mask);
+#if defined(ESP8266)      
+      if(hw_type == HW_TYPE_LATCH) {
+        engage_booster = true;  // if LATCH controller, engage booster when bit changes
+      }
+#endif
       switch_special_station(sid, 0); // handle special stations
       return 255;
     }
@@ -1680,8 +1792,8 @@ void OpenSprinkler::options_setup() {
   if (!button) {
     // flash screen
     lcd_print_line_clear_pgm(PSTR(" OpenSprinkler"),0);
-    lcd.setCursor(2, 1);
-    lcd_print_pgm(PSTR("HW v"));
+    lcd.setCursor((hw_type==HW_TYPE_LATCH)?2:4, 1);
+    lcd_print_pgm(PSTR("v"));
     byte hwv = options[OPTION_HW_VERSION];
     lcd.print((char)('0'+(hwv/10)));
     lcd.print('.');
@@ -1691,12 +1803,25 @@ void OpenSprinkler::options_setup() {
       lcd_print_pgm(PSTR(" DC"));
       break;
     case HW_TYPE_LATCH:
-      lcd_print_pgm(PSTR(" LA"));
+      lcd_print_pgm(PSTR(" LATCH"));
       break;
     default:
       lcd_print_pgm(PSTR(" AC"));
     }
     delay(1500);
+    #ifdef ESP8266
+    lcd.setCursor(2, 1);
+    lcd_print_pgm(PSTR("FW "));
+    lcd.print((char)('0'+(OS_FW_VERSION/100)));
+    lcd.print('.');
+    lcd.print((char)('0'+((OS_FW_VERSION/10)%10)));
+    lcd.print('.');
+    lcd.print((char)('0'+(OS_FW_VERSION%10)));
+    lcd.print('(');
+    lcd.print(OS_FW_MINOR);
+    lcd.print(')');
+    delay(1000);
+    #endif
   }
 #endif
 }
