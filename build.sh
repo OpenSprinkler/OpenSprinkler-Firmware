@@ -1,9 +1,16 @@
 #!/bin/bash
 
-while getopts ":s" opt; do
+# use -s to suppress user prompt and NOT install for startup
+# use -i to suppress user prompt AND INSTALL for startup
+# without either, user is prompted to choose
+while getopts ":si" opt; do
   case $opt in
     s)
 	  SILENT=true
+	  command shift
+      ;;
+    i)
+	  AUTOINSTALL=true
 	  command shift
       ;;
   esac
@@ -20,11 +27,14 @@ fi
 
 if [ ! "$SILENT" = true ] && [ -f OpenSprinkler.launch ] && [ ! -f /etc/init.d/OpenSprinkler.sh ]; then
 
-	read -p "Do you want to start OpenSprinkler on startup? " -n 1 -r
-	echo
+	# only ask user if auto-install not specified
+	if [ ! "$AUTOINSTALL" = true ]; then
+		read -p "Do you want to start OpenSprinkler on startup? " -n 1 -r
+		echo
 
-	if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-		exit 0
+		if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+			exit 0
+		fi
 	fi
 
 	echo "Adding OpenSprinkler launch script..."
