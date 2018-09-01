@@ -65,6 +65,7 @@ class EthernetServer
 {
 public:
 	EthernetServer(uint16_t port);
+	EthernetServer(uint16_t port, uint8_t lh_only);
 	~EthernetServer();
 
 	bool begin();
@@ -72,6 +73,7 @@ public:
 private:
 	uint16_t m_port;
 	int m_sock;
+	uint8_t o_lh_only;
 };
 #endif
 

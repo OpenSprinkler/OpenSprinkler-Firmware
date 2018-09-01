@@ -39,7 +39,12 @@
 #include "defines.h"
 
 EthernetServer::EthernetServer(uint16_t port)
-		: m_port(port), m_sock(0)
+		: m_port(port), m_sock(0), o_lh_only(0)
+{
+}
+
+EthernetServer::EthernetServer(uint16_t port, uint8_t lh_only)
+		: m_port(port), m_sock(0), o_lh_only(lh_only)
 {
 }
 
@@ -53,7 +58,13 @@ bool EthernetServer::begin()
 	struct sockaddr_in6 sin = {0};
 	sin.sin6_family = AF_INET6;
 	sin.sin6_port = htons(m_port);
-	sin.sin6_addr = in6addr_any;
+	//sin.sin6_addr = in6addr_any;
+	//sin.sin6_addr = in6addr_loopback;
+
+	if (o_lh_only)
+		sin.sin6_addr = in6addr_loopback;
+	else
+		sin.sin6_addr = in6addr_any;
 
 	if ((m_sock = socket(PF_INET6, SOCK_STREAM, 0)) < 0)
 	{
