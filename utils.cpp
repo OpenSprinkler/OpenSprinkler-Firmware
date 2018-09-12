@@ -25,8 +25,9 @@
 #include "OpenSprinkler.h"
 extern OpenSprinkler os;
 
-#if defined(ARDUINO)  // AVR
-  #ifdef ESP8266
+#if defined(ARDUINO)  // Arduino
+
+  #if defined(ESP8266)
     #include <FS.h>
   #else
     #include <avr/eeprom.h>
@@ -34,239 +35,7 @@ extern OpenSprinkler os;
     extern SdFat sd;
   #endif
 
-void write_to_file(const char *name, const char *data, int size, int pos, bool trunc) {
-  if (!os.status.has_sd)  return;
-
-  char fn[12];
-  strcpy_P(fn, name);
-  
-  #ifdef ESP8266
-    File f;
-    if(trunc) {
-      f = SPIFFS.open(fn, "w");
-    } else {
-      f = SPIFFS.open(fn, "r+");
-      if(!f) f = SPIFFS.open(fn, "w");
-    }    
-    if(!f) {f.close(); return;}
-    if(pos) f.seek(pos, SeekSet);
-    if(size==0) {
-      f.write((byte*)" ", 1);  // hack to circumvent SPIFFS bug involving writing empty file
-    } else {
-      f.write((byte*)data, size);
-    }
-    f.close();
-  #else
-    sd.chdir("/");
-    SdFile file;
-    int flag = O_CREAT | O_WRITE;
-    if (trunc) flag |= O_TRUNC;
-    int ret = file.open(fn, flag);
-    if(!ret) {
-      file.close();
-      return;
-    }
-    file.seekSet(pos);
-    file.write(data, size);
-    file.close();
-  #endif
-}
-
-bool read_from_file(const char *name, char *data, int maxsize, int pos) {
-  if (!os.status.has_sd)  { data[0]=0; return false; }
-
-  char fn[12];
-  strcpy_P(fn, name);
-  
-  #ifdef ESP8266
-    File f = SPIFFS.open(fn, "r");
-    if(!f) {
-      data[0]=0;
-      f.close();
-      return true;  // return true but with empty string
-    }
-    if(pos)  f.seek(pos, SeekSet);
-    int len = f.read((byte*)data, maxsize);
-    if(len>0) data[len]=0;
-    if(len==1 && data[0]==' ') data[0] = 0;  // hack to circumvent SPIFFS bug involving writing empty file
-    data[maxsize-1]=0;
-    f.close();
-    return true;
-  #else
-    sd.chdir("/");
-    SdFile file;
-    int ret = file.open(fn, O_READ );
-    if(!ret) {
-      data[0]=0;
-      file.close();
-      return true;  // return true but with empty string
-    }
-    file.seekSet(pos);
-    ret = file.fgets(data, maxsize);
-    data[maxsize-1]=0;
-    file.close();
-    return true;
-  #endif
-}
-
-void remove_file(const char *name) {
-  if (!os.status.has_sd)  return;
-
-  char fn[12];
-  strcpy_P(fn, name);
-  
-  #ifdef ESP8266
-    if(!SPIFFS.exists(fn)) return;
-    SPIFFS.remove(fn);
-  #else
-    sd.chdir("/");
-    if (!sd.exists(fn))  return;
-    sd.remove(fn);
-  #endif
-}
-
-#ifdef ESP8266
-// nvm functions for ESP8266
-// do not use File.readBytes or readBytesUntil because it's very slow
-void nvm_read_block(void *dst, const void *src, int len) {
-  File f = SPIFFS.open(NVM_FILENAME, "r");
-  if(f) {
-    f.seek((unsigned int)src, SeekSet);
-    f.read((byte*)dst, len);
-    f.close();
-  }
-}
-
-void nvm_write_block(const void *src, void *dst, int len) {
-  File f = SPIFFS.open(NVM_FILENAME, "r+");
-  if(!f) f = SPIFFS.open(NVM_FILENAME, "w");
-  if(f) {
-    f.seek((unsigned int)dst, SeekSet);
-    f.write((byte*)src, len);
-    f.close();
-  }
-}
-
-byte nvm_read_byte(const byte *p) {
-  File f = SPIFFS.open(NVM_FILENAME, "r");
-  byte v = 0;
-  if(f) {
-    f.seek((unsigned int)p, SeekSet);
-    f.read((byte*)&v, 1);
-    f.close();
-  }
-  return v;
-}
-
-void nvm_write_byte(const byte *p, byte v) {
-  File f = SPIFFS.open(NVM_FILENAME, "r+");
-  if(!f) f = SPIFFS.open(NVM_FILENAME, "w");
-  if(f) {
-    f.seek((unsigned int)p, SeekSet);
-    f.write(&v, 1);
-    f.close();  
-  }
-}
-
-#endif
-
-#else // RPI/BBB/LINUX
-void nvm_read_block(void *dst, const void *src, int len) {
-  FILE *fp = fopen(get_filename_fullpath(NVM_FILENAME), "rb");
-  if(fp) {
-    fseek(fp, (unsigned int)src, SEEK_SET);
-    fread(dst, 1, len, fp);
-    fclose(fp);
-  }
-}
-
-void nvm_write_block(const void *src, void *dst, int len) {
-  FILE *fp = fopen(get_filename_fullpath(NVM_FILENAME), "rb+");
-  if(!fp) {
-    fp = fopen(get_filename_fullpath(NVM_FILENAME), "wb+"); //This will open the file for editting after creation
-  }
-  if(fp) {
-    fseek(fp, (unsigned int)dst, SEEK_SET); //this fails silently without the above change
-    fwrite(src, 1, len, fp);
-    fclose(fp);
-  } else {
-    // file does not exist
-  }
-}
-
-byte nvm_read_byte(const byte *p) {
-  FILE *fp = fopen(get_filename_fullpath(NVM_FILENAME), "rb");
-  byte v = 0;
-  if(fp) {
-    fseek(fp, (unsigned int)p, SEEK_SET);
-    fread(&v, 1, 1, fp);
-    fclose(fp);
-  } else {
-   // file does not exist
-  }
-  return v;
-}
-
-void nvm_write_byte(const byte *p, byte v) {
-  FILE *fp = fopen(get_filename_fullpath(NVM_FILENAME), "rb+");
-  if(!fp) {
-    fp = fopen(get_filename_fullpath(NVM_FILENAME), "wb+"); //This will open the file for editting after creation
-  }
-  if(fp) {
-    fseek(fp, (unsigned int)p, SEEK_SET); //This fails silently without above change
-    fwrite(&v, 1, 1, fp);
-    fclose(fp);
-  } else {
-    // file does not exist
-  }
-}
-
-void write_to_file(const char *name, const char *data, int size, int pos, bool trunc) {
-  FILE *file;
-  if(trunc) {
-    file = fopen(get_filename_fullpath(name), "wb");
-  } else {
-    file = fopen(get_filename_fullpath(name), "r+b");
-    if(!file) {
-        file = fopen(get_filename_fullpath(name), "wb");
-    }
-  }
-
-  if (!file) { return; }
-
-  fseek(file, pos, SEEK_SET);
-  fwrite(data, 1, size, file);
-  fclose(file);
-}
-
-bool read_from_file(const char *name, char *data, int maxsize, int pos) {
-
-  FILE *file;
-  file = fopen(get_filename_fullpath(name), "rb");
-  if(!file) {
-    data[0] = 0;
-    return true;
-  }
-
-  int res;
-  fseek(file, pos, SEEK_SET);
-  if(fgets(data, maxsize, file)) {
-    res = strlen(data);
-  } else {
-    res = 0;
-  }
-  if (res <= 0) {
-    data[0] = 0;
-  }
-
-  data[maxsize-1]=0;
-  fclose(file);
-  return true;
-}
-
-void remove_file(const char *name) {
-  remove(get_filename_fullpath(name));
-}
+#else // RPI/BBB
 
 char* get_runtime_path() {
   static char path[PATH_MAX];
@@ -298,31 +67,6 @@ char* get_filename_fullpath(const char *filename) {
   strcat(fullpath, filename);
   return fullpath;
 }
-
-#if defined(OSPI)
-unsigned int detect_rpi_rev() {
-  FILE * filp;
-  unsigned int rev;
-  char buf[512];
-  char term;
-
-  rev = 0;
-  filp = fopen ("/proc/cpuinfo", "r");
-
-  if (filp != NULL) {
-    while (fgets(buf, sizeof(buf), filp) != NULL) {
-      if (!strncasecmp("revision\t", buf, 9)) {
-        if (sscanf(buf+strlen(buf)-5, "%x%c", &rev, &term) == 2) {
-          if (term == '\n') break;
-          rev = 0;
-        }
-      }
-    }
-    fclose(filp);
-  }
-  return rev;
-}
-#endif
 
 void delay(ulong howLong)
 {
@@ -398,8 +142,239 @@ ulong micros (void)
   return (uint32_t)(now - epochMicro) ;
 }
 
+#if defined(OSPI)
+unsigned int detect_rpi_rev() {
+  FILE * filp;
+  unsigned int rev;
+  char buf[512];
+  char term;
+
+  rev = 0;
+  filp = fopen ("/proc/cpuinfo", "r");
+
+  if (filp != NULL) {
+    while (fgets(buf, sizeof(buf), filp) != NULL) {
+      if (!strncasecmp("revision\t", buf, 9)) {
+        if (sscanf(buf+strlen(buf)-5, "%x%c", &rev, &term) == 2) {
+          if (term == '\n') break;
+          rev = 0;
+        }
+      }
+    }
+    fclose(filp);
+  }
+  return rev;
+}
+#endif
 
 #endif
+
+void write_to_file(const char *fn, const char *data, int size, int pos, bool trunc) {
+
+#if defined(ESP8266)
+
+  File f;
+  if(trunc) {
+    f = SPIFFS.open(fn, "w");
+  } else {
+    f = SPIFFS.open(fn, "r+");
+    if(!f) f = SPIFFS.open(fn, "w");
+  }    
+  if(!f) return;
+  if(pos) f.seek(pos, SeekSet);
+  if(size==0) {
+    f.write((byte*)" ", 1);  // hack to circumvent SPIFFS bug involving writing empty file
+  } else {
+    f.write((byte*)data, size);
+  }
+  f.close();
+  
+#elif defined(ARDUINO)
+
+  sd.chdir("/");
+  SdFile file;
+  int flag = O_CREAT | O_RDWR;
+  if(trunc) flag |= O_TRUNC;
+  int ret = file.open(fn, flag);
+  if(!ret) return;
+  file.seekSet(pos);
+  file.write(data, size);
+  file.close();
+  
+#else
+
+  FILE *file;
+  if(trunc) {
+    file = fopen(get_filename_fullpath(fn), "wb");
+  } else {
+    file = fopen(get_filename_fullpath(fn), "r+b");
+    if(!file) file = fopen(get_filename_fullpath(fn), "wb");
+  }
+  if(!file)  return;
+  fseek(file, pos, SEEK_SET);
+  fwrite(data, 1, size, file);
+  fclose(file);
+  
+#endif
+}
+
+void read_from_file(const char *fn, char *data, int maxsize, int pos) {
+#if defined(ESP8266)
+
+  File f = SPIFFS.open(fn, "r");
+  if(!f) {
+    data[0]=0;
+    return;  // return with empty string
+  }
+  if(pos)  f.seek(pos, SeekSet);
+  int len = f.read((byte*)data, maxsize);
+  if(len>0) data[len]=0;
+  if(len==1 && data[0]==' ') data[0] = 0;  // hack to circumvent SPIFFS bug involving writing empty file
+  data[maxsize-1]=0;
+  f.close();
+  return;
+
+#elif defined(ARDUINO)
+
+  sd.chdir("/");
+  SdFile file;
+  int ret = file.open(fn, O_READ);
+  if(!ret) {
+    data[0]=0;
+    return;  // return with empty string
+  }
+  file.seekSet(pos);
+  ret = file.fgets(data, maxsize);
+  data[maxsize-1]=0;
+  file.close();
+  return;
+
+#else
+
+  FILE *file;
+  file = fopen(get_filename_fullpath(fn), "rb");
+  if(!file) {
+    data[0] = 0;
+    return;
+  }
+
+  int res;
+  fseek(file, pos, SEEK_SET);
+  if(fgets(data, maxsize, file)) {
+    res = strlen(data);
+  } else {
+    res = 0;
+  }
+  if (res <= 0) {
+    data[0] = 0;
+  }
+
+  data[maxsize-1]=0;
+  fclose(file);
+  return;
+
+#endif
+}
+
+void remove_file(const char *fn) {
+#if defined(ESP8266)
+
+  if(!SPIFFS.exists(fn)) return;
+  SPIFFS.remove(fn);
+
+#elif defined(ARDUINO)
+
+  sd.chdir("/");
+  if (!sd.exists(fn))  return;
+  sd.remove(fn);
+
+#else
+
+  remove(get_filename_fullpath(fn));
+
+#endif
+}
+
+// file functions
+void file_read_block(const char *fn, void *dst, int pos, int len) {
+#if defined(ESP8266)
+
+  // do not use File.readBytes or readBytesUntil because it's very slow  
+  File f = SPIFFS.open(fn, "r");
+  if(f) {
+    f.seek(pos, SeekSet);
+    f.read((byte*)dst, len);
+    f.close();
+  }
+
+#elif defined(ARDUINO)
+
+  sd.chdir("/");
+  SdFile file;
+  if(file.open(fn, O_READ)) {
+    file.seekSet(pos);
+    file.fgets(dst, len);
+    file.close();
+  }
+
+#else
+
+  FILE *fp = fopen(get_filename_fullpath(fn), "rb");
+  if(fp) {
+    fseek(fp, pos, SEEK_SET);
+    fread(dst, 1, len, fp);
+    fclose(fp);
+  }  
+
+#endif
+}
+
+void file_write_block(const char *fn, const void *src, int pos, int len) {
+#if defined(ESP8266)
+
+  File f = SPIFFS.open(fn, "r+");
+  if(!f) f = SPIFFS.open(fn, "w");
+  if(f) {
+    f.seek(pos, SeekSet);
+    f.write((byte*)src, len);
+    f.close();
+  }
+
+#elif defined(ARDUINO)
+
+  sd.chdir("/");
+  SdFile file;
+  int ret = file.open(fn, O_CREAT | O_RDWR);
+  if(!ret) return;
+  file.seekSet(pos);
+  file.write(src, len);
+  file.close();
+
+#else
+
+  FILE *fp = fopen(get_filename_fullpath(fn), "rb+");
+  if(!fp) {
+    fp = fopen(get_filename_fullpath(fn), "wb+");
+  }
+  if(fp) {
+    fseek(fp, pos, SEEK_SET); //this fails silently without the above change
+    fwrite(src, 1, len, fp);
+    fclose(fp);
+  }
+
+#endif
+
+}
+
+byte file_read_byte(const char *fn, int pos) {
+  byte v = 0;
+  file_read_block(fn, &v, pos, 1);
+  return v;
+}
+
+void file_write_byte(const char *fn, int pos, byte v) {
+  file_write_block(fn, &v, pos, 1);
+}
 
 // copy n-character string from program memory with ending 0
 void strncpy_P0(char* dest, const char* src, int n) {
@@ -409,20 +384,6 @@ void strncpy_P0(char* dest, const char* src, int n) {
     dest++;
   }
   *dest=0;
-}
-
-// compare a string to nvm
-byte strcmp_to_nvm(const char* src, int _addr) {
-  byte c1, c2;
-  byte *addr = (byte*)_addr;
-  while(1) {
-    c1 = nvm_read_byte(addr++);
-    c2 = *src++;
-    if (c1==0 || c2==0)
-      break;
-    if (c1!=c2)  return 1;
-  }
-  return (c1==c2) ? 0 : 1;
 }
 
 // resolve water time

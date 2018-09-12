@@ -25,18 +25,20 @@
 #ifndef _OPENSPRINKLER_H
 #define _OPENSPRINKLER_H
 
-#if defined(ARDUINO) && !defined(ESP8266) // headers for AVR
-  #include "Arduino.h"
+#if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__) // headers for AVR
+  #include <Arduino.h>
   #include <avr/eeprom.h>
   #include <Wire.h>
+  #include <RCSwitch.h>
+  #include <UIPEthernet.h>
   #include "LiquidCrystal.h"
   #include "Time.h"
-  #include "DS1307RTC.h"
-  #include "EtherCard.h"
+  #include "i2crtc.h"
 #elif defined(ESP8266) // headers for ESP8266
   #include <Wire.h>
   #include <FS.h>
   #include <RCSwitch.h>
+  #include <UIPEthernet.h>  
   #include "SSD1306Display.h"
   #include "i2crtc.h"
   #include "espconnect.h"
@@ -50,15 +52,8 @@
 #include "defines.h"
 #include "utils.h"
 #include "gpio.h"
-  
-struct OptionStruct {
-  String name;
-  uint16_t ival;
-  uint16_t max;
-  String sval;
-};
 
-/** Non-volatile data */
+/** Non-volatile data structure */
 struct NVConData {
   uint16_t sunrise_time;  // sunrise time (in minutes)
   uint16_t sunset_time;   // sunset time (in minutes)
@@ -66,37 +61,41 @@ struct NVConData {
   uint32_t external_ip;   // external ip
 };
 
-/** Station special attribute data */
-struct StationSpecialData {
-  byte type;
-  byte data[STATION_SPECIAL_DATA_SIZE];
+/** Station data structure */
+struct StationData {
+  byte mas:1;
+  byte igr:1;
+  byte mas2:1;
+  byte dis:1;
+  byte seq:1;
+  byte gid:3; // group id: reserved for the future
+  byte reserved[3]; // reserve 3 bytes for the future
+  char name[STATION_NAME_SIZE];
+  byte spet;  // special station type
+  byte sped[STATION_SPECIAL_DATA_SIZE]; // special station data
 };
 
-/** Station data structures - Must fit in STATION_SPECIAL_DATA_SIZE */
+/** RF station data structures - Must fit in STATION_SPECIAL_DATA_SIZE */
 struct RFStationData {
   byte on[6];
   byte off[6];
   byte timing[4];
 };
 
-struct RFStationDataFull {
-  byte on[8];
-  byte off[8];
-  byte timing[4];
-  byte protocol[4];
-};
-
+/** Remote station data structures - Must fit in STATION_SPECIAL_DATA_SIZE */
 struct RemoteStationData {
   byte ip[8];
   byte port[4];
   byte sid[2];
 };
 
+/** GPIO station data structures - Must fit in STATION_SPECIAL_DATA_SIZE */
 struct GPIOStationData {
   byte pin[2];
   byte active;
 };
 
+/** HTTP station data structures - Must fit in STATION_SPECIAL_DATA_SIZE */
 struct HTTPStationData {
   byte data[STATION_SPECIAL_DATA_SIZE];
 };
@@ -108,36 +107,20 @@ struct ConStatus {
   byte rain_sensed:1;       // rain sensor bit (when set, it indicates that rain is detected)
   byte program_busy:1;      // HIGH means a program is being executed currently
   byte has_curr_sense:1;    // HIGH means the controller has a current sensing pin
-  byte has_sd:1;            // HIGH means a microSD card is detected
   byte safe_reboot:1;       // HIGH means a safe reboot has been marked
-  byte has_hwmac:1;         // has hardware MAC chip
   byte req_ntpsync:1;       // request ntpsync
   byte req_network:1;       // request check network
-  byte display_board:4;     // the board that is being displayed onto the lcd
-  byte network_fails:2;     // number of network fails
+  byte display_board:5;     // the board that is being displayed onto the lcd
+  byte network_fails:3;     // number of network fails
   byte mas:8;               // master station index
   byte mas2:8;              // master2 station index
 };
-
-extern const char wtopts_filename[];
-extern const char stns_filename[];
-extern const char ifkey_filename[];
-extern const byte op_max[];
-extern const char op_json_names[];
-#ifdef ESP8266
-struct WiFiConfig {
-  byte mode;
-  String ssid;
-  String pass;
-};  
-extern const char wifi_filename[];
-#endif
 
 class OpenSprinkler {
 public:
 
   // data members
-#if defined(ARDUINO) && !defined(ESP8266)
+#if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
   static LiquidCrystal lcd; // 16x2 character LCD
 #elif defined(ESP8266)
   static SSD1306Display lcd;  // 128x64 OLED display
@@ -156,7 +139,7 @@ public:
   static byte nboards, nstations;
   static byte hw_type;           // hardware type
 
-  static OptionStruct options[];  // option values, max, name, and flag
+  static byte options[];  // option values, max, name, and flag
 
   static byte station_bits[];     // station activation bits. each byte corresponds to a board (8 stations)
                                   // first byte-> master controller, second byte-> ext. board 1, and so on
@@ -211,10 +194,10 @@ public:
   static void raindelay_stop();   // stop rain delay
   static void rainsensor_status();// update rainsensor status
   static bool programswitch_status(ulong); // get program switch status
-#if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__) || defined(ESP8266)
+
   static uint16_t read_current(); // read current sensing value
   static uint16_t baseline_current; // resting state current
-#endif
+
   static int detect_exp();        // detect the number of expansion boards
   static byte weekday_today();    // returns index of today's weekday (Monday is 0)
 
@@ -225,7 +208,7 @@ public:
 
   // -- LCD functions
 #if defined(ARDUINO) // LCD functions for Arduino
-  #ifdef ESP8266
+  #if defined(ESP8266)
   static void lcd_print_pgm(PGM_P str); // ESP8266 does not allow PGM_P followed by PROGMEM
   static void lcd_print_line_clear_pgm(PGM_P str, byte line);
   #else
@@ -249,8 +232,7 @@ public:
   static void lcd_set_brightness(byte value=1);
   static void lcd_set_contrast();
 
-  #ifdef ESP8266
-  static WiFiConfig wifi_config;
+  #if defined(ESP8266)
   static IOEXP *mainio, *drio;
   static IOEXP *expanders[];
   static RCSwitch rfswitch;
@@ -258,7 +240,7 @@ public:
   static void flash_screen();
   static void toggle_screen_led();
   static void set_screen_led(byte status);  
-  static byte get_wifi_mode() {return wifi_config.mode;}
+  static byte get_wifi_mode() {return options[OPTION_WIFI_MODE];}
   static void config_ip();
   static void reset_to_ap();
   static byte state;
@@ -268,10 +250,9 @@ private:
   static void lcd_print_2digit(int v);  // print a integer in 2 digits
   static void lcd_start();
   static byte button_read_busy(byte pin_butt, byte waitmode, byte butt, byte is_holding);
-#if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__) || defined(ESP8266)
   static byte engage_booster;
-#endif
-#if defined(ESP8266)
+
+  #if defined(ESP8266)
   static void latch_boost();
   static void latch_open(byte sid);
   static void latch_close(byte sid);
@@ -279,7 +260,7 @@ private:
   static void latch_setallzonepins(byte value);
   static void latch_apply_all_station_bits();
   static byte prev_station_bits[];
-#endif
+  #endif
 #endif // LCD functions
 };
 

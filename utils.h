@@ -25,10 +25,7 @@
 #define _UTILS_H
 
 #if defined(ARDUINO)
-  #ifdef ESP8266
-    typedef unsigned short uint16_t;
-    typedef short int16_t;
-  #endif
+
 #else // headers for RPI/BBB
   #include <stdio.h>
   #include <limits.h>
@@ -37,31 +34,25 @@
 #endif
 #include "defines.h"
 
+// File reading/writing functions
+void write_to_file(const char *fname, const char *data, int size, int pos=0, bool trunc=true);
+void read_from_file(const char *fname, char *data, int maxsize=TMP_BUFFER_SIZE, int pos=0);
+void remove_file(const char *fname);
+
+void file_read_block (const char *fname, void *dst, int pos, int len);
+void file_write_block(const char *fname, void *src, int pos, int len);
+byte file_read_byte (const char *fname, int pos);
+void file_write_byte(const char *fname, int pos, byte v);  
+
+// misc. string and time converstion functions
 void strncpy_P0(char* dest, const char* src, int n);
-byte strcmp_to_nvm(const char* src, int addr);
 ulong water_time_resolve(uint16_t v);
 byte water_time_encode_signed(int16_t i);
 int16_t water_time_decode_signed(byte i);
-void write_to_file(const char *name, const char *data, int size, int pos=0, bool trunc=true);
-bool read_from_file(const char *name, char *data, int maxsize=TMP_BUFFER_SIZE, int pos=0);
-void remove_file(const char *name);
+
 #if defined(ARDUINO)
-  #ifdef ESP8266
-    void nvm_read_block(void *dst, const void *src, int len);
-    void nvm_write_block(const void *src, void *dst, int len);
-    byte nvm_read_byte(const byte *p);
-    void nvm_write_byte(const byte *p, byte v);  
-  #else
-    #define nvm_read_block  eeprom_read_block
-    #define nvm_write_block eeprom_write_block
-    #define nvm_read_byte   eeprom_read_byte
-    #define nvm_write_byte  eeprom_write_byte
-  #endif
-#else // NVM functions for RPI/BBB
-  void nvm_read_block(void *dst, const void *src, int len);
-  void nvm_write_block(const void *src, void *dst, int len);
-  byte nvm_read_byte(const byte *p);
-  void nvm_write_byte(const byte *p, byte v);
+
+#else // Arduino compatible functions for RPI/BBB
   char* get_runtime_path();
   char* get_filename_fullpath(const char *filename);
   void delay(ulong ms);

@@ -124,8 +124,7 @@ protected:
 #define ADDR_PROGRAMCOUNTER        (ADDR_NVM_PROGRAMS+1)
 #define ADDR_PROGRAMDATA           (ADDR_NVM_PROGRAMS+2)
 
-// maximum number of programs, restricted by internal NVM size
-#define MAX_NUMBER_PROGRAMS        ((MAX_PROGRAMDATA-2)/PROGRAMSTRUCT_SIZE)
+#define MAX_NUM_PROGRAMS  40    // maximum number of programs
 
 extern OpenSprinkler os;
 

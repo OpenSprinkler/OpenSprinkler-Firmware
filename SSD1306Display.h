@@ -1,9 +1,7 @@
 #ifndef SSD1306_DISPLAY_H
 #define SSD1306_DISPLAY_H
 
-#ifndef ESP8266
-// nothing to do if it's not ESP8266
-#else
+#if defined(ESP8266)
 
 #include <SSD1306.h>
 #include "font.h"

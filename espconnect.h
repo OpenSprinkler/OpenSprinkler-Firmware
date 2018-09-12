@@ -18,7 +18,7 @@
  * <http://www.gnu.org/licenses/>.
  */
 
-#ifdef ESP8266
+#if defined(ESP8266)
 
 #ifndef _ESP_CONNECT_H
 #define _ESP_CONNECT_H

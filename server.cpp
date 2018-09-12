@@ -1048,7 +1048,6 @@ void server_json_options_main() {
     #endif
 
     if (oid==OPTION_SEQUENTIAL_RETIRED) continue;
-    if (oid==OPTION_DEVICE_ID && os.status.has_hwmac) continue; // do not send DEVICE ID if hardware MAC exists
    
 #if defined(ARDUINO)
     #ifdef ESP8266

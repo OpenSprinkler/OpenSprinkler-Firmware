@@ -12,7 +12,7 @@
 
 #include <inttypes.h>
 
-#ifndef ESP8266
+#if !defined(ESP8266)
 typedef unsigned long time_t;
 #endif
 
