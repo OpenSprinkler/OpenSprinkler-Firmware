@@ -320,6 +320,22 @@ enum {
   #define V1_PIN_RAINSENSOR    V1_PIN_SENSOR1 // for this firmware, rain and flow sensors are both assumed on sensor 1
   #define V1_PIN_FLOWSENSOR    V1_PIN_SENSOR1
 
+  /* OS30 revision 2 pin defines */
+  // pins on PCA9555A IO expander have pin numbers IOEXP_PIN+i
+  #define V2_IO_CONFIG         0x1F00 // config bits
+  #define V2_IO_OUTPUT         0x1F00 // output bits
+  #define V2_PIN_BUTTON_1      2 // button 1
+  #define V2_PIN_BUTTON_2      0 // button 2
+  #define V2_PIN_BUTTON_3      IOEXP_PIN+12 // button 3
+  #define V2_PIN_RFTX          15
+  #define V2_PIN_BOOST         IOEXP_PIN+13
+  #define V2_PIN_BOOST_EN      IOEXP_PIN+14
+  #define V2_PIN_LATCH_COM     IOEXP_PIN+15  
+  #define V2_PIN_SENSOR1       3  // sensor 1
+  #define V2_PIN_SENSOR2       10 // sensor 2
+  #define V2_PIN_RAINSENSOR    V2_PIN_SENSOR1
+  #define V2_PIN_FLOWSENSOR    V2_PIN_SENSOR1
+  
 #elif defined(OSPI) // for OSPi
 
   #define OS_HW_VERSION    OSPI_HW_VERSION_BASE

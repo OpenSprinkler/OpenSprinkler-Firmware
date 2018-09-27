@@ -601,21 +601,7 @@ void OpenSprinkler::begin() {
     digitalWriteExt(PIN_LATCH_COM, LOW);
     
   } else {
-    /* assign revision 1 pins */
-    PIN_BUTTON_1 = V1_PIN_BUTTON_1;
-    PIN_BUTTON_2 = V1_PIN_BUTTON_2;
-    PIN_BUTTON_3 = V1_PIN_BUTTON_3;
-    PIN_RFRX = V1_PIN_RFRX;
-    PIN_RFTX = V1_PIN_RFTX;
-    PIN_IOEXP_INT = V1_PIN_IOEXP_INT;
-    PIN_BOOST = V1_PIN_BOOST;
-    PIN_BOOST_EN = V1_PIN_BOOST_EN;
-    PIN_LATCH_COM = V1_PIN_LATCH_COM;
-    PIN_SENSOR1 = V1_PIN_SENSOR1;
-    PIN_SENSOR2 = V1_PIN_SENSOR2;
-    PIN_RAINSENSOR = V1_PIN_RAINSENSOR;
-    PIN_FLOWSENSOR = V1_PIN_FLOWSENSOR;    
-    
+
     if(hw_type==HW_TYPE_DC) {
       drio = new PCA9555(DCDR_I2CADDR);
     } else if(hw_type==HW_TYPE_LATCH) {
@@ -623,11 +609,44 @@ void OpenSprinkler::begin() {
     } else {
       drio = new PCA9555(ACDR_I2CADDR);
     }
-    
-    // on revision 1, main IOEXP and driver IOEXP are combined into one single PCA9555 (16-ch) chip
     mainio = drio;
-    mainio->i2c_write(NXP_CONFIG_REG, V1_IO_CONFIG);
-    mainio->i2c_write(NXP_OUTPUT_REG, V1_IO_OUTPUT);
+
+    pinMode(16, INPUT);
+    if(digitalRead(16)==LOW) {
+      // revision 1
+      mainio->i2c_write(NXP_CONFIG_REG, V1_IO_CONFIG);
+      mainio->i2c_write(NXP_OUTPUT_REG, V1_IO_OUTPUT);
+
+      PIN_BUTTON_1 = V1_PIN_BUTTON_1;
+      PIN_BUTTON_2 = V1_PIN_BUTTON_2;
+      PIN_BUTTON_3 = V1_PIN_BUTTON_3;
+      PIN_RFRX = V1_PIN_RFRX;
+      PIN_RFTX = V1_PIN_RFTX;
+      PIN_IOEXP_INT = V1_PIN_IOEXP_INT;
+      PIN_BOOST = V1_PIN_BOOST;
+      PIN_BOOST_EN = V1_PIN_BOOST_EN;
+      PIN_LATCH_COM = V1_PIN_LATCH_COM;
+      PIN_SENSOR1 = V1_PIN_SENSOR1;
+      PIN_SENSOR2 = V1_PIN_SENSOR2;
+      PIN_RAINSENSOR = V1_PIN_RAINSENSOR;
+      PIN_FLOWSENSOR = V1_PIN_FLOWSENSOR;
+    } else {
+      // revision 2
+      mainio->i2c_write(NXP_CONFIG_REG, V2_IO_CONFIG);
+      mainio->i2c_write(NXP_OUTPUT_REG, V2_IO_OUTPUT);
+      
+      PIN_BUTTON_1 = V2_PIN_BUTTON_1;
+      PIN_BUTTON_2 = V2_PIN_BUTTON_2;
+      PIN_BUTTON_3 = V2_PIN_BUTTON_3;
+      PIN_RFTX = V2_PIN_RFTX;
+      PIN_BOOST = V2_PIN_BOOST;
+      PIN_BOOST_EN = V2_PIN_BOOST_EN;
+      PIN_LATCH_COM = V2_PIN_LATCH_COM;
+      PIN_SENSOR1 = V2_PIN_SENSOR1;
+      PIN_SENSOR2 = V2_PIN_SENSOR2;
+      PIN_RAINSENSOR = V2_PIN_RAINSENSOR;
+      PIN_FLOWSENSOR = V2_PIN_FLOWSENSOR;
+    }    
   }
   
   /* detect expanders */
