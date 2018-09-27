@@ -28,7 +28,7 @@
 // External variables defined in main ion file
 #if defined(ARDUINO)
 
-  #ifdef ESP8266
+  #if defined(ESP8266)
 
     #include <FS.h>
     #include "espconnect.h"
@@ -44,7 +44,8 @@
     #include "SdFat.h"
     extern SdFat sd;
     #define handle_return(x) {return_code=x; return;}
-    #define INSERT_DELAY(x) delay(x)
+    //#define INSERT_DELAY(x) delay(x)
+    INSERT_DELAY(x) {}
   #endif
 
   static uint8_t ntpclientportL = 123; // Default NTP client port
@@ -67,7 +68,7 @@ extern OpenSprinkler os;
 extern ProgramData pd;
 extern ulong flow_count;
 
-#ifndef ESP8266
+#if !defined(ESP8266)
 static byte return_code;
 static char* get_buffer = NULL;
 #endif
@@ -140,7 +141,7 @@ static const char htmlReturnHome[] PROGMEM =
 
 #if defined(ARDUINO)
 void print_html_standard_header() {
-#ifdef ESP8266
+#if defined(ESP8266)
   wifi_server->sendHeader("Cache-Control", "max-age=0, no-cache, no-store, must-revalidate");
   wifi_server->sendHeader("Access-Control-Allow-Origin", "*");
 #else
@@ -149,7 +150,7 @@ void print_html_standard_header() {
 }
 
 void print_json_header(bool bracket=true) {
-#ifdef ESP8266
+#if defined(ESP8266)
   wifi_server->sendHeader("Cache-Control", "max-age=0, no-cache, no-store, must-revalidate");
   wifi_server->sendHeader("Content-Type", "application/json");
   wifi_server->sendHeader("Access-Control-Allow-Origin", "*");
@@ -162,7 +163,7 @@ void print_json_header(bool bracket=true) {
 byte findKeyVal (const char *str,char *strbuf, uint8_t maxlen,const char *key,bool key_in_pgm=false,uint8_t *keyfound=NULL)
 {
   uint8_t found=0;
-#ifdef ESP8266
+#if defined(ESP8266)
   // for ESP8266: there are two cases:
   // case 1: if str is NULL, we assume the key-val to search is already parsed in wifi_server
   if(str==NULL) {
@@ -240,7 +241,7 @@ byte findKeyVal (const char *str,char *strbuf, uint8_t maxlen,const char *key,bo
 }
 
 void rewind_ether_buffer() {
-#ifdef ESP8266
+#if defined(ESP8266)
   bfill = ether_buffer;
 #else
   bfill = ether.tcpOffset();
@@ -248,7 +249,7 @@ void rewind_ether_buffer() {
 }
 
 void send_packet(bool final=false) {
-#ifndef ESP8266
+#if !defined(ESP8266)
   if(final) {
     ether.httpServerReply_with_flags(bfill.position(), TCP_FLAGS_ACK_V|TCP_FLAGS_FIN_V);
   } else {
@@ -372,7 +373,7 @@ void urlDecode (char *urlbuf)
     *dst = '\0';
 }
 
-#ifdef ESP8266
+#if defined(ESP8266)
 String two_digits(uint8_t x) {
   return String(x/10) + (x%10);
 }
@@ -498,9 +499,10 @@ void on_ap_scan() {
 void on_ap_change_config() {
   if(os.get_wifi_mode()!=WIFI_MODE_AP) return;
   if(wifi_server->hasArg("ssid")&&wifi_server->arg("ssid").length()!=0) {
-    os.wifi_config.ssid = wifi_server->arg("ssid");
-    os.wifi_config.pass = wifi_server->arg("pass");
-    os.options_save(true);
+    os.wifi_ssid = wifi_server->arg("ssid");
+    os.wifi_pass = wifi_server->arg("pass"); 
+    os.sopt_save(SOPT_STA_SSID, os.wifi_ssid.c_str());
+    os.sopt_save(SOPT_STA_PASS, os.wifi_pass.c_str());
     server_send_result(HTML_SUCCESS);
     os.state = OS_STATE_TRY_CONNECT;
     os.lcd.setCursor(0, 2);
@@ -528,24 +530,24 @@ void on_ap_try_connect() {
 
 
 /** Check and verify password */
-#ifdef ESP8266
+#if defined(ESP8266)
 boolean process_password(boolean fwv_on_fail=false, char *p = NULL)
 #else
 boolean check_password(char *p)
 #endif
 {
-  if (os.options[OPTION_IGNORE_PASSWORD])  return true;
+  if (os.iopts[IOPT_IGNORE_PASSWORD])  return true;
   if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("pw"), true)) {
     urlDecode(tmp_buffer);
     if (os.password_verify(tmp_buffer))
       return true;
   }
-#ifdef ESP8266
+#if defined(ESP8266)
   /* some pages will output fwv if password check has failed */
   if(fwv_on_fail) {
     rewind_ether_buffer();
     print_json_header();
-    bfill.emit_p(PSTR("\"$F\":$D}"), op_json_names+0, os.options[0]);
+    bfill.emit_p(PSTR("\"$F\":$D}"), iopt_json_names+0, os.iopts[0]);
     server_send_html(ether_buffer);
   } else {
     server_send_result(HTML_UNAUTHORIZED);
@@ -554,11 +556,8 @@ boolean check_password(char *p)
   return false;
 }
 
-
-void server_json_stations_attrib(const char* name, int addr)
+void server_json_stations_attrib(const char* name, byte *attrib)
 {
-  byte *attrib = (byte*)tmp_buffer;
-  os.station_attrib_bits_load(addr, attrib);
   bfill.emit_p(PSTR("\"$F\":["), name);
   for(byte i=0;i<os.nboards;i++) {
     bfill.emit_p(PSTR("$D"), attrib[i]);
@@ -570,16 +569,12 @@ void server_json_stations_attrib(const char* name, int addr)
 
 void server_json_stations_main()
 {
-  server_json_stations_attrib(PSTR("masop"), ADDR_NVM_MAS_OP);
-  server_json_stations_attrib(PSTR("ignore_rain"), ADDR_NVM_IGNRAIN);
-  server_json_stations_attrib(PSTR("masop2"), ADDR_NVM_MAS_OP_2);
-  server_json_stations_attrib(PSTR("stn_dis"), ADDR_NVM_STNDISABLE);
-  server_json_stations_attrib(PSTR("stn_seq"), ADDR_NVM_STNSEQ);
-  
-  // only output stn_spe if it's supported
-  if (os.status.has_sd) {
-    server_json_stations_attrib(PSTR("stn_spe"), ADDR_NVM_STNSPE);
-  }
+  server_json_stations_attrib(PSTR("masop"), os.attrib_mas);
+  server_json_stations_attrib(PSTR("ignore_rain"), os.attrib_igr);
+  server_json_stations_attrib(PSTR("masop2"), os.attrib_mas2);
+  server_json_stations_attrib(PSTR("stn_dis"), os.attrib_dis);
+  server_json_stations_attrib(PSTR("stn_seq"), os.attrib_seq);
+  server_json_stations_attrib(PSTR("stn_spe"), os.attrib_spe);
 
   bfill.emit_p(PSTR("\"snames\":["));
   byte sid;
@@ -598,7 +593,7 @@ void server_json_stations_main()
 
 /** Output stations data */
 void server_json_stations() {
-#ifdef ESP8266
+#if defined(ESP8266)
   if(!process_password()) return;
   rewind_ether_buffer();
 #endif
@@ -609,25 +604,22 @@ void server_json_stations() {
 
 /** Output station special attribute */
 void server_json_station_special() {
-  // if no sd card, return false
-  if (!os.status.has_sd)  handle_return(HTML_PAGE_NOT_FOUND);
 
-#ifdef ESP8266
+#if defined(ESP8266)
   if(!process_password()) return;
   rewind_ether_buffer();
 #endif
 
   byte sid;
   byte comma=0;
-  int stepsize=sizeof(StationSpecialData);
-  StationSpecialData *stn = (StationSpecialData *)tmp_buffer;
+  StationData *data = (StationData*)tmp_buffer;
   print_json_header();
   for(sid=0;sid<os.nstations;sid++) {
-    if(os.station_attrib_bits_read(ADDR_NVM_STNSPE+(sid>>3))&(1<<(sid&0x07))) {
-      read_from_file(stns_filename, (char*)stn, stepsize, sid*stepsize);
+    if(os.get_station_type(sid)!=STN_TYPE_STANDARD) {  // check if this is a special station
+      os.get_station_data(sid, data);
       if (comma) bfill.emit_p(PSTR(","));
       else {comma=1;}
-      bfill.emit_p(PSTR("\"$D\":{\"st\":$D,\"sd\":\"$S\"}"), sid, stn->type, stn->data);
+      bfill.emit_p(PSTR("\"$D\":{\"st\":$D,\"sd\":\"$S\"}"), sid, data->type, data->sped);
     }
   }
   bfill.emit_p(PSTR("}"));
@@ -635,10 +627,9 @@ void server_json_station_special() {
   handle_return(HTML_OK);
 }
 
-void server_change_stations_attrib(char *p, char header, int addr)
+
+void server_change_stations_attrib(char *p, char header, byte *attrib)
 {
-  byte attrib[MAX_EXT_BOARDS+1];
-  os.station_attrib_bits_load(addr, attrib);
   char tbuf2[3] = {0, 0, 0};
   byte bid;
   tbuf2[0]=header;
@@ -648,11 +639,9 @@ void server_change_stations_attrib(char *p, char header, int addr)
       attrib[bid] = atoi(tmp_buffer);
     }
   }
-  os.station_attrib_bits_save(addr, attrib);
 }
 
-/**
- * Change Station Name and Attributes
+/**Change Station Name and Attributes
  * Command: /cs?pw=xxx&s?=x&m?=x&i?=x&n?=x&d?=x
  *
  * pw: password
@@ -665,7 +654,7 @@ void server_change_stations_attrib(char *p, char header, int addr)
  * p?: station special flag bit field
  */
 void server_change_stations() {
-#ifdef ESP8266
+#if defined(ESP8266)
   char* p = NULL;
   if(!process_password()) return;
 #else
@@ -682,15 +671,12 @@ void server_change_stations() {
     }
   }
 
-  server_change_stations_attrib(p, 'm', ADDR_NVM_MAS_OP); // master1
-  server_change_stations_attrib(p, 'i', ADDR_NVM_IGNRAIN); // ignore rain
-  server_change_stations_attrib(p, 'n', ADDR_NVM_MAS_OP_2); // master2
-  server_change_stations_attrib(p, 'd', ADDR_NVM_STNDISABLE); // disable
-  server_change_stations_attrib(p, 'q', ADDR_NVM_STNSEQ); // sequential
-  // only parse station special bits if it's supported
-  if(os.status.has_sd) {
-    server_change_stations_attrib(p, 'p', ADDR_NVM_STNSPE); // special
-  }
+  server_change_stations_attrib(p, 'm', os.attrib_mas); // master1
+  server_change_stations_attrib(p, 'i', os.attrib_igr); // ignore rain
+  server_change_stations_attrib(p, 'n', os.attrib_mas2); // master2
+  server_change_stations_attrib(p, 'd', os.attrib_dis); // disable
+  server_change_stations_attrib(p, 'q', os.attrib_seq); // sequential
+  server_change_stations_attrib(p, 'p', os.attrib_spe); // special
 
   /* handle special data */
   if(findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("sid"), true)) {
@@ -698,9 +684,9 @@ void server_change_stations() {
     if(sid<0 || sid>os.nstations) handle_return(HTML_DATA_OUTOFBOUND);
     if(findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("st"), true) &&
        findKeyVal(p, tmp_buffer+1, TMP_BUFFER_SIZE-1, PSTR("sd"), true)) {
-      int stepsize=sizeof(StationSpecialData);
+
       tmp_buffer[0]-='0';
-      tmp_buffer[stepsize-1] = 0;
+      tmp_buffer[STATION_SPECIAL_DATA_SIZE] = 0;
 
 #if !defined(ARDUINO) || defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__) || defined(ESP8266)
       // only process GPIO and HTTP stations for OS 2.3, above, and OSPi
@@ -724,8 +710,9 @@ void server_change_stations() {
 		    }
 	    }
 #endif
-
-      write_to_file(stns_filename, tmp_buffer, strlen(tmp_buffer)+1, stepsize*sid, false);
+      // write spe data
+      file_write_block(STATIONS_FILENAME, tmp_buffer,
+        (uint32_t)sid*sizeof(StationData)+offsetof(StationData,type), STATION_SPECIAL_DATA_SIZE+1);
 
     } else {
 
@@ -733,6 +720,9 @@ void server_change_stations() {
 
     }
   }
+
+  os.attribs_save();
+  
   handle_return(HTML_SUCCESS);
 }
 
@@ -762,11 +752,11 @@ void manual_start_program(byte, byte);
  * uwt: use weather (i.e. watering percentage)
  */
 void server_manual_program() {
-#ifdef ESP8266
-  char* p = NULL;
+#if defined(ESP8266)
+  char *p = NULL;
   if(!process_password()) return;
 #else
-  char* p = get_buffer;
+  char *p = get_buffer;
 #endif
 
   if (!findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("pid"), true))
@@ -798,13 +788,13 @@ void server_manual_program() {
  * t:  station water time
  */
 void server_change_runonce() {
-#ifdef ESP8266
+#if defined(ESP8266)
   char* p = NULL;
   if(!process_password()) return;
-  if(!findKeyVal(p,tmp_buffer,TMP_BUFFER_SIZE, "t",false)) handle_return(HTML_DATA_MISSING);
+  if(!findKeyVal(p,tmp_buffer,TMP_BUFFER_SIZE, "t", false)) handle_return(HTML_DATA_MISSING);
   char *pv = tmp_buffer+1;
 #else
-  char* p = get_buffer;
+  char *p = get_buffer;
   
   // decode url first
   if(p) urlDecode(p);
@@ -827,13 +817,14 @@ void server_change_runonce() {
   byte sid, bid, s;
   uint16_t dur;
   boolean match_found = false;
+  StationAttrib attrib;
   for(sid=0;sid<os.nstations;sid++) {
     dur=parse_listdata(&pv);
     bid=sid>>3;
     s=sid&0x07;
     // if non-zero duration is given
     // and if the station has not been disabled
-    if (dur>0 && !(os.station_attrib_bits_read(ADDR_NVM_STNDISABLE+bid)&(1<<s))) {
+    if (dur>0 && (os.attrib_dis[bid]&(1<<s))) {
       RuntimeQueueStruct *q = pd.enqueue();
       if (q) {
         q->st = 0;
@@ -861,11 +852,11 @@ void server_change_runonce() {
  * pid:program index (-1 will delete all programs)
  */
 void server_delete_program() {
-#ifdef ESP8266
-  char* p = NULL;
+#if defined(ESP8266)
+  char *p = NULL;
   if(!process_password()) return;
 #else
-  char* p = get_buffer;
+  char *p = get_buffer;
 #endif
   if (!findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("pid"), true))
     handle_return(HTML_DATA_MISSING);
@@ -890,11 +881,11 @@ void server_delete_program() {
  * pid: program index (must be 1 or larger, because we can't move up program 0)
 */
 void server_moveup_program() {
-#ifdef ESP8266
-  char* p = NULL;
+#if defined(ESP8266)
+  char *p = NULL;
   if(!process_password()) return;
 #else
-  char* p = get_buffer;
+  char *p = get_buffer;
 #endif
 
   if (!findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("pid"), true))
@@ -922,12 +913,12 @@ void server_moveup_program() {
 */
 const char _str_program[] PROGMEM = "Program ";
 void server_change_program() {
-#ifdef ESP8266
-  char* p = NULL;
+#if defined(ESP8266)
+  char *p = NULL;
   if(!process_password()) return;
 
 #else
-  char* p = get_buffer;
+  char *p = get_buffer;
 #endif
 
   byte i;
@@ -966,7 +957,7 @@ void server_change_program() {
   // do a full string decoding
   if(p) urlDecode(p);
 
-#ifdef ESP8266
+#if defined(ESP8266)
   if(!findKeyVal(p,tmp_buffer,TMP_BUFFER_SIZE, "v",false)) handle_return(HTML_DATA_MISSING);
   char *pv = tmp_buffer+1;  
 #else
@@ -1025,45 +1016,45 @@ void server_change_program() {
 
 void server_json_options_main() {
   byte oid;
-  for(oid=0;oid<NUM_OPTIONS;oid++) {
+  for(oid=0;oid<NUM_IOPTS;oid++) {
     #if !defined(ARDUINO) // do not send the following parameters for non-Arduino platforms
-    if (oid==OPTION_USE_NTP     || oid==OPTION_USE_DHCP    ||
-        oid==OPTION_STATIC_IP1  || oid==OPTION_STATIC_IP2  || oid==OPTION_STATIC_IP3  || oid==OPTION_STATIC_IP4  ||
-        oid==OPTION_GATEWAY_IP1 || oid==OPTION_GATEWAY_IP2 || oid==OPTION_GATEWAY_IP3 || oid==OPTION_GATEWAY_IP4)
+    if (oid==IOPT_USE_NTP     || oid==IOPT_USE_DHCP    ||
+        oid==IOPT_STATIC_IP1  || oid==IOPT_STATIC_IP2  || oid==IOPT_STATIC_IP3  || oid==IOPT_STATIC_IP4  ||
+        oid==IOPT_GATEWAY_IP1 || oid==IOPT_GATEWAY_IP2 || oid==IOPT_GATEWAY_IP3 || oid==IOPT_GATEWAY_IP4)
         continue;
     #endif
-    int32_t v=os.options[oid];
-    if (oid==OPTION_MASTER_OFF_ADJ || oid==OPTION_MASTER_OFF_ADJ_2 ||
-        oid==OPTION_MASTER_ON_ADJ  || oid==OPTION_MASTER_ON_ADJ_2 ||
-        oid==OPTION_STATION_DELAY_TIME) {
+    int32_t v=os.iopts[oid];
+    if (oid==IOPT_MASTER_OFF_ADJ || oid==IOPT_MASTER_OFF_ADJ_2 ||
+        oid==IOPT_MASTER_ON_ADJ  || oid==IOPT_MASTER_ON_ADJ_2 ||
+        oid==IOPT_STATION_DELAY_TIME) {
       v=water_time_decode_signed(v);
     }
-    #if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__) || defined(ESP8266)
-    if (oid==OPTION_BOOST_TIME) {
+    #if defined(ARDUINO)
+    if (oid==IOPT_BOOST_TIME) {
       if (os.hw_type==HW_TYPE_AC || os.hw_type==HW_TYPE_UNKNOWN) continue;
       else v<<=2;
     }
     #else
-    if (oid==OPTION_BOOST_TIME) continue;
+    if (oid==IOPT_BOOST_TIME) continue;
     #endif
 
-    if (oid==OPTION_SEQUENTIAL_RETIRED) continue;
+    if (oid==IOPT_SEQUENTIAL_RETIRED) continue;
    
 #if defined(ARDUINO)
-    #ifdef ESP8266
-      if(oid==OPTION_LCD_CONTRAST || oid==OPTION_LCD_BACKLIGHT || oid==OPTION_LCD_DIMMING) continue;
+    #if defined(ESP8266)
+      if(oid==IOPT_LCD_CONTRAST || oid==IOPT_LCD_BACKLIGHT || oid==IOPT_LCD_DIMMING) continue;
     #else
     if (os.lcd.type() == LCD_I2C) {
       // for I2C type LCD, we can't adjust contrast or backlight
-      if(oid==OPTION_LCD_CONTRAST || oid==OPTION_LCD_BACKLIGHT) continue;
+      if(oid==IOPT_LCD_CONTRAST || oid==IOPT_LCD_BACKLIGHT) continue;
     }
     #endif
 #endif
 
     // each json name takes 5 characters
-    strncpy_P0(tmp_buffer, op_json_names+oid*5, 5);
+    strncpy_P0(tmp_buffer, iopt_json_names+oid*5, 5);
     bfill.emit_p(PSTR("\"$S\":$D"), tmp_buffer, v);
-    if(oid!=NUM_OPTIONS-1)
+    if(oid!=NUM_IOPTS-1)
       bfill.emit_p(PSTR(","));
   }
 
@@ -1073,7 +1064,7 @@ void server_json_options_main() {
 
 /** Output Options */
 void server_json_options() {
-#ifdef ESP8266
+#if defined(ESP8266)
   if(!process_password(true)) return;
   rewind_ether_buffer();
 #endif
@@ -1085,7 +1076,7 @@ void server_json_options() {
 void server_json_programs_main() {
 
   bfill.emit_p(PSTR("\"nprogs\":$D,\"nboards\":$D,\"mnp\":$D,\"mnst\":$D,\"pnsize\":$D,\"pd\":["),
-               pd.nprograms, os.nboards, MAX_NUMBER_PROGRAMS, MAX_NUM_STARTTIMES, PROGRAM_NAME_SIZE);
+               pd.nprograms, os.nboards, MAX_NUM_PROGRAMS, MAX_NUM_STARTTIMES, PROGRAM_NAME_SIZE);
   byte pid, i;
   ProgramStruct prog;
   for(pid=0;pid<pd.nprograms;pid++) {
@@ -1127,7 +1118,7 @@ void server_json_programs_main() {
 
 /** Output program data */
 void server_json_programs() {
-#ifdef ESP8266
+#if defined(ESP8266)
   if(!process_password()) return;
   rewind_ether_buffer();
 #endif
@@ -1139,22 +1130,21 @@ void server_json_programs() {
 
 /** Output script url form */
 void server_view_scripturl() {
-#ifdef ESP8266
+#if defined(ESP8266)
   // no authenticaion needed
   rewind_ether_buffer();
 #endif
 
   print_html_standard_header();
-  bfill.emit_p(PSTR("<form name=of action=cu method=get><table cellspacing=\"12\"><tr><td><b>JavaScript</b>:</td><td><input type=text size=40 maxlength=40 value=\"$E\" name=jsp></td></tr><tr><td>Default:</td><td>$S</td></tr><tr><td><b>Weather</b>:</td><td><input type=text size=40 maxlength=40 value=\"$E\" name=wsp></td></tr><tr><td>Default:</td><td>$S</td></tr><tr><td><b>Password</b>:</td><td><input type=password size=32 name=pw> <input type=submit></td></tr></table></form><script src=https://ui.opensprinkler.com/js/hasher.js></script>"), ADDR_NVM_JAVASCRIPTURL, DEFAULT_JAVASCRIPT_URL, ADDR_NVM_WEATHERURL, DEFAULT_WEATHER_URL);
+  bfill.emit_p(PSTR("<form name=of action=cu method=get><table cellspacing=\"12\"><tr><td><b>JavaScript</b>:</td><td><input type=text size=40 maxlength=40 value=\"$O\" name=jsp></td></tr><tr><td>Default:</td><td>$S</td></tr><tr><td><b>Weather</b>:</td><td><input type=text size=40 maxlength=40 value=\"$O\" name=wsp></td></tr><tr><td>Default:</td><td>$S</td></tr><tr><td><b>Password</b>:</td><td><input type=password size=32 name=pw> <input type=submit></td></tr></table></form><script src=https://ui.opensprinkler.com/js/hasher.js></script>"), SOPT_JAVASCRIPTURL, DEFAULT_JAVASCRIPT_URL, SOPT_WEATHERURL, DEFAULT_WEATHER_URL);
   handle_return(HTML_OK);
 }
 
 void server_json_controller_main() {
   byte bid, sid;
   ulong curr_time = os.now_tz();
-  //os.nvm_string_get(ADDR_NVM_LOCATION, tmp_buffer);
   bfill.emit_p(PSTR("\"devt\":$L,\"nbrd\":$D,\"en\":$D,\"rd\":$D,\"rs\":$D,\"rdst\":$L,"
-                    "\"loc\":\"$E\",\"wtkey\":\"$E\",\"sunrise\":$D,\"sunset\":$D,\"eip\":$L,\"lwc\":$L,\"lswc\":$L,"
+                    "\"loc\":\"$O\",\"wtkey\":\"$O\",\"sunrise\":$D,\"sunset\":$D,\"eip\":$L,\"lwc\":$L,\"lswc\":$L,"
                     "\"lupt\":$L,\"lrun\":[$D,$D,$D,$L],"),
               curr_time,
               os.nboards,
@@ -1162,8 +1152,8 @@ void server_json_controller_main() {
               os.status.rain_delayed,
               os.status.rain_sensed,
               os.nvdata.rd_stop_time,
-              ADDR_NVM_LOCATION,
-              ADDR_NVM_WEATHER_KEY,
+              SOPT_LOCATION,
+              SOPT_WEATHER_KEY,
               os.nvdata.sunrise_time,
               os.nvdata.sunset_time,
               os.nvdata.external_ip,
@@ -1175,14 +1165,14 @@ void server_json_controller_main() {
               pd.lastrun.duration,
               pd.lastrun.endtime);
 
-#if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__) || defined(ESP8266)
+#if defined(ARDUINO)
   if(os.status.has_curr_sense) {
     uint16_t current = os.read_current();
     if((!os.status.program_busy) && (current<os.baseline_current)) current=0;
     bfill.emit_p(PSTR("\"curr\":$D,"), current);
   }
 #endif
-  if(os.options[OPTION_SENSOR1_TYPE]==SENSOR_TYPE_FLOW) {
+  if(os.iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_FLOW) {
     bfill.emit_p(PSTR("\"flcrt\":$L,\"flwrt\":$D,"), os.flowcount_rt, FLOWCOUNT_RT_WINDOW);
   }
 
@@ -1210,17 +1200,11 @@ void server_json_controller_main() {
     }
   }
 
-  if(read_from_file(wtopts_filename, tmp_buffer)) {
-    bfill.emit_p(PSTR(",\"wto\":{$S}"), tmp_buffer);
-  }
+  bfill.emit_p(PSTR(",\"wto\":{$O}"), SOPT_WEATHER_OPTS);
   
-#if !defined(ARDUINO) || defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__) || defined(ESP8266)
-  if(read_from_file(ifkey_filename, tmp_buffer)) {
-    bfill.emit_p(PSTR(",\"ifkey\":\"$S\""), tmp_buffer);
-  }
-#endif
+  bfill.emit_p(PSTR(",\"ifkey\":\"$O\""), SOPT_IFTTT_KEY);
 
-#ifdef ESP8266
+#if defined(ESP8266)
   bfill.emit_p(PSTR(",\"RSSI\":$D"), (int16_t)WiFi.RSSI());
 #endif
   bfill.emit_p(PSTR("}"));
@@ -1229,7 +1213,7 @@ void server_json_controller_main() {
 
 /** Output controller variables in json */
 void server_json_controller() {
-#ifdef ESP8266
+#if defined(ESP8266)
   if(!process_password()) return;
   rewind_ether_buffer();
 #endif
@@ -1242,7 +1226,7 @@ void server_json_controller() {
 /** Output homepage */
 void server_home()
 {
-#ifdef ESP8266
+#if defined(ESP8266)
   rewind_ether_buffer();
 #endif
 
@@ -1251,9 +1235,9 @@ void server_home()
   bfill.emit_p(PSTR("<!DOCTYPE html>\n<html>\n<head>\n$F</head>\n<body>\n<script>"), htmlMobileHeader);
   // send server variables and javascript packets
   bfill.emit_p(PSTR("var ver=$D,ipas=$D;</script>\n"),
-               OS_FW_VERSION, os.options[OPTION_IGNORE_PASSWORD]);
+               OS_FW_VERSION, os.iopts[IOPT_IGNORE_PASSWORD]);
 
-  bfill.emit_p(PSTR("<script src=\"$E/home.js\"></script>\n</body>\n</html>"), ADDR_NVM_JAVASCRIPTURL);
+  bfill.emit_p(PSTR("<script src=\"$O/home.js\"></script>\n</body>\n</html>"), SOPT_JAVASCRIPTURL);
 
   handle_return(HTML_OK);
 }
@@ -1273,26 +1257,25 @@ void server_home()
  */
 void server_change_values()
 {
-#ifdef ESP8266
-  char* p = NULL;
+#if defined(ESP8266)
+  char *p = NULL;
   extern unsigned long reboot_timer;
   if(!process_password()) return;
 #else
-  char* p = get_buffer;
+  char *p = get_buffer;
 #endif  
   if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("rsn"), true)) {
     reset_all_stations();
   }
 
-#ifndef ARDUINO
-    if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("update"), true) && atoi(tmp_buffer) > 0) {
-        //bfill.emit_p(PSTR("Updating..."));
-        os.update_dev();
-    }
+#if !defined(ARDUINO)
+  if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("update"), true) && atoi(tmp_buffer) > 0) {
+    os.update_dev();
+  }
 #endif
 
   if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("rbt"), true) && atoi(tmp_buffer) > 0) {
-    #ifdef ESP8266
+    #if defined(ESP8266)
       reboot_timer = millis() + 1000;
       handle_return(HTML_SUCCESS);
     #else
@@ -1319,16 +1302,16 @@ void server_change_values()
   }
 
   if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("re"), true)) {
-    if (tmp_buffer[0]=='1' && !os.options[OPTION_REMOTE_EXT_MODE]) {
-      os.options[OPTION_REMOTE_EXT_MODE] = 1;
-      os.options_save();
-    } else if(tmp_buffer[0]=='0' && os.options[OPTION_REMOTE_EXT_MODE]) {
-      os.options[OPTION_REMOTE_EXT_MODE] = 0;
-      os.options_save();
+    if (tmp_buffer[0]=='1' && !os.iopts[IOPT_REMOTE_EXT_MODE]) {
+      os.iopts[IOPT_REMOTE_EXT_MODE] = 1;
+      os.iopts_save();
+    } else if(tmp_buffer[0]=='0' && os.iopts[IOPT_REMOTE_EXT_MODE]) {
+      os.iopts[IOPT_REMOTE_EXT_MODE] = 0;
+      os.iopts_save();
     }
   }
   
-  #ifdef ESP8266
+  #if defined(ESP8266)
   if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("ap"), true)) {
     os.reset_to_ap();
   }  
@@ -1356,11 +1339,11 @@ void string_remove_space(char *src) {
  * jsp: Javascript path
  */
 void server_change_scripturl() {
-#ifdef ESP8266
-  char* p = NULL;
+#if defined(ESP8266)
+  char *p = NULL;
   if(!process_password()) return;
 #else  
-  char* p = get_buffer;
+  char *p = get_buffer;
 #endif
   
 #if defined(DEMO)
@@ -1368,16 +1351,16 @@ void server_change_scripturl() {
 #endif
   if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("jsp"), true)) {
     urlDecode(tmp_buffer);
-    tmp_buffer[MAX_JAVASCRIPTURL]=0;  // make sure we don't exceed the maximum size
+    tmp_buffer[TMP_BUFFER_SIZE]=0;  // make sure we don't exceed the maximum size
     // trim unwanted space characters
     string_remove_space(tmp_buffer);
-    nvm_write_block(tmp_buffer, (void *)ADDR_NVM_JAVASCRIPTURL, strlen(tmp_buffer)+1);
+    os.sopt_save(SOPT_JAVASCRIPTURL, tmp_buffer);
   }
   if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("wsp"), true)) {
     urlDecode(tmp_buffer);
-    tmp_buffer[MAX_WEATHERURL]=0;
+    tmp_buffer[TMP_BUFFER_SIZE]=0;
     string_remove_space(tmp_buffer);
-    nvm_write_block(tmp_buffer, (void *)ADDR_NVM_WEATHERURL, strlen(tmp_buffer)+1);
+    os.sopt_save(SOPT_WEATHERURL, tmp_buffer);
   }
   handle_return(HTML_REDIRECT_HOME);
 }
@@ -1394,11 +1377,11 @@ void server_change_scripturl() {
  */
 void server_change_options()
 {
-#ifdef ESP8266
-  char* p = NULL;
+#if defined(ESP8266)
+  char *p = NULL;
   if(!process_password()) return;
 #else  
-  char* p = get_buffer;
+  char *p = get_buffer;
 #endif
 
   // temporarily save some old options values
@@ -1412,81 +1395,85 @@ void server_change_options()
   byte err = 0;
   byte prev_value;
   byte max_value;
-  for (byte oid=0; oid<NUM_OPTIONS; oid++) {
+  for (byte oid=0; oid<NUM_IOPTS; oid++) {
 
     // skip options that cannot be set through /co command
-    if (oid==OPTION_RESET || oid==OPTION_DEVICE_ENABLE ||
-        oid==OPTION_FW_VERSION || oid==OPTION_HW_VERSION ||
-        oid==OPTION_FW_MINOR || oid==OPTION_SEQUENTIAL_RETIRED ||
-        oid==OPTION_REMOTE_EXT_MODE)
+    if (oid==IOPT_RESET || oid==IOPT_DEVICE_ENABLE ||
+        oid==IOPT_FW_VERSION || oid==IOPT_HW_VERSION ||
+        oid==IOPT_FW_MINOR || oid==IOPT_SEQUENTIAL_RETIRED ||
+        oid==IOPT_REMOTE_EXT_MODE)
       continue;
-    prev_value = os.options[oid];
-    max_value = pgm_read_byte(op_max+oid);
-    if (max_value==1)  os.options[oid] = 0;  // set a bool variable to 0 first
+    prev_value = os.iopts[oid];
+    max_value = pgm_read_byte(iopt_max+oid);
+    if (max_value==1)  os.iopts[oid] = 0;  // set a bool variable to 0 first
     char tbuf2[5] = {'o', 0, 0, 0, 0};
     itoa(oid, tbuf2+1, 10);
     if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, tbuf2)) {
       if (max_value==1) {
-        os.options[oid] = 1;  // if the bool variable is detected, set to 1
+        os.iopts[oid] = 1;  // if the bool variable is detected, set to 1
       } else {
 		    int32_t v = atol(tmp_buffer);
-		    if (oid==OPTION_MASTER_OFF_ADJ || oid==OPTION_MASTER_OFF_ADJ_2 ||
-		        oid==OPTION_MASTER_ON_ADJ  || oid==OPTION_MASTER_ON_ADJ_2  ||
-		        oid==OPTION_STATION_DELAY_TIME) {
+		    if (oid==IOPT_MASTER_OFF_ADJ || oid==IOPT_MASTER_OFF_ADJ_2 ||
+		        oid==IOPT_MASTER_ON_ADJ  || oid==IOPT_MASTER_ON_ADJ_2  ||
+		        oid==IOPT_STATION_DELAY_TIME) {
 		      v=water_time_encode_signed(v);
 		    } // encode station delay time
-        #if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__) || defined(ESP8266)
-        if(oid==OPTION_BOOST_TIME) {
+        #if defined(ARDUINO)
+        if(oid==IOPT_BOOST_TIME) {
            v>>=2;
         }
         #endif
         if (v>=0 && v<=max_value) {
-          os.options[oid] = v;
+          os.iopts[oid] = v;
 		    } else {
 		      err = 1;
 		    }
 		  }
     }
-    if (os.options[oid] != prev_value) {	// if value has changed
-    	if (oid==OPTION_TIMEZONE || oid==OPTION_USE_NTP)    time_change = true;
-    	if (oid>=OPTION_NTP_IP1 && oid<=OPTION_NTP_IP4)     time_change = true;
-    	if (oid>=OPTION_USE_DHCP && oid<=OPTION_HTTPPORT_1) network_change = true;
-    	if (oid==OPTION_DEVICE_ID)  network_change = true;
-      if (oid==OPTION_USE_WEATHER) weather_change = true;
+    // todo future: support json names
+    if (os.iopts[oid] != prev_value) {	// if value has changed
+    	if (oid==IOPT_TIMEZONE || oid==IOPT_USE_NTP)    time_change = true;
+    	if (oid>=IOPT_NTP_IP1 && oid<=IOPT_NTP_IP4)     time_change = true;
+    	if (oid>=IOPT_USE_DHCP && oid<=IOPT_HTTPPORT_1) network_change = true;
+    	if (oid==IOPT_DEVICE_ID)  network_change = true;
+      if (oid==IOPT_USE_WEATHER) weather_change = true;
     }
   }
 
   if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("loc"), true)) {
     urlDecode(tmp_buffer);
-    tmp_buffer[MAX_LOCATION-1]=0;   // make sure we don't exceed the maximum size
-    if (strcmp_to_nvm(tmp_buffer, ADDR_NVM_LOCATION)) { // if location has changed
-      nvm_write_block(tmp_buffer, (void*)ADDR_NVM_LOCATION, strlen(tmp_buffer)+1);
+    if (os.sopt_save(SOPT_LOCATION, tmp_buffer)) { // if location string has changed
       weather_change = true;
     }
   }
   uint8_t keyfound = 0;
   if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("wtkey"), true, &keyfound)) {
     urlDecode(tmp_buffer);
-    tmp_buffer[MAX_WEATHER_KEY-1]=0;
-    if (strcmp_to_nvm(tmp_buffer, ADDR_NVM_WEATHER_KEY)) {  // if weather key has changed
-      nvm_write_block(tmp_buffer, (void*)ADDR_NVM_WEATHER_KEY, strlen(tmp_buffer)+1);
+    if (os.sopt_save(SOPT_WEATHER_KEY, tmp_buffer)) {  // if weather key has changed
       weather_change = true;
     }
   } else if (keyfound) {
     tmp_buffer[0]=0;
-    nvm_write_block(tmp_buffer, (void*)ADDR_NVM_WEATHER_KEY, strlen(tmp_buffer)+1);
+    os.sopt_save(SOPT_WEATHER_KEY, tmp_buffer);
   }
+
+  if(findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("wto"), true)) {
+    urlDecode(tmp_buffer);
+    os.sopt_save(SOPT_WEATHER_OPTS, tmp_buffer);
+    weather_change = true;
+  }
+  
   keyfound = 0;
   if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("ifkey"), true, &keyfound)) {
     urlDecode(tmp_buffer);
-    tmp_buffer[TMP_BUFFER_SIZE-1]=0;
-    write_to_file(ifkey_filename, tmp_buffer, strlen(tmp_buffer));
+    os.sopt_save(SOPT_IFTTT_KEY, tmp_buffer);
   } else if (keyfound) {
     tmp_buffer[0]=0;
-    write_to_file(ifkey_filename, tmp_buffer, strlen(tmp_buffer));
+    os.sopt_save(SOPT_IFTTT_KEY, tmp_buffer);
   }  
+
   // if not using NTP and manually setting time
-  if (!os.options[OPTION_USE_NTP] && findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("ttt"), true)) {
+  if (!os.iopts[IOPT_USE_NTP] && findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("ttt"), true)) {
     unsigned long t;
     t = atol(tmp_buffer);
     // before chaging time, reset all stations to avoid messing up with timing
@@ -1496,16 +1483,9 @@ void server_change_options()
     RTC.set(t);
 #endif
   }
-  if(findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("wto"), true)) {
-    urlDecode(tmp_buffer);
-    tmp_buffer[TMP_BUFFER_SIZE-1]=0;
-    // store weather key
-    write_to_file(wtopts_filename, tmp_buffer, strlen(tmp_buffer));
-    weather_change = true;
-  }
   if (err)  handle_return(HTML_DATA_OUTOFBOUND);
 
-  os.options_save();
+  os.iopts_save();
 
   if(time_change) {
     os.status.req_ntpsync = 1;
@@ -1536,7 +1516,7 @@ void server_change_password() {
   handle_return(HTML_SUCCESS);  // do not allow chnaging password for demo
 #endif
 
-#ifdef ESP8266
+#if defined(ESP8266)
   char* p = NULL;
   if(!process_password()) return;
 #else
@@ -1544,10 +1524,9 @@ void server_change_password() {
 #endif
   if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("npw"), true)) {
     char tbuf2[TMP_BUFFER_SIZE];
-    if (findKeyVal(p, tbuf2, TMP_BUFFER_SIZE, PSTR("cpw"), true) && strncmp(tmp_buffer, tbuf2, MAX_USER_PASSWORD) == 0) {
+    if (findKeyVal(p, tbuf2, TMP_BUFFER_SIZE, PSTR("cpw"), true) && strncmp(tmp_buffer, tbuf2, TMP_BUFFER_SIZE) == 0) {
       urlDecode(tmp_buffer);
-      tmp_buffer[MAX_USER_PASSWORD-1]=0;  // make sure we don't exceed the maximum size
-      nvm_write_block(tmp_buffer, (void*)ADDR_NVM_PASSWORD, strlen(tmp_buffer)+1);
+      os.sopt_save(SOPT_PASSWORD, tmp_buffer);
       handle_return(HTML_SUCCESS);
     } else {
       handle_return(HTML_MISMATCH);
@@ -1571,7 +1550,7 @@ void server_json_status_main() {
 /** Output station status */
 void server_json_status()
 {
-#ifdef ESP8266
+#if defined(ESP8266)
   if(!process_password()) return;
   rewind_ether_buffer();
 #endif
@@ -1590,11 +1569,11 @@ void server_json_status()
  * t:  timer (required if en=1)
  */
 void server_change_manual() {
-#ifdef ESP8266
-  char* p = NULL;
+#if defined(ESP8266)
+  char *p = NULL;
   if(!process_password()) return;
 #else
-  char* p = get_buffer;
+  char *p = get_buffer;
 #endif
 
   int sid=-1;
@@ -1656,7 +1635,7 @@ void server_change_manual() {
 }
 
 
-#ifdef ESP8266
+#if defined(ESP8266)
 int file_fgets(File file, char* buf, int maxsize) {
   int index=0;
   while(index<maxsize) {
@@ -1685,15 +1664,12 @@ int file_fgets(File file, char* buf, int maxsize) {
  */
 void server_json_log() {
 
-#ifdef ESP8266
-  char* p = NULL;
+#if defined(ESP8266)
+  char *p = NULL;
   if(!process_password()) return;  
 #else
-  char* p = get_buffer;
+  char *p = get_buffer;
 #endif
-
-  // if no sd card, return false
-  if (!os.status.has_sd)  handle_return(HTML_PAGE_NOT_FOUND);
 
   unsigned int start, end;
 
@@ -1724,7 +1700,7 @@ void server_json_log() {
   if (findKeyVal(p, type, 4, PSTR("type"), true))
     type_specified = true;
 
-#ifdef ESP8266
+#if defined(ESP8266)
   // as the log data can be large, we will use ESP8266's sendContent function to
   // send multiple packets of data, instead of the standard way of using send().
   rewind_ether_buffer();
@@ -1742,13 +1718,13 @@ void server_json_log() {
     itoa(i, tmp_buffer, 10);
     make_logfile_name(tmp_buffer);
 
-#if defined(ARDUINO) && !defined(ESP8266)  // prepare to open log file for Arduino
+#if defined(ESP8266)
+    File file = SPIFFS.open(tmp_buffer, "r");
+    if(!file) continue;
+#elif defined(ARDUINO)
     if (!sd.exists(tmp_buffer)) continue;
     SdFile file;
     file.open(tmp_buffer, O_READ);
-#elif defined(ESP8266)
-    File file = SPIFFS.open(tmp_buffer, "r");
-    if(!file) continue;
 #else // prepare to open log file for RPI/BBB
     FILE *file = fopen(get_filename_fullpath(tmp_buffer), "rb");
     if(!file) continue;
@@ -1756,13 +1732,7 @@ void server_json_log() {
 
     int res;
     while(true) {
-    #if defined(ARDUINO) && !defined(ESP8266)
-      res = file.fgets(tmp_buffer, TMP_BUFFER_SIZE);
-      if (res <= 0) {
-        file.close();
-        break;
-      }
-    #elif defined(ESP8266)
+    #if defined(ESP8266)
       // do not use file.readBytes or readBytesUntil because it's very slow
       int res = file_fgets(file, tmp_buffer, TMP_BUFFER_SIZE);
       if (res <= 0) {
@@ -1770,6 +1740,12 @@ void server_json_log() {
         break;
       }
       tmp_buffer[res]=0;
+    #elif defined(ARDUINO)
+      res = file.fgets(tmp_buffer, TMP_BUFFER_SIZE);
+      if (res <= 0) {
+        file.close();
+        break;
+      }
     #else
       if(fgets(tmp_buffer, TMP_BUFFER_SIZE, file)) {
         res = strlen(tmp_buffer);
@@ -1812,7 +1788,7 @@ void server_json_log() {
 
   bfill.emit_p(PSTR("]"));
   INSERT_DELAY(1);
-#ifdef ESP8266
+#if defined(ESP8266)
   send_packet(true);
 #else
   handle_return(HTML_OK);
@@ -1828,11 +1804,11 @@ void server_json_log() {
  * if day=all: delete all log files)
  */
 void server_delete_log() {
-#ifdef ESP8266
-  char* p = NULL;
+#if defined(ESP8266)
+  char *p = NULL;
   if(!process_password()) return;
 #else  
-  char* p = get_buffer;
+  char *p = get_buffer;
 #endif
 
   if (!findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("day"), true))
@@ -1845,7 +1821,7 @@ void server_delete_log() {
 
 /** Output all JSON data, including jc, jp, jo, js, jn */
 void server_json_all() {
-#ifdef ESP8266
+#if defined(ESP8266)
   if(!process_password(true)) return;
   rewind_ether_buffer();
 #endif
@@ -1926,7 +1902,7 @@ URLHandler urls[] = {
 };
 
 // handle Ethernet request
-#ifdef ESP8266
+#if defined(ESP8266)
 void on_ap_update() {
   String html = FPSTR(ap_update_html);
   server_send_html(html);
@@ -2094,7 +2070,7 @@ void handle_web_request(char *p)
           if(check_password(dat)==false) {
             print_json_header();
             bfill.emit_p(PSTR("\"$F\":$D}"),
-                   op_json_names+0, os.options[0]);
+                   iopt_json_names+0, os.iopts[0]);
             ret = HTML_OK;
           } else {
             get_buffer = dat;
@@ -2142,20 +2118,20 @@ void handle_web_request(char *p)
 /** NTP sync request */
 ulong getNtpTime()
 {
-#ifdef ESP8266
+#if defined(ESP8266)
   static bool configured = false;
     
   if (os.state!=OS_STATE_CONNECTED || WiFi.status()!=WL_CONNECTED) return 0;
   
   if(!configured) {
     String ntpip = "";
-    ntpip+=os.options[OPTION_NTP_IP1];
+    ntpip+=os.iopts[IOPT_NTP_IP1];
     ntpip+=".";
-    ntpip+=os.options[OPTION_NTP_IP2];
+    ntpip+=os.iopts[IOPT_NTP_IP2];
     ntpip+=".";
-    ntpip+=os.options[OPTION_NTP_IP3];
+    ntpip+=os.iopts[IOPT_NTP_IP3];
     ntpip+=".";
-    ntpip+=os.options[OPTION_NTP_IP4];
+    ntpip+=os.iopts[IOPT_NTP_IP4];
     
     configTime(0, 0, "pool.ntp.org", ntpip.c_str(), "time.nist.gov");
     delay(1000);
@@ -2178,10 +2154,10 @@ ulong getNtpTime()
   
 #else
   byte ntpip[4] = {
-    os.options[OPTION_NTP_IP1],
-    os.options[OPTION_NTP_IP2],
-    os.options[OPTION_NTP_IP3],
-    os.options[OPTION_NTP_IP4]};
+    os.iopts[IOPT_NTP_IP1],
+    os.iopts[IOPT_NTP_IP2],
+    os.iopts[IOPT_NTP_IP3],
+    os.iopts[IOPT_NTP_IP4]};
   uint32_t time;
   byte tick=0;
   unsigned long expire;

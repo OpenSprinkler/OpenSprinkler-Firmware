@@ -25,23 +25,22 @@
 #ifndef _OPENSPRINKLER_H
 #define _OPENSPRINKLER_H
 
-#if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__) // headers for AVR
+#if defined(ESP8266) // headers for ESP8266
+  #include <Wire.h>
+  #include <FS.h>
+  #include <RCSwitch.h>
+  //#include <UIPEthernet.h>  
+  #include "SSD1306Display.h"
+  #include "i2crtc.h"
+  #include "espconnect.h"
+#elif defined(ARDUINO) // headers for AVR
   #include <Arduino.h>
   #include <avr/eeprom.h>
   #include <Wire.h>
   #include <RCSwitch.h>
   #include <UIPEthernet.h>
   #include "LiquidCrystal.h"
-  #include "Time.h"
   #include "i2crtc.h"
-#elif defined(ESP8266) // headers for ESP8266
-  #include <Wire.h>
-  #include <FS.h>
-  #include <RCSwitch.h>
-  #include <UIPEthernet.h>  
-  #include "SSD1306Display.h"
-  #include "i2crtc.h"
-  #include "espconnect.h"
 #else // headers for RPI/BBB/LINUX
   #include <time.h>
   #include <string.h>
@@ -61,8 +60,7 @@ struct NVConData {
   uint32_t external_ip;   // external ip
 };
 
-/** Station data structure */
-struct StationData {
+struct StationAttrib {  // station attributes
   byte mas:1;
   byte igr:1;
   byte mas2:1;
@@ -70,8 +68,13 @@ struct StationData {
   byte seq:1;
   byte gid:3; // group id: reserved for the future
   byte reserved[3]; // reserve 3 bytes for the future
+};
+
+/** Station data structure */
+struct StationData {
   char name[STATION_NAME_SIZE];
-  byte spet;  // special station type
+  StationAttrib attrib;
+  byte type; // station type
   byte sped[STATION_SPECIAL_DATA_SIZE]; // special station data
 };
 
@@ -116,14 +119,17 @@ struct ConStatus {
   byte mas2:8;              // master2 station index
 };
 
+extern const char iopt_json_names[];
+extern const byte iopt_max[];
+
 class OpenSprinkler {
 public:
 
   // data members
-#if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
-  static LiquidCrystal lcd; // 16x2 character LCD
-#elif defined(ESP8266)
+#if defined(ESP8266)
   static SSD1306Display lcd;  // 128x64 OLED display
+#elif defined(ARDUINO)
+  static LiquidCrystal lcd; // 16x2 character LCD
 #else
   // todo: LCD define for RPI/BBB
 #endif
@@ -139,11 +145,18 @@ public:
   static byte nboards, nstations;
   static byte hw_type;           // hardware type
 
-  static byte options[];  // option values, max, name, and flag
-
+  static byte iopts[]; // integer options
+  static const char*sopts[]; // string options
   static byte station_bits[];     // station activation bits. each byte corresponds to a board (8 stations)
                                   // first byte-> master controller, second byte-> ext. board 1, and so on
-
+  // todo future: the following attribute bytes are for backward compatibility
+  static byte attrib_mas[];
+  static byte attrib_igr[];
+  static byte attrib_mas2[];
+  static byte attrib_dis[];
+  static byte attrib_seq[];
+  static byte attrib_spe[];
+    
   // variables for time keeping
   static ulong sensor_lasttime;  // time when the last sensor reading is recorded
   static volatile ulong flowcount_time_ms;// time stamp when new flow sensor click is received (in milliseconds)
@@ -166,24 +179,30 @@ public:
 #endif
   static time_t now_tz();
   // -- station names and attributes
+  static void get_station_data(byte sid, StationData* data); // get station data
+  static void set_station_data(byte sid, StationData* data); // set station data
   static void get_station_name(byte sid, char buf[]); // get station name
   static void set_station_name(byte sid, char buf[]); // set station name
+  static byte get_station_type(byte sid); // get station type
+  //static StationAttrib get_station_attrib(byte sid); // get station attribute
+  static void attribs_save(); // repackage attrib bits and save (backward compatibility)
+  static void attribs_load(); // load and repackage attrib bits (backward compatibility)
   static uint16_t parse_rfstation_code(RFStationData *data, ulong *on, ulong *off); // parse rf code into on/off/time sections
   static void switch_rfstation(RFStationData *data, bool turnon);  // switch rf station
   static void switch_remotestation(RemoteStationData *data, bool turnon); // switch remote station
   static void switch_gpiostation(GPIOStationData *data, bool turnon); // switch gpio station
   static void switch_httpstation(HTTPStationData *data, bool turnon); // switch http station
-  static void station_attrib_bits_save(int addr, byte bits[]); // save station attribute bits to nvm
-  static void station_attrib_bits_load(int addr, byte bits[]); // load station attribute bits from nvm
-  static byte station_attrib_bits_read(int addr); // read one station attribte byte from nvm
 
   // -- options and data storeage
   static void nvdata_load();
   static void nvdata_save();
 
   static void options_setup();
-  static void options_load();
-  static void options_save(bool savewifi=false);
+  static void iopts_load();
+  static void iopts_save();
+  static bool sopt_save(byte oid, const char *buf);
+  static void sopt_load(byte oid, char *buf);
+  static String sopt_load(byte oid);
 
   static byte password_verify(char *pw);  // verify password
   
@@ -240,7 +259,8 @@ public:
   static void flash_screen();
   static void toggle_screen_led();
   static void set_screen_led(byte status);  
-  static byte get_wifi_mode() {return options[OPTION_WIFI_MODE];}
+  static byte get_wifi_mode() {return iopts[IOPT_WIFI_MODE];}
+  static String wifi_ssid, wifi_pass;
   static void config_ip();
   static void reset_to_ap();
   static byte state;
@@ -250,7 +270,6 @@ private:
   static void lcd_print_2digit(int v);  // print a integer in 2 digits
   static void lcd_start();
   static byte button_read_busy(byte pin_butt, byte waitmode, byte butt, byte is_holding);
-  static byte engage_booster;
 
   #if defined(ESP8266)
   static void latch_boost();
@@ -262,6 +281,7 @@ private:
   static byte prev_station_bits[];
   #endif
 #endif // LCD functions
+  static byte engage_booster;
 };
 
 #endif  // _OPENSPRINKLER_H

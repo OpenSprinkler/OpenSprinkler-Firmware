@@ -26,7 +26,7 @@
 
 #if defined(ARDUINO)
 
-#ifdef ESP8266
+#if defined(ESP8266)
 
 #include "Arduino.h"
 

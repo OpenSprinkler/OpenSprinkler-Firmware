@@ -25,7 +25,7 @@
 #define _UTILS_H
 
 #if defined(ARDUINO)
-
+  #include <Arduino.h>
 #else // headers for RPI/BBB
   #include <stdio.h>
   #include <limits.h>
@@ -35,14 +35,17 @@
 #include "defines.h"
 
 // File reading/writing functions
-void write_to_file(const char *fname, const char *data, int size, int pos=0, bool trunc=true);
-void read_from_file(const char *fname, char *data, int maxsize=TMP_BUFFER_SIZE, int pos=0);
+void write_to_file(const char *fname, const char *data, ulong size, ulong pos=0, bool trunc=true);
+void read_from_file(const char *fname, char *data, ulong maxsize=TMP_BUFFER_SIZE, int pos=0);
 void remove_file(const char *fname);
+bool file_exists(const char *fname);
 
-void file_read_block (const char *fname, void *dst, int pos, int len);
-void file_write_block(const char *fname, void *src, int pos, int len);
-byte file_read_byte (const char *fname, int pos);
-void file_write_byte(const char *fname, int pos, byte v);  
+void file_read_block (const char *fname, void *dst, ulong pos, ulong len);
+void file_write_block(const char *fname, const void *src, ulong pos, ulong len);
+void file_copy_block (const char *fname, ulong from, ulong to, ulong len, void *tmp=0);
+byte file_read_byte (const char *fname, ulong pos);
+void file_write_byte(const char *fname, ulong pos, byte v);  
+byte file_cmp_block(const char *fname, const char *buf, ulong pos);
 
 // misc. string and time converstion functions
 void strncpy_P0(char* dest, const char* src, int n);
@@ -61,9 +64,10 @@ int16_t water_time_decode_signed(byte i);
   ulong millis();
   ulong micros();
   void initialiseEpoch();
-#if defined(OSPI)
+  #if defined(OSPI)
   unsigned int detect_rpi_rev();
+  #endif
+
 #endif
-#endif  // NVM functions
 
 #endif // _UTILS_H

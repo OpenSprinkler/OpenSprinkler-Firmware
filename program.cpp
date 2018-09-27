@@ -37,6 +37,7 @@ RuntimeQueueStruct ProgramData::queue[RUNTIME_QUEUE_SIZE];
 byte ProgramData::station_qid[MAX_NUM_STATIONS];
 LogStruct ProgramData::lastrun;
 ulong ProgramData::last_seq_stop_time;
+extern char tmp_buffer[];
 
 void ProgramData::init() {
 	reset_runtime();
@@ -92,14 +93,14 @@ void ProgramData::dequeue(byte qid) {
   DEBUG_PRINTLN("");*/
 }
 
-/** Load program count from NVM */
+/** Load program count from program file */
 void ProgramData::load_count() {
-  nprograms = nvm_read_byte((byte *) ADDR_PROGRAMCOUNTER);
+  nprograms = file_read_byte(PROG_FILENAME, 0);
 }
 
-/** Save program count to NVM */
+/** Save program count to program file */
 void ProgramData::save_count() {
-  nvm_write_byte((byte *) ADDR_PROGRAMCOUNTER, nprograms);
+  file_write_byte(PROG_FILENAME, 0, nprograms);
 }
 
 /** Erase all program data */
@@ -108,67 +109,38 @@ void ProgramData::eraseall() {
   save_count();
 }
 
-/** Read a program from NVM*/
+/** Read a program from program file*/
 void ProgramData::read(byte pid, ProgramStruct *buf) {
   if (pid >= nprograms) return;
-  if (0) {
-    // todo: handle SD card
-  } else {
-    unsigned int addr = ADDR_PROGRAMDATA + (unsigned int)pid * PROGRAMSTRUCT_SIZE;
-    nvm_read_block((void*)buf, (const void *)addr, PROGRAMSTRUCT_SIZE);  
-  }
+  // first byte is program counter, so 1+
+  file_read_block(PROG_FILENAME, buf, 1+(ulong)pid*PROGRAMSTRUCT_SIZE, PROGRAMSTRUCT_SIZE);
 }
 
 /** Add a program */
 byte ProgramData::add(ProgramStruct *buf) {
-  if (0) {
-    // todo: handle SD card
-  } else {
-    if (nprograms >= MAX_NUMBER_PROGRAMS)  return 0;
-    unsigned int addr = ADDR_PROGRAMDATA + (unsigned int)nprograms * PROGRAMSTRUCT_SIZE;
-    nvm_write_block((const void*)buf, (void *)addr, PROGRAMSTRUCT_SIZE);
-    nprograms ++;
-    save_count();
-  }
+  if (nprograms >= MAX_NUM_PROGRAMS)  return 0;
+  file_write_block(PROG_FILENAME, buf, 1+(ulong)nprograms*PROGRAMSTRUCT_SIZE, PROGRAMSTRUCT_SIZE);
+  nprograms ++;
+  save_count();
   return 1;
 }
 
 /** Move a program up (i.e. swap a program with the one above it) */
 void ProgramData::moveup(byte pid) {
   if(pid >= nprograms || pid == 0) return;
-
-  if(0) {
-    // todo: handle SD card
-  } else {
-    // swap program pid-1 and pid
-    unsigned int src = ADDR_PROGRAMDATA + (unsigned int)(pid-1) * PROGRAMSTRUCT_SIZE;
-    unsigned int dst = src + PROGRAMSTRUCT_SIZE;
-#if defined(ARDUINO) // NVM write for Arduino
-    byte tmp;
-    for(int i=0;i<PROGRAMSTRUCT_SIZE;i++,src++,dst++) {
-      tmp = nvm_read_byte((byte *)src);
-      nvm_write_byte((byte *)src, nvm_read_byte((byte *)dst));
-      nvm_write_byte((byte *)dst, tmp);
-    }
-#else // NVM write for RPI/BBB
-    ProgramStruct tmp1, tmp2;
-    nvm_read_block(&tmp1, (void *)src, PROGRAMSTRUCT_SIZE);
-    nvm_read_block(&tmp2, (void *)dst, PROGRAMSTRUCT_SIZE);
-    nvm_write_block(&tmp1, (void *)dst, PROGRAMSTRUCT_SIZE);
-    nvm_write_block(&tmp2, (void *)src, PROGRAMSTRUCT_SIZE);
-#endif // NVM write
-  }
+  // swap program pid-1 and pid
+  ulong pos = 1+(ulong)(pid-1)*PROGRAMSTRUCT_SIZE;
+  ulong next = pos+PROGRAMSTRUCT_SIZE;
+  file_read_block(PROG_FILENAME, tmp_buffer, pos, PROGRAMSTRUCT_SIZE);
+  file_copy_block(PROG_FILENAME, next, pos, PROGRAMSTRUCT_SIZE, tmp_buffer);
+  file_write_block(PROG_FILENAME, tmp_buffer, next, PROGRAMSTRUCT_SIZE);
 }
 
 /** Modify a program */
 byte ProgramData::modify(byte pid, ProgramStruct *buf) {
   if (pid >= nprograms)  return 0;
-  if (0) {
-    // handle SD card
-  } else {
-    unsigned int addr = ADDR_PROGRAMDATA + (unsigned int)pid * PROGRAMSTRUCT_SIZE;
-    nvm_write_block((const void*)buf, (void *)addr, PROGRAMSTRUCT_SIZE);
-  }
+  ulong pos = 1+(ulong)pid*PROGRAMSTRUCT_SIZE;
+  file_write_block(PROG_FILENAME, buf, pos, PROGRAMSTRUCT_SIZE);
   return 1;
 }
 
@@ -176,20 +148,23 @@ byte ProgramData::modify(byte pid, ProgramStruct *buf) {
 byte ProgramData::del(byte pid) {
   if (pid >= nprograms)  return 0;
   if (nprograms == 0) return 0;
-  if (0) {
-    // handle SD card
-  } else {
-    ProgramStruct copy;
-    unsigned int addr = ADDR_PROGRAMDATA + (unsigned int)(pid+1) * PROGRAMSTRUCT_SIZE;
-    // erase by copying backward
-    for (; addr < ADDR_PROGRAMDATA + nprograms * PROGRAMSTRUCT_SIZE; addr += PROGRAMSTRUCT_SIZE) {
-      nvm_read_block((void*)&copy, (const void *)addr, PROGRAMSTRUCT_SIZE);  
-      nvm_write_block((const void*)&copy, (void *)(addr-PROGRAMSTRUCT_SIZE), PROGRAMSTRUCT_SIZE);
-    }
-    nprograms --;
-    save_count();
+  ulong pos = 1+(ulong)(pid+1)*PROGRAMSTRUCT_SIZE;
+  // erase by copying backward
+  for (; pos < 1+(ulong)nprograms*PROGRAMSTRUCT_SIZE; pos+=PROGRAMSTRUCT_SIZE) {
+    file_copy_block(PROG_FILENAME, pos, pos-PROGRAMSTRUCT_SIZE, PROGRAMSTRUCT_SIZE, tmp_buffer);
   }
+  nprograms --;
+  save_count();
   return 1;
+}
+
+// set the enable bit
+byte ProgramData::set_flagbit(byte pid, byte bid, byte value) {
+  if (pid >= nprograms)  return 0;
+  byte flag = file_read_byte(PROG_FILENAME, 1+(ulong)pid*PROGRAMSTRUCT_SIZE);
+  if(value) flag|=(1<<bid);
+  else flag&=(~(1<<bid));
+  file_write_byte(PROG_FILENAME, 1+(ulong)pid*PROGRAMSTRUCT_SIZE, flag);
 }
 
 /** Decode a sunrise/sunset start time to actual start time */
@@ -234,7 +209,7 @@ byte ProgramStruct::check_day_match(time_t t) {
     break;
 
     case PROGRAM_TYPE_BIWEEKLY:
-      // todo
+      // todo future
     break;
 
     case PROGRAM_TYPE_MONTHLY:
@@ -316,11 +291,11 @@ byte ProgramStruct::check_match(time_t t) {
 }
 
 // convert absolute remainder (reference time 1970 01-01) to relative remainder (reference time today)
-// absolute remainder is stored in nvm, relative remainder is presented to web
+// absolute remainder is stored in flash, relative remainder is presented to web
 void ProgramData::drem_to_relative(byte days[2]) {
   byte rem_abs=days[0];
   byte inv=days[1];
-  // todo: use now_tz()?
+  // todo future: use now_tz()?
   days[0] = (byte)((rem_abs + inv - (os.now_tz()/SECS_PER_DAY) % inv) % inv);
 }
 
@@ -328,24 +303,9 @@ void ProgramData::drem_to_relative(byte days[2]) {
 void ProgramData::drem_to_absolute(byte days[2]) {
   byte rem_rel=days[0];
   byte inv=days[1];
-  // todo: use now_tz()?
+  // todo future: use now_tz()?
   days[0] = (byte)(((os.now_tz()/SECS_PER_DAY) + rem_rel) % inv);
 }
 
-// set the enable bit
-byte ProgramData::set_flagbit(byte pid, byte bid, byte value) {
-  if (pid >= nprograms)  return 0;
-  if (0) {
-    // handle SD card
-  } else {
-    byte flag;
-    unsigned int addr = ADDR_PROGRAMDATA + (unsigned int)pid * PROGRAMSTRUCT_SIZE;
-    flag=nvm_read_byte((const byte *)addr);
-    if(value) flag|=(1<<bid);
-    else flag&=(~(1<<bid));
-    nvm_write_byte((const byte *)addr, flag);
-  }
-  return 1;  
-}
 
 

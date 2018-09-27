@@ -128,7 +128,7 @@ ulong millis (void)
   gettimeofday (&tv, NULL) ;
   now  = (uint64_t)tv.tv_sec * (uint64_t)1000 + (uint64_t)(tv.tv_usec / 1000) ;
 
-  return (uint32_t)(now - epochMilli) ;
+  return (ulong)(now - epochMilli) ;
 }
 
 ulong micros (void)
@@ -139,7 +139,7 @@ ulong micros (void)
   gettimeofday (&tv, NULL) ;
   now  = (uint64_t)tv.tv_sec * (uint64_t)1000000 + (uint64_t)tv.tv_usec ;
 
-  return (uint32_t)(now - epochMicro) ;
+  return (ulong)(now - epochMicro) ;
 }
 
 #if defined(OSPI)
@@ -169,7 +169,7 @@ unsigned int detect_rpi_rev() {
 
 #endif
 
-void write_to_file(const char *fn, const char *data, int size, int pos, bool trunc) {
+void write_to_file(const char *fn, const char *data, ulong size, ulong pos, bool trunc) {
 
 #if defined(ESP8266)
 
@@ -218,7 +218,7 @@ void write_to_file(const char *fn, const char *data, int size, int pos, bool tru
 #endif
 }
 
-void read_from_file(const char *fn, char *data, int maxsize, int pos) {
+void read_from_file(const char *fn, char *data, ulong maxsize, ulong pos) {
 #if defined(ESP8266)
 
   File f = SPIFFS.open(fn, "r");
@@ -295,8 +295,28 @@ void remove_file(const char *fn) {
 #endif
 }
 
+bool file_exists(const char *fn) {
+#if defined(ESP8266)
+
+  return SPIFFS.exists(fn);
+
+#elif defined(ARDUINO)
+
+  sd.chdir("/");
+  return sd.exists(fn);
+
+#else
+
+  FILE *file;
+  file = fopen(get_filename_fullpath(fn), "rb");
+  if(file) {fclose(file); return true;}
+  else {return false;}
+
+#endif
+}
+
 // file functions
-void file_read_block(const char *fn, void *dst, int pos, int len) {
+void file_read_block(const char *fn, void *dst, ulong pos, ulong len) {
 #if defined(ESP8266)
 
   // do not use File.readBytes or readBytesUntil because it's very slow  
@@ -329,7 +349,7 @@ void file_read_block(const char *fn, void *dst, int pos, int len) {
 #endif
 }
 
-void file_write_block(const char *fn, const void *src, int pos, int len) {
+void file_write_block(const char *fn, const void *src, ulong pos, ulong len) {
 #if defined(ESP8266)
 
   File f = SPIFFS.open(fn, "r+");
@@ -366,13 +386,103 @@ void file_write_block(const char *fn, const void *src, int pos, int len) {
 
 }
 
-byte file_read_byte(const char *fn, int pos) {
+void file_copy_block(const char *fn, ulong from, ulong to, ulong len, void *tmp) {
+  // assume tmp buffer is provided and is larger than len
+  // todo future: if tmp buffer is not provided, do byte-to-byte copy
+  if(tmp==NULL) { return; }
+#if defined(ESP8266)
+
+  File f = SPIFFS.open(fn, "r+");
+  if(!f) return;
+  f.seek(from, SeekSet);
+  f.read((byte*)tmp, len);
+  f.seek(to, SeekSet);
+  f.write((byte*)tmp, len);
+  f.close();
+
+#elif defined(ARDUINO)
+
+  sd.chdir("/");
+  SdFile file;
+  int ret = file.open(fn, O_RDWR);
+  if(!ret) return;
+  file.seekSet(from);
+  file.read(tmp, len);
+  file.seekSet(to);
+  file.write(tmp, len);
+  file.close();
+
+#else
+
+  FILE *fp = fopen(get_filename_fullpath(fn), "rb+");
+  if(!fp) return;
+  fseek(fp, from, SEEK_SET);
+  fread(tmp, 1, len, fp);
+  fseek(fp, to, SEEK_SET);
+  fwrite(tmp, 1, len, fp);
+  fclose(fp);
+
+#endif
+
+}
+
+// compare a block of content
+byte file_cmp_block(const char *fn, const char *buf, ulong pos) {
+  char c;
+#if defined(ESP8266)
+
+  File f = SPIFFS.open(fn, "r");
+  if(f) {
+    f.seek(pos, SeekSet);
+    char c = f.read();
+    while(*buf && (c==*buf)) {
+      buf++;
+      c=f.read();
+    }
+    f.close();
+    return (*buf==c)?0:1;
+  }
+
+#elif defined(ARDUINO)
+
+  sd.chdir("/");
+  SdFile file;
+  if(file.open(fn, O_READ)) {
+    file.seekSet(pos);
+    char c = file.read();
+    while(*buf && (c==*buf)) {
+      buf++;
+      c=file.read();
+    }
+    file.close();
+    return (*buf==c)?0:1;
+  }
+
+#else
+
+  FILE *fp = fopen(get_filename_fullpath(fn), "rb");
+  if(fp) {
+    fseek(fp, pos, SEEK_SET);
+    char c = fgetc(fp);
+    while(*buf && (c==*buf)) {
+      buf++;
+      c=fgetc(fp);
+    }
+    fclose(fp);
+    return (*buf==c)?0:1;
+  }  
+
+#endif
+  return 1;
+}
+
+byte file_read_byte(const char *fn, ulong pos) {
   byte v = 0;
   file_read_block(fn, &v, pos, 1);
   return v;
 }
 
-void file_write_byte(const char *fn, int pos, byte v) {
+void file_write_byte(const char *fn, ulong pos, byte v) {
   file_write_block(fn, &v, pos, 1);
 }
 

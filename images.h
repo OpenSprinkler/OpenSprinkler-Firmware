@@ -1,4 +1,4 @@
-#ifdef ESP8266
+#if defined(ESP8266)
 
 #ifndef IMAGES_H
 #define IMAGES_H

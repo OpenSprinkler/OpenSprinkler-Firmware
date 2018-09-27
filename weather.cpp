@@ -22,7 +22,7 @@
  */
 
 #if defined(ARDUINO)
-  #ifdef ESP8266
+  #if defined(ESP8266)
   extern char ether_buffer[];
   #endif
 #else
@@ -32,8 +32,6 @@
 #include <netdb.h>
 extern char ether_buffer[];
 #endif
-
-extern const char wtopts_filename[];
 
 #include "OpenSprinkler.h"
 #include "utils.h"
@@ -90,10 +88,10 @@ static void getweather_callback(byte status, uint16_t off, uint16_t len) {
 
   if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("scale"), true)) {
     v = atoi(tmp_buffer);
-    if (v>=0 && v<=250 && v != os.options[OPTION_WATER_PERCENTAGE]) {
+    if (v>=0 && v<=250 && v != os.iopts[IOPT_WATER_PERCENTAGE]) {
       // only save if the value has changed
-      os.options[OPTION_WATER_PERCENTAGE] = v;
-      os.options_save();
+      os.iopts[IOPT_WATER_PERCENTAGE] = v;
+      os.iopts_save();
       os.weather_update_flag |= WEATHER_UPDATE_WL;      
     }
   }
@@ -101,10 +99,10 @@ static void getweather_callback(byte status, uint16_t off, uint16_t len) {
   if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("tz"), true)) {
     v = atoi(tmp_buffer);
     if (v>=0 && v<= 108) {
-      if (v != os.options[OPTION_TIMEZONE]) {
+      if (v != os.iopts[IOPT_TIMEZONE]) {
         // if timezone changed, save change and force ntp sync
-        os.options[OPTION_TIMEZONE] = v;
-        os.options_save();
+        os.iopts[IOPT_TIMEZONE] = v;
+        os.iopts_save();
         os.weather_update_flag |= WEATHER_UPDATE_TZ;
       }
     }
@@ -156,9 +154,8 @@ void peel_http_header() { // remove the HTTP header
 #if defined(ARDUINO)  // for AVR
 void GetWeather() {
   // perform DNS lookup for every query
-  nvm_read_block(tmp_buffer, (void*)ADDR_NVM_WEATHERURL, MAX_WEATHERURL);
-
-#ifdef ESP8266
+  os.sopt_load(SOPT_WEATHERURL, tmp_buffer);
+#if defined(ESP8266)
   if (os.state!=OS_STATE_CONNECTED || WiFi.status()!=WL_CONNECTED) return;
   WiFiClient client;
   if(!client.connect(tmp_buffer, 80))  return;
@@ -166,19 +163,17 @@ void GetWeather() {
   ether.dnsLookup(tmp_buffer, true);
 #endif
 
-  char tmp[60];
-  read_from_file(wtopts_filename, tmp, 60);
-#ifdef ESP8266
+#if defined(ESP8266)
   BufferFiller bf = tmp_buffer;
 #else  
   BufferFiller bf = (uint8_t*)tmp_buffer;
 #endif
-  bf.emit_p(PSTR("$D.py?loc=$E&key=$E&fwv=$D&wto=$S"),
-                (int) os.options[OPTION_USE_WEATHER],
-                ADDR_NVM_LOCATION,
-                ADDR_NVM_WEATHER_KEY,
-                (int)os.options[OPTION_FW_VERSION],
-                tmp);
+  bf.emit_p(PSTR("$D.py?loc=$O&key=$O&wto=$O&fwv=$D"),
+                (int) os.iopts[IOPT_USE_WEATHER],
+                SOPT_LOCATION,
+                SOPT_WEATHER_KEY,
+                SOPT_WEATHER_OPTS,
+                (int)os.iopts[IOPT_FW_VERSION]);
   // copy string to tmp_buffer, replacing all spaces with _
   char *src=tmp_buffer+strlen(tmp_buffer);
   char *dst=tmp_buffer+TMP_BUFFER_SIZE-12;
@@ -198,7 +193,7 @@ void GetWeather() {
     }
   };
   *dst = *src;
-#ifdef ESP8266
+#if defined(ESP8266)
   char urlBuffer[255];
   strcpy(urlBuffer, "GET /weather");
   strcat(urlBuffer, dst);
@@ -234,19 +229,20 @@ void GetWeather() {
   char * delim;
   struct hostent *server;
   
-  nvm_read_block(tmp_buffer, (void*)ADDR_NVM_WEATHERURL, MAX_WEATHERURL);
+  char *ptmp = tmp_buffer;
+  os.sopt_load(SOPT_WEATHERURL, ptmp);
 
   // Check to see if url specifies a port number to use
-  delim = strchr(tmp_buffer, ':');
+  delim = strchr(ptmp, ':');
   if (delim != NULL) {
         *delim = 0;
         port = atoi(delim+1);
   }
 
-  server = gethostbyname(tmp_buffer);
+  server = gethostbyname(ptmp);
   if (!server) {
     DEBUG_PRINT("can't resolve weather server - ");
-    DEBUG_PRINTLN(tmp_buffer);
+    DEBUG_PRINTLN(ptmp);
     return;
   }
   DEBUG_PRINT("weather server ip:port - ");
@@ -266,15 +262,13 @@ void GetWeather() {
   }
 
   BufferFiller bf = tmp_buffer;
-  char tmp[100];
-  read_from_file(wtopts_filename, tmp, 100);
-  bf.emit_p(PSTR("$D.py?loc=$E&key=$E&fwv=$D&wto=$S"),
-                (int) os.options[OPTION_USE_WEATHER],
-                ADDR_NVM_LOCATION,
-                ADDR_NVM_WEATHER_KEY,
-                (int)os.options[OPTION_FW_VERSION],
-                tmp);    
-
+  bf.emit_p(PSTR("$D.py?loc=$O&key=$O&wto=$O&fwv=$D"),
+                (int) os.iopts[IOPT_USE_WEATHER],
+                SOPT_LOCATION,
+                SOPT_WEATHER_KEY,
+                SOPT_WEATHER_OPTS,
+                (int)os.iopts[IOPT_FW_VERSION]);
+                  
   char *src=tmp_buffer+strlen(tmp_buffer);
   char *dst=tmp_buffer+TMP_BUFFER_SIZE-12;
   

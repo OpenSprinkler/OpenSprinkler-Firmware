@@ -28,9 +28,8 @@
 
 typedef unsigned char byte;
 typedef unsigned long ulong;
-
+  
 #define TMP_BUFFER_SIZE      255   // scratch buffer size
-#define STATION_SPECIAL_DATA_SIZE  (TMP_BUFFER_SIZE - 8)
 
 /** Firmware version, hardware version, and maximal values */
 #define OS_FW_VERSION  219  // Firmware version: 219 means 2.1.9
@@ -52,22 +51,19 @@ typedef unsigned long ulong;
 #define HW_TYPE_UNKNOWN      0xFF
 
 /** Data file names */
-#define IOPTS_FILENAME        "iopts.dat"   // integer options/settings data file
-#define SOPTS_FILENAME        "sopts.dat"   // string options/settings data file
+#define IOPTS_FILENAME        "iopts.dat"   // integer options data file
+#define SOPTS_FILENAME        "sopts.dat"   // string options data file
 #define STATIONS_FILENAME     "stns.dat"    // stations data file
 #define NVCON_FILENAME        "nvcon.dat"   // non-volatile controller data file, see OpenSprinkler.h --> struct NVConData
 #define PROG_FILENAME         "prog.dat"    // program data file
-
-//#define WEATHER_OPTS_FILENAME "wtopts.txt"  // weather options file
-//#define IFTTT_KEY_FILENAME    "ifkey.txt"
-//#define WIFI_FILENAME         "wifi.dat"    // wifi credentials file
+#define DONE_FILENAME         "done.dat"    // used to indicate the completion of all files
 
 /** Station macro defines */
 #define STN_TYPE_STANDARD    0x00
 #define STN_TYPE_RF          0x01
 #define STN_TYPE_REMOTE      0x02
-#define STN_TYPE_GPIO        0x03	// Support for raw connection of station to GPIO pin
-#define STN_TYPE_HTTP        0x04	// Support for HTTP Get connection
+#define STN_TYPE_GPIO        0x03
+#define STN_TYPE_HTTP        0x04
 #define STN_TYPE_OTHER       0xFF
 
 /** IFTTT macro defines */
@@ -80,27 +76,24 @@ typedef unsigned long ulong;
 
 /** Sensor macro defines */
 #define SENSOR_TYPE_NONE    0x00
-#define SENSOR_TYPE_RAIN    0x01  // rain sensor
-#define SENSOR_TYPE_FLOW    0x02  // flow sensor
-#define SENSOR_TYPE_PSWITCH 0xF0  // program switch
+#define SENSOR_TYPE_RAIN    0x01
+#define SENSOR_TYPE_FLOW    0x02
+#define SENSOR_TYPE_PSWITCH 0xF0
 #define SENSOR_TYPE_OTHER   0xFF
 
 #define FLOWCOUNT_RT_WINDOW   30    // flow count window (for computing real-time flow rate), 30 seconds
 
-#if defined(ESP8266)
-  /** WiFi defines */
-  #define WIFI_MODE_AP       0xA9
-  #define WIFI_MODE_STA      0x2A
+/** WiFi defines */
+#define WIFI_MODE_AP       0xA9
+#define WIFI_MODE_STA      0x2A
 
-  #define OS_STATE_INITIAL        0
-  #define OS_STATE_CONNECTING     1
-  #define OS_STATE_CONNECTED      2
-  #define OS_STATE_TRY_CONNECT    3
+#define OS_STATE_INITIAL        0
+#define OS_STATE_CONNECTING     1
+#define OS_STATE_CONNECTED      2
+#define OS_STATE_TRY_CONNECT    3
 
-  #define LED_FAST_BLINK 100
-  #define LED_SLOW_BLINK 500
-
-#endif
+#define LED_FAST_BLINK 100
+#define LED_SLOW_BLINK 500
 
 
 /** Storage / zone expander defines */
@@ -108,19 +101,28 @@ typedef unsigned long ulong;
 #define MAX_NUM_BOARDS    (1+MAX_EXT_BOARDS)  // maximum number of 8-zone boards including expanders
 #define MAX_NUM_STATIONS  (MAX_NUM_BOARDS*8)  // maximum number of stations
 #define STATION_NAME_SIZE 32    // maximum number of characters in each station name
+#define MAX_SOPTS_SIZE    128   // maximum string option size
+
+#define STATION_SPECIAL_DATA_SIZE  (TMP_BUFFER_SIZE - STATION_NAME_SIZE - 6)
 
 /** Default string option values */
 #define DEFAULT_PASSWORD          "a6d82bced638de3def1e9bbb4983225c"  // md5 of 'opendoor'
 #define DEFAULT_LOCATION          "Boston,MA"
 #define DEFAULT_JAVASCRIPT_URL    "https://ui.opensprinkler.com/js"
 #define DEFAULT_WEATHER_URL       "weather.opensprinkler.com"
+#define DEFAULT_WEATHER_KEY       ""
+#define DEFAULT_WEATHER_OPTS      ""
+#define DEFAULT_IFTTT_KEY         ""
 #define DEFAULT_IFTTT_URL         "maker.ifttt.com"
-  
+#define DEFAULT_STA_SSID          ""
+#define DEFAULT_STA_PASS          ""
+#define DEFAULT_AP_PASS           ""  // default ap mode wifi password
+
 /** Macro define of each option
   * Refer to OpenSprinkler.cpp for details on each option
   */
-typedef enum {
-  IOPT_FW_VERSION = 0,
+enum {
+  IOPT_FW_VERSION=0,
   IOPT_TIMEZONE,
   IOPT_USE_NTP,
   IOPT_USE_DHCP,
@@ -177,19 +179,22 @@ typedef enum {
   NUM_IOPTS // total number of integer options
 };
 
-type enum {
-  SOPT_PASSWORD,
+enum {
+  SOPT_PASSWORD=0,
   SOPT_LOCATION,
   SOPT_JAVASCRIPTURL,
   SOPT_WEATHERURL,
   SOPT_WEATHER_KEY,
   SOPT_WEATHER_OPTS,
   SOPT_IFTTT_KEY,
-  SOPT_WIFI_SSID,
-  SOPT_WIFI_PASS,
+  SOPT_STA_SSID,
+  SOPT_STA_PASS,
+  SOPT_AP_PASS,
   NUM_SOPTS	// total number of string options
-}
+};
 
+#define I_OPTS  0x01
+#define S_OPTS  0x02
   
 /** Log Data Type */
 #define LOGDATA_STATION    0x00
@@ -204,7 +209,7 @@ type enum {
 /** Hardware defines */
 #if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__) // for OS 2.3
 
-  #define OS_HW_VERSION (OS_HW_VERSION_BASE+23)
+  #define OS_HW_VERSION   (OS_HW_VERSION_BASE+23)
   #define PIN_FREE_LIST		{2,10,12,13,14,15,18,19}  // Free GPIO pins
 
   // hardware pins
@@ -242,16 +247,13 @@ type enum {
   #define PIN_CURR_SENSE     7    // current sensing pin (A7)
   #define PIN_CURR_DIGITAL  24    // digital pin index for A7
 
-  #define ETHER_BUFFER_SIZE   1400 // ATmega1284 has 16K RAM, so use a bigger buffer
+  #define ETHER_BUFFER_SIZE   2048
 
   #define 	wdt_reset()   __asm__ __volatile__ ("wdr")  // watchdog timer reset
 
-  //typedef unsigned char   uint8_t;
-  //typedef unsigned int    uint16_t;
-  //typedef int int16_t;
-  #define pinModeExt      pinMode
-  #define digitalReadExt  digitalRead
-  #define digitalWriteExt digitalWrite  
+  #define pinModeExt        pinMode
+  #define digitalReadExt    digitalRead
+  #define digitalWriteExt   digitalWrite  
 
 #elif defined(ESP8266) // for ESP8266
 
@@ -400,18 +402,20 @@ type enum {
   #define PSTR(x)      x
   #define strcat_P     strcat
   #define strcpy_P     strcpy
+  #include<string>
+  #define String       string
+  using namespace std;
   #define PROGMEM
   typedef const char* PGM_P;
   typedef unsigned char   uint8_t;
   typedef short           int16_t;
   typedef unsigned short  uint16_t;
+  //typedef unsigned long   uint32_t;
   typedef bool boolean;
   #define pinModeExt      pinMode
   #define digitalReadExt  digitalRead
   #define digitalWriteExt digitalWrite
 #endif
-
-#endif  // end of Hardawre defines
 
 /** Other defines */
 // button values

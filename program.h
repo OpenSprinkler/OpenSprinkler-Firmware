@@ -25,21 +25,11 @@
 #ifndef _PROGRAM_H
 #define _PROGRAM_H
 
+#define MAX_NUM_PROGRAMS    40    // maximum number of programs
 #define MAX_NUM_STARTTIMES  4
-
-#if defined(ARDUINO)
-  #if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__) // for 4KB NVM
-    #define PROGRAM_NAME_SIZE   20
-    #define RUNTIME_QUEUE_SIZE  MAX_NUM_STATIONS
-  #else
-    #define PROGRAM_NAME_SIZE   16
-    #define RUNTIME_QUEUE_SIZE  MAX_NUM_STATIONS
-  #endif
-#else
-  #define PROGRAM_NAME_SIZE   20
-  #define RUNTIME_QUEUE_SIZE  MAX_NUM_STATIONS
-#endif
-
+#define PROGRAM_NAME_SIZE   32
+#define RUNTIME_QUEUE_SIZE  MAX_NUM_STATIONS
+#define PROGRAMSTRUCT_SIZE  sizeof(ProgramStruct)
 #include "OpenSprinkler.h"
 
 /** Log data structure */
@@ -61,6 +51,7 @@ struct LogStruct {
 
 #define PROGRAMSTRUCT_EN_BIT   0
 #define PROGRAMSTRUCT_UWT_BIT  1
+
 /** Program data structure */
 class ProgramStruct {
 public:
@@ -112,23 +103,15 @@ public:
   char name[PROGRAM_NAME_SIZE];
 
   byte check_match(time_t t);
-  int16_t starttime_decode(int16_t t);  
+  int16_t starttime_decode(int16_t t);
+  
 protected:
+
   byte check_day_match(time_t t);
 
 };
 
-/** Program data nvm addresses */
-#define PROGRAMSTRUCT_SIZE         (sizeof(ProgramStruct))
-#define ADDR_PROGRAMTYPEVERSION     ADDR_NVM_PROGRAMS
-#define ADDR_PROGRAMCOUNTER        (ADDR_NVM_PROGRAMS+1)
-#define ADDR_PROGRAMDATA           (ADDR_NVM_PROGRAMS+2)
-
-#define MAX_NUM_PROGRAMS  40    // maximum number of programs
-
 extern OpenSprinkler os;
-
-#define PROGRAM_TYPE_VERSION  11
 
 class RuntimeQueueStruct {
 public:

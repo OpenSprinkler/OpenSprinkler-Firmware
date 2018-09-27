@@ -32,14 +32,12 @@
 
 #include "Wire.h"
 
-#ifdef ESP8266
+#if defined(ESP8266)
   #include <FS.h>
   #include "gpio.h"
   #include "espconnect.h"
-  char ether_buffer[ETHER_BUFFER_SIZE];
 #else
   #include <SdFat.h>
-  byte Ethernet::buffer[ETHER_BUFFER_SIZE]; // Ethernet packet buffer
   SdFat sd;                                 // SD card object
 #endif
 
@@ -51,7 +49,6 @@ unsigned long getNtpTime();
 #include <netdb.h>
 #include "etherport.h"
 #include "gpio.h"
-char ether_buffer[ETHER_BUFFER_SIZE];
 EthernetServer *m_server = 0;
 EthernetClient *m_client = 0;
 
@@ -63,7 +60,6 @@ void push_message(byte type, uint32_t lval=0, float fval=0.f, const char* sval=N
 void manual_start_program(byte, byte);
 void httpget_callback(byte, uint16_t, uint16_t);
 
-
 // Small variations have been added to the timing values below
 // to minimize conflicting events
 #define NTP_SYNC_INTERVAL       86403L  // NYP sync interval, 24 hrs
@@ -74,9 +70,11 @@ void httpget_callback(byte, uint16_t, uint16_t);
 #define LCD_BACKLIGHT_TIMEOUT   15      // LCD backlight timeout: 15 secs
 #define PING_TIMEOUT            200     // Ping test timeout: 200 ms
 
-extern char tmp_buffer[];       // scratch buffer
+// Define buffers: need them to be sufficiently large to cover string option reading
+char ether_buffer[ETHER_BUFFER_SIZE+MAX_SOPTS_SIZE+1]; // ethernet buffer
+char tmp_buffer[TMP_BUFFER_SIZE+MAX_SOPTS_SIZE+1];     // scratch buffer
 
-#ifdef ESP8266
+#if defined(ESP8266)
 ESP8266WebServer *wifi_server = NULL;
 static uint16_t led_blink_ms = LED_FAST_BLINK;
 #endif
@@ -97,9 +95,9 @@ byte prev_flow_state = HIGH;
 
 void flow_poll() {
   byte curr_flow_state = digitalReadExt(PIN_FLOWSENSOR);
-  if(os.options[OPTION_SENSOR1_TYPE]!=SENSOR_TYPE_FLOW) return;
+  if(os.iopts[IOPT_SENSOR1_TYPE]!=SENSOR_TYPE_FLOW) return;
 
-#ifdef ESP8266  
+#if defined(ESP8266)
   if(!(prev_flow_state==HIGH && curr_flow_state==LOW)) {
     prev_flow_state = curr_flow_state;
     return;
@@ -124,7 +122,7 @@ void flow_poll() {
 
 volatile byte flow_isr_flag = false;
 /** Flow sensor interrupt service routine */
-#ifdef ESP8266
+#if defined(ESP8266)
 
 ICACHE_RAM_ATTR void flow_isr() // for ESP8266, ISR must be marked ICACHE_RAM_ATTR
 #else
@@ -146,7 +144,7 @@ static char ui_anim_chars[3] = {'.', 'o', 'O'};
 static byte ui_state = UI_STATE_DEFAULT;
 static byte ui_state_runprog = 0;
 
-#ifdef ESP8266
+#if defined(ESP8266)
 bool ui_confirm(PGM_P str) {
   os.lcd_print_line_clear_pgm(str, 0);
   os.lcd_print_line_clear_pgm(PSTR("(B1:No, B3:Yes)"), 1);
@@ -164,7 +162,7 @@ bool ui_confirm(PGM_P str) {
 
 void ui_state_machine() {
  
-#ifdef ESP8266
+#if defined(ESP8266)
   // process screen led
   static ulong led_toggle_timeout = 0;
   if(led_blink_ms) {
@@ -196,12 +194,12 @@ void ui_state_machine() {
     case BUTTON_1:
       if (button & BUTTON_FLAG_HOLD) {  // holding B1
         if (digitalReadExt(PIN_BUTTON_3)==0) { // if B3 is pressed while holding B1, run a short test (internal test)
-          #ifdef ESP8266
+          #if defined(ESP8266)
           if(!ui_confirm(PSTR("Start 2s test?"))) {ui_state = UI_STATE_DEFAULT; break;}
           #endif
           manual_start_program(255, 0);
         } else if (digitalReadExt(PIN_BUTTON_2)==0) { // if B2 is pressed while holding B1, display gateway IP
-          #ifdef ESP8266
+          #if defined(ESP8266)
           os.lcd.clear(0, 1);
           os.lcd.setCursor(0, 0);
           os.lcd.print(WiFi.gatewayIP());
@@ -213,19 +211,19 @@ void ui_state_machine() {
           os.lcd_print_pgm(PSTR("(gwip)"));
           ui_state = UI_STATE_DISP_IP;
         } else {  // if no other button is clicked, stop all zones
-          #ifdef ESP8266
+          #if defined(ESP8266)
           if(!ui_confirm(PSTR("Stop all zones?"))) {ui_state = UI_STATE_DEFAULT; break;}
           #endif
           reset_all_stations();
         }
       } else {  // clicking B1: display device IP and port
-        #ifdef ESP8266
+        #if defined(ESP8266)
         os.lcd.clear(0, 1);        
         os.lcd.setCursor(0, 0);
         os.lcd.print(WiFi.localIP());
         os.lcd.setCursor(0, 1);
         os.lcd_print_pgm(PSTR(":"));
-        uint16_t httpport = (uint16_t)(os.options[OPTION_HTTPPORT_1]<<8) + (uint16_t)os.options[OPTION_HTTPPORT_0];
+        uint16_t httpport = (uint16_t)(os.iopts[IOPT_HTTPPORT_1]<<8) + (uint16_t)os.iopts[IOPT_HTTPPORT_0];
         os.lcd.print(httpport);
         #else
         os.lcd.clear();
@@ -252,13 +250,13 @@ void ui_state_machine() {
           os.lcd_print_pgm(PSTR("(lswc)"));
           ui_state = UI_STATE_DISP_IP;          
         } else {  // if no other button is clicked, reboot
-          #ifdef ESP8266
+          #if defined(ESP8266)
           if(!ui_confirm(PSTR("Reboot device?"))) {ui_state = UI_STATE_DEFAULT; break;}
           #endif
           os.reboot_dev();
         }
       } else {  // clicking B2: display MAC
-        #ifdef ESP8266
+        #if defined(ESP8266)
         os.lcd.clear(0, 1);
         byte mac[6];
         WiFi.macAddress(mac);
@@ -278,7 +276,7 @@ void ui_state_machine() {
           os.lcd_print_pgm(PSTR("(lupt)"));
           ui_state = UI_STATE_DISP_IP;              
         } else if(digitalReadExt(PIN_BUTTON_2)==0) {  // if B2 is pressed while holding B3, reset to AP and reboot
-          #ifdef ESP8266
+          #if defined(ESP8266)
           if(!ui_confirm(PSTR("Reset to AP?"))) {ui_state = UI_STATE_DEFAULT; break;}
           os.reset_to_ap();
           #endif
@@ -328,7 +326,7 @@ void ui_state_machine() {
 // ======================
 void do_setup() {
   /* Clear WDT reset flag. */
-#ifdef ESP8266
+#if defined(ESP8266)
   if(wifi_server) { delete wifi_server; wifi_server = NULL; }
   WiFi.persistent(false);
   led_blink_ms = LED_FAST_BLINK;
@@ -348,7 +346,7 @@ void do_setup() {
   os.lcd_print_time(os.now_tz());  // display time to LCD
   os.powerup_lasttime = os.now_tz();
   
-#ifndef ESP8266
+#if !defined(ESP8266)
   // enable WDT
   /* In order to change WDE or the prescaler, we need to
    * set WDCE (This will allow updates for 4 clock cycles).
@@ -375,7 +373,7 @@ void do_setup() {
 // Arduino software reset function
 void(* sysReset) (void) = 0;
 
-#ifndef ESP8266
+#if !defined(ESP8266)
 volatile byte wdt_timeout = 0;
 /** WDT interrupt service routine */
 ISR(WDT_vect)
@@ -418,7 +416,7 @@ void check_weather();
 void perform_ntp_sync();
 void delete_log(char *name);
 
-#ifdef ESP8266
+#if defined(ESP8266)
 void start_server_ap();
 void start_server_client();
 unsigned long reboot_timer = 0;
@@ -430,7 +428,7 @@ void handle_web_request(char *p);
 void do_loop()
 {
   /* If flow_isr_flag is on, do flow sensing.
-     todo: not the most efficient way, as we can't do I2C inside ISR.
+     todo future: not the most efficient way, as we can't do I2C inside ISR.
      need to figure out a more efficient way to do flow sensing */
   if(flow_isr_flag) {
     flow_isr_flag = false;
@@ -443,12 +441,12 @@ void do_loop()
   byte bid, sid, s, pid, qid, bitvalue;
   ProgramStruct prog;
 
-  os.status.mas = os.options[OPTION_MASTER_STATION];
-  os.status.mas2= os.options[OPTION_MASTER_STATION_2];
+  os.status.mas = os.iopts[IOPT_MASTER_STATION];
+  os.status.mas2= os.iopts[IOPT_MASTER_STATION_2];
   time_t curr_time = os.now_tz();
   // ====== Process Ethernet packets ======
 #if defined(ARDUINO)  // Process Ethernet packets for Arduino
-  #ifdef ESP8266
+  #if defined(ESP8266)
   static ulong connecting_timeout;
   switch(os.state) {
   case OS_STATE_INITIAL:
@@ -458,20 +456,20 @@ void do_loop()
       connecting_timeout = 0;
     } else {
       led_blink_ms = LED_SLOW_BLINK;
-      start_network_sta(os.wifi_config.ssid.c_str(), os.wifi_config.pass.c_str());
+      start_network_sta(os.wifi_ssid.c_str(), os.wifi_pass.c_str());
       os.config_ip();
       os.state = OS_STATE_CONNECTING;
       connecting_timeout = millis() + 120000L;
       os.lcd.setCursor(0, -1);
       os.lcd.print(F("Connecting to..."));      
       os.lcd.setCursor(0, 2);
-      os.lcd.print(os.wifi_config.ssid);
+      os.lcd.print(os.wifi_ssid);
     }
     break;
     
   case OS_STATE_TRY_CONNECT:
     led_blink_ms = LED_SLOW_BLINK;  
-    start_network_sta_with_ap(os.wifi_config.ssid.c_str(), os.wifi_config.pass.c_str());
+    start_network_sta_with_ap(os.wifi_ssid.c_str(), os.wifi_pass.c_str());
     os.config_ip();
     os.state = OS_STATE_CONNECTED;
     break;
@@ -501,8 +499,8 @@ void do_loop()
         break;
       }
       if(WiFi.status()==WL_CONNECTED && WiFi.localIP()) {
-        os.wifi_config.mode = WIFI_MODE_STA;
-        os.options_save(true);
+        os.iopts[IOPT_WIFI_MODE] = WIFI_MODE_STA;
+        os.iopts_save();
         os.reboot_dev();
       }
     }
@@ -556,7 +554,7 @@ void do_loop()
     last_time = curr_time;
     if (os.button_timeout) os.button_timeout--;
     
-    #ifdef ESP8266
+    #if defined(ESP8266)
     if(reboot_timer && millis() > reboot_timer) {
       os.reboot_dev();
     }
@@ -593,7 +591,7 @@ void do_loop()
     }
 
     // ====== Check rain sensor status ======
-    if (os.options[OPTION_SENSOR1_TYPE] == SENSOR_TYPE_RAIN) { // if a rain sensor is connected
+    if (os.iopts[IOPT_SENSOR1_TYPE] == SENSOR_TYPE_RAIN) { // if a rain sensor is connected
       os.rainsensor_status();
       if (os.old_status.rain_sensed != os.status.rain_sensed) {
         if (os.status.rain_sensed) {
@@ -629,7 +627,7 @@ void do_loop()
       last_minute = curr_minute;
       // check through all programs
       for(pid=0; pid<pd.nprograms; pid++) {
-        pd.read(pid, &prog);
+        pd.read(pid, &prog);  // todo future: reduce load time
         if(prog.check_match(curr_time)) {
           // program match found
           // process all selected stations
@@ -641,12 +639,12 @@ void do_loop()
               continue;
 
             // if station has non-zero water time and the station is not disabled
-            if (prog.durations[sid] && !(os.station_attrib_bits_read(ADDR_NVM_STNDISABLE+bid)&(1<<s))) {
+            if (prog.durations[sid] && !(os.attrib_dis[bid]&(1<<s))) {
               // water time is scaled by watering percentage
               ulong water_time = water_time_resolve(prog.durations[sid]);
               // if the program is set to use weather scaling
               if (prog.use_weather) {
-                byte wl = os.options[OPTION_WATER_PERCENTAGE];
+                byte wl = os.iopts[IOPT_WATER_PERCENTAGE];
                 water_time = water_time * wl / 100;
                 if (wl < 20 && water_time < 10) // if water_percentage is less than 20% and water_time is less than 10 seconds
                                                 // do not water
@@ -669,7 +667,7 @@ void do_loop()
               }// if water_time
             }// if prog.durations[sid]
           }// for sid
-          if(match_found) push_message(IFTTT_PROGRAM_SCHED, pid, prog.use_weather?os.options[OPTION_WATER_PERCENTAGE]:100);
+          if(match_found) push_message(IFTTT_PROGRAM_SCHED, pid, prog.use_weather?os.iopts[IOPT_WATER_PERCENTAGE]:100);
         }// if check_match
       }// for pid
 
@@ -760,7 +758,7 @@ void do_loop()
       // check through runtime queue, calculate the last stop time of sequential stations
       pd.last_seq_stop_time = 0;
       ulong sst;
-      byte re=os.options[OPTION_REMOTE_EXT_MODE];
+      byte re=os.iopts[IOPT_REMOTE_EXT_MODE];
       q = pd.queue;
       for(;q<pd.queue+pd.nqueue;q++) {
         sid = q->sid;
@@ -771,7 +769,7 @@ void do_loop()
         sst = q->st + q->dur;
         if (sst>curr_time) {
           // only need to update last_seq_stop_time for sequential stations
-          if (os.station_attrib_bits_read(ADDR_NVM_STNSEQ+bid)&(1<<s) && !re) {
+          if (os.attrib_seq[bid]&(1<<s) && !re) {
             pd.last_seq_stop_time = (sst>pd.last_seq_stop_time ) ? sst : pd.last_seq_stop_time;
           }
         }
@@ -788,30 +786,30 @@ void do_loop()
         // reset program busy bit
         os.status.program_busy = 0;
         // log flow sensor reading if flow sensor is used
-        if(os.options[OPTION_SENSOR1_TYPE]==SENSOR_TYPE_FLOW) {
+        if(os.iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_FLOW) {
           write_log(LOGDATA_FLOWSENSE, curr_time);
           push_message(IFTTT_FLOWSENSOR, (flow_count>os.flowcount_log_start)?(flow_count-os.flowcount_log_start):0);
         }
 
         // in case some options have changed while executing the program
-        os.status.mas = os.options[OPTION_MASTER_STATION]; // update master station
-        os.status.mas2= os.options[OPTION_MASTER_STATION_2]; // update master2 station
+        os.status.mas = os.iopts[IOPT_MASTER_STATION]; // update master station
+        os.status.mas2= os.iopts[IOPT_MASTER_STATION_2]; // update master2 station
       }
     }//if_some_program_is_running
 
     // handle master
     if (os.status.mas>0) {
-      int16_t mas_on_adj = water_time_decode_signed(os.options[OPTION_MASTER_ON_ADJ]);
-      int16_t mas_off_adj= water_time_decode_signed(os.options[OPTION_MASTER_OFF_ADJ]);
+      int16_t mas_on_adj = water_time_decode_signed(os.iopts[IOPT_MASTER_ON_ADJ]);
+      int16_t mas_off_adj= water_time_decode_signed(os.iopts[IOPT_MASTER_OFF_ADJ]);
       byte masbit = 0;
-      os.station_attrib_bits_load(ADDR_NVM_MAS_OP, (byte*)tmp_buffer);  // tmp_buffer now stores masop_bits
+      
       for(sid=0;sid<os.nstations;sid++) {
         // skip if this is the master station
         if (os.status.mas == sid+1) continue;
         bid = sid>>3;
         s = sid&0x07;
         // if this station is running and is set to activate master
-        if ((os.station_bits[bid]&(1<<s)) && (tmp_buffer[bid]&(1<<s))) {
+        if ((os.station_bits[bid]&(1<<s)) && (os.attrib_mas[bid]&(1<<s))) {
           q=pd.queue+pd.station_qid[sid];
           // check if timing is within the acceptable range
           if (curr_time >= q->st + mas_on_adj &&
@@ -825,17 +823,16 @@ void do_loop()
     }
     // handle master2
     if (os.status.mas2>0) {
-      int16_t mas_on_adj_2 = water_time_decode_signed(os.options[OPTION_MASTER_ON_ADJ_2]);
-      int16_t mas_off_adj_2= water_time_decode_signed(os.options[OPTION_MASTER_OFF_ADJ_2]);
+      int16_t mas_on_adj_2 = water_time_decode_signed(os.iopts[IOPT_MASTER_ON_ADJ_2]);
+      int16_t mas_off_adj_2= water_time_decode_signed(os.iopts[IOPT_MASTER_OFF_ADJ_2]);
       byte masbit2 = 0;
-      os.station_attrib_bits_load(ADDR_NVM_MAS_OP_2, (byte*)tmp_buffer);  // tmp_buffer now stores masop2_bits
       for(sid=0;sid<os.nstations;sid++) {
         // skip if this is the master station
         if (os.status.mas2 == sid+1) continue;
         bid = sid>>3;
         s = sid&0x07;
         // if this station is running and is set to activate master
-        if ((os.station_bits[bid]&(1<<s)) && (tmp_buffer[bid]&(1<<s))) {
+        if ((os.station_bits[bid]&(1<<s)) && (os.attrib_mas2[bid]&(1<<s))) {
           q=pd.queue+pd.station_qid[sid];
           // check if timing is within the acceptable range
           if (curr_time >= q->st + mas_on_adj_2 &&
@@ -858,7 +855,7 @@ void do_loop()
     // process LCD display
     if (!ui_state) {
       os.lcd_print_station(1, ui_anim_chars[(unsigned long)curr_time%3]);
-      #ifdef ESP8266
+      #if defined(ESP8266)
       if(os.get_wifi_mode()==WIFI_MODE_STA && WiFi.status()==WL_CONNECTED && WiFi.localIP()) {
         os.lcd.setCursor(0, 2);
         os.lcd.clear(2, 2);
@@ -894,7 +891,7 @@ void do_loop()
 
     // real-time flow count
     static ulong flowcount_rt_start = 0;
-    if (os.options[OPTION_SENSOR1_TYPE]==SENSOR_TYPE_FLOW) {
+    if (os.iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_FLOW) {
       if (curr_time % FLOWCOUNT_RT_WINDOW == 0) {
         os.flowcount_rt = (flow_count > flowcount_rt_start) ? flow_count - flowcount_rt_start: 0;
         flowcount_rt_start = flow_count;
@@ -921,7 +918,7 @@ void do_loop()
         // at the moment, we only send notification if water level or external IP changed
         // the other changes, such as sunrise, sunset changes are ignored for notification
         push_message(IFTTT_WEATHER_UPDATE, (wuf&WEATHER_UPDATE_EIP)?os.nvdata.external_ip:0,
-                                         (wuf&WEATHER_UPDATE_WL)?os.options[OPTION_WATER_PERCENTAGE]:-1);
+                                         (wuf&WEATHER_UPDATE_WL)?os.iopts[IOPT_WATER_PERCENTAGE]:-1);
       }
       os.weather_update_flag = 0;
     }
@@ -943,9 +940,9 @@ void check_weather() {
   // do not check weather if
   // - network check has failed, or
   // - the controller is in remote extension mode
-  if (os.status.network_fails>0 || os.options[OPTION_REMOTE_EXT_MODE]) return;
+  if (os.status.network_fails>0 || os.iopts[IOPT_REMOTE_EXT_MODE]) return;
 
-#ifdef ESP8266
+#if defined(ESP8266)
   if (os.get_wifi_mode()!=WIFI_MODE_STA || WiFi.status()!=WL_CONNECTED || os.state!=OS_STATE_CONNECTED) return;
 #endif
 
@@ -1012,13 +1009,13 @@ void process_dynamic_events(ulong curr_time) {
   // check if rain is detected
   bool rain = false;
   bool en = os.status.enabled ? true : false;
-  if (os.status.rain_delayed || (os.status.rain_sensed && os.options[OPTION_SENSOR1_TYPE] == SENSOR_TYPE_RAIN)) {
+  if (os.status.rain_delayed || (os.status.rain_sensed && os.iopts[IOPT_SENSOR1_TYPE] == SENSOR_TYPE_RAIN)) {
     rain = true;
   }
 
   byte sid, s, bid, qid, rbits;
   for(bid=0;bid<os.nboards;bid++) {
-    rbits = os.station_attrib_bits_read(ADDR_NVM_IGNRAIN+bid);
+    rbits = os.attrib_igr[bid];
     for(s=0;s<8;s++) {
       sid=bid*8+s;
 
@@ -1049,14 +1046,14 @@ void schedule_all_stations(ulong curr_time) {
   ulong con_start_time = curr_time + 1;   // concurrent start time
   ulong seq_start_time = con_start_time;  // sequential start time
 
-  int16_t station_delay = water_time_decode_signed(os.options[OPTION_STATION_DELAY_TIME]);
+  int16_t station_delay = water_time_decode_signed(os.iopts[IOPT_STATION_DELAY_TIME]);
   // if the sequential queue has stations running
   if (pd.last_seq_stop_time > curr_time) {
     seq_start_time = pd.last_seq_stop_time + station_delay;
   }
 
   RuntimeQueueStruct *q = pd.queue;
-  byte re = os.options[OPTION_REMOTE_EXT_MODE];
+  byte re = os.iopts[IOPT_REMOTE_EXT_MODE];
   // go through runtime queue and calculate start time of each station
   for(;q<pd.queue+pd.nqueue;q++) {
     if(q->st) continue; // if this queue element has already been scheduled, skip
@@ -1067,7 +1064,7 @@ void schedule_all_stations(ulong curr_time) {
 
     // if this is a sequential station and the controller is not in remote extension mode
     // use sequential scheduling. station delay time apples
-    if (os.station_attrib_bits_read(ADDR_NVM_STNSEQ+bid)&(1<<s) && !re) {
+    if (os.attrib_seq[bid]&(1<<s) && !re) {
       // sequential scheduling
       q->st = seq_start_time;
       seq_start_time += q->dur;
@@ -1089,7 +1086,7 @@ void schedule_all_stations(ulong curr_time) {
     if (!os.status.program_busy) {
       os.status.program_busy = 1;  // set program busy bit
       // start flow count
-      if(os.options[OPTION_SENSOR1_TYPE] == SENSOR_TYPE_FLOW) {  // if flow sensor is connected
+      if(os.iopts[IOPT_SENSOR1_TYPE] == SENSOR_TYPE_FLOW) {  // if flow sensor is connected
         os.flowcount_log_start = flow_count;
         os.sensor_lasttime = curr_time;
       }
@@ -1134,7 +1131,7 @@ void manual_start_program(byte pid, byte uwt) {
   byte sid, bid, s;
   if ((pid>0)&&(pid<255)) {
     pd.read(pid-1, &prog);
-    push_message(IFTTT_PROGRAM_SCHED, pid-1, uwt?os.options[OPTION_WATER_PERCENTAGE]:100, "");
+    push_message(IFTTT_PROGRAM_SCHED, pid-1, uwt?os.iopts[IOPT_WATER_PERCENTAGE]:100, "");
   }
   for(sid=0;sid<os.nstations;sid++) {
     bid=sid>>3;
@@ -1147,9 +1144,9 @@ void manual_start_program(byte pid, byte uwt) {
     else if(pid>0)
       dur = water_time_resolve(prog.durations[sid]);
     if(uwt) {
-      dur = dur * os.options[OPTION_WATER_PERCENTAGE] / 100;
+      dur = dur * os.iopts[IOPT_WATER_PERCENTAGE] / 100;
     }
-    if(dur>0 && !(os.station_attrib_bits_read(ADDR_NVM_STNDISABLE+bid)&(1<<s))) {
+    if(dur>0 && !(os.attrib_dis[bid]&(1<<s))) {
       RuntimeQueueStruct *q = pd.enqueue();
       if (q) {
         q->st = 0;
@@ -1177,21 +1174,18 @@ void ip2string(char* str, byte ip[4]) {
 
 void push_message(byte type, uint32_t lval, float fval, const char* sval) {
 
-#if !defined(ARDUINO) || defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__) || defined(ESP8266)
-
   static const char* server = DEFAULT_IFTTT_URL;
-  static char key[IFTTT_KEY_MAXSIZE];
+  static char key[MAX_SOPTS_SIZE];
   static char postval[TMP_BUFFER_SIZE];
 
   // check if this type of event is enabled for push notification
-  if((os.options[OPTION_IFTTT_ENABLE]&type) == 0) return;
-  key[0] = 0;
-  read_from_file(ifkey_filename, key);
-  key[IFTTT_KEY_MAXSIZE-1]=0;
+  if((os.iopts[IOPT_IFTTT_ENABLE]&type) == 0) return;
+  os.sopt_load(SOPT_IFTTT_KEY, key);
+  key[MAX_SOPTS_SIZE-1]=0;
 
   if(strlen(key)==0) return;
 
-  #if defined(ARDUINO) && !defined(ESP8266)
+  #if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
     uint16_t _port = ether.hisport; // make a copy of the original port
     ether.hisport = 80;
   #endif
@@ -1209,7 +1203,7 @@ void push_message(byte type, uint32_t lval, float fval, const char* sval) {
       strcat_P(postval, PSTR(" minutes "));
       itoa((int)fval%60, postval+strlen(postval), 10);
       strcat_P(postval, PSTR(" seconds."));
-      if(os.options[OPTION_SENSOR1_TYPE]==SENSOR_TYPE_FLOW) {
+      if(os.iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_FLOW) {
         strcat_P(postval, PSTR(" Flow rate: "));
         #if defined(ARDUINO)
         dtostrf(flow_last_gpm,5,2,postval+strlen(postval));
@@ -1246,8 +1240,8 @@ void push_message(byte type, uint32_t lval, float fval, const char* sval) {
       itoa(lval, postval+strlen(postval), 10);
       strcat_P(postval, PSTR(", volume: "));
       {
-      uint32_t volume = os.options[OPTION_PULSE_RATE_1];
-      volume = (volume<<8)+os.options[OPTION_PULSE_RATE_0];
+      uint32_t volume = os.iopts[IOPT_PULSE_RATE_1];
+      volume = (volume<<8)+os.iopts[IOPT_PULSE_RATE_0];
       volume = lval*volume;
       itoa(volume/100, postval+strlen(postval), 10);
       strcat(postval, ".");
@@ -1275,7 +1269,7 @@ void push_message(byte type, uint32_t lval, float fval, const char* sval) {
     case IFTTT_REBOOT:
       #if defined(ARDUINO)
         strcat_P(postval, PSTR("Rebooted. Device IP: "));
-        #ifdef ESP8266
+        #if defined(ESP8266)
         {
           IPAddress _ip = WiFi.localIP();
           byte ip[4] = {_ip[0], _ip[1], _ip[2], _ip[3]};
@@ -1298,7 +1292,7 @@ void push_message(byte type, uint32_t lval, float fval, const char* sval) {
 
 #if defined(ARDUINO)
 
-  #ifdef ESP8266
+  #if defined(ESP8266)
   WiFiClient client;
   if(!client.connect(server, 80)) return;
   
@@ -1380,8 +1374,7 @@ void push_message(byte type, uint32_t lval, float fval, const char* sval) {
   client.stop();
 
 #endif
-  
-#endif
+
 }
 
 // ================================
@@ -1398,7 +1391,7 @@ char LOG_PREFIX[] = "./logs/";
  */
 void make_logfile_name(char *name) {
 #if defined(ARDUINO)
-  #ifndef ESP8266
+  #if !defined(ESP8266)
   sd.chdir("/");
   #endif
 #endif
@@ -1423,7 +1416,7 @@ static const char log_type_names[] PROGMEM =
 /** write run record to log on SD card */
 void write_log(byte type, ulong curr_time) {
 
-  if (!os.options[OPTION_ENABLE_LOGGING]) return;
+  if (!os.iopts[IOPT_ENABLE_LOGGING]) return;
 
   // file name will be logs/xxxxx.tx where xxxxx is the day in epoch time
   ultoa(curr_time / 86400, tmp_buffer, 10);
@@ -1432,9 +1425,8 @@ void write_log(byte type, ulong curr_time) {
   // Step 1: open file if exists, or create new otherwise, 
   // and move file pointer to the end  
 #if defined(ARDUINO) // prepare log folder for Arduino
-  if (!os.status.has_sd)  return;
 
-  #ifdef ESP8266
+  #if defined(ESP8266)
   File file = SPIFFS.open(tmp_buffer, "r+");
   if(!file) {
     file = SPIFFS.open(tmp_buffer, "w");
@@ -1502,14 +1494,14 @@ void write_log(byte type, ulong curr_time) {
         lvalue = (curr_time>os.raindelay_start_time)?(curr_time-os.raindelay_start_time):0;
         break;
       case LOGDATA_WATERLEVEL:
-        lvalue = os.options[OPTION_WATER_PERCENTAGE];
+        lvalue = os.iopts[IOPT_WATER_PERCENTAGE];
         break;
     }
     ultoa(lvalue, tmp_buffer+strlen(tmp_buffer), 10);
   }
   strcat_P(tmp_buffer, PSTR(","));
   ultoa(curr_time, tmp_buffer+strlen(tmp_buffer), 10);
-  if((os.options[OPTION_SENSOR1_TYPE]==SENSOR_TYPE_FLOW) && (type==LOGDATA_STATION)) {
+  if((os.iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_FLOW) && (type==LOGDATA_STATION)) {
     // RAH implementation of flow sensor
     strcat_P(tmp_buffer, PSTR(","));
     #if defined(ARDUINO)
@@ -1521,7 +1513,7 @@ void write_log(byte type, ulong curr_time) {
   strcat_P(tmp_buffer, PSTR("]\r\n"));
 
 #if defined(ARDUINO)
-  #ifdef ESP8266
+  #if defined(ESP8266)
   file.write((byte*)tmp_buffer, strlen(tmp_buffer));
   #else
   file.write(tmp_buffer);
@@ -1538,11 +1530,10 @@ void write_log(byte type, ulong curr_time) {
  * If name is 'all', delete all logs
  */
 void delete_log(char *name) {
-  if (!os.options[OPTION_ENABLE_LOGGING]) return;
+  if (!os.iopts[IOPT_ENABLE_LOGGING]) return;
 #if defined(ARDUINO)
-  if (!os.status.has_sd) return;
 
-  #ifdef ESP8266
+  #if defined(ESP8266)
   if (strncmp(name, "all", 3) == 0) {
     // delete all log files
     Dir dir = SPIFFS.openDir(LOG_PREFIX);
@@ -1590,7 +1581,7 @@ void delete_log(char *name) {
  * If not, it re-initializes Ethernet controller.
  */
 void check_network() {
-#if defined(ARDUINO) && !defined(ESP8266)
+#if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
   // do not perform network checking if the controller has just started, or if a program is running
   if (os.status.program_busy) {return;}
 
@@ -1641,8 +1632,8 @@ void check_network() {
 void perform_ntp_sync() {
 #if defined(ARDUINO)
   // do not perform sync if this option is disabled, or if network is not available, or if a program is running
-  if (!os.options[OPTION_USE_NTP] || os.status.program_busy) return;
-  #ifdef ESP8266
+  if (!os.iopts[IOPT_USE_NTP] || os.status.program_busy) return;
+  #if defined(ESP8266)
   if (os.get_wifi_mode()!=WIFI_MODE_STA || WiFi.status()!=WL_CONNECTED || os.state!=OS_STATE_CONNECTED) return;
   #else
   if (os.status.network_fails>0) return;
@@ -1661,7 +1652,7 @@ void perform_ntp_sync() {
     if (t>0) {
       setTime(t);
       RTC.set(t);
-      #ifndef ESP8266
+      #if !defined(ESP8266)
       // if rtc was uninitialized and now it is, restart
       if(rtc_zero && now()>978307200L) {
         os.reboot_dev();
