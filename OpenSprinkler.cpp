@@ -20,9 +20,6 @@
  * along with this program.  If not, see
  * <http://www.gnu.org/licenses/>.
  */
-#if !defined(ARDUINO)
-#include <netdb.h>
-#endif
 
 #include "OpenSprinkler.h"
 #include "server.h"
@@ -60,34 +57,27 @@ byte OpenSprinkler::attrib_seq[MAX_NUM_BOARDS];
 byte OpenSprinkler::attrib_spe[MAX_NUM_BOARDS];
   
 extern char tmp_buffer[];
-
-#if defined(ESP8266)
-byte OpenSprinkler::state = OS_STATE_INITIAL;
-byte OpenSprinkler::prev_station_bits[MAX_NUM_BOARDS];
-IOEXP* OpenSprinkler::expanders[MAX_NUM_BOARDS/2];
-IOEXP* OpenSprinkler::mainio;
-IOEXP* OpenSprinkler::drio;
-RCSwitch OpenSprinkler::rfswitch;
-
-String OpenSprinkler::wifi_ssid="";
-String OpenSprinkler::wifi_pass="";
-extern ESP8266WebServer *wifi_server;
 extern char ether_buffer[];
-#endif
 
 #if defined(ESP8266)
-  #include <FS.h>
   SSD1306Display OpenSprinkler::lcd(0x3c, SDA, SCL);
+  byte OpenSprinkler::state = OS_STATE_INITIAL;
+  byte OpenSprinkler::prev_station_bits[MAX_NUM_BOARDS];
+  IOEXP* OpenSprinkler::expanders[MAX_NUM_BOARDS/2];
+  IOEXP* OpenSprinkler::mainio;
+  IOEXP* OpenSprinkler::drio;
+  RCSwitch OpenSprinkler::rfswitch;
+
+  String OpenSprinkler::wifi_ssid="";
+  String OpenSprinkler::wifi_pass="";
 #elif defined(ARDUINO)
   LiquidCrystal OpenSprinkler::lcd;
-  #include <SdFat.h>
   extern SdFat sd;
 #else
+  #if defined(OSPI)
+    byte OpenSprinkler::pin_sr_data = PIN_SR_DATA;
+  #endif
   // todo future: LCD define for Linux-based systems
-#endif
-
-#if defined(OSPI)
-  byte OpenSprinkler::pin_sr_data = PIN_SR_DATA;
 #endif
 
 /** Option json names (stored in PROGMEM to reduce RAM usage) */
@@ -389,23 +379,29 @@ bool detect_i2c(int addr) {
 
 /** read hardware MAC into tmp_buffer */
 #define MAC_CTRL_ID 0x50
-bool OpenSprinkler::read_hardware_mac() {
+void OpenSprinkler::load_hardware_mac(byte* buffer) {
 #if defined(ESP8266)
-  WiFi.macAddress((byte*)tmp_buffer);
-  return true;
+  WiFi.macAddress(buffer);
 #else
   uint8_t ret;
   ret = detect_i2c(MAC_CTRL_ID);
-  if (ret)  return false;
-
-  Wire.beginTransmission(MAC_CTRL_ID);
-  Wire.write(0xFA); // The address of the register we want
-  Wire.endTransmission(); // Send the data
-  if(Wire.requestFrom(MAC_CTRL_ID, 6) != 6) return false; // Request 6 bytes from the EEPROM
-  for (ret=0;ret<6;ret++) {
-    tmp_buffer[ret] = Wire.read();
+  if (ret) {
+    // if I2C EEPROM doesn't exist, use software-defined MAC
+    buffer[0] = 0x00;
+    buffer[1] = 0x69;
+    buffer[2] = 0x69;
+    buffer[3] = 0x2D;
+    buffer[4] = 0x31;
+    buffer[5] = iopts[IOPT_DEVICE_ID];
+  } else {
+    Wire.beginTransmission(MAC_CTRL_ID);
+    Wire.write(0xFA); // The address of the register we want
+    Wire.endTransmission(); // Send the data
+    if(Wire.requestFrom(MAC_CTRL_ID, 6) != 6) return false; // Request 6 bytes from the EEPROM
+    for (ret=0;ret<6;ret++) {
+      buffer[ret] = Wire.read();
+    }
   }
-  return true;
 #endif
 }
 
@@ -428,39 +424,35 @@ byte OpenSprinkler::start_network() {
 #else
 
   lcd_print_line_clear_pgm(PSTR("Connecting..."), 1);
-  if(!read_hardware_mac()) {
-    // if no hardware MAC exists, use software-defined MAC
-    tmp_buffer[0] = 0x00;
-    tmp_buffer[1] = 0x69;
-    tmp_buffer[2] = 0x69;
-    tmp_buffer[3] = 0x2D;
-    tmp_buffer[4] = 0x31;
-    tmp_buffer[5] = iopts[IOPT_DEVICE_ID];
-  } 
-  
-  // todo: UIP
-  if(!ether.begin(ETHER_BUFFER_SIZE, (uint8_t*)tmp_buffer, PIN_ETHER_CS))  return 0;
-  // calculate http port number
-  ether.hisport = (unsigned int)(iopts[IOPT_HTTPPORT_1]<<8) + (unsigned int)iopts[IOPT_HTTPPORT_0];
-
-  // todo: UIP
-  if (iopts[IOPT_USE_DHCP]) {
-    // set up DHCP
-    // register with domain name "OS-xx" where xx is the last byte of the MAC address
-    if (!ether.dhcpSetup()) return 0;
-    // once we have valid DHCP IP, we write these into static IP / gateway IP
-    memcpy(options+IOPT_STATIC_IP1, ether.myip, 4);
-    memcpy(options+IOPT_GATEWAY_IP1, ether.gwip,4);
-    memcpy(options+IOPT_DNS_IP1, ether.dnsip, 4);
-    iopts_save();
-    
+  load_hardware_mac((byte*)tmp_buffer);
+  if(ether_server) delete ether_server;
+  if(Udp) delete Udp;
+  if(iopts[IOPT_USE_DHCP]) {
+    if(Ethernet.begin((byte*)tmp_buffer)) {
+      // once we have valid DHCP IP, we write these into static IP / gateway IP
+      memcpy(iopts+IOPT_STATIC_IP1, &(Ethernet.localIP()[0]), 4);
+      memcpy(iopts+IOPT_GATEWAY_IP1, &(Ethernet.gatewayIP()[0]),4);
+      memcpy(iopts+IOPT_DNS_IP1, &(Ethernet.dnsServerIP()[0]), 4);
+      iopts_save();
+    } else return 0;
+      
   } else {
-    // set up static IP
-    byte *staticip = options+IOPT_STATIC_IP1;
-    byte *gateway  = options+IOPT_GATEWAY_IP1;
-    byte *dns      = options+IOPT_DNS_IP1;
-    if (!ether.staticSetup(staticip, gateway, dns))  return 0;
+    IPAddress staticip(iopts+IOPT_STATIC_IP1);
+    IPAddress gateway(iopts+IOPT_GATEWAY_IP1);
+    IPAddress dns(iopts+IOPT_DNS_IP1);
+    Ethernet.begin((byte*)tmp_buffer, staticip, dns, gateway);
   }
+  unsigned int httpport = (unsigned int)(iopts[IOPT_HTTPPORT_1]<<8) + (unsigned int)iopts[IOPT_HTTPPORT_0];
+  ether_server = new EthernetServer(httpport);
+  ether_server->begin();
+  
+  Udp = new EthernetUDP();
+  // Start UDP service for NTP. Avoid the same port with http
+  if(httpport==8888)
+    Udp->begin(8000);
+  else
+    Udp->begin(8888);
+
 #endif
   return 1;
 }
@@ -484,7 +476,6 @@ void OpenSprinkler::reboot_dev() {
 #include "server.h"
 
 extern EthernetServer *m_server;
-extern char ether_buffer[];
 
 /** Initialize network with the given mac address and http port */
 byte OpenSprinkler::start_network() {
@@ -1507,10 +1498,10 @@ void OpenSprinkler::switch_gpiostation(GPIOStationData *data, bool turnon) {
 
 /** Callback function for browseUrl calls */
 void httpget_callback(byte status, uint16_t off, uint16_t len) {
-#if defined(SERIAL_DEBUG)
+/*
   Ethernet::buffer[off+ETHER_BUFFER_SIZE-1] = 0;
   DEBUG_PRINTLN((const char*) Ethernet::buffer + off);
-#endif
+*/
 }
 
 /** Switch remote station
@@ -1528,6 +1519,9 @@ void OpenSprinkler::switch_remotestation(RemoteStationData *data, bool turnon) {
 
   #if defined(ESP8266)
   WiFiClient client;
+  #else
+  EthernetClient client;
+  #endif
   
   char *p = tmp_buffer + sizeof(RemoteStationData) + 1;
   BufferFiller bf = p;
@@ -1548,43 +1542,20 @@ void OpenSprinkler::switch_remotestation(RemoteStationData *data, bool turnon) {
   if(!client.connect(IPAddress(cip), port))  return;
   client.write((uint8_t *)p, strlen(p));
   
-  bzero(ether_buffer, ETHER_BUFFER_SIZE);
+  memset(ether_buffer, 0, ETHER_BUFFER_SIZE);
   
   time_t timeout = now_tz() + 5; // 5 seconds timeout
   while(!client.available() && now_tz() < timeout) {
   }
 
-  bzero(ether_buffer, ETHER_BUFFER_SIZE);
   while(client.available()) {
     client.read((uint8_t*)ether_buffer, ETHER_BUFFER_SIZE);
   }
   client.stop();
   //httpget_callback(0, 0, ETHER_BUFFER_SIZE);  
   
-  #else
-  // todo: UIP
-  ether.hisip[0] = ip>>24;
-  ether.hisip[1] = (ip>>16)&0xff;
-  ether.hisip[2] = (ip>>8)&0xff;
-  ether.hisip[3] = ip&0xff;
-
-  uint16_t _port = ether.hisport; // save current port number
-  ether.hisport = port;
-
-  char *p = tmp_buffer + sizeof(RemoteStationData) + 1;
-  BufferFiller bf = (byte*)p;
-  // MAX_NUM_STATIONS is the refresh cycle
-  uint16_t timer = iopts[IOPT_SPE_AUTO_REFRESH]?2*MAX_NUM_STATIONS:64800;
-  bf.emit_p(PSTR("?pw=$O&sid=$D&en=$D&t=$D"),
-            SOPT_PASSWORD,
-            (int)hex2ulong(data->sid,sizeof(data->sid)),
-            turnon, timer);
-  ether.browseUrl(PSTR("/cm"), p, PSTR("*"), httpget_callback);
-  for(int l=0;l<100;l++)  ether.packetLoop(ether.packetReceive());
-  ether.hisport = _port;
-  #endif
-  
 #else
+
   EthernetClient client;
 
   uint8_t hisip[4];
@@ -1648,49 +1619,30 @@ void OpenSprinkler::switch_httpstation(HTTPStationData *data, bool turnon) {
 #if defined(ARDUINO)
 
   #if defined(ESP8266)
-  
   WiFiClient client;
+  #else
+  EthernetClient client;
+  #endif
+  
   if(!client.connect(server, atoi(port))) return;
   
   char getBuffer[255];
   sprintf(getBuffer, "GET /%s HTTP/1.0\r\nHOST: *\r\n\r\n", cmd);
   
-  DEBUG_PRINTLN(getBuffer);
+  //DEBUG_PRINTLN(getBuffer);
   
   client.write((uint8_t *)getBuffer, strlen(getBuffer));
   
-  bzero(ether_buffer, ETHER_BUFFER_SIZE);
+  memset(ether_buffer, 0, ETHER_BUFFER_SIZE);
   
   time_t timeout = now_tz() + 5; // 5 seconds timeout
   while(!client.available() && now_tz() < timeout) {
   }
 
-  bzero(ether_buffer, ETHER_BUFFER_SIZE);
   while(client.available()) {
     client.read((uint8_t*)ether_buffer, ETHER_BUFFER_SIZE);
   }
   client.stop();
-  
-  #else
-  // todo: UIP
-  if(!ether.dnsLookup(server, true)) {
-    char *ip0 = strtok(server, ".");
-    char *ip1 = strtok(NULL, ".");
-    char *ip2 = strtok(NULL, ".");
-    char *ip3 = strtok(NULL, ".");
-  
-    ether.hisip[0] = ip0 ? atoi(ip0) : 0;
-    ether.hisip[1] = ip1 ? atoi(ip1) : 0;
-    ether.hisip[2] = ip2 ? atoi(ip2) : 0;
-    ether.hisip[3] = ip3 ? atoi(ip3) : 0;
-  }
-
-  uint16_t _port = ether.hisport;
-  ether.hisport = atoi(port);
-  ether.browseUrlRamHost(PSTR("/"), cmd, server, httpget_callback);
-  for(int l=0;l<100;l++)  ether.packetLoop(ether.packetReceive());
-  ether.hisport = _port;
-  #endif
   
 #else
 
@@ -1764,6 +1716,12 @@ void OpenSprinkler::options_setup() {
 
     // 1. write all options
     iopts_save();
+    // wipe out sopts file first
+    memset(tmp_buffer, 0, MAX_SOPTS_SIZE);
+    for(int i=0; i<NUM_SOPTS; i++) {
+      file_write_block(SOPTS_FILENAME, tmp_buffer, (ulong)MAX_SOPTS_SIZE*i, MAX_SOPTS_SIZE);
+    }
+    // write string options 
     for(int i=0; i<NUM_SOPTS; i++) {
       sopt_save(i, sopts[i]);
     }
@@ -1948,13 +1906,13 @@ String OpenSprinkler::sopt_load(byte oid) {
 /** Save a string option to file */
 bool OpenSprinkler::sopt_save(byte oid, const char *buf) {
   // smart save: if value hasn't changed, don't write
-  if(file_cmp_block(SOPTS_FILENAME, buf, MAX_SOPTS_SIZE*oid)==0) return false;
+  //if(file_cmp_block(SOPTS_FILENAME, buf, (ulong)MAX_SOPTS_SIZE*oid)==0) return false;
   int len = strlen(buf);
   if(len>=MAX_SOPTS_SIZE) {
-    file_write_block(SOPTS_FILENAME, buf, MAX_SOPTS_SIZE*oid, MAX_SOPTS_SIZE);
+    file_write_block(SOPTS_FILENAME, buf, (ulong)MAX_SOPTS_SIZE*oid, MAX_SOPTS_SIZE);
   } else {
     // copy ending 0 too
-    file_write_block(SOPTS_FILENAME, buf, MAX_SOPTS_SIZE*oid, len+1);
+    file_write_block(SOPTS_FILENAME, buf, (ulong)MAX_SOPTS_SIZE*oid, len+1);
   }
   return true;
 }

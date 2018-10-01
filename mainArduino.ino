@@ -12,7 +12,7 @@
   #include <SdFat.h>
 #endif
 
-#include <OpenSprinkler.h>
+#include "OpenSprinkler.h"
 
 extern OpenSprinkler os;
 

@@ -27,15 +27,14 @@
 
 // External variables defined in main ion file
 #if defined(ARDUINO)
-
+  
   #if defined(ESP8266)
 
     #include <FS.h>
     #include "espconnect.h"
     #define INSERT_DELAY(x) {}
-    
+   
     extern ESP8266WebServer *wifi_server;
-    extern char ether_buffer[];
 
     #define handle_return(x) {if(x==HTML_OK) server_send_html(ether_buffer); else server_send_result(x); return;}
 
@@ -43,12 +42,11 @@
 
     #include "SdFat.h"
     extern SdFat sd;
+    extern EthernetClient *ether_client;
     #define handle_return(x) {return_code=x; return;}
     //#define INSERT_DELAY(x) delay(x)
-    INSERT_DELAY(x) {}
+    #define INSERT_DELAY(x) {}
   #endif
-
-  static uint8_t ntpclientportL = 123; // Default NTP client port
 
 #else
 
@@ -56,13 +54,13 @@
   #include <stdlib.h>
   #include "etherport.h"
 
-  extern char ether_buffer[];
   extern EthernetClient *m_client;
   #define handle_return(x) {return_code=x; return;}
   #define INSERT_DELAY(x) {}
 
 #endif
 
+extern char ether_buffer[];
 extern char tmp_buffer[];
 extern OpenSprinkler os;
 extern ProgramData pd;
@@ -241,26 +239,23 @@ byte findKeyVal (const char *str,char *strbuf, uint8_t maxlen,const char *key,bo
 }
 
 void rewind_ether_buffer() {
-#if defined(ESP8266)
   bfill = ether_buffer;
-#else
-  bfill = ether.tcpOffset();
-#endif
 }
 
 void send_packet(bool final=false) {
-#if !defined(ESP8266)
-  if(final) {
-    ether.httpServerReply_with_flags(bfill.position(), TCP_FLAGS_ACK_V|TCP_FLAGS_FIN_V);
-  } else {
-    ether.httpServerReply_with_flags(bfill.position(), TCP_FLAGS_ACK_V);
-    bfill=ether.tcpOffset();
-  }
-#else
-  if(final || available_ether_buffer()<250) {
+#if defined(ESP8266)
+  if(final || available_ether_buffer()<0) {
     wifi_server->sendContent(ether_buffer);
     if(final)
       wifi_server->client().stop();      
+    else
+      rewind_ether_buffer();
+  }
+#else
+  if(final || available_ether_buffer()<0) {
+    ether_client->write(ether_buffer, strlen(ether_buffer));
+    if(final)
+      ether_client->stop();      
     else
       rewind_ether_buffer();
   }
@@ -456,7 +451,7 @@ char dec2hexchar(byte dec) {
   else return 'A'+(dec-10);
 }
 
-String get_mac() {
+/*String get_mac() {
   static String hex;
   if(!hex.length()) {
     byte mac[6];
@@ -468,7 +463,7 @@ String get_mac() {
     }
   }
   return hex;
-}
+}*/
 
 String get_ap_ssid() {
   static String ap_ssid;
@@ -583,7 +578,7 @@ void server_json_stations_main()
     bfill.emit_p(PSTR("\"$S\""), tmp_buffer);
     if(sid!=os.nstations-1)
       bfill.emit_p(PSTR(","));
-    if (available_ether_buffer()<80) {
+    if (available_ether_buffer() < 0) {
       send_packet();
     }
   }
@@ -697,7 +692,7 @@ void server_change_stations() {
 
 		    byte gpioList[] = PIN_FREE_LIST;
 		    bool found = false;
-		    for (int i = 0; i < sizeof(gpioList) && found == false; i++) {
+		    for (byte i = 0; i < sizeof(gpioList) && found == false; i++) {
 			    if (gpioList[i] == gpio) found = true;
 		    }
 		    if (!found || activeState > 1) handle_return(HTML_DATA_OUTOFBOUND);
@@ -817,7 +812,6 @@ void server_change_runonce() {
   byte sid, bid, s;
   uint16_t dur;
   boolean match_found = false;
-  StationAttrib attrib;
   for(sid=0;sid<os.nstations;sid++) {
     dur=parse_listdata(&pv);
     bid=sid>>3;
@@ -1108,7 +1102,7 @@ void server_json_programs_main() {
     }
     // push out a packet if available
     // buffer size is getting small
-    if (available_ether_buffer() < 250) {
+    if (available_ether_buffer() < 0) {
       send_packet();
     }
   }
@@ -1195,7 +1189,7 @@ void server_json_controller_main() {
 
     // if available ether buffer is getting small
     // send out a packet
-    if(available_ether_buffer() < 80) {
+    if(available_ether_buffer() < 0) {
       send_packet();
     }
   }
@@ -1602,8 +1596,6 @@ void server_change_manual() {
       // schedule manual station
       // skip if the station is a master station
       // (because master cannot be scheduled independently)
-      byte bid = sid>>3;
-      byte s = sid&0x07;
       if ((os.status.mas==sid+1) || (os.status.mas2==sid+1))
         handle_return(HTML_NOT_PERMITTED);
 
@@ -1714,7 +1706,7 @@ void server_json_log() {
   bfill.emit_p(PSTR("["));
 
   bool comma = 0;
-  for(int i=start;i<=end;i++) {
+  for(unsigned int i=start;i<=end;i++) {
     itoa(i, tmp_buffer, 10);
     make_logfile_name(tmp_buffer);
 
@@ -1780,7 +1772,7 @@ void server_json_log() {
       bfill.emit_p(PSTR("$S"), tmp_buffer);
       // if the available ether buffer size is getting small
       // push out a packet
-      if (available_ether_buffer() < 80) {
+      if (available_ether_buffer() < 0) {
         send_packet();
       }
     }
@@ -2038,9 +2030,6 @@ void start_server_ap() {
 #else
 void handle_web_request(char *p)
 {
-#if defined(ARDUINO)
-  ether.httpServerReplyAck();
-#endif
   rewind_ether_buffer();
 
   // assume this is a GET request
@@ -2153,29 +2142,48 @@ ulong getNtpTime()
   return gt;
   
 #else
+  // the following is from Arduino UdpNtpClient code
+  const int NTP_PACKET_SIZE = 48;
+  static byte packetBuffer[NTP_PACKET_SIZE];
   byte ntpip[4] = {
     os.iopts[IOPT_NTP_IP1],
     os.iopts[IOPT_NTP_IP2],
     os.iopts[IOPT_NTP_IP3],
     os.iopts[IOPT_NTP_IP4]};
-  uint32_t time;
   byte tick=0;
-  unsigned long expire;
   do {
-    ether.ntpRequest(ntpip, ++ntpclientportL);
-    expire = millis() + 1000; // wait for at most 1 second
-    do {
-      word len = ether.packetReceive();
-      ether.packetLoop(len);
-      if(len > 0 && ether.ntpProcessAnswer(&time, ntpclientportL)) {
-        if ((time & 0x80000000UL) ==0){
-          time+=2085978496;
-        }else{
-          time-=2208988800UL;
-        }
-        return time;
-      }
-    } while(millis() < expire);
+    // sendNtpPacket
+    memset(packetBuffer, 0, NTP_PACKET_SIZE);
+    packetBuffer[0] = 0b11100011;   // LI, Version, Mode
+    packetBuffer[1] = 0;     // Stratum, or type of clock
+    packetBuffer[2] = 6;     // Polling Interval
+    packetBuffer[3] = 0xEC;  // Peer Clock Precision
+    // 8 bytes of zero for Root Delay & Root Dispersion
+    packetBuffer[12]  = 49;
+    packetBuffer[13]  = 0x4E;
+    packetBuffer[14]  = 49;
+    packetBuffer[15]  = 52;
+    // all NTP fields have been given values, now
+    // you can send a packet requesting a timestamp:
+    Udp->beginPacket(ntpip, 123); // NTP requests are to port 123
+    Udp->write(packetBuffer, NTP_PACKET_SIZE);
+    Udp->endPacket();
+    // end of sendNtpPacket
+    
+    // wait for response
+    delay(1000);
+    if(Udp->parsePacket()) {
+      Udp->read(packetBuffer, NTP_PACKET_SIZE);
+      unsigned long highWord = word(packetBuffer[40], packetBuffer[41]);
+      unsigned long lowWord = word(packetBuffer[42], packetBuffer[43]);
+      // combine the four bytes (two words) into a long integer
+      // this is NTP time (seconds since Jan 1 1900):
+      unsigned long secsSince1900 = highWord << 16 | lowWord;
+      // Unix time starts on Jan 1 1970. In seconds, that's 2208988800:
+      const unsigned long seventyYears = 2208988800UL;
+      // subtract seventy years:
+      return secsSince1900 - seventyYears;
+    }
     tick ++;
   } while(tick<20);
 #endif

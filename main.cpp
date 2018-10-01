@@ -29,29 +29,19 @@
 #include "server.h"
 
 #if defined(ARDUINO)
-
-#include "Wire.h"
-
-#if defined(ESP8266)
-  #include <FS.h>
-  #include "gpio.h"
-  #include "espconnect.h"
-#else
-  #include <SdFat.h>
-  SdFat sd;                                 // SD card object
-#endif
-
-unsigned long getNtpTime();
-
+  EthernetServer *ether_server = NULL;
+  EthernetClient *ether_client = NULL;
+  EthernetUDP    *Udp = NULL;
+  #if defined(ESP8266)
+    ESP8266WebServer *wifi_server = NULL;
+    static uint16_t led_blink_ms = LED_FAST_BLINK;
+  #else
+    SdFat sd;                                 // SD card object
+  #endif
+  unsigned long getNtpTime();
 #else // header and defs for RPI/BBB
-
-#include <sys/stat.h>
-#include <netdb.h>
-#include "etherport.h"
-#include "gpio.h"
-EthernetServer *m_server = 0;
-EthernetClient *m_client = 0;
-
+  EthernetServer *m_server = 0;
+  EthernetClient *m_client = 0;
 #endif
 
 void reset_all_stations();
@@ -71,13 +61,9 @@ void httpget_callback(byte, uint16_t, uint16_t);
 #define PING_TIMEOUT            200     // Ping test timeout: 200 ms
 
 // Define buffers: need them to be sufficiently large to cover string option reading
-char ether_buffer[ETHER_BUFFER_SIZE+MAX_SOPTS_SIZE+1]; // ethernet buffer
+char ether_buffer[ETHER_BUFFER_SIZE+TMP_BUFFER_SIZE]; // ethernet buffer
 char tmp_buffer[TMP_BUFFER_SIZE+MAX_SOPTS_SIZE+1];     // scratch buffer
 
-#if defined(ESP8266)
-ESP8266WebServer *wifi_server = NULL;
-static uint16_t led_blink_ms = LED_FAST_BLINK;
-#endif
 // ====== Object defines ======
 OpenSprinkler os; // OpenSprinkler object
 ProgramData pd;   // ProgramdData object
@@ -94,10 +80,10 @@ float flow_last_gpm=0;
 byte prev_flow_state = HIGH;
 
 void flow_poll() {
-  byte curr_flow_state = digitalReadExt(PIN_FLOWSENSOR);
   if(os.iopts[IOPT_SENSOR1_TYPE]!=SENSOR_TYPE_FLOW) return;
 
 #if defined(ESP8266)
+  byte curr_flow_state = digitalReadExt(PIN_FLOWSENSOR);
   if(!(prev_flow_state==HIGH && curr_flow_state==LOW)) {
     prev_flow_state = curr_flow_state;
     return;
@@ -205,7 +191,7 @@ void ui_state_machine() {
           os.lcd.print(WiFi.gatewayIP());
           #else
           os.lcd.clear();
-          os.lcd_print_ip(ether.gwip, 0);
+          os.lcd_print_ip(&(Ethernet.gatewayIP()[0]), 0);
           #endif
           os.lcd.setCursor(0, 1);
           os.lcd_print_pgm(PSTR("(gwip)"));
@@ -227,10 +213,11 @@ void ui_state_machine() {
         os.lcd.print(httpport);
         #else
         os.lcd.clear();
-        os.lcd_print_ip(ether.myip, 0);
+        os.lcd_print_ip(&(Ethernet.localIP()[0]), 0);
         os.lcd.setCursor(0, 1);
         os.lcd_print_pgm(PSTR(":"));
-        os.lcd.print(ether.hisport);
+        uint16_t httpport = (uint16_t)(os.iopts[IOPT_HTTPPORT_1]<<8) + (uint16_t)os.iopts[IOPT_HTTPPORT_0];        
+        os.lcd.print(httpport);
         #endif
         os.lcd_print_pgm(PSTR(" (ip:port)"));
         ui_state = UI_STATE_DISP_IP;
@@ -258,13 +245,11 @@ void ui_state_machine() {
       } else {  // clicking B2: display MAC
         #if defined(ESP8266)
         os.lcd.clear(0, 1);
-        byte mac[6];
-        WiFi.macAddress(mac);
-        os.lcd_print_mac(mac);
         #else
         os.lcd.clear();
-        os.lcd_print_mac(ether.mymac);
         #endif
+        os.load_hardware_mac((byte*)tmp_buffer);
+        os.lcd_print_mac((byte*)tmp_buffer);
         ui_state = UI_STATE_DISP_GW;
       }
       break;
@@ -517,10 +502,28 @@ void do_loop()
   
   #else // AVR
   
-  uint16_t pos=ether.packetLoop(ether.packetReceive());
-  if (pos>0) {  // packet received
-    handle_web_request((char*)Ethernet::buffer+pos);
+  EthernetClient client = ether_server->available();
+  if (client) {
+    while(true) {
+      int len = client.read((uint8_t*) ether_buffer, ETHER_BUFFER_SIZE);
+      if (len <=0) {
+        if(!client.connected()) {
+          break;
+        } else {
+          continue;
+        }
+      } else {
+        ether_client = &client;
+        ether_buffer[len] = 0;  // put a zero at the end of the packet
+        handle_web_request(ether_buffer);
+        ether_client = NULL;
+        break;
+      }
+    }
   }
+
+  Ethernet.maintain();
+   
   wdt_reset();  // reset watchdog timer
   wdt_timeout = 0;
   #endif
@@ -1185,11 +1188,6 @@ void push_message(byte type, uint32_t lval, float fval, const char* sval) {
 
   if(strlen(key)==0) return;
 
-  #if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
-    uint16_t _port = ether.hisport; // make a copy of the original port
-    ether.hisport = 80;
-  #endif
-
   strcpy_P(postval, PSTR("{\"value1\":\""));
 
   switch(type) {
@@ -1270,13 +1268,9 @@ void push_message(byte type, uint32_t lval, float fval, const char* sval) {
       #if defined(ARDUINO)
         strcat_P(postval, PSTR("Rebooted. Device IP: "));
         #if defined(ESP8266)
-        {
-          IPAddress _ip = WiFi.localIP();
-          byte ip[4] = {_ip[0], _ip[1], _ip[2], _ip[3]};
-          ip2string(postval, ip);
-        }
+        ip2string(postval, &(WiFi.localIP()[0]));
         #else
-        ip2string(postval, ether.myip);
+        ip2string(postval, &(Ethernet.localIP()[0]));
         #endif
         //strcat(postval, ":");
         //itoa(_port, postval+strlen(postval), 10);
@@ -1294,6 +1288,10 @@ void push_message(byte type, uint32_t lval, float fval, const char* sval) {
 
   #if defined(ESP8266)
   WiFiClient client;
+  #else
+  EthernetClient client;
+  #endif
+  
   if(!client.connect(server, 80)) return;
   
   char postBuffer[1500];
@@ -1309,28 +1307,14 @@ void push_message(byte type, uint32_t lval, float fval, const char* sval) {
   while(!client.available() && os.now_tz() < timeout) {
   }
 
-  bzero(ether_buffer, ETHER_BUFFER_SIZE);
+  memset(ether_buffer, 0, ETHER_BUFFER_SIZE);
   
   while(client.available()) {
     client.read((uint8_t*)ether_buffer, ETHER_BUFFER_SIZE);
   }
   client.stop();
   //DEBUG_PRINTLN(ether_buffer);
-    
-  #else
-  if(!ether.dnsLookup(server, true)) {
-    // if DNS lookup fails, use default IP
-    ether.hisip[0] = 54;
-    ether.hisip[1] = 172;
-    ether.hisip[2] = 244;
-    ether.hisip[3] = 116;
-  }
 
-  ether.httpPostVar(PSTR("/trigger/sprinkler/with/key/"), PSTR(DEFAULT_IFTTT_URL), key, postval, httpget_callback);
-  for(int l=0;l<100;l++)  ether.packetLoop(ether.packetReceive());
-  ether.hisport = _port;
-  #endif
-  
 #else
 
   EthernetClient client;
@@ -1594,11 +1578,11 @@ void check_network() {
       os.lcd.write(4);
     }
 
-    // ping gateway ip
-    ether.clientIcmpRequest(ether.gwip);
 
+    boolean failed = false;
+    // todo: ping gateway ip
+    /*ether.clientIcmpRequest(ether.gwip);
     ulong start = millis();
-    boolean failed = true;
     // wait at most PING_TIMEOUT milliseconds for ping result
     do {
       ether.packetLoop(ether.packetReceive());
@@ -1606,7 +1590,7 @@ void check_network() {
         failed = false;
         break;
       }
-    } while(millis() - start < PING_TIMEOUT);
+    } while(millis() - start < PING_TIMEOUT);*/
     if (failed)  {
       if(os.status.network_fails<3)  os.status.network_fails++;
       // clamp it to 6

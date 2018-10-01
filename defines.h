@@ -238,7 +238,7 @@ enum {
   #define PIN_BOOST         20    // booster pin
   #define PIN_BOOST_EN      23    // boost voltage enable pin
 
-  #define PIN_ETHER_CS       4    // Ethernet controller chip select pin
+  //#define PIN_ETHER_CS       4    // Ethernet controller chip select pin
   #define PIN_SD_CS          0    // SD card chip select pin
   #define PIN_RAINSENSOR    11    // rain sensor is connected to pin D3
   #define PIN_FLOWSENSOR    11    // flow sensor (currently shared with rain sensor, change if using a different pin)

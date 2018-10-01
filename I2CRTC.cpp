@@ -25,9 +25,9 @@
  */
 
 
-#if defined(ESP8266)
+#if defined(ARDUINO)
 
-#include "i2crtc.h"
+#include "I2CRTC.h"
 #include <Wire.h>
 
 static uint8_t _addrs[] = {DS1307_ADDR, MCP7940_ADDR, PCF8563_ADDR};

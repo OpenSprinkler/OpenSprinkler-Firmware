@@ -21,18 +21,6 @@
  * <http://www.gnu.org/licenses/>. 
  */
 
-#if defined(ARDUINO)
-  #if defined(ESP8266)
-  extern char ether_buffer[];
-  #endif
-#else
-#include "etherport.h"
-#include <string.h>
-#include <stdlib.h>
-#include <netdb.h>
-extern char ether_buffer[];
-#endif
-
 #include "OpenSprinkler.h"
 #include "utils.h"
 #include "server.h"
@@ -40,6 +28,7 @@ extern char ether_buffer[];
 
 extern OpenSprinkler os; // OpenSprinkler object
 extern char tmp_buffer[];
+extern char ether_buffer[];
 byte findKeyVal (const char *str,char *strbuf, uint8_t maxlen,const char *key,bool key_in_pgm=false,uint8_t *keyfound=NULL);
 void write_log(byte type, ulong curr_time);
 
@@ -47,12 +36,8 @@ void write_log(byte type, ulong curr_time);
 // the default script is WEATHER_SCRIPT_HOST/weather?.py
 //static char website[] PROGMEM = DEFAULT_WEATHER_URL ;
 
-static void getweather_callback(byte status, uint16_t off, uint16_t len) {
-#if defined(ARDUINO) && !defined(ESP8266)
-  char *p = (char*)Ethernet::buffer + off;
-#else
+static void getweather_callback() {
   char *p = ether_buffer;
-#endif
   /* scan the buffer until the first & symbol */
   while(*p && *p!='&') {
     p++;
@@ -122,7 +107,6 @@ static void getweather_callback(byte status, uint16_t off, uint16_t len) {
   write_log(LOGDATA_WATERLEVEL, os.checkwt_success_lasttime);
 }
 
-#if !defined(ARDUINO) || defined(ESP8266)
 void peel_http_header() { // remove the HTTP header
   int i=0;
   bool eol=true;
@@ -149,25 +133,22 @@ void peel_http_header() { // remove the HTTP header
     i++;
   }
 }
-#endif
 
 #if defined(ARDUINO)  // for AVR
 void GetWeather() {
   // perform DNS lookup for every query
   os.sopt_load(SOPT_WEATHERURL, tmp_buffer);
-#if defined(ESP8266)
-  if (os.state!=OS_STATE_CONNECTED || WiFi.status()!=WL_CONNECTED) return;
-  WiFiClient client;
-  if(!client.connect(tmp_buffer, 80))  return;
-#else
-  ether.dnsLookup(tmp_buffer, true);
-#endif
 
 #if defined(ESP8266)
-  BufferFiller bf = tmp_buffer;
-#else  
-  BufferFiller bf = (uint8_t*)tmp_buffer;
+  WiFiClient client;
+  if (os.state!=OS_STATE_CONNECTED || WiFi.status()!=WL_CONNECTED) return;
+#else
+  EthernetClient client;
 #endif
+
+  if(!client.connect(tmp_buffer, 80))  return;
+
+  BufferFiller bf = tmp_buffer;
   bf.emit_p(PSTR("$D.py?loc=$O&key=$O&wto=$O&fwv=$D"),
                 (int) os.iopts[IOPT_USE_WEATHER],
                 SOPT_LOCATION,
@@ -193,7 +174,7 @@ void GetWeather() {
     }
   };
   *dst = *src;
-#if defined(ESP8266)
+
   char urlBuffer[255];
   strcpy(urlBuffer, "GET /weather");
   strcat(urlBuffer, dst);
@@ -202,23 +183,19 @@ void GetWeather() {
   
   client.write((uint8_t *)urlBuffer, strlen(urlBuffer));
   
+  memset(ether_buffer, 0, ETHER_BUFFER_SIZE);
+  
   time_t timeout = os.now_tz() + 5; // 5 seconds timeout
   while(!client.available() && os.now_tz() < timeout) {
   }
 
-  bzero(ether_buffer, ETHER_BUFFER_SIZE);
   while(client.available()) {
     client.read((uint8_t*)ether_buffer, ETHER_BUFFER_SIZE);
   }
   client.stop();
   peel_http_header();
-  getweather_callback(0, 0, ETHER_BUFFER_SIZE);
-#else
-  uint16_t _port = ether.hisport; // save current port number
-  ether.hisport = 80;
-  ether.browseUrl(PSTR("/weather"), dst, PSTR("*"), getweather_callback);
-  ether.hisport = _port;
-#endif
+  getweather_callback();
+
 }
 
 #else // for RPI/BBB/LINUX
@@ -245,7 +222,7 @@ void GetWeather() {
     DEBUG_PRINTLN(ptmp);
     return;
   }
-  DEBUG_PRINT("weather server ip:port - ");
+  /*DEBUG_PRINT("weather server ip:port - ");
   DEBUG_PRINT(((uint8_t*)server->h_addr)[0]);
   DEBUG_PRINT(".");
   DEBUG_PRINT(((uint8_t*)server->h_addr)[1]);
@@ -254,7 +231,7 @@ void GetWeather() {
   DEBUG_PRINT(".");
   DEBUG_PRINT(((uint8_t*)server->h_addr)[3]);
   DEBUG_PRINT(":");
-  DEBUG_PRINTLN(port);
+  DEBUG_PRINTLN(port);*/
 
   if (!client.connect((uint8_t*)server->h_addr, port)) {
     client.stop();
@@ -309,7 +286,7 @@ void GetWeather() {
         continue;
     }
     peel_http_header();
-    getweather_callback(0, 0, ETHER_BUFFER_SIZE);
+    getweather_callback();
     break;
   }
   client.stop();

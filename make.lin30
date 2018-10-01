@@ -1,4 +1,4 @@
-SKETCH = ./examples/mainArduino/mainArduino.ino
+SKETCH = ./mainArduino.ino
 LIBS = .\
   $(ESP_LIBS)/Wire \
   $(ESP_LIBS)/ESP8266WiFi \

@@ -25,26 +25,29 @@
 #ifndef _OPENSPRINKLER_H
 #define _OPENSPRINKLER_H
 
-#if defined(ESP8266) // headers for ESP8266
-  #include <Wire.h>
-  #include <FS.h>
-  #include <RCSwitch.h>
-  //#include <UIPEthernet.h>  
-  #include "SSD1306Display.h"
-  #include "i2crtc.h"
-  #include "espconnect.h"
-#elif defined(ARDUINO) // headers for AVR
+#if defined(ARDUINO) // headers for ESP8266
   #include <Arduino.h>
-  #include <avr/eeprom.h>
   #include <Wire.h>
-  #include <RCSwitch.h>
+  #include <SPI.h>
   #include <UIPEthernet.h>
-  #include "LiquidCrystal.h"
-  #include "i2crtc.h"
+  #include "I2CRTC.h"
+
+  #if defined(ESP8266)
+    #include <FS.h>
+    #include <RCSwitch.h>
+    #include "SSD1306Display.h"
+    #include "espconnect.h"
+  #else
+    #include <SdFat.h>
+    #include "LiquidCrystal.h"
+  #endif
+  
 #else // headers for RPI/BBB/LINUX
   #include <time.h>
   #include <string.h>
   #include <unistd.h>
+  #include <netdb.h>  
+  #include <sys/stat.h>  
   #include "etherport.h"
 #endif // end of headers
 
@@ -175,7 +178,7 @@ public:
   static void begin();        // initialization, must call this function before calling other functions
   static byte start_network();  // initialize network with the given mac and port
 #if defined(ARDUINO)
-  static bool read_hardware_mac();  // read hardware mac address
+  static void load_hardware_mac(byte* buffer);  // read hardware mac address
 #endif
   static time_t now_tz();
   // -- station names and attributes
@@ -283,5 +286,14 @@ private:
 #endif // LCD functions
   static byte engage_booster;
 };
+
+#if defined(ARDUINO)
+  extern EthernetServer *ether_server;
+  extern EthernetClient *ether_client;
+  extern EthernetUDP    *Udp;  
+  #if defined(ESP8266)
+  extern ESP8266WebServer *wifi_server;
+  #endif
+#endif
 
 #endif  // _OPENSPRINKLER_H

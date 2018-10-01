@@ -333,7 +333,7 @@ void file_read_block(const char *fn, void *dst, ulong pos, ulong len) {
   SdFile file;
   if(file.open(fn, O_READ)) {
     file.seekSet(pos);
-    file.fgets(dst, len);
+    file.read(dst, len);
     file.close();
   }
 

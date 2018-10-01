@@ -1,12 +1,12 @@
-ARDUINO_VERS = 169
 OFLAG = -Os
-
-SKETCHBOOK = .
-ARDUINO_DIR = /home/xxx/arduino-1.6.9
-BOARD_TAG = os23
-ARDUINO = $(ARDUINO_DIR)
-AVR_TOOLS = $(ARDUINO_DIR)/hardware/tools/avr
-PATH += $(ARDUINO)/hardware/tools/avr/bin
+ARDMK_DIR = .
+ARDUINO_DIR = $(HOME)/arduino-1.8.5
+ALTERNATE_CORE_PATH = $(HOME)/.arduino15/packages/MightyCore/hardware/avr/2.0.1
+BOARD_TAG = 1284
+MCU = atmega1284p
+VARIANT = sanguino
+F_CPU = 16000000L
+ARDUINO_LIBS = UIPEthernet Wire SdFat SPI 
 MONITOR_PORT = /dev/ttyUSB0
-
-include $(SKETCHBOOK)/Arduino.mk
+MONITOR_BAUDRATE = 115200
+include ./Arduino.mk
