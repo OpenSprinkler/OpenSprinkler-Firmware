@@ -374,7 +374,7 @@ time_t OpenSprinkler::now_tz() {
 
 bool detect_i2c(int addr) {
   Wire.beginTransmission(addr);
-  return (Wire.endTransmission()==0); // return is 0 if device is detected
+  return (Wire.endTransmission()==0); // successful if received 0
 }
 
 /** read hardware MAC into tmp_buffer */
@@ -384,8 +384,7 @@ void OpenSprinkler::load_hardware_mac(byte* buffer) {
   WiFi.macAddress(buffer);
 #else
   uint8_t ret;
-  ret = detect_i2c(MAC_CTRL_ID);
-  if (ret) {
+  if (detect_i2c(MAC_CTRL_ID)==false) {
     // if I2C EEPROM doesn't exist, use software-defined MAC
     buffer[0] = 0x00;
     buffer[1] = 0x69;
@@ -397,7 +396,7 @@ void OpenSprinkler::load_hardware_mac(byte* buffer) {
     Wire.beginTransmission(MAC_CTRL_ID);
     Wire.write(0xFA); // The address of the register we want
     Wire.endTransmission(); // Send the data
-    if(Wire.requestFrom(MAC_CTRL_ID, 6) != 6) return false; // Request 6 bytes from the EEPROM
+    Wire.requestFrom(MAC_CTRL_ID, 6);
     for (ret=0;ret<6;ret++) {
       buffer[ret] = Wire.read();
     }
@@ -732,17 +731,15 @@ void OpenSprinkler::begin() {
     baseline_current = 80;
     
   #else // OS 2.3 specific detections
-    uint8_t ret;
 
     // detect hardware type
-  	ret = detect_i2c(MAC_CTRL_ID);
-  	if (!ret) {
+  	if (detect_i2c(MAC_CTRL_ID)) {
     	Wire.requestFrom(MAC_CTRL_ID, 1);
-    	ret = Wire.read();
+    	byte ret = Wire.read();
       if (ret == HW_TYPE_AC || ret == HW_TYPE_DC || ret == HW_TYPE_LATCH) {
         hw_type = ret;
       } else {
-        // hardware type is not assigned
+        hw_type = HW_TYPE_AC; // if type not supported, make it AC
       }
     }
 
