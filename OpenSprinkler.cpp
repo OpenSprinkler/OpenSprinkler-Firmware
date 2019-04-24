@@ -35,6 +35,7 @@ NVConData OpenSprinkler::nvdata;
 ConStatus OpenSprinkler::status;
 ConStatus OpenSprinkler::old_status;
 byte OpenSprinkler::hw_type;
+byte OpenSprinkler::hw_rev;
 
 byte OpenSprinkler::nboards;
 byte OpenSprinkler::nstations;
@@ -516,6 +517,7 @@ void OpenSprinkler::lcd_start() {
 #endif
 
 extern void flow_isr();
+extern void flow_poll();
 /** Initialize pins, controller variables, LCD */
 void OpenSprinkler::begin() {
 
@@ -524,8 +526,9 @@ void OpenSprinkler::begin() {
 #endif
 
   hw_type = HW_TYPE_UNKNOWN;
-    
-#ifdef ESP8266
+  hw_rev = 0;
+  
+#if defined(ESP8266)
 
   if(detect_i2c(ACDR_I2CADDR)) hw_type = HW_TYPE_AC;
   else if(detect_i2c(DCDR_I2CADDR)) hw_type = HW_TYPE_DC;
@@ -567,21 +570,7 @@ void OpenSprinkler::begin() {
     digitalWriteExt(PIN_LATCH_COM, LOW);
     
   } else {
-    /* assign revision 1 pins */
-    PIN_BUTTON_1 = V1_PIN_BUTTON_1;
-    PIN_BUTTON_2 = V1_PIN_BUTTON_2;
-    PIN_BUTTON_3 = V1_PIN_BUTTON_3;
-    PIN_RFRX = V1_PIN_RFRX;
-    PIN_RFTX = V1_PIN_RFTX;
-    PIN_IOEXP_INT = V1_PIN_IOEXP_INT;
-    PIN_BOOST = V1_PIN_BOOST;
-    PIN_BOOST_EN = V1_PIN_BOOST_EN;
-    PIN_LATCH_COM = V1_PIN_LATCH_COM;
-    PIN_SENSOR1 = V1_PIN_SENSOR1;
-    PIN_SENSOR2 = V1_PIN_SENSOR2;
-    PIN_RAINSENSOR = V1_PIN_RAINSENSOR;
-    PIN_FLOWSENSOR = V1_PIN_FLOWSENSOR;    
-    
+  
     if(hw_type==HW_TYPE_DC) {
       drio = new PCA9555(DCDR_I2CADDR);
     } else if(hw_type==HW_TYPE_LATCH) {
@@ -589,11 +578,46 @@ void OpenSprinkler::begin() {
     } else {
       drio = new PCA9555(ACDR_I2CADDR);
     }
-    
-    // on revision 1, main IOEXP and driver IOEXP are combined into one single PCA9555 (16-ch) chip
     mainio = drio;
-    mainio->i2c_write(NXP_CONFIG_REG, V1_IO_CONFIG);
-    mainio->i2c_write(NXP_OUTPUT_REG, V1_IO_OUTPUT);
+    
+    pinMode(16, INPUT);
+    if(digitalRead(16)==LOW) {
+      // revision 1
+      hw_rev = 1;
+      mainio->i2c_write(NXP_CONFIG_REG, V1_IO_CONFIG);
+      mainio->i2c_write(NXP_OUTPUT_REG, V1_IO_OUTPUT);
+
+      /* assign revision 1 pins */
+      PIN_BUTTON_1 = V1_PIN_BUTTON_1;
+      PIN_BUTTON_2 = V1_PIN_BUTTON_2;
+      PIN_BUTTON_3 = V1_PIN_BUTTON_3;
+      PIN_RFRX = V1_PIN_RFRX;
+      PIN_RFTX = V1_PIN_RFTX;
+      PIN_IOEXP_INT = V1_PIN_IOEXP_INT;
+      PIN_BOOST = V1_PIN_BOOST;
+      PIN_BOOST_EN = V1_PIN_BOOST_EN;
+      PIN_LATCH_COM = V1_PIN_LATCH_COM;
+      PIN_SENSOR1 = V1_PIN_SENSOR1;
+      PIN_SENSOR2 = V1_PIN_SENSOR2;
+      PIN_RAINSENSOR = V1_PIN_RAINSENSOR;
+      PIN_FLOWSENSOR = V1_PIN_FLOWSENSOR;
+    } else {
+      // revision 2
+      hw_rev = 2;      
+      mainio->i2c_write(NXP_CONFIG_REG, V2_IO_CONFIG);
+      mainio->i2c_write(NXP_OUTPUT_REG, V2_IO_OUTPUT);
+
+      PIN_BUTTON_1 = V2_PIN_BUTTON_1;
+      PIN_BUTTON_2 = V2_PIN_BUTTON_2;
+      PIN_BUTTON_3 = V2_PIN_BUTTON_3;
+      PIN_RFTX = V2_PIN_RFTX;
+      PIN_BOOST = V2_PIN_BOOST;
+      PIN_BOOST_EN = V2_PIN_BOOST_EN;
+      PIN_SENSOR1 = V2_PIN_SENSOR1;
+      PIN_SENSOR2 = V2_PIN_SENSOR2;
+      PIN_RAINSENSOR = V2_PIN_RAINSENSOR;
+      PIN_FLOWSENSOR = V2_PIN_FLOWSENSOR;    
+    }
   }
   
   for(byte i=0;i<(MAX_EXT_BOARDS+1)/2;i++)
@@ -640,13 +664,17 @@ void OpenSprinkler::begin() {
 
   // Set up sensors
 #if defined(ARDUINO)
-  #ifdef ESP8266
+  #if defined(ESP8266)
     /* todo: handle two sensors */
     if(mainio->type==IOEXP_TYPE_8574) {
       attachInterrupt(PIN_FLOWSENSOR, flow_isr, FALLING);
     } else if(mainio->type==IOEXP_TYPE_9555) {
-      mainio->i2c_read(NXP_INPUT_REG);  // do a read to clear out current interrupt flag
-      attachInterrupt(PIN_IOEXP_INT, flow_isr, FALLING);
+      if(hw_rev==1) {
+        mainio->i2c_read(NXP_INPUT_REG);  // do a read to clear out current interrupt flag
+        attachInterrupt(PIN_IOEXP_INT, flow_isr, FALLING);
+      } else if(hw_rev==2) {
+        attachInterrupt(PIN_FLOWSENSOR, flow_isr, FALLING);
+      }
     }
   #else
     //digitalWrite(PIN_RAINSENSOR, HIGH); // enabled internal pullup on rain sensor
@@ -1381,8 +1409,8 @@ void OpenSprinkler::switch_rfstation(RFStationData *data, bool turnon) {
 #if defined(ARDUINO)
   #ifdef ESP8266
   rfswitch.enableTransmit(PIN_RFTX);
-  rfswitch.setPulseLength(length);
   rfswitch.setProtocol(1);
+  rfswitch.setPulseLength(length);
   rfswitch.send(turnon ? on : off, 24);
   #else
   send_rfsignal(turnon ? on : off, length);
@@ -1797,7 +1825,11 @@ void OpenSprinkler::options_setup() {
     byte hwv = options[OPTION_HW_VERSION];
     lcd.print((char)('0'+(hwv/10)));
     lcd.print('.');
+    #ifdef ESP8266
+    lcd.print(hw_rev);
+    #else
     lcd.print((char)('0'+(hwv%10)));
+    #endif
     switch(hw_type) {
     case HW_TYPE_DC:
       lcd_print_pgm(PSTR(" DC"));

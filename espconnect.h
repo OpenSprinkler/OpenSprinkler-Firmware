@@ -18,23 +18,10 @@
  * <http://www.gnu.org/licenses/>.
  */
 
-#ifdef ESP8266
+#if defined(ESP8266)
 
 #ifndef _ESP_CONNECT_H
 #define _ESP_CONNECT_H
-
-/*#define HTML_OK              0x00
-#define HTML_SUCCESS           0x01
-#define HTML_UNAUTHORIZED      0x02
-#define HTML_MISMATCH          0x03
-#define HTML_DATA_MISSING      0x10
-#define HTML_DATA_OUTOFBOUND   0x11
-#define HTML_PAGE_NOT_FOUND    0x20
-#define HTML_FILE_NOT_FOUND    0x21
-#define HTML_NOT_PERMITTED     0x30
-#define HTML_UPLOAD_FAILED     0x40
-#define HTML_WRONG_MODE        0x50
-#define HTML_REDIRECT_HOME     0xFF*/
 
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>

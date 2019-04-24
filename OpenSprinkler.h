@@ -147,8 +147,9 @@ public:
   static ConStatus status;
   static ConStatus old_status;
   static byte nboards, nstations;
-  static byte hw_type;           // hardware type
-
+  static byte hw_type;  // hardware type
+  static byte hw_rev; // hardware minor    
+  
   static byte options[];  // option values, max, name, and flag
 
   static byte station_bits[];     // station activation bits. each byte corresponds to a board (8 stations)
