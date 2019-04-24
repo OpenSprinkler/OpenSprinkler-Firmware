@@ -534,6 +534,9 @@ boolean process_password(boolean fwv_on_fail=false, char *p = NULL)
 boolean check_password(char *p)
 #endif
 {
+#if defined(DEMO)
+	return true;
+#endif
   if (os.options[OPTION_IGNORE_PASSWORD])  return true;
   if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("pw"), true)) {
     urlDecode(tmp_buffer);
