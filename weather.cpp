@@ -45,6 +45,15 @@ extern char tmp_buffer[];
 byte findKeyVal (const char *str,char *strbuf, uint8_t maxlen,const char *key,bool key_in_pgm=false,uint8_t *keyfound=NULL);
 void write_log(byte type, ulong curr_time);
 
+#ifdef ESP8266_ETHERNET
+#include <Client.h>
+#include "UIPClient.h"
+#include "UIPServer.h"
+#include "UIPEthernet.h"
+extern UIPServer *m_server;
+extern UIPEthernetClass ether;
+#endif
+
 // The weather function calls getweather.py on remote server to retrieve weather data
 // the default script is WEATHER_SCRIPT_HOST/weather?.py
 //static char website[] PROGMEM = DEFAULT_WEATHER_URL ;
@@ -158,12 +167,27 @@ void GetWeather() {
   // perform DNS lookup for every query
   nvm_read_block(tmp_buffer, (void*)ADDR_NVM_WEATHERURL, MAX_WEATHERURL);
 
+#ifdef ESP8266_ETHERNET
+  Client *client;
+  if (m_server) {
+    UIPClient *uipclient = new UIPClient();
+    uipclient->connect(tmp_buffer, 80);
+    client = uipclient;
+  } else {
+    if (os.state!=OS_STATE_CONNECTED || WiFi.status()!=WL_CONNECTED) return;
+    WiFiClient *wificlient = new WiFiClient();
+    wificlient->connect(tmp_buffer, 80);
+    client = wificlient;
+  }
+#else
 #ifdef ESP8266
   if (os.state!=OS_STATE_CONNECTED || WiFi.status()!=WL_CONNECTED) return;
-  WiFiClient client;
-  if(!client.connect(tmp_buffer, 80))  return;
+  WiFiClient wificlient;
+  if(!wificlient.connect(tmp_buffer, 80))  return;
+  client = &wificlient;
 #else
   ether.dnsLookup(tmp_buffer, true);
+#endif
 #endif
 
   char tmp[60];
@@ -204,18 +228,26 @@ void GetWeather() {
   strcat(urlBuffer, dst);
   strcat(urlBuffer, " HTTP/1.0\r\nHOST: ");
   strcat(urlBuffer, "*\r\n\r\n");
-  
-  client.write((uint8_t *)urlBuffer, strlen(urlBuffer));
-  
+
   time_t timeout = os.now_tz() + 5; // 5 seconds timeout
-  while(!client.available() && os.now_tz() < timeout) {
+  client->write((uint8_t *)urlBuffer, strlen(urlBuffer));
+ 
+#ifdef ESP8266
+  while(!client->available() && os.now_tz() < timeout) {
   }
+#endif
 
   bzero(ether_buffer, ETHER_BUFFER_SIZE);
-  while(client.available()) {
-    client.read((uint8_t*)ether_buffer, ETHER_BUFFER_SIZE);
+  
+#ifdef ESP8266
+  while(client->available()) {
+    client->read((uint8_t*)ether_buffer, ETHER_BUFFER_SIZE);
   }
-  client.stop();
+  client->stop();
+#ifdef ESP8266_ETHERNET
+  delete client;
+#endif
+#endif
   peel_http_header();
   getweather_callback(0, 0, ETHER_BUFFER_SIZE);
 #else

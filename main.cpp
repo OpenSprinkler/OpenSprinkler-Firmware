@@ -37,6 +37,16 @@
   #include "gpio.h"
   #include "espconnect.h"
   char ether_buffer[ETHER_BUFFER_SIZE];
+  
+#ifdef ESP8266_ETHERNET
+  #include "UIPServer.h"
+  #include "UIPClient.h"
+  #include "UIPEthernet.h"
+  UIPServer *m_server = 0;
+  UIPClient *m_client = 0;
+  UIPEthernetClass ether;
+#endif
+  
 #else
   #include <SdFat.h>
   byte Ethernet::buffer[ETHER_BUFFER_SIZE]; // Ethernet packet buffer
@@ -189,11 +199,15 @@ void ui_state_machine() {
   } else {
     return;
   }
+  
+  DEBUG_PRINT("UI_STATE=");
+  DEBUG_PRINTLN(ui_state);
 
   switch(ui_state) {
   case UI_STATE_DEFAULT:
     switch (button & BUTTON_MASK) {
     case BUTTON_1:
+      DEBUG_PRINTLN("BUTTON 1");
       if (button & BUTTON_FLAG_HOLD) {  // holding B1
         if (digitalReadExt(PIN_BUTTON_3)==0) { // if B3 is pressed while holding B1, run a short test (internal test)
           #ifdef ESP8266
@@ -204,7 +218,12 @@ void ui_state_machine() {
           #ifdef ESP8266
           os.lcd.clear(0, 1);
           os.lcd.setCursor(0, 0);
-          os.lcd.print(WiFi.gatewayIP());
+		  #ifdef ESP8266_ETHERNET
+		  if (m_server)
+			  os.lcd.print(ether.gatewayIP());
+		  else
+		  #endif
+            os.lcd.print(WiFi.gatewayIP());
           #else
           os.lcd.clear();
           os.lcd_print_ip(ether.gwip, 0);
@@ -222,7 +241,12 @@ void ui_state_machine() {
         #ifdef ESP8266
         os.lcd.clear(0, 1);        
         os.lcd.setCursor(0, 0);
-        os.lcd.print(WiFi.localIP());
+ 	    #ifdef ESP8266_ETHERNET
+		if (m_server)
+		    os.lcd.print(ether.localIP());
+		else
+		#endif
+          os.lcd.print(WiFi.localIP());
         os.lcd.setCursor(0, 1);
         os.lcd_print_pgm(PSTR(":"));
         uint16_t httpport = (uint16_t)(os.options[OPTION_HTTPPORT_1]<<8) + (uint16_t)os.options[OPTION_HTTPPORT_0];
@@ -239,6 +263,7 @@ void ui_state_machine() {
       }
       break;
     case BUTTON_2:
+      DEBUG_PRINTLN("BUTTON 2");
       if (button & BUTTON_FLAG_HOLD) {  // holding B2
         if (digitalReadExt(PIN_BUTTON_1)==0) { // if B1 is pressed while holding B2, display external IP
           os.lcd_print_ip((byte*)(&os.nvdata.external_ip), 1);
@@ -261,7 +286,14 @@ void ui_state_machine() {
         #ifdef ESP8266
         os.lcd.clear(0, 1);
         byte mac[6];
-        WiFi.macAddress(mac);
+	    #ifdef ESP8266_ETHERNET
+		if (m_server) {
+			os.get_hardware_mac();
+			memcpy(mac, tmp_buffer, 6);
+		}
+		else
+		  #endif
+          WiFi.macAddress(mac);
         os.lcd_print_mac(mac);
         #else
         os.lcd.clear();
@@ -271,6 +303,7 @@ void ui_state_machine() {
       }
       break;
     case BUTTON_3:
+      DEBUG_PRINTLN("BUTTON 3");
       if (button & BUTTON_FLAG_HOLD) {  // holding B3
         if (digitalReadExt(PIN_BUTTON_1)==0) {  // if B1 is pressed while holding B3, display up time
           os.lcd_print_time(os.powerup_lasttime);
@@ -422,6 +455,9 @@ void delete_log(char *name);
 void start_server_ap();
 void start_server_client();
 unsigned long reboot_timer = 0;
+#ifdef ESP8266_ETHERNET
+void handle_web_request(char *p);
+#endif
 #else
 void handle_web_request(char *p);
 #endif
@@ -516,6 +552,31 @@ void do_loop()
     }
     break;
   }
+	#if defined(ESP8266_ETHERNET)
+	if (m_server) {
+		ether.maintain();
+		UIPClient client = m_server->available();
+		if (client) {
+                  while (true) {
+                    int len = client.read((uint8_t*) ether_buffer, ETHER_BUFFER_SIZE);
+                    if (len <= 0) {
+                      if(!client.connected()) {
+                        break;
+                      } else {
+                        continue;
+                      }
+				  
+                    } else {
+                      m_client = &client;
+                      ether_buffer[len] = 0;  // put a zero at the end of the packet
+                      handle_web_request(ether_buffer);
+                      m_client= 0;
+                      break;
+                    }
+                  }
+		}
+	}
+    #endif
   
   #else // AVR
   
@@ -944,7 +1005,10 @@ void check_weather() {
   // - network check has failed, or
   // - the controller is in remote extension mode
   if (os.status.network_fails>0 || os.options[OPTION_REMOTE_EXT_MODE]) return;
-
+  
+#ifdef ESP8266_ETHERNET
+  if (!m_server)
+#endif
 #ifdef ESP8266
   if (os.get_wifi_mode()!=WIFI_MODE_STA || WiFi.status()!=WL_CONNECTED || os.state!=OS_STATE_CONNECTED) return;
 #endif
@@ -1277,9 +1341,20 @@ void push_message(byte type, uint32_t lval, float fval, const char* sval) {
         strcat_P(postval, PSTR("Rebooted. Device IP: "));
         #ifdef ESP8266
         {
+          #ifdef ESP8266_ETHERNET
+          IPAddress _ip;
+          if (m_server) {
+            _ip = ether.localIP();
+          } else {
+            _ip = WiFi.localIP();
+          }
+          byte ip[4] = {_ip[0], _ip[1], _ip[2], _ip[3]};
+          ip2string(postval, ip);
+          #else
           IPAddress _ip = WiFi.localIP();
           byte ip[4] = {_ip[0], _ip[1], _ip[2], _ip[3]};
           ip2string(postval, ip);
+          #endif
         }
         #else
         ip2string(postval, ether.myip);
@@ -1299,8 +1374,19 @@ void push_message(byte type, uint32_t lval, float fval, const char* sval) {
 #if defined(ARDUINO)
 
   #ifdef ESP8266
-  WiFiClient client;
-  if(!client.connect(server, 80)) return;
+  Client *client;
+  #ifdef ESP8266_ETHERNET
+  if (m_server)
+    client = new UIPClient();
+  else
+  #endif
+    client = new WiFiClient();
+  
+    
+  if(!client->connect(server, 80)) {
+    delete client;
+    return;
+  }
   
   char postBuffer[1500];
   sprintf(postBuffer, "POST /trigger/sprinkler/with/key/%s HTTP/1.0\r\n"
@@ -1309,18 +1395,19 @@ void push_message(byte type, uint32_t lval, float fval, const char* sval) {
                       "Content-Length: %d\r\n"
                       "Content-Type: application/json\r\n"
                       "\r\n%s", key, server, strlen(postval), postval);
-  client.write((uint8_t *)postBuffer, strlen(postBuffer));
+  client->write((uint8_t *)postBuffer, strlen(postBuffer));
 
   time_t timeout = os.now_tz() + 5; // 5 seconds timeout
-  while(!client.available() && os.now_tz() < timeout) {
+  while(!client->available() && os.now_tz() < timeout) {
   }
 
   bzero(ether_buffer, ETHER_BUFFER_SIZE);
   
-  while(client.available()) {
-    client.read((uint8_t*)ether_buffer, ETHER_BUFFER_SIZE);
+  while(client->available()) {
+    client->read((uint8_t*)ether_buffer, ETHER_BUFFER_SIZE);
   }
-  client.stop();
+  client->stop();
+  delete client;
   //DEBUG_PRINTLN(ether_buffer);
     
   #else
@@ -1643,6 +1730,10 @@ void perform_ntp_sync() {
   // do not perform sync if this option is disabled, or if network is not available, or if a program is running
   if (!os.options[OPTION_USE_NTP] || os.status.program_busy) return;
   #ifdef ESP8266
+  #ifdef ESP8266_ETHERNET
+  if (!m_server)
+  #endif
+  
   if (os.get_wifi_mode()!=WIFI_MODE_STA || WiFi.status()!=WL_CONNECTED || os.state!=OS_STATE_CONNECTED) return;
   #else
   if (os.status.network_fails>0) return;

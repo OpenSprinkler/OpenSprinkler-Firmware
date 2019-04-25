@@ -30,6 +30,18 @@
 #include "images.h"
 #include "testmode.h"
 
+#if defined(ESP8266_ETHERNET)
+#include "defines.h"
+#include "UIPEthernet.h"
+#include "UIPServer.h"
+#include <stdlib.h>
+#include "utils.h"
+#include "server.h"
+extern char ether_buffer[];
+extern UIPServer *m_server;
+extern UIPEthernetClass ether;
+#endif
+
 /** Declare static data members */
 NVConData OpenSprinkler::nvdata;
 ConStatus OpenSprinkler::status;
@@ -351,6 +363,12 @@ bool detect_i2c(int addr) {
 #define MAC_CTRL_ID 0x50
 bool OpenSprinkler::read_hardware_mac() {
 #ifdef ESP8266
+#ifdef ESP8266_ETHERNET
+  if (m_server) {
+    get_hardware_mac();
+    return true;
+  }
+#endif
   WiFi.macAddress((byte*)tmp_buffer);
   return true;
 #else
@@ -376,6 +394,24 @@ byte OpenSprinkler::start_network() {
 
 #ifdef ESP8266
 
+#ifdef ESP8266_ETHERNET
+  if(m_server)  {
+      delete m_server;
+      m_server = 0;
+  }
+
+  if (start_ether())
+  {
+    unsigned int port = (unsigned int)(options[OPTION_HTTPPORT_1]<<8) + (unsigned int)options[OPTION_HTTPPORT_0];
+//#if defined(DEMO)
+    port = 80;
+//#endif
+    m_server = new UIPServer(port);
+    m_server->begin();
+  }
+
+#endif
+
   lcd_print_line_clear_pgm(PSTR("Starting..."), 1);
   if(wifi_server) delete wifi_server;
   if(get_wifi_mode()==WIFI_MODE_AP) {
@@ -387,7 +423,37 @@ byte OpenSprinkler::start_network() {
   status.has_hwmac = 1;
   
 #else
+  return start_ether();
+#endif
+  return 1;
+}
 
+#if defined(ESP8266_ETHERNET)
+void OpenSprinkler::get_hardware_mac()
+{
+  tmp_buffer[0] = 0x00;
+  tmp_buffer[1] = 0x69;
+  tmp_buffer[2] = 0x69;
+  tmp_buffer[3] = 0x2D;
+  tmp_buffer[4] = 0x31;
+  tmp_buffer[5] = options[OPTION_DEVICE_ID];	
+}
+
+byte OpenSprinkler::start_ether()
+{
+  lcd_print_line_clear_pgm(PSTR("init ethernet..."), 1);
+  
+  ether.init(PIN_ETHER_CS);
+  get_hardware_mac();
+  lcd_print_line_clear_pgm(PSTR("setup link..."), 1);
+  if(!ether.begin((uint8_t*)tmp_buffer))  return 0;
+  lcd_print_line_clear_pgm(PSTR("waiting link..."), 1);
+  if(ether.linkStatus() != LinkON) return 0;
+  return 1;
+}
+#else
+byte OpenSprinkler::start_ether()
+{
   lcd_print_line_clear_pgm(PSTR("Connecting..."), 1);
   // new from 2.2: read hardware MAC
   if(!read_hardware_mac())
@@ -425,9 +491,9 @@ byte OpenSprinkler::start_network() {
     byte *dns      = options+OPTION_DNS_IP1;
     if (!ether.staticSetup(staticip, gateway, dns))  return 0;
   }
-#endif
   return 1;
 }
+#endif
 
 /** Reboot controller */
 void OpenSprinkler::reboot_dev() {
@@ -536,6 +602,7 @@ void OpenSprinkler::begin() {
   
   /* detect hardware revision type */
   if(detect_i2c(MAIN_I2CADDR)) {  // check if main PCF8574 exists
+    DEBUG_PRINTLN("PCF8574 detected");
     /* assign revision 0 pins */
     PIN_BUTTON_1 = V0_PIN_BUTTON_1;
     PIN_BUTTON_2 = V0_PIN_BUTTON_2;

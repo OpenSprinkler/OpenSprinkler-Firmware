@@ -172,9 +172,13 @@ public:
   static void reboot_dev();   // reboot the microcontroller
   static void begin();        // initialization, must call this function before calling other functions
   static byte start_network();  // initialize network with the given mac and port
+  static byte start_ether();  // initialize ethernet with the given mac and port
 #if defined(ARDUINO)
   static bool read_hardware_mac();  // read hardware mac address
 #endif
+  #ifdef ESP8266_ETHERNET
+  static void get_hardware_mac();
+  #endif
   static time_t now_tz();
   // -- station names and attributes
   static void get_station_name(byte sid, char buf[]); // get station name

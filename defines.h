@@ -24,6 +24,8 @@
 #ifndef _DEFINES_H
 #define _DEFINES_H
 
+#define ESP8266_ETHERNET
+
 typedef unsigned char byte;
 typedef unsigned long ulong;
 
@@ -376,6 +378,8 @@ typedef enum {
     #define PIN_CURR_SENSE    A0
     #define PIN_FREE_LIST     {} // no free GPIO pin at the moment
     #define ETHER_BUFFER_SIZE   4096
+
+    #define PIN_ETHER_CS       16   // Ethernet controller chip select pin, the CS (chip select pin) is 16 on OS 3.2.
 
     /* To accommodate different OS30 versions, we use software defines pins */ 
     extern byte PIN_BUTTON_1;
