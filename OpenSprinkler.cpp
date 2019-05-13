@@ -20,27 +20,12 @@
  * along with this program.  If not, see
  * <http://www.gnu.org/licenses/>.
  */
-#if !defined(ARDUINO)
-#include <netdb.h>
-#endif
 
 #include "OpenSprinkler.h"
 #include "server.h"
 #include "gpio.h"
 #include "images.h"
 #include "testmode.h"
-
-#if defined(ESP8266_ETHERNET)
-#include "defines.h"
-#include "UIPEthernet.h"
-#include "UIPServer.h"
-#include <stdlib.h>
-#include "utils.h"
-#include "server.h"
-extern char ether_buffer[];
-extern UIPServer *m_server;
-extern UIPEthernetClass ether;
-#endif
 
 /** Declare static data members */
 NVConData OpenSprinkler::nvdata;
@@ -73,7 +58,7 @@ char tmp_buffer[TMP_BUFFER_SIZE+1];       // scratch buffer
 const char wtopts_filename[] PROGMEM = WEATHER_OPTS_FILENAME;
 const char stns_filename[]   PROGMEM = STATION_ATTR_FILENAME;
 const char ifkey_filename[]  PROGMEM = IFTTT_KEY_FILENAME;
-#ifdef ESP8266
+#if defined(ESP8266)
 const char wifi_filename[]   PROGMEM = WIFI_FILENAME;
 byte OpenSprinkler::state = OS_STATE_INITIAL;
 byte OpenSprinkler::prev_station_bits[MAX_EXT_BOARDS+1];
@@ -83,6 +68,7 @@ IOEXP* OpenSprinkler::mainio;
 IOEXP* OpenSprinkler::drio;
 RCSwitch OpenSprinkler::rfswitch;
 extern ESP8266WebServer *wifi_server;
+extern EthernetServer *m_server;
 extern char ether_buffer[];
 #endif
 
@@ -361,65 +347,56 @@ bool detect_i2c(int addr) {
 
 /** read hardware MAC */
 #define MAC_CTRL_ID 0x50
-bool OpenSprinkler::read_hardware_mac() {
-#ifdef ESP8266
-#ifdef ESP8266_ETHERNET
-  if (m_server) {
-    get_hardware_mac();
-    return true;
-  }
-#endif
-  WiFi.macAddress((byte*)tmp_buffer);
+bool OpenSprinkler::load_hardware_mac(uint8_t* buffer, bool wired) {
+#if defined(ESP8266)
+  WiFi.macAddress((byte*)buffer);
+  // if requesting wired Ethernet MAC, flip the last byte to create a modified MAC
+  if(wired) buffer[5] = ~buffer[5];
   return true;
 #else
-  uint8_t ret;
-  ret = detect_i2c(MAC_CTRL_ID);
-  if (ret)  return false;
+	// initialize the buffer by assigning software mac
+	buffer[0] = 0x00;
+ 	buffer[1] = 0x69;
+  buffer[2] = 0x69;
+  buffer[3] = 0x2D;
+  buffer[4] = 0x31;
+  buffer[5] = options[OPTION_DEVICE_ID];
+  if (detect_i2c(MAC_CTRL_ID)==false)	return false;
 
-  Wire.beginTransmission(MAC_CTRL_ID);
-  Wire.write(0xFA); // The address of the register we want
-  Wire.endTransmission(); // Send the data
-  if(Wire.requestFrom(MAC_CTRL_ID, 6) != 6) return false; // Request 6 bytes from the EEPROM
-  for (ret=0;ret<6;ret++) {
-    tmp_buffer[ret] = Wire.read();
-  }
-  return true;
+	Wire.beginTransmission(MAC_CTRL_ID);
+	Wire.write(0xFA); // The address of the register we want
+	Wire.endTransmission(); // Send the data
+	if(Wire.requestFrom(MAC_CTRL_ID, 6) != 6) return false;	// if not enough data, return false
+	for (ret=0;ret<6;ret++) {
+	  buffer[ret] = Wire.read();
+	}
+	return true;
 #endif
 }
 
 void(* resetFunc) (void) = 0; // AVR software reset function
 
-/** Initialize network with the given mac address and http port */
+/** Initialize network connection */
 byte OpenSprinkler::start_network() {
-
-#ifdef ESP8266
-
-#ifdef ESP8266_ETHERNET
-  if(m_server)  {
-      delete m_server;
-      m_server = 0;
-  }
-
-  if (start_ether())
-  {
-    unsigned int port = (unsigned int)(options[OPTION_HTTPPORT_1]<<8) + (unsigned int)options[OPTION_HTTPPORT_0];
-//#if defined(DEMO)
-    port = 80;
-//#endif
-    m_server = new UIPServer(port);
-    m_server->begin();
-  }
-
-#endif
-
+#if defined(ESP8266)
   lcd_print_line_clear_pgm(PSTR("Starting..."), 1);
-  if(wifi_server) delete wifi_server;
-  if(get_wifi_mode()==WIFI_MODE_AP) {
-    wifi_server = new ESP8266WebServer(80);
+
+	uint16_t httpport = (uint16_t)(options[OPTION_HTTPPORT_1]<<8) + (uint16_t)options[OPTION_HTTPPORT_0];
+  if(m_server)  { delete m_server; m_server = 0; }
+  if (start_ether()) {
+    m_server = new EthernetServer(httpport);
+    m_server->begin();
+  	// todo: add option to keep both ether and wifi active
+    WiFi.mode(WIFI_OFF);
   } else {
-    uint16_t httpport = (uint16_t)(options[OPTION_HTTPPORT_1]<<8) + (uint16_t)options[OPTION_HTTPPORT_0];
-    wifi_server = new ESP8266WebServer(httpport);
-  }
+		if(wifi_server) { delete wifi_server; wifi_server = 0; }
+		if(get_wifi_mode()==WIFI_MODE_AP) {
+			wifi_server = new ESP8266WebServer(80);
+		} else {
+			wifi_server = new ESP8266WebServer(httpport);
+		}
+	}
+	
   status.has_hwmac = 1;
   
 #else
@@ -428,44 +405,38 @@ byte OpenSprinkler::start_network() {
   return 1;
 }
 
-#if defined(ESP8266_ETHERNET)
-void OpenSprinkler::get_hardware_mac()
-{
-  tmp_buffer[0] = 0x00;
-  tmp_buffer[1] = 0x69;
-  tmp_buffer[2] = 0x69;
-  tmp_buffer[3] = 0x2D;
-  tmp_buffer[4] = 0x31;
-  tmp_buffer[5] = options[OPTION_DEVICE_ID];	
-}
+#if defined(ESP8266)
+byte OpenSprinkler::start_ether() {
+	if(hw_rev<2) return 0;	// ethernet capability is only available after hw_rev 2
+	Ethernet.init(PIN_ETHER_CS);	// make sure to call this before any Ethernet calls
+  load_hardware_mac((uint8_t*)tmp_buffer, true);
+	// detect if Enc28J60 exists
+	Enc28J60Network::init((uint8_t*)tmp_buffer);
+	uint8_t erevid = Enc28J60Network::geterevid();
+	// a valid chip must have erevid > 0 and < 255
+	if(erevid==0 || erevid==255) return 0;
 
-byte OpenSprinkler::start_ether()
-{
-  lcd_print_line_clear_pgm(PSTR("init ethernet..."), 1);
+  lcd_print_line_clear_pgm(PSTR("Start wired link"), 1);
   
-  ether.init(PIN_ETHER_CS);
-  get_hardware_mac();
-  lcd_print_line_clear_pgm(PSTR("setup link..."), 1);
-  if(!ether.begin((uint8_t*)tmp_buffer))  return 0;
-  lcd_print_line_clear_pgm(PSTR("waiting link..."), 1);
-  if(ether.linkStatus() != LinkON) return 0;
+  if (options[OPTION_USE_DHCP]) {
+	  if(!Ethernet.begin((uint8_t*)tmp_buffer))	return 0;
+    memcpy(options+OPTION_STATIC_IP1, &(Ethernet.localIP()[0]), 4);
+    memcpy(options+OPTION_GATEWAY_IP1, &(Ethernet.gatewayIP()[0]),4);
+    memcpy(options+OPTION_DNS_IP1, &(Ethernet.dnsServerIP()[0]), 4);	  
+  } else {
+    IPAddress staticip(options+OPTION_STATIC_IP1);
+    IPAddress gateway(options+OPTION_GATEWAY_IP1);
+    IPAddress dns(options+OPTION_DNS_IP1);  
+  	Ethernet.begin((uint8_t*)tmp_buffer, staticip, dns, gateway);
+  }
+  if(Ethernet.linkStatus() != LinkON) return 0;
   return 1;
 }
 #else
-byte OpenSprinkler::start_ether()
-{
+byte OpenSprinkler::start_ether() {
   lcd_print_line_clear_pgm(PSTR("Connecting..."), 1);
   // new from 2.2: read hardware MAC
-  if(!read_hardware_mac())
-  {
-    // if no hardware MAC exists, use software MAC
-    tmp_buffer[0] = 0x00;
-    tmp_buffer[1] = 0x69;
-    tmp_buffer[2] = 0x69;
-    tmp_buffer[3] = 0x2D;
-    tmp_buffer[4] = 0x31;
-    tmp_buffer[5] = options[OPTION_DEVICE_ID];
-  } else {
+  if(load_hardware_mac((uint8_t*)tmp_buffer)) {
     // has hardware MAC chip
     status.has_hwmac = 1;
   }
@@ -602,7 +573,6 @@ void OpenSprinkler::begin() {
   
   /* detect hardware revision type */
   if(detect_i2c(MAIN_I2CADDR)) {  // check if main PCF8574 exists
-    DEBUG_PRINTLN("PCF8574 detected");
     /* assign revision 0 pins */
     PIN_BUTTON_1 = V0_PIN_BUTTON_1;
     PIN_BUTTON_2 = V0_PIN_BUTTON_2;
@@ -904,6 +874,8 @@ void OpenSprinkler::begin() {
     lcd.createChar(5, _iconimage_remotext);
     lcd.createChar(6, _iconimage_flow);
     lcd.createChar(7, _iconimage_pswitch);
+    lcd.createChar(8, _iconimage_ether_connected);
+    lcd.createChar(9, _iconimage_ether_disconnected);
     
     lcd.setCursor(0,0);
     lcd.print(F("Init file system"));
@@ -1530,8 +1502,19 @@ void OpenSprinkler::switch_remotestation(RemoteStationData *data, bool turnon) {
   ulong port = hex2ulong(data->port, sizeof(data->port));
 
   #ifdef ESP8266
-  WiFiClient client;
+	Client *client;
+	if(m_server)    
+	  client = new EthernetClient();
+	else
+		client = new WiFiClient();
   
+  byte cip[4];
+  cip[0] = ip>>24;
+  cip[1] = (ip>>16)&0xff;
+  cip[2] = (ip>>8)&0xff;
+  cip[3] = ip&0xff;
+  if(!client->connect(IPAddress(cip), port))	{delete client; return;}
+
   char *p = tmp_buffer + sizeof(RemoteStationData) + 1;
   BufferFiller bf = p;
   // MAX_NUM_STATIONS is the refresh cycle
@@ -1541,27 +1524,21 @@ void OpenSprinkler::switch_remotestation(RemoteStationData *data, bool turnon) {
             (int)hex2ulong(data->sid, sizeof(data->sid)),
             turnon, timer);
   bf.emit_p(PSTR(" HTTP/1.0\r\nHOST: *\r\n\r\n"));
-  
-  byte cip[4];
-  cip[0] = ip>>24;
-  cip[1] = (ip>>16)&0xff;
-  cip[2] = (ip>>8)&0xff;
-  cip[3] = ip&0xff;
 
-  if(!client.connect(IPAddress(cip), port))  return;
-  client.write((uint8_t *)p, strlen(p));
-  
-  bzero(ether_buffer, ETHER_BUFFER_SIZE);
-  
   time_t timeout = now_tz() + 5; // 5 seconds timeout
-  while(!client.available() && now_tz() < timeout) {
+  client->write((uint8_t *)p, strlen(p));
+
+  while(!client->available() && now_tz() < timeout) {
+  	yield();
   }
 
   bzero(ether_buffer, ETHER_BUFFER_SIZE);
-  while(client.available()) {
-    client.read((uint8_t*)ether_buffer, ETHER_BUFFER_SIZE);
+  while(client->available()) {
+    client->read((uint8_t*)ether_buffer, ETHER_BUFFER_SIZE);
+    yield();
   }
-  client.stop();
+  client->stop();
+  delete client;
   //httpget_callback(0, 0, ETHER_BUFFER_SIZE);  
   
   #else
@@ -1651,28 +1628,34 @@ void OpenSprinkler::switch_httpstation(HTTPStationData *data, bool turnon) {
 #if defined(ARDUINO)
 
   #ifdef ESP8266
-  
-  WiFiClient client;
-  if(!client.connect(server, atoi(port))) return;
+	Client *client;
+	if (m_server)
+		client = new EthernetClient();
+	else
+  	client = new WiFiClient();
+  	
+  if(!client->connect(server, atoi(port))) {delete client; return;}
   
   char getBuffer[255];
   sprintf(getBuffer, "GET /%s HTTP/1.0\r\nHOST: *\r\n\r\n", cmd);
   
   DEBUG_PRINTLN(getBuffer);
   
-  client.write((uint8_t *)getBuffer, strlen(getBuffer));
-  
-  bzero(ether_buffer, ETHER_BUFFER_SIZE);
-  
   time_t timeout = now_tz() + 5; // 5 seconds timeout
-  while(!client.available() && now_tz() < timeout) {
+  client->write((uint8_t *)getBuffer, strlen(getBuffer));
+
+  while(!client->available() && now_tz() < timeout) {
+  	yield();
   }
 
   bzero(ether_buffer, ETHER_BUFFER_SIZE);
-  while(client.available()) {
-    client.read((uint8_t*)ether_buffer, ETHER_BUFFER_SIZE);
+  while(client->available()) {
+    client->read((uint8_t*)ether_buffer, ETHER_BUFFER_SIZE);
+    yield();
   }
-  client.stop();
+  
+  client->stop();
+  delete client;
   
   #else
   
@@ -1738,7 +1721,7 @@ void OpenSprinkler::switch_httpstation(HTTPStationData *data, bool turnon) {
 void OpenSprinkler::options_setup() {
 
   // add 0.25 second delay to allow nvm to stablize
-  delay(250);
+  delay(50);
 
   byte curr_ver = nvm_read_byte((byte*)(ADDR_NVM_OPTIONS+OPTION_FW_VERSION));
   
@@ -1755,8 +1738,8 @@ void OpenSprinkler::options_setup() {
     int i, sn;
 
 #ifdef ESP8266
-    //if(curr_ver!=0) // if SPIFFS has been written before, perform a full format
-    SPIFFS.format();  // perform a SPIFFS format
+    if(curr_ver>216 && curr_ver<250) // if a previous firmware has been written to flash
+    	SPIFFS.format();  // perform a SPIFFS format
 #endif
     // 0. wipe out nvm
     for(i=0;i<TMP_BUFFER_SIZE;i++) tmp_buffer[i]=0;
@@ -1800,7 +1783,7 @@ void OpenSprinkler::options_setup() {
     nvm_write_block(tmp_buffer, (void*)ADDR_NVM_MAS_OP, MAX_EXT_BOARDS+1);
     nvm_write_block(tmp_buffer, (void*)ADDR_NVM_STNSEQ, MAX_EXT_BOARDS+1);
 
-#ifndef ESP8266 // for ESP8266, the flash format will erase all files
+#if !defined(ESP8266) // for ESP8266, the flash format will erase all files
     // 5. delete sd file
     remove_file(wtopts_filename);
     remove_file(ifkey_filename);
@@ -1887,8 +1870,8 @@ void OpenSprinkler::options_setup() {
   if (!button) {
     // flash screen
     lcd_print_line_clear_pgm(PSTR(" OpenSprinkler"),0);
-    lcd.setCursor((hw_type==HW_TYPE_LATCH)?2:4, 1);
-    lcd_print_pgm(PSTR("v"));
+    lcd.setCursor(2, 1);
+    lcd_print_pgm((hw_type==HW_TYPE_LATCH)?PSTR("v"):PSTR("  v"));
     byte hwv = options[OPTION_HW_VERSION];
     lcd.print((char)('0'+(hwv/10)));
     lcd.print('.');
@@ -1899,15 +1882,15 @@ void OpenSprinkler::options_setup() {
     #endif
     switch(hw_type) {
     case HW_TYPE_DC:
-      lcd_print_pgm(PSTR(" DC"));
+      lcd_print_pgm(PSTR(" DC "));
       break;
     case HW_TYPE_LATCH:
       lcd_print_pgm(PSTR(" LATCH"));
       break;
     default:
-      lcd_print_pgm(PSTR(" AC"));
+      lcd_print_pgm(PSTR(" AC "));
     }
-    delay(1500);
+    delay(1000);
     #ifdef ESP8266
     lcd.setCursor(2, 1);
     lcd_print_pgm(PSTR("FW "));
@@ -2091,7 +2074,15 @@ void OpenSprinkler::lcd_print_mac(const byte *mac) {
     lcd.print((mac[i]&0x0F), HEX);
     if(i==4) lcd.setCursor(0, 1);
   }
-  lcd_print_pgm(PSTR(" (MAC)"));
+#if defined(ESP8266)
+	if(m_server) {
+	  lcd_print_pgm(PSTR(" (Ether MAC)"));
+	} else {
+		lcd_print_pgm(PSTR(" (WiFi MAC)"));
+	}
+#else
+  lcd_print_pgm(PSTR(" (MAC)"));	
+#endif  
 }
 
 /** print station bits */
@@ -2143,7 +2134,10 @@ void OpenSprinkler::lcd_print_station(byte line, char c) {
 
 	lcd.setCursor(15, 1);
 	#ifdef ESP8266
-	lcd.write(WiFi.status()==WL_CONNECTED?0:1);
+	if(m_server)
+		lcd.write(Ethernet.linkStatus()==LinkON?8:9);
+	else
+		lcd.write(WiFi.status()==WL_CONNECTED?0:1);
 	#else
   lcd.write(status.network_fails>2?1:0);  // if network failure detection is more than 2, display disconnect icon
   #endif
@@ -2411,7 +2405,7 @@ void OpenSprinkler::flash_screen() {
   lcd.drawXbm(34, 24, WiFi_Logo_width, WiFi_Logo_height, (const byte*) WiFi_Logo_image);
   lcd.setCursor(0, 2);  
   lcd.display();
-  delay(1500);
+  delay(1000);
   lcd.clear();
   lcd.display();
 }

@@ -21,8 +21,14 @@
  * <http://www.gnu.org/licenses/>. 
  */
 
+#include "OpenSprinkler.h"
+#include "utils.h"
+#include "server.h"
+#include "weather.h"
+
 #if defined(ARDUINO)
   #ifdef ESP8266
+  extern EthernetServer *m_server;
   extern char ether_buffer[];
   #endif
 #else
@@ -35,24 +41,10 @@ extern char ether_buffer[];
 
 extern const char wtopts_filename[];
 
-#include "OpenSprinkler.h"
-#include "utils.h"
-#include "server.h"
-#include "weather.h"
-
 extern OpenSprinkler os; // OpenSprinkler object
 extern char tmp_buffer[];
 byte findKeyVal (const char *str,char *strbuf, uint8_t maxlen,const char *key,bool key_in_pgm=false,uint8_t *keyfound=NULL);
 void write_log(byte type, ulong curr_time);
-
-#ifdef ESP8266_ETHERNET
-#include <Client.h>
-#include "UIPClient.h"
-#include "UIPServer.h"
-#include "UIPEthernet.h"
-extern UIPServer *m_server;
-extern UIPEthernetClass ether;
-#endif
 
 // The weather function calls getweather.py on remote server to retrieve weather data
 // the default script is WEATHER_SCRIPT_HOST/weather?.py
@@ -167,27 +159,17 @@ void GetWeather() {
   // perform DNS lookup for every query
   nvm_read_block(tmp_buffer, (void*)ADDR_NVM_WEATHERURL, MAX_WEATHERURL);
 
-#ifdef ESP8266_ETHERNET
+#if defined(ESP8266)
   Client *client;
   if (m_server) {
-    UIPClient *uipclient = new UIPClient();
-    uipclient->connect(tmp_buffer, 80);
-    client = uipclient;
+    client = new EthernetClient();
   } else {
     if (os.state!=OS_STATE_CONNECTED || WiFi.status()!=WL_CONNECTED) return;
-    WiFiClient *wificlient = new WiFiClient();
-    wificlient->connect(tmp_buffer, 80);
-    client = wificlient;
+    client = new WiFiClient();
   }
-#else
-#ifdef ESP8266
-  if (os.state!=OS_STATE_CONNECTED || WiFi.status()!=WL_CONNECTED) return;
-  WiFiClient wificlient;
-  if(!wificlient.connect(tmp_buffer, 80))  return;
-  client = &wificlient;
+  client->connect(tmp_buffer, 80); 
 #else
   ether.dnsLookup(tmp_buffer, true);
-#endif
 #endif
 
   char tmp[60];
@@ -229,25 +211,22 @@ void GetWeather() {
   strcat(urlBuffer, " HTTP/1.0\r\nHOST: ");
   strcat(urlBuffer, "*\r\n\r\n");
 
-  time_t timeout = os.now_tz() + 5; // 5 seconds timeout
+  time_t timeout = os.now_tz() + 5; // 5 seconds timeout  
   client->write((uint8_t *)urlBuffer, strlen(urlBuffer));
- 
-#ifdef ESP8266
+
   while(!client->available() && os.now_tz() < timeout) {
+  	yield();
   }
-#endif
 
   bzero(ether_buffer, ETHER_BUFFER_SIZE);
   
-#ifdef ESP8266
   while(client->available()) {
     client->read((uint8_t*)ether_buffer, ETHER_BUFFER_SIZE);
+    yield();
   }
   client->stop();
-#ifdef ESP8266_ETHERNET
   delete client;
-#endif
-#endif
+
   peel_http_header();
   getweather_callback(0, 0, ETHER_BUFFER_SIZE);
 #else
