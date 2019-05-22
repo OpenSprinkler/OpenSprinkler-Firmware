@@ -38,7 +38,7 @@ typedef unsigned long ulong;
                             // if this number is different from the one stored in non-volatile memory
                             // a device reset will be automatically triggered
 
-#define OS_FW_MINOR      3  // Firmware minor version
+#define OS_FW_MINOR      4  // Firmware minor version
 
 /** Hardware version base numbers */
 #define OS_HW_VERSION_BASE   0x00
@@ -374,8 +374,10 @@ typedef enum {
     #define LCD_I2CADDR      0x3C // 128x64 OLED display I2C address
 
     #define PIN_CURR_SENSE    A0
-    #define PIN_FREE_LIST     {} // no free GPIO pin at the moment
+    #define PIN_FREE_LIST     {}  // no free GPIO pin at the moment
     #define ETHER_BUFFER_SIZE   4096
+
+    #define PIN_ETHER_CS       16 // ENC28J60 CS (chip select pin) is 16 on OS 3.2.
 
     /* To accommodate different OS30 versions, we use software defines pins */ 
     extern byte PIN_BUTTON_1;
@@ -495,13 +497,14 @@ typedef enum {
     #define ETHER_BUFFER_SIZE   16384
   #endif
 
-  #define ENABLE_DEBUG
+  //#define ENABLE_DEBUG 
   #if defined(ENABLE_DEBUG)
     #if defined(ESP8266)
       #define DEBUG_BEGIN(x)   Serial.begin(x)
       #define DEBUG_PRINT(x)   Serial.print(x)
       #define DEBUG_PRINTLN(x) Serial.println(x)
     #else
+    	#include <stdio.h>
       #define DEBUG_BEGIN(x)          {}  /** Serial debug functions */
       inline  void DEBUG_PRINT(int x) {printf("%d", x);}
       inline  void DEBUG_PRINT(const char*s) {printf("%s", s);}
@@ -515,6 +518,8 @@ typedef enum {
 
   /** Re-define avr-specific (e.g. PGM) types to use standard types */
   #if !defined(ESP8266)
+  	#include <stdio.h>
+  	#include <string.h>
     inline void itoa(int v,char *s,int b)   {sprintf(s,"%d",v);}
     inline void ultoa(unsigned long v,char *s,int b) {sprintf(s,"%lu",v);}
     #define now()       time(0)

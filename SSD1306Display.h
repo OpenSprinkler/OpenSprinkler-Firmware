@@ -10,13 +10,14 @@
 
 #define LCD_STD 0     // Standard LCD
 #define LCD_I2C 1
+#define MAX_CUSTOM_CHARS	10
 
 class SSD1306Display : public SSD1306{
 public:
   SSD1306Display(uint8_t _addr, uint8_t _sda, uint8_t _scl) : SSD1306(_addr, _sda, _scl) {
     cx = 0;
     cy = 0;
-    for(byte i=0;i<8;i++) custom_chars[i]=NULL;
+    for(byte i=0;i<MAX_CUSTOM_CHARS;i++) custom_chars[i]=NULL;
   }
   void begin() {
     Wire.setClock(400000L); // lower clock to 400kHz
@@ -50,7 +51,7 @@ public:
     fillRect(cx, cy, fontWidth, fontHeight);
     setColor(WHITE);
 
-    if(c<8 && custom_chars[c]!=NULL) {
+    if(c<MAX_CUSTOM_CHARS && custom_chars[c]!=NULL) {
       drawXbm(cx, cy, fontWidth, fontHeight, (const byte*) custom_chars[c]);
     } else {
       drawString(cx, cy, String((char)c));
@@ -70,12 +71,12 @@ public:
     return nc;
   }
   void createChar(byte idx, PGM_P ptr) {
-    if(idx>=0&&idx<8) custom_chars[idx]=ptr;
+    if(idx>=0&&idx<MAX_CUSTOM_CHARS) custom_chars[idx]=ptr;
   }
 private:
   uint8_t cx, cy;
   uint8_t fontWidth, fontHeight;
-  PGM_P custom_chars[8];
+  PGM_P custom_chars[MAX_CUSTOM_CHARS];
 };
 
 #endif

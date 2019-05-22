@@ -21,8 +21,14 @@
  * <http://www.gnu.org/licenses/>. 
  */
 
+#include "OpenSprinkler.h"
+#include "utils.h"
+#include "server.h"
+#include "weather.h"
+
 #if defined(ARDUINO)
   #ifdef ESP8266
+  extern EthernetServer *m_server;
   extern char ether_buffer[];
   #endif
 #else
@@ -34,11 +40,6 @@ extern char ether_buffer[];
 #endif
 
 extern const char wtopts_filename[];
-
-#include "OpenSprinkler.h"
-#include "utils.h"
-#include "server.h"
-#include "weather.h"
 
 extern OpenSprinkler os; // OpenSprinkler object
 extern char tmp_buffer[];
@@ -158,10 +159,15 @@ void GetWeather() {
   // perform DNS lookup for every query
   nvm_read_block(tmp_buffer, (void*)ADDR_NVM_WEATHERURL, MAX_WEATHERURL);
 
-#ifdef ESP8266
-  if (os.state!=OS_STATE_CONNECTED || WiFi.status()!=WL_CONNECTED) return;
-  WiFiClient client;
-  if(!client.connect(tmp_buffer, 80))  return;
+#if defined(ESP8266)
+  Client *client;
+  if (m_server) {
+    client = new EthernetClient();
+  } else {
+    if (os.state!=OS_STATE_CONNECTED || WiFi.status()!=WL_CONNECTED) return;
+    client = new WiFiClient();
+  }
+  client->connect(tmp_buffer, 80); 
 #else
   ether.dnsLookup(tmp_buffer, true);
 #endif
@@ -204,18 +210,23 @@ void GetWeather() {
   strcat(urlBuffer, dst);
   strcat(urlBuffer, " HTTP/1.0\r\nHOST: ");
   strcat(urlBuffer, "*\r\n\r\n");
-  
-  client.write((uint8_t *)urlBuffer, strlen(urlBuffer));
-  
-  time_t timeout = os.now_tz() + 5; // 5 seconds timeout
-  while(!client.available() && os.now_tz() < timeout) {
+
+  time_t timeout = os.now_tz() + 5; // 5 seconds timeout  
+  client->write((uint8_t *)urlBuffer, strlen(urlBuffer));
+
+  while(!client->available() && os.now_tz() < timeout) {
+  	yield();
   }
 
   bzero(ether_buffer, ETHER_BUFFER_SIZE);
-  while(client.available()) {
-    client.read((uint8_t*)ether_buffer, ETHER_BUFFER_SIZE);
+  
+  while(client->available()) {
+    client->read((uint8_t*)ether_buffer, ETHER_BUFFER_SIZE);
+    yield();
   }
-  client.stop();
+  client->stop();
+  delete client;
+
   peel_http_header();
   getweather_callback(0, 0, ETHER_BUFFER_SIZE);
 #else

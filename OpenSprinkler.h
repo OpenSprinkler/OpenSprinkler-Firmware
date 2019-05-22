@@ -25,6 +25,10 @@
 #ifndef _OPENSPRINKLER_H
 #define _OPENSPRINKLER_H
 
+#include "defines.h"
+#include "utils.h"
+#include "gpio.h"
+
 #if defined(ARDUINO) && !defined(ESP8266) // headers for AVR
   #include "Arduino.h"
   #include <avr/eeprom.h>
@@ -37,6 +41,8 @@
   #include <Wire.h>
   #include <FS.h>
   #include <RCSwitch.h>
+	#include <stdlib.h>
+	#include <UIPEthernet.h>
   #include "SSD1306Display.h"
   #include "i2crtc.h"
   #include "espconnect.h"
@@ -44,12 +50,9 @@
   #include <time.h>
   #include <string.h>
   #include <unistd.h>
+  #include <netdb.h>
   #include "etherport.h"
 #endif // end of headers
-
-#include "defines.h"
-#include "utils.h"
-#include "gpio.h"
   
 /** Non-volatile data */
 struct NVConData {
@@ -128,12 +131,11 @@ extern const char wifi_filename[];
 
 class OpenSprinkler {
 public:
-
   // data members
 #if defined(ARDUINO) && !defined(ESP8266)
   static LiquidCrystal lcd; // 16x2 character LCD
 #elif defined(ESP8266)
-  static SSD1306Display lcd;  // 128x64 OLED display
+  static SSD1306Display lcd;// 128x64 OLED display
 #else
   // todo: LCD define for RPI/BBB
 #endif
@@ -147,8 +149,8 @@ public:
   static ConStatus status;
   static ConStatus old_status;
   static byte nboards, nstations;
-  static byte hw_type;  // hardware type
-  static byte hw_rev; // hardware minor    
+  static byte hw_type;// hardware type
+  static byte hw_rev; // hardware minor
   
   static byte options[];  // option values, max, name, and flag
 
@@ -172,8 +174,9 @@ public:
   static void reboot_dev();   // reboot the microcontroller
   static void begin();        // initialization, must call this function before calling other functions
   static byte start_network();  // initialize network with the given mac and port
+  static byte start_ether();  // initialize ethernet with the given mac and port
 #if defined(ARDUINO)
-  static bool read_hardware_mac();  // read hardware mac address
+  static bool load_hardware_mac(uint8_t*, bool wired=false);  // read hardware mac address
 #endif
   static time_t now_tz();
   // -- station names and attributes

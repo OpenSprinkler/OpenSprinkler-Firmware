@@ -11,7 +11,7 @@
 //
 // 2010-05-20 <jc@wippler.nl>
 
-#ifndef ESP8266
+#if !defined(ESP8266)
 
 #include "EtherCard.h"
 #include "net.h"

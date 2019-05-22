@@ -36,7 +36,11 @@
   #include <FS.h>
   #include "gpio.h"
   #include "espconnect.h"
+	static uint16_t led_blink_ms = LED_FAST_BLINK;  
   char ether_buffer[ETHER_BUFFER_SIZE];
+	ESP8266WebServer *wifi_server = NULL;
+  EthernetServer *m_server = 0;
+  EthernetClient *m_client = 0;
 #else
   #include <SdFat.h>
   byte Ethernet::buffer[ETHER_BUFFER_SIZE]; // Ethernet packet buffer
@@ -76,10 +80,6 @@ void httpget_callback(byte, uint16_t, uint16_t);
 
 extern char tmp_buffer[];       // scratch buffer
 
-#ifdef ESP8266
-ESP8266WebServer *wifi_server = NULL;
-static uint16_t led_blink_ms = LED_FAST_BLINK;
-#endif
 // ====== Object defines ======
 OpenSprinkler os; // OpenSprinkler object
 ProgramData pd;   // ProgramdData object
@@ -125,7 +125,6 @@ void flow_poll() {
 volatile byte flow_isr_flag = false;
 /** Flow sensor interrupt service routine */
 #ifdef ESP8266
-
 ICACHE_RAM_ATTR void flow_isr() // for ESP8266, ISR must be marked ICACHE_RAM_ATTR
 #else
 void flow_isr()
@@ -189,7 +188,7 @@ void ui_state_machine() {
   } else {
     return;
   }
-
+  
   switch(ui_state) {
   case UI_STATE_DEFAULT:
     switch (button & BUTTON_MASK) {
@@ -203,8 +202,12 @@ void ui_state_machine() {
         } else if (digitalReadExt(PIN_BUTTON_2)==0) { // if B2 is pressed while holding B1, display gateway IP
           #ifdef ESP8266
           os.lcd.clear(0, 1);
-          os.lcd.setCursor(0, 0);
-          os.lcd.print(WiFi.gatewayIP());
+					os.lcd.setCursor(0, 0);
+					if (m_server) {
+						os.lcd.print(Ethernet.gatewayIP());
+					} else {
+            os.lcd.print(WiFi.gatewayIP());
+          }
           #else
           os.lcd.clear();
           os.lcd_print_ip(ether.gwip, 0);
@@ -222,7 +225,11 @@ void ui_state_machine() {
         #ifdef ESP8266
         os.lcd.clear(0, 1);        
         os.lcd.setCursor(0, 0);
-        os.lcd.print(WiFi.localIP());
+        if (m_server) {
+					os.lcd.print(Ethernet.localIP());
+				} else {
+          os.lcd.print(WiFi.localIP());
+        }
         os.lcd.setCursor(0, 1);
         os.lcd_print_pgm(PSTR(":"));
         uint16_t httpport = (uint16_t)(os.options[OPTION_HTTPPORT_1]<<8) + (uint16_t)os.options[OPTION_HTTPPORT_0];
@@ -261,7 +268,7 @@ void ui_state_machine() {
         #ifdef ESP8266
         os.lcd.clear(0, 1);
         byte mac[6];
-        WiFi.macAddress(mac);
+        os.load_hardware_mac(mac, m_server!=NULL);
         os.lcd_print_mac(mac);
         #else
         os.lcd.clear();
@@ -329,7 +336,6 @@ void ui_state_machine() {
 void do_setup() {
   /* Clear WDT reset flag. */
 #ifdef ESP8266
-  if(wifi_server) { delete wifi_server; wifi_server = NULL; }
   WiFi.persistent(false);
   led_blink_ms = LED_FAST_BLINK;
 #else
@@ -348,7 +354,7 @@ void do_setup() {
   os.lcd_print_time(os.now_tz());  // display time to LCD
   os.powerup_lasttime = os.now_tz();
   
-#ifndef ESP8266
+#if !defined(ESP8266)
   // enable WDT
   /* In order to change WDE or the prescaler, we need to
    * set WDCE (This will allow updates for 4 clock cycles).
@@ -375,7 +381,7 @@ void do_setup() {
 // Arduino software reset function
 void(* sysReset) (void) = 0;
 
-#ifndef ESP8266
+#if !defined(ESP8266)
 volatile byte wdt_timeout = 0;
 /** WDT interrupt service routine */
 ISR(WDT_vect)
@@ -422,9 +428,9 @@ void delete_log(char *name);
 void start_server_ap();
 void start_server_client();
 unsigned long reboot_timer = 0;
-#else
-void handle_web_request(char *p);
 #endif
+
+void handle_web_request(char *p);
 
 /** Main Loop */
 void do_loop()
@@ -450,73 +456,97 @@ void do_loop()
 #if defined(ARDUINO)  // Process Ethernet packets for Arduino
   #ifdef ESP8266
   static ulong connecting_timeout;
-  switch(os.state) {
-  case OS_STATE_INITIAL:
-    if(os.get_wifi_mode()==WIFI_MODE_AP) {
-      start_server_ap();
-      os.state = OS_STATE_CONNECTED;
-      connecting_timeout = 0;
-    } else {
-      led_blink_ms = LED_SLOW_BLINK;
-      start_network_sta(os.wifi_config.ssid.c_str(), os.wifi_config.pass.c_str());
-      os.config_ip();
-      os.state = OS_STATE_CONNECTING;
-      connecting_timeout = millis() + 120000L;
-      os.lcd.setCursor(0, -1);
-      os.lcd.print(F("Connecting to..."));      
-      os.lcd.setCursor(0, 2);
-      os.lcd.print(os.wifi_config.ssid);
-    }
-    break;
-    
-  case OS_STATE_TRY_CONNECT:
-    led_blink_ms = LED_SLOW_BLINK;  
-    start_network_sta_with_ap(os.wifi_config.ssid.c_str(), os.wifi_config.pass.c_str());
-    os.config_ip();
-    os.state = OS_STATE_CONNECTED;
-    break;
-   
-  case OS_STATE_CONNECTING:
-    if(WiFi.status() == WL_CONNECTED) {
-      led_blink_ms = 0;
-      os.set_screen_led(LOW);
-      os.lcd.clear();
-      start_server_client();
-      os.state = OS_STATE_CONNECTED;
-      connecting_timeout = 0;
-    } else {
-      if(millis()>connecting_timeout) {
-        os.state = OS_STATE_INITIAL;
-        DEBUG_PRINTLN(F("timeout"));
+	if (m_server) {	// if wired Ethernet
+		led_blink_ms = 0;
+		Ethernet.maintain(); // todo: is this necessary?
+		EthernetClient client = m_server->available();
+		if (client) {
+      while (true) {
+        int len = client.read((uint8_t*) ether_buffer, ETHER_BUFFER_SIZE);
+        if (len <= 0) {
+          if(!client.connected()) {
+            break;
+          } else {
+            continue;
+          }
+
+        } else {
+          m_client = &client;
+          ether_buffer[len] = 0;  // put a zero at the end of the packet
+          handle_web_request(ether_buffer);
+          m_client= 0;
+          break;
+        }
       }
-    }
-    break;
-    
-  case OS_STATE_CONNECTED:
-    if(os.get_wifi_mode() == WIFI_MODE_AP) {
-      wifi_server->handleClient();
-      connecting_timeout = 0;
-      if(os.get_wifi_mode()==WIFI_MODE_STA) {
-        // already in STA mode, waiting to reboot
-        break;
-      }
-      if(WiFi.status()==WL_CONNECTED && WiFi.localIP()) {
-        os.wifi_config.mode = WIFI_MODE_STA;
-        os.options_save(true);
-        os.reboot_dev();
-      }
-    }
-    else {
-      if(WiFi.status() == WL_CONNECTED) {
-        wifi_server->handleClient();
-        connecting_timeout = 0;
-      } else {
-        os.state = OS_STATE_INITIAL;
-      }
-    }
-    break;
-  }
-  
+		}
+	} else {
+		switch(os.state) {
+		case OS_STATE_INITIAL:
+		  if(os.get_wifi_mode()==WIFI_MODE_AP) {
+		    start_server_ap();
+		    os.state = OS_STATE_CONNECTED;
+		    connecting_timeout = 0;
+		  } else {
+		    led_blink_ms = LED_SLOW_BLINK;
+		    start_network_sta(os.wifi_config.ssid.c_str(), os.wifi_config.pass.c_str());
+		    os.config_ip();
+		    os.state = OS_STATE_CONNECTING;
+		    connecting_timeout = millis() + 120000L;
+		    os.lcd.setCursor(0, -1);
+		    os.lcd.print(F("Connecting to..."));      
+		    os.lcd.setCursor(0, 2);
+		    os.lcd.print(os.wifi_config.ssid);
+		  }
+		  break;
+		  
+		case OS_STATE_TRY_CONNECT:
+		  led_blink_ms = LED_SLOW_BLINK;  
+		  start_network_sta_with_ap(os.wifi_config.ssid.c_str(), os.wifi_config.pass.c_str());
+		  os.config_ip();
+		  os.state = OS_STATE_CONNECTED;
+		  break;
+		 
+		case OS_STATE_CONNECTING:
+		  if(WiFi.status() == WL_CONNECTED) {
+		    led_blink_ms = 0;
+		    os.set_screen_led(LOW);
+		    os.lcd.clear();
+		    start_server_client();
+		    os.state = OS_STATE_CONNECTED;
+		    connecting_timeout = 0;
+		  } else {
+		    if(millis()>connecting_timeout) {
+		      os.state = OS_STATE_INITIAL;
+		      DEBUG_PRINTLN(F("timeout"));
+		    }
+		  }
+		  break;
+		  
+		case OS_STATE_CONNECTED:
+		  if(os.get_wifi_mode() == WIFI_MODE_AP) {
+		  	if(wifi_server)	wifi_server->handleClient();
+		    connecting_timeout = 0;
+		    if(os.get_wifi_mode()==WIFI_MODE_STA) {
+		      // already in STA mode, waiting to reboot
+		      break;
+		    }
+		    if(WiFi.status()==WL_CONNECTED && WiFi.localIP()) {
+		      os.wifi_config.mode = WIFI_MODE_STA;
+		      os.options_save(true);
+		      os.reboot_dev();
+		    }
+		  }
+		  else {
+		    if(WiFi.status() == WL_CONNECTED) {
+		    	if(wifi_server)	wifi_server->handleClient();
+		      connecting_timeout = 0;
+		    } else {
+		      os.state = OS_STATE_INITIAL;
+		    }
+		  }
+		  break;
+		}
+	}  
   #else // AVR
   
   uint16_t pos=ether.packetLoop(ether.packetReceive());
@@ -944,9 +974,11 @@ void check_weather() {
   // - network check has failed, or
   // - the controller is in remote extension mode
   if (os.status.network_fails>0 || os.options[OPTION_REMOTE_EXT_MODE]) return;
-
+  
 #ifdef ESP8266
-  if (os.get_wifi_mode()!=WIFI_MODE_STA || WiFi.status()!=WL_CONNECTED || os.state!=OS_STATE_CONNECTED) return;
+  if (!m_server) {
+  	if (os.get_wifi_mode()!=WIFI_MODE_STA || WiFi.status()!=WL_CONNECTED || os.state!=OS_STATE_CONNECTED) return;
+  }
 #endif
 
   ulong ntz = os.now_tz();
@@ -1275,9 +1307,14 @@ void push_message(byte type, uint32_t lval, float fval, const char* sval) {
     case IFTTT_REBOOT:
       #if defined(ARDUINO)
         strcat_P(postval, PSTR("Rebooted. Device IP: "));
-        #ifdef ESP8266
+        #if defined(ESP8266)
         {
-          IPAddress _ip = WiFi.localIP();
+          IPAddress _ip;
+          if (m_server) {
+            _ip = Ethernet.localIP();
+          } else {
+            _ip = WiFi.localIP();
+          }
           byte ip[4] = {_ip[0], _ip[1], _ip[2], _ip[3]};
           ip2string(postval, ip);
         }
@@ -1299,8 +1336,16 @@ void push_message(byte type, uint32_t lval, float fval, const char* sval) {
 #if defined(ARDUINO)
 
   #ifdef ESP8266
-  WiFiClient client;
-  if(!client.connect(server, 80)) return;
+  Client *client;
+  if (m_server)
+    client = new EthernetClient();
+  else
+    client = new WiFiClient();
+    
+  if(!client->connect(server, 80)) {
+    delete client;
+    return;
+  }
   
   char postBuffer[1500];
   sprintf(postBuffer, "POST /trigger/sprinkler/with/key/%s HTTP/1.0\r\n"
@@ -1309,18 +1354,21 @@ void push_message(byte type, uint32_t lval, float fval, const char* sval) {
                       "Content-Length: %d\r\n"
                       "Content-Type: application/json\r\n"
                       "\r\n%s", key, server, strlen(postval), postval);
-  client.write((uint8_t *)postBuffer, strlen(postBuffer));
-
   time_t timeout = os.now_tz() + 5; // 5 seconds timeout
-  while(!client.available() && os.now_tz() < timeout) {
+  client->write((uint8_t *)postBuffer, strlen(postBuffer));
+
+  while(!client->available() && os.now_tz() < timeout) {
+  	yield();
   }
 
   bzero(ether_buffer, ETHER_BUFFER_SIZE);
   
-  while(client.available()) {
-    client.read((uint8_t*)ether_buffer, ETHER_BUFFER_SIZE);
+  while(client->available()) {
+    client->read((uint8_t*)ether_buffer, ETHER_BUFFER_SIZE);
+    yield();
   }
-  client.stop();
+  client->stop();
+  delete client;
   //DEBUG_PRINTLN(ether_buffer);
     
   #else
@@ -1380,7 +1428,7 @@ void push_message(byte type, uint32_t lval, float fval, const char* sval) {
   client.stop();
 
 #endif
-  
+
 #endif
 }
 
@@ -1398,7 +1446,7 @@ char LOG_PREFIX[] = "./logs/";
  */
 void make_logfile_name(char *name) {
 #if defined(ARDUINO)
-  #ifndef ESP8266
+  #if !defined(ESP8266)
   sd.chdir("/");
   #endif
 #endif
@@ -1643,7 +1691,9 @@ void perform_ntp_sync() {
   // do not perform sync if this option is disabled, or if network is not available, or if a program is running
   if (!os.options[OPTION_USE_NTP] || os.status.program_busy) return;
   #ifdef ESP8266
-  if (os.get_wifi_mode()!=WIFI_MODE_STA || WiFi.status()!=WL_CONNECTED || os.state!=OS_STATE_CONNECTED) return;
+  if (!m_server) {
+	  if (os.get_wifi_mode()!=WIFI_MODE_STA || WiFi.status()!=WL_CONNECTED || os.state!=OS_STATE_CONNECTED) return;
+	}
   #else
   if (os.status.network_fails>0) return;
   #endif
@@ -1661,13 +1711,16 @@ void perform_ntp_sync() {
     if (t>0) {
       setTime(t);
       RTC.set(t);
-      #ifndef ESP8266
+      #if !defined(ESP8266)
       // if rtc was uninitialized and now it is, restart
       if(rtc_zero && now()>978307200L) {
         os.reboot_dev();
       }
       #endif
     }
+    if (!ui_state) {
+      os.lcd_print_line_clear_pgm(PSTR("NTP completed."),1);
+    }    
   }
 #else
   // nothing to do here
