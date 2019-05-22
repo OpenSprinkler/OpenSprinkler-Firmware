@@ -518,6 +518,7 @@ typedef enum {
 
   /** Re-define avr-specific (e.g. PGM) types to use standard types */
   #if !defined(ESP8266)
+  	#include <stdio.h>
   	#include <string.h>
     inline void itoa(int v,char *s,int b)   {sprintf(s,"%d",v);}
     inline void ultoa(unsigned long v,char *s,int b) {sprintf(s,"%lu",v);}
