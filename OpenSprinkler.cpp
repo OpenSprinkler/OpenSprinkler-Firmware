@@ -144,6 +144,9 @@ const char op_json_names[] PROGMEM =
     "ife\0\0"
     "sn2t\0"
     "sn2o\0"
+#ifdef OSPI
+    "hlh\0\0"
+#endif
     "reset";
 
 /** Option promopts (stored in progmem, for LCD display) */
@@ -202,6 +205,9 @@ const char op_prompts[] PROGMEM =
     "IFTTT Enable:   "
     "Sensor 2 type:  "
     "Normally open?  "
+#ifdef OSPI
+    "HTTP Local Only?"
+#endif
     "Factory reset?  ";
 
 /** Option maximum values (stored in progmem) */
@@ -258,6 +264,9 @@ const byte op_max[] PROGMEM = {
   255,
   255,
   1,
+#ifdef OSPI
+  1,
+#endif
   1
 };
 
@@ -320,6 +329,9 @@ byte OpenSprinkler::options[] = {
   0,  // ifttt enable bits
   0,  // sensor 2 type
   0,  // sensor 2 option. 0: normally closed; 1: normally open.
+#ifdef OSPI
+  0,  // 0: bind to all available interfaces, 1: bind to local host only
+#endif
   0   // reset
 };
 
@@ -490,6 +502,9 @@ extern char ether_buffer[];
 /** Initialize network with the given mac address and http port */
 byte OpenSprinkler::start_network() {
   unsigned int port = (unsigned int)(options[OPTION_HTTPPORT_1]<<8) + (unsigned int)options[OPTION_HTTPPORT_0];
+  #ifdef OSPI
+  uint8_t olocalhostonly = options[OPTION_HTTPLOCAL];
+  #endif
 #if defined(DEMO)
   port = 80;
 #endif
@@ -497,8 +512,11 @@ byte OpenSprinkler::start_network() {
     delete m_server;
     m_server = 0;
   }
-
+  #ifdef OSPI
+  m_server = new EthernetServer(port,olocalhostonly);
+  #else
   m_server = new EthernetServer(port);
+  #endif
   return m_server->begin();
 }
 

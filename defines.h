@@ -264,6 +264,9 @@ typedef enum {
   OPTION_IFTTT_ENABLE,
   OPTION_SENSOR2_TYPE,
   OPTION_SENSOR2_OPTION,
+#ifdef OSPI
+  OPTION_HTTPLOCAL,
+#endif
   OPTION_RESET,
   NUM_OPTIONS	// total number of options
 } OS_OPTION_t;
