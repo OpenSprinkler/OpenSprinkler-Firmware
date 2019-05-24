@@ -1818,7 +1818,7 @@ void server_json_log() {
     File file = SPIFFS.open(tmp_buffer, "r");
     if(!file) continue;
 #else // prepare to open log file for RPI/BBB
-    FILE *file = fopen(get_filename_fullpath(tmp_buffer), "rb");
+    FILE *file = fopen(tmp_buffer, "rb");
     if(!file) continue;
 #endif // prepare to open log file
 
