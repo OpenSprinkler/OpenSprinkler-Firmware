@@ -654,7 +654,12 @@ void do_loop()
     }
 
     // ====== Check rain sensor status ======
+#ifdef ESP8266
+    if (os.options[OPTION_SENSOR1_TYPE] == SENSOR_TYPE_RAIN
+      || os.options[OPTION_SENSOR2_TYPE] == SENSOR_TYPE_RAIN) { // if a rain sensor is connected
+#else
     if (os.options[OPTION_SENSOR1_TYPE] == SENSOR_TYPE_RAIN) { // if a rain sensor is connected
+#endif
       os.rainsensor_status();
       if (os.old_status.rain_sensed != os.status.rain_sensed) {
         if (os.status.rain_sensed) {
@@ -673,6 +678,35 @@ void do_loop()
         os.old_status.rain_sensed = os.status.rain_sensed;
       }
     }
+
+    // ====== Check soil moisture status ======
+#ifdef ESP8266
+    if (os.options[OPTION_SENSOR1_TYPE] == SENSOR_TYPE_RAIN
+      || os.options[OPTION_SENSOR2_TYPE] == SENSOR_TYPE_RAIN) { // if a rain sensor is connected
+#else
+    if (os.options[OPTION_SENSOR1_TYPE] == SENSOR_TYPE_RAIN) { // if a rain sensor is connected
+#endif
+      os.soil_moisture_sensor_status();
+      if (os.old_status.soil_moisture_sensed != os.status.soil_moisture_sensed) {
+        if (os.status.soil_moisture_sensed) {
+          os.soil_moisture_sensed_time = curr_time + 120*60*60; //Delay 120min todo: add to config
+          push_message(IFTTT_SOILSENSOR, LOGDATA_SOILSENSE, 1);
+        } else {
+          os.soil_moisture_sensed_time = 0;
+          write_log(LOGDATA_SOILSENSE, curr_time);
+          push_message(IFTTT_SOILSENSOR, LOGDATA_SOILSENSE, 0);
+        }
+        os.old_status.soil_moisture_sensed = os.status.soil_moisture_sensed;
+      }
+      
+      // Delayed set of os.status.soil_moisture_active, so it's not firing during watering
+      if (os.status.soil_moisture_sensed && os.soil_moisture_sensed_time && curr_time>os.soil_moisture_sensed_time) {
+        os.status.soil_moisture_active = true;
+      } else {
+        os.status.soil_moisture_active = false;
+      }
+    }
+
 
     // ===== Check program switch status =====
     if (os.programswitch_status(curr_time)) {
@@ -1076,7 +1110,14 @@ void process_dynamic_events(ulong curr_time) {
   // check if rain is detected
   bool rain = false;
   bool en = os.status.enabled ? true : false;
+#ifdef ESP8266
+  if (os.status.rain_delayed || 
+    (os.status.rain_sensed && 
+      (os.options[OPTION_SENSOR1_TYPE] == SENSOR_TYPE_RAIN ||
+      os.options[OPTION_SENSOR2_TYPE] == SENSOR_TYPE_RAIN))) {
+#else
   if (os.status.rain_delayed || (os.status.rain_sensed && os.options[OPTION_SENSOR1_TYPE] == SENSOR_TYPE_RAIN)) {
+#endif
     rain = true;
   }
 
@@ -1301,6 +1342,13 @@ void push_message(byte type, uint32_t lval, float fval, const char* sval) {
     case IFTTT_RAINSENSOR:
 
       strcat_P(postval, (lval==LOGDATA_RAINDELAY) ? PSTR("Rain delay ") : PSTR("Rain sensor "));
+      strcat_P(postval, ((int)fval)?PSTR("activated."):PSTR("de-activated"));
+
+      break;
+
+    case IFTTT_SOILSENSOR:
+
+      strcat_P(postval, PSTR("Soil sensor "));
       strcat_P(postval, ((int)fval)?PSTR("activated."):PSTR("de-activated"));
 
       break;

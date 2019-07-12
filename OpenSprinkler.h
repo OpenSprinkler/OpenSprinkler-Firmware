@@ -110,6 +110,9 @@ struct ConStatus {
   byte network_fails:2;     // number of network fails
   byte mas:8;               // master station index
   byte mas2:8;              // master2 station index
+  
+  byte soil_moisture_sensed:1; // soil moisture sensor bit (when set, it indicates wet, delayed)
+  byte soil_moisture_active:1; // soil moisture sensor bit (when set, it indicates wet, active after delay)
 };
 
 extern const char wtopts_filename[];
@@ -157,6 +160,7 @@ public:
 
   // variables for time keeping
   static ulong sensor_lasttime;  // time when the last sensor reading is recorded
+  static ulong soil_moisture_sensed_time; //time when soil moisture detects wet, base for delay
   static volatile ulong flowcount_time_ms;// time stamp when new flow sensor click is received (in milliseconds)
   static ulong flowcount_rt;     // flow count (for computing real-time flow rate)
   static ulong flowcount_log_start; // starting flow count (for logging)
@@ -208,6 +212,7 @@ public:
   static void raindelay_start();  // start raindelay
   static void raindelay_stop();   // stop rain delay
   static void rainsensor_status();// update rainsensor status
+  static void soil_moisture_sensor_status(); // update soil moisture status
   static bool programswitch_status(ulong); // get program switch status
 #if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__) || defined(ESP8266)
   static uint16_t read_current(); // read current sensing value
