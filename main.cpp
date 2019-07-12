@@ -681,10 +681,10 @@ void do_loop()
 
     // ====== Check soil moisture status ======
 #ifdef ESP8266
-    if (os.options[OPTION_SENSOR1_TYPE] == SENSOR_TYPE_RAIN
-      || os.options[OPTION_SENSOR2_TYPE] == SENSOR_TYPE_RAIN) { // if a rain sensor is connected
+    if (os.options[OPTION_SENSOR1_TYPE] == SENSOR_TYPE_SOIL
+      || os.options[OPTION_SENSOR2_TYPE] == SENSOR_TYPE_SOIL) { // if a soil moisture sensor is connected
 #else
-    if (os.options[OPTION_SENSOR1_TYPE] == SENSOR_TYPE_RAIN) { // if a rain sensor is connected
+    if (os.options[OPTION_SENSOR1_TYPE] == SENSOR_TYPE_SOIL) { // if a soil moisture sensor is connected
 #endif
       os.soil_moisture_sensor_status();
       if (os.old_status.soil_moisture_sensed != os.status.soil_moisture_sensed) {
