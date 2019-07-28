@@ -1,3 +1,5 @@
+#if defined(ARDUINO) && !defined(ESP8266)
+
 #include "LiquidCrystal.h"
 #include <inttypes.h>
 #include <Arduino.h>
@@ -378,3 +380,4 @@ void LiquidCrystal::pulseEnable(void) {
   delayMicroseconds(100);   // commands need > 37us to settle
 }
 
+#endif

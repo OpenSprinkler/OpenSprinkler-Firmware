@@ -1,6 +1,8 @@
 #ifndef LIQUID_CRYSTAL_DUAL_H
 #define LIQUID_CRYSTAL_DUAL_H
 
+#if defined(ARDUINO) && !defined(ESP8266)
+
 #include <inttypes.h>
 #include <Print.h>
 
@@ -118,5 +120,7 @@ private:
 
   uint8_t _numlines,_currline;
 };
+
+#if defined(ARDUINO) && !defined(ESP8266)
 
 #endif // LIQUID_CRYSTAL_DUAL_H

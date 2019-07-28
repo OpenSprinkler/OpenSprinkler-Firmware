@@ -67,10 +67,8 @@ extern OpenSprinkler os;
 extern ProgramData pd;
 extern ulong flow_count;
 
-#if !defined(ESP8266)
 static byte return_code;
 static char* get_buffer = NULL;
-#endif
 
 BufferFiller bfill;
 
@@ -169,7 +167,7 @@ void print_json_header(bool bracket=true) {
   wifi_server->sendHeader("Cache-Control", "max-age=0, no-cache, no-store, must-revalidate");
   wifi_server->sendHeader("Content-Type", "application/json");
   wifi_server->sendHeader("Access-Control-Allow-Origin", "*");
-  //todo if(bracket) bfill.emit_p(PSTR("{")); //
+  if(bracket) bfill.emit_p(PSTR("{"));
 #elif defined(ARDUINO)
   bfill.emit_p(PSTR("$F$F$F$F\r\n"), html200OK, htmlContentJSON, htmlAccessControl, htmlNoCache);
   if(bracket) bfill.emit_p(PSTR("{"));
@@ -465,13 +463,20 @@ boolean process_password(boolean fwv_on_fail=false, char *p = NULL)
 boolean check_password(char *p)
 #endif
 {
+#if defined(DEMO)
+	return true;
+#endif
   if (os.iopts[IOPT_IGNORE_PASSWORD])  return true;
+  if (m_client && !p) {
+    p = get_buffer;
+  }  
   if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("pw"), true)) {
     urlDecode(tmp_buffer);
     if (os.password_verify(tmp_buffer))
       return true;
   }
 #if defined(ESP8266)
+  if(m_client) { return false; }
   /* some pages will output fwv if password check has failed */
   if(fwv_on_fail) {
     rewind_ether_buffer();
@@ -1156,7 +1161,6 @@ void server_json_controller() {
   if(!process_password()) return;
   rewind_ether_buffer();
 #endif
-
   print_json_header();
   server_json_controller_main();
   handle_return(HTML_OK);
@@ -2042,7 +2046,7 @@ void handle_web_request(char *p) {
           ret = return_code;
         } else if ((com[0]=='j' && com[1]=='o') ||
                    (com[0]=='j' && com[1]=='a'))  { // for /jo and /ja we output fwv if password fails
-#ifdef ESP8266
+#if defined(ESP8266)
 					if(process_password(false, dat)==false) {
 #else
 					if(check_password(dat)==false) {
@@ -2058,7 +2062,7 @@ void handle_web_request(char *p) {
           }
         } else {
           // first check password
-#ifdef ESP8266
+#if defined(ESP8266)
 					if(process_password(false, dat)==false) {
 #else
 					if(check_password(dat)==false) {

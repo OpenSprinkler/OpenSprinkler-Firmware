@@ -111,8 +111,8 @@ const char iopt_json_names[] PROGMEM =
   "mas\0\0"
   "mton\0"
   "mtof\0"
-  "sn1t\0" // replaces urs previously
-  "sn1o\0" // replaces rso previously
+  "urs\0\0" //"sn1t\0" // replaces urs previously
+  "rso\0\0" //"sn1o\0" // replaces rso previously
   "wl\0\0\0"
   "den\0\0"
   "ipas\0"
@@ -464,10 +464,7 @@ byte OpenSprinkler::start_ether() {
 	if(hw_rev<2) return 0;	// ethernet capability is only available after hw_rev 2
 #endif	
 	Ethernet.init(PIN_ETHER_CS);	// make sure to call this before any Ethernet calls
-	status.has_hwmac = 0;
-  if(load_hardware_mac((uint8_t*)tmp_buffer, true)) {
-		status.has_hwmac = 1;
-	}
+  load_hardware_mac((uint8_t*)tmp_buffer, true);
 	// detect if Enc28J60 exists
 	Enc28J60Network::init((uint8_t*)tmp_buffer);
 	uint8_t erevid = Enc28J60Network::geterevid();
@@ -1709,6 +1706,7 @@ void OpenSprinkler::options_setup() {
     StationData *pdata=(StationData*)tmp_buffer;
     pdata->name[0]='S';
     pdata->name[3]=0;
+    pdata->name[4]=0;
     StationAttrib at;
     memset(&at, 0, sizeof(StationAttrib));
     at.mas=1;
@@ -1718,8 +1716,15 @@ void OpenSprinkler::options_setup() {
     pdata->sped[0]='0';
     pdata->sped[1]=0;
     for(int i=0; i<MAX_NUM_STATIONS; i++) {
-      pdata->name[1]='0'+((i+1)/10); // default station name
-      pdata->name[2]='0'+((i+1)%10);
+    	int sid=i+1;
+    	if(i<99) {
+	      pdata->name[1]='0'+(sid/10); // default station name
+  	    pdata->name[2]='0'+(sid%10);
+  	  } else {
+  	  	pdata->name[1]='0'+(sid/100);
+  	  	pdata->name[2]='0'+((sid%100)/10);
+  	  	pdata->name[3]='0'+(sid%10);
+  	  }
       file_write_block(STATIONS_FILENAME, pdata, sizeof(StationData)*i, sizeof(StationData));
     }
     
@@ -2068,6 +2073,7 @@ void OpenSprinkler::lcd_print_station(byte line, char c) {
 #else
   if(iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_SOIL)  {
 #endif
+		lcd.write(ICON_SOIL_SENSED);
     if (status.soil_moisture_sensed)
       lcd.write(ICON_SOIL_SENSED);
     else if (status.soil_moisture_active)

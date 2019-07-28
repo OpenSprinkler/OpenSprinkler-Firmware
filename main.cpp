@@ -415,9 +415,9 @@ void delete_log(char *name);
 void start_server_ap();
 void start_server_client();
 unsigned long reboot_timer = 0;
-#else
-void handle_web_request(char *p);
 #endif
+
+void handle_web_request(char *p);
 
 /** Main Loop */
 void do_loop()
