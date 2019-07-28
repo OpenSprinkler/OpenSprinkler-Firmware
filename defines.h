@@ -436,6 +436,7 @@ enum {
 #if !defined(ARDUINO)
 	#include <stdio.h>
 	#include <string.h>
+	#include <stddef.h>
 	inline void itoa(int v,char *s,int b)   {sprintf(s,"%d",v);}
 	inline void ultoa(unsigned long v,char *s,int b) {sprintf(s,"%lu",v);}
 	#define now()       time(0)
