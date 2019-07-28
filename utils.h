@@ -52,6 +52,8 @@ void strncpy_P0(char* dest, const char* src, int n);
 ulong water_time_resolve(uint16_t v);
 byte water_time_encode_signed(int16_t i);
 int16_t water_time_decode_signed(byte i);
+void urlDecode(char *);
+void peel_http_header(char*);
 
 #if defined(ARDUINO)
 

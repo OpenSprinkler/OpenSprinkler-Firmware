@@ -31,13 +31,17 @@
 NVConData OpenSprinkler::nvdata;
 ConStatus OpenSprinkler::status;
 ConStatus OpenSprinkler::old_status;
+byte OpenSprinkler::hw_type;
+byte OpenSprinkler::hw_rev;
+
 byte OpenSprinkler::nboards;
 byte OpenSprinkler::nstations;
-byte OpenSprinkler::hw_type;
 byte OpenSprinkler::station_bits[MAX_NUM_BOARDS];
 byte OpenSprinkler::engage_booster;
 uint16_t OpenSprinkler::baseline_current;
+
 ulong OpenSprinkler::sensor_lasttime;
+ulong OpenSprinkler::soil_moisture_sensed_time;
 ulong OpenSprinkler::flowcount_log_start;
 ulong OpenSprinkler::flowcount_rt;
 volatile ulong OpenSprinkler::flowcount_time_ms;
@@ -107,8 +111,8 @@ const char iopt_json_names[] PROGMEM =
   "mas\0\0"
   "mton\0"
   "mtof\0"
-  "urs\0\0" // todo future: rename to sn1t
-  "rso\0\0" // todo future: rename to sn1o
+  "sn1t\0" // replaces urs previously
+  "sn1o\0" // replaces rso previously
   "wl\0\0\0"
   "den\0\0"
   "ipas\0"
@@ -347,12 +351,14 @@ const char *OpenSprinkler::sopts[] = {
   DEFAULT_LOCATION,
   DEFAULT_JAVASCRIPT_URL,
   DEFAULT_WEATHER_URL,
-  DEFAULT_WEATHER_KEY,
-  DEFAULT_WEATHER_OPTS,
-  DEFAULT_IFTTT_KEY,
-  DEFAULT_STA_SSID,
-  DEFAULT_STA_PASS,
-  DEFAULT_AP_PASS
+  DEFAULT_EMPTY_STRING,
+  DEFAULT_EMPTY_STRING,
+  DEFAULT_EMPTY_STRING,
+  DEFAULT_EMPTY_STRING,
+  DEFAULT_EMPTY_STRING,
+  DEFAULT_EMPTY_STRING,
+  DEFAULT_EMPTY_STRING,
+  DEFAULT_EMPTY_STRING
 };
 
 /** Weekday strings (stored in PROGMEM to reduce RAM usage) */
@@ -379,80 +385,111 @@ bool detect_i2c(int addr) {
 
 /** read hardware MAC into tmp_buffer */
 #define MAC_CTRL_ID 0x50
-void OpenSprinkler::load_hardware_mac(byte* buffer) {
+bool OpenSprinkler::load_hardware_mac(byte* buffer, bool wired) {
 #if defined(ESP8266)
-  WiFi.macAddress(buffer);
+  WiFi.macAddress((byte*)buffer);
+  // if requesting wired Ethernet MAC, flip the last byte to create a modified MAC
+  if(wired) buffer[5] = ~buffer[5];
+  return true;
 #else
-  uint8_t ret;
-  if (detect_i2c(MAC_CTRL_ID)==false) {
-    // if I2C EEPROM doesn't exist, use software-defined MAC
-    buffer[0] = 0x00;
-    buffer[1] = 0x69;
-    buffer[2] = 0x69;
-    buffer[3] = 0x2D;
-    buffer[4] = 0x31;
-    buffer[5] = iopts[IOPT_DEVICE_ID];
-  } else {
-    Wire.beginTransmission(MAC_CTRL_ID);
-    Wire.write(0xFA); // The address of the register we want
-    Wire.endTransmission(); // Send the data
-    Wire.requestFrom(MAC_CTRL_ID, 6);
-    for (ret=0;ret<6;ret++) {
-      buffer[ret] = Wire.read();
-    }
-  }
+	// initialize the buffer by assigning software mac
+	buffer[0] = 0x00;
+ 	buffer[1] = 0x69;
+  buffer[2] = 0x69;
+  buffer[3] = 0x2D;
+  buffer[4] = 0x31;
+  buffer[5] = iopts[IOPT_DEVICE_ID];
+  if (detect_i2c(MAC_CTRL_ID)==false)	return false;
+
+	Wire.beginTransmission(MAC_CTRL_ID);
+	Wire.write(0xFA); // The address of the register we want
+	Wire.endTransmission(); // Send the data
+	if(Wire.requestFrom(MAC_CTRL_ID, 6) != 6) return false;	// if not enough data, return false
+	for (ret=0;ret<6;ret++) {
+	  buffer[ret] = Wire.read();
+	}
+	return true;
 #endif
 }
 
 void(* resetFunc) (void) = 0; // AVR software reset function
 
 /** Initialize network with the given mac address and http port */
+
 byte OpenSprinkler::start_network() {
-
-#if defined(ESP8266)
-
   lcd_print_line_clear_pgm(PSTR("Starting..."), 1);
-  if(wifi_server) delete wifi_server;
-  if(get_wifi_mode()==WIFI_MODE_AP) {
-    wifi_server = new ESP8266WebServer(80);
+	uint16_t httpport = (uint16_t)(iopts[IOPT_HTTPPORT_1]<<8) + (uint16_t)iopts[IOPT_HTTPPORT_0];
+  if(m_server)  { delete m_server; m_server = 0; }
+	if(Udp) { delete Udp; Udp = 0; }
+	
+#if defined(ESP8266)
+  if (start_ether()) {
+    m_server = new EthernetServer(httpport);
+    m_server->begin();
+  	// todo: add option to keep both ether and wifi active
+    WiFi.mode(WIFI_OFF);
   } else {
-    uint16_t httpport = (uint16_t)(iopts[IOPT_HTTPPORT_1]<<8) + (uint16_t)iopts[IOPT_HTTPPORT_0];
-    wifi_server = new ESP8266WebServer(httpport);
-  }
-  
+		if(wifi_server) { delete wifi_server; wifi_server = 0; }
+		if(get_wifi_mode()==WIFI_MODE_AP) {
+			wifi_server = new ESP8266WebServer(80);
+		} else {
+			wifi_server = new ESP8266WebServer(httpport);
+		}
+	}
+
+  return 1;	
 #else
 
-  lcd_print_line_clear_pgm(PSTR("Connecting..."), 1);
-  load_hardware_mac((byte*)tmp_buffer);
-  if(ether_server) delete ether_server;
-  if(Udp) delete Udp;
-  if(iopts[IOPT_USE_DHCP]) {
-    if(Ethernet.begin((byte*)tmp_buffer)) {
-      // once we have valid DHCP IP, we write these into static IP / gateway IP
-      memcpy(iopts+IOPT_STATIC_IP1, &(Ethernet.localIP()[0]), 4);
-      memcpy(iopts+IOPT_GATEWAY_IP1, &(Ethernet.gatewayIP()[0]),4);
-      memcpy(iopts+IOPT_DNS_IP1, &(Ethernet.dnsServerIP()[0]), 4);
-      iopts_save();
-    } else return 0;
-      
+	if(start_ether()) {
+		m_server = new EthernetServer(httpport);
+		m_server->begin();
+			
+		Udp = new EthernetUDP();
+		// Start UDP service for NTP. Avoid the same port with http
+		if(httpport==8888)
+			Udp->begin(8000);
+		else
+			Udp->begin(8888);
+		return 1;
+	}
+	
+	return 0;
+
+#endif
+
+}
+
+byte OpenSprinkler::start_ether() {
+#if defined(ESP8266)
+	if(hw_rev<2) return 0;	// ethernet capability is only available after hw_rev 2
+#endif	
+	Ethernet.init(PIN_ETHER_CS);	// make sure to call this before any Ethernet calls
+	status.has_hwmac = 0;
+  if(load_hardware_mac((uint8_t*)tmp_buffer, true)) {
+		status.has_hwmac = 1;
+	}
+	// detect if Enc28J60 exists
+	Enc28J60Network::init((uint8_t*)tmp_buffer);
+	uint8_t erevid = Enc28J60Network::geterevid();
+	// a valid chip must have erevid > 0 and < 255
+	if(erevid==0 || erevid==255) return 0;
+
+  lcd_print_line_clear_pgm(PSTR("Start wired link"), 1);
+  
+  if (iopts[IOPT_USE_DHCP]) {
+	  if(!Ethernet.begin((uint8_t*)tmp_buffer))	return 0;
+    memcpy(iopts+IOPT_STATIC_IP1, &(Ethernet.localIP()[0]), 4);
+    memcpy(iopts+IOPT_GATEWAY_IP1, &(Ethernet.gatewayIP()[0]),4);
+    memcpy(iopts+IOPT_DNS_IP1, &(Ethernet.dnsServerIP()[0]), 4);
+	  iopts_save();     
   } else {
     IPAddress staticip(iopts+IOPT_STATIC_IP1);
     IPAddress gateway(iopts+IOPT_GATEWAY_IP1);
-    IPAddress dns(iopts+IOPT_DNS_IP1);
-    Ethernet.begin((byte*)tmp_buffer, staticip, dns, gateway);
+    IPAddress dns(iopts+IOPT_DNS_IP1);  
+  	Ethernet.begin((uint8_t*)tmp_buffer, staticip, dns, gateway);
   }
-  unsigned int httpport = (unsigned int)(iopts[IOPT_HTTPPORT_1]<<8) + (unsigned int)iopts[IOPT_HTTPPORT_0];
-  ether_server = new EthernetServer(httpport);
-  ether_server->begin();
-  
-  Udp = new EthernetUDP();
-  // Start UDP service for NTP. Avoid the same port with http
-  if(httpport==8888)
-    Udp->begin(8000);
-  else
-    Udp->begin(8888);
+  if(Ethernet.linkStatus() != LinkON) return 0;
 
-#endif
   return 1;
 }
 
@@ -474,18 +511,13 @@ void OpenSprinkler::reboot_dev() {
 #include "utils.h"
 #include "server.h"
 
-extern EthernetServer *m_server;
-
 /** Initialize network with the given mac address and http port */
 byte OpenSprinkler::start_network() {
   unsigned int port = (unsigned int)(iopts[IOPT_HTTPPORT_1]<<8) + (unsigned int)iopts[IOPT_HTTPPORT_0];
 #if defined(DEMO)
   port = 80;
 #endif
-  if(m_server)  {
-    delete m_server;
-    m_server = 0;
-  }
+  if(m_server) { delete m_server; m_server = 0; }
 
   m_server = new EthernetServer(port);
   return m_server->begin();
@@ -503,7 +535,7 @@ void OpenSprinkler::reboot_dev() {
 
 /** Launch update script */
 void OpenSprinkler::update_dev() {
-  char cmd[1024];
+  char cmd[1000];
   sprintf(cmd, "cd %s & ./updater.sh", get_runtime_path());
   system(cmd);
 }
@@ -548,6 +580,7 @@ void OpenSprinkler::begin() {
 #endif
 
   hw_type = HW_TYPE_UNKNOWN;
+  hw_rev = 0;
     
 #if defined(ESP8266)
 
@@ -569,7 +602,11 @@ void OpenSprinkler::begin() {
     PIN_SENSOR1 = V0_PIN_SENSOR1;
     PIN_SENSOR2 = V0_PIN_SENSOR2;
     PIN_RAINSENSOR = V0_PIN_RAINSENSOR;
+    PIN_SOILSENSOR = V0_PIN_SOILSENSOR;
     PIN_FLOWSENSOR = V0_PIN_FLOWSENSOR;
+		PIN_RAINSENSOR2 = V0_PIN_RAINSENSOR2;
+		PIN_SOILSENSOR2 = V0_PIN_SOILSENSOR2;
+		PIN_FLOWSENSOR2 = V0_PIN_FLOWSENSOR2;    
     
     // on revision 0, main IOEXP and driver IOEXP are two separate PCF8574 chips
     if(hw_type==HW_TYPE_DC) {
@@ -604,6 +641,7 @@ void OpenSprinkler::begin() {
     pinMode(16, INPUT);
     if(digitalRead(16)==LOW) {
       // revision 1
+      hw_rev = 1;
       mainio->i2c_write(NXP_CONFIG_REG, V1_IO_CONFIG);
       mainio->i2c_write(NXP_OUTPUT_REG, V1_IO_OUTPUT);
 
@@ -619,9 +657,14 @@ void OpenSprinkler::begin() {
       PIN_SENSOR1 = V1_PIN_SENSOR1;
       PIN_SENSOR2 = V1_PIN_SENSOR2;
       PIN_RAINSENSOR = V1_PIN_RAINSENSOR;
+      PIN_SOILSENSOR = V1_PIN_SOILSENSOR;
       PIN_FLOWSENSOR = V1_PIN_FLOWSENSOR;
+			PIN_RAINSENSOR2 = V1_PIN_RAINSENSOR2;
+			PIN_SOILSENSOR2 = V1_PIN_SOILSENSOR2;
+			PIN_FLOWSENSOR2 = V1_PIN_FLOWSENSOR2;      
     } else {
       // revision 2
+      hw_rev = 2;
       mainio->i2c_write(NXP_CONFIG_REG, V2_IO_CONFIG);
       mainio->i2c_write(NXP_OUTPUT_REG, V2_IO_OUTPUT);
       
@@ -635,7 +678,11 @@ void OpenSprinkler::begin() {
       PIN_SENSOR1 = V2_PIN_SENSOR1;
       PIN_SENSOR2 = V2_PIN_SENSOR2;
       PIN_RAINSENSOR = V2_PIN_RAINSENSOR;
+      PIN_SOILSENSOR = V2_PIN_SOILSENSOR;
       PIN_FLOWSENSOR = V2_PIN_FLOWSENSOR;
+			PIN_RAINSENSOR2 = V2_PIN_RAINSENSOR2;
+			PIN_SOILSENSOR2 = V2_PIN_SOILSENSOR2;
+			PIN_FLOWSENSOR2 = V2_PIN_FLOWSENSOR2;          
     }    
   }
   
@@ -691,8 +738,12 @@ void OpenSprinkler::begin() {
     if(mainio->type==IOEXP_TYPE_8574) {
       attachInterrupt(PIN_FLOWSENSOR, flow_isr, FALLING);
     } else if(mainio->type==IOEXP_TYPE_9555) {
-      mainio->i2c_read(NXP_INPUT_REG);  // do a read to clear out current interrupt flag
-      attachInterrupt(PIN_IOEXP_INT, flow_isr, FALLING);
+      if(hw_rev==1) {
+        mainio->i2c_read(NXP_INPUT_REG);  // do a read to clear out current interrupt flag
+        attachInterrupt(PIN_IOEXP_INT, flow_isr, FALLING);
+      } else if(hw_rev==2) {
+        attachInterrupt(PIN_FLOWSENSOR, flow_isr, FALLING);
+      }
     }
   #else
     //digitalWrite(PIN_RAINSENSOR, HIGH); // enabled internal pullup on rain sensor
@@ -762,103 +813,34 @@ void OpenSprinkler::begin() {
 
   lcd_start();
 
+  lcd.createChar(ICON_CONNECTED, _iconimage_connected);
+  lcd.createChar(ICON_DISCONNECTED, _iconimage_disconnected);
+  lcd.createChar(ICON_REMOTEXT, _iconimage_remotext);
+  lcd.createChar(ICON_RAIN, _iconimage_rain);
+  lcd.createChar(ICON_FLOW, _iconimage_flow);
+  lcd.createChar(ICON_PSWITCH, _iconimage_pswitch);
+	lcd.createChar(ICON_SOIL_SENSED, _iconimage_soil_sensed);
+	lcd.createChar(ICON_SOIL_ACTIVE, _iconimage_soil_active);
+  
   #if defined(ESP8266)
 
     /* create custom characters */
-    lcd.createChar(0, _iconimage_connected);
-    lcd.createChar(1, _iconimage_disconnected);
-    lcd.createChar(2, _iconimage_sdcard);
-    lcd.createChar(3, _iconimage_rain);
-    lcd.createChar(4, _iconimage_connect);    
-    lcd.createChar(5, _iconimage_remotext);
-    lcd.createChar(6, _iconimage_flow);
-    lcd.createChar(7, _iconimage_pswitch);
+    lcd.createChar(ICON_ETHER_CONNECTED, _iconimage_ether_connected);
+    lcd.createChar(ICON_ETHER_DISCONNECTED, _iconimage_ether_disconnected);
     
     lcd.setCursor(0,0);
     lcd.print(F("Init file system"));
     lcd.setCursor(0,1);
     if(!SPIFFS.begin()) {
-      // !!! SPIFFS failed, stall as we cannot proceed
-      DEBUG_PRINTLN(F("SPIFFS failed"));
-      while(1){}
-    } 
+      // !!! flash init failed, stall as we cannot proceed
+      lcd.setCursor(0, 0);
+      lcd_print_pgm(PSTR("Error Code: 0x2D"));
+      delay(5000);
+    }
 
     state = OS_STATE_INITIAL;
     
   #else
-    // define lcd custom icons
-    byte _icon[8];
-    // WiFi icon
-    _icon[0] = B00000;
-    _icon[1] = B10100;
-    _icon[2] = B01000;
-    _icon[3] = B10101;
-    _icon[4] = B00001;
-    _icon[5] = B00101;
-    _icon[6] = B00101;
-    _icon[7] = B10101;
-    lcd.createChar(1, _icon);
-
-    _icon[1]=0;
-    _icon[2]=0;
-    _icon[3]=1;
-    lcd.createChar(0, _icon);
-
-    // uSD card icon
-    _icon[1] = B00000;
-    _icon[2] = B11111;
-    _icon[3] = B10001;
-    _icon[4] = B11111;
-    _icon[5] = B10001;
-    _icon[6] = B10011;
-    _icon[7] = B11110;
-    lcd.createChar(2, _icon);
-
-    // Rain icon
-    _icon[2] = B00110;
-    _icon[3] = B01001;
-    _icon[4] = B11111;
-    _icon[5] = B00000;
-    _icon[6] = B10101;
-    _icon[7] = B10101;
-    lcd.createChar(3, _icon);
-
-    // Connect icon
-    _icon[2] = B00111;
-    _icon[3] = B00011;
-    _icon[4] = B00101;
-    _icon[5] = B01000;
-    _icon[6] = B10000;
-    _icon[7] = B00000;
-    lcd.createChar(4, _icon);
-
-    // Remote extension icon
-    _icon[2] = B00000;
-    _icon[3] = B10001;
-    _icon[4] = B01011;
-    _icon[5] = B00101;
-    _icon[6] = B01001;
-    _icon[7] = B11110;
-    lcd.createChar(5, _icon);
-
-    // Flow sensor icon
-    _icon[2] = B00000;
-    _icon[3] = B11010;
-    _icon[4] = B10010;
-    _icon[5] = B11010;
-    _icon[6] = B10011;
-    _icon[7] = B00000;
-    lcd.createChar(6, _icon);
-
-    // Program switch icon
-    _icon[1] = B11100;
-    _icon[2] = B10100;
-    _icon[3] = B11100;
-    _icon[4] = B10010;
-    _icon[5] = B10110;
-    _icon[6] = B00010;
-    _icon[7] = B00111;
-    lcd.createChar(7, _icon);  
   
     // set sd cs pin high to release SD
     pinMode(PIN_SD_CS, OUTPUT);
@@ -1095,20 +1077,46 @@ void OpenSprinkler::apply_all_station_bits() {
 /** Read rain sensor status */
 void OpenSprinkler::rainsensor_status() {
   // rs_type: 0 if normally closed, 1 if normally open
-  if(iopts[IOPT_SENSOR1_TYPE]!=SENSOR_TYPE_RAIN) return;
-  status.rain_sensed = (digitalReadExt(PIN_RAINSENSOR) == iopts[IOPT_SENSOR1_OPTION] ? 0 : 1);
+  if(iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_RAIN)
+    status.rain_sensed = (digitalReadExt(PIN_RAINSENSOR) == iopts[IOPT_SENSOR1_OPTION] ? 0 : 1);
+#if defined(ESP8266)
+  if(iopts[IOPT_SENSOR2_TYPE]==SENSOR_TYPE_RAIN)
+    status.rain_sensed = (digitalReadExt(PIN_RAINSENSOR2) == iopts[IOPT_SENSOR2_OPTION] ? 0 : 1);
+#endif
+}
+
+/** Read soil moisture sensor status */
+void OpenSprinkler::soil_moisture_sensor_status() {
+  if(iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_SOIL)
+    status.soil_moisture_sensed = (digitalReadExt(PIN_SOILSENSOR) == iopts[IOPT_SENSOR1_OPTION] ? 0 : 1);
+#if defined(ESP8266)
+  if(iopts[IOPT_SENSOR2_TYPE]==SENSOR_TYPE_SOIL)
+    status.soil_moisture_sensed = (digitalReadExt(PIN_SOILSENSOR2) == iopts[IOPT_SENSOR2_OPTION] ? 0 : 1);
+#endif
 }
 
 /** Return program switch status */
 bool OpenSprinkler::programswitch_status(ulong curr_time) {
-  if(iopts[IOPT_SENSOR1_TYPE]!=SENSOR_TYPE_PSWITCH) return false;
-  static ulong keydown_time = 0;
-  byte val = digitalReadExt(PIN_RAINSENSOR);
-  if(!val && !keydown_time) keydown_time = curr_time;
-  else if(val && keydown_time && (curr_time > keydown_time)) {
-    keydown_time = 0;
-    return true;
+  if(iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_PSWITCH) {
+    static ulong keydown_time = 0;
+    byte val = digitalReadExt(PIN_RAINSENSOR);
+    if(!val && !keydown_time) keydown_time = curr_time;
+    else if(val && keydown_time && (curr_time > keydown_time)) {
+      keydown_time = 0;
+      return true;
+    }
   }
+#if defined(ESP8266)
+  if(iopts[IOPT_SENSOR2_TYPE]==SENSOR_TYPE_PSWITCH) {
+    static ulong keydown_time = 0;
+    byte val = digitalReadExt(PIN_RAINSENSOR2);
+    if(!val && !keydown_time) keydown_time = curr_time;
+    else if(val && keydown_time && (curr_time > keydown_time)) {
+      keydown_time = 0;
+      return true;
+    }
+  }
+#endif
   return false;
 }
 /** Read current sensing value
@@ -1140,11 +1148,11 @@ uint16_t OpenSprinkler::read_current() {
       scale = 0.0;  // for other controllers, current is 0
     }
     /* do an average */
-    const byte K = 5;
+    const byte K = 8;
     uint16_t sum = 0;
     for(byte i=0;i<K;i++) {
       sum += analogRead(PIN_CURR_SENSE);
-      delay(2);
+      delay(1);
     }
     return (uint16_t)((sum/K)*scale);
   } else {
@@ -1165,33 +1173,15 @@ int OpenSprinkler::detect_exp() {
   }
   return (n+1)*2;
   #else
-  unsigned int v = analogRead(PIN_EXP_SENSE);
   // OpenSprinkler uses voltage divider to detect expansion boards
   // Master controller has a 1.6K pull-up;
-  // each expansion board (8 stations) has 10K pull-down connected in parallel;
+  // each expansion board (8 stations) has 2x 4.7K pull-down connected in parallel;
   // so the exact ADC value for n expansion boards is:
-  //    ADC = 1024 * 10 / (10 + 1.6 * n)
-  // For  0,   1,   2,   3,   4,   5,  6 expansion boards, the ADC values are:
-  //   1024, 882, 775, 691, 624, 568, 522
-  // Actual threshold is taken as the midpoint between, to account for errors
-  int n = -1;
-  if (v > 953) { // 0
-    n = 0;
-  } else if (v > 828) { // 1
-    n = 1;
-  } else if (v > 733) { // 2
-    n = 2;
-  } else if (v > 657) { // 3
-    n = 3;
-  } else if (v > 596) { // 4
-    n = 4;
-  } else if (v > 545) { // 5
-    n = 5;
-  } else if (v > 502) { // 6
-    n = 6;
-  } else {  // cannot determine
-  }
-  return n;
+  //    ADC = 1024 * 9.4 / (10 + 9.4 * n)
+  // Reverse this fomular we have:
+  //    n = (1024 * 9.4 / ADC - 9.4) / 1.6
+  int n = (int)((1024 * 9.4 / analogRead(PIN_EXP_SENSE) - 9.4) / 1.6 + 0.33);
+	return n;	
   #endif
 #else
   return -1;
@@ -1461,8 +1451,8 @@ void OpenSprinkler::switch_rfstation(RFStationData *data, bool turnon) {
 #if defined(ARDUINO)
   #if defined(ESP8266)
   rfswitch.enableTransmit(PIN_RFTX);
-  rfswitch.setPulseLength(length);
   rfswitch.setProtocol(1);
+  rfswitch.setPulseLength(length);
   rfswitch.send(turnon ? on : off, 24);
   #else
   send_rfsignal(turnon ? on : off, length);
@@ -1493,12 +1483,124 @@ void OpenSprinkler::switch_gpiostation(GPIOStationData *data, bool turnon) {
     digitalWrite(gpio, 1-activeState);
 }
 
-/** Callback function for browseUrl calls */
-void httpget_callback(byte status, uint16_t off, uint16_t len) {
+/** Callback function for switching remote station */
+void remote_http_callback(char* buffer) {
 /*
-  Ethernet::buffer[off+ETHER_BUFFER_SIZE-1] = 0;
-  DEBUG_PRINTLN((const char*) Ethernet::buffer + off);
+  DEBUG_PRINTLN(buffer);
 */
+}
+
+void OpenSprinkler::send_http_request(uint32_t ip4, uint16_t port, char* p, void(*callback)(char*), uint16_t timeout) {
+  byte ip[4];
+  ip[0] = ip4>>24;
+  ip[1] = (ip4>>16)&0xff;
+  ip[2] = (ip4>>8)&0xff;
+  ip[3] = ip4&0xff;
+
+#if defined(ARDUINO)
+
+	Client *client;
+	#if defined(ESP8266)
+		if(m_server) client = new EthernetClient();
+		else client = new WiFiClient();
+	#else
+		client = new EthernetClient();
+	#endif
+
+	if(!client->connect(IPAddress(ip), port)) { delete client; return; }	
+
+#else
+
+	EthernetClient *client = new EthernetClient();
+	if(!client->connect(ip, port)) { delete client; return; }	
+
+#endif
+
+ 	uint32_t stoptime = millis()+timeout;
+ 	uint16_t len = strlen(p);
+	if(len > ETHER_BUFFER_SIZE) len = ETHER_BUFFER_SIZE;
+ 	client->write((uint8_t *)p, len);
+  bzero(ether_buffer, ETHER_BUFFER_SIZE);
+
+#if defined(ARDUINO) 	
+  while(!client->available() && millis() < stoptime) {
+		if(!client->connected())  break;  
+  	yield();
+  } 	
+  while(client->available()) {
+    client->read((uint8_t*)ether_buffer, ETHER_BUFFER_SIZE);
+    yield();
+  }
+#else
+  while(millis() < stoptime) {
+    int len=client->read((uint8_t *)ether_buffer, ETHER_BUFFER_SIZE);
+    if (len<=0) {
+      if(!client->connected())  break;
+      else	continue;
+    }
+  }
+#endif
+  client->stop();
+  delete client;
+  if(callback) callback(ether_buffer);
+}
+
+void OpenSprinkler::send_http_request(const char* server, uint16_t port, char* p, void(*callback)(char*), uint16_t timeout) {
+#if defined(ARDUINO)
+
+	Client *client;
+	#if defined(ESP8266)
+		if(m_server) client = new EthernetClient();
+		else client = new WiFiClient();
+	#else
+		client = new EthernetClient();
+	#endif
+
+	if(!client->connect(server, port)) { delete client; return; }	
+
+#else
+
+	EthernetClient *client = new EthernetClient();
+  struct hostent *host;
+  host = gethostbyname(server);
+  if (!host) {
+    DEBUG_PRINT("can't resolve http station - ");
+    DEBUG_PRINTLN(server);
+    delete client;
+    return;
+  }
+
+	if(!client->connect((uint8_t*)host->h_addr, port)) { delete client; return; }	
+
+#endif
+
+ 	uint32_t stoptime = millis()+timeout;
+ 	uint16_t len = strlen(p);
+	if(len > ETHER_BUFFER_SIZE) len = ETHER_BUFFER_SIZE;
+ 	client->write((uint8_t *)p, len);
+  bzero(ether_buffer, ETHER_BUFFER_SIZE);
+
+#if defined(ARDUINO) 	
+  while(!client->available() && millis() < stoptime) {
+		if(!client->connected())  break;  
+  	yield();
+  } 	
+  while(client->available()) {
+    client->read((uint8_t*)ether_buffer, ETHER_BUFFER_SIZE);
+    yield();
+  }
+#else
+  while(millis() < stoptime) {
+    int len=client->read((uint8_t *)ether_buffer, ETHER_BUFFER_SIZE);
+    if (len<=0) {
+      if(!client->connected())  break;
+      else	continue;
+    }
+  }
+#endif
+  client->stop();
+  delete client;
+  if(callback) callback(ether_buffer);
 }
 
 /** Switch remote station
@@ -1509,93 +1611,33 @@ void httpget_callback(byte status, uint16_t off, uint16_t len) {
  * password as the main controller
  */
 void OpenSprinkler::switch_remotestation(RemoteStationData *data, bool turnon) {
-#if defined(ARDUINO)
+	RemoteStationData copy;
+	memcpy((char*)&copy, (char*)data, sizeof(RemoteStationData));
+	
+  uint32_t ip4 = hex2ulong(copy.ip, sizeof(copy.ip));
+  uint16_t port = (uint16_t)hex2ulong(copy.port, sizeof(copy.port));
 
-  ulong ip = hex2ulong(data->ip, sizeof(data->ip));
-  ulong port = hex2ulong(data->port, sizeof(data->port));
-
-  #if defined(ESP8266)
-  WiFiClient client;
-  #else
-  EthernetClient client;
-  #endif
+  byte ip[4];
+  ip[0] = ip4>>24;
+  ip[1] = (ip4>>16)&0xff;
+  ip[2] = (ip4>>8)&0xff;
+  ip[3] = ip4&0xff;
   
-  char *p = tmp_buffer + sizeof(RemoteStationData) + 1;
+  // use tmp_buffer starting at a later location
+  // because remote station data is loaded at the beginning
+  char *p = tmp_buffer;
   BufferFiller bf = p;
   // MAX_NUM_STATIONS is the refresh cycle
   uint16_t timer = iopts[IOPT_SPE_AUTO_REFRESH]?2*MAX_NUM_STATIONS:64800;  
   bf.emit_p(PSTR("GET /cm?pw=$O&sid=$D&en=$D&t=$D"),
             SOPT_PASSWORD,
-            (int)hex2ulong(data->sid, sizeof(data->sid)),
+            (int)hex2ulong(copy.sid, sizeof(copy.sid)),
             turnon, timer);
-  bf.emit_p(PSTR(" HTTP/1.0\r\nHOST: *\r\n\r\n"));
-  
-  byte cip[4];
-  cip[0] = ip>>24;
-  cip[1] = (ip>>16)&0xff;
-  cip[2] = (ip>>8)&0xff;
-  cip[3] = ip&0xff;
+  bf.emit_p(PSTR(" HTTP/1.0\r\nHOST: $D.$D.$D.$D\r\n\r\n"),
+  					ip[0],ip[1],ip[2],ip[3]);
 
-  if(!client.connect(IPAddress(cip), port))  return;
-  client.write((uint8_t *)p, strlen(p));
-  
-  memset(ether_buffer, 0, ETHER_BUFFER_SIZE);
-  
-  time_t timeout = now_tz() + 5; // 5 seconds timeout
-  while(!client.available() && now_tz() < timeout) {
-  }
+	send_http_request(ip4, port, p, remote_http_callback);
 
-  while(client.available()) {
-    client.read((uint8_t*)ether_buffer, ETHER_BUFFER_SIZE);
-  }
-  client.stop();
-  //httpget_callback(0, 0, ETHER_BUFFER_SIZE);  
-  
-#else
-
-  EthernetClient client;
-
-  uint8_t hisip[4];
-  uint16_t hisport;
-  ulong ip = hex2ulong(data->ip, sizeof(data->ip));
-  hisip[0] = ip>>24;
-  hisip[1] = (ip>>16)&0xff;
-  hisip[2] = (ip>>8)&0xff;
-  hisip[3] = ip&0xff;
-  hisport = hex2ulong(data->port, sizeof(data->port));
-
-  if (!client.connect(hisip, hisport)) {
-    client.stop();
-    return;
-  }
-
-  char *p = tmp_buffer + sizeof(RemoteStationData) + 1;
-  BufferFiller bf = p;
-  // MAX_NUM_STATIONS is the refresh cycle
-  uint16_t timer = iopts[IOPT_SPE_AUTO_REFRESH]?2*MAX_NUM_STATIONS:64800;  
-  bf.emit_p(PSTR("GET /cm?pw=$O&sid=$D&en=$D&t=$D"),
-            SOPT_PASSWORD,
-            (int)hex2ulong(data->sid, sizeof(data->sid)),
-            turnon, timer);
-  bf.emit_p(PSTR(" HTTP/1.0\r\nHOST: *\r\n\r\n"));
-
-  client.write((uint8_t *)p, strlen(p));
-
-  bzero(ether_buffer, ETHER_BUFFER_SIZE);
-
-  time_t timeout = now() + 5; // 5 seconds timeout
-  while(now() < timeout) {
-    int len=client.read((uint8_t *)ether_buffer, ETHER_BUFFER_SIZE);
-    if (len<=0) {
-      if(!client.connected())
-        break;
-      else
-        continue;
-    }
-    httpget_callback(0, 0, ETHER_BUFFER_SIZE);
-  }
-  client.stop();
-#endif
 }
 
 /** Switch http station
@@ -1604,7 +1646,7 @@ void OpenSprinkler::switch_remotestation(RemoteStationData *data, bool turnon) {
  */
 void OpenSprinkler::switch_httpstation(HTTPStationData *data, bool turnon) {
 
-  static HTTPStationData copy;
+  HTTPStationData copy;
   // make a copy of the HTTP station data and work with it
   memcpy((char*)&copy, (char*)data, sizeof(HTTPStationData));
   char * server = strtok((char *)copy.data, ",");
@@ -1613,71 +1655,11 @@ void OpenSprinkler::switch_httpstation(HTTPStationData *data, bool turnon) {
   char * off_cmd = strtok(NULL, ",");
   char * cmd = turnon ? on_cmd : off_cmd;
 
-#if defined(ARDUINO)
+	char *p = tmp_buffer;
+	BufferFiller bf = p;
+	bf.emit_p(PSTR("GET /$S HTTP/1.0\r\nHOST: $S\r\n\r\n"), cmd, server);
 
-  #if defined(ESP8266)
-  WiFiClient client;
-  #else
-  EthernetClient client;
-  #endif
-  
-  if(!client.connect(server, atoi(port))) return;
-  
-  char getBuffer[255];
-  sprintf(getBuffer, "GET /%s HTTP/1.0\r\nHOST: *\r\n\r\n", cmd);
-  
-  //DEBUG_PRINTLN(getBuffer);
-  
-  client.write((uint8_t *)getBuffer, strlen(getBuffer));
-  
-  memset(ether_buffer, 0, ETHER_BUFFER_SIZE);
-  
-  time_t timeout = now_tz() + 5; // 5 seconds timeout
-  while(!client.available() && now_tz() < timeout) {
-  }
-
-  while(client.available()) {
-    client.read((uint8_t*)ether_buffer, ETHER_BUFFER_SIZE);
-  }
-  client.stop();
-  
-#else
-
-  EthernetClient client;
-  struct hostent *host;
-
-  host = gethostbyname(server);
-  if (!host) {
-    DEBUG_PRINT("can't resolve http station - ");
-    DEBUG_PRINTLN(server);
-    return;
-  }
-
-  if (!client.connect((uint8_t*)host->h_addr, atoi(port))) {
-    client.stop();
-    return;
-  }
-
-  char getBuffer[255];
-  sprintf(getBuffer, "GET /%s HTTP/1.0\r\nHOST: %s\r\n\r\n", cmd, host->h_name);
-  client.write((uint8_t *)getBuffer, strlen(getBuffer));
-
-  bzero(ether_buffer, ETHER_BUFFER_SIZE);
-
-  time_t timeout = now() + 5; // 5 seconds timeout
-  while(now() < timeout) {
-    int len=client.read((uint8_t *)ether_buffer, ETHER_BUFFER_SIZE);
-    if (len<=0) {
-      if(!client.connected())
-        break;
-      else
-        continue;
-    }
-    httpget_callback(0, 0, ETHER_BUFFER_SIZE);
-  }
-
-  client.stop();
-#endif
+	send_http_request(server, atoi(port), p, remote_http_callback);
 }
 
 /** Setup function for options */
@@ -1829,7 +1811,11 @@ void OpenSprinkler::options_setup() {
     byte hwv = iopts[IOPT_HW_VERSION];
     lcd.print((char)('0'+(hwv/10)));
     lcd.print('.');
+    #if defined(ESP8266)
+    lcd.print(hw_rev);
+    #else
     lcd.print((char)('0'+(hwv%10)));
+    #endif
     switch(hw_type) {
     case HW_TYPE_DC:
       lcd_print_pgm(PSTR(" DC"));
@@ -2020,7 +2006,15 @@ void OpenSprinkler::lcd_print_mac(const byte *mac) {
     lcd.print((mac[i]&0x0F), HEX);
     if(i==4) lcd.setCursor(0, 1);
   }
-  lcd_print_pgm(PSTR(" (MAC)"));
+#if defined(ESP8266)
+	if(m_server) {
+	  lcd_print_pgm(PSTR(" (Ether MAC)"));
+	} else {
+		lcd_print_pgm(PSTR(" (WiFi MAC)"));
+	}
+#else
+  lcd_print_pgm(PSTR(" (MAC)"));	
+#endif  
 }
 
 /** print station bits */
@@ -2053,29 +2047,58 @@ void OpenSprinkler::lcd_print_station(byte line, char c) {
 	  }
 	}
 	lcd_print_pgm(PSTR("    "));
-  lcd.setCursor(12, 1);
+  lcd.setCursor(13, 1);
   if(iopts[IOPT_REMOTE_EXT_MODE]) {
-    lcd.write(5);
+    lcd.write(ICON_REMOTEXT);
   }
-	lcd.setCursor(13, 1);
-  if(status.rain_delayed || (status.rain_sensed && iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_RAIN))  {
-    lcd.write(3);
+  
+	lcd.setCursor(14, 1);
+#if defined(ESP8266)
+  if(status.rain_delayed || 
+    (status.rain_sensed && (iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_RAIN || iopts[IOPT_SENSOR2_TYPE]==SENSOR_TYPE_RAIN)))  {
+#else
+  if(status.rain_delayed ||
+  	(status.rain_sensed && iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_RAIN))  {
+#endif
+    lcd.write(ICON_RAIN);
   }
+
+#if defined(ESP8266)
+  if(iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_SOIL || iopts[IOPT_SENSOR2_TYPE]==SENSOR_TYPE_SOIL)  {
+#else
+  if(iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_SOIL)  {
+#endif
+    if (status.soil_moisture_sensed)
+      lcd.write(ICON_SOIL_SENSED);
+    else if (status.soil_moisture_active)
+      lcd.write(ICON_SOIL_ACTIVE);
+  }
+  
+#if defined(ESP8266)
+  if(iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_FLOW || iopts[IOPT_SENSOR2_TYPE]==SENSOR_TYPE_FLOW) {
+#else
   if(iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_FLOW) {
-    lcd.write(6);
+#endif
+    lcd.write(ICON_FLOW);
   }
+
+#if defined(ESP8266)
+  if(iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_PSWITCH || iopts[IOPT_SENSOR2_TYPE]==SENSOR_TYPE_PSWITCH) {
+#else
   if(iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_PSWITCH) {
-    lcd.write(7);
+#endif
+    lcd.write(ICON_PSWITCH);
   }
-  lcd.setCursor(14, 1);
-  lcd.write(2);
 
 	lcd.setCursor(15, 1);
-	#if defined(ESP8266)
-	lcd.write(WiFi.status()==WL_CONNECTED?0:1);
-	#else
-  lcd.write(status.network_fails>2?1:0);  // if network failure detection is more than 2, display disconnect icon
-  #endif
+#if defined(ESP8266)
+	if(m_server)
+		lcd.write(Ethernet.linkStatus()==LinkON?ICON_ETHER_CONNECTED:ICON_ETHER_DISCONNECTED);
+	else
+		lcd.write(WiFi.status()==WL_CONNECTED?ICON_CONNECTED:ICON_DISCONNECTED);
+#else
+  lcd.write(status.network_fails>2?ICON_DISCONNECTED:ICON_CONNECTED);  // if network failure detection is more than 2, display disconnect icon
+#endif
 }
 
 /** print a version number */

@@ -29,15 +29,16 @@
 extern OpenSprinkler os; // OpenSprinkler object
 extern char tmp_buffer[];
 extern char ether_buffer[];
-byte findKeyVal (const char *str,char *strbuf, uint8_t maxlen,const char *key,bool key_in_pgm=false,uint8_t *keyfound=NULL);
+byte findKeyVal (const char *str,char *strbuf, uint16_t maxlen,const char *key,bool key_in_pgm=false,uint8_t *keyfound=NULL);
 void write_log(byte type, ulong curr_time);
 
 // The weather function calls getweather.py on remote server to retrieve weather data
 // the default script is WEATHER_SCRIPT_HOST/weather?.py
 //static char website[] PROGMEM = DEFAULT_WEATHER_URL ;
 
-static void getweather_callback() {
-  char *p = ether_buffer;
+static void getweather_callback(char* buffer) {
+  char *p = buffer;
+	DEBUG_PRINTLN(p);  
   /* scan the buffer until the first & symbol */
   while(*p && *p!='&') {
     p++;
@@ -107,55 +108,25 @@ static void getweather_callback() {
   write_log(LOGDATA_WATERLEVEL, os.checkwt_success_lasttime);
 }
 
-void peel_http_header() { // remove the HTTP header
-  int i=0;
-  bool eol=true;
-  while(i<ETHER_BUFFER_SIZE) {
-    char c = ether_buffer[i];
-    if(c==0)  return;
-    if(c=='\n' && eol) {
-      // copy
-      i++;
-      int j=0;
-      while(i<ETHER_BUFFER_SIZE) {
-        ether_buffer[j]=ether_buffer[i];
-        if(ether_buffer[j]==0)  break;
-        i++;
-        j++;
-      }
-      return;
-    }
-    if(c=='\n') {
-      eol=true;
-    } else if (c!='\r') {
-      eol=false;
-    }
-    i++;
-  }
+static void getweather_callback_with_peel_header(char* buffer) {
+	peel_http_header(buffer);
+	getweather_callback(buffer);
 }
 
-#if defined(ARDUINO)  // for AVR
 void GetWeather() {
-  // perform DNS lookup for every query
-  os.sopt_load(SOPT_WEATHERURL, tmp_buffer);
-
 #if defined(ESP8266)
-  WiFiClient client;
-  if (os.state!=OS_STATE_CONNECTED || WiFi.status()!=WL_CONNECTED) return;
-#else
-  EthernetClient client;
+	if(!m_server) {
+	  if (os.state!=OS_STATE_CONNECTED || WiFi.status()!=WL_CONNECTED) return;
+	}
 #endif
-
-  if(!client.connect(tmp_buffer, 80))  return;
-
+	// use temp buffer to construct get command
   BufferFiller bf = tmp_buffer;
-  bf.emit_p(PSTR("$D.py?loc=$O&key=$O&wto=$O&fwv=$D"),
+  bf.emit_p(PSTR("$D?loc=$O&wto=$O&fwv=$D"),
                 (int) os.iopts[IOPT_USE_WEATHER],
                 SOPT_LOCATION,
-                SOPT_WEATHER_KEY,
                 SOPT_WEATHER_OPTS,
                 (int)os.iopts[IOPT_FW_VERSION]);
-  // copy string to tmp_buffer, replacing all spaces with _
+
   char *src=tmp_buffer+strlen(tmp_buffer);
   char *dst=tmp_buffer+TMP_BUFFER_SIZE-12;
   
@@ -175,121 +146,23 @@ void GetWeather() {
   };
   *dst = *src;
 
-  char urlBuffer[255];
-  strcpy(urlBuffer, "GET /weather");
-  strcat(urlBuffer, dst);
-  strcat(urlBuffer, " HTTP/1.0\r\nHOST: ");
-  strcat(urlBuffer, "*\r\n\r\n");
-  
-  client.write((uint8_t *)urlBuffer, strlen(urlBuffer));
-  
-  memset(ether_buffer, 0, ETHER_BUFFER_SIZE);
-  
-  time_t timeout = os.now_tz() + 5; // 5 seconds timeout
-  while(!client.available() && os.now_tz() < timeout) {
-  }
+  strcpy(ether_buffer, "GET /");
+  strcat(ether_buffer, dst);
+	// because dst is part of tmp_buffer,
+	// must load weather url AFTER dst is copied to ether_buffer  
 
-  while(client.available()) {
-    client.read((uint8_t*)ether_buffer, ETHER_BUFFER_SIZE);
-  }
-  client.stop();
-  peel_http_header();
-  getweather_callback();
+  // load weather url
+  os.sopt_load(SOPT_WEATHERURL, tmp_buffer);
+  char* server = strtok(tmp_buffer, ":");
+  char* port = strtok(NULL, ":");
 
+  strcat(ether_buffer, " HTTP/1.0\r\nHOST: ");
+  strcat(ether_buffer, server);
+  strcat(ether_buffer, "\r\n\r\n");
+
+	DEBUG_PRINTLN(ether_buffer);
+	
+	os.send_http_request(server, (port==NULL)?80:atoi(port),
+									  	 ether_buffer, getweather_callback_with_peel_header);
 }
-
-#else // for RPI/BBB/LINUX
-
-void GetWeather() {
-  EthernetClient client;
-  uint16_t port = 80;
-  char * delim;
-  struct hostent *server;
-  
-  char *ptmp = tmp_buffer;
-  os.sopt_load(SOPT_WEATHERURL, ptmp);
-
-  // Check to see if url specifies a port number to use
-  delim = strchr(ptmp, ':');
-  if (delim != NULL) {
-        *delim = 0;
-        port = atoi(delim+1);
-  }
-
-  server = gethostbyname(ptmp);
-  if (!server) {
-    DEBUG_PRINT("can't resolve weather server - ");
-    DEBUG_PRINTLN(ptmp);
-    return;
-  }
-  /*DEBUG_PRINT("weather server ip:port - ");
-  DEBUG_PRINT(((uint8_t*)server->h_addr)[0]);
-  DEBUG_PRINT(".");
-  DEBUG_PRINT(((uint8_t*)server->h_addr)[1]);
-  DEBUG_PRINT(".");
-  DEBUG_PRINT(((uint8_t*)server->h_addr)[2]);
-  DEBUG_PRINT(".");
-  DEBUG_PRINT(((uint8_t*)server->h_addr)[3]);
-  DEBUG_PRINT(":");
-  DEBUG_PRINTLN(port);*/
-
-  if (!client.connect((uint8_t*)server->h_addr, port)) {
-    client.stop();
-    return;
-  }
-
-  BufferFiller bf = tmp_buffer;
-  bf.emit_p(PSTR("$D.py?loc=$O&key=$O&wto=$O&fwv=$D"),
-                (int) os.iopts[IOPT_USE_WEATHER],
-                SOPT_LOCATION,
-                SOPT_WEATHER_KEY,
-                SOPT_WEATHER_OPTS,
-                (int)os.iopts[IOPT_FW_VERSION]);
-                  
-  char *src=tmp_buffer+strlen(tmp_buffer);
-  char *dst=tmp_buffer+TMP_BUFFER_SIZE-12;
-  
-  char c;
-  // url encode. convert SPACE to %20
-  // copy reversely from the end because we are potentially expanding
-  // the string size 
-  while(src!=tmp_buffer) {
-    c = *src--;
-    if(c==' ') {
-      *dst-- = '0';
-      *dst-- = '2';
-      *dst-- = '%';
-    } else {
-      *dst-- = c;
-    }
-  };
-  *dst = *src;
-
-  char urlBuffer[255];
-  strcpy(urlBuffer, "GET /weather");
-  strcat(urlBuffer, dst);
-  strcat(urlBuffer, " HTTP/1.0\r\nHOST: ");
-  strcat(urlBuffer, server->h_name);
-  strcat(urlBuffer, "\r\n\r\n");
-  
-  client.write((uint8_t *)urlBuffer, strlen(urlBuffer));
-  
-  bzero(ether_buffer, ETHER_BUFFER_SIZE);
-  
-  time_t timeout = os.now_tz() + 5; // 5 seconds timeout
-  while(os.now_tz() < timeout) {
-    int len=client.read((uint8_t *)ether_buffer, ETHER_BUFFER_SIZE);
-    if (len<=0) {
-      if(!client.connected())
-        break;
-      else 
-        continue;
-    }
-    peel_http_header();
-    getweather_callback();
-    break;
-  }
-  client.stop();
-}
-#endif // GetWeather()
 

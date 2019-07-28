@@ -1,7 +1,21 @@
-#if defined(ESP8266)
-
 #ifndef IMAGES_H
 #define IMAGES_H
+
+enum {
+	ICON_CONNECTED = 0,
+	ICON_DISCONNECTED,
+	ICON_REMOTEXT,
+	ICON_RAIN,
+	ICON_FLOW,
+	ICON_PSWITCH,
+	ICON_SOIL_SENSED,
+	ICON_SOIL_ACTIVE,
+	ICON_ETHER_CONNECTED,
+	ICON_ETHER_DISCONNECTED,
+	NUM_CUSTOM_ICONS
+};
+
+#if defined(ESP8266)
 
 #define WiFi_Logo_width 60
 #define WiFi_Logo_height 36
@@ -46,11 +60,11 @@ const char _iconimage_disconnected[] PROGMEM = {
   0xAA, 0xAA, 0x00, 0x00,
   };
 
-const char _iconimage_sdcard[] PROGMEM = {
+const char _iconimage_remotext[] PROGMEM = {
   0x00, 0x00, 0x00, 0x00,
-  0x00, 0x00, 0x3E, 0x22,
-  0x3E, 0x22, 0x22, 0x3A,
-  0x0E, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x41,
+  0x62, 0x54, 0x48, 0x44,
+  0x22, 0x1F, 0x00, 0x00,
   };
   
 const char _iconimage_rain[] PROGMEM = {
@@ -58,20 +72,6 @@ const char _iconimage_rain[] PROGMEM = {
   0x18, 0x24, 0x3E, 0x00,
   0x2A, 0x2A, 0x00, 0x2A,
   0x2A, 0x00, 0x00, 0x00,
-  };  
-
-const char _iconimage_connect[] PROGMEM = {
-  0x00, 0x00, 0x00, 0x00,
-  0x00, 0x00, 0x00, 0x00,
-  0x00, 0x00, 0x00, 0x00,
-  0x00, 0x00, 0x00, 0x00,
-  };  
-
-const char _iconimage_remotext[] PROGMEM = {
-  0x00, 0x00, 0x00, 0x00,
-  0x00, 0x00, 0x00, 0x41,
-  0x62, 0x54, 0x48, 0x44,
-  0x22, 0x1F, 0x00, 0x00,
   };  
 
 const char _iconimage_flow[] PROGMEM = {
@@ -88,6 +88,126 @@ const char _iconimage_pswitch[] PROGMEM = {
   0x20, 0x70, 0x00, 0x00,
   };  
 
+// todo
+const char _iconimage_soil_sensed[] PROGMEM = {
+	0x00, 0x00, 0x00, 0x0E,
+	0x01, 0x0E, 0x10, 0x0F,
+	0x00, 0x60, 0x90, 0x90,
+	0x60, 0x00, 0x00, 0x00,
+  };  
+
+const char _iconimage_soil_active[] PROGMEM = {
+	0x00, 0x00, 0x00, 0x0E,
+	0x01, 0x0E, 0x10, 0x0F,
+	0x00, 0x60, 0x90, 0x90,
+	0x60, 0x00, 0x00, 0x00,
+  };  
+
+const char _iconimage_ether_connected[] PROGMEM = {
+  0x00, 0x00, 0x00, 0x38,
+  0x28, 0x38, 0x10, 0x10,
+  0xFE, 0x44, 0x44, 0xEE,
+  0xAA, 0xEE, 0x00, 0x00,
+  };
+  
+const char _iconimage_ether_disconnected[] PROGMEM = {
+  0x00, 0x00, 0x11, 0x0A,
+  0x04, 0xEA, 0xB1, 0xE0,
+  0x40, 0xFE, 0x44, 0xEE,
+  0xAA, 0xEE, 0x00, 0x00,
+  };
+
+#elif defined(ARDUINO)
+
+const char _iconimage_connected[] PROGMEM = {
+	B00000,
+	B00000,
+	B00000,
+	B00001,
+	B00001,
+	B00101,
+	B00101,
+	B10101
+};
+
+const char _iconimage_disconnected[] PROGMEM = {
+	B00000,
+	B10100,
+	B01000,
+	B10101,
+	B00001,
+	B00101,
+	B00101,
+	B10101
+};
+
+const char _iconimage_remotext[] PROGMEM = {
+	B00000,
+	B00000,
+	B00000,
+	B10001,
+	B01011,
+	B00101,
+	B01001,
+	B11110
+};
+
+const char _iconimage_rain[] PROGMEM = {
+	B00000,
+	B00000,
+	B00110,
+	B01001,
+	B11111,
+	B00000,
+	B10101,
+	B10101
+};
+
+const char _iconimage_flow[] PROGMEM = {
+	B00000,
+	B00000,
+	B00000,
+	B11010,
+	B10010,
+	B11010,
+	B10011,
+	B00000
+};
+
+const char _iconimage_pswitch[] PROGMEM = {
+	B00000,
+	B11100,
+	B10100,
+	B11100,
+	B10010,
+	B10110,
+	B00010,
+	B00111
+};
+
+// todo
+const char _iconimage_soil_sensed[] PROGMEM = {
+	B00000,
+	B00000,
+	B01110,
+	B10000,
+	B01110,
+	B00001,
+	B11110,
+	B00000	
+};  
+
+const char _iconimage_soil_active[] PROGMEM = {
+	B00000,
+	B00000,
+	B01110,
+	B10000,
+	B01110,
+	B00001,
+	B11110,
+	B00000
+};  
+  
 #endif
 
 #endif

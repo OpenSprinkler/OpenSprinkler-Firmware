@@ -25,6 +25,10 @@
 #ifndef _OPENSPRINKLER_H
 #define _OPENSPRINKLER_H
 
+#include "defines.h"
+#include "utils.h"
+#include "gpio.h"
+
 #if defined(ARDUINO) // headers for ESP8266
   #include <Arduino.h>
   #include <Wire.h>
@@ -50,10 +54,6 @@
   #include <sys/stat.h>  
   #include "etherport.h"
 #endif // end of headers
-
-#include "defines.h"
-#include "utils.h"
-#include "gpio.h"
 
 /** Non-volatile data structure */
 struct NVConData {
@@ -120,6 +120,8 @@ struct ConStatus {
   byte network_fails:3;     // number of network fails
   byte mas:8;               // master station index
   byte mas2:8;              // master2 station index
+	byte soil_moisture_sensed:1; // soil moisture sensor bit (when set, it indicates wet, delayed)
+	byte soil_moisture_active:1; // soil moisture sensor bit (when set, it indicates wet, active after delay)  
 };
 
 extern const char iopt_json_names[];
@@ -146,7 +148,8 @@ public:
   static ConStatus status;
   static ConStatus old_status;
   static byte nboards, nstations;
-  static byte hw_type;           // hardware type
+  static byte hw_type;	// hardware type
+  static byte hw_rev;		// hardware minor
 
   static byte iopts[]; // integer options
   static const char*sopts[]; // string options
@@ -162,6 +165,7 @@ public:
     
   // variables for time keeping
   static ulong sensor_lasttime;  // time when the last sensor reading is recorded
+	static ulong soil_moisture_sensed_time; //time when soil moisture detects wet, base for delay  
   static volatile ulong flowcount_time_ms;// time stamp when new flow sensor click is received (in milliseconds)
   static ulong flowcount_rt;     // flow count (for computing real-time flow rate)
   static ulong flowcount_log_start; // starting flow count (for logging)
@@ -177,8 +181,9 @@ public:
   static void reboot_dev();   // reboot the microcontroller
   static void begin();        // initialization, must call this function before calling other functions
   static byte start_network();  // initialize network with the given mac and port
+  static byte start_ether();  // initialize ethernet with the given mac and port  
 #if defined(ARDUINO)
-  static void load_hardware_mac(byte* buffer);  // read hardware mac address
+  static bool load_hardware_mac(byte* buffer, bool wired=false);  // read hardware mac address
 #endif
   static time_t now_tz();
   // -- station names and attributes
@@ -215,6 +220,7 @@ public:
   static void raindelay_start();  // start raindelay
   static void raindelay_stop();   // stop rain delay
   static void rainsensor_status();// update rainsensor status
+	static void soil_moisture_sensor_status(); // update soil moisture status  
   static bool programswitch_status(ulong); // get program switch status
 
   static uint16_t read_current(); // read current sensing value
@@ -228,6 +234,9 @@ public:
   static void clear_all_station_bits(); // clear all station bits
   static void apply_all_station_bits(); // apply all station bits (activate/deactive values)
 
+  static void send_http_request(uint32_t ip4, uint16_t port, char* p, void(*callback)(char*)=NULL, uint16_t timeout=5000);
+  static void send_http_request(const char* server, uint16_t port, char* p, void(*callback)(char*)=NULL, uint16_t timeout=5000);
+  
   // -- LCD functions
 #if defined(ARDUINO) // LCD functions for Arduino
   #if defined(ESP8266)
@@ -267,7 +276,8 @@ public:
   static void config_ip();
   static void reset_to_ap();
   static byte state;
-  #endif  
+  #endif
+  
 private:
   static void lcd_print_option(int i);  // print an option to the lcd
   static void lcd_print_2digit(int v);  // print a integer in 2 digits
@@ -287,13 +297,16 @@ private:
   static byte engage_booster;
 };
 
+// todo
 #if defined(ARDUINO)
-  extern EthernetServer *ether_server;
-  extern EthernetClient *ether_client;
+  extern EthernetServer *m_server;
+  extern EthernetClient *m_client;
   extern EthernetUDP    *Udp;  
   #if defined(ESP8266)
   extern ESP8266WebServer *wifi_server;
   #endif
+#else
+  extern EthernetServer *m_server;
 #endif
 
 #endif  // _OPENSPRINKLER_H

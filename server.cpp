@@ -35,16 +35,17 @@
     #define INSERT_DELAY(x) {}
    
     extern ESP8266WebServer *wifi_server;
-
-    #define handle_return(x) {if(x==HTML_OK) server_send_html(ether_buffer); else server_send_result(x); return;}
+	  extern EthernetServer *m_server;
+	  extern EthernetClient *m_client;
+    
+    #define handle_return(x) {if(m_client) {return_code=x; return;} else {if(x==HTML_OK) server_send_html(ether_buffer); else server_send_result(x); return;}}
 
   #else
 
     #include "SdFat.h"
     extern SdFat sd;
-    extern EthernetClient *ether_client;
+    extern EthernetClient *m_client;
     #define handle_return(x) {return_code=x; return;}
-    //#define INSERT_DELAY(x) delay(x)
     #define INSERT_DELAY(x) {}
   #endif
 
@@ -137,29 +138,52 @@ static const char htmlReturnHome[] PROGMEM =
   "<script>window.location=\"/\";</script>\n"
 ;
 
-#if defined(ARDUINO)
 void print_html_standard_header() {
 #if defined(ESP8266)
+  if (m_client) {
+    bfill.emit_p(PSTR("$F$F$F$F\r\n"), html200OK, htmlContentHTML, htmlNoCache, htmlAccessControl);
+    return;
+  }
+  // else
   wifi_server->sendHeader("Cache-Control", "max-age=0, no-cache, no-store, must-revalidate");
   wifi_server->sendHeader("Access-Control-Allow-Origin", "*");
-#else
+#elif defined(ARDUINO)
   bfill.emit_p(PSTR("$F$F$F$F\r\n"), html200OK, htmlContentHTML, htmlNoCache, htmlAccessControl);
+#else
+  m_client->write((const uint8_t *)html200OK, strlen(html200OK));
+  m_client->write((const uint8_t *)htmlContentHTML, strlen(htmlContentHTML));
+  m_client->write((const uint8_t *)htmlNoCache, strlen(htmlNoCache));
+  m_client->write((const uint8_t *)htmlAccessControl, strlen(htmlAccessControl));
+  m_client->write((const uint8_t *)"\r\n", 2);
 #endif
 }
 
 void print_json_header(bool bracket=true) {
 #if defined(ESP8266)
+  if (m_client) {
+    bfill.emit_p(PSTR("$F$F$F$F\r\n"), html200OK, htmlContentJSON, htmlAccessControl, htmlNoCache);
+    if(bracket) bfill.emit_p(PSTR("{"));
+    return;
+  }
+  // else
   wifi_server->sendHeader("Cache-Control", "max-age=0, no-cache, no-store, must-revalidate");
   wifi_server->sendHeader("Content-Type", "application/json");
   wifi_server->sendHeader("Access-Control-Allow-Origin", "*");
-#else
+  //todo if(bracket) bfill.emit_p(PSTR("{")); //
+#elif defined(ARDUINO)
   bfill.emit_p(PSTR("$F$F$F$F\r\n"), html200OK, htmlContentJSON, htmlAccessControl, htmlNoCache);
-#endif
   if(bracket) bfill.emit_p(PSTR("{"));
+#else
+  m_client->write((const uint8_t *)html200OK, strlen(html200OK));
+  m_client->write((const uint8_t *)htmlContentJSON, strlen(htmlContentJSON));
+  m_client->write((const uint8_t *)htmlNoCache, strlen(htmlNoCache));
+  m_client->write((const uint8_t *)htmlAccessControl, strlen(htmlAccessControl));
+  if(bracket) m_client->write((const uint8_t *)"\r\n{", 3);
+  else m_client->write((const uint8_t *)"\r\n", 2);
+#endif
 }
 
-byte findKeyVal (const char *str,char *strbuf, uint8_t maxlen,const char *key,bool key_in_pgm=false,uint8_t *keyfound=NULL)
-{
+byte findKeyVal (const char *str,char *strbuf, uint16_t maxlen,const char *key,bool key_in_pgm=false,uint8_t *keyfound=NULL) {
   uint8_t found=0;
 #if defined(ESP8266)
   // for ESP8266: there are two cases:
@@ -181,9 +205,10 @@ byte findKeyVal (const char *str,char *strbuf, uint8_t maxlen,const char *key,bo
   }
 #endif
   // case 2: otherwise, assume the key-val is stored in str
-  uint8_t i=0;
+  uint16_t i=0;
   const char *kp;
   kp=key;
+#if defined(ARDUINO)  
   if (key_in_pgm) {
     // key is in program memory space
     while(*str &&  *str!=' ' && *str!='\n' && found==0){
@@ -201,7 +226,11 @@ byte findKeyVal (const char *str,char *strbuf, uint8_t maxlen,const char *key,bo
       }
       str++;
     }
-  } else {
+  }
+  else
+#endif
+	// for Linux, key_in_pgm is always false
+  {
     while(*str &&  *str!=' ' && *str!='\n' && found==0){
       if (*str == *kp){
         kp++;
@@ -244,128 +273,37 @@ void rewind_ether_buffer() {
 
 void send_packet(bool final=false) {
 #if defined(ESP8266)
-  if(final || available_ether_buffer()<0) {
+  if (m_client) {
+    m_client->write((const uint8_t *)ether_buffer, strlen(ether_buffer));
+    if (final)
+      m_client->stop();
+    else
+      rewind_ether_buffer();
+    return;
+  }
+  // else
+  if(final || available_ether_buffer()<250) {
     wifi_server->sendContent(ether_buffer);
     if(final)
       wifi_server->client().stop();      
     else
       rewind_ether_buffer();
   }
-#else
-  if(final || available_ether_buffer()<0) {
-    ether_client->write(ether_buffer, strlen(ether_buffer));
+#elif defined(ARDUINO)
+  if(final || available_ether_buffer()<250) {
+    m_client->write(ether_buffer, strlen(ether_buffer));
     if(final)
-      ether_client->stop();      
+      m_client->stop();      
     else
       rewind_ether_buffer();
   }
-#endif
-}
-
 #else
-void print_html_standard_header() {
-  m_client->write((const uint8_t *)html200OK, strlen(html200OK));
-  m_client->write((const uint8_t *)htmlContentHTML, strlen(htmlContentHTML));
-  m_client->write((const uint8_t *)htmlNoCache, strlen(htmlNoCache));
-  m_client->write((const uint8_t *)htmlAccessControl, strlen(htmlAccessControl));
-  m_client->write((const uint8_t *)"\r\n", 2);
-}
-
-void print_json_header(bool bracket=true) {
-  m_client->write((const uint8_t *)html200OK, strlen(html200OK));
-  m_client->write((const uint8_t *)htmlContentJSON, strlen(htmlContentJSON));
-  m_client->write((const uint8_t *)htmlNoCache, strlen(htmlNoCache));
-  m_client->write((const uint8_t *)htmlAccessControl, strlen(htmlAccessControl));
-  if(bracket) m_client->write((const uint8_t *)"\r\n{", 3);
-  else m_client->write((const uint8_t *)"\r\n", 2);
-}
-
-byte findKeyVal (const char *str,char *strbuf, uint8_t maxlen,const char *key,bool key_in_pgm=false,uint8_t *keyfound=NULL)
-{
-  uint8_t found=0;
-  uint8_t i=0;
-  const char *kp;
-  kp=key;
-  while(*str &&  *str!=' ' && *str!='\n' && found==0){
-    if (*str == *kp){
-      kp++;
-      if (*kp == '\0'){
-        str++;
-        kp=key;
-        if (*str == '='){
-            found=1;
-        }
-      }
-    } else {
-      kp=key;
-    }
-    str++;
-  }
-  if (found==1){
-    // copy the value to a buffer and terminate it with '\0'
-    while(*str &&  *str!=' ' && *str!='\n' && *str!='&' && i<maxlen-1){
-      *strbuf=*str;
-      i++;
-      str++;
-      strbuf++;
-    }
-    if (!(*str) ||  *str == ' ' || *str == '\n' || *str == '&') {
-      *strbuf = '\0';
-    } else {
-      found = 0;  // Ignore partial values i.e. value length is larger than maxlen
-      i = 0;
-    }
-  }
-  // return the length of the value
-  if (keyfound) *keyfound = found;
-  return(i);
-}
-
-void rewind_ether_buffer() {
-  bfill = ether_buffer;
-}
-
-void send_packet(bool final=false) {
   m_client->write((const uint8_t *)ether_buffer, strlen(ether_buffer));
   if (final)
     m_client->stop();
   else
     rewind_ether_buffer();
-}
-
-#endif
-
-/** Convert a single hex digit character to its integer value */
-unsigned char h2int(char c)
-{
-    if (c >= '0' && c <='9'){
-        return((unsigned char)c - '0');
-    }
-    if (c >= 'a' && c <='f'){
-        return((unsigned char)c - 'a' + 10);
-    }
-    if (c >= 'A' && c <='F'){
-        return((unsigned char)c - 'A' + 10);
-    }
-    return(0);
-}
-
-/** Decode a url string e.g "hello%20joe" or "hello+joe" becomes "hello joe" */
-void urlDecode (char *urlbuf)
-{
-    if(!urlbuf) return;
-    char c;
-    char *dst = urlbuf;
-    while ((c = *urlbuf) != 0) {
-        if (c == '+') c = ' ';
-        if (c == '%') {
-            c = *++urlbuf;
-            c = (h2int(c) << 4) | h2int(*++urlbuf);
-        }
-        *dst++ = c;
-        urlbuf++;
-    }
-    *dst = '\0';
+#endif	
 }
 
 #if defined(ESP8266)
@@ -378,29 +316,39 @@ String toHMS(ulong t) {
 }
 
 void server_send_html(String html) {
+  if (m_client) {
+    return;
+  }
+  // else
   wifi_server->send(200, "text/html", html);
 }
 
 void server_send_json(String json) {
+  if (m_client) {
+    return;
+  }
+  // else
   wifi_server->send(200, "application/json", json);
 }
 
 void server_send_result(byte code) {
+  rewind_ether_buffer();
   String html = F("{\"result\":");
   html += code;
   html += "}";
-  print_html_standard_header();
+  print_json_header(false);
   server_send_json(html);
 }
 
 void server_send_result(byte code, const char* item) {
+  rewind_ether_buffer();
   String html = F("{\"result\":");
   html += code;
   html += F(",\"item\":\"");
   if(item) html += item;
   html += "\"";
   html += "}";
-  print_json_header();
+  print_json_header(false);
   server_send_json(html);
 }
 
@@ -450,20 +398,6 @@ char dec2hexchar(byte dec) {
   if(dec<10) return '0'+dec;
   else return 'A'+(dec-10);
 }
-
-/*String get_mac() {
-  static String hex;
-  if(!hex.length()) {
-    byte mac[6];
-    WiFi.macAddress(mac);
-
-    for(byte i=0;i<6;i++) {
-      hex += dec2hexchar((mac[i]>>4)&0x0F);
-      hex += dec2hexchar(mac[i]&0x0F);
-    }
-  }
-  return hex;
-}*/
 
 String get_ap_ssid() {
   static String ap_ssid;
@@ -652,6 +586,8 @@ void server_change_stations() {
 #if defined(ESP8266)
   char* p = NULL;
   if(!process_password()) return;
+  if (m_client)
+    p = get_buffer;  
 #else
   char* p = get_buffer;
 #endif
@@ -683,7 +619,6 @@ void server_change_stations() {
       tmp_buffer[0]-='0';
       tmp_buffer[STATION_SPECIAL_DATA_SIZE] = 0;
 
-#if !defined(ARDUINO) || defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__) || defined(ESP8266)
       // only process GPIO and HTTP stations for OS 2.3, above, and OSPi
 	    if(tmp_buffer[0] == STN_TYPE_GPIO) {
         // check that pin does not clash with OSPi pins
@@ -697,14 +632,15 @@ void server_change_stations() {
 		    }
 		    if (!found || activeState > 1) handle_return(HTML_DATA_OUTOFBOUND);
 	    } else if (tmp_buffer[0] == STN_TYPE_HTTP) {
-        #if !defined(ESP8266)  // ESP8266 performs automatic decoding so no need to do it again
-		      urlDecode(tmp_buffer + 1);
-        #endif
+        #if defined(ESP8266)  // ESP8266 performs automatic decoding so no need to do it again
+		      if(m_server) urlDecode(tmp_buffer + 1);
+        #else
+	        urlDecode(tmp_buffer + 1);
+	      #endif
 		    if (strlen(tmp_buffer+1) > sizeof(HTTPStationData)) {
 			    handle_return(HTML_DATA_OUTOFBOUND);
 		    }
 	    }
-#endif
       // write spe data
       file_write_block(STATIONS_FILENAME, tmp_buffer,
         (uint32_t)sid*sizeof(StationData)+offsetof(StationData,type), STATION_SPECIAL_DATA_SIZE+1);
@@ -748,8 +684,10 @@ void manual_start_program(byte, byte);
  */
 void server_manual_program() {
 #if defined(ESP8266)
-  char *p = NULL;
+  char* p = NULL;
   if(!process_password()) return;
+  if (m_client)
+    p = get_buffer;
 #else
   char *p = get_buffer;
 #endif
@@ -786,6 +724,8 @@ void server_change_runonce() {
 #if defined(ESP8266)
   char* p = NULL;
   if(!process_password()) return;
+  if (m_client)
+    p = get_buffer;  
   if(!findKeyVal(p,tmp_buffer,TMP_BUFFER_SIZE, "t", false)) handle_return(HTML_DATA_MISSING);
   char *pv = tmp_buffer+1;
 #else
@@ -849,6 +789,8 @@ void server_delete_program() {
 #if defined(ESP8266)
   char *p = NULL;
   if(!process_password()) return;
+  if (m_client)
+    p = get_buffer;  
 #else
   char *p = get_buffer;
 #endif
@@ -878,6 +820,8 @@ void server_moveup_program() {
 #if defined(ESP8266)
   char *p = NULL;
   if(!process_password()) return;
+  if (m_client)
+    p = get_buffer;  
 #else
   char *p = get_buffer;
 #endif
@@ -910,7 +854,8 @@ void server_change_program() {
 #if defined(ESP8266)
   char *p = NULL;
   if(!process_password()) return;
-
+  if (m_client)
+    p = get_buffer;
 #else
   char *p = get_buffer;
 #endif
@@ -1138,7 +1083,7 @@ void server_json_controller_main() {
   byte bid, sid;
   ulong curr_time = os.now_tz();
   bfill.emit_p(PSTR("\"devt\":$L,\"nbrd\":$D,\"en\":$D,\"rd\":$D,\"rs\":$D,\"rdst\":$L,"
-                    "\"loc\":\"$O\",\"wtkey\":\"$O\",\"sunrise\":$D,\"sunset\":$D,\"eip\":$L,\"lwc\":$L,\"lswc\":$L,"
+                    "\"loc\":\"$O\",\"sunrise\":$D,\"sunset\":$D,\"eip\":$L,\"lwc\":$L,\"lswc\":$L,"
                     "\"lupt\":$L,\"lrun\":[$D,$D,$D,$L],"),
               curr_time,
               os.nboards,
@@ -1147,7 +1092,6 @@ void server_json_controller_main() {
               os.status.rain_sensed,
               os.nvdata.rd_stop_time,
               SOPT_LOCATION,
-              SOPT_WEATHER_KEY,
               os.nvdata.sunrise_time,
               os.nvdata.sunset_time,
               os.nvdata.external_ip,
@@ -1195,9 +1139,10 @@ void server_json_controller_main() {
   }
 
   bfill.emit_p(PSTR(",\"wto\":{$O}"), SOPT_WEATHER_OPTS);
-  
   bfill.emit_p(PSTR(",\"ifkey\":\"$O\""), SOPT_IFTTT_KEY);
-
+  //bfill.emit_p(PSTR(",\"blynk\":\"$O\""), SOPT_BLYNK_TOKEN);
+  //bfill.emit_p(PSTR(",\"mqtt\":\"$O\""), SOPT_MQTT_IP);
+  
 #if defined(ESP8266)
   bfill.emit_p(PSTR(",\"RSSI\":$D"), (int16_t)WiFi.RSSI());
 #endif
@@ -1255,6 +1200,8 @@ void server_change_values()
   char *p = NULL;
   extern unsigned long reboot_timer;
   if(!process_password()) return;
+  if (m_client)
+    p = get_buffer;  
 #else
   char *p = get_buffer;
 #endif  
@@ -1336,6 +1283,8 @@ void server_change_scripturl() {
 #if defined(ESP8266)
   char *p = NULL;
   if(!process_password()) return;
+  if (m_client)
+    p = get_buffer;  
 #else  
   char *p = get_buffer;
 #endif
@@ -1361,12 +1310,11 @@ void server_change_scripturl() {
 
 /**
  * Change options
- * Command: /co?pw=xxx&o?=x&loc=x&wtkey=x&ttt=x
+ * Command: /co?pw=xxx&o?=x&loc=x&ttt=x
  *
  * pw:  password
  * o?:  option name (? is option index)
  * loc: location
- * wtkey: weather underground api key
  * ttt: manual time (applicable only if ntp=0)
  */
 void server_change_options()
@@ -1374,6 +1322,8 @@ void server_change_options()
 #if defined(ESP8266)
   char *p = NULL;
   if(!process_password()) return;
+  if (m_client)
+    p = get_buffer;  
 #else  
   char *p = get_buffer;
 #endif
@@ -1441,6 +1391,7 @@ void server_change_options()
     }
   }
   uint8_t keyfound = 0;
+  /*
   if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("wtkey"), true, &keyfound)) {
     urlDecode(tmp_buffer);
     if (os.sopt_save(SOPT_WEATHER_KEY, tmp_buffer)) {  // if weather key has changed
@@ -1449,7 +1400,7 @@ void server_change_options()
   } else if (keyfound) {
     tmp_buffer[0]=0;
     os.sopt_save(SOPT_WEATHER_KEY, tmp_buffer);
-  }
+  }*/
 
   if(findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("wto"), true)) {
     urlDecode(tmp_buffer);
@@ -1464,7 +1415,27 @@ void server_change_options()
   } else if (keyfound) {
     tmp_buffer[0]=0;
     os.sopt_save(SOPT_IFTTT_KEY, tmp_buffer);
-  }  
+  }
+  
+  /*
+  keyfound = 0;
+  if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("blynk"), true, &keyfound)) {
+    urlDecode(tmp_buffer);
+    os.sopt_save(SOPT_BLYNK_TOKEN, tmp_buffer);
+  } else if (keyfound) {
+    tmp_buffer[0]=0;
+    os.sopt_save(SOPT_BLYNK_TOKEN, tmp_buffer);
+  }
+
+  keyfound = 0;
+  if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("mqtt"), true, &keyfound)) {
+    urlDecode(tmp_buffer);
+    os.sopt_save(SOPT_MQTT_IP, tmp_buffer);
+  } else if (keyfound) {
+    tmp_buffer[0]=0;
+    os.sopt_save(SOPT_MQTT_IP, tmp_buffer);
+  }
+  */
 
   // if not using NTP and manually setting time
   if (!os.iopts[IOPT_USE_NTP] && findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("ttt"), true)) {
@@ -1508,11 +1479,14 @@ void server_change_options()
 void server_change_password() {
 #if defined(DEMO)
   handle_return(HTML_SUCCESS);  // do not allow chnaging password for demo
+  return;
 #endif
 
 #if defined(ESP8266)
   char* p = NULL;
   if(!process_password()) return;
+  if (m_client)
+    p = get_buffer;  
 #else
   char* p = get_buffer;
 #endif
@@ -1566,6 +1540,8 @@ void server_change_manual() {
 #if defined(ESP8266)
   char *p = NULL;
   if(!process_password()) return;
+  if (m_client)
+    p = get_buffer;  
 #else
   char *p = get_buffer;
 #endif
@@ -1639,8 +1615,8 @@ int file_fgets(File file, char* buf, int maxsize) {
   }
   return index;
 }
-
 #endif
+
 /**
  * Get log data
  * Command: /jl?start=x&end=x&hist=x&type=x
@@ -1658,7 +1634,9 @@ void server_json_log() {
 
 #if defined(ESP8266)
   char *p = NULL;
-  if(!process_password()) return;  
+  if(!process_password()) return;
+  if (m_client)
+    p = get_buffer;  
 #else
   char *p = get_buffer;
 #endif
@@ -1799,6 +1777,8 @@ void server_delete_log() {
 #if defined(ESP8266)
   char *p = NULL;
   if(!process_password()) return;
+  if (m_client)
+    p = get_buffer;  
 #else  
   char *p = get_buffer;
 #endif
@@ -1978,6 +1958,8 @@ void on_ap_upload() {
 }
 
 void start_server_client() {
+	if(!wifi_server) return;
+	
   wifi_server->on("/", server_home);  // handle home page
   wifi_server->on("/index.html", server_home);
   wifi_server->on("/update", HTTP_GET, on_sta_update); // handle firmware update
@@ -1996,7 +1978,8 @@ void start_server_client() {
 }
 
 void start_server_ap() {
-
+	if(!wifi_server) return;
+	
   scanned_ssids = scan_network();
   String ap_ssid = get_ap_ssid();
   start_network_ap(ap_ssid.c_str(), NULL);
@@ -2027,9 +2010,12 @@ void start_server_ap() {
   os.lcd.print(WiFi.softAPIP());
 }
 
-#else
-void handle_web_request(char *p)
-{
+#endif
+
+void handle_web_request(char *p) {
+#if defined(ARDUINO) && !defined(ESP8266)
+  ether.httpServerReplyAck();
+#endif
   rewind_ether_buffer();
 
   // assume this is a GET request
@@ -2056,7 +2042,11 @@ void handle_web_request(char *p)
           ret = return_code;
         } else if ((com[0]=='j' && com[1]=='o') ||
                    (com[0]=='j' && com[1]=='a'))  { // for /jo and /ja we output fwv if password fails
-          if(check_password(dat)==false) {
+#ifdef ESP8266
+					if(process_password(false, dat)==false) {
+#else
+					if(check_password(dat)==false) {
+#endif
             print_json_header();
             bfill.emit_p(PSTR("\"$F\":$D}"),
                    iopt_json_names+0, os.iopts[0]);
@@ -2068,7 +2058,11 @@ void handle_web_request(char *p)
           }
         } else {
           // first check password
-          if(check_password(dat)==false) {
+#ifdef ESP8266
+					if(process_password(false, dat)==false) {
+#else
+					if(check_password(dat)==false) {
+#endif
             ret = HTML_UNAUTHORIZED;
           } else {
             get_buffer = dat;
@@ -2076,6 +2070,15 @@ void handle_web_request(char *p)
             ret = return_code;
           }
         }
+        if (ret == -1) {
+          if (m_client)
+            m_client->stop();
+#if defined(ESP8266)
+          else
+             wifi_server->client().stop();
+#endif
+          return;
+        }        
         switch(ret) {
         case HTML_OK:
           break;
@@ -2101,6 +2104,13 @@ void handle_web_request(char *p)
   //delay(50); // add a bit of delay here
 
 }
+
+#if defined(ESP8266)
+#include "NTPClient.h"
+static EthernetUDP udp;
+static NTPClient *ntp = 0;
+extern EthernetServer *m_server;
+static char _ntpip[16];
 #endif
 
 #if defined(ARDUINO)
@@ -2108,6 +2118,42 @@ void handle_web_request(char *p)
 ulong getNtpTime()
 {
 #if defined(ESP8266)
+	if (m_server) {
+  	if (!ntp) {
+		  String ntpip = "";
+		  ntpip+=os.iopts[IOPT_NTP_IP1];
+		  ntpip+=".";
+		  ntpip+=os.iopts[IOPT_NTP_IP2];
+		  ntpip+=".";
+		  ntpip+=os.iopts[IOPT_NTP_IP3];
+		  ntpip+=".";
+		  ntpip+=os.iopts[IOPT_NTP_IP4];
+		  strcpy(_ntpip, ntpip.c_str());
+		  if (!os.iopts[IOPT_NTP_IP1] || os.iopts[IOPT_NTP_IP1] == '0')
+		    strcpy(_ntpip, "pool.ntp.org");
+
+		  ntp = new NTPClient(udp, _ntpip);
+		  ntp->begin();
+		  delay(1000);
+  	}
+	  ulong gt = 0;
+	  byte tick=0;
+		if (ntp->update()) {
+		  do {
+		    gt = ntp->getEpochTime();
+		    tick++;
+		    delay(1000);
+		  } while(gt<978307200L && tick<20);
+		  if(gt<978307200L) {
+		    DEBUG_PRINTLN(F("NTP-E failed!"));
+		    gt=0;
+		  } else {
+		    DEBUG_PRINTLN(F("NTP-E done."));
+		  }
+		}
+	  return gt;
+	}
+	
   static bool configured = false;
     
   if (os.state!=OS_STATE_CONNECTED || WiFi.status()!=WL_CONNECTED) return 0;

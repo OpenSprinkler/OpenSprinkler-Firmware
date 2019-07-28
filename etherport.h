@@ -39,8 +39,7 @@
 
 class EthernetServer;
 
-class EthernetClient
-{
+class EthernetClient {
 public:
 	EthernetClient();
 	EthernetClient(int sock);
@@ -61,8 +60,7 @@ private:
 	friend class EthernetServer;
 };
 
-class EthernetServer
-{
+class EthernetServer {
 public:
 	EthernetServer(uint16_t port);
 	~EthernetServer();

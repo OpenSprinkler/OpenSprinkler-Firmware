@@ -527,5 +527,60 @@ int16_t water_time_decode_signed(byte i) {
 }
 
 
+/** Convert a single hex digit character to its integer value */
+static unsigned char h2int(char c) {
+    if (c >= '0' && c <='9'){
+        return((unsigned char)c - '0');
+    }
+    if (c >= 'a' && c <='f'){
+        return((unsigned char)c - 'a' + 10);
+    }
+    if (c >= 'A' && c <='F'){
+        return((unsigned char)c - 'A' + 10);
+    }
+    return(0);
+}
 
+/** Decode a url string e.g "hello%20joe" or "hello+joe" becomes "hello joe" */
+void urlDecode (char *urlbuf) {
+	if(!urlbuf) return;
+	char c;
+	char *dst = urlbuf;
+	while ((c = *urlbuf) != 0) {
+		if (c == '+') c = ' ';
+		if (c == '%') {
+			c = *++urlbuf;
+			c = (h2int(c) << 4) | h2int(*++urlbuf);
+		}
+		*dst++ = c;
+		urlbuf++;
+	}
+	*dst = '\0';
+}
 
+void peel_http_header(char* buffer) { // remove the HTTP header
+  int i=0;
+  bool eol=true;
+  while(i<ETHER_BUFFER_SIZE) {
+    char c = buffer[i];
+    if(c==0)  return;
+    if(c=='\n' && eol) {
+      // copy
+      i++;
+      int j=0;
+      while(i<ETHER_BUFFER_SIZE) {
+        buffer[j]=buffer[i];
+        if(buffer[j]==0)  break;
+        i++;
+        j++;
+      }
+      return;
+    }
+    if(c=='\n') {
+      eol=true;
+    } else if (c!='\r') {
+      eol=false;
+    }
+    i++;
+  }
+}
