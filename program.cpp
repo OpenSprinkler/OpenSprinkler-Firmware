@@ -165,6 +165,7 @@ byte ProgramData::set_flagbit(byte pid, byte bid, byte value) {
   if(value) flag|=(1<<bid);
   else flag&=(~(1<<bid));
   file_write_byte(PROG_FILENAME, 1+(ulong)pid*PROGRAMSTRUCT_SIZE, flag);
+  return 1;
 }
 
 /** Decode a sunrise/sunset start time to actual start time */
@@ -249,7 +250,7 @@ byte ProgramStruct::check_match(time_t t) {
   int16_t start = starttime_decode(starttimes[0]);
   int16_t repeat = starttimes[1];
   int16_t interval = starttimes[2];
-  unsigned int current_minute = (t%86400L)/60;
+  int16_t current_minute = (t%86400L)/60;
 
   // first assume program starts today
   if (check_day_match(t)) {

@@ -130,7 +130,6 @@ static char ui_anim_chars[3] = {'.', 'o', 'O'};
 static byte ui_state = UI_STATE_DEFAULT;
 static byte ui_state_runprog = 0;
 
-#if defined(ESP8266)
 bool ui_confirm(PGM_P str) {
   os.lcd_print_line_clear_pgm(str, 0);
   os.lcd_print_line_clear_pgm(PSTR("(B1:No, B3:Yes)"), 1);
@@ -144,7 +143,6 @@ bool ui_confirm(PGM_P str) {
   } while(millis() < timeout);
   return false;
 }
-#endif
 
 void ui_state_machine() {
  
@@ -180,53 +178,35 @@ void ui_state_machine() {
     case BUTTON_1:
       if (button & BUTTON_FLAG_HOLD) {  // holding B1
         if (digitalReadExt(PIN_BUTTON_3)==0) { // if B3 is pressed while holding B1, run a short test (internal test)
-          #if defined(ESP8266)
           if(!ui_confirm(PSTR("Start 2s test?"))) {ui_state = UI_STATE_DEFAULT; break;}
-          #endif
           manual_start_program(255, 0);
         } else if (digitalReadExt(PIN_BUTTON_2)==0) { // if B2 is pressed while holding B1, display gateway IP
-          #if defined(ESP8266)
           os.lcd.clear(0, 1);
           os.lcd.setCursor(0, 0);
-					if (m_server) {
-						os.lcd.print(Ethernet.gatewayIP());
-					} else {
-            os.lcd.print(WiFi.gatewayIP());
-          }
-          #else
-          os.lcd.clear();
-          os.lcd_print_ip(&(Ethernet.gatewayIP()[0]), 0);
-          #endif
+          #if defined(ESP8266)
+					if (!m_server) { os.lcd.print(WiFi.gatewayIP()); }
+					else
+					#endif
+					{	os.lcd.print(Ethernet.gatewayIP());	}
           os.lcd.setCursor(0, 1);
           os.lcd_print_pgm(PSTR("(gwip)"));
           ui_state = UI_STATE_DISP_IP;
         } else {  // if no other button is clicked, stop all zones
-          #if defined(ESP8266)
           if(!ui_confirm(PSTR("Stop all zones?"))) {ui_state = UI_STATE_DEFAULT; break;}
-          #endif
           reset_all_stations();
         }
       } else {  // clicking B1: display device IP and port
-        #if defined(ESP8266)
-        os.lcd.clear(0, 1);        
+        os.lcd.clear(0, 1);  
         os.lcd.setCursor(0, 0);
-        if (m_server) {
-					os.lcd.print(Ethernet.localIP());
-				} else {
-          os.lcd.print(WiFi.localIP());
-        }
+        #if defined(ESP8266)
+        if (!m_server) { os.lcd.print(WiFi.localIP());	}
+        else
+        #endif
+        { os.lcd.print(Ethernet.localIP()); }
         os.lcd.setCursor(0, 1);
         os.lcd_print_pgm(PSTR(":"));
         uint16_t httpport = (uint16_t)(os.iopts[IOPT_HTTPPORT_1]<<8) + (uint16_t)os.iopts[IOPT_HTTPPORT_0];
         os.lcd.print(httpport);
-        #else
-        os.lcd.clear();
-        os.lcd_print_ip(&(Ethernet.localIP()[0]), 0);
-        os.lcd.setCursor(0, 1);
-        os.lcd_print_pgm(PSTR(":"));
-        uint16_t httpport = (uint16_t)(os.iopts[IOPT_HTTPPORT_1]<<8) + (uint16_t)os.iopts[IOPT_HTTPPORT_0];        
-        os.lcd.print(httpport);
-        #endif
         os.lcd_print_pgm(PSTR(" (ip:port)"));
         ui_state = UI_STATE_DISP_IP;
       }
@@ -245,21 +225,18 @@ void ui_state_machine() {
           os.lcd_print_pgm(PSTR("(lswc)"));
           ui_state = UI_STATE_DISP_IP;          
         } else {  // if no other button is clicked, reboot
-          #if defined(ESP8266)
           if(!ui_confirm(PSTR("Reboot device?"))) {ui_state = UI_STATE_DEFAULT; break;}
-          #endif
           os.reboot_dev();
         }
       } else {  // clicking B2: display MAC
-        #ifdef ESP8266
         os.lcd.clear(0, 1);
         byte mac[6];
+        #if defined(ESP8266)
         os.load_hardware_mac(mac, m_server!=NULL);
-        os.lcd_print_mac(mac);
         #else
-        os.lcd.clear();
-        os.lcd_print_mac(ether.mymac);
+        os.load_hardware_mac(mac);
         #endif
+        os.lcd_print_mac(mac);
         ui_state = UI_STATE_DISP_GW;
       }
       break;

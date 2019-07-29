@@ -67,6 +67,7 @@ public:
   void begin();
 
   void clear();
+  void clear(int start, int end) { clear(); }
   void home();
 
   void noDisplay();
@@ -83,7 +84,7 @@ public:
   void noAutoscroll();
 
   //void createChar(uint8_t, uint8_t[]);
-	void createChar(uint8_t, PGM_P PROGMEM ptr) {
+	void createChar(uint8_t, PGM_P ptr);
   void setCursor(uint8_t, uint8_t); 
   virtual size_t write(uint8_t);
   void command(uint8_t);
@@ -121,6 +122,6 @@ private:
   uint8_t _numlines,_currline;
 };
 
-#if defined(ARDUINO) && !defined(ESP8266)
+#endif
 
 #endif // LIQUID_CRYSTAL_DUAL_H

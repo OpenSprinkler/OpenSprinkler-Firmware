@@ -405,7 +405,7 @@ bool OpenSprinkler::load_hardware_mac(byte* buffer, bool wired) {
 	Wire.write(0xFA); // The address of the register we want
 	Wire.endTransmission(); // Send the data
 	if(Wire.requestFrom(MAC_CTRL_ID, 6) != 6) return false;	// if not enough data, return false
-	for (ret=0;ret<6;ret++) {
+	for(byte ret=0;ret<6;ret++) {
 	  buffer[ret] = Wire.read();
 	}
 	return true;
@@ -782,6 +782,9 @@ void OpenSprinkler::begin() {
 
     // detect hardware type
   	if (detect_i2c(MAC_CTRL_ID)) {
+  		Wire.beginTransmission(MAC_CTRL_ID);
+  		Wire.write(0x00);
+  		Wire.endTransmission();
     	Wire.requestFrom(MAC_CTRL_ID, 1);
     	byte ret = Wire.read();
       if (ret == HW_TYPE_AC || ret == HW_TYPE_DC || ret == HW_TYPE_LATCH) {
@@ -1517,7 +1520,8 @@ void OpenSprinkler::send_http_request(uint32_t ip4, uint16_t port, char* p, void
  	uint16_t len = strlen(p);
 	if(len > ETHER_BUFFER_SIZE) len = ETHER_BUFFER_SIZE;
  	client->write((uint8_t *)p, len);
-  bzero(ether_buffer, ETHER_BUFFER_SIZE);
+  memset(ether_buffer, 0, ETHER_BUFFER_SIZE);
+	//bzero(ether_buffer, ETHER_BUFFER_SIZE);
 
 #if defined(ARDUINO) 	
   while(!client->available() && millis() < stoptime) {
@@ -1575,7 +1579,8 @@ void OpenSprinkler::send_http_request(const char* server, uint16_t port, char* p
  	uint16_t len = strlen(p);
 	if(len > ETHER_BUFFER_SIZE) len = ETHER_BUFFER_SIZE;
  	client->write((uint8_t *)p, len);
-  bzero(ether_buffer, ETHER_BUFFER_SIZE);
+ 	memset(ether_buffer, 0, ETHER_BUFFER_SIZE);
+  //bzero(ether_buffer, ETHER_BUFFER_SIZE);
 
 #if defined(ARDUINO) 	
   while(!client->available() && millis() < stoptime) {
@@ -2073,7 +2078,6 @@ void OpenSprinkler::lcd_print_station(byte line, char c) {
 #else
   if(iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_SOIL)  {
 #endif
-		lcd.write(ICON_SOIL_SENSED);
     if (status.soil_moisture_sensed)
       lcd.write(ICON_SOIL_SENSED);
     else if (status.soil_moisture_active)
@@ -2270,14 +2274,16 @@ void OpenSprinkler::ui_set_options(int oid)
     case BUTTON_1:
       if (i==IOPT_FW_VERSION || i==IOPT_HW_VERSION || i==IOPT_FW_MINOR ||
           i==IOPT_HTTPPORT_0 || i==IOPT_HTTPPORT_1 ||
-          i==IOPT_PULSE_RATE_0 || i==IOPT_PULSE_RATE_1) break; // ignore non-editable options
+          i==IOPT_PULSE_RATE_0 || i==IOPT_PULSE_RATE_1 ||
+          i==IOPT_WIFI_MODE) break; // ignore non-editable options
       if (pgm_read_byte(iopt_max+i) != iopts[i]) iopts[i] ++;
       break;
 
     case BUTTON_2:
       if (i==IOPT_FW_VERSION || i==IOPT_HW_VERSION || i==IOPT_FW_MINOR ||
           i==IOPT_HTTPPORT_0 || i==IOPT_HTTPPORT_1 ||
-          i==IOPT_PULSE_RATE_0 || i==IOPT_PULSE_RATE_1) break; // ignore non-editable options
+          i==IOPT_PULSE_RATE_0 || i==IOPT_PULSE_RATE_1 ||
+          i==IOPT_WIFI_MODE) break; // ignore non-editable options
       if (iopts[i] != 0) iopts[i] --;
       break;
 

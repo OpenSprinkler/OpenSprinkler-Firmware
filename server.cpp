@@ -967,12 +967,14 @@ void server_json_options_main() {
         oid==IOPT_GATEWAY_IP1 || oid==IOPT_GATEWAY_IP2 || oid==IOPT_GATEWAY_IP3 || oid==IOPT_GATEWAY_IP4)
         continue;
     #endif
+    
     int32_t v=os.iopts[oid];
     if (oid==IOPT_MASTER_OFF_ADJ || oid==IOPT_MASTER_OFF_ADJ_2 ||
         oid==IOPT_MASTER_ON_ADJ  || oid==IOPT_MASTER_ON_ADJ_2 ||
         oid==IOPT_STATION_DELAY_TIME) {
       v=water_time_decode_signed(v);
     }
+    
     #if defined(ARDUINO)
     if (oid==IOPT_BOOST_TIME) {
       if (os.hw_type==HW_TYPE_AC || os.hw_type==HW_TYPE_UNKNOWN) continue;
@@ -981,7 +983,13 @@ void server_json_options_main() {
     #else
     if (oid==IOPT_BOOST_TIME) continue;
     #endif
-
+    
+		#if defined(ESP8266)
+		if (oid==IOPT_HW_VERSION) {
+			v+=os.hw_rev;	// for OS3.x, add hardware revision number
+		}
+		#endif
+		
     if (oid==IOPT_SEQUENTIAL_RETIRED) continue;
    
 #if defined(ARDUINO)
@@ -2017,9 +2025,6 @@ void start_server_ap() {
 #endif
 
 void handle_web_request(char *p) {
-#if defined(ARDUINO) && !defined(ESP8266)
-  ether.httpServerReplyAck();
-#endif
   rewind_ether_buffer();
 
   // assume this is a GET request
