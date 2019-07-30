@@ -28,6 +28,7 @@
 #include "defines.h"
 #include "utils.h"
 #include "gpio.h"
+#include "images.h"
 
 #if defined(ARDUINO) // headers for ESP8266
   #include <Arduino.h>
@@ -65,13 +66,17 @@ struct NVConData {
 
 struct StationAttrib {  // station attributes
   byte mas:1;
-  byte igr:1;
+  byte igs:1;	// ignore sensor 1
   byte mas2:1;
   byte dis:1;
   byte seq:1;
   byte gid:3; // group id: reserved for the future
-  byte reserved[3]; // reserve 3 bytes for the future
-};
+  
+  byte igs2:1;// ignore sensor 2
+  byte igrd:1;// ignore rain delay
+  byte dummy:6;
+  byte reserved[2]; // reserved bytes for the future
+}; // total is 4 bytes so far
 
 /** Station data structure */
 struct StationData {
@@ -110,7 +115,7 @@ struct HTTPStationData {
 struct ConStatus {
   byte enabled:1;           // operation enable (when set, controller operation is enabled)
   byte rain_delayed:1;      // rain delay bit (when set, rain delay is applied)
-  byte rain_sensed:1;       // rain sensor bit (when set, it indicates that rain is detected)
+  byte sensor1:1;       		// sensor1 status bit (when set, sensor1 is activated)
   byte program_busy:1;      // HIGH means a program is being executed currently
   byte has_curr_sense:1;    // HIGH means the controller has a current sensing pin
   byte safe_reboot:1;       // HIGH means a safe reboot has been marked
@@ -120,8 +125,9 @@ struct ConStatus {
   byte network_fails:3;     // number of network fails
   byte mas:8;               // master station index
   byte mas2:8;              // master2 station index
-	byte soil_moisture_sensed:1; // soil moisture sensor bit (when set, it indicates wet, delayed)
-	byte soil_moisture_active:1; // soil moisture sensor bit (when set, it indicates wet, active after delay)  
+	byte sensor2:1;						// sensor2 status bit (when set, sensor2 is activated)
+	byte soil_active:1;		// soil active bit (when set, it indicates sensor1 is active) 
+	byte soil_active_2:1; // soil active 2 (when set, it indicates sensor2 is active)
 };
 
 extern const char iopt_json_names[];
@@ -157,15 +163,18 @@ public:
                                   // first byte-> master controller, second byte-> ext. board 1, and so on
   // todo future: the following attribute bytes are for backward compatibility
   static byte attrib_mas[];
-  static byte attrib_igr[];
+  static byte attrib_igs[];
   static byte attrib_mas2[];
+  static byte attrib_igs2[];
+  static byte attrib_igrd[];
   static byte attrib_dis[];
   static byte attrib_seq[];
   static byte attrib_spe[];
     
   // variables for time keeping
-  static ulong sensor_lasttime;  // time when the last sensor reading is recorded
-	static ulong soil_moisture_sensed_time; //time when soil moisture detects wet, base for delay  
+  static ulong sensor1_lasttime;  // time when the last sensor1 reading is recorded
+  static ulong sensor2_lasttime;  // time when the last sensor1 reading is recorded  
+	static ulong soil_sensed_time; //time when soil moisture detects wet, base for delay  
   static volatile ulong flowcount_time_ms;// time stamp when new flow sensor click is received (in milliseconds)
   static ulong flowcount_rt;     // flow count (for computing real-time flow rate)
   static ulong flowcount_log_start; // starting flow count (for logging)
@@ -220,8 +229,8 @@ public:
   static void raindelay_start();  // start raindelay
   static void raindelay_stop();   // stop rain delay
   static void rainsensor_status();// update rainsensor status
-	static void soil_moisture_sensor_status(); // update soil moisture status  
-  static bool programswitch_status(ulong); // get program switch status
+	static void soilsensor_status(); // update soil moisture status  
+  static byte programswitch_status(ulong); // get program switch status
 
   static uint16_t read_current(); // read current sensing value
   static uint16_t baseline_current; // resting state current

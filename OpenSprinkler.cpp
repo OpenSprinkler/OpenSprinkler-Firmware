@@ -24,7 +24,6 @@
 #include "OpenSprinkler.h"
 #include "server.h"
 #include "gpio.h"
-#include "images.h"
 #include "testmode.h"
 
 /** Declare static data members */
@@ -40,8 +39,9 @@ byte OpenSprinkler::station_bits[MAX_NUM_BOARDS];
 byte OpenSprinkler::engage_booster;
 uint16_t OpenSprinkler::baseline_current;
 
-ulong OpenSprinkler::sensor_lasttime;
-ulong OpenSprinkler::soil_moisture_sensed_time;
+ulong OpenSprinkler::sensor1_lasttime;
+ulong OpenSprinkler::sensor2_lasttime;
+ulong OpenSprinkler::soil_sensed_time;
 ulong OpenSprinkler::flowcount_log_start;
 ulong OpenSprinkler::flowcount_rt;
 volatile ulong OpenSprinkler::flowcount_time_ms;
@@ -54,8 +54,10 @@ byte OpenSprinkler::weather_update_flag;
 
 // todo future: the following attribute bytes are for backward compatibility
 byte OpenSprinkler::attrib_mas[MAX_NUM_BOARDS];
-byte OpenSprinkler::attrib_igr[MAX_NUM_BOARDS];
+byte OpenSprinkler::attrib_igs[MAX_NUM_BOARDS];
 byte OpenSprinkler::attrib_mas2[MAX_NUM_BOARDS];
+byte OpenSprinkler::attrib_igs2[MAX_NUM_BOARDS];
+byte OpenSprinkler::attrib_igrd[MAX_NUM_BOARDS];
 byte OpenSprinkler::attrib_dis[MAX_NUM_BOARDS];
 byte OpenSprinkler::attrib_seq[MAX_NUM_BOARDS];
 byte OpenSprinkler::attrib_spe[MAX_NUM_BOARDS];
@@ -598,12 +600,6 @@ void OpenSprinkler::begin() {
     PIN_BOOST_EN = V0_PIN_BOOST_EN;
     PIN_SENSOR1 = V0_PIN_SENSOR1;
     PIN_SENSOR2 = V0_PIN_SENSOR2;
-    PIN_RAINSENSOR = V0_PIN_RAINSENSOR;
-    PIN_SOILSENSOR = V0_PIN_SOILSENSOR;
-    PIN_FLOWSENSOR = V0_PIN_FLOWSENSOR;
-		PIN_RAINSENSOR2 = V0_PIN_RAINSENSOR2;
-		PIN_SOILSENSOR2 = V0_PIN_SOILSENSOR2;
-		PIN_FLOWSENSOR2 = V0_PIN_FLOWSENSOR2;    
     
     // on revision 0, main IOEXP and driver IOEXP are two separate PCF8574 chips
     if(hw_type==HW_TYPE_DC) {
@@ -653,12 +649,6 @@ void OpenSprinkler::begin() {
       PIN_LATCH_COM = V1_PIN_LATCH_COM;
       PIN_SENSOR1 = V1_PIN_SENSOR1;
       PIN_SENSOR2 = V1_PIN_SENSOR2;
-      PIN_RAINSENSOR = V1_PIN_RAINSENSOR;
-      PIN_SOILSENSOR = V1_PIN_SOILSENSOR;
-      PIN_FLOWSENSOR = V1_PIN_FLOWSENSOR;
-			PIN_RAINSENSOR2 = V1_PIN_RAINSENSOR2;
-			PIN_SOILSENSOR2 = V1_PIN_SOILSENSOR2;
-			PIN_FLOWSENSOR2 = V1_PIN_FLOWSENSOR2;      
     } else {
       // revision 2
       hw_rev = 2;
@@ -674,12 +664,6 @@ void OpenSprinkler::begin() {
       PIN_LATCH_COM = V2_PIN_LATCH_COM;
       PIN_SENSOR1 = V2_PIN_SENSOR1;
       PIN_SENSOR2 = V2_PIN_SENSOR2;
-      PIN_RAINSENSOR = V2_PIN_RAINSENSOR;
-      PIN_SOILSENSOR = V2_PIN_SOILSENSOR;
-      PIN_FLOWSENSOR = V2_PIN_FLOWSENSOR;
-			PIN_RAINSENSOR2 = V2_PIN_RAINSENSOR2;
-			PIN_SOILSENSOR2 = V2_PIN_SOILSENSOR2;
-			PIN_FLOWSENSOR2 = V2_PIN_FLOWSENSOR2;          
     }    
   }
   
@@ -725,7 +709,10 @@ void OpenSprinkler::begin() {
   // pull shift register OE low to enable output
   digitalWrite(PIN_SR_OE, LOW);
   // Rain sensor port set up
-  pinMode(PIN_RAINSENSOR, INPUT_PULLUP);
+  pinMode(PIN_SENSOR1, INPUT_PULLUP);
+  #if defined(PIN_SENSOR2)
+  pinMode(PIN_SENSOR2, INPUT_PULLUP);
+  #endif
 #endif
 
   // Set up sensors
@@ -733,22 +720,21 @@ void OpenSprinkler::begin() {
   #if defined(ESP8266)
     /* todo future: handle two sensors */
     if(mainio->type==IOEXP_TYPE_8574) {
-      attachInterrupt(PIN_FLOWSENSOR, flow_isr, FALLING);
+      attachInterrupt(PIN_SENSOR1, flow_isr, FALLING);
     } else if(mainio->type==IOEXP_TYPE_9555) {
       if(hw_rev==1) {
         mainio->i2c_read(NXP_INPUT_REG);  // do a read to clear out current interrupt flag
         attachInterrupt(PIN_IOEXP_INT, flow_isr, FALLING);
       } else if(hw_rev==2) {
-        attachInterrupt(PIN_FLOWSENSOR, flow_isr, FALLING);
+        attachInterrupt(PIN_SENSOR1, flow_isr, FALLING);
       }
     }
   #else
-    //digitalWrite(PIN_RAINSENSOR, HIGH); // enabled internal pullup on rain sensor
     attachInterrupt(PIN_FLOWSENSOR_INT, flow_isr, FALLING);
   #endif
 #else
   // OSPI and OSBO use external pullups
-  attachInterrupt(PIN_FLOWSENSOR, "falling", flow_isr);
+  attachInterrupt(PIN_SENSOR1, "falling", flow_isr);
 #endif
 
 
@@ -813,14 +799,15 @@ void OpenSprinkler::begin() {
 
   lcd_start();
 
-  lcd.createChar(ICON_CONNECTED, _iconimage_connected);
+  //lcd.createChar(ICON_CONNECTED, _iconimage_connected);
+  lcd.createChar(ICON_CONNECTED, _iconimage_raindelay);
   lcd.createChar(ICON_DISCONNECTED, _iconimage_disconnected);
   lcd.createChar(ICON_REMOTEXT, _iconimage_remotext);
+  lcd.createChar(ICON_RAINDELAY, _iconimage_raindelay);
   lcd.createChar(ICON_RAIN, _iconimage_rain);
   lcd.createChar(ICON_FLOW, _iconimage_flow);
   lcd.createChar(ICON_PSWITCH, _iconimage_pswitch);
-	lcd.createChar(ICON_SOIL_SENSED, _iconimage_soil_sensed);
-	lcd.createChar(ICON_SOIL_ACTIVE, _iconimage_soil_active);
+	lcd.createChar(ICON_SOIL, _iconimage_soil);
   
   #if defined(ESP8266)
 
@@ -1078,46 +1065,50 @@ void OpenSprinkler::apply_all_station_bits() {
 void OpenSprinkler::rainsensor_status() {
   // rs_type: 0 if normally closed, 1 if normally open
   if(iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_RAIN)
-    status.rain_sensed = (digitalReadExt(PIN_RAINSENSOR) == iopts[IOPT_SENSOR1_OPTION] ? 0 : 1);
-#if defined(ESP8266)
+    status.sensor1 = (digitalReadExt(PIN_SENSOR1) == iopts[IOPT_SENSOR1_OPTION] ? 0 : 1);
+
+// ESP8266 is guaranteed to have sensor 2
+#if defined(ESP8266) || defined(PIN_SENSOR2)
   if(iopts[IOPT_SENSOR2_TYPE]==SENSOR_TYPE_RAIN)
-    status.rain_sensed = (digitalReadExt(PIN_RAINSENSOR2) == iopts[IOPT_SENSOR2_OPTION] ? 0 : 1);
+    status.sensor2 = (digitalReadExt(PIN_SENSOR2) == iopts[IOPT_SENSOR2_OPTION] ? 0 : 1);
 #endif
 }
 
 /** Read soil moisture sensor status */
-void OpenSprinkler::soil_moisture_sensor_status() {
+void OpenSprinkler::soilsensor_status() {
   if(iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_SOIL)
-    status.soil_moisture_sensed = (digitalReadExt(PIN_SOILSENSOR) == iopts[IOPT_SENSOR1_OPTION] ? 0 : 1);
-#if defined(ESP8266)
+    status.sensor1 = (digitalReadExt(PIN_SENSOR1) == iopts[IOPT_SENSOR1_OPTION] ? 0 : 1);
+
+#if defined(ESP8266) || defined(PIN_SENSOR2)
   if(iopts[IOPT_SENSOR2_TYPE]==SENSOR_TYPE_SOIL)
-    status.soil_moisture_sensed = (digitalReadExt(PIN_SOILSENSOR2) == iopts[IOPT_SENSOR2_OPTION] ? 0 : 1);
+    status.sensor2 = (digitalReadExt(PIN_SENSOR2) == iopts[IOPT_SENSOR2_OPTION] ? 0 : 1);
 #endif
 }
 
 /** Return program switch status */
-bool OpenSprinkler::programswitch_status(ulong curr_time) {
+byte OpenSprinkler::programswitch_status(ulong curr_time) {
+	byte ret = 0;
   if(iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_PSWITCH) {
     static ulong keydown_time = 0;
-    byte val = digitalReadExt(PIN_RAINSENSOR);
+    byte val = digitalReadExt(PIN_SENSOR1);
     if(!val && !keydown_time) keydown_time = curr_time;
     else if(val && keydown_time && (curr_time > keydown_time)) {
       keydown_time = 0;
-      return true;
+      ret |= 0x01;
     }
   }
-#if defined(ESP8266)
+#if defined(ESP8266) || defined(PIN_SENSOR2)  
   if(iopts[IOPT_SENSOR2_TYPE]==SENSOR_TYPE_PSWITCH) {
-    static ulong keydown_time = 0;
-    byte val = digitalReadExt(PIN_RAINSENSOR2);
-    if(!val && !keydown_time) keydown_time = curr_time;
-    else if(val && keydown_time && (curr_time > keydown_time)) {
-      keydown_time = 0;
-      return true;
+    static ulong keydown_time_2 = 0;
+    byte val = digitalReadExt(PIN_SENSOR2);
+    if(!val && !keydown_time_2) keydown_time_2 = curr_time;
+    else if(val && keydown_time_2 && (curr_time > keydown_time_2)) {
+      keydown_time_2 = 0;
+      ret |= 0x02;
     }
   }
 #endif
-  return false;
+  return ret;
 }
 /** Read current sensing value
  * OpenSprinkler 2.3 and above have a 0.2 ohm current sensing resistor.
@@ -1264,8 +1255,10 @@ void OpenSprinkler::attribs_save() {
   for(bid=0;bid<nboards;bid++) {
     for(s=0;s<8;s++,sid++) {
       at.mas = (attrib_mas[bid]>>s) & 1;
-      at.igr = (attrib_igr[bid]>>s) & 1;
+      at.igs = (attrib_igs[bid]>>s) & 1;
       at.mas2= (attrib_mas2[bid]>>s)& 1;
+      at.igs2= (attrib_igs2[bid]>>s) & 1;
+      at.igrd= (attrib_igrd[bid]>>s) & 1;      
       at.dis = (attrib_dis[bid]>>s) & 1;
       at.seq = (attrib_seq[bid]>>s) & 1;
       at.gid = 0;
@@ -1284,18 +1277,23 @@ void OpenSprinkler::attribs_load() {
   byte bid, s, sid=0;
   StationAttrib at;
   byte ty;
+  memset(attrib_mas, 0, nboards);
+  memset(attrib_igs, 0, nboards);
+  memset(attrib_mas2, 0, nboards);
+  memset(attrib_igs2, 0, nboards);
+  memset(attrib_igrd, 0, nboards);
+  memset(attrib_dis, 0, nboards);
+  memset(attrib_seq, 0, nboards);
+  memset(attrib_spe, 0, nboards);
+                
   for(bid=0;bid<nboards;bid++) {
-    attrib_mas[bid] = 0;
-    attrib_igr[bid] = 0;
-    attrib_mas2[bid] = 0;
-    attrib_dis[bid] = 0;
-    attrib_seq[bid] = 0;
-    attrib_spe[bid] = 0;
     for(s=0;s<8;s++,sid++) {
       file_read_block(STATIONS_FILENAME, &at, (uint32_t)sid*sizeof(StationData)+offsetof(StationData, attrib), sizeof(StationAttrib));
       attrib_mas[bid] |= (at.mas<<s);
-      attrib_igr[bid] |= (at.igr<<s);
+      attrib_igs[bid] |= (at.igs<<s);
       attrib_mas2[bid]|= (at.mas2<<s);
+      attrib_igs2[bid]|= (at.igs2<<s);
+      attrib_igrd[bid]|= (at.igrd<<s);
       attrib_dis[bid] |= (at.dis<<s);
       attrib_seq[bid] |= (at.seq<<s);
       file_read_block(STATIONS_FILENAME, &ty, (uint32_t)sid*sizeof(StationData)+offsetof(StationData, type), 1);
@@ -2057,50 +2055,60 @@ void OpenSprinkler::lcd_print_station(byte line, char c) {
 	  }
 	}
 	lcd_print_pgm(PSTR("    "));
-  lcd.setCursor(13, 1);
+
   if(iopts[IOPT_REMOTE_EXT_MODE]) {
+	  lcd.setCursor(LCD_CURSOR_REMOTEXT, 1);
     lcd.write(ICON_REMOTEXT);
   }
   
-	lcd.setCursor(14, 1);
-#if defined(ESP8266)
-  if(status.rain_delayed || 
-    (status.rain_sensed && (iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_RAIN || iopts[IOPT_SENSOR2_TYPE]==SENSOR_TYPE_RAIN)))  {
-#else
-  if(status.rain_delayed ||
-  	(status.rain_sensed && iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_RAIN))  {
-#endif
-    lcd.write(ICON_RAIN);
-  }
+  if(status.rain_delayed) {
+		lcd.setCursor(LCD_CURSOR_RAINDELAY, 1);
+  	lcd.print(ICON_RAINDELAY);
+	}
+  
+  // write sensor 1 icon
+	lcd.setCursor(LCD_CURSOR_SENSOR1, 1);  
 
-#if defined(ESP8266)
-  if(iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_SOIL || iopts[IOPT_SENSOR2_TYPE]==SENSOR_TYPE_SOIL)  {
-#else
-  if(iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_SOIL)  {
-#endif
-    if (status.soil_moisture_sensed)
-      lcd.write(ICON_SOIL_SENSED);
-    else if (status.soil_moisture_active)
-      lcd.write(ICON_SOIL_ACTIVE);
+  if(status.sensor1) {
+  	if(iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_RAIN) {
+	  	lcd.write(ICON_RAIN);
+	  }
+	  if(iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_SOIL) {
+	  	if(status.soil_active) {
+		  	lcd.write(ICON_SOIL);
+		 	}
+	  }
   }
   
-#if defined(ESP8266)
-  if(iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_FLOW || iopts[IOPT_SENSOR2_TYPE]==SENSOR_TYPE_FLOW) {
-#else
   if(iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_FLOW) {
-#endif
-    lcd.write(ICON_FLOW);
+  	lcd.write(ICON_FLOW);
   }
-
-#if defined(ESP8266)
-  if(iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_PSWITCH || iopts[IOPT_SENSOR2_TYPE]==SENSOR_TYPE_PSWITCH) {
-#else
+  
   if(iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_PSWITCH) {
-#endif
-    lcd.write(ICON_PSWITCH);
+  	lcd.write(ICON_PSWITCH);
   }
+  
+  // write sensor 2 icon  
+	lcd.setCursor(LCD_CURSOR_SENSOR2, 1);
 
-	lcd.setCursor(15, 1);
+  if(status.sensor2) {
+  	if(iopts[IOPT_SENSOR2_TYPE]==SENSOR_TYPE_RAIN) {
+	  	lcd.write(ICON_RAIN);
+	  }
+	  if(iopts[IOPT_SENSOR2_TYPE]==SENSOR_TYPE_SOIL) {
+	  	if(status.soil_active_2) {
+		  	lcd.write(ICON_SOIL);
+	  	}
+	  }
+	}
+
+	// at the moment sensor2 cannot be flow sensor
+	
+	if(iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_PSWITCH) {
+  	lcd.write(ICON_PSWITCH);
+  }	
+	
+	lcd.setCursor(LCD_CURSOR_NETWORK, 1);
 #if defined(ESP8266)
 	if(m_server)
 		lcd.write(Ethernet.linkStatus()==LinkON?ICON_ETHER_CONNECTED:ICON_ETHER_DISCONNECTED);

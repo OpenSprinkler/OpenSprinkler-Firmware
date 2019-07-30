@@ -68,12 +68,13 @@ typedef unsigned long ulong;
 
 /** IFTTT macro defines */
 #define IFTTT_PROGRAM_SCHED   0x01
-#define IFTTT_RAINSENSOR      0x02
+#define IFTTT_SENSOR1         0x02
 #define IFTTT_FLOWSENSOR      0x04
 #define IFTTT_WEATHER_UPDATE  0x08
 #define IFTTT_REBOOT          0x10
 #define IFTTT_STATION_RUN     0x20
-#define IFTTT_SOILSENSOR      0x40
+#define IFTTT_SENSOR2         0x40
+#define IFTTT_RAINDELAY				0x80
 
 /** Sensor macro defines */
 #define SENSOR_TYPE_NONE    0x00
@@ -109,7 +110,7 @@ typedef unsigned long ulong;
 #define STATION_NAME_SIZE 32    // maximum number of characters in each station name
 #define MAX_SOPTS_SIZE    160   // maximum string option size
 
-#define STATION_SPECIAL_DATA_SIZE  (TMP_BUFFER_SIZE - STATION_NAME_SIZE - 6)
+#define STATION_SPECIAL_DATA_SIZE  (TMP_BUFFER_SIZE - STATION_NAME_SIZE - 12)
 
 /** Default string option values */
 #define DEFAULT_PASSWORD          "a6d82bced638de3def1e9bbb4983225c"  // md5 of 'opendoor'
@@ -197,11 +198,11 @@ enum {
 
 /** Log Data Type */
 #define LOGDATA_STATION    0x00
-#define LOGDATA_RAINSENSE  0x01
+#define LOGDATA_SENSOR1    0x01
 #define LOGDATA_RAINDELAY  0x02
 #define LOGDATA_WATERLEVEL 0x03
 #define LOGDATA_FLOWSENSE  0x04
-#define LOGDATA_SOILSENSE  0x05
+#define LOGDATA_SENSOR2    0x05
 #define LOGDATA_CURRENT    0x80
 
 #undef OS_HW_VERSION
@@ -239,10 +240,8 @@ enum {
 	#define PIN_BOOST_EN      23    // boost voltage enable pin
 
 	#define PIN_ETHER_CS       4    // Ethernet controller chip select pin
+	#define PIN_SENSOR1				11		// 
 	#define PIN_SD_CS          0    // SD card chip select pin
-	#define PIN_RAINSENSOR    11    // rain sensor is connected to pin D3
-	#define PIN_FLOWSENSOR    11    // flow sensor (currently shared with rain sensor, change if using a different pin)
-	#define PIN_SOILSENSOR    11    // soil moisture sensor (currently shared with rain sensor, change if using a different pin)
 	#define PIN_FLOWSENSOR_INT 1    // flow sensor interrupt pin (INT1)
 	#define PIN_EXP_SENSE      4    // expansion board sensing pin (A4)
 	#define PIN_CURR_SENSE     7    // current sensing pin (A7)
@@ -284,12 +283,6 @@ enum {
 	extern byte PIN_LATCH_COM;
 	extern byte PIN_SENSOR1;
 	extern byte PIN_SENSOR2;
-	extern byte PIN_RAINSENSOR;
-	extern byte PIN_FLOWSENSOR;
-	extern byte PIN_SOILSENSOR;
-	extern byte PIN_RAINSENSOR2;
-	extern byte PIN_FLOWSENSOR2;
-	extern byte PIN_SOILSENSOR2;	
 	extern byte PIN_IOEXP_INT;
 
 	/* Original OS30 pin defines */
@@ -306,12 +299,6 @@ enum {
 	#define V0_PIN_BOOST_EN      IOEXP_PIN+7
 	#define V0_PIN_SENSOR1       12 // sensor 1
 	#define V0_PIN_SENSOR2       13 // sensor 2
-	#define V0_PIN_RAINSENSOR    V0_PIN_SENSOR1
-	#define V0_PIN_FLOWSENSOR    V0_PIN_SENSOR1
-	#define V0_PIN_SOILSENSOR    V0_PIN_SENSOR1
-	#define V0_PIN_RAINSENSOR2   V0_PIN_SENSOR2
-	#define V0_PIN_FLOWSENSOR2   V0_PIN_SENSOR2
-	#define V0_PIN_SOILSENSOR2   V0_PIN_SENSOR2	
 
 	/* OS30 revision 1 pin defines */
 	// pins on PCA9555A IO expander have pin numbers IOEXP_PIN+i
@@ -328,12 +315,6 @@ enum {
 	#define V1_PIN_LATCH_COM     IOEXP_PIN+15
 	#define V1_PIN_SENSOR1       IOEXP_PIN+8 // sensor 1
 	#define V1_PIN_SENSOR2       IOEXP_PIN+9 // sensor 2
-	#define V1_PIN_RAINSENSOR    V1_PIN_SENSOR1
-	#define V1_PIN_FLOWSENSOR    V1_PIN_SENSOR1
-	#define V1_PIN_SOILSENSOR    V1_PIN_SENSOR1
-	#define V1_PIN_RAINSENSOR2   V1_PIN_SENSOR2
-	#define V1_PIN_FLOWSENSOR2   V1_PIN_SENSOR2
-	#define V1_PIN_SOILSENSOR2   V1_PIN_SENSOR2	
 
 	/* OS30 revision 2 pin defines */
 	// pins on PCA9555A IO expander have pin numbers IOEXP_PIN+i
@@ -348,12 +329,6 @@ enum {
 	#define V2_PIN_LATCH_COM     IOEXP_PIN+15  
 	#define V2_PIN_SENSOR1       3  // sensor 1
 	#define V2_PIN_SENSOR2       10 // sensor 2
-	#define V2_PIN_RAINSENSOR    V2_PIN_SENSOR1
-	#define V2_PIN_FLOWSENSOR    V2_PIN_SENSOR1
-	#define V2_PIN_SOILSENSOR    V2_PIN_SENSOR1
-	#define V2_PIN_RAINSENSOR2   V2_PIN_SENSOR2
-	#define V2_PIN_FLOWSENSOR2   V2_PIN_SENSOR2
-	#define V2_PIN_SOILSENSOR2   V2_PIN_SENSOR2	
 
 #elif defined(OSPI) // for OSPi
 
@@ -363,9 +338,8 @@ enum {
 	#define PIN_SR_DATA_ALT   21    // shift register data pin (alternative, for RPi 1 rev. 1 boards)
 	#define PIN_SR_CLOCK       4    // shift register clock pin
 	#define PIN_SR_OE         17    // shift register output enable pin
-	#define PIN_RAINSENSOR    14    // rain sensor
-	#define PIN_FLOWSENSOR    14    // flow sensor (currently shared with rain sensor, change if using a different pin)
-	#define PIN_SOILSENSOR    14    // soil moisture sensor (currently shared with rain sensor, change if using a different pin)	
+	#define PIN_SENSOR1				14
+	#define PIN_SENSOR2				23
 	#define PIN_RFTX          15    // RF transmitter pin
 	#define PIN_BUTTON_1      23    // button 1
 	#define PIN_BUTTON_2      24    // button 2
@@ -383,9 +357,7 @@ enum {
 	#define PIN_SR_DATA       30    // P9_11, shift register data pin
 	#define PIN_SR_CLOCK      31    // P9_13, shift register clock pin
 	#define PIN_SR_OE         50    // P9_14, shift register output enable pin
-	#define PIN_RAINSENSOR    48    // P9_15, rain sensor is connected to pin D3
-	#define PIN_FLOWSENSOR    48    // flow sensor (currently shared with rain sensor, change if using a different pin)
-	#define PIN_SOILSENSOR    48    // soil moisture sensor (currently shared with rain sensor, change if using a different pin)	
+	#define PIN_SENSOR1				48
 	#define PIN_RFTX          51    // RF transmitter pin
 
 	#define PIN_FREE_LIST     {38,39,34,35,45,44,26,47,27,65,63,62,37,36,33,32,61,86,88,87,89,76,77,74,72,73,70,71}
@@ -402,9 +374,8 @@ enum {
 	#define PIN_SR_DATA     0
 	#define PIN_SR_CLOCK    0
 	#define PIN_SR_OE       0
-	#define PIN_RAINSENSOR  0
-	#define PIN_FLOWSENSOR  0
-	#define PIN_SOILSENSOR  0	
+	#define PIN_SENSOR1			0
+	#define PIN_SENSOR2			0
 	#define PIN_RFTX     0
 	#define PIN_FREE_LIST	{}
 	#define ETHER_BUFFER_SIZE   16384

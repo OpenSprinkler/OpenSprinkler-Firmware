@@ -83,7 +83,7 @@ void flow_poll() {
   if(os.iopts[IOPT_SENSOR1_TYPE]!=SENSOR_TYPE_FLOW) return;
 
 #if defined(ESP8266)
-  byte curr_flow_state = digitalReadExt(PIN_FLOWSENSOR);
+  byte curr_flow_state = digitalReadExt(PIN_SENSOR1);
   if(!(prev_flow_state==HIGH && curr_flow_state==LOW)) {
     prev_flow_state = curr_flow_state;
     return;
@@ -596,41 +596,64 @@ void do_loop()
       if (os.status.rain_delayed) {
         // rain delay started, record time
         os.raindelay_start_time = curr_time;
-        push_message(IFTTT_RAINSENSOR, LOGDATA_RAINDELAY, 1);
+        push_message(IFTTT_RAINDELAY, LOGDATA_RAINDELAY, 1);
       } else {
         // rain delay stopped, write log
         write_log(LOGDATA_RAINDELAY, curr_time);
-        push_message(IFTTT_RAINSENSOR, LOGDATA_RAINDELAY, 0);
+        push_message(IFTTT_RAINDELAY, LOGDATA_RAINDELAY, 0);
       }
       os.old_status.rain_delayed = os.status.rain_delayed;
     }
 
     // ====== Check rain sensor status ======
+    os.rainsensor_status();
     if (os.iopts[IOPT_SENSOR1_TYPE] == SENSOR_TYPE_RAIN) { // if a rain sensor is connected
-      os.rainsensor_status();
-      if (os.old_status.rain_sensed != os.status.rain_sensed) {
-        if (os.status.rain_sensed) {
+      if (os.old_status.sensor1 != os.status.sensor1) {
+        if (os.status.sensor1) {
           // rain sensor on, record time
-          os.sensor_lasttime = curr_time;
-          push_message(IFTTT_RAINSENSOR, LOGDATA_RAINSENSE, 1);
+          os.sensor1_lasttime = curr_time;
+          push_message(IFTTT_SENSOR1, LOGDATA_SENSOR1, 1);
         } else {
           // rain sensor off, write log
-          if (curr_time>os.sensor_lasttime+10) {  // add a 10 second threshold
+          if (curr_time>os.sensor1_lasttime+10) {  // add a 10 second threshold
                                                   // to avoid faulty rain sensors generating
                                                   // too many log records
-            write_log(LOGDATA_RAINSENSE, curr_time);
-            push_message(IFTTT_RAINSENSOR, LOGDATA_RAINSENSE, 0);
+            write_log(LOGDATA_SENSOR1, curr_time);
+            push_message(IFTTT_SENSOR1, LOGDATA_SENSOR1, 0);
           }
         }
-        os.old_status.rain_sensed = os.status.rain_sensed;
+        os.old_status.sensor1 = os.status.sensor1;
       }
     }
 
+    if (os.iopts[IOPT_SENSOR2_TYPE] == SENSOR_TYPE_RAIN) { // if a rain sensor is connected
+      if (os.old_status.sensor2 != os.status.sensor2) {
+        if (os.status.sensor2) {
+          // rain sensor on, record time
+          os.sensor2_lasttime = curr_time;
+          push_message(IFTTT_SENSOR2, LOGDATA_SENSOR2, 1);
+        } else {
+          // rain sensor off, write log
+          if (curr_time>os.sensor2_lasttime+10) {  // add a 10 second threshold
+                                                  // to avoid faulty rain sensors generating
+                                                  // too many log records
+            write_log(LOGDATA_SENSOR2, curr_time);
+            push_message(IFTTT_SENSOR2, LOGDATA_SENSOR2, 0);
+          }
+        }
+        os.old_status.sensor2 = os.status.sensor2;
+      }
+    }
     // ===== Check program switch status =====
-    if (os.programswitch_status(curr_time)) {
-      reset_all_stations_immediate(); // immediately stop all stations
+    byte pswitch = os.programswitch_status(curr_time);
+    if(pswitch > 0) reset_all_stations_immediate(); // immediately stop all stations
+    if (pswitch & 0x01) {
       if(pd.nprograms > 0)  manual_start_program(1, 0);
     }
+    if (pswitch & 0x02) {
+    	if(pd.nprograms > 1)	manual_start_program(2, 0);
+    }
+    
 
     // ====== Schedule program data ======
     ulong curr_minute = curr_time / 60;
@@ -1025,15 +1048,26 @@ void turn_off_station(byte sid, ulong curr_time) {
  */
 void process_dynamic_events(ulong curr_time) {
   // check if rain is detected
-  bool rain = false;
-  bool en = os.status.enabled ? true : false;
-  if (os.status.rain_delayed || (os.status.rain_sensed && os.iopts[IOPT_SENSOR1_TYPE] == SENSOR_TYPE_RAIN)) {
-    rain = true;
-  }
+  bool sn1 = false;
+  bool sn2 = false;
+  bool rd  = os.status.rain_delayed;
+  bool en = os.status.enabled;
 
-  byte sid, s, bid, qid, rbits;
+	if((os.iopts[IOPT_SENSOR1_TYPE] == SENSOR_TYPE_RAIN || os.iopts[IOPT_SENSOR1_TYPE] == SENSOR_TYPE_SOIL)
+		 && os.status.sensor1)
+		sn1 = true;
+		
+	if((os.iopts[IOPT_SENSOR2_TYPE] == SENSOR_TYPE_RAIN || os.iopts[IOPT_SENSOR2_TYPE] == SENSOR_TYPE_SOIL)
+		 && os.status.sensor2)
+		sn2 = true;
+
+	// todo: handle sensor 2
+  byte sid, s, bid, qid, igs, igs2, igrd;
   for(bid=0;bid<os.nboards;bid++) {
-    rbits = os.attrib_igr[bid];
+    igs = os.attrib_igs[bid];
+    igs2= os.attrib_igs2[bid];
+    igrd= os.attrib_igrd[bid];
+    
     for(s=0;s<8;s++) {
       sid=bid*8+s;
 
@@ -1048,9 +1082,11 @@ void process_dynamic_events(ulong curr_time) {
       if(qid==255) continue;
       RuntimeQueueStruct *q = pd.queue + qid;
 
-      if ((q->pid<99) && (!en || (rain && !(rbits&(1<<s)))) ) {
-        turn_off_station(sid, curr_time);
-      }
+			if(q->pid>=99) continue;	// if this is a manually started program, proceed
+			if(!en)	turn_off_station(sid, curr_time);	// if system is disabled, turn off zone
+			if(rd && !(igrd&(1<<s))) turn_off_station(sid, curr_time);	// if rain delay is on and zone does not ignore rain delay, turn it off
+			if(sn1&& !(igs &(1<<s))) turn_off_station(sid, curr_time);	// if sensor1 is on and zone does not ignore sensor1, turn it off
+			if(sn2&& !(igs2&(1<<s))) turn_off_station(sid, curr_time);  // if sensor2 is on and zone does not ignore sensor2, turn it off
     }
   }
 }
@@ -1106,7 +1142,7 @@ void schedule_all_stations(ulong curr_time) {
       // start flow count
       if(os.iopts[IOPT_SENSOR1_TYPE] == SENSOR_TYPE_FLOW) {  // if flow sensor is connected
         os.flowcount_log_start = flow_count;
-        os.sensor_lasttime = curr_time;
+        os.sensor1_lasttime = curr_time;
       }
     }
   }
@@ -1241,13 +1277,24 @@ void push_message(byte type, uint32_t lval, float fval, const char* sval) {
       strcat_P(postval, PSTR("% water level."));
       break;
 
-    case IFTTT_RAINSENSOR:
+    case IFTTT_SENSOR1:
+    	
+    	strcat_P(postval, PSTR("Sensor 1 "));
+    	strcat_P(postval, ((int)fval)?PSTR("activated."):PSTR("de-activated"));
+    	break;
+    	
+		case IFTTT_SENSOR2:
 
-      strcat_P(postval, (lval==LOGDATA_RAINDELAY) ? PSTR("Rain delay ") : PSTR("Rain sensor "));
-      strcat_P(postval, ((int)fval)?PSTR("activated."):PSTR("de-activated"));
+    	strcat_P(postval, PSTR("Sensor 2 "));
+    	strcat_P(postval, ((int)fval)?PSTR("activated."):PSTR("de-activated"));
+    	break;
 
-      break;
+		case IFTTT_RAINDELAY:
 
+    	strcat_P(postval, PSTR("Rain delay "));
+    	strcat_P(postval, ((int)fval)?PSTR("activated."):PSTR("de-activated"));
+    	break;
+    	      
     case IFTTT_FLOWSENSOR:
       strcat_P(postval, PSTR("Flow count: "));
       itoa(lval, postval+strlen(postval), 10);
@@ -1428,10 +1475,13 @@ void write_log(byte type, ulong curr_time) {
     strcat_P(tmp_buffer, PSTR("\","));
 
     switch(type) {
-      case LOGDATA_RAINSENSE:
+      case LOGDATA_SENSOR1:
       case LOGDATA_FLOWSENSE:
-        lvalue = (curr_time>os.sensor_lasttime)?(curr_time-os.sensor_lasttime):0;
+        lvalue = (curr_time>os.sensor1_lasttime)?(curr_time-os.sensor1_lasttime):0;
         break;
+      case LOGDATA_SENSOR2:
+	      lvalue = (curr_time>os.sensor2_lasttime)?(curr_time-os.sensor2_lasttime):0;
+				break;
       case LOGDATA_RAINDELAY:
         lvalue = (curr_time>os.raindelay_start_time)?(curr_time-os.raindelay_start_time):0;
         break;
@@ -1532,7 +1582,7 @@ void check_network() {
     os.status.req_network = 0;
     // change LCD icon to indicate it's checking network
     if (!ui_state) {
-      os.lcd.setCursor(15, 1);
+      os.lcd.setCursor(LCD_CURSOR_NETWORK, 1);
       os.lcd.write('>');
     }
 

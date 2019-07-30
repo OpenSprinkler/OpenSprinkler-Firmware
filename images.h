@@ -8,14 +8,23 @@ enum {
 	ICON_RAIN,
 	ICON_FLOW,
 	ICON_PSWITCH,
-	ICON_SOIL_SENSED,
-	ICON_SOIL_ACTIVE,
+	ICON_SOIL,
+	ICON_RAINDELAY,
 	ICON_ETHER_CONNECTED,
 	ICON_ETHER_DISCONNECTED,
+	ICON_PSWITCH_2,	
 	NUM_CUSTOM_ICONS
 };
 
 #if defined(ESP8266)
+
+enum {
+	LCD_CURSOR_REMOTEXT = 11,// 
+	LCD_CURSOR_RAINDELAY,// 12
+	LCD_CURSOR_SENSOR1,	 // 13
+	LCD_CURSOR_SENSOR2,	 // 14
+	LCD_CURSOR_NETWORK	 // 15
+};
 
 #define WiFi_Logo_width 60
 #define WiFi_Logo_height 36
@@ -89,19 +98,19 @@ const char _iconimage_pswitch[] PROGMEM = {
   };  
 
 // todo
-const char _iconimage_soil_sensed[] PROGMEM = {
+const char _iconimage_soil[] PROGMEM = {
 	0x00, 0x00, 0x00, 0x0E,
 	0x01, 0x0E, 0x10, 0x0F,
 	0x00, 0x60, 0x90, 0x90,
 	0x60, 0x00, 0x00, 0x00,
-  };  
-
-const char _iconimage_soil_active[] PROGMEM = {
-	0x00, 0x00, 0x00, 0x0E,
-	0x01, 0x0E, 0x10, 0x0F,
-	0x00, 0x60, 0x90, 0x90,
-	0x60, 0x00, 0x00, 0x00,
-  };  
+  };
+  
+const char _iconimage_raindelay[] PROGMEM = {
+	0x00, 0x00, 0x00, 0x1C,
+	0x22, 0x49, 0x49, 0x49,
+	0x59, 0x41, 0x41, 0x41,
+	0x22, 0x1C, 0x00, 0x00,
+  };    
 
 const char _iconimage_ether_connected[] PROGMEM = {
   0x00, 0x00, 0x00, 0x38,
@@ -118,6 +127,14 @@ const char _iconimage_ether_disconnected[] PROGMEM = {
   };
 
 #elif defined(ARDUINO)
+
+enum {
+	LCD_CURSOR_SENSOR2 = 11,
+	LCD_CURSOR_REMOTEXT, // 12
+	LCD_CURSOR_RAINDELAY,// 13
+	LCD_CURSOR_SENSOR1,  // 14
+	LCD_CURSOR_NETWORK   // 15
+};
 
 const char _iconimage_connected[] PROGMEM = {
 	B00000,
@@ -175,39 +192,49 @@ const char _iconimage_flow[] PROGMEM = {
 };
 
 const char _iconimage_pswitch[] PROGMEM = {
-	B00000,
-	B11100,
-	B10100,
-	B11100,
-	B10010,
-	B10110,
-	B00010,
-	B00111
+  B00000,
+  B11000,
+  B10100,
+  B11000,
+  B10010,
+  B10110,
+  B00010,
+  B00111
 };
 
 // todo
-const char _iconimage_soil_sensed[] PROGMEM = {
-	B00000,
-	B00000,
-	B01110,
-	B10000,
-	B01110,
-	B00001,
-	B11110,
-	B00000	
+const char _iconimage_soil[] PROGMEM = {
+  B01100,
+  B10000,
+  B01000,
+  B00100,
+  B11000,
+  B00010,
+  B00101,
+  B00010
 };  
 
-const char _iconimage_soil_active[] PROGMEM = {
-	B00000,
-	B00000,
-	B01110,
-	B10000,
-	B01110,
-	B00001,
-	B11110,
-	B00000
+const char _iconimage_raindelay[] PROGMEM = {
+  B00000,
+  B01110,
+  B10101,
+  B10101,
+  B10111,
+  B10001,
+  B10001,
+  B01110
 };  
-  
+
+#else 
+
+enum {
+	LCD_CURSOR_REMOTEXT = 11,// 
+	LCD_CURSOR_RAINDELAY,// 12
+	LCD_CURSOR_SENSOR1,	 // 13
+	LCD_CURSOR_SENSOR2,	 // 14
+	LCD_CURSOR_NETWORK	 // 15
+};
+
 #endif
 
 #endif

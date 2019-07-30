@@ -501,11 +501,12 @@ void server_json_stations_attrib(const char* name, byte *attrib)
   bfill.emit_p(PSTR("],"));
 }
 
-void server_json_stations_main()
-{
+void server_json_stations_main() {
   server_json_stations_attrib(PSTR("masop"), os.attrib_mas);
-  server_json_stations_attrib(PSTR("ignore_rain"), os.attrib_igr);
+  server_json_stations_attrib(PSTR("ignore_rain"), os.attrib_igs);
   server_json_stations_attrib(PSTR("masop2"), os.attrib_mas2);
+  server_json_stations_attrib(PSTR("ignore_rain2"), os.attrib_igs2);
+  server_json_stations_attrib(PSTR("ignore_rd"), os.attrib_igrd);  
   server_json_stations_attrib(PSTR("stn_dis"), os.attrib_dis);
   server_json_stations_attrib(PSTR("stn_seq"), os.attrib_seq);
   server_json_stations_attrib(PSTR("stn_spe"), os.attrib_spe);
@@ -517,7 +518,7 @@ void server_json_stations_main()
     bfill.emit_p(PSTR("\"$S\""), tmp_buffer);
     if(sid!=os.nstations-1)
       bfill.emit_p(PSTR(","));
-    if (available_ether_buffer() < 0) {
+    if (available_ether_buffer() < 60) {
       send_packet();
     }
   }
@@ -608,8 +609,10 @@ void server_change_stations() {
   }
 
   server_change_stations_attrib(p, 'm', os.attrib_mas); // master1
-  server_change_stations_attrib(p, 'i', os.attrib_igr); // ignore rain
+  server_change_stations_attrib(p, 'i', os.attrib_igs); // ignore sensor
   server_change_stations_attrib(p, 'n', os.attrib_mas2); // master2
+  server_change_stations_attrib(p, 'j', os.attrib_igs2); // ignore sensor2
+  server_change_stations_attrib(p, 'r', os.attrib_igrd); // ignore rain delay
   server_change_stations_attrib(p, 'd', os.attrib_dis); // disable
   server_change_stations_attrib(p, 'q', os.attrib_seq); // sequential
   server_change_stations_attrib(p, 'p', os.attrib_spe); // special
@@ -1060,7 +1063,7 @@ void server_json_programs_main() {
     }
     // push out a packet if available
     // buffer size is getting small
-    if (available_ether_buffer() < 0) {
+    if (available_ether_buffer() < 250) {
       send_packet();
     }
   }
@@ -1095,16 +1098,16 @@ void server_view_scripturl() {
 void server_json_controller_main() {
   byte bid, sid;
   ulong curr_time = os.now_tz();
-  bfill.emit_p(PSTR("\"devt\":$L,\"nbrd\":$D,\"en\":$D,\"rd\":$D,\"rs\":$D,\"rdst\":$L,"
-                    "\"loc\":\"$O\",\"sunrise\":$D,\"sunset\":$D,\"eip\":$L,\"lwc\":$L,\"lswc\":$L,"
+  bfill.emit_p(PSTR("\"devt\":$L,\"nbrd\":$D,\"en\":$D,\"rs\":$D,\"rs2\":$D,\"rd\":$D,\"rdst\":$L,"
+                    "\"sunrise\":$D,\"sunset\":$D,\"eip\":$L,\"lwc\":$L,\"lswc\":$L,"
                     "\"lupt\":$L,\"lrun\":[$D,$D,$D,$L],"),
               curr_time,
               os.nboards,
               os.status.enabled,
+              os.status.sensor1,
+              os.status.sensor2,
               os.status.rain_delayed,
-              os.status.rain_sensed,
               os.nvdata.rd_stop_time,
-              SOPT_LOCATION,
               os.nvdata.sunrise_time,
               os.nvdata.sunset_time,
               os.nvdata.external_ip,
@@ -1146,13 +1149,18 @@ void server_json_controller_main() {
 
     // if available ether buffer is getting small
     // send out a packet
-    if(available_ether_buffer() < 0) {
+    if(available_ether_buffer() < 60) {
       send_packet();
     }
   }
 
-  bfill.emit_p(PSTR(",\"wto\":{$O}"), SOPT_WEATHER_OPTS);
-  bfill.emit_p(PSTR(",\"ifkey\":\"$O\""), SOPT_IFTTT_KEY);
+	bfill.emit_p(PSTR(",\"loc\":\"$O\",\"jsp\":\"$O\",\"wsp\":\"$O\",\"wto\":{$O},\"ifkey\":\"$O\""),
+							 SOPT_LOCATION,
+							 SOPT_JAVASCRIPTURL,
+							 SOPT_WEATHERURL,
+							 SOPT_WEATHER_OPTS,
+							 SOPT_IFTTT_KEY);
+	
   //bfill.emit_p(PSTR(",\"blynk\":\"$O\""), SOPT_BLYNK_TOKEN);
   //bfill.emit_p(PSTR(",\"mqtt\":\"$O\""), SOPT_MQTT_IP);
   
@@ -1762,7 +1770,7 @@ void server_json_log() {
       bfill.emit_p(PSTR("$S"), tmp_buffer);
       // if the available ether buffer size is getting small
       // push out a packet
-      if (available_ether_buffer() < 0) {
+      if (available_ether_buffer() < 60) {
         send_packet();
       }
     }
