@@ -151,18 +151,16 @@ void GetWeather() {
 	// because dst is part of tmp_buffer,
 	// must load weather url AFTER dst is copied to ether_buffer  
 
-  // load weather url
-  os.sopt_load(SOPT_WEATHERURL, tmp_buffer);
-  char* server = strtok(tmp_buffer, ":");
-  char* port = strtok(NULL, ":");
+  // load weather url to tmp_buffer
+  char *host = tmp_buffer;
+  os.sopt_load(SOPT_WEATHERURL, host);
 
   strcat(ether_buffer, " HTTP/1.0\r\nHOST: ");
-  strcat(ether_buffer, server);
+  strcat(ether_buffer, host);
   strcat(ether_buffer, "\r\n\r\n");
 
 	DEBUG_PRINTLN(ether_buffer);
 	
-	os.send_http_request(server, (port==NULL)?80:atoi(port),
-									  	 ether_buffer, getweather_callback_with_peel_header);
+	os.send_http_request(host, ether_buffer, getweather_callback_with_peel_header);
 }
 

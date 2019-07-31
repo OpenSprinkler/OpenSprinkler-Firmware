@@ -2051,7 +2051,7 @@ void handle_web_request(char *p) {
        &&pgm_read_byte(_url_keys+2*i+1)==com[1]) {
 
         // check password
-        byte ret = HTML_UNAUTHORIZED;
+        int ret = HTML_UNAUTHORIZED;
 
         if (com[0]=='s' && com[1]=='u') { // for /su do not require password
           get_buffer = dat;

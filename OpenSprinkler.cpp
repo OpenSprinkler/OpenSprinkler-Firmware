@@ -1603,6 +1603,12 @@ void OpenSprinkler::send_http_request(const char* server, uint16_t port, char* p
   if(callback) callback(ether_buffer);
 }
 
+void OpenSprinkler::send_http_request(char* server_with_port, char* p, void(*callback)(char*), uint16_t timeout) {
+  char * server = strtok(server_with_port, ":");
+  char * port = strtok(NULL, ":");
+  send_http_request(server, (port==NULL)?80:atoi(port), p, callback, timeout);
+}
+
 /** Switch remote station
  * This function takes a remote station code,
  * parses it into remote IP, port, station index,

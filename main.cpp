@@ -46,7 +46,7 @@
 
 void reset_all_stations();
 void reset_all_stations_immediate();
-void push_message(byte type, uint32_t lval=0, float fval=0.f, const char* sval=NULL);
+void push_message(byte type, uint32_t lval=0, float fval=0.f);
 void manual_start_program(byte, byte);
 void remote_http_callback(char*);
 
@@ -1185,7 +1185,7 @@ void manual_start_program(byte pid, byte uwt) {
   byte sid, bid, s;
   if ((pid>0)&&(pid<255)) {
     pd.read(pid-1, &prog);
-    push_message(IFTTT_PROGRAM_SCHED, pid-1, uwt?os.iopts[IOPT_WATER_PERCENTAGE]:100, "");
+    push_message(IFTTT_PROGRAM_SCHED, pid-1, uwt?os.iopts[IOPT_WATER_PERCENTAGE]:100);
   }
   for(sid=0;sid<os.nstations;sid++) {
     bid=sid>>3;
@@ -1226,18 +1226,14 @@ void ip2string(char* str, byte ip[4]) {
   }
 }
 
-void push_message(byte type, uint32_t lval, float fval, const char* sval) {
+void push_message(byte type, uint32_t lval, float fval) {
 
-  static const char* server = DEFAULT_IFTTT_URL;
-  static char key[MAX_SOPTS_SIZE];
-  static char postval[TMP_BUFFER_SIZE];
+  static const char* host = DEFAULT_IFTTT_URL;
+  // prepare post message in tmp_buffer
+  char* postval = tmp_buffer;
 
   // check if this type of event is enabled for push notification
   if((os.iopts[IOPT_IFTTT_ENABLE]&type) == 0) return;
-  os.sopt_load(SOPT_IFTTT_KEY, key);
-  key[MAX_SOPTS_SIZE-1]=0;
-
-  if(strlen(key)==0) return;
 
   strcpy_P(postval, PSTR("{\"value1\":\""));
 
@@ -1257,20 +1253,19 @@ void push_message(byte type, uint32_t lval, float fval, const char* sval) {
         #if defined(ARDUINO)
         dtostrf(flow_last_gpm,5,2,postval+strlen(postval));
         #else
-        sprintf(tmp_buffer+strlen(tmp_buffer), "%5.2f", flow_last_gpm);
+        sprintf(postval+strlen(postval), "%5.2f", flow_last_gpm);
         #endif
       }
       break;
 
     case IFTTT_PROGRAM_SCHED:
 
-      if(sval) strcat_P(postval, PSTR("Manually scheduled "));
-      else strcat_P(postval, PSTR("Automatically scheduled "));
-      strcat_P(postval, PSTR("Program "));
+      strcat_P(postval, PSTR("Scheduled Program "));
       {
         ProgramStruct prog;
         pd.read(lval, &prog);
         if(lval<pd.nprograms) strcat(postval, prog.name);
+        else strcat_P(postval, PSTR("Manual"));
       }
       strcat_P(postval, PSTR(" with "));
       itoa((int)fval, postval+strlen(postval), 10);
@@ -1353,17 +1348,18 @@ void push_message(byte type, uint32_t lval, float fval, const char* sval) {
 
   strcat_P(postval, PSTR("\"}"));
 
-  //DEBUG_PRINTLN(postval);
+	//char postBuffer[1500];
+	BufferFiller bf = ether_buffer;
+	bf.emit_p(PSTR("POST /trigger/sprinkler/with/key/$O HTTP/1.0\r\n"
+                 "Host: $S\r\n"
+                 "Accept: */*\r\n"
+                 "Content-Length: $D\r\n"
+                 "Content-Type: application/json\r\n\r\n$S"),
+                 SOPT_IFTTT_KEY, host, strlen(postval), postval);
 
-	// todo: send http request
-	char postBuffer[1500];
-  sprintf(postBuffer, "POST /trigger/sprinkler/with/key/%s HTTP/1.0\r\n"
-                      "Host: %s\r\n"
-                      "Accept: */*\r\n"
-                      "Content-Length: %d\r\n"
-                      "Content-Type: application/json\r\n"
-                      "\r\n%s", key, server, strlen(postval), postval);
-	os.send_http_request(server, 80, postBuffer, remote_http_callback);
+	DEBUG_PRINTLN(ether_buffer);
+	
+	os.send_http_request(host, 80, ether_buffer, remote_http_callback);
 }
 
 // ================================
