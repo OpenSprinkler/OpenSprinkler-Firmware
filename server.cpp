@@ -1362,39 +1362,34 @@ void server_change_options()
   for (byte oid=0; oid<NUM_IOPTS; oid++) {
 
     // skip options that cannot be set through /co command
-    if (oid==IOPT_RESET || oid==IOPT_DEVICE_ENABLE ||
-        oid==IOPT_FW_VERSION || oid==IOPT_HW_VERSION ||
-        oid==IOPT_FW_MINOR || oid==IOPT_SEQUENTIAL_RETIRED ||
-        oid==IOPT_REMOTE_EXT_MODE)
+    if (oid==IOPT_FW_VERSION || oid==IOPT_HW_VERSION || oid==IOPT_SEQUENTIAL_RETIRED ||
+    	  oid==IOPT_DEVICE_ENABLE || oid==IOPT_FW_MINOR || oid==IOPT_REMOTE_EXT_MODE ||
+    	  oid==IOPT_RESET || oid==IOPT_WIFI_MODE)
       continue;
     prev_value = os.iopts[oid];
     max_value = pgm_read_byte(iopt_max+oid);
-    if (max_value==1)  os.iopts[oid] = 0;  // set a bool variable to 0 first
-    char tbuf2[5] = {'o', 0, 0, 0, 0};
-    itoa(oid, tbuf2+1, 10);
-    if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, tbuf2)) {
-      if (max_value==1) {
-        os.iopts[oid] = 1;  // if the bool variable is detected, set to 1
-      } else {
-		    int32_t v = atol(tmp_buffer);
-		    if (oid==IOPT_MASTER_OFF_ADJ || oid==IOPT_MASTER_OFF_ADJ_2 ||
-		        oid==IOPT_MASTER_ON_ADJ  || oid==IOPT_MASTER_ON_ADJ_2  ||
-		        oid==IOPT_STATION_DELAY_TIME) {
-		      v=water_time_encode_signed(v);
-		    } // encode station delay time
-        #if defined(ARDUINO)
-        if(oid==IOPT_BOOST_TIME) {
-           v>>=2;
-        }
-        #endif
-        if (v>=0 && v<=max_value) {
-          os.iopts[oid] = v;
-		    } else {
-		      err = 1;
-		    }
-		  }
+    
+    // will no longer support oxx option names
+    // json name only
+    char tbuf2[6];
+    strncpy_P0(tbuf2, iopt_json_names+oid*5, 5);
+    if(findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, tbuf2)) {
+	    int32_t v = atol(tmp_buffer);
+	    if (oid==IOPT_MASTER_OFF_ADJ || oid==IOPT_MASTER_OFF_ADJ_2 ||
+	        oid==IOPT_MASTER_ON_ADJ  || oid==IOPT_MASTER_ON_ADJ_2  ||
+	        oid==IOPT_STATION_DELAY_TIME) {
+	      v=water_time_encode_signed(v);
+	    } // encode station delay time
+      if(oid==IOPT_BOOST_TIME) {
+         v>>=2;
+      }
+      if (v>=0 && v<=max_value) {
+        os.iopts[oid] = v;
+	    } else {
+	      err = 1;
+	    }    
     }
-    // todo future: support json names
+    
     if (os.iopts[oid] != prev_value) {	// if value has changed
     	if (oid==IOPT_TIMEZONE || oid==IOPT_USE_NTP)    time_change = true;
     	if (oid>=IOPT_NTP_IP1 && oid<=IOPT_NTP_IP4)     time_change = true;
@@ -1411,17 +1406,6 @@ void server_change_options()
     }
   }
   uint8_t keyfound = 0;
-  /*
-  if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("wtkey"), true, &keyfound)) {
-    urlDecode(tmp_buffer);
-    if (os.sopt_save(SOPT_WEATHER_KEY, tmp_buffer)) {  // if weather key has changed
-      weather_change = true;
-    }
-  } else if (keyfound) {
-    tmp_buffer[0]=0;
-    os.sopt_save(SOPT_WEATHER_KEY, tmp_buffer);
-  }*/
-
   if(findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("wto"), true)) {
     urlDecode(tmp_buffer);
     os.sopt_save(SOPT_WEATHER_OPTS, tmp_buffer);
@@ -1438,6 +1422,17 @@ void server_change_options()
   }
   
   /*
+  // wtkey is retired
+  if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("wtkey"), true, &keyfound)) {
+    urlDecode(tmp_buffer);
+    if (os.sopt_save(SOPT_WEATHER_KEY, tmp_buffer)) {  // if weather key has changed
+      weather_change = true;
+    }
+  } else if (keyfound) {
+    tmp_buffer[0]=0;
+    os.sopt_save(SOPT_WEATHER_KEY, tmp_buffer);
+  }
+  
   keyfound = 0;
   if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("blynk"), true, &keyfound)) {
     urlDecode(tmp_buffer);

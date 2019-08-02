@@ -144,6 +144,10 @@ const char iopt_json_names[] PROGMEM =
   "ife\0\0"
   "sn2t\0"
   "sn2o\0"
+  "sn1on"
+  "sn1of"
+  "sn2on"
+  "sn2of"
   "wimod"
   "reset"
   ;
@@ -219,6 +223,10 @@ const char iopt_prompts[] PROGMEM =
   "IFTTT Enable:   "
   "Sensor 2 type:  "
   "Normally open?  "
+  "Sn1 on adjust:  "
+  "Sn1 off adjust: "
+  "Sn2 on adjust:  "
+  "Sn2 off adjust: "
   "WiFi mode?      "
   "Factory reset?  ";
   
@@ -278,6 +286,10 @@ const byte iopt_max[] PROGMEM = {
   255,
   255,
   1,
+  255,
+  255,
+  255,
+  255,
   255,
   1
 };
@@ -343,6 +355,10 @@ byte OpenSprinkler::iopts[] = {
   0,  // ifttt enable bits
   0,  // sensor 2 type
   0,  // sensor 2 option. 0: normally closed; 1: normally open.
+  1,	// sensor 1 on delay
+  1,	// sensor 1 off delay
+  1,	// sensor 2 on delay
+  1,	// sensor 2 off delay
   WIFI_MODE_AP, // wifi mode
   0   // reset
 };
@@ -487,7 +503,7 @@ byte OpenSprinkler::start_ether() {
     IPAddress dns(iopts+IOPT_DNS_IP1);  
   	Ethernet.begin((uint8_t*)tmp_buffer, staticip, dns, gateway);
   }
-  if(Ethernet.linkStatus() != LinkON) return 0;
+  //if(Ethernet.linkStatus() != LinkON) return 0;
 
   return 1;
 }
