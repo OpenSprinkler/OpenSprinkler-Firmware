@@ -1098,14 +1098,14 @@ void server_view_scripturl() {
 void server_json_controller_main() {
   byte bid, sid;
   ulong curr_time = os.now_tz();
-  bfill.emit_p(PSTR("\"devt\":$L,\"nbrd\":$D,\"en\":$D,\"rs\":$D,\"rs2\":$D,\"rd\":$D,\"rdst\":$L,"
+  bfill.emit_p(PSTR("\"devt\":$L,\"nbrd\":$D,\"en\":$D,\"sn1\":$D,\"sn2\":$D,\"rd\":$D,\"rdst\":$L,"
                     "\"sunrise\":$D,\"sunset\":$D,\"eip\":$L,\"lwc\":$L,\"lswc\":$L,"
                     "\"lupt\":$L,\"lrun\":[$D,$D,$D,$L],"),
               curr_time,
               os.nboards,
               os.status.enabled,
-              os.status.sensor1,
-              os.status.sensor2,
+              os.status.sensor1_active,
+              os.status.sensor2_active,
               os.status.rain_delayed,
               os.nvdata.rd_stop_time,
               os.nvdata.sunrise_time,
@@ -1352,6 +1352,7 @@ void server_change_options()
 	bool time_change = false;
 	bool weather_change = false;
 	bool network_change = false;
+	bool sensor_change = false;
 
   // !!! p and bfill share the same buffer, so don't write
   // to bfill before you are done analyzing the buffer !!!
@@ -1396,6 +1397,8 @@ void server_change_options()
     	if (oid>=IOPT_USE_DHCP && oid<=IOPT_HTTPPORT_1) network_change = true;
     	if (oid==IOPT_DEVICE_ID)  network_change = true;
       if (oid==IOPT_USE_WEATHER) weather_change = true;
+      if (oid==IOPT_SENSOR1_TYPE || oid==IOPT_SENSOR1_OPTION) sensor_change = true;
+      if (oid>=IOPT_SENSOR2_TYPE && oid<=IOPT_SENSOR2_OFF_DELAY) sensor_change = true;
     }
   }
 
@@ -1475,6 +1478,9 @@ void server_change_options()
     os.checkwt_lasttime = 0;  // force weather update
   }
 
+	if(sensor_change) {
+		os.sensor_resetall();
+	}
   if(network_change) {
     // network related options have changed
     // this would require a restart to take effect

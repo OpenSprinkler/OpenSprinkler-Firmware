@@ -417,6 +417,7 @@ enum {
 	#define now()       time(0)
 	#define pgm_read_byte(x) *(x)
 	#define PSTR(x)      x
+	#define F(x)				 x
 	#define strcat_P     strcat
 	#define strcpy_P     strcpy
 	#include<string>

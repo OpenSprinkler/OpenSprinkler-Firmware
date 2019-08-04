@@ -39,13 +39,17 @@ byte OpenSprinkler::station_bits[MAX_NUM_BOARDS];
 byte OpenSprinkler::engage_booster;
 uint16_t OpenSprinkler::baseline_current;
 
-ulong OpenSprinkler::sensor1_lasttime;
-ulong OpenSprinkler::sensor2_lasttime;
-ulong OpenSprinkler::soil_sensed_time;
+ulong OpenSprinkler::sensor1_on_timer;
+ulong OpenSprinkler::sensor1_off_timer;
+ulong OpenSprinkler::sensor1_active_lasttime;
+ulong OpenSprinkler::sensor2_on_timer;
+ulong OpenSprinkler::sensor2_off_timer;
+ulong OpenSprinkler::sensor2_active_lasttime;
+ulong OpenSprinkler::raindelay_on_lasttime;
+
 ulong OpenSprinkler::flowcount_log_start;
 ulong OpenSprinkler::flowcount_rt;
 volatile ulong OpenSprinkler::flowcount_time_ms;
-ulong OpenSprinkler::raindelay_start_time;
 byte OpenSprinkler::button_timeout;
 ulong OpenSprinkler::checkwt_lasttime;
 ulong OpenSprinkler::checkwt_success_lasttime;
@@ -113,8 +117,8 @@ const char iopt_json_names[] PROGMEM =
   "mas\0\0"
   "mton\0"
   "mtof\0"
-  "urs\0\0" //"sn1t\0" // replaces urs previously
-  "rso\0\0" //"sn1o\0" // replaces rso previously
+  "sn1t\0" // replaces urs previously
+  "sn1o\0" // replaces rso previously
   "wl\0\0\0"
   "den\0\0"
   "ipas\0"
@@ -355,10 +359,10 @@ byte OpenSprinkler::iopts[] = {
   0,  // ifttt enable bits
   0,  // sensor 2 type
   0,  // sensor 2 option. 0: normally closed; 1: normally open.
-  1,	// sensor 1 on delay
-  1,	// sensor 1 off delay
-  1,	// sensor 2 on delay
-  1,	// sensor 2 off delay
+  0,	// sensor 1 on delay
+  0,	// sensor 1 off delay
+  0,	// sensor 2 on delay
+  0,	// sensor 2 off delay
   WIFI_MODE_AP, // wifi mode
   0   // reset
 };
@@ -815,15 +819,12 @@ void OpenSprinkler::begin() {
 
   lcd_start();
 
-  //lcd.createChar(ICON_CONNECTED, _iconimage_connected);
-  lcd.createChar(ICON_CONNECTED, _iconimage_raindelay);
+  lcd.createChar(ICON_CONNECTED, _iconimage_connected);
   lcd.createChar(ICON_DISCONNECTED, _iconimage_disconnected);
   lcd.createChar(ICON_REMOTEXT, _iconimage_remotext);
   lcd.createChar(ICON_RAINDELAY, _iconimage_raindelay);
   lcd.createChar(ICON_RAIN, _iconimage_rain);
-  lcd.createChar(ICON_FLOW, _iconimage_flow);
-  lcd.createChar(ICON_PSWITCH, _iconimage_pswitch);
-	lcd.createChar(ICON_SOIL, _iconimage_soil);
+  lcd.createChar(ICON_SOIL, _iconimage_soil);
   
   #if defined(ESP8266)
 
@@ -1078,20 +1079,67 @@ void OpenSprinkler::apply_all_station_bits() {
 }
 
 /** Read rain sensor status */
-void OpenSprinkler::rainsensor_status() {
-  // rs_type: 0 if normally closed, 1 if normally open
-  if(iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_RAIN)
+void OpenSprinkler::detect_binarysensor_status(ulong curr_time) {
+  // sensor_type: 0 if normally closed, 1 if normally open
+  if(iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_RAIN || iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_SOIL) {
     status.sensor1 = (digitalReadExt(PIN_SENSOR1) == iopts[IOPT_SENSOR1_OPTION] ? 0 : 1);
+  	if(status.sensor1) {
+  		if(!sensor1_on_timer) {
+  			// add minimum of 5 seconds on delay
+  			ulong delay_time = (ulong)iopts[IOPT_SENSOR1_ON_DELAY]*60;
+	  		sensor1_on_timer = curr_time + (delay_time>5?delay_time:5);
+  			sensor1_off_timer = 0;
+  		} else {
+  			if(curr_time > sensor1_on_timer) {
+  				status.sensor1_active = 1;
+  			}
+  		}
+  	} else {
+  		if(!sensor1_off_timer) {
+  			ulong delay_time = (ulong)iopts[IOPT_SENSOR1_OFF_DELAY]*60;
+	  		sensor1_off_timer = curr_time + (delay_time>5?delay_time:5);
+  			sensor1_on_timer = 0;
+  		} else {
+  			if(curr_time > sensor1_off_timer) {
+  				status.sensor1_active = 0;
+  			}
+  		}
+  	}
+	}
 
 // ESP8266 is guaranteed to have sensor 2
 #if defined(ESP8266) || defined(PIN_SENSOR2)
-  if(iopts[IOPT_SENSOR2_TYPE]==SENSOR_TYPE_RAIN)
+  if(iopts[IOPT_SENSOR2_TYPE]==SENSOR_TYPE_RAIN || iopts[IOPT_SENSOR2_TYPE]==SENSOR_TYPE_SOIL) {
     status.sensor2 = (digitalReadExt(PIN_SENSOR2) == iopts[IOPT_SENSOR2_OPTION] ? 0 : 1);
+  	if(status.sensor2) {
+  		if(!sensor2_on_timer) {
+  			// add minimum of 5 seconds on delay
+  			ulong delay_time = (ulong)iopts[IOPT_SENSOR2_ON_DELAY]*60;
+	  		sensor2_on_timer = curr_time + (delay_time>5?delay_time:5);
+  			sensor2_off_timer = 0;
+  		} else {
+  			if(curr_time > sensor2_on_timer) {
+  				status.sensor2_active = 1;
+  			}
+  		}
+  	} else {
+  		if(!sensor2_off_timer) {
+  			ulong delay_time = (ulong)iopts[IOPT_SENSOR2_OFF_DELAY]*60;
+	  		sensor2_off_timer = curr_time + (delay_time>5?delay_time:5);  		
+  			sensor2_on_timer = 0;
+  		} else {
+  			if(curr_time > sensor2_off_timer) {
+  				status.sensor2_active = 0;
+  			}
+  		}
+  	}
+	}
+
 #endif
 }
 
 /** Read soil moisture sensor status */
-void OpenSprinkler::soilsensor_status() {
+/*void OpenSprinkler::soilsensor_status() {
   if(iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_SOIL)
     status.sensor1 = (digitalReadExt(PIN_SENSOR1) == iopts[IOPT_SENSOR1_OPTION] ? 0 : 1);
 
@@ -1099,10 +1147,10 @@ void OpenSprinkler::soilsensor_status() {
   if(iopts[IOPT_SENSOR2_TYPE]==SENSOR_TYPE_SOIL)
     status.sensor2 = (digitalReadExt(PIN_SENSOR2) == iopts[IOPT_SENSOR2_OPTION] ? 0 : 1);
 #endif
-}
+}*/
 
 /** Return program switch status */
-byte OpenSprinkler::programswitch_status(ulong curr_time) {
+byte OpenSprinkler::detect_programswitch_status(ulong curr_time) {
 	byte ret = 0;
   if(iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_PSWITCH) {
     static ulong keydown_time = 0;
@@ -1126,6 +1174,18 @@ byte OpenSprinkler::programswitch_status(ulong curr_time) {
 #endif
   return ret;
 }
+
+void OpenSprinkler::sensor_resetall() {
+	sensor1_on_timer = 0;
+	sensor1_off_timer = 0;
+	sensor1_active_lasttime = 0;
+	sensor2_on_timer = 0;
+	sensor2_off_timer = 0;
+	sensor2_active_lasttime = 0;
+	old_status.sensor1_active = status.sensor1_active = 0;
+	old_status.sensor2_active = status.sensor2_active = 0;
+}
+
 /** Read current sensing value
  * OpenSprinkler 2.3 and above have a 0.2 ohm current sensing resistor.
  * Therefore the conversion from analog reading to milli-amp is:
@@ -1561,6 +1621,8 @@ void OpenSprinkler::send_http_request(uint32_t ip4, uint16_t port, char* p, void
 }
 
 void OpenSprinkler::send_http_request(const char* server, uint16_t port, char* p, void(*callback)(char*), uint16_t timeout) {
+	DEBUG_PRINTLN(server);
+	DEBUG_PRINTLN(port);
 #if defined(ARDUINO)
 
 	Client *client;
@@ -2089,47 +2151,40 @@ void OpenSprinkler::lcd_print_station(byte line, char c) {
 	}
   
   // write sensor 1 icon
-	lcd.setCursor(LCD_CURSOR_SENSOR1, 1);  
-
-  if(status.sensor1) {
-  	if(iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_RAIN) {
-	  	lcd.write(ICON_RAIN);
-	  }
-	  if(iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_SOIL) {
-	  	if(status.soil_active) {
-		  	lcd.write(ICON_SOIL);
-		 	}
-	  }
-  }
-  
-  if(iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_FLOW) {
-  	lcd.write(ICON_FLOW);
-  }
-  
-  if(iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_PSWITCH) {
-  	lcd.write(ICON_PSWITCH);
+	lcd.setCursor(LCD_CURSOR_SENSOR1, 1);
+	switch(iopts[IOPT_SENSOR1_TYPE]) {
+		case SENSOR_TYPE_RAIN:
+			lcd.write(status.sensor1_active?ICON_RAIN:(status.sensor1?'R':'r'));
+			break;
+		case SENSOR_TYPE_SOIL:
+			lcd.write(status.sensor1_active?ICON_SOIL:(status.sensor1?'S':'s'));
+			break;
+		case SENSOR_TYPE_FLOW:
+			lcd.write('F');
+			break;
+		case SENSOR_TYPE_PSWITCH:
+			lcd.write('P');
+			break;
   }
   
   // write sensor 2 icon  
 	lcd.setCursor(LCD_CURSOR_SENSOR2, 1);
+	switch(iopts[IOPT_SENSOR2_TYPE]) {
+		case SENSOR_TYPE_RAIN:
+			lcd.write(status.sensor2_active?ICON_RAIN:(status.sensor2?'R':'r'));
+			break;
+		case SENSOR_TYPE_SOIL:
+			lcd.write(status.sensor2_active?ICON_SOIL:(status.sensor2?'S':'s'));
+			break;
+			// sensor2 cannot be flow sensor
+		/*case SENSOR_TYPE_FLOW:
+			lcd.write('F');
+			break;*/
+		case SENSOR_TYPE_PSWITCH:
+			lcd.write('P');
+			break;
+  }
 
-  if(status.sensor2) {
-  	if(iopts[IOPT_SENSOR2_TYPE]==SENSOR_TYPE_RAIN) {
-	  	lcd.write(ICON_RAIN);
-	  }
-	  if(iopts[IOPT_SENSOR2_TYPE]==SENSOR_TYPE_SOIL) {
-	  	if(status.soil_active_2) {
-		  	lcd.write(ICON_SOIL);
-	  	}
-	  }
-	}
-
-	// at the moment sensor2 cannot be flow sensor
-	
-	if(iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_PSWITCH) {
-  	lcd.write(ICON_PSWITCH);
-  }	
-	
 	lcd.setCursor(LCD_CURSOR_NETWORK, 1);
 #if defined(ESP8266)
 	if(m_server)

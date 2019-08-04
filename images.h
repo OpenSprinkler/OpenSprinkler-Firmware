@@ -5,14 +5,11 @@ enum {
 	ICON_CONNECTED = 0,
 	ICON_DISCONNECTED,
 	ICON_REMOTEXT,
-	ICON_RAIN,
-	ICON_FLOW,
-	ICON_PSWITCH,
-	ICON_SOIL,
 	ICON_RAINDELAY,
+	ICON_RAIN,
+	ICON_SOIL,
 	ICON_ETHER_CONNECTED,
 	ICON_ETHER_DISCONNECTED,
-	ICON_PSWITCH_2,	
 	NUM_CUSTOM_ICONS
 };
 
@@ -76,35 +73,6 @@ const char _iconimage_remotext[] PROGMEM = {
   0x22, 0x1F, 0x00, 0x00,
   };
   
-const char _iconimage_rain[] PROGMEM = {
-  0x00, 0x00, 0x00, 0x00,
-  0x18, 0x24, 0x3E, 0x00,
-  0x2A, 0x2A, 0x00, 0x2A,
-  0x2A, 0x00, 0x00, 0x00,
-  };  
-
-const char _iconimage_flow[] PROGMEM = {
-  0x00, 0x00, 0x0F, 0x0F,
-  0x03, 0x0F, 0x0F, 0x03,
-  0x1B, 0x18, 0x18, 0x18,
-  0x78, 0x78, 0x00, 0x00,
-  };  
-
-const char _iconimage_pswitch[] PROGMEM = {
-  0x00, 0x00, 0x1E, 0x12,
-  0x12, 0x12, 0x1E, 0x02,
-  0x22, 0x32, 0x22, 0x20,
-  0x20, 0x70, 0x00, 0x00,
-  };  
-
-// todo
-const char _iconimage_soil[] PROGMEM = {
-	0x00, 0x00, 0x00, 0x0E,
-	0x01, 0x0E, 0x10, 0x0F,
-	0x00, 0x60, 0x90, 0x90,
-	0x60, 0x00, 0x00, 0x00,
-  };
-  
 const char _iconimage_raindelay[] PROGMEM = {
 	0x00, 0x00, 0x00, 0x1C,
 	0x22, 0x49, 0x49, 0x49,
@@ -112,6 +80,20 @@ const char _iconimage_raindelay[] PROGMEM = {
 	0x22, 0x1C, 0x00, 0x00,
   };    
 
+const char _iconimage_rain[] PROGMEM = {
+  0x00, 0x00, 0x00, 0x00,
+  0x18, 0x24, 0x3E, 0x00,
+  0x2A, 0x2A, 0x00, 0x2A,
+  0x2A, 0x00, 0x00, 0x00,
+  };  
+  
+const char _iconimage_soil[] PROGMEM = {
+	0x00, 0x00, 0x10,
+	0x10, 0x28, 0x28, 0x44,
+	0x44, 0x8A, 0x8A, 0x92,
+	0x44, 0x38, 0x00, 0xC6, 0x38,
+  };
+  
 const char _iconimage_ether_connected[] PROGMEM = {
   0x00, 0x00, 0x00, 0x38,
   0x28, 0x38, 0x10, 0x10,
@@ -125,14 +107,33 @@ const char _iconimage_ether_disconnected[] PROGMEM = {
   0x40, 0xFE, 0x44, 0xEE,
   0xAA, 0xEE, 0x00, 0x00,
   };
+  
+ 
+/*
+
+const char _iconimage_flow[] PROGMEM = {
+  0x00, 0x00, 0x0F, 0x0F,
+  0x03, 0x0F, 0x0F, 0x03,
+  0x1B, 0x18, 0x18, 0x18,
+  0x78, 0x78, 0x00, 0x00,
+  }; 
+
+const char _iconimage_pswitch[] PROGMEM = {
+  0x00, 0x00, 0x1E, 0x12,
+  0x12, 0x12, 0x1E, 0x02,
+  0x22, 0x32, 0x22, 0x20,
+  0x20, 0x70, 0x00, 0x00,
+  };  
+
+*/
 
 #elif defined(ARDUINO)
 
 enum {
-	LCD_CURSOR_SENSOR2 = 11,
-	LCD_CURSOR_REMOTEXT, // 12
-	LCD_CURSOR_RAINDELAY,// 13
-	LCD_CURSOR_SENSOR1,  // 14
+	LCD_CURSOR_REMOTEXT = 11,
+	LCD_CURSOR_RAINDELAY,// 12
+	LCD_CURSOR_SENSOR1,  // 13
+	LCD_CURSOR_SENSOR2,  // 14
 	LCD_CURSOR_NETWORK   // 15
 };
 
@@ -169,6 +170,17 @@ const char _iconimage_remotext[] PROGMEM = {
 	B11110
 };
 
+const char _iconimage_raindelay[] PROGMEM = {
+  B00000,
+  B01110,
+  B10101,
+  B10101,
+  B10111,
+  B10001,
+  B10001,
+  B01110
+};
+
 const char _iconimage_rain[] PROGMEM = {
 	B00000,
 	B00000,
@@ -180,6 +192,18 @@ const char _iconimage_rain[] PROGMEM = {
 	B10101
 };
 
+const char _iconimage_soil[] PROGMEM = {
+  B00100,
+  B00100,
+  B01010,
+  B01010,
+  B10001,
+  B10001,
+  B10001,
+  B01110
+}; 
+
+/*
 const char _iconimage_flow[] PROGMEM = {
 	B00000,
 	B00000,
@@ -203,27 +227,9 @@ const char _iconimage_pswitch[] PROGMEM = {
 };
 
 // todo
-const char _iconimage_soil[] PROGMEM = {
-  B01100,
-  B10000,
-  B01000,
-  B00100,
-  B11000,
-  B00010,
-  B00101,
-  B00010
-};  
-
-const char _iconimage_raindelay[] PROGMEM = {
-  B00000,
-  B01110,
-  B10101,
-  B10101,
-  B10111,
-  B10001,
-  B10001,
-  B01110
-};  
+ 
+*/
+  
 
 #else 
 
