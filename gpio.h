@@ -44,66 +44,66 @@
 
 class IOEXP {
 public:
-  IOEXP(uint8_t addr=255) { address = addr; type = IOEXP_TYPE_NONEXIST; }
-  
-  virtual void pinMode(uint8_t pin, uint8_t IOMode) { }
-  virtual uint16_t i2c_read(uint8_t reg) { return 0xFFFF; }
-  virtual void i2c_write(uint8_t reg, uint16_t v) { }
+	IOEXP(uint8_t addr=255) { address = addr; type = IOEXP_TYPE_NONEXIST; }
+	
+	virtual void pinMode(uint8_t pin, uint8_t IOMode) { }
+	virtual uint16_t i2c_read(uint8_t reg) { return 0xFFFF; }
+	virtual void i2c_write(uint8_t reg, uint16_t v) { }
 
-  void digitalWrite(uint16_t v) {
-    i2c_write(NXP_OUTPUT_REG, v);
-  }
+	void digitalWrite(uint16_t v) {
+		i2c_write(NXP_OUTPUT_REG, v);
+	}
 
-  uint16_t digitalRead() {
-    return i2c_read(NXP_INPUT_REG);
-  }
+	uint16_t digitalRead() {
+		return i2c_read(NXP_INPUT_REG);
+	}
 
-  uint8_t digitalRead(uint8_t pin) {
-    return (digitalRead() & (1<<pin)) ? HIGH : LOW;
-  }
+	uint8_t digitalRead(uint8_t pin) {
+		return (digitalRead() & (1<<pin)) ? HIGH : LOW;
+	}
 
-  void digitalWrite(uint8_t pin, uint8_t v) {
-    uint16_t values = i2c_read(NXP_OUTPUT_REG);
-    if(v > 0) values |= (1<<pin);
-    else values &= ~(1 << pin);
-    i2c_write(NXP_OUTPUT_REG, values);
-  }
+	void digitalWrite(uint8_t pin, uint8_t v) {
+		uint16_t values = i2c_read(NXP_OUTPUT_REG);
+		if(v > 0) values |= (1<<pin);
+		else values &= ~(1 << pin);
+		i2c_write(NXP_OUTPUT_REG, values);
+	}
 
-  static byte detectType(uint8_t address);
-  uint8_t address;
-  uint8_t type;
+	static byte detectType(uint8_t address);
+	uint8_t address;
+	uint8_t type;
 };
 
 class PCA9555 : public IOEXP {
 public:
-  PCA9555(uint8_t addr) { address = addr; type = IOEXP_TYPE_9555; }
-  void pinMode(uint8_t pin, uint8_t IOMode);
-  uint16_t i2c_read(uint8_t reg);
-  void i2c_write(uint8_t reg, uint16_t v);
+	PCA9555(uint8_t addr) { address = addr; type = IOEXP_TYPE_9555; }
+	void pinMode(uint8_t pin, uint8_t IOMode);
+	uint16_t i2c_read(uint8_t reg);
+	void i2c_write(uint8_t reg, uint16_t v);
 };
 
 class PCF8575 : public IOEXP {
 public:
-  PCF8575(uint8_t addr) { address = addr; type = IOEXP_TYPE_8575; }
-  void pinMode(uint8_t pin, uint8_t IOMode) {
-    if(IOMode!=OUTPUT) inputmask |= (1<<pin);
-  }
-  uint16_t i2c_read(uint8_t reg);
-  void i2c_write(uint8_t reg, uint16_t v);
+	PCF8575(uint8_t addr) { address = addr; type = IOEXP_TYPE_8575; }
+	void pinMode(uint8_t pin, uint8_t IOMode) {
+		if(IOMode!=OUTPUT) inputmask |= (1<<pin);
+	}
+	uint16_t i2c_read(uint8_t reg);
+	void i2c_write(uint8_t reg, uint16_t v);
 private:
-  uint16_t inputmask = 0;
+	uint16_t inputmask = 0;
 };
 
 class PCF8574 : public IOEXP {
 public:
-  PCF8574(uint8_t addr) { address = addr; type = IOEXP_TYPE_8574; }
-  void pinMode(uint8_t pin, uint8_t IOMode) { 
-    if(IOMode!=OUTPUT) inputmask |= (1<<pin);
-  }
-  uint16_t i2c_read(uint8_t reg);
-  void i2c_write(uint8_t reg, uint16_t v);
+	PCF8574(uint8_t addr) { address = addr; type = IOEXP_TYPE_8574; }
+	void pinMode(uint8_t pin, uint8_t IOMode) { 
+		if(IOMode!=OUTPUT) inputmask |= (1<<pin);
+	}
+	uint16_t i2c_read(uint8_t reg);
+	void i2c_write(uint8_t reg, uint16_t v);
 private:
-  uint8_t inputmask = 0;  // mask bits for input pins
+	uint8_t inputmask = 0;	// mask bits for input pins
 };
 
 //void pcf_write(int addr, byte data);
@@ -113,7 +113,7 @@ void pinModeExt(byte pin, byte mode);
 void digitalWriteExt(byte pin, byte value);
 byte digitalReadExt(byte pin);
 
-#endif  // ESP8266
+#endif	// ESP8266
 
 #else
 
@@ -125,8 +125,8 @@ byte digitalReadExt(byte pin);
 #define OUTPUT 0
 #define INPUT  1
 #define INPUT_PULLUP 1
-#define HIGH   1
-#define LOW    0
+#define HIGH	 1
+#define LOW		 0
 
 void pinMode(int pin, byte mode);
 void digitalWrite(int pin, byte value);

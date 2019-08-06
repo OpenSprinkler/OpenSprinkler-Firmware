@@ -25,11 +25,11 @@
 #define _UTILS_H
 
 #if defined(ARDUINO)
-  #include <Arduino.h>
+	#include <Arduino.h>
 #else // headers for RPI/BBB
-  #include <stdio.h>
-  #include <limits.h>
-  #include <sys/time.h>
+	#include <stdio.h>
+	#include <limits.h>
+	#include <sys/time.h>
 
 #endif
 #include "defines.h"
@@ -58,17 +58,17 @@ void peel_http_header(char*);
 #if defined(ARDUINO)
 
 #else // Arduino compatible functions for RPI/BBB
-  char* get_runtime_path();
-  char* get_filename_fullpath(const char *filename);
-  void delay(ulong ms);
-  void delayMicroseconds(ulong us);
-  void delayMicrosecondsHard(ulong us);
-  ulong millis();
-  ulong micros();
-  void initialiseEpoch();
-  #if defined(OSPI)
-  unsigned int detect_rpi_rev();
-  #endif
+	char* get_runtime_path();
+	char* get_filename_fullpath(const char *filename);
+	void delay(ulong ms);
+	void delayMicroseconds(ulong us);
+	void delayMicrosecondsHard(ulong us);
+	ulong millis();
+	ulong micros();
+	void initialiseEpoch();
+	#if defined(OSPI)
+	unsigned int detect_rpi_rev();
+	#endif
 
 #endif
 

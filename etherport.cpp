@@ -90,9 +90,9 @@ bool EthernetServer::begin()
 	return true;
 }
 
-//  This function blocks until we get a client connected.
-//   It will timeout after 50ms and return a blank client.
-//   If it succeeds it will return an EthernetClient.
+//	This function blocks until we get a client connected.
+//	 It will timeout after 50ms and return a blank client.
+//	 If it succeeds it will return an EthernetClient.
 EthernetClient EthernetServer::available()
 {
 	fd_set sock_set;
@@ -141,8 +141,8 @@ int EthernetClient::connect(uint8_t ip[4], uint16_t port)
 	m_sock = socket(AF_INET, SOCK_STREAM, 0);
 	if (::connect(m_sock, (struct sockaddr *) &sin, sizeof(sin)) < 0)
 	{
-    DEBUG_PRINTLN("error connecting to server");
-    return 0;
+		DEBUG_PRINTLN("error connecting to server");
+		return 0;
 	}
 	m_connected = true;
 	return 1;
@@ -174,9 +174,9 @@ EthernetClient::operator bool()
 }
 
 // read data from the client into the buffer provided
-//  This function will block until either data is received OR a timeout happens.
-//  If an error occurs or a timeout happens, we set the disconnect flag on the socket
-//  and return 0;
+//	This function will block until either data is received OR a timeout happens.
+//	If an error occurs or a timeout happens, we set the disconnect flag on the socket
+//	and return 0;
 int EthernetClient::read(uint8_t *buf, size_t size)
 {
 	fd_set sock_set;

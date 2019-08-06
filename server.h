@@ -29,60 +29,60 @@
 #endif
 
 class BufferFiller {
-  char *start; //!< Pointer to start of buffer
-  char *ptr; //!< Pointer to cursor position
+	char *start; //!< Pointer to start of buffer
+	char *ptr; //!< Pointer to cursor position
 public:
-  BufferFiller () {}
-  BufferFiller (char *buf) : start (buf), ptr (buf) {}
+	BufferFiller () {}
+	BufferFiller (char *buf) : start (buf), ptr (buf) {}
 
-  void emit_p(PGM_P fmt, ...) {
-    va_list ap;
-    va_start(ap, fmt);
-    for (;;) {
-      char c = pgm_read_byte(fmt++);
-      if (c == 0)
-        break;
-      if (c != '$') {
-        *ptr++ = c;
-        continue;
-      }
-      c = pgm_read_byte(fmt++);
-      switch (c) {
-      case 'D':
-        //wtoa(va_arg(ap, uint16_t), (char*) ptr);
-        itoa(va_arg(ap, int), (char*) ptr, 10);  // ray
-        break;
-      case 'L':
-        //ltoa(va_arg(ap, long), (char*) ptr, 10);
-        ultoa(va_arg(ap, long), (char*) ptr, 10); // ray
-        break;
-      case 'S':
-        strcpy((char*) ptr, va_arg(ap, const char*));
-        break;
-      case 'F': {
-        PGM_P s = va_arg(ap, PGM_P);
-        char d;
-        while ((d = pgm_read_byte(s++)) != 0)
-            *ptr++ = d;
-        continue;
-      }
-      case 'O': {
-        uint16_t oid = va_arg(ap, int);
-        file_read_block(SOPTS_FILENAME, (char*) ptr, oid*MAX_SOPTS_SIZE, MAX_SOPTS_SIZE);
-      }
-        break;
-      default:
-        *ptr++ = c;
-        continue;
-      }
-      ptr += strlen((char*) ptr);
-    }
-    *(ptr)=0;        
-    va_end(ap);
-  }
+	void emit_p(PGM_P fmt, ...) {
+		va_list ap;
+		va_start(ap, fmt);
+		for (;;) {
+			char c = pgm_read_byte(fmt++);
+			if (c == 0)
+				break;
+			if (c != '$') {
+				*ptr++ = c;
+				continue;
+			}
+			c = pgm_read_byte(fmt++);
+			switch (c) {
+			case 'D':
+				//wtoa(va_arg(ap, uint16_t), (char*) ptr);
+				itoa(va_arg(ap, int), (char*) ptr, 10);  // ray
+				break;
+			case 'L':
+				//ltoa(va_arg(ap, long), (char*) ptr, 10);
+				ultoa(va_arg(ap, long), (char*) ptr, 10); // ray
+				break;
+			case 'S':
+				strcpy((char*) ptr, va_arg(ap, const char*));
+				break;
+			case 'F': {
+				PGM_P s = va_arg(ap, PGM_P);
+				char d;
+				while ((d = pgm_read_byte(s++)) != 0)
+						*ptr++ = d;
+				continue;
+			}
+			case 'O': {
+				uint16_t oid = va_arg(ap, int);
+				file_read_block(SOPTS_FILENAME, (char*) ptr, oid*MAX_SOPTS_SIZE, MAX_SOPTS_SIZE);
+			}
+				break;
+			default:
+				*ptr++ = c;
+				continue;
+			}
+			ptr += strlen((char*) ptr);
+		}
+		*(ptr)=0;				 
+		va_end(ap);
+	}
 
-  char* buffer () const { return start; }
-  unsigned int position () const { return ptr - start; }
+	char* buffer () const { return start; }
+	unsigned int position () const { return ptr - start; }
 };
 
 

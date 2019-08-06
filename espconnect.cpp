@@ -24,49 +24,49 @@
 const char html_ap_redirect[] PROGMEM = "<h3>WiFi config saved. Now switching to station mode.</h3>";
 
 String scan_network() {
-  WiFi.mode(WIFI_STA);
-  WiFi.disconnect();
-  byte n = WiFi.scanNetworks();
-  String wirelessinfo;
-  if (n>32) n = 32; // limit to 32 ssids max
-   //Maintain old format of wireless network JSON for mobile app compat
-   wirelessinfo = "{\"ssids\":["; 
-  for(int i=0;i<n;i++) {
-    wirelessinfo += "\"";
-    wirelessinfo += WiFi.SSID(i);
-    wirelessinfo += "\"";
-    if(i<n-1) wirelessinfo += ",\r\n";
-  }
-  wirelessinfo += "],";
-  wirelessinfo += "\"rssis\":["; 
-  for(int i=0;i<n;i++) {
-    wirelessinfo += "\"";
-    wirelessinfo += WiFi.RSSI(i);
-    wirelessinfo += "\"";
-    if(i<n-1) wirelessinfo += ",\r\n";
-  }
-  wirelessinfo += "]}";
-  return wirelessinfo;
+	WiFi.mode(WIFI_STA);
+	WiFi.disconnect();
+	byte n = WiFi.scanNetworks();
+	String wirelessinfo;
+	if (n>32) n = 32; // limit to 32 ssids max
+	 //Maintain old format of wireless network JSON for mobile app compat
+	 wirelessinfo = "{\"ssids\":["; 
+	for(int i=0;i<n;i++) {
+		wirelessinfo += "\"";
+		wirelessinfo += WiFi.SSID(i);
+		wirelessinfo += "\"";
+		if(i<n-1) wirelessinfo += ",\r\n";
+	}
+	wirelessinfo += "],";
+	wirelessinfo += "\"rssis\":["; 
+	for(int i=0;i<n;i++) {
+		wirelessinfo += "\"";
+		wirelessinfo += WiFi.RSSI(i);
+		wirelessinfo += "\"";
+		if(i<n-1) wirelessinfo += ",\r\n";
+	}
+	wirelessinfo += "]}";
+	return wirelessinfo;
 }
 
 void start_network_ap(const char *ssid, const char *pass) {
-  if(!ssid) return;
-  if(pass)
-    WiFi.softAP(ssid, pass);
-  else
-    WiFi.softAP(ssid);
-  WiFi.mode(WIFI_AP_STA); // start in AP_STA mode
-  WiFi.disconnect();  // disconnect from router
+	if(!ssid) return;
+	if(pass)
+		WiFi.softAP(ssid, pass);
+	else
+		WiFi.softAP(ssid);
+	WiFi.mode(WIFI_AP_STA); // start in AP_STA mode
+	WiFi.disconnect();	// disconnect from router
 }
 
 void start_network_sta_with_ap(const char *ssid, const char *pass) {
-  if(!ssid || !pass) return;
-  WiFi.begin(ssid, pass);
+	if(!ssid || !pass) return;
+	WiFi.begin(ssid, pass);
 }
 
 void start_network_sta(const char *ssid, const char *pass) {
-  if(!ssid || !pass) return;
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(ssid, pass);
+	if(!ssid || !pass) return;
+	WiFi.mode(WIFI_STA);
+	WiFi.begin(ssid, pass);
 }
 #endif

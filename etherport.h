@@ -34,7 +34,7 @@
 #include <ctype.h>
 
 #ifdef __APPLE__
-#	define MSG_NOSIGNAL SO_NOSIGPIPE
+#define MSG_NOSIGNAL SO_NOSIGPIPE
 #endif
 
 class EthernetServer;
