@@ -117,8 +117,8 @@ const char iopt_json_names[] PROGMEM =
 	"mas\0\0"
 	"mton\0"
 	"mtof\0"
-	"sn1t\0" // replaces urs previously
-	"sn1o\0" // replaces rso previously
+	"urs\0\0"
+	"rso\0\0"
 	"wl\0\0\0"
 	"den\0\0"
 	"ipas\0"
@@ -146,12 +146,18 @@ const char iopt_json_names[] PROGMEM =
 	"dns4\0"
 	"sar\0\0"
 	"ife\0\0"
+	"sn1t\0"
+	"sn1o\0"
 	"sn2t\0"
 	"sn2o\0"
 	"sn1on"
 	"sn1of"
 	"sn2on"
 	"sn2of"
+	"subn1"
+	"subn2"
+	"subn3"
+	"subn4"
 	"wimod"
 	"reset"
 	;
@@ -196,8 +202,8 @@ const char iopt_prompts[] PROGMEM =
 	"Master 1 (Mas1):"
 	"Mas1  on adjust:"
 	"Mas1 off adjust:"
-	"Sensor 1 type:  "
-	"Normally open?  "
+	"----------------"
+	"----------------"
 	"Watering level: "
 	"Device enabled? "
 	"Ignore password?"
@@ -225,12 +231,18 @@ const char iopt_prompts[] PROGMEM =
 	"DNS server.ip4: "
 	"Special Refresh?"
 	"IFTTT Enable:	 "
+	"Sensor 1 type:  "
+	"Normally open?  "	
 	"Sensor 2 type:  "
 	"Normally open?  "
 	"Sn1 on adjust:  "
 	"Sn1 off adjust: "
 	"Sn2 on adjust:  "
 	"Sn2 off adjust: "
+	"Subnet mask1:   "
+	"Subnet mask2:   "
+	"Subnet mask3:   "
+	"Subnet mask4:   "
 	"WiFi mode?			 "
 	"Factory reset?  ";
 	
@@ -291,6 +303,12 @@ const byte iopt_max[] PROGMEM = {
 	255,
 	1,
 	255,
+	1,
+	255,
+	255,
+	255,
+	255,
+	255,
 	255,
 	255,
 	255,
@@ -328,8 +346,8 @@ byte OpenSprinkler::iopts[] = {
 	0,	// index of master station. 0: no master station
 	120,// master on time adjusted time (-10 minutes to 10 minutes)
 	120,// master off adjusted time (-10 minutes to 10 minutes)
-	0,	// sensor 1 type (see SENSOR_TYPE macro defines)
-	0,	// sensor 1 option. 0: normally closed; 1: normally open.
+	0,	// urs (retired)
+	0,	// rso (retired)
 	100,// water level (default 100%),
 	1,	// device enable
 	0,	// 1: ignore password; 0: use password
@@ -357,12 +375,18 @@ byte OpenSprinkler::iopts[] = {
 	8,
 	0,	// special station auto refresh
 	0,	// ifttt enable bits
+	0,	// sensor 1 type (see SENSOR_TYPE macro defines)
+	0,	// sensor 1 option. 0: normally closed; 1: normally open.	
 	0,	// sensor 2 type
 	0,	// sensor 2 option. 0: normally closed; 1: normally open.
 	0,	// sensor 1 on delay
 	0,	// sensor 1 off delay
 	0,	// sensor 2 on delay
 	0,	// sensor 2 off delay
+	255,// subnet mask 1
+	255,// subnet mask 2
+	255,// subnet mask 3
+	0,
 	WIFI_MODE_AP, // wifi mode
 	0		// reset
 };
@@ -500,12 +524,14 @@ byte OpenSprinkler::start_ether() {
 		memcpy(iopts+IOPT_STATIC_IP1, &(Ethernet.localIP()[0]), 4);
 		memcpy(iopts+IOPT_GATEWAY_IP1, &(Ethernet.gatewayIP()[0]),4);
 		memcpy(iopts+IOPT_DNS_IP1, &(Ethernet.dnsServerIP()[0]), 4);
+		memcpy(iopts+IOPT_SUBNET_MASK1, &(Ethernet.subnetMask()[0]), 4);
 		iopts_save();			
 	} else {
 		IPAddress staticip(iopts+IOPT_STATIC_IP1);
 		IPAddress gateway(iopts+IOPT_GATEWAY_IP1);
-		IPAddress dns(iopts+IOPT_DNS_IP1);	
-		Ethernet.begin((uint8_t*)tmp_buffer, staticip, dns, gateway);
+		IPAddress dns(iopts+IOPT_DNS_IP1);
+		IPAddress subn(iopts+IOPT_SUBNET_MASK1);
+		Ethernet.begin((uint8_t*)tmp_buffer, staticip, dns, gateway, subn);
 	}
 	//if(Ethernet.linkStatus() != LinkON) return 0;
 
@@ -1621,8 +1647,7 @@ void OpenSprinkler::send_http_request(uint32_t ip4, uint16_t port, char* p, void
 }
 
 void OpenSprinkler::send_http_request(const char* server, uint16_t port, char* p, void(*callback)(char*), uint16_t timeout) {
-	DEBUG_PRINTLN(server);
-	DEBUG_PRINTLN(port);
+
 #if defined(ARDUINO)
 
 	Client *client;
@@ -2395,7 +2420,7 @@ void OpenSprinkler::ui_set_options(int oid)
 				else	{
 					i = (i+1) % NUM_IOPTS;
 				}
-				if(i==IOPT_SEQUENTIAL_RETIRED) i++;
+				if(i==IOPT_SEQUENTIAL_RETIRED || i==IOPT_URS_RETIRED || i==IOPT_RSO_RETIRED) i++;
 				else if (hw_type==HW_TYPE_AC && i==IOPT_BOOST_TIME) i++;	// skip boost time for non-DC controller
 				#if defined(ESP8266)
 				else if (lcd.type()==LCD_I2C && i==IOPT_LCD_CONTRAST) i+=3;
@@ -2493,9 +2518,13 @@ void OpenSprinkler::config_ip() {
 		IPAddress gwip(_ip[0], _ip[1], _ip[2], _ip[3]);
 		if(gwip==(uint32_t)0x00000000) return;
 		
-		IPAddress subn(255,255,255,0);
+		_ip = iopts+IOPT_SUBNET_MASK1;
+		IPAddress subn(_ip[0], _ip[1], _ip[2], _ip[3]);
+		if(subn==(uint32_t)0x00000000) return;
+		
 		_ip = iopts+IOPT_DNS_IP1;
 		IPAddress dnsip(_ip[0], _ip[1], _ip[2], _ip[3]);
+		
 		WiFi.config(dvip, gwip, subn, dnsip);
 	}
 }

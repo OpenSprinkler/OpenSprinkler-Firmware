@@ -24,6 +24,7 @@
 #include "OpenSprinkler.h"
 #include "program.h"
 #include "server.h"
+#include "weather.h"
 
 // External variables defined in main ion file
 #if defined(ARDUINO)
@@ -503,10 +504,10 @@ void server_json_stations_attrib(const char* name, byte *attrib)
 
 void server_json_stations_main() {
 	server_json_stations_attrib(PSTR("masop"), os.attrib_mas);
-	server_json_stations_attrib(PSTR("ignore_rain"), os.attrib_igs);
+	server_json_stations_attrib(PSTR("ignore_sn1"), os.attrib_igs);
 	server_json_stations_attrib(PSTR("masop2"), os.attrib_mas2);
-	server_json_stations_attrib(PSTR("ignore_rain2"), os.attrib_igs2);
-	server_json_stations_attrib(PSTR("ignore_rd"), os.attrib_igrd);  
+	server_json_stations_attrib(PSTR("ignore_sn2"), os.attrib_igs2);
+	server_json_stations_attrib(PSTR("ignore_rain"), os.attrib_igrd);  
 	server_json_stations_attrib(PSTR("stn_dis"), os.attrib_dis);
 	server_json_stations_attrib(PSTR("stn_seq"), os.attrib_seq);
 	server_json_stations_attrib(PSTR("stn_spe"), os.attrib_spe);
@@ -966,8 +967,10 @@ void server_json_options_main() {
 	for(oid=0;oid<NUM_IOPTS;oid++) {
 		#if !defined(ARDUINO) // do not send the following parameters for non-Arduino platforms
 		if (oid==IOPT_USE_NTP			|| oid==IOPT_USE_DHCP		 ||
-				oid==IOPT_STATIC_IP1	|| oid==IOPT_STATIC_IP2  || oid==IOPT_STATIC_IP3	|| oid==IOPT_STATIC_IP4  ||
-				oid==IOPT_GATEWAY_IP1 || oid==IOPT_GATEWAY_IP2 || oid==IOPT_GATEWAY_IP3 || oid==IOPT_GATEWAY_IP4)
+				(oid>=IOPT_STATIC_IP1	&& oid<=IOPT_STATIC_IP4) ||
+				(oid>=IOPT_GATEWAY_IP1 && oid<=IOPT_GATEWAY_IP4) ||
+				(oid>=IOPT_DNS_IP1 && oid<=IOPT_DNS_IP4) ||
+				(oid>=IOPT_SUBNET_MASK1 && oid<=IOPT_SUBNET_MASK4))
 				continue;
 		#endif
 		
@@ -993,17 +996,21 @@ void server_json_options_main() {
 		}
 		#endif
 		
-		if (oid==IOPT_SEQUENTIAL_RETIRED) continue;
+		if (oid==IOPT_SEQUENTIAL_RETIRED || oid==IOPT_URS_RETIRED || oid==IOPT_RSO_RETIRED) continue;
 	 
 #if defined(ARDUINO)
 		#if defined(ESP8266)
-			if(oid==IOPT_LCD_CONTRAST || oid==IOPT_LCD_BACKLIGHT || oid==IOPT_LCD_DIMMING) continue;
+		// for SSD1306, no LCD parameters
+		if(oid==IOPT_LCD_CONTRAST || oid==IOPT_LCD_BACKLIGHT || oid==IOPT_LCD_DIMMING) continue;
 		#else
 		if (os.lcd.type() == LCD_I2C) {
 			// for I2C type LCD, we can't adjust contrast or backlight
 			if(oid==IOPT_LCD_CONTRAST || oid==IOPT_LCD_BACKLIGHT) continue;
 		}
 		#endif
+#else
+		// for Linux-based platforms, there is no LCD currently
+		if(oid==IOPT_LCD_CONTRAST || oid==IOPT_LCD_BACKLIGHT || oid==IOPT_LCD_DIMMING) continue;
 #endif
 
 		// each json name takes 5 characters
@@ -1119,6 +1126,19 @@ void server_json_controller_main() {
 							pd.lastrun.duration,
 							pd.lastrun.endtime);
 
+#if defined(ESP8266)
+	bfill.emit_p(PSTR("\"RSSI\":$D,"), (int16_t)WiFi.RSSI());
+#endif
+
+	bfill.emit_p(PSTR("\"loc\":\"$O\",\"jsp\":\"$O\",\"wsp\":\"$O\",\"wto\":{$O},\"ifkey\":\"$O\",\"wtdata\":$S,\"wterr\":$D,"),
+							 SOPT_LOCATION,
+							 SOPT_JAVASCRIPTURL,
+							 SOPT_WEATHERURL,
+							 SOPT_WEATHER_OPTS,
+							 SOPT_IFTTT_KEY,
+							 strlen(wt_rawData)==0?"{}":wt_rawData,
+							 wt_errCode);
+
 #if defined(ARDUINO)
 	if(os.status.has_curr_sense) {
 		uint16_t current = os.read_current();
@@ -1129,7 +1149,7 @@ void server_json_controller_main() {
 	if(os.iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_FLOW) {
 		bfill.emit_p(PSTR("\"flcrt\":$L,\"flwrt\":$D,"), os.flowcount_rt, FLOWCOUNT_RT_WINDOW);
 	}
-
+	
 	bfill.emit_p(PSTR("\"sbits\":["));
 	// print sbits
 	for(bid=0;bid<os.nboards;bid++)
@@ -1137,6 +1157,11 @@ void server_json_controller_main() {
 	bfill.emit_p(PSTR("0],\"ps\":["));
 	// print ps
 	for(sid=0;sid<os.nstations;sid++) {
+		// if available ether buffer is getting small
+		// send out a packet
+		if(available_ether_buffer() < 60) {
+			send_packet();
+		}
 		unsigned long rem = 0;
 		byte qid = pd.station_qid[sid];
 		RuntimeQueueStruct *q = pd.queue + qid;
@@ -1146,27 +1171,11 @@ void server_json_controller_main() {
 		}
 		bfill.emit_p(PSTR("[$D,$L,$L]"), (qid<255)?q->pid:0, rem, (qid<255)?q->st:0);
 		bfill.emit_p((sid<os.nstations-1)?PSTR(","):PSTR("]"));
-
-		// if available ether buffer is getting small
-		// send out a packet
-		if(available_ether_buffer() < 60) {
-			send_packet();
-		}
 	}
-
-	bfill.emit_p(PSTR(",\"loc\":\"$O\",\"jsp\":\"$O\",\"wsp\":\"$O\",\"wto\":{$O},\"ifkey\":\"$O\""),
-							 SOPT_LOCATION,
-							 SOPT_JAVASCRIPTURL,
-							 SOPT_WEATHERURL,
-							 SOPT_WEATHER_OPTS,
-							 SOPT_IFTTT_KEY);
 	
 	//bfill.emit_p(PSTR(",\"blynk\":\"$O\""), SOPT_BLYNK_TOKEN);
 	//bfill.emit_p(PSTR(",\"mqtt\":\"$O\""), SOPT_MQTT_IP);
 	
-#if defined(ESP8266)
-	bfill.emit_p(PSTR(",\"RSSI\":$D"), (int16_t)WiFi.RSSI());
-#endif
 	bfill.emit_p(PSTR("}"));
 	INSERT_DELAY(1);
 }
@@ -1351,7 +1360,6 @@ void server_change_options()
 	// temporarily save some old options values
 	bool time_change = false;
 	bool weather_change = false;
-	bool network_change = false;
 	bool sensor_change = false;
 
 	// !!! p and bfill share the same buffer, so don't write
@@ -1365,7 +1373,7 @@ void server_change_options()
 		// skip options that cannot be set through /co command
 		if (oid==IOPT_FW_VERSION || oid==IOPT_HW_VERSION || oid==IOPT_SEQUENTIAL_RETIRED ||
 				oid==IOPT_DEVICE_ENABLE || oid==IOPT_FW_MINOR || oid==IOPT_REMOTE_EXT_MODE ||
-				oid==IOPT_RESET || oid==IOPT_WIFI_MODE)
+				oid==IOPT_RESET || oid==IOPT_WIFI_MODE || oid==IOPT_URS_RETIRED || oid==IOPT_RSO_RETIRED)
 			continue;
 		prev_value = os.iopts[oid];
 		max_value = pgm_read_byte(iopt_max+oid);
@@ -1394,8 +1402,6 @@ void server_change_options()
 		if (os.iopts[oid] != prev_value) {	// if value has changed
 			if (oid==IOPT_TIMEZONE || oid==IOPT_USE_NTP)		time_change = true;
 			if (oid>=IOPT_NTP_IP1 && oid<=IOPT_NTP_IP4)			time_change = true;
-			if (oid>=IOPT_USE_DHCP && oid<=IOPT_HTTPPORT_1) network_change = true;
-			if (oid==IOPT_DEVICE_ID)	network_change = true;
 			if (oid==IOPT_USE_WEATHER) weather_change = true;
 			if (oid==IOPT_SENSOR1_TYPE || oid==IOPT_SENSOR1_OPTION) sensor_change = true;
 			if (oid>=IOPT_SENSOR2_TYPE && oid<=IOPT_SENSOR2_OFF_DELAY) sensor_change = true;
@@ -1480,10 +1486,6 @@ void server_change_options()
 
 	if(sensor_change) {
 		os.sensor_resetall();
-	}
-	if(network_change) {
-		// network related options have changed
-		// this would require a restart to take effect
 	}
 
 	handle_return(HTML_SUCCESS);
@@ -1908,7 +1910,7 @@ void on_sta_update() {
 
 void on_sta_upload_fin() {
 	if(!process_password()) {
-		Update.reset();
+		Update.end(false);
 		return;
 	}
 	// finish update and check error

@@ -107,17 +107,15 @@ static void getweather_callback(char* buffer) {
 		}
 	}
 
+	wt_rawData[0] = 0;
 	if (findKeyVal(p, wt_rawData, TMP_BUFFER_SIZE, PSTR("rawData"), true)) {
 		wt_rawData[TMP_BUFFER_SIZE-1]=0;	// make sure the buffer ends properly
-	} else {
-		wt_rawData[0] = 0;
 	}
 	
+	wt_errCode = -1; // -1 to indicate error code not received
 	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("errCode"), true)) {
 		wt_errCode = atoi(tmp_buffer);
-	} else {
-		wt_errCode = 0;
-	} 
+	}
 
 	os.checkwt_success_lasttime = os.now_tz();
 	write_log(LOGDATA_WATERLEVEL, os.checkwt_success_lasttime);
@@ -134,6 +132,9 @@ void GetWeather() {
 		if (os.state!=OS_STATE_CONNECTED || WiFi.status()!=WL_CONNECTED) return;
 	}
 #endif
+	// reset raw data buffer and error code
+	wt_rawData[0] = 0;
+	wt_errCode = -1;
 	// use temp buffer to construct get command
 	BufferFiller bf = tmp_buffer;
 	bf.emit_p(PSTR("$D?loc=$O&wto=$O&fwv=$D"),
