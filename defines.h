@@ -86,6 +86,21 @@ typedef unsigned long ulong;
 
 #define FLOWCOUNT_RT_WINDOW   30    // flow count window (for computing real-time flow rate), 30 seconds
 
+/** Reboot cause */
+#define REBOOT_CAUSE_NONE   0
+#define REBOOT_CAUSE_RESET  1
+#define REBOOT_CAUSE_BUTTON 2
+#define REBOOT_CAUSE_RSTAP  3
+#define REBOOT_CAUSE_TIMER  4
+#define REBOOT_CAUSE_WEB    5
+#define REBOOT_CAUSE_WIFIDONE     6
+#define REBOOT_CAUSE_FWUPDATE     7
+#define REBOOT_CAUSE_WEATHER_FAIL 8
+#define REBOOT_CAUSE_NETWORK_FAIL 9
+#define REBOOT_CAUSE_NTP          10
+#define REBOOT_CAUSE_POWERON      99
+
+
 /** WiFi defines */
 #define WIFI_MODE_AP       0xA9
 #define WIFI_MODE_STA      0x2A
@@ -115,7 +130,7 @@ typedef unsigned long ulong;
 /** Default string option values */
 #define DEFAULT_PASSWORD          "a6d82bced638de3def1e9bbb4983225c"  // md5 of 'opendoor'
 #define DEFAULT_LOCATION          "42.36,-71.06"	// Boston,MA
-#define DEFAULT_JAVASCRIPT_URL    "https://ui.opensprinkler.com/js"
+#define DEFAULT_JAVASCRIPT_URL    "https://betaui.opensprinkler.com/js"
 #define DEFAULT_WEATHER_URL       "weather.opensprinkler.com"
 #define DEFAULT_IFTTT_URL         "maker.ifttt.com"
 #define DEFAULT_EMPTY_STRING      ""

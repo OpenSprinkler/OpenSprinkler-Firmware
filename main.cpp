@@ -226,7 +226,7 @@ void ui_state_machine() {
 					ui_state = UI_STATE_DISP_IP;					
 				} else {	// if no other button is clicked, reboot
 					if(!ui_confirm(PSTR("Reboot device?"))) {ui_state = UI_STATE_DEFAULT; break;}
-					os.reboot_dev();
+					os.reboot_dev(REBOOT_CAUSE_BUTTON);
 				}
 			} else {	// clicking B2: display MAC
 				os.lcd.clear(0, 1);
@@ -245,7 +245,8 @@ void ui_state_machine() {
 				if (digitalReadExt(PIN_BUTTON_1)==0) {	// if B1 is pressed while holding B3, display up time
 					os.lcd_print_time(os.powerup_lasttime);
 					os.lcd.setCursor(0, 1);
-					os.lcd_print_pgm(PSTR("(lupt)"));
+					os.lcd_print_pgm(PSTR("(lupt) cause:"));
+					os.lcd.print(os.last_reboot_cause);
 					ui_state = UI_STATE_DISP_IP;							
 				} else if(digitalReadExt(PIN_BUTTON_2)==0) {	// if B2 is pressed while holding B3, reset to AP and reboot
 					#if defined(ESP8266)
@@ -497,7 +498,7 @@ void do_loop()
 				if(WiFi.status()==WL_CONNECTED && WiFi.localIP()) {
 					os.iopts[IOPT_WIFI_MODE] = WIFI_MODE_STA;
 					os.iopts_save();
-					os.reboot_dev();
+					os.reboot_dev(REBOOT_CAUSE_WIFIDONE);
 				}
 			}
 			else {
@@ -571,7 +572,7 @@ void do_loop()
 		
 		#if defined(ESP8266)
 		if(reboot_timer && millis() > reboot_timer) {
-			os.reboot_dev();
+			os.reboot_dev(REBOOT_CAUSE_TIMER);
 		}
 		#endif
 			
@@ -615,6 +616,7 @@ void do_loop()
 				os.sensor1_active_lasttime = curr_time;
 				push_message(IFTTT_SENSOR1, LOGDATA_SENSOR1, 1);
 			} else {
+				DEBUG_PRINTLN(F("notify sensor1 deActive"));
 				write_log(LOGDATA_SENSOR1, curr_time);
 				push_message(IFTTT_SENSOR1, LOGDATA_SENSOR1, 0);			
 			}
@@ -628,6 +630,7 @@ void do_loop()
 				os.sensor2_active_lasttime = curr_time;				
 				push_message(IFTTT_SENSOR2, LOGDATA_SENSOR2, 1);
 			} else {
+				DEBUG_PRINTLN(F("notify sensor2 deActive"));			
 				write_log(LOGDATA_SENSOR2, curr_time);
 				push_message(IFTTT_SENSOR2, LOGDATA_SENSOR2, 0);
 			}
@@ -915,7 +918,7 @@ void do_loop()
 					}
 				}
 				if (!willrun) {
-					os.reboot_dev();
+					os.reboot_dev(os.nvdata.reboot_cause);
 				}
 			}
 		}
@@ -986,6 +989,7 @@ void check_weather() {
 		// if weather check has failed to return for too long, restart network
 		os.checkwt_success_lasttime = 0;
 		// mark for safe restart
+		os.nvdata.reboot_cause = REBOOT_CAUSE_WEATHER_FAIL;
 		os.status.safe_reboot = 1;
 		return;
 	}
@@ -1600,6 +1604,7 @@ void check_network() {
 		// if failed more than 3 times, restart
 		if (os.status.network_fails==3) {
 			// mark for safe restart
+			os.nvdata.reboot_cause = REBOOT_CAUSE_NETWORK_FAIL;
 			os.status.safe_reboot = 1;
 		} else if (os.status.network_fails>2) {
 			// if failed more than twice, try to reconnect		
@@ -1641,7 +1646,7 @@ void perform_ntp_sync() {
 			#if !defined(ESP8266)
 			// if rtc was uninitialized and now it is, restart
 			if(rtc_zero && now()>978307200L) {
-				os.reboot_dev();
+				os.reboot_dev(REBOOT_CAUSE_NTP);
 			}
 			#endif
 		}

@@ -54,6 +54,7 @@ byte OpenSprinkler::button_timeout;
 ulong OpenSprinkler::checkwt_lasttime;
 ulong OpenSprinkler::checkwt_success_lasttime;
 ulong OpenSprinkler::powerup_lasttime;
+uint8_t OpenSprinkler::last_reboot_cause = REBOOT_CAUSE_NONE;
 byte OpenSprinkler::weather_update_flag;
 
 // todo future: the following attribute bytes are for backward compatibility
@@ -376,9 +377,9 @@ byte OpenSprinkler::iopts[] = {
 	0,	// special station auto refresh
 	0,	// ifttt enable bits
 	0,	// sensor 1 type (see SENSOR_TYPE macro defines)
-	0,	// sensor 1 option. 0: normally closed; 1: normally open.	
+	1,	// sensor 1 option. 0: normally closed; 1: normally open.	default 1.
 	0,	// sensor 2 type
-	0,	// sensor 2 option. 0: normally closed; 1: normally open.
+	1,	// sensor 2 option. 0: normally closed; 1: normally open. default 1.
 	0,	// sensor 1 on delay
 	0,	// sensor 1 off delay
 	0,	// sensor 2 on delay
@@ -539,8 +540,12 @@ byte OpenSprinkler::start_ether() {
 }
 
 /** Reboot controller */
-void OpenSprinkler::reboot_dev() {
+void OpenSprinkler::reboot_dev(uint8_t cause) {
 	lcd_print_line_clear_pgm(PSTR("Rebooting..."), 0);
+	if(cause) {
+		nvdata.reboot_cause = cause;
+		nvdata_save();
+	}
 #if defined(ESP8266)
 	ESP.restart();
 #else
@@ -569,7 +574,9 @@ byte OpenSprinkler::start_network() {
 }
 
 /** Reboot controller */
-void OpenSprinkler::reboot_dev() {
+void OpenSprinkler::reboot_dev(uint8_t cause) {
+	nvdata.reboot_cause = cause;
+	nvdata_save();
 #if defined(DEMO)
 	// do nothing
 #else
@@ -794,7 +801,8 @@ void OpenSprinkler::begin() {
 
 	nvdata.sunrise_time = 360;	// 6:00am default sunrise
 	nvdata.sunset_time = 1080;	// 6:00pm default sunset
-
+	nvdata.reboot_cause = REBOOT_CAUSE_POWERON;
+	
 	nboards = 1;
 	nstations = nboards*8;
 
@@ -1164,23 +1172,13 @@ void OpenSprinkler::detect_binarysensor_status(ulong curr_time) {
 #endif
 }
 
-/** Read soil moisture sensor status */
-/*void OpenSprinkler::soilsensor_status() {
-	if(iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_SOIL)
-		status.sensor1 = (digitalReadExt(PIN_SENSOR1) == iopts[IOPT_SENSOR1_OPTION] ? 0 : 1);
-
-#if defined(ESP8266) || defined(PIN_SENSOR2)
-	if(iopts[IOPT_SENSOR2_TYPE]==SENSOR_TYPE_SOIL)
-		status.sensor2 = (digitalReadExt(PIN_SENSOR2) == iopts[IOPT_SENSOR2_OPTION] ? 0 : 1);
-#endif
-}*/
 
 /** Return program switch status */
 byte OpenSprinkler::detect_programswitch_status(ulong curr_time) {
 	byte ret = 0;
 	if(iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_PSWITCH) {
 		static ulong keydown_time = 0;
-		byte val = digitalReadExt(PIN_SENSOR1);
+		byte val = (digitalReadExt(PIN_SENSOR1)==iopts[IOPT_SENSOR1_OPTION]);
 		if(!val && !keydown_time) keydown_time = curr_time;
 		else if(val && keydown_time && (curr_time > keydown_time)) {
 			keydown_time = 0;
@@ -1190,7 +1188,7 @@ byte OpenSprinkler::detect_programswitch_status(ulong curr_time) {
 #if defined(ESP8266) || defined(PIN_SENSOR2)	
 	if(iopts[IOPT_SENSOR2_TYPE]==SENSOR_TYPE_PSWITCH) {
 		static ulong keydown_time_2 = 0;
-		byte val = digitalReadExt(PIN_SENSOR2);
+		byte val = (digitalReadExt(PIN_SENSOR2)==iopts[IOPT_SENSOR2_OPTION]);
 		if(!val && !keydown_time_2) keydown_time_2 = curr_time;
 		else if(val && keydown_time_2 && (curr_time > keydown_time_2)) {
 			keydown_time_2 = 0;
@@ -1843,7 +1841,9 @@ void OpenSprinkler::options_setup() {
 		attribs_load(); // load and repackage attrib bits (for backward compatibility)
 		
 		// 3. write non-volatile controller status
+		nvdata.reboot_cause = REBOOT_CAUSE_RESET;
 		nvdata_save();
+		last_reboot_cause = nvdata.reboot_cause;
 		
 		// 4. write program data: just need to write a program counter: 0
 		file_write_byte(PROG_FILENAME, 0, 0);
@@ -1855,6 +1855,9 @@ void OpenSprinkler::options_setup() {
 
 		iopts_load();
 		nvdata_load();
+		last_reboot_cause = nvdata.reboot_cause;
+		nvdata.reboot_cause = REBOOT_CAUSE_POWERON;
+		nvdata_save();
 		#if defined(ESP8266)
 		wifi_ssid = sopt_load(SOPT_STA_SSID);
 		wifi_pass = sopt_load(SOPT_STA_PASS);
@@ -1871,7 +1874,7 @@ void OpenSprinkler::options_setup() {
 		// if BUTTON_1 is pressed during startup, go to 'reset all options'
 		ui_set_options(IOPT_RESET);
 		if (iopts[IOPT_RESET]) {
-			reboot_dev();
+			reboot_dev(REBOOT_CAUSE_NONE);
 		}
 		break;
 
@@ -1911,7 +1914,7 @@ void OpenSprinkler::options_setup() {
 		lcd.clear();
 		ui_set_options(0);
 		if (iopts[IOPT_RESET]) {
-			reboot_dev();
+			reboot_dev(REBOOT_CAUSE_NONE);
 		}
 		break;
 	}
@@ -1969,6 +1972,7 @@ void OpenSprinkler::nvdata_load() {
 
 /** Save non-volatile controller status data */
 void OpenSprinkler::nvdata_save() {
+	DEBUG_PRINTLN(F("save nvdata"));
 	file_write_block(NVCON_FILENAME, &nvdata, 0, sizeof(NVConData));
 }
 
@@ -2006,7 +2010,7 @@ String OpenSprinkler::sopt_load(byte oid) {
 /** Save a string option to file */
 bool OpenSprinkler::sopt_save(byte oid, const char *buf) {
 	// smart save: if value hasn't changed, don't write
-	//if(file_cmp_block(SOPTS_FILENAME, buf, (ulong)MAX_SOPTS_SIZE*oid)==0) return false;
+	if(file_cmp_block(SOPTS_FILENAME, buf, (ulong)MAX_SOPTS_SIZE*oid)==0) return false;
 	int len = strlen(buf);
 	if(len>=MAX_SOPTS_SIZE) {
 		file_write_block(SOPTS_FILENAME, buf, (ulong)MAX_SOPTS_SIZE*oid, MAX_SOPTS_SIZE);
@@ -2413,8 +2417,6 @@ void OpenSprinkler::ui_set_options(int oid)
 				if (i==IOPT_USE_DHCP && iopts[i]) i += 9; // if use DHCP, skip static ip set
 				else if (i==IOPT_HTTPPORT_0) i+=2; // skip IOPT_HTTPPORT_1
 				else if (i==IOPT_PULSE_RATE_0) i+=2; // skip IOPT_PULSE_RATE_1
-				else if (i==IOPT_SENSOR1_TYPE && iopts[i]!=SENSOR_TYPE_RAIN) i+=2; // if sensor1 is not rain sensor, skip sensor1 option
-				else if (i==IOPT_SENSOR2_TYPE && iopts[i]!=SENSOR_TYPE_RAIN) i+=2; // if sensor2 is not rain sensor, skip sensor2 option
 				else if (i==IOPT_MASTER_STATION && iopts[i]==0) i+=3; // if not using master station, skip master on/off adjust
 				else if (i==IOPT_MASTER_STATION_2&& iopts[i]==0) i+=3; // if not using master2, skip master2 on/off adjust
 				else	{
@@ -2505,7 +2507,7 @@ void OpenSprinkler::set_screen_led(byte status) {
 void OpenSprinkler::reset_to_ap() {
 	iopts[IOPT_WIFI_MODE] = WIFI_MODE_AP;
 	iopts_save();
-	reboot_dev();
+	reboot_dev(REBOOT_CAUSE_RSTAP);
 }
 
 void OpenSprinkler::config_ip() {

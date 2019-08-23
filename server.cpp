@@ -450,7 +450,7 @@ void on_ap_try_connect() {
 	server_send_html(html);
 	if(WiFi.status() == WL_CONNECTED && WiFi.localIP()) {
 		// IP received by client, restart
-		os.reboot_dev();
+		//os.reboot_dev(REBOOT_CAUSE_WIFIDONE);
 	}  
 }
 
@@ -598,6 +598,7 @@ void server_change_stations() {
 #else
 	char* p = get_buffer;
 #endif
+	
 	byte sid;
 	char tbuf2[4] = {'s', 0, 0, 0};
 	// process station names
@@ -1107,7 +1108,7 @@ void server_json_controller_main() {
 	ulong curr_time = os.now_tz();
 	bfill.emit_p(PSTR("\"devt\":$L,\"nbrd\":$D,\"en\":$D,\"sn1\":$D,\"sn2\":$D,\"rd\":$D,\"rdst\":$L,"
 										"\"sunrise\":$D,\"sunset\":$D,\"eip\":$L,\"lwc\":$L,\"lswc\":$L,"
-										"\"lupt\":$L,\"lrun\":[$D,$D,$D,$L],"),
+										"\"lupt\":$L,\"lrbtc\":$D,\"lrun\":[$D,$D,$D,$L],"),
 							curr_time,
 							os.nboards,
 							os.status.enabled,
@@ -1121,6 +1122,7 @@ void server_json_controller_main() {
 							os.checkwt_lasttime,
 							os.checkwt_success_lasttime,
 							os.powerup_lasttime,
+							os.last_reboot_cause,
 							pd.lastrun.station,
 							pd.lastrun.program,
 							pd.lastrun.duration,
@@ -1252,7 +1254,7 @@ void server_change_values()
 			print_html_standard_header();
 			//bfill.emit_p(PSTR("Rebooting..."));
 			send_packet(true);
-			os.reboot_dev();
+			os.reboot_dev(REBOOT_CAUSE_WEB);
 		#endif
 	}
 
@@ -1403,8 +1405,7 @@ void server_change_options()
 			if (oid==IOPT_TIMEZONE || oid==IOPT_USE_NTP)		time_change = true;
 			if (oid>=IOPT_NTP_IP1 && oid<=IOPT_NTP_IP4)			time_change = true;
 			if (oid==IOPT_USE_WEATHER) weather_change = true;
-			if (oid==IOPT_SENSOR1_TYPE || oid==IOPT_SENSOR1_OPTION) sensor_change = true;
-			if (oid>=IOPT_SENSOR2_TYPE && oid<=IOPT_SENSOR2_OFF_DELAY) sensor_change = true;
+			if (oid>=IOPT_SENSOR1_TYPE && oid<=IOPT_SENSOR2_OFF_DELAY) sensor_change = true;
 		}
 	}
 
@@ -1417,8 +1418,9 @@ void server_change_options()
 	uint8_t keyfound = 0;
 	if(findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("wto"), true)) {
 		urlDecode(tmp_buffer);
-		os.sopt_save(SOPT_WEATHER_OPTS, tmp_buffer);
-		weather_change = true;
+		if (os.sopt_save(SOPT_WEATHER_OPTS, tmp_buffer)) {
+			weather_change = true;	// if wto has changed
+		}
 	}
 	
 	keyfound = 0;
@@ -1919,7 +1921,7 @@ void on_sta_upload_fin() {
 	}
 	
 	server_send_result(HTML_SUCCESS);
-	os.reboot_dev();
+	os.reboot_dev(REBOOT_CAUSE_FWUPDATE);
 }
 
 void on_ap_upload_fin() { on_sta_upload_fin(); }
@@ -2038,6 +2040,7 @@ void start_server_ap() {
 void handle_web_request(char *p) {
 	rewind_ether_buffer();
 
+	//DEBUG_PRINTLN(p);
 	// assume this is a GET request
 	// GET /xx?xxxx
 	char *com = p+5;

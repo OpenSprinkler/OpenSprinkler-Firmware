@@ -62,6 +62,7 @@ struct NVConData {
 	uint16_t sunset_time;		// sunset time (in minutes)
 	uint32_t rd_stop_time;	// rain delay stop time
 	uint32_t external_ip;		// external ip
+	uint8_t  reboot_cause;	// reboot cause
 };
 
 struct StationAttrib {	// station attributes
@@ -189,11 +190,12 @@ public:
 	static ulong checkwt_lasttime;			// time when weather was checked
 	static ulong checkwt_success_lasttime; // time when weather check was successful
 	static ulong powerup_lasttime;			// time when controller is powered up most recently
+	static uint8_t last_reboot_cause;		// last reboot cause
 	static byte  weather_update_flag; 
 	// member functions
 	// -- setup
 	static void update_dev();		// update software for Linux instances
-	static void reboot_dev();		// reboot the microcontroller
+	static void reboot_dev(uint8_t);		// reboot the microcontroller
 	static void begin();				// initialization, must call this function before calling other functions
 	static byte start_network();	// initialize network with the given mac and port
 	static byte start_ether();	// initialize ethernet with the given mac and port	
