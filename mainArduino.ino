@@ -1,13 +1,12 @@
 #include <Wire.h>
 
-#ifdef ESP8266
-  struct tcp_pcb;
-  extern struct tcp_pcb* tcp_tw_pcbs;
-  extern "C" void tcp_abort (struct tcp_pcb* pcb);
-
-  void tcpCleanup()   // losing bytes work around
-  {  while(tcp_tw_pcbs)
-    {    tcp_abort(tcp_tw_pcbs);  }}
+#if defined(ESP8266)
+	struct tcp_pcb;
+	extern struct tcp_pcb* tcp_tw_pcbs;
+	extern "C" void tcp_abort (struct tcp_pcb* pcb);
+	void tcpCleanup() { // losing bytes work around
+		while(tcp_tw_pcbs) { tcp_abort(tcp_tw_pcbs); }
+	}
 #else
   #include <SdFat.h>
 #endif
@@ -25,7 +24,7 @@ void setup() {
 
 void loop() {
   do_loop();
-#ifdef ESP8266
+#if defined(ESP8266)
   tcpCleanup();
 #endif
 }

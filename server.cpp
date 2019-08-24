@@ -1483,6 +1483,9 @@ void server_change_options()
 	}
 
 	if(weather_change) {
+		os.iopts[IOPT_WATER_PERCENTAGE] = 100; // reset watering percentage to 100%
+		wt_rawData[0] = 0; 		// reset wt_rawData and errCode
+		wt_errCode = -1;		
 		os.checkwt_lasttime = 0;	// force weather update
 	}
 

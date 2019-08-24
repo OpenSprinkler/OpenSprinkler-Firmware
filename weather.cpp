@@ -41,18 +41,19 @@ void write_log(byte type, ulong curr_time);
 
 static void getweather_callback(char* buffer) {
 	char *p = buffer;
-	DEBUG_PRINTLN(p);  
+	DEBUG_PRINTLN(p);
 	/* scan the buffer until the first & symbol */
 	while(*p && *p!='&') {
 		p++;
 	}
 	if (*p != '&')	return;
 	int v;
+	bool save_nvdata = false;
 	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("sunrise"), true)) {
 		v = atoi(tmp_buffer);
 		if (v>=0 && v<=1440 && v != os.nvdata.sunrise_time) {
 			os.nvdata.sunrise_time = v;
-			os.nvdata_save();
+			save_nvdata = true;
 			os.weather_update_flag |= WEATHER_UPDATE_SUNRISE;
 		}
 	}
@@ -61,7 +62,7 @@ static void getweather_callback(char* buffer) {
 		v = atoi(tmp_buffer);
 		if (v>=0 && v<=1440 && v != os.nvdata.sunset_time) {
 			os.nvdata.sunset_time = v;
-			os.nvdata_save();
+			save_nvdata = true;			
 			os.weather_update_flag |= WEATHER_UPDATE_SUNSET;			
 		}
 	}
@@ -70,7 +71,7 @@ static void getweather_callback(char* buffer) {
 		uint32_t l = atol(tmp_buffer);
 		if(l != os.nvdata.external_ip) {
 			os.nvdata.external_ip = atol(tmp_buffer);
-			os.nvdata_save();
+			save_nvdata = true;			
 			os.weather_update_flag |= WEATHER_UPDATE_EIP;
 		}
 	}
@@ -107,7 +108,6 @@ static void getweather_callback(char* buffer) {
 		}
 	}
 
-	wt_rawData[0] = 0;
 	if (findKeyVal(p, wt_rawData, TMP_BUFFER_SIZE, PSTR("rawData"), true)) {
 		wt_rawData[TMP_BUFFER_SIZE-1]=0;	// make sure the buffer ends properly
 	}
@@ -117,8 +117,10 @@ static void getweather_callback(char* buffer) {
 		wt_errCode = atoi(tmp_buffer);
 	}
 
+	if(save_nvdata) os.nvdata_save();
 	os.checkwt_success_lasttime = os.now_tz();
 	write_log(LOGDATA_WATERLEVEL, os.checkwt_success_lasttime);
+
 }
 
 static void getweather_callback_with_peel_header(char* buffer) {
@@ -132,9 +134,6 @@ void GetWeather() {
 		if (os.state!=OS_STATE_CONNECTED || WiFi.status()!=WL_CONNECTED) return;
 	}
 #endif
-	// reset raw data buffer and error code
-	wt_rawData[0] = 0;
-	wt_errCode = -1;
 	// use temp buffer to construct get command
 	BufferFiller bf = tmp_buffer;
 	bf.emit_p(PSTR("$D?loc=$O&wto=$O&fwv=$D"),

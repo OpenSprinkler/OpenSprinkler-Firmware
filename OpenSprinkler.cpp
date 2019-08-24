@@ -548,6 +548,7 @@ void OpenSprinkler::reboot_dev(uint8_t cause) {
 	}
 #if defined(ESP8266)
 	ESP.restart();
+	//ESP.reset();
 #else
 	resetFunc();
 #endif
@@ -1589,7 +1590,7 @@ void remote_http_callback(char* buffer) {
 }
 
 void OpenSprinkler::send_http_request(uint32_t ip4, uint16_t port, char* p, void(*callback)(char*), uint16_t timeout) {
-	byte ip[4];
+	static byte ip[4];
 	ip[0] = ip4>>24;
 	ip[1] = (ip4>>16)&0xff;
 	ip[2] = (ip4>>8)&0xff;
@@ -1597,20 +1598,22 @@ void OpenSprinkler::send_http_request(uint32_t ip4, uint16_t port, char* p, void
 
 #if defined(ARDUINO)
 
-	Client *client;
-	#if defined(ESP8266)
-		if(m_server) client = new EthernetClient();
-		else client = new WiFiClient();
-	#else
-		client = new EthernetClient();
-	#endif
+	static Client *client = NULL;
+	if(!client) {
+		#if defined(ESP8266)
+			if(m_server) client = new EthernetClient();
+			else client = new WiFiClient();
+		#else
+			client = new EthernetClient();
+		#endif
+	}
 
-	if(!client->connect(IPAddress(ip), port)) { delete client; return; }	
+	if(!client->connect(IPAddress(ip), port)) { return; }	
 
 #else
-
-	EthernetClient *client = new EthernetClient();
-	if(!client->connect(ip, port)) { delete client; return; }	
+	static EthernetClient *client = NULL;
+	if(!client) { client = new EthernetClient(); }
+	if(!client->connect(ip, port)) { return; }	
 
 #endif
 
@@ -1624,11 +1627,11 @@ void OpenSprinkler::send_http_request(uint32_t ip4, uint16_t port, char* p, void
 #if defined(ARDUINO)	
 	while(!client->available() && millis() < stoptime) {
 		if(!client->connected())	break;	
-		yield();
+		delay(0);
 	}		
 	while(client->available()) {
 		client->read((uint8_t*)ether_buffer, ETHER_BUFFER_SIZE);
-		yield();
+		delay(0);
 	}
 #else
 	while(millis() < stoptime) {
@@ -1640,7 +1643,6 @@ void OpenSprinkler::send_http_request(uint32_t ip4, uint16_t port, char* p, void
 	}
 #endif
 	client->stop();
-	delete client;
 	if(callback) callback(ether_buffer);
 }
 
@@ -1648,29 +1650,31 @@ void OpenSprinkler::send_http_request(const char* server, uint16_t port, char* p
 
 #if defined(ARDUINO)
 
-	Client *client;
-	#if defined(ESP8266)
-		if(m_server) client = new EthernetClient();
-		else client = new WiFiClient();
-	#else
-		client = new EthernetClient();
-	#endif
+	static Client *client = NULL;
+	if(!client) {
+		#if defined(ESP8266)
+			if(m_server) client = new EthernetClient();
+			else client = new WiFiClient();
+		#else
+			client = new EthernetClient();
+		#endif
+	}
 
-	if(!client->connect(server, port)) { delete client; return; }	
-
+	if(!client->connect(server, port)) { return; }	
+	
 #else
 
-	EthernetClient *client = new EthernetClient();
+	static EthernetClient *client = NULL;
+	if(!client) { client = new EthernetClient(); }
 	struct hostent *host;
 	host = gethostbyname(server);
 	if (!host) {
 		DEBUG_PRINT("can't resolve http station - ");
 		DEBUG_PRINTLN(server);
-		delete client;
 		return;
 	}
 
-	if(!client->connect((uint8_t*)host->h_addr, port)) { delete client; return; }	
+	if(!client->connect((uint8_t*)host->h_addr, port)) { return; }	
 
 #endif
 
@@ -1684,11 +1688,11 @@ void OpenSprinkler::send_http_request(const char* server, uint16_t port, char* p
 #if defined(ARDUINO)	
 	while(!client->available() && millis() < stoptime) {
 		if(!client->connected())	break;	
-		yield();
-	}		
+		delay(0);
+	}
 	while(client->available()) {
 		client->read((uint8_t*)ether_buffer, ETHER_BUFFER_SIZE);
-		yield();
+		delay(0);
 	}
 #else
 	while(millis() < stoptime) {
@@ -1700,7 +1704,6 @@ void OpenSprinkler::send_http_request(const char* server, uint16_t port, char* p
 	}
 #endif
 	client->stop();
-	delete client;
 	if(callback) callback(ether_buffer);
 }
 

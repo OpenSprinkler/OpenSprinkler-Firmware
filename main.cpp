@@ -56,7 +56,7 @@ void remote_http_callback(char*);
 #define RTC_SYNC_INTERVAL				60			// RTC sync interval, 60 secs
 #define CHECK_NETWORK_INTERVAL	601			// Network checking timeout, 10 minutes
 #define CHECK_WEATHER_TIMEOUT		7201		// Weather check interval: 2 hours
-#define CHECK_WEATHER_SUCCESS_TIMEOUT 172833L // Weather check success interval: 24 hrs
+#define CHECK_WEATHER_SUCCESS_TIMEOUT 86416L // Weather check success interval: 24 hrs
 #define LCD_BACKLIGHT_TIMEOUT		15			// LCD backlight timeout: 15 secs
 #define PING_TIMEOUT						200			// Ping test timeout: 200 ms
 
@@ -506,6 +506,7 @@ void do_loop()
 					wifi_server->handleClient();
 					connecting_timeout = 0;
 				} else {
+					DEBUG_PRINTLN(F("WiFi disconnected, going back to initial"));
 					os.state = OS_STATE_INITIAL;
 				}
 			}
@@ -567,6 +568,12 @@ void do_loop()
 
 	// The main control loop runs once every second
 	if (curr_time != last_time) {
+	#if defined(ESP8266)
+		DEBUG_PRINT(F("Free heap:"));
+		DEBUG_PRINT(ESP.getFreeHeap());
+		DEBUG_PRINT(":");
+		DEBUG_PRINTLN(curr_time);
+	#endif
 		last_time = curr_time;
 		if (os.button_timeout) os.button_timeout--;
 		
@@ -662,6 +669,7 @@ void do_loop()
 			last_minute = curr_minute;
 			// check through all programs
 			for(pid=0; pid<pd.nprograms; pid++) {
+				delay(0);
 				pd.read(pid, &prog);	// todo future: reduce load time
 				if(prog.check_match(curr_time)) {
 					// program match found
@@ -881,6 +889,7 @@ void do_loop()
 		}		 
 
 		// process dynamic events
+		DEBUG_PRINTLN(F("process dynamic events"));
 		process_dynamic_events(curr_time);
 
 		// activate/deactivate valves
@@ -937,8 +946,10 @@ void do_loop()
 		// instead of using curr_time, which may change due to NTP sync itself
 		// we use Arduino's millis() method
 		//if (curr_time % NTP_SYNC_INTERVAL == 0) os.status.req_ntpsync = 1;
+		DEBUG_PRINTLN(F("ntp sync ..."));		
 		if((millis()/1000) % NTP_SYNC_INTERVAL==0) os.status.req_ntpsync = 1;
 		perform_ntp_sync();
+		DEBUG_PRINTLN(F("ntp sync done"));				
 
 		// check network connection
 		if (curr_time && (curr_time % CHECK_NETWORK_INTERVAL==0))  os.status.req_network = 1;
@@ -986,14 +997,15 @@ void check_weather() {
 
 	ulong ntz = os.now_tz();
 	if (os.checkwt_success_lasttime && (ntz > os.checkwt_success_lasttime + CHECK_WEATHER_SUCCESS_TIMEOUT)) {
-		// if weather check has failed to return for too long, restart network
-		os.checkwt_success_lasttime = 0;
-		// mark for safe restart
-		os.nvdata.reboot_cause = REBOOT_CAUSE_WEATHER_FAIL;
-		os.status.safe_reboot = 1;
-		return;
-	}
-	if (!os.checkwt_lasttime || (ntz > os.checkwt_lasttime + CHECK_WEATHER_TIMEOUT)) {
+		// if last successful weather call timestamp is more than allowed threshold
+		// and if the selected adjustment method is not manual
+		// reset watering percentage to 100
+		if(!(os.iopts[IOPT_USE_WEATHER]==0 || os.iopts[IOPT_USE_WEATHER]==2)) {
+			os.iopts[IOPT_WATER_PERCENTAGE] = 100; // reset watering percentage to 100%
+			wt_rawData[0] = 0; 		// reset wt_rawData and errCode
+			wt_errCode = -1;
+		}
+	} else if (!os.checkwt_lasttime || (ntz > os.checkwt_lasttime + CHECK_WEATHER_TIMEOUT)) {
 		os.checkwt_lasttime = ntz;
 		GetWeather();
 	}
