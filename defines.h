@@ -70,12 +70,13 @@ typedef unsigned long ulong;
 #define STN_TYPE_HTTP        0x04	// Support for HTTP Get connection
 #define STN_TYPE_OTHER       0xFF
 
-#define IFTTT_PROGRAM_SCHED   0x01
-#define IFTTT_RAINSENSOR      0x02
-#define IFTTT_FLOWSENSOR      0x04
-#define IFTTT_WEATHER_UPDATE  0x08
-#define IFTTT_REBOOT          0x10
-#define IFTTT_STATION_RUN     0x20
+#define NOTIFY_PROGRAM_SCHED   0x01
+#define NOTIFY_RAINSENSOR      0x02
+#define NOTIFY_FLOWSENSOR      0x04
+#define NOTIFY_WEATHER_UPDATE  0x08
+#define NOTIFY_REBOOT          0x10
+#define NOTIFY_STATION_OFF     0x20
+#define NOTIFY_STATION_ON      0x40
 
 /** Sensor type macro defines */
 #define SENSOR_TYPE_NONE    0x00
@@ -207,6 +208,8 @@ typedef unsigned long ulong;
 #define DEFAULT_JAVASCRIPT_URL    "https://ui.opensprinkler.com/js"
 #define DEFAULT_WEATHER_URL       "weather.opensprinkler.com"
 #define DEFAULT_IFTTT_URL         "maker.ifttt.com"
+#define DEFAULT_MQTT_HOST         "localhost"
+#define DEFAULT_MQTT_PORT         1883
 
 /** Macro define of each option
   * Refer to OpenSprinkler.cpp for details on each option
@@ -262,6 +265,8 @@ typedef enum {
   OPTION_DNS_IP4,
   OPTION_SPE_AUTO_REFRESH,
   OPTION_IFTTT_ENABLE,
+  OPTION_MQTT_ENABLE,
+  OPTION_NOTIFY_TOPIC,
   OPTION_SENSOR2_TYPE,
   OPTION_SENSOR2_OPTION,
   OPTION_RESET,
@@ -527,6 +532,7 @@ typedef enum {
     #define PSTR(x)      x
     #define strcat_P     strcat
     #define strcpy_P     strcpy
+    #define sprintf_P    sprintf
     #define PROGMEM
     typedef const char* PGM_P;
     typedef unsigned char   uint8_t;

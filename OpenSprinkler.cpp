@@ -87,6 +87,11 @@ extern char ether_buffer[];
   byte OpenSprinkler::pin_sr_data = PIN_SR_DATA;
 #endif
 
+#if defined(MQTT) && defined(OSPI)
+struct mosquitto *mqtt_client = NULL;
+#endif
+
+
 /** Option json names (stored in progmem) */
 // IMPORTANT: each json name is strictly 5 characters
 // with 0 fillings if less
@@ -142,6 +147,8 @@ const char op_json_names[] PROGMEM =
     "dns4\0"
     "sar\0\0"
     "ife\0\0"
+    "mqtt\0"
+    "notif"
     "sn2t\0"
     "sn2o\0"
     "reset";
@@ -199,7 +206,9 @@ const char op_prompts[] PROGMEM =
     "DNS server.ip3: "
     "DNS server.ip4: "
     "Special Refresh?"
-    "IFTTT Enable:   "
+    "IFTTT enabled?  "
+    "MQTT enabled?   "
+    "Notify events:  "
     "Sensor 2 type:  "
     "Normally open?  "
     "Factory reset?  ";
@@ -254,6 +263,8 @@ const byte op_max[] PROGMEM = {
   255,
   255,
   255,
+  1,
+  1,
   1,
   255,
   255,
@@ -317,7 +328,9 @@ byte OpenSprinkler::options[] = {
   8,
   8,
   0,  // special station auto refresh
-  0,  // ifttt enable bits
+  0,  // ifttt enabled
+  1,  // mqtt enabled
+  255,  // notify messages bits
   0,  // sensor 2 type
   0,  // sensor 2 option. 0: normally closed; 1: normally open.
   0   // reset
@@ -466,6 +479,7 @@ byte OpenSprinkler::start_ether() {
 }
 #endif
 
+
 /** Reboot controller */
 void OpenSprinkler::reboot_dev() {
   lcd_print_line_clear_pgm(PSTR("Rebooting..."), 0);
@@ -489,6 +503,23 @@ extern char ether_buffer[];
 
 /** Initialize network with the given mac address and http port */
 byte OpenSprinkler::start_network() {
+  #ifdef MQTT
+  if (options[OPTION_MQTT_ENABLE]) {
+    mosquitto_lib_init();
+    int keepalive = 60;
+    bool clean_session = true;
+    mqtt_client = mosquitto_new(NULL, clean_session, NULL);
+    if (!mqtt_client) {
+      DEBUG_PRINTLN("CANNOT CREATE MQTT CLIENT");
+      return 1;
+    }
+    if (mosquitto_connect(mqtt_client, DEFAULT_MQTT_HOST, DEFAULT_MQTT_PORT, keepalive)) {
+      DEBUG_PRINTLN("CANNOT CONNECT TO MQTT");
+      return 1;
+    }
+  }
+  #endif
+
   unsigned int port = (unsigned int)(options[OPTION_HTTPPORT_1]<<8) + (unsigned int)options[OPTION_HTTPPORT_0];
 #if defined(DEMO)
   port = 80;
@@ -519,6 +550,14 @@ void OpenSprinkler::update_dev() {
   system(cmd);
 }
 #endif // end network init functions
+
+
+void OpenSprinkler::mqtt_publish(const char *topic, const char *payload) {
+#if defined(MQTT) && defined(OSPI)
+  mosquitto_publish(mqtt_client, NULL, topic, strlen(payload), payload, 0, true);
+  // mqtt_client.publish(topic, payload, true);
+#endif
+}
 
 #if defined(ARDUINO)
 /** Initialize LCD */

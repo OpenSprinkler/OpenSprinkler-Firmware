@@ -417,6 +417,7 @@ void do_setup() {
 
 void write_log(byte type, ulong curr_time);
 void schedule_all_stations(ulong curr_time);
+void turn_on_station(byte sid);
 void turn_off_station(byte sid, ulong curr_time);
 void process_dynamic_events(ulong curr_time);
 void check_network();
@@ -613,11 +614,11 @@ void do_loop()
       if (os.status.rain_delayed) {
         // rain delay started, record time
         os.raindelay_start_time = curr_time;
-        push_message(IFTTT_RAINSENSOR, LOGDATA_RAINDELAY, 1);
+        push_message(NOTIFY_RAINSENSOR, LOGDATA_RAINDELAY, 1);
       } else {
         // rain delay stopped, write log
         write_log(LOGDATA_RAINDELAY, curr_time);
-        push_message(IFTTT_RAINSENSOR, LOGDATA_RAINDELAY, 0);
+        push_message(NOTIFY_RAINSENSOR, LOGDATA_RAINDELAY, 0);
       }
       os.old_status.rain_delayed = os.status.rain_delayed;
     }
@@ -629,14 +630,14 @@ void do_loop()
         if (os.status.rain_sensed) {
           // rain sensor on, record time
           os.sensor_lasttime = curr_time;
-          push_message(IFTTT_RAINSENSOR, LOGDATA_RAINSENSE, 1);
+          push_message(NOTIFY_RAINSENSOR, LOGDATA_RAINSENSE, 1);
         } else {
           // rain sensor off, write log
           if (curr_time>os.sensor_lasttime+10) {  // add a 10 second threshold
                                                   // to avoid faulty rain sensors generating
                                                   // too many log records
             write_log(LOGDATA_RAINSENSE, curr_time);
-            push_message(IFTTT_RAINSENSOR, LOGDATA_RAINSENSE, 0);
+            push_message(NOTIFY_RAINSENSOR, LOGDATA_RAINSENSE, 0);
           }
         }
         os.old_status.rain_sensed = os.status.rain_sensed;
@@ -699,7 +700,7 @@ void do_loop()
               }// if water_time
             }// if prog.durations[sid]
           }// for sid
-          if(match_found) push_message(IFTTT_PROGRAM_SCHED, pid, prog.use_weather?os.options[OPTION_WATER_PERCENTAGE]:100);
+          if(match_found) push_message(NOTIFY_PROGRAM_SCHED, pid, prog.use_weather?os.options[OPTION_WATER_PERCENTAGE]:100);
         }// if check_match
       }// for pid
 
@@ -761,8 +762,7 @@ void do_loop()
           if(!((bitvalue>>s)&1)) {
             if (curr_time >= q->st && curr_time < q->st+q->dur) {
 
-              //turn_on_station(sid);
-              os.set_station_bit(sid, 1);
+              turn_on_station(sid);
 
               // RAH implementation of flow sensor
               flow_start=0;
@@ -820,7 +820,7 @@ void do_loop()
         // log flow sensor reading if flow sensor is used
         if(os.options[OPTION_SENSOR1_TYPE]==SENSOR_TYPE_FLOW) {
           write_log(LOGDATA_FLOWSENSE, curr_time);
-          push_message(IFTTT_FLOWSENSOR, (flow_count>os.flowcount_log_start)?(flow_count-os.flowcount_log_start):0);
+          push_message(NOTIFY_FLOWSENSOR, (flow_count>os.flowcount_log_start)?(flow_count-os.flowcount_log_start):0);
         }
 
         // in case some options have changed while executing the program
@@ -950,7 +950,7 @@ void do_loop()
       if((wuf&WEATHER_UPDATE_EIP) | (wuf&WEATHER_UPDATE_WL)) {
         // at the moment, we only send notification if water level or external IP changed
         // the other changes, such as sunrise, sunset changes are ignored for notification
-        push_message(IFTTT_WEATHER_UPDATE, (wuf&WEATHER_UPDATE_EIP)?os.nvdata.external_ip:0,
+        push_message(NOTIFY_WEATHER_UPDATE, (wuf&WEATHER_UPDATE_EIP)?os.nvdata.external_ip:0,
                                          (wuf&WEATHER_UPDATE_WL)?os.options[OPTION_WATER_PERCENTAGE]:-1);
       }
       os.weather_update_flag = 0;
@@ -958,7 +958,7 @@ void do_loop()
     static byte reboot_notification = 1;
     if(reboot_notification) {
       reboot_notification = 0;
-      push_message(IFTTT_REBOOT);
+      push_message(NOTIFY_REBOOT);
     }
 
   }
@@ -995,6 +995,15 @@ void check_weather() {
   }
 }
 
+/** Turn on a station
+ * This function turns on a scheduled station
+ */
+void turn_on_station(byte sid) {
+  if (os.set_station_bit(sid, 1)) {
+    push_message(NOTIFY_STATION_ON, sid);
+  }
+}
+
 /** Turn off a station
  * This function turns off a scheduled station
  * and writes log record
@@ -1027,7 +1036,7 @@ void turn_off_station(byte sid, ulong curr_time) {
 
       // log station run
       write_log(LOGDATA_STATION, curr_time);
-      push_message(IFTTT_STATION_RUN, sid, pd.lastrun.duration);
+      push_message(NOTIFY_STATION_OFF, sid, pd.lastrun.duration);
     }
   }
 
@@ -1166,7 +1175,7 @@ void manual_start_program(byte pid, byte uwt) {
   byte sid, bid, s;
   if ((pid>0)&&(pid<255)) {
     pd.read(pid-1, &prog);
-    push_message(IFTTT_PROGRAM_SCHED, pid-1, uwt?os.options[OPTION_WATER_PERCENTAGE]:100, "");
+    push_message(NOTIFY_PROGRAM_SCHED, pid-1, uwt?os.options[OPTION_WATER_PERCENTAGE]:100, "");
   }
   for(sid=0;sid<os.nstations;sid++) {
     bid=sid>>3;
@@ -1201,46 +1210,65 @@ void manual_start_program(byte pid, byte uwt) {
 // ====== PUSH NOTIFICATION FUNCTIONS =======
 // ==========================================
 void ip2string(char* str, byte ip[4]) {
-  for(byte i=0;i<4;i++) {
-    itoa(ip[i], str+strlen(str), 10);
-    if(i!=3) strcat(str, ".");
-  }
+  sprintf_P(str+strlen(str), PSTR("%d.%d.%d.%d"), ip[0], ip[1], ip[2], ip[3]);
 }
 
 void push_message(byte type, uint32_t lval, float fval, const char* sval) {
+  // check if this type of event is enabled for push notification
+  byte test_type = (type != NOTIFY_STATION_ON) ? type : NOTIFY_STATION_OFF;
+  if((os.options[OPTION_NOTIFY_TOPIC]&test_type) == 0) return;
+  if(!os.options[OPTION_IFTTT_ENABLE] && !os.options[OPTION_MQTT_ENABLE]) return;
 
 #if !defined(ARDUINO) || defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__) || defined(ESP8266)
 
-  static const char* server = DEFAULT_IFTTT_URL;
   static char key[IFTTT_KEY_MAXSIZE];
   static char postval[TMP_BUFFER_SIZE];
 
-  // check if this type of event is enabled for push notification
-  if((os.options[OPTION_IFTTT_ENABLE]&type) == 0) return;
-  key[0] = 0;
-  read_from_file(ifkey_filename, key);
-  key[IFTTT_KEY_MAXSIZE-1]=0;
+  if (os.options[OPTION_IFTTT_ENABLE]) {
+    DEBUG_PRINTLN("push_message iftt enabled");
+    key[0] = 0;
+    read_from_file(ifkey_filename, key);
+    key[IFTTT_KEY_MAXSIZE-1]=0;
 
-  if(strlen(key)==0) return;
+    if(strlen(key)==0) return;
+
+    strcpy_P(postval, PSTR("{\"value1\":\""));
+  }
+
+  static char topic[TMP_BUFFER_SIZE];
+  static char payload[TMP_BUFFER_SIZE];
+
+  if (os.options[OPTION_MQTT_ENABLE]) {
+    DEBUG_PRINTLN("push_message mqtt enabled");
+    topic[0] = 0;
+    payload[0] = 0;
+  }
 
   #if defined(ARDUINO) && !defined(ESP8266)
     uint16_t _port = ether.hisport; // make a copy of the original port
     ether.hisport = 80;
   #endif
 
-  strcpy_P(postval, PSTR("{\"value1\":\""));
+  uint32_t volume;
 
   switch(type) {
+  case  NOTIFY_STATION_ON:
+    if (os.options[OPTION_MQTT_ENABLE]) {
+      sprintf_P(topic, PSTR("opensprinkler/station/%d"), lval);
+      strcpy_P(payload, PSTR("{\"state\":1}"));
+    }
+    break;
 
-    case IFTTT_STATION_RUN:
-      
-      strcat_P(postval, PSTR("Station "));
-      os.get_station_name(lval, postval+strlen(postval));
-      strcat_P(postval, PSTR(" closed. It ran for "));
-      itoa((int)fval/60, postval+strlen(postval), 10);
-      strcat_P(postval, PSTR(" minutes "));
-      itoa((int)fval%60, postval+strlen(postval), 10);
-      strcat_P(postval, PSTR(" seconds."));
+  case NOTIFY_STATION_OFF:
+    if (os.options[OPTION_MQTT_ENABLE]) {
+      sprintf_P(topic, PSTR("opensprinkler/station/%d"), lval);
+      strcpy_P(payload, PSTR("{\"state\":0}"));
+    }
+    if (os.options[OPTION_IFTTT_ENABLE]) {
+      char name[STATION_NAME_SIZE];
+      os.get_station_name(lval, name);
+      sprintf_P(postval+strlen(postval), PSTR("Station %s closed. It ran for %d minutes %d seconds."), name, (int)fval/60, (int)fval%60);
+
       if(os.options[OPTION_SENSOR1_TYPE]==SENSOR_TYPE_FLOW) {
         strcat_P(postval, PSTR(" Flow rate: "));
         #if defined(ARDUINO)
@@ -1249,10 +1277,11 @@ void push_message(byte type, uint32_t lval, float fval, const char* sval) {
         sprintf(tmp_buffer+strlen(tmp_buffer), "%5.2f", flow_last_gpm);
         #endif
       }
-      break;
+    }
+    break;
 
-    case IFTTT_PROGRAM_SCHED:
-
+  case NOTIFY_PROGRAM_SCHED:
+    if (os.options[OPTION_IFTTT_ENABLE]) {
       if(sval) strcat_P(postval, PSTR("Manually scheduled "));
       else strcat_P(postval, PSTR("Automatically scheduled "));
       strcat_P(postval, PSTR("Program "));
@@ -1261,33 +1290,32 @@ void push_message(byte type, uint32_t lval, float fval, const char* sval) {
         pd.read(lval, &prog);
         if(lval<pd.nprograms) strcat(postval, prog.name);
       }
-      strcat_P(postval, PSTR(" with "));
-      itoa((int)fval, postval+strlen(postval), 10);
-      strcat_P(postval, PSTR("% water level."));
-      break;
+      sprintf_P(postval+strlen(postval), PSTR(" with %f%% water level."), fval);
+    }
+    break;
 
-    case IFTTT_RAINSENSOR:
-
+  case NOTIFY_RAINSENSOR:
+    if (os.options[OPTION_IFTTT_ENABLE]) {
       strcat_P(postval, (lval==LOGDATA_RAINDELAY) ? PSTR("Rain delay ") : PSTR("Rain sensor "));
       strcat_P(postval, ((int)fval)?PSTR("activated."):PSTR("de-activated"));
+    }
+    break;
 
-      break;
+  case NOTIFY_FLOWSENSOR:
+    volume = os.options[OPTION_PULSE_RATE_1];
+    volume = (volume<<8)+os.options[OPTION_PULSE_RATE_0];
+    volume = lval*volume;
+    if (os.options[OPTION_MQTT_ENABLE]) {
+      strcpy_P(topic, PSTR("opensprinkler/sensor/flow"));
+      sprintf_P(payload, PSTR("{\"count\":%d,\"volume\":%.2f}"), lval, (float)volume/100);
+    }
+    if (os.options[OPTION_IFTTT_ENABLE]) {
+      sprintf_P(postval+strlen(postval), PSTR("Flow count: %d, volume: %.2f"), lval, (float)volume/100);
+    }
+    break;
 
-    case IFTTT_FLOWSENSOR:
-      strcat_P(postval, PSTR("Flow count: "));
-      itoa(lval, postval+strlen(postval), 10);
-      strcat_P(postval, PSTR(", volume: "));
-      {
-      uint32_t volume = os.options[OPTION_PULSE_RATE_1];
-      volume = (volume<<8)+os.options[OPTION_PULSE_RATE_0];
-      volume = lval*volume;
-      itoa(volume/100, postval+strlen(postval), 10);
-      strcat(postval, ".");
-      itoa(volume%100, postval+strlen(postval), 10);
-      }
-      break;
-
-    case IFTTT_WEATHER_UPDATE:
+  case NOTIFY_WEATHER_UPDATE:
+    if (os.options[OPTION_IFTTT_ENABLE]) {
       if(lval>0) {
         strcat_P(postval, PSTR("External IP updated: "));
         byte ip[4] = {(byte)((lval>>24)&0xFF),
@@ -1297,14 +1325,17 @@ void push_message(byte type, uint32_t lval, float fval, const char* sval) {
         ip2string(postval, ip);
       }
       if(fval>=0) {
-        strcat_P(postval, PSTR("Water level updated: "));
-        itoa((int)fval, postval+strlen(postval), 10);
-        strcat_P(postval, PSTR("%."));
+        sprintf_P(postval+strlen(postval), PSTR("Water level updated: %f%%."), fval);
       }
-        
-      break;
+    }
+    break;
 
-    case IFTTT_REBOOT:
+  case NOTIFY_REBOOT:
+    if (os.options[OPTION_MQTT_ENABLE]) {
+      strcpy_P(topic, PSTR("opensprinkler/system"));
+      strcpy_P(payload, PSTR("{\"state\":\"started\"}"));
+    }
+    if (os.options[OPTION_IFTTT_ENABLE]) {
       #if defined(ARDUINO)
         strcat_P(postval, PSTR("Rebooted. Device IP: "));
         #if defined(ESP8266)
@@ -1326,12 +1357,19 @@ void push_message(byte type, uint32_t lval, float fval, const char* sval) {
       #else
         strcat_P(postval, PSTR("Process restarted."));
       #endif
-      break;
+    }
+    break;
   }
+
+  if (os.options[OPTION_MQTT_ENABLE]) os.mqtt_publish(topic, payload);
+
+  if (!os.options[OPTION_IFTTT_ENABLE]) return;
 
   strcat_P(postval, PSTR("\"}"));
 
   //DEBUG_PRINTLN(postval);
+
+  static const char* server = DEFAULT_IFTTT_URL;
 
 #if defined(ARDUINO)
 
@@ -1406,7 +1444,7 @@ void push_message(byte type, uint32_t lval, float fval, const char* sval) {
   sprintf(postBuffer, "POST /trigger/sprinkler/with/key/%s HTTP/1.0\r\n"
                       "Host: %s\r\n"
                       "Accept: */*\r\n"
-                      "Content-Length: %d\r\n"
+                      "Content-Length: %lu\r\n"
                       "Content-Type: application/json\r\n"
                       "\r\n%s", key, host->h_name, strlen(postval), postval);
   client.write((uint8_t *)postBuffer, strlen(postBuffer));
