@@ -764,9 +764,6 @@ void do_loop()
 
               turn_on_station(sid);
 
-              // RAH implementation of flow sensor
-              flow_start=0;
-
             } //if curr_time > scheduled_start_time
           } // if current station is not running
         }//end_s
@@ -999,6 +996,9 @@ void check_weather() {
  * This function turns on a scheduled station
  */
 void turn_on_station(byte sid) {
+  // RAH implementation of flow sensor
+  flow_start=0;
+
   if (os.set_station_bit(sid, 1)) {
     push_message(NOTIFY_STATION_ON, sid);
   }
@@ -1262,7 +1262,11 @@ void push_message(byte type, uint32_t lval, float fval, const char* sval) {
   case NOTIFY_STATION_OFF:
     if (os.options[OPTION_MQTT_ENABLE]) {
       sprintf_P(topic, PSTR("opensprinkler/station/%d"), lval);
-      strcpy_P(payload, PSTR("{\"state\":0}"));
+      if (os.options[OPTION_SENSOR1_TYPE]==SENSOR_TYPE_FLOW) {
+        sprintf_P(payload, PSTR("{\"state\":0, \"flow\": %5.2f}"), flow_last_gpm);
+      } else {
+        sprintf_P(payload, PSTR("{\"state\":0}"));
+      }
     }
     if (os.options[OPTION_IFTTT_ENABLE]) {
       char name[STATION_NAME_SIZE];
