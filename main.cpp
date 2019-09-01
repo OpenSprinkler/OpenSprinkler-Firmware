@@ -96,10 +96,10 @@ byte prev_flow_state = HIGH;
 float flow_last_gpm=0;
 
 void flow_poll() {
-  byte curr_flow_state = digitalReadExt(PIN_FLOWSENSOR);
   if(os.options[OPTION_SENSOR1_TYPE]!=SENSOR_TYPE_FLOW) return;
 
-#ifdef ESP8266  
+#ifdef ESP8266
+  byte curr_flow_state = digitalReadExt(PIN_FLOWSENSOR);
   if(!(prev_flow_state==HIGH && curr_flow_state==LOW)) {
     prev_flow_state = curr_flow_state;
     return;
@@ -1263,9 +1263,9 @@ void push_message(byte type, uint32_t lval, float fval, const char* sval) {
     if (os.options[OPTION_MQTT_ENABLE]) {
       sprintf_P(topic, PSTR("opensprinkler/station/%d"), lval);
       if (os.options[OPTION_SENSOR1_TYPE]==SENSOR_TYPE_FLOW) {
-        sprintf_P(payload, PSTR("{\"state\":0, \"flow\": %5.2f}"), flow_last_gpm);
+        sprintf_P(payload, PSTR("{\"state\":0,\"duration\":%.0f,\"flow\":%.2f}"), fval, flow_last_gpm);
       } else {
-        sprintf_P(payload, PSTR("{\"state\":0}"));
+        sprintf_P(payload, PSTR("{\"state\":0,\"duration\":%.0f}"), fval);
       }
     }
     if (os.options[OPTION_IFTTT_ENABLE]) {
