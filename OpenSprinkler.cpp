@@ -326,7 +326,7 @@ byte OpenSprinkler::options[] = {
   8,
   0,  // special station auto refresh
   0,  // ifttt enable bits
-  255,  // mqtt enable bits
+  0,  // mqtt enable bits
   0,  // sensor 2 type
   0,  // sensor 2 option. 0: normally closed; 1: normally open.
   0   // reset
@@ -550,7 +550,22 @@ void OpenSprinkler::update_dev() {
 
 void OpenSprinkler::mqtt_publish(const char *topic, const char *payload) {
 #if defined(MQTT) && defined(OSPI)
-  mosquitto_publish(mqtt_client, NULL, topic, strlen(payload), payload, 0, true);
+  int rc = mosquitto_reconnect(mqtt_client);
+  if (rc != MOSQ_ERR_SUCCESS) {
+    DEBUG_PRINT("MQTT connection failed. Error: ");
+    DEBUG_PRINTLN(rc);
+    return;
+  }
+  rc = mosquitto_publish(mqtt_client, NULL, topic, strlen(payload), payload, 0, true);
+  switch(rc) {
+  case MOSQ_ERR_SUCCESS:
+    DEBUG_PRINTLN("Message pushed successfuly");
+    return;
+  default:
+    DEBUG_PRINT("Unexpected error: ");
+    DEBUG_PRINTLN(rc);
+    return;
+  }
   // mqtt_client.publish(topic, payload, true);
 #endif
 }

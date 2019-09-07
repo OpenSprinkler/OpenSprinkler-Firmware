@@ -1368,7 +1368,7 @@ void push_message(byte type, uint32_t lval, float fval, const char* sval) {
     break;
   }
 
-  if (os.options[OPTION_MQTT_ENABLE]&test_type) os.mqtt_publish(topic, payload);
+  if ((os.options[OPTION_MQTT_ENABLE]&test_type) && strlen(topic) & strlen(payload)) os.mqtt_publish(topic, payload);
 
   if (!os.options[OPTION_IFTTT_ENABLE]&test_type) return;
 
