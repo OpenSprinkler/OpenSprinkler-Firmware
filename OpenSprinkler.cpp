@@ -148,7 +148,6 @@ const char op_json_names[] PROGMEM =
     "sar\0\0"
     "ife\0\0"
     "mqtt\0"
-    "notif"
     "sn2t\0"
     "sn2o\0"
     "reset";
@@ -206,9 +205,8 @@ const char op_prompts[] PROGMEM =
     "DNS server.ip3: "
     "DNS server.ip4: "
     "Special Refresh?"
-    "IFTTT enabled?  "
-    "MQTT enabled?   "
-    "Notify events:  "
+    "IFTTT Enable:   "
+    "MQTT Enable:    "
     "Sensor 2 type:  "
     "Normally open?  "
     "Factory reset?  ";
@@ -264,8 +262,7 @@ const byte op_max[] PROGMEM = {
   255,
   255,
   1,
-  1,
-  1,
+  255,
   255,
   255,
   1,
@@ -328,9 +325,8 @@ byte OpenSprinkler::options[] = {
   8,
   8,
   0,  // special station auto refresh
-  0,  // ifttt enabled
-  1,  // mqtt enabled
-  255,  // notify messages bits
+  0,  // ifttt enable bits
+  255,  // mqtt enable bits
   0,  // sensor 2 type
   0,  // sensor 2 option. 0: normally closed; 1: normally open.
   0   // reset

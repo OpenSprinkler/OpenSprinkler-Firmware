@@ -1216,15 +1216,14 @@ void ip2string(char* str, byte ip[4]) {
 void push_message(byte type, uint32_t lval, float fval, const char* sval) {
   // check if this type of event is enabled for push notification
   byte test_type = (type != NOTIFY_STATION_ON) ? type : NOTIFY_STATION_OFF;
-  if((os.options[OPTION_NOTIFY_TOPIC]&test_type) == 0) return;
-  if(!os.options[OPTION_IFTTT_ENABLE] && !os.options[OPTION_MQTT_ENABLE]) return;
+  if(!os.options[OPTION_IFTTT_ENABLE]&test_type && !os.options[OPTION_MQTT_ENABLE]&test_type) return;
 
 #if !defined(ARDUINO) || defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__) || defined(ESP8266)
 
   static char key[IFTTT_KEY_MAXSIZE];
   static char postval[TMP_BUFFER_SIZE];
 
-  if (os.options[OPTION_IFTTT_ENABLE]) {
+  if (os.options[OPTION_IFTTT_ENABLE]&test_type) {
     DEBUG_PRINTLN("push_message iftt enabled");
     key[0] = 0;
     read_from_file(ifkey_filename, key);
@@ -1238,7 +1237,7 @@ void push_message(byte type, uint32_t lval, float fval, const char* sval) {
   static char topic[TMP_BUFFER_SIZE];
   static char payload[TMP_BUFFER_SIZE];
 
-  if (os.options[OPTION_MQTT_ENABLE]) {
+  if (os.options[OPTION_MQTT_ENABLE]&test_type) {
     DEBUG_PRINTLN("push_message mqtt enabled");
     topic[0] = 0;
     payload[0] = 0;
@@ -1253,14 +1252,14 @@ void push_message(byte type, uint32_t lval, float fval, const char* sval) {
 
   switch(type) {
   case  NOTIFY_STATION_ON:
-    if (os.options[OPTION_MQTT_ENABLE]) {
+    if (os.options[OPTION_MQTT_ENABLE]&test_type) {
       sprintf_P(topic, PSTR("opensprinkler/station/%d"), lval);
       strcpy_P(payload, PSTR("{\"state\":1}"));
     }
     break;
 
   case NOTIFY_STATION_OFF:
-    if (os.options[OPTION_MQTT_ENABLE]) {
+    if (os.options[OPTION_MQTT_ENABLE]&test_type) {
       sprintf_P(topic, PSTR("opensprinkler/station/%d"), lval);
       if (os.options[OPTION_SENSOR1_TYPE]==SENSOR_TYPE_FLOW) {
         sprintf_P(payload, PSTR("{\"state\":0,\"duration\":%.0f,\"flow\":%.2f}"), fval, flow_last_gpm);
@@ -1268,7 +1267,7 @@ void push_message(byte type, uint32_t lval, float fval, const char* sval) {
         sprintf_P(payload, PSTR("{\"state\":0,\"duration\":%.0f}"), fval);
       }
     }
-    if (os.options[OPTION_IFTTT_ENABLE]) {
+    if (os.options[OPTION_IFTTT_ENABLE]&test_type) {
       char name[STATION_NAME_SIZE];
       os.get_station_name(lval, name);
       sprintf_P(postval+strlen(postval), PSTR("Station %s closed. It ran for %d minutes %d seconds."), name, (int)fval/60, (int)fval%60);
@@ -1285,7 +1284,7 @@ void push_message(byte type, uint32_t lval, float fval, const char* sval) {
     break;
 
   case NOTIFY_PROGRAM_SCHED:
-    if (os.options[OPTION_IFTTT_ENABLE]) {
+    if (os.options[OPTION_IFTTT_ENABLE]&test_type) {
       if(sval) strcat_P(postval, PSTR("Manually scheduled "));
       else strcat_P(postval, PSTR("Automatically scheduled "));
       strcat_P(postval, PSTR("Program "));
@@ -1299,7 +1298,11 @@ void push_message(byte type, uint32_t lval, float fval, const char* sval) {
     break;
 
   case NOTIFY_RAINSENSOR:
-    if (os.options[OPTION_IFTTT_ENABLE]) {
+    if (os.options[OPTION_MQTT_ENABLE]&test_type) {
+      strcpy_P(topic, PSTR("opensprinkler/sensor/rain"));
+      sprintf_P(payload, PSTR("{\"state\":%f}"), fval);
+    }
+    if (os.options[OPTION_IFTTT_ENABLE]&test_type) {
       strcat_P(postval, (lval==LOGDATA_RAINDELAY) ? PSTR("Rain delay ") : PSTR("Rain sensor "));
       strcat_P(postval, ((int)fval)?PSTR("activated."):PSTR("de-activated"));
     }
@@ -1309,17 +1312,17 @@ void push_message(byte type, uint32_t lval, float fval, const char* sval) {
     volume = os.options[OPTION_PULSE_RATE_1];
     volume = (volume<<8)+os.options[OPTION_PULSE_RATE_0];
     volume = lval*volume;
-    if (os.options[OPTION_MQTT_ENABLE]) {
+    if (os.options[OPTION_MQTT_ENABLE]&test_type) {
       strcpy_P(topic, PSTR("opensprinkler/sensor/flow"));
       sprintf_P(payload, PSTR("{\"count\":%d,\"volume\":%.2f}"), lval, (float)volume/100);
     }
-    if (os.options[OPTION_IFTTT_ENABLE]) {
+    if (os.options[OPTION_IFTTT_ENABLE]&test_type) {
       sprintf_P(postval+strlen(postval), PSTR("Flow count: %d, volume: %.2f"), lval, (float)volume/100);
     }
     break;
 
   case NOTIFY_WEATHER_UPDATE:
-    if (os.options[OPTION_IFTTT_ENABLE]) {
+    if (os.options[OPTION_IFTTT_ENABLE]&test_type) {
       if(lval>0) {
         strcat_P(postval, PSTR("External IP updated: "));
         byte ip[4] = {(byte)((lval>>24)&0xFF),
@@ -1335,11 +1338,11 @@ void push_message(byte type, uint32_t lval, float fval, const char* sval) {
     break;
 
   case NOTIFY_REBOOT:
-    if (os.options[OPTION_MQTT_ENABLE]) {
+    if (os.options[OPTION_MQTT_ENABLE]&test_type) {
       strcpy_P(topic, PSTR("opensprinkler/system"));
       strcpy_P(payload, PSTR("{\"state\":\"started\"}"));
     }
-    if (os.options[OPTION_IFTTT_ENABLE]) {
+    if (os.options[OPTION_IFTTT_ENABLE]&test_type) {
       #if defined(ARDUINO)
         strcat_P(postval, PSTR("Rebooted. Device IP: "));
         #if defined(ESP8266)
@@ -1365,9 +1368,9 @@ void push_message(byte type, uint32_t lval, float fval, const char* sval) {
     break;
   }
 
-  if (os.options[OPTION_MQTT_ENABLE]) os.mqtt_publish(topic, payload);
+  if (os.options[OPTION_MQTT_ENABLE]&test_type) os.mqtt_publish(topic, payload);
 
-  if (!os.options[OPTION_IFTTT_ENABLE]) return;
+  if (!os.options[OPTION_IFTTT_ENABLE]&test_type) return;
 
   strcat_P(postval, PSTR("\"}"));
 
