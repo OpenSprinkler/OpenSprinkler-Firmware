@@ -121,7 +121,7 @@ void pinModeExt(byte pin, byte mode) {
 	if(pin>=IOEXP_PIN) {
 		os.mainio->pinMode(pin-IOEXP_PIN, mode);
 	} else {
-		::pinMode(pin, mode);
+		pinMode(pin, mode);
 	}
 }
 
@@ -138,7 +138,7 @@ void digitalWriteExt(byte pin, byte value) {
 		data |= MAIN_INPUTMASK; // make sure to enforce 1 for input pins
 		pcf_write(MAIN_I2CADDR, data);*/
 	} else {
-		::digitalWrite(pin, value);
+		digitalWrite(pin, value);
 	}
 }
 
@@ -149,7 +149,7 @@ byte digitalReadExt(byte pin) {
 		// a pin on IO expander
 		//return pcf_read(MAIN_I2CADDR)&(1<<(pin-IOEXP_PIN));
 	} else {
-		return ::digitalRead(pin);
+		return digitalRead(pin);
 	}
 }
 #endif

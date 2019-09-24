@@ -76,6 +76,13 @@ typedef unsigned long ulong;
 #define IFTTT_SENSOR2         0x40
 #define IFTTT_RAINDELAY				0x80
 
+/** HTTP request macro defines */
+#define HTTP_RQT_SUCCESS			 0
+#define HTTP_RQT_NOT_RECEIVED -1
+#define HTTP_RQT_CONNECT_ERR	-2
+#define HTTP_RQT_TIMEOUT			-3
+#define HTTP_RQT_EMPTY_RETURN	-4
+
 /** Sensor macro defines */
 #define SENSOR_TYPE_NONE    0x00
 #define SENSOR_TYPE_RAIN    0x01	// rain sensor
@@ -130,7 +137,7 @@ typedef unsigned long ulong;
 /** Default string option values */
 #define DEFAULT_PASSWORD          "a6d82bced638de3def1e9bbb4983225c"  // md5 of 'opendoor'
 #define DEFAULT_LOCATION          "42.36,-71.06"	// Boston,MA
-#define DEFAULT_JAVASCRIPT_URL    "https://betaui.opensprinkler.com/js"
+#define DEFAULT_JAVASCRIPT_URL    "https://ui.opensprinkler.com/js"
 #define DEFAULT_WEATHER_URL       "weather.opensprinkler.com"
 #define DEFAULT_IFTTT_URL         "maker.ifttt.com"
 #define DEFAULT_EMPTY_STRING      ""

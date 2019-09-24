@@ -83,6 +83,7 @@ void flow_poll() {
 	if(os.iopts[IOPT_SENSOR1_TYPE]!=SENSOR_TYPE_FLOW) return;
 
 #if defined(ESP8266)
+	pinModeExt(PIN_SENSOR1, INPUT_PULLUP);
 	byte curr_flow_state = digitalReadExt(PIN_SENSOR1);
 	if(!(prev_flow_state==HIGH && curr_flow_state==LOW)) {
 		prev_flow_state = curr_flow_state;
@@ -308,6 +309,7 @@ void do_setup() {
 #endif
 
 	DEBUG_BEGIN(115200);
+	
 	os.begin();					 // OpenSprinkler init
 	os.options_setup();  // Setup options
 
@@ -403,10 +405,21 @@ void do_loop()
 	/* If flow_isr_flag is on, do flow sensing.
 		 todo future: not the most efficient way, as we can't do I2C inside ISR.
 		 need to figure out a more efficient way to do flow sensing */
+	#if defined(ESP8266)
+	if(os.hw_rev==2) { flow_poll(); }
+	else {
+		if(flow_isr_flag) {
+			flow_isr_flag = false;
+			flow_poll();
+		}
+	}
+	#else
 	if(flow_isr_flag) {
 		flow_isr_flag = false;
 		flow_poll();
 	}
+	#endif
+	
 
 	static ulong last_time = 0;
 	static ulong last_minute = 0;
@@ -417,6 +430,7 @@ void do_loop()
 	os.status.mas = os.iopts[IOPT_MASTER_STATION];
 	os.status.mas2= os.iopts[IOPT_MASTER_STATION_2];
 	time_t curr_time = os.now_tz();
+	
 	// ====== Process Ethernet packets ======
 #if defined(ARDUINO)	// Process Ethernet packets for Arduino
 	#if defined(ESP8266)
@@ -476,6 +490,7 @@ void do_loop()
 				led_blink_ms = 0;
 				os.set_screen_led(LOW);
 				os.lcd.clear();
+				os.save_wifi_ip();
 				start_server_client();
 				os.state = OS_STATE_CONNECTED;
 				connecting_timeout = 0;
@@ -568,12 +583,29 @@ void do_loop()
 
 	// The main control loop runs once every second
 	if (curr_time != last_time) {
-	#if defined(ESP8266)
-		DEBUG_PRINT(F("Free heap:"));
-		DEBUG_PRINT(ESP.getFreeHeap());
-		DEBUG_PRINT(":");
-		DEBUG_PRINTLN(curr_time);
-	#endif
+#if defined(ESP8266)
+		/*static uint16_t lastHeap = 0;
+		static uint32_t lastHeapTime = 0;
+		uint16_t heap = ESP.getFreeHeap();
+		if(heap != lastHeap) {
+			os.lcd.setCursor(0, -1);
+			os.lcd.print(heap);
+			DEBUG_PRINT(F("Heap:"));
+			DEBUG_PRINT(heap);
+			DEBUG_PRINT("|");
+			DEBUG_PRINTLN(curr_time - lastHeapTime);
+			lastHeap = heap;
+			lastHeapTime = curr_time;
+		}*/
+#endif
+	
+		#if defined(ESP8266)
+		if(os.hw_rev==2) {	// on OS3.2, for some reason we need to repeatedly set pin mode on sensor pins
+			pinModeExt(PIN_SENSOR1, INPUT);
+			pinModeExt(PIN_SENSOR2, INPUT);
+		}
+		#endif	
+		
 		last_time = curr_time;
 		if (os.button_timeout) os.button_timeout--;
 		
@@ -612,7 +644,7 @@ void do_loop()
 			}
 			os.old_status.rain_delayed = os.status.rain_delayed;
 		}
-
+	
 		// ====== Check binary (i.e. rain or soil) sensor status ======
 		os.detect_binarysensor_status(curr_time);
 
@@ -643,7 +675,7 @@ void do_loop()
 			}
 		}
 		os.old_status.sensor2_active = os.status.sensor2_active;			
-		
+
 		// ===== Check program switch status =====
 		byte pswitch = os.detect_programswitch_status(curr_time);
 		if(pswitch > 0) {
@@ -889,7 +921,6 @@ void do_loop()
 		}		 
 
 		// process dynamic events
-		DEBUG_PRINTLN(F("process dynamic events"));
 		process_dynamic_events(curr_time);
 
 		// activate/deactivate valves
@@ -946,10 +977,8 @@ void do_loop()
 		// instead of using curr_time, which may change due to NTP sync itself
 		// we use Arduino's millis() method
 		//if (curr_time % NTP_SYNC_INTERVAL == 0) os.status.req_ntpsync = 1;
-		DEBUG_PRINTLN(F("ntp sync ..."));		
 		if((millis()/1000) % NTP_SYNC_INTERVAL==0) os.status.req_ntpsync = 1;
 		perform_ntp_sync();
-		DEBUG_PRINTLN(F("ntp sync done"));				
 
 		// check network connection
 		if (curr_time && (curr_time % CHECK_NETWORK_INTERVAL==0))  os.status.req_network = 1;
@@ -1000,10 +1029,13 @@ void check_weather() {
 		// if last successful weather call timestamp is more than allowed threshold
 		// and if the selected adjustment method is not manual
 		// reset watering percentage to 100
+		// todo: the firmware currently needs to be explicitly aware of which adjustment methods
+		// use manual watering percentage (namely methods 0 and 2), this is not ideal
+		os.checkwt_success_lasttime = 0;
 		if(!(os.iopts[IOPT_USE_WEATHER]==0 || os.iopts[IOPT_USE_WEATHER]==2)) {
 			os.iopts[IOPT_WATER_PERCENTAGE] = 100; // reset watering percentage to 100%
 			wt_rawData[0] = 0; 		// reset wt_rawData and errCode
-			wt_errCode = -1;
+			wt_errCode = HTTP_RQT_NOT_RECEIVED;
 		}
 	} else if (!os.checkwt_lasttime || (ntz > os.checkwt_lasttime + CHECK_WEATHER_TIMEOUT)) {
 		os.checkwt_lasttime = ntz;
@@ -1064,11 +1096,11 @@ void process_dynamic_events(ulong curr_time) {
 	bool en = os.status.enabled;
 
 	if((os.iopts[IOPT_SENSOR1_TYPE] == SENSOR_TYPE_RAIN || os.iopts[IOPT_SENSOR1_TYPE] == SENSOR_TYPE_SOIL)
-		 && os.status.sensor1)
+		 && os.status.sensor1_active)
 		sn1 = true;
 		
 	if((os.iopts[IOPT_SENSOR2_TYPE] == SENSOR_TYPE_RAIN || os.iopts[IOPT_SENSOR2_TYPE] == SENSOR_TYPE_SOIL)
-		 && os.status.sensor2)
+		 && os.status.sensor2_active)
 		sn2 = true;
 
 	// todo: handle sensor 2

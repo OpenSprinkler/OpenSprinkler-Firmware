@@ -735,7 +735,7 @@ void server_change_runonce() {
 	char* p = NULL;
 	if(!process_password()) return;
 	if (m_client)
-		p = get_buffer;  
+		p = get_buffer;
 	if(!findKeyVal(p,tmp_buffer,TMP_BUFFER_SIZE, "t", false)) handle_return(HTML_DATA_MISSING);
 	char *pv = tmp_buffer+1;
 #else
@@ -768,7 +768,7 @@ void server_change_runonce() {
 		s=sid&0x07;
 		// if non-zero duration is given
 		// and if the station has not been disabled
-		if (dur>0 && (os.attrib_dis[bid]&(1<<s))) {
+		if (dur>0 && !(os.attrib_dis[bid]&(1<<s))) {
 			RuntimeQueueStruct *q = pd.enqueue();
 			if (q) {
 				q->st = 0;
@@ -973,6 +973,12 @@ void server_json_options_main() {
 				(oid>=IOPT_DNS_IP1 && oid<=IOPT_DNS_IP4) ||
 				(oid>=IOPT_SUBNET_MASK1 && oid<=IOPT_SUBNET_MASK4))
 				continue;
+		#endif
+		
+		#if !defined(ESP8266)
+		// so far only OS3.x has sensor2
+		if (oid==IOPT_SENSOR2_TYPE || oid==IOPT_SENSOR2_OPTION || oid==IOPT_SENSOR2_ON_DELAY || oid==IOPT_SENSOR2_OFF_DELAY)
+			continue;
 		#endif
 		
 		int32_t v=os.iopts[oid];
@@ -1485,7 +1491,7 @@ void server_change_options()
 	if(weather_change) {
 		os.iopts[IOPT_WATER_PERCENTAGE] = 100; // reset watering percentage to 100%
 		wt_rawData[0] = 0; 		// reset wt_rawData and errCode
-		wt_errCode = -1;		
+		wt_errCode = HTTP_RQT_NOT_RECEIVED;		
 		os.checkwt_lasttime = 0;	// force weather update
 	}
 
@@ -1845,6 +1851,32 @@ void server_json_all() {
 	handle_return(HTML_OK);
 }
 
+#if defined(ARDUINO) && !defined(ESP8266)
+static int freeHeap () {
+  extern int __heap_start, *__brkval; 
+  int v; 
+  return (int) &v - (__brkval == 0 ? (int) &__heap_start : (int) __brkval); 
+}
+#endif
+
+#if defined(ARDUINO)
+void server_json_debug() {
+  rewind_ether_buffer();
+  print_json_header();
+  bfill.emit_p(PSTR("\"date\":\"$S\",\"time\":\"$S\",\"heap\":$D"), __DATE__, __TIME__,
+  #if defined(ESP8266)
+  (uint16_t)ESP.getFreeHeap());
+  FSInfo fs_info;
+	SPIFFS.info(fs_info);
+  bfill.emit_p(PSTR(",\"flash\":$D,\"used\":$D}"), fs_info.totalBytes, fs_info.usedBytes);
+  #else
+  (uint16_t)freeHeap());
+  bfill.emit_p(PSTR("}"));
+  #endif
+  handle_return(HTML_OK);	
+}
+#endif
+
 typedef void (*URLHandler)(void);
 
 /* Server function urls
@@ -1874,7 +1906,11 @@ const char _url_keys[] PROGMEM =
 	"dl"
 	"su"
 	"cu"
-	"ja";
+	"ja"
+#if defined(ARDUINO)  
+  "db"
+#endif	
+	;
 
 // Server function handlers
 URLHandler urls[] = {
@@ -1898,7 +1934,10 @@ URLHandler urls[] = {
 	server_delete_log,			// dl
 	server_view_scripturl,	// su
 	server_change_scripturl,// cu
-	server_json_all					// ja
+	server_json_all,				// ja
+#if defined(ARDUINO)  
+  server_json_debug,			// db
+#endif	
 };
 
 // handle Ethernet request
@@ -2082,6 +2121,10 @@ void handle_web_request(char *p) {
 						(urls[i])();
 						ret = return_code;
 					}
+				} else if (com[0]=='d' && com[1]=='b') {
+					get_buffer = dat;
+					(urls[i])();
+					ret = return_code;
 				} else {
 					// first check password
 #if defined(ESP8266)

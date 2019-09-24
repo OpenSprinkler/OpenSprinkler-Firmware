@@ -10,6 +10,7 @@ LIBS = . \
   ~/Arduino/libraries/UIPEthernet \
 
 ESP_ROOT = $(HOME)/esp8266_2.5.2/
+ESPCORE_VERSION = 252
 BUILD_ROOT = /tmp/$(MAIN_NAME)
 
 UPLOAD_SPEED = 460800
@@ -21,9 +22,11 @@ UPLOAD_RESET = nodemcu
 
 FLASH_DEF = 4M3M
 FLASH_MODE = dio
-FLASH_SPEED = 80  
+FLASH_SPEED = 80 
 F_CPU = 160000000L
 
 BOARD = generic
 
-include ./makeEspArduino.mk1
+EXCLUDE_DIRS = ./build-1284
+
+include ./makeEspArduino.mk

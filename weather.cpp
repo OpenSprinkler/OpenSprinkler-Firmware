@@ -30,7 +30,7 @@ extern OpenSprinkler os; // OpenSprinkler object
 extern char tmp_buffer[];
 extern char ether_buffer[];
 char wt_rawData[TMP_BUFFER_SIZE];
-int wt_errCode = 0;
+int wt_errCode = HTTP_RQT_NOT_RECEIVED;
 
 byte findKeyVal (const char *str,char *strbuf, uint16_t maxlen,const char *key,bool key_in_pgm=false,uint8_t *keyfound=NULL);
 void write_log(byte type, ulong curr_time);
@@ -49,6 +49,24 @@ static void getweather_callback(char* buffer) {
 	if (*p != '&')	return;
 	int v;
 	bool save_nvdata = false;
+	
+	// first check errCode, only update lswc timestamp if errCode is 0
+	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("errCode"), true)) {
+		wt_errCode = atoi(tmp_buffer);
+		if(wt_errCode==0) os.checkwt_success_lasttime = os.now_tz();
+	}
+	
+	// then only parse scale if errCode is 0
+	if (wt_errCode==0 && findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("scale"), true)) {
+		v = atoi(tmp_buffer);
+		if (v>=0 && v<=250 && v != os.iopts[IOPT_WATER_PERCENTAGE]) {
+			// only save if the value has changed
+			os.iopts[IOPT_WATER_PERCENTAGE] = v;
+			os.iopts_save();
+			os.weather_update_flag |= WEATHER_UPDATE_WL;			
+		}
+	}	
+		
 	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("sunrise"), true)) {
 		v = atoi(tmp_buffer);
 		if (v>=0 && v<=1440 && v != os.nvdata.sunrise_time) {
@@ -73,16 +91,6 @@ static void getweather_callback(char* buffer) {
 			os.nvdata.external_ip = atol(tmp_buffer);
 			save_nvdata = true;			
 			os.weather_update_flag |= WEATHER_UPDATE_EIP;
-		}
-	}
-
-	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("scale"), true)) {
-		v = atoi(tmp_buffer);
-		if (v>=0 && v<=250 && v != os.iopts[IOPT_WATER_PERCENTAGE]) {
-			// only save if the value has changed
-			os.iopts[IOPT_WATER_PERCENTAGE] = v;
-			os.iopts_save();
-			os.weather_update_flag |= WEATHER_UPDATE_WL;			
 		}
 	}
 	
@@ -112,15 +120,8 @@ static void getweather_callback(char* buffer) {
 		wt_rawData[TMP_BUFFER_SIZE-1]=0;	// make sure the buffer ends properly
 	}
 	
-	wt_errCode = -1; // -1 to indicate error code not received
-	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("errCode"), true)) {
-		wt_errCode = atoi(tmp_buffer);
-	}
-
 	if(save_nvdata) os.nvdata_save();
-	os.checkwt_success_lasttime = os.now_tz();
 	write_log(LOGDATA_WATERLEVEL, os.checkwt_success_lasttime);
-
 }
 
 static void getweather_callback_with_peel_header(char* buffer) {
@@ -176,6 +177,11 @@ void GetWeather() {
 
 	DEBUG_PRINTLN(ether_buffer);
 	
-	os.send_http_request(host, ether_buffer, getweather_callback_with_peel_header);
+	wt_errCode = HTTP_RQT_NOT_RECEIVED;
+	int ret = os.send_http_request(host, ether_buffer, getweather_callback_with_peel_header);
+	if(ret!=HTTP_RQT_SUCCESS) {
+		if(wt_errCode < 0) wt_errCode = ret;
+		// if wt_errCode > 0, the call is successful but weather script may return error
+	}
 }
 

@@ -185,16 +185,16 @@ const char iopt_prompts[] PROGMEM =
 	"Firmware version"
 	"Time zone (GMT):"
 	"Enable NTP sync?"
-	"Enable DHCP?		 "
-	"Static.ip1:		 "
-	"Static.ip2:		 "
-	"Static.ip3:		 "
-	"Static.ip4:		 "
-	"Gateway.ip1:		 "
-	"Gateway.ip2:		 "
-	"Gateway.ip3:		 "
-	"Gateway.ip4:		 "
-	"HTTP Port:			 "
+	"Enable DHCP?    "
+	"Static.ip1:     "
+	"Static.ip2:     "
+	"Static.ip3:     "
+	"Static.ip4:     "
+	"Gateway.ip1:    "
+	"Gateway.ip2:    "
+	"Gateway.ip3:    "
+	"Gateway.ip4:    "
+	"HTTP Port:      "
 	"----------------"
 	"Hardware version"
 	"# of exp. board:"
@@ -208,10 +208,10 @@ const char iopt_prompts[] PROGMEM =
 	"Watering level: "
 	"Device enabled? "
 	"Ignore password?"
-	"Device ID:			 "
-	"LCD contrast:	 "
+	"Device ID:      "
+	"LCD contrast:   "
 	"LCD brightness: "
-	"LCD dimming:		 "
+	"LCD dimming:    "
 	"DC boost time:  "
 	"Weather algo.:  "
 	"NTP server.ip1: "
@@ -223,7 +223,7 @@ const char iopt_prompts[] PROGMEM =
 	"Mas2  on adjust:"
 	"Mas2 off adjust:"
 	"Firmware minor: "
-	"Pulse rate:		 "
+	"Pulse rate:     "
 	"----------------"
 	"As remote ext.? "
 	"DNS server.ip1: "
@@ -231,7 +231,7 @@ const char iopt_prompts[] PROGMEM =
 	"DNS server.ip3: "
 	"DNS server.ip4: "
 	"Special Refresh?"
-	"IFTTT Enable:	 "
+	"IFTTT Enable:   "
 	"Sensor 1 type:  "
 	"Normally open?  "	
 	"Sensor 2 type:  "
@@ -244,7 +244,7 @@ const char iopt_prompts[] PROGMEM =
 	"Subnet mask2:   "
 	"Subnet mask3:   "
 	"Subnet mask4:   "
-	"WiFi mode?			 "
+	"WiFi mode?      "
 	"Factory reset?  ";
 	
 // string options do not have prompts 
@@ -780,7 +780,7 @@ void OpenSprinkler::begin() {
 				mainio->i2c_read(NXP_INPUT_REG);	// do a read to clear out current interrupt flag
 				attachInterrupt(PIN_IOEXP_INT, flow_isr, FALLING);
 			} else if(hw_rev==2) {
-				attachInterrupt(PIN_SENSOR1, flow_isr, FALLING);
+				//attachInterrupt(PIN_SENSOR1, flow_isr, FALLING);
 			}
 		}
 	#else
@@ -1117,7 +1117,9 @@ void OpenSprinkler::apply_all_station_bits() {
 void OpenSprinkler::detect_binarysensor_status(ulong curr_time) {
 	// sensor_type: 0 if normally closed, 1 if normally open
 	if(iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_RAIN || iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_SOIL) {
-		status.sensor1 = (digitalReadExt(PIN_SENSOR1) == iopts[IOPT_SENSOR1_OPTION] ? 0 : 1);
+		pinModeExt(PIN_SENSOR1, INPUT_PULLUP); // for some reason, we have to reset pin mode here
+		byte val = digitalReadExt(PIN_SENSOR1);
+		status.sensor1 = (val == iopts[IOPT_SENSOR1_OPTION]) ? 0 : 1;
 		if(status.sensor1) {
 			if(!sensor1_on_timer) {
 				// add minimum of 5 seconds on delay
@@ -1145,7 +1147,9 @@ void OpenSprinkler::detect_binarysensor_status(ulong curr_time) {
 // ESP8266 is guaranteed to have sensor 2
 #if defined(ESP8266) || defined(PIN_SENSOR2)
 	if(iopts[IOPT_SENSOR2_TYPE]==SENSOR_TYPE_RAIN || iopts[IOPT_SENSOR2_TYPE]==SENSOR_TYPE_SOIL) {
-		status.sensor2 = (digitalReadExt(PIN_SENSOR2) == iopts[IOPT_SENSOR2_OPTION] ? 0 : 1);
+		pinModeExt(PIN_SENSOR2, INPUT_PULLUP); // for some reason, we have to reset pin mode here		
+		byte val = digitalReadExt(PIN_SENSOR2);
+		status.sensor2 = (val == iopts[IOPT_SENSOR2_OPTION]) ? 0 : 1;
 		if(status.sensor2) {
 			if(!sensor2_on_timer) {
 				// add minimum of 5 seconds on delay
@@ -1179,7 +1183,9 @@ byte OpenSprinkler::detect_programswitch_status(ulong curr_time) {
 	byte ret = 0;
 	if(iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_PSWITCH) {
 		static ulong keydown_time = 0;
-		byte val = (digitalReadExt(PIN_SENSOR1)==iopts[IOPT_SENSOR1_OPTION]);
+		pinModeExt(PIN_SENSOR1, INPUT_PULLUP); // for some reason, we have to reset pin mode here
+		status.sensor1 = (digitalReadExt(PIN_SENSOR1) != iopts[IOPT_SENSOR1_OPTION]);
+		byte val = (digitalReadExt(PIN_SENSOR1) == iopts[IOPT_SENSOR1_OPTION]);
 		if(!val && !keydown_time) keydown_time = curr_time;
 		else if(val && keydown_time && (curr_time > keydown_time)) {
 			keydown_time = 0;
@@ -1189,7 +1195,9 @@ byte OpenSprinkler::detect_programswitch_status(ulong curr_time) {
 #if defined(ESP8266) || defined(PIN_SENSOR2)	
 	if(iopts[IOPT_SENSOR2_TYPE]==SENSOR_TYPE_PSWITCH) {
 		static ulong keydown_time_2 = 0;
-		byte val = (digitalReadExt(PIN_SENSOR2)==iopts[IOPT_SENSOR2_OPTION]);
+		pinModeExt(PIN_SENSOR2, INPUT_PULLUP); // for some reason, we have to reset pin mode here		
+		status.sensor2 = (digitalReadExt(PIN_SENSOR2) != iopts[IOPT_SENSOR2_OPTION]);
+		byte val = (digitalReadExt(PIN_SENSOR2) == iopts[IOPT_SENSOR2_OPTION]);
 		if(!val && !keydown_time_2) keydown_time_2 = curr_time;
 		else if(val && keydown_time_2 && (curr_time > keydown_time_2)) {
 			keydown_time_2 = 0;
@@ -1353,7 +1361,7 @@ void OpenSprinkler::attribs_save() {
 	byte bid, s, sid=0;
 	StationAttrib at;
 	byte ty = STN_TYPE_STANDARD;
-	for(bid=0;bid<nboards;bid++) {
+	for(bid=0;bid<MAX_NUM_BOARDS;bid++) {
 		for(s=0;s<8;s++,sid++) {
 			at.mas = (attrib_mas[bid]>>s) & 1;
 			at.igs = (attrib_igs[bid]>>s) & 1;
@@ -1387,7 +1395,7 @@ void OpenSprinkler::attribs_load() {
 	memset(attrib_seq, 0, nboards);
 	memset(attrib_spe, 0, nboards);
 								
-	for(bid=0;bid<nboards;bid++) {
+	for(bid=0;bid<MAX_NUM_BOARDS;bid++) {
 		for(s=0;s<8;s++,sid++) {
 			file_read_block(STATIONS_FILENAME, &at, (uint32_t)sid*sizeof(StationData)+offsetof(StationData, attrib), sizeof(StationAttrib));
 			attrib_mas[bid] |= (at.mas<<s);
@@ -1589,7 +1597,9 @@ void remote_http_callback(char* buffer) {
 */
 }
 
-void OpenSprinkler::send_http_request(uint32_t ip4, uint16_t port, char* p, void(*callback)(char*), uint16_t timeout) {
+#define SERVER_CONNECT_NTRIES 3
+
+int8_t OpenSprinkler::send_http_request(uint32_t ip4, uint16_t port, char* p, void(*callback)(char*), uint16_t timeout) {
 	static byte ip[4];
 	ip[0] = ip4>>24;
 	ip[1] = (ip4>>16)&0xff;
@@ -1598,40 +1608,48 @@ void OpenSprinkler::send_http_request(uint32_t ip4, uint16_t port, char* p, void
 
 #if defined(ARDUINO)
 
-	static Client *client = NULL;
-	if(!client) {
-		#if defined(ESP8266)
-			if(m_server) client = new EthernetClient();
-			else client = new WiFiClient();
-		#else
-			client = new EthernetClient();
-		#endif
+	Client *client;
+	#if defined(ESP8266)
+		EthernetClient etherClient;
+		WiFiClient wifiClient;
+		if(m_server) client = &etherClient;
+		else client = &wifiClient;
+	#else
+		EthernetClient etherClient;
+		client = &etherClient;
+	#endif
+	
+	byte nk;
+	for(nk=0;nk<SERVER_CONNECT_NTRIES;nk++) {
+		if(client->connect(IPAddress(ip), port))	break;
+		delay(500);
 	}
-
-	if(!client->connect(IPAddress(ip), port)) { return; }	
+	if(nk==SERVER_CONNECT_NTRIES) { client->stop(); return HTTP_RQT_CONNECT_ERR; }
 
 #else
-	static EthernetClient *client = NULL;
-	if(!client) { client = new EthernetClient(); }
-	if(!client->connect(ip, port)) { return; }	
+
+	EthernetClient etherClient;
+	EthernetClient *client = &etherClient;
+	if(!client->connect(ip, port)) { client->stop(); return HTTP_RQT_CONNECT_ERR; }	
 
 #endif
 
-	uint32_t stoptime = millis()+timeout;
 	uint16_t len = strlen(p);
 	if(len > ETHER_BUFFER_SIZE) len = ETHER_BUFFER_SIZE;
 	client->write((uint8_t *)p, len);
 	memset(ether_buffer, 0, ETHER_BUFFER_SIZE);
-	//bzero(ether_buffer, ETHER_BUFFER_SIZE);
+	uint32_t stoptime = millis()+timeout;
 
-#if defined(ARDUINO)	
-	while(!client->available() && millis() < stoptime) {
-		if(!client->connected())	break;	
+#if defined(ARDUINO)
+	while(client->connected() || client->available()) {
+		if(client->available()) {
+			client->read((uint8_t*)ether_buffer, ETHER_BUFFER_SIZE);
+		}
 		delay(0);
-	}		
-	while(client->available()) {
-		client->read((uint8_t*)ether_buffer, ETHER_BUFFER_SIZE);
-		delay(0);
+		if(millis()>stoptime) {
+			client->stop();
+			return HTTP_RQT_TIMEOUT;			
+		}
 	}
 #else
 	while(millis() < stoptime) {
@@ -1643,56 +1661,64 @@ void OpenSprinkler::send_http_request(uint32_t ip4, uint16_t port, char* p, void
 	}
 #endif
 	client->stop();
+	if(strlen(ether_buffer)==0) return HTTP_RQT_EMPTY_RETURN;
 	if(callback) callback(ether_buffer);
+	return HTTP_RQT_SUCCESS;
 }
 
-void OpenSprinkler::send_http_request(const char* server, uint16_t port, char* p, void(*callback)(char*), uint16_t timeout) {
+int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char* p, void(*callback)(char*), uint16_t timeout) {
 
 #if defined(ARDUINO)
 
-	static Client *client = NULL;
-	if(!client) {
-		#if defined(ESP8266)
-			if(m_server) client = new EthernetClient();
-			else client = new WiFiClient();
-		#else
-			client = new EthernetClient();
-		#endif
-	}
-
-	if(!client->connect(server, port)) { return; }	
+	Client *client;
+	#if defined(ESP8266)
+		EthernetClient etherClient;
+		WiFiClient wifiClient;
+		if(m_server) client = &etherClient;
+		else client = &wifiClient;
+	#else
+		EthernetClient etherClient;
+		client = &etherClient;
+	#endif
 	
+	byte nk;
+	for(nk=0;nk<SERVER_CONNECT_NTRIES;nk++) {
+		if(client->connect(server, port))	break;
+		delay(500);
+	}
+	if(nk==SERVER_CONNECT_NTRIES) { client->stop(); return HTTP_RQT_CONNECT_ERR; }
+
 #else
 
-	static EthernetClient *client = NULL;
-	if(!client) { client = new EthernetClient(); }
+	EthernetClient etherClient;
+	EthernetClient *client = &etherClient;
 	struct hostent *host;
 	host = gethostbyname(server);
 	if (!host) {
 		DEBUG_PRINT("can't resolve http station - ");
 		DEBUG_PRINTLN(server);
-		return;
-	}
-
-	if(!client->connect((uint8_t*)host->h_addr, port)) { return; }	
+		return HTTP_RQT_CONNECT_ERR;
+	}	
+	if(!client->connect((uint8_t*)host->h_addr, port)) { client->stop(); return HTTP_RQT_CONNECT_ERR; }	
 
 #endif
 
-	uint32_t stoptime = millis()+timeout;
 	uint16_t len = strlen(p);
 	if(len > ETHER_BUFFER_SIZE) len = ETHER_BUFFER_SIZE;
 	client->write((uint8_t *)p, len);
 	memset(ether_buffer, 0, ETHER_BUFFER_SIZE);
-	//bzero(ether_buffer, ETHER_BUFFER_SIZE);
+	uint32_t stoptime = millis()+timeout;
 
-#if defined(ARDUINO)	
-	while(!client->available() && millis() < stoptime) {
-		if(!client->connected())	break;	
+#if defined(ARDUINO)
+	while(client->connected() || client->available()) {
+		if(client->available()) {
+			client->read((uint8_t*)ether_buffer, ETHER_BUFFER_SIZE);
+		}
 		delay(0);
-	}
-	while(client->available()) {
-		client->read((uint8_t*)ether_buffer, ETHER_BUFFER_SIZE);
-		delay(0);
+		if(millis()>stoptime) {
+			client->stop();
+			return HTTP_RQT_TIMEOUT;			
+		}
 	}
 #else
 	while(millis() < stoptime) {
@@ -1704,13 +1730,15 @@ void OpenSprinkler::send_http_request(const char* server, uint16_t port, char* p
 	}
 #endif
 	client->stop();
+	if(strlen(ether_buffer)==0) return HTTP_RQT_EMPTY_RETURN;
 	if(callback) callback(ether_buffer);
+	return HTTP_RQT_SUCCESS;
 }
 
-void OpenSprinkler::send_http_request(char* server_with_port, char* p, void(*callback)(char*), uint16_t timeout) {
+int8_t OpenSprinkler::send_http_request(char* server_with_port, char* p, void(*callback)(char*), uint16_t timeout) {
 	char * server = strtok(server_with_port, ":");
 	char * port = strtok(NULL, ":");
-	send_http_request(server, (port==NULL)?80:atoi(port), p, callback, timeout);
+	return send_http_request(server, (port==NULL)?80:atoi(port), p, callback, timeout);
 }
 
 /** Switch remote station
@@ -1779,6 +1807,7 @@ void OpenSprinkler::options_setup() {
 	if (file_read_byte(IOPTS_FILENAME, IOPT_FW_VERSION)<219 ||	// fw version is invalid (<219)
 			!file_exists(DONE_FILENAME) ||													// done file doesn't exist
 			file_read_byte(IOPTS_FILENAME, IOPT_RESET)==0xAA)  {	 // reset flag is on
+
 #if defined(ARDUINO)
 		lcd_print_line_clear_pgm(PSTR("Resetting..."), 0);
 		lcd_print_line_clear_pgm(PSTR("Please Wait..."), 1);
@@ -1853,7 +1882,7 @@ void OpenSprinkler::options_setup() {
 		
 		// 5. write 'done' file
 		file_write_byte(DONE_FILENAME, 0, 1);
-
+		
 	} else	{
 
 		iopts_load();
@@ -2192,10 +2221,10 @@ void OpenSprinkler::lcd_print_station(byte line, char c) {
 			lcd.write(status.sensor1_active?ICON_SOIL:(status.sensor1?'S':'s'));
 			break;
 		case SENSOR_TYPE_FLOW:
-			lcd.write('F');
+			lcd.write(flowcount_rt>0?'F':'f');
 			break;
 		case SENSOR_TYPE_PSWITCH:
-			lcd.write('P');
+			lcd.write(status.sensor1?'P':'p');
 			break;
 	}
 	
@@ -2213,7 +2242,7 @@ void OpenSprinkler::lcd_print_station(byte line, char c) {
 			lcd.write('F');
 			break;*/
 		case SENSOR_TYPE_PSWITCH:
-			lcd.write('P');
+			lcd.write(status.sensor2?'Q':'q');
 			break;
 	}
 
@@ -2420,13 +2449,15 @@ void OpenSprinkler::ui_set_options(int oid)
 				if (i==IOPT_USE_DHCP && iopts[i]) i += 9; // if use DHCP, skip static ip set
 				else if (i==IOPT_HTTPPORT_0) i+=2; // skip IOPT_HTTPPORT_1
 				else if (i==IOPT_PULSE_RATE_0) i+=2; // skip IOPT_PULSE_RATE_1
-				else if (i==IOPT_MASTER_STATION && iopts[i]==0) i+=3; // if not using master station, skip master on/off adjust
+				else if (i==IOPT_MASTER_STATION && iopts[i]==0) i+=3; // if not using master station, skip master on/off adjust including two retired options
 				else if (i==IOPT_MASTER_STATION_2&& iopts[i]==0) i+=3; // if not using master2, skip master2 on/off adjust
 				else	{
 					i = (i+1) % NUM_IOPTS;
 				}
-				if(i==IOPT_SEQUENTIAL_RETIRED || i==IOPT_URS_RETIRED || i==IOPT_RSO_RETIRED) i++;
-				else if (hw_type==HW_TYPE_AC && i==IOPT_BOOST_TIME) i++;	// skip boost time for non-DC controller
+				if(i==IOPT_SEQUENTIAL_RETIRED) i++;
+				if(i==IOPT_URS_RETIRED) i++;
+				if(i==IOPT_RSO_RETIRED) i++;
+				if (hw_type==HW_TYPE_AC && i==IOPT_BOOST_TIME) i++;	// skip boost time for non-DC controller
 				#if defined(ESP8266)
 				else if (lcd.type()==LCD_I2C && i==IOPT_LCD_CONTRAST) i+=3;
 				#else
@@ -2531,6 +2562,16 @@ void OpenSprinkler::config_ip() {
 		IPAddress dnsip(_ip[0], _ip[1], _ip[2], _ip[3]);
 		
 		WiFi.config(dvip, gwip, subn, dnsip);
+	}
+}
+
+void OpenSprinkler::save_wifi_ip() {
+	if(iopts[IOPT_USE_DHCP] && WiFi.status() == WL_CONNECTED) {
+		memcpy(iopts+IOPT_STATIC_IP1, &(WiFi.localIP()[0]), 4);
+		memcpy(iopts+IOPT_GATEWAY_IP1, &(WiFi.gatewayIP()[0]),4);
+		memcpy(iopts+IOPT_DNS_IP1, &(WiFi.dnsIP()[0]), 4);
+		memcpy(iopts+IOPT_SUBNET_MASK1, &(WiFi.subnetMask()[0]), 4);
+		iopts_save();
 	}
 }
 
