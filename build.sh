@@ -18,7 +18,7 @@ else
 	g++ -o OpenSprinkler -DOSPI main.cpp OpenSprinkler.cpp program.cpp server.cpp utils.cpp weather.cpp gpio.cpp etherport.cpp -lpthread
 fi
 
-if [ ! "$SILENT" = true ] && [ -f OpenSprinkler.launch ] && [ ! -f /etc/init.d/OpenSprinkler.sh ]; then
+if [ ! "$SILENT" = true ]; then
 
 	read -p "Do you want to start OpenSprinkler on startup? " -n 1 -r
 	echo
@@ -27,27 +27,43 @@ if [ ! "$SILENT" = true ] && [ -f OpenSprinkler.launch ] && [ ! -f /etc/init.d/O
 		exit 0
 	fi
 
-	echo "Adding OpenSprinkler launch script..."
+    # Get current directory (binary location)
+    pushd `dirname $0` > /dev/null
+    DIR=`pwd`
+    popd > /dev/null
 
-	# Get current directory (binary location)
-	pushd `dirname $0` > /dev/null
-	DIR=`pwd`
-	popd > /dev/null
+    if [ -d "/run/systemd/system" ] && [ ! -f /etc/systemd/system/ospi.service ]; then
+        echo "Adding OpenSprinkler systemd service..."
 
-	# Update binary location in start up script
-	sed -e 's,\_\_OpenSprinkler\_Path\_\_,'"$DIR"',g' OpenSprinkler.launch > OpenSprinkler.sh
+        # Update binary location in service
+        sed -e 's,\_\_OpenSprinkler\_Path\_\_,'"$DIR"',g' OpenSprinkler.systemd > ospi.service
 
-	# Make file executable
-	chmod +x OpenSprinkler.sh
+        # Move service script to systemd directory
+        sudo mv ospi.service /etc/systemd/system/
 
-	# Move start up script to init.d directory
-	sudo mv OpenSprinkler.sh /etc/init.d/
+        # Add to auto-launch on system startup
+        sudo systemctl enable ospi.service
 
-	# Add to auto-launch on system startup
-	sudo update-rc.d OpenSprinkler.sh defaults
+        # Start the deamon now
+        sudo systemctl start ospi.service
+    elif [ -f OpenSprinkler.launch ] && [ ! -f /etc/init.d/OpenSprinkler.sh ]; then
+        echo "Adding OpenSprinkler launch script..."
 
-	# Start the deamon now
-	sudo /etc/init.d/OpenSprinkler.sh start
+        # Update binary location in start up script
+        sed -e 's,\_\_OpenSprinkler\_Path\_\_,'"$DIR"',g' OpenSprinkler.launch > OpenSprinkler.sh
+
+        # Make file executable
+        chmod +x OpenSprinkler.sh
+
+        # Move start up script to init.d directory
+        sudo mv OpenSprinkler.sh /etc/init.d/
+
+        # Add to auto-launch on system startup
+        sudo update-rc.d OpenSprinkler.sh defaults
+
+        # Start the deamon now
+        sudo /etc/init.d/OpenSprinkler.sh start
+    fi
 
 fi
 
