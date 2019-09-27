@@ -575,7 +575,7 @@ void do_loop()
 		#if defined(ESP8266)
 		pinModeExt(PIN_SENSOR1, INPUT_PULLUP); // this seems necessary for OS 3.2
 		pinModeExt(PIN_SENSOR2, INPUT_PULLUP);
-		#endif*/	
+		#endif
 		
 		last_time = curr_time;
 		if (os.button_timeout) os.button_timeout--;
