@@ -181,8 +181,6 @@ public:
 	static ulong sensor2_off_timer; // time when sensor2 is detected off last time
 	static ulong sensor2_active_lasttime; // most recent time sensor1 is activated	
 	static ulong raindelay_on_lasttime;  // time when the most recent rain delay started
-			
-	static volatile ulong flowcount_time_ms;// time stamp when new flow sensor click is received (in milliseconds)
 	static ulong flowcount_rt;		 // flow count (for computing real-time flow rate)
 	static ulong flowcount_log_start; // starting flow count (for logging)
 
@@ -288,7 +286,8 @@ public:
 	static void flash_screen();
 	static void toggle_screen_led();
 	static void set_screen_led(byte status);	
-	static byte get_wifi_mode() {return iopts[IOPT_WIFI_MODE];}
+	static byte get_wifi_mode() {return wifi_testmode ? WIFI_MODE_STA : iopts[IOPT_WIFI_MODE];}
+	static byte wifi_testmode;
 	static String wifi_ssid, wifi_pass;
 	static void config_ip();
 	static void save_wifi_ip();

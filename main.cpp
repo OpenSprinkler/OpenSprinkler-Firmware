@@ -80,43 +80,25 @@ float flow_last_gpm=0;
 byte prev_flow_state = HIGH;
 
 void flow_poll() {
-	if(os.iopts[IOPT_SENSOR1_TYPE]!=SENSOR_TYPE_FLOW) return;
-
-#if defined(ESP8266)
-	pinModeExt(PIN_SENSOR1, INPUT_PULLUP);
+	#if defined(ESP8266)
+	pinModeExt(PIN_SENSOR1, INPUT_PULLUP); // this seems necessary for OS 3.2 
+	#endif
 	byte curr_flow_state = digitalReadExt(PIN_SENSOR1);
-	if(!(prev_flow_state==HIGH && curr_flow_state==LOW)) {
+	if(!(prev_flow_state==HIGH && curr_flow_state==LOW)) {	// only record on falling edge
 		prev_flow_state = curr_flow_state;
 		return;
 	}
 	prev_flow_state = curr_flow_state;
-#endif
-
 	ulong curr = millis();
-
-	if(curr <= os.flowcount_time_ms) return;	// debounce threshold: 1ms
 	flow_count++;
-	os.flowcount_time_ms = curr;
 
 	/* RAH implementation of flow sensor */
 	if (flow_start==0) { flow_gallons=0; flow_start=curr;}	// if first pulse, record time
 	if ((curr-flow_start)<90000) { flow_gallons=0; } // wait 90 seconds before recording flow_begin
 	else {	if (flow_gallons==1)	{  flow_begin = curr;}}
 	flow_stop = curr; // get time in ms for stop
-	flow_gallons++;  // increment gallon count for each interrupt
+	flow_gallons++;  // increment gallon count for each poll
 	/* End of RAH implementation of flow sensor */
-}
-
-volatile byte flow_isr_flag = false;
-/** Flow sensor interrupt service routine */
-#if defined(ESP8266)
-
-ICACHE_RAM_ATTR void flow_isr() // for ESP8266, ISR must be marked ICACHE_RAM_ATTR
-#else
-void flow_isr()
-#endif
-{
-	flow_isr_flag = true;
 }
 
 #if defined(ARDUINO)
@@ -402,24 +384,15 @@ void handle_web_request(char *p);
 /** Main Loop */
 void do_loop()
 {
-	/* If flow_isr_flag is on, do flow sensing.
-		 todo future: not the most efficient way, as we can't do I2C inside ISR.
-		 need to figure out a more efficient way to do flow sensing */
-	#if defined(ESP8266)
-	if(os.hw_rev==2) { flow_poll(); }
-	else {
-		if(flow_isr_flag) {
-			flow_isr_flag = false;
+	// handle flow sensor using polling every 1ms (maximum freq 1/(2*1ms)=500Hz)
+	static ulong flowpoll_timeout=0;
+	if(os.iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_FLOW) {
+		ulong curr = millis();
+		if(curr!=flowpoll_timeout) {
+			flowpoll_timeout = curr;
 			flow_poll();
 		}
 	}
-	#else
-	if(flow_isr_flag) {
-		flow_isr_flag = false;
-		flow_poll();
-	}
-	#endif
-	
 
 	static ulong last_time = 0;
 	static ulong last_minute = 0;
@@ -600,11 +573,9 @@ void do_loop()
 #endif
 	
 		#if defined(ESP8266)
-		if(os.hw_rev==2) {	// on OS3.2, for some reason we need to repeatedly set pin mode on sensor pins
-			pinModeExt(PIN_SENSOR1, INPUT);
-			pinModeExt(PIN_SENSOR2, INPUT);
-		}
-		#endif	
+		pinModeExt(PIN_SENSOR1, INPUT_PULLUP); // this seems necessary for OS 3.2
+		pinModeExt(PIN_SENSOR2, INPUT_PULLUP);
+		#endif*/	
 		
 		last_time = curr_time;
 		if (os.button_timeout) os.button_timeout--;
@@ -1435,10 +1406,12 @@ void make_logfile_name(char *name) {
  */
 static const char log_type_names[] PROGMEM =
 	"  \0"
-	"rs\0"
+	"s1\0"
 	"rd\0"
 	"wl\0"
-	"fl\0";
+	"fl\0"
+	"s2\0"
+	"cu\0";
 
 /** write run record to log on SD card */
 void write_log(byte type, ulong curr_time) {

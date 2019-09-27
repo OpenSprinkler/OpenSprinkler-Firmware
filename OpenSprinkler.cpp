@@ -49,7 +49,6 @@ ulong OpenSprinkler::raindelay_on_lasttime;
 
 ulong OpenSprinkler::flowcount_log_start;
 ulong OpenSprinkler::flowcount_rt;
-volatile ulong OpenSprinkler::flowcount_time_ms;
 byte OpenSprinkler::button_timeout;
 ulong OpenSprinkler::checkwt_lasttime;
 ulong OpenSprinkler::checkwt_success_lasttime;
@@ -81,6 +80,7 @@ extern char ether_buffer[];
 
 	String OpenSprinkler::wifi_ssid="";
 	String OpenSprinkler::wifi_pass="";
+	byte OpenSprinkler::wifi_testmode = 0;
 #elif defined(ARDUINO)
 	LiquidCrystal OpenSprinkler::lcd;
 	extern SdFat sd;
@@ -623,7 +623,7 @@ void OpenSprinkler::lcd_start() {
 }
 #endif
 
-extern void flow_isr();
+//extern void flow_isr();
 
 /** Initialize pins, controller variables, LCD */
 void OpenSprinkler::begin() {
@@ -759,6 +759,7 @@ void OpenSprinkler::begin() {
 	// OS 3.0 has two independent sensors
 	pinModeExt(PIN_SENSOR1, INPUT_PULLUP);
 	pinModeExt(PIN_SENSOR2, INPUT_PULLUP);
+	
 #else
 	// pull shift register OE low to enable output
 	digitalWrite(PIN_SR_OE, LOW);
@@ -768,29 +769,6 @@ void OpenSprinkler::begin() {
 	pinMode(PIN_SENSOR2, INPUT_PULLUP);
 	#endif
 #endif
-
-	// Set up sensors
-#if defined(ARDUINO)
-	#if defined(ESP8266)
-		/* todo future: handle two sensors */
-		if(mainio->type==IOEXP_TYPE_8574) {
-			attachInterrupt(PIN_SENSOR1, flow_isr, FALLING);
-		} else if(mainio->type==IOEXP_TYPE_9555) {
-			if(hw_rev==1) {
-				mainio->i2c_read(NXP_INPUT_REG);	// do a read to clear out current interrupt flag
-				attachInterrupt(PIN_IOEXP_INT, flow_isr, FALLING);
-			} else if(hw_rev==2) {
-				//attachInterrupt(PIN_SENSOR1, flow_isr, FALLING);
-			}
-		}
-	#else
-		attachInterrupt(PIN_FLOWSENSOR_INT, flow_isr, FALLING);
-	#endif
-#else
-	// OSPI and OSBO use external pullups
-	attachInterrupt(PIN_SENSOR1, "falling", flow_isr);
-#endif
-
 
 	// Default controller status variables
 	// Static variables are assigned 0 by default
@@ -1117,7 +1095,7 @@ void OpenSprinkler::apply_all_station_bits() {
 void OpenSprinkler::detect_binarysensor_status(ulong curr_time) {
 	// sensor_type: 0 if normally closed, 1 if normally open
 	if(iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_RAIN || iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_SOIL) {
-		pinModeExt(PIN_SENSOR1, INPUT_PULLUP); // for some reason, we have to reset pin mode here
+		pinModeExt(PIN_SENSOR1, INPUT_PULLUP); // this seems necessary for OS 3.2
 		byte val = digitalReadExt(PIN_SENSOR1);
 		status.sensor1 = (val == iopts[IOPT_SENSOR1_OPTION]) ? 0 : 1;
 		if(status.sensor1) {
@@ -1147,7 +1125,7 @@ void OpenSprinkler::detect_binarysensor_status(ulong curr_time) {
 // ESP8266 is guaranteed to have sensor 2
 #if defined(ESP8266) || defined(PIN_SENSOR2)
 	if(iopts[IOPT_SENSOR2_TYPE]==SENSOR_TYPE_RAIN || iopts[IOPT_SENSOR2_TYPE]==SENSOR_TYPE_SOIL) {
-		pinModeExt(PIN_SENSOR2, INPUT_PULLUP); // for some reason, we have to reset pin mode here		
+		pinModeExt(PIN_SENSOR2, INPUT_PULLUP); // this seems necessary for OS 3.2	
 		byte val = digitalReadExt(PIN_SENSOR2);
 		status.sensor2 = (val == iopts[IOPT_SENSOR2_OPTION]) ? 0 : 1;
 		if(status.sensor2) {
@@ -1183,7 +1161,7 @@ byte OpenSprinkler::detect_programswitch_status(ulong curr_time) {
 	byte ret = 0;
 	if(iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_PSWITCH) {
 		static ulong keydown_time = 0;
-		pinModeExt(PIN_SENSOR1, INPUT_PULLUP); // for some reason, we have to reset pin mode here
+		pinModeExt(PIN_SENSOR1, INPUT_PULLUP); // this seems necessary for OS 3.2
 		status.sensor1 = (digitalReadExt(PIN_SENSOR1) != iopts[IOPT_SENSOR1_OPTION]);
 		byte val = (digitalReadExt(PIN_SENSOR1) == iopts[IOPT_SENSOR1_OPTION]);
 		if(!val && !keydown_time) keydown_time = curr_time;
@@ -1195,7 +1173,7 @@ byte OpenSprinkler::detect_programswitch_status(ulong curr_time) {
 #if defined(ESP8266) || defined(PIN_SENSOR2)	
 	if(iopts[IOPT_SENSOR2_TYPE]==SENSOR_TYPE_PSWITCH) {
 		static ulong keydown_time_2 = 0;
-		pinModeExt(PIN_SENSOR2, INPUT_PULLUP); // for some reason, we have to reset pin mode here		
+		pinModeExt(PIN_SENSOR2, INPUT_PULLUP); // this seems necessary for OS 3.2		
 		status.sensor2 = (digitalReadExt(PIN_SENSOR2) != iopts[IOPT_SENSOR2_OPTION]);
 		byte val = (digitalReadExt(PIN_SENSOR2) == iopts[IOPT_SENSOR2_OPTION]);
 		if(!val && !keydown_time_2) keydown_time_2 = curr_time;
@@ -1826,11 +1804,11 @@ void OpenSprinkler::options_setup() {
 		}
 
 		remove_file(DONE_FILENAME);
-		remove_file(IOPTS_FILENAME);
+		/*remove_file(IOPTS_FILENAME);
 		remove_file(SOPTS_FILENAME);
 		remove_file(STATIONS_FILENAME);
 		remove_file(NVCON_FILENAME);
-		remove_file(PROG_FILENAME);
+		remove_file(PROG_FILENAME);*/
 
 		// 1. write all options
 		iopts_save();
@@ -1921,7 +1899,8 @@ void OpenSprinkler::options_setup() {
 		} while(!((button&BUTTON_MASK)==BUTTON_3 && (button&BUTTON_FLAG_DOWN)));
 		// set test mode parameters
 		
-		iopts[IOPT_WIFI_MODE] = WIFI_MODE_STA;
+		//iopts[IOPT_WIFI_MODE] = WIFI_MODE_STA;
+		wifi_testmode = 1;
 		#if defined(TESTMODE_SSID)
 		wifi_ssid = TESTMODE_SSID;
 		wifi_pass = TESTMODE_PASS;
