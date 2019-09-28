@@ -41,7 +41,7 @@ void write_log(byte type, ulong curr_time);
 
 static void getweather_callback(char* buffer) {
 	char *p = buffer;
-	DEBUG_PRINTLN(p);
+
 	/* scan the buffer until the first & symbol */
 	while(*p && *p!='&') {
 		p++;
@@ -175,8 +175,6 @@ void GetWeather() {
 	strcat(ether_buffer, host);
 	strcat(ether_buffer, "\r\n\r\n");
 
-	DEBUG_PRINTLN(ether_buffer);
-	
 	wt_errCode = HTTP_RQT_NOT_RECEIVED;
 	int ret = os.send_http_request(host, ether_buffer, getweather_callback_with_peel_header);
 	if(ret!=HTTP_RQT_SUCCESS) {

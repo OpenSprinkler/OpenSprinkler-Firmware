@@ -77,20 +77,6 @@ void ProgramData::dequeue(byte qid) {
 			station_qid[queue[qid].sid] = qid;
 	}
 	nqueue--;
-
-	/*
-	RuntimeQueueStruct *q = queue;
-	DEBUG_PRINT("de:");
-	for(;q<queue+nqueue;q++) {
-		DEBUG_PRINT("[");
-		DEBUG_PRINT(q->sid);
-		DEBUG_PRINT(",");
-		DEBUG_PRINT(q->dur);
-		DEBUG_PRINT(",");
-		DEBUG_PRINT(q->st);
-		DEBUG_PRINT("]");
-	}
-	DEBUG_PRINTLN("");*/
 }
 
 /** Load program count from program file */

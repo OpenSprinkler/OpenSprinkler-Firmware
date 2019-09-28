@@ -622,11 +622,9 @@ void do_loop()
 		if(os.old_status.sensor1_active != os.status.sensor1_active) {
 			// send notification when sensor1 becomes active
 			if(os.status.sensor1_active) {
-				DEBUG_PRINTLN(F("notify sensor1 active"));
 				os.sensor1_active_lasttime = curr_time;
 				push_message(IFTTT_SENSOR1, LOGDATA_SENSOR1, 1);
 			} else {
-				DEBUG_PRINTLN(F("notify sensor1 deActive"));
 				write_log(LOGDATA_SENSOR1, curr_time);
 				push_message(IFTTT_SENSOR1, LOGDATA_SENSOR1, 0);			
 			}
@@ -636,11 +634,9 @@ void do_loop()
 		if(os.old_status.sensor2_active != os.status.sensor2_active) {
 			// send notification when sensor1 becomes active
 			if(os.status.sensor2_active) {
-				DEBUG_PRINTLN(F("notify sensor2 active"));
 				os.sensor2_active_lasttime = curr_time;				
 				push_message(IFTTT_SENSOR2, LOGDATA_SENSOR2, 1);
 			} else {
-				DEBUG_PRINTLN(F("notify sensor2 deActive"));			
 				write_log(LOGDATA_SENSOR2, curr_time);
 				push_message(IFTTT_SENSOR2, LOGDATA_SENSOR2, 0);
 			}
@@ -651,8 +647,6 @@ void do_loop()
 		byte pswitch = os.detect_programswitch_status(curr_time);
 		if(pswitch > 0) {
 			reset_all_stations_immediate(); // immediately stop all stations
-			DEBUG_PRINTLN(F("program switch detected"));
-			DEBUG_PRINTLN(pswitch);
 		}
 		if (pswitch & 0x01) {
 			if(pd.nprograms > 0)	manual_start_program(1, 0);
@@ -1370,8 +1364,6 @@ void push_message(byte type, uint32_t lval, float fval) {
 								 "Content-Type: application/json\r\n\r\n$S"),
 								 SOPT_IFTTT_KEY, host, strlen(postval), postval);
 
-	DEBUG_PRINTLN(ether_buffer);
-	
 	os.send_http_request(host, 80, ether_buffer, remote_http_callback);
 }
 

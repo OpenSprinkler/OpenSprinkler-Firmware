@@ -1983,7 +1983,6 @@ void OpenSprinkler::nvdata_load() {
 
 /** Save non-volatile controller status data */
 void OpenSprinkler::nvdata_save() {
-	DEBUG_PRINTLN(F("save nvdata"));
 	file_write_block(NVCON_FILENAME, &nvdata, 0, sizeof(NVConData));
 }
 

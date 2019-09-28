@@ -2082,7 +2082,6 @@ void start_server_ap() {
 void handle_web_request(char *p) {
 	rewind_ether_buffer();
 
-	//DEBUG_PRINTLN(p);
 	// assume this is a GET request
 	// GET /xx?xxxx
 	char *com = p+5;
