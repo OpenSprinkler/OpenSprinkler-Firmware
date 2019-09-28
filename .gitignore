@@ -1,6 +1,7 @@
 logs/**
-nvm.dat
 OpenSprinkler
 wtopts.txt
-stns.dat
+*.dat
+*.sh
 testmode.h
+build-1284/*
