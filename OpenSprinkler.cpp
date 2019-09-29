@@ -486,6 +486,10 @@ byte OpenSprinkler::start_network() {
 
 	return 1;	
 #else
+  return start_ether();
+#endif
+  return 1;
+}
 
 	if(start_ether()) {
 		m_server = new EthernetServer(httpport);
@@ -538,6 +542,7 @@ byte OpenSprinkler::start_ether() {
 
 	return 1;
 }
+#endif
 
 /** Reboot controller */
 void OpenSprinkler::reboot_dev(uint8_t cause) {

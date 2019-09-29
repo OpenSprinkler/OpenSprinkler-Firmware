@@ -76,8 +76,8 @@ ProgramData pd;		// ProgramdData object
  * flow_last_gpm - last flow rate measured (averaged over flow_gallons) from last valve stopped (used to write to log file). */
 ulong flow_begin, flow_start, flow_stop, flow_gallons;
 ulong flow_count = 0;
-float flow_last_gpm=0;
 byte prev_flow_state = HIGH;
+float flow_last_gpm=0;
 
 void flow_poll() {
 	#if defined(ESP8266)

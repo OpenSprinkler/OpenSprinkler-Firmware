@@ -9,6 +9,7 @@
 
 #define LCD_STD 0			// Standard LCD
 #define LCD_I2C 1
+#define MAX_CUSTOM_CHARS	10
 
 class SSD1306Display : public SSD1306{
 public:
