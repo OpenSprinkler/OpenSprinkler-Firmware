@@ -490,6 +490,7 @@ byte OpenSprinkler::start_network() {
 #endif
   return 1;
 }
+#endif
 
 	if(start_ether()) {
 		m_server = new EthernetServer(httpport);
