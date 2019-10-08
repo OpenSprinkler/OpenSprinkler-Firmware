@@ -1708,9 +1708,9 @@ void server_json_log() {
 	// as the log data can be large, we will use ESP8266's sendContent function to
 	// send multiple packets of data, instead of the standard way of using send().
 	rewind_ether_buffer();
-	bfill.emit_p(PSTR("$F$F$F$F\r\n"), html200OK, htmlContentJSON, htmlAccessControl, htmlNoCache);
-	wifi_server->sendContent(ether_buffer);
-	rewind_ether_buffer();
+	print_json_header(false);
+	//bfill.emit_p(PSTR("$F$F$F$F\r\n"), html200OK, htmlContentJSON, htmlAccessControl, htmlNoCache);
+	//wifi_server->sendContent(ether_buffer);
 #else
 	print_json_header(false);
 #endif
