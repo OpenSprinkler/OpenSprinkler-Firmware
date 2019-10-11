@@ -54,6 +54,9 @@
 	#include <netdb.h>	
 	#include <sys/stat.h>  
 	#include "etherport.h"
+	#ifdef MQTT
+		#include <mosquitto.h>
+	#endif
 #endif // end of headers
 
 /** Non-volatile data structure */
@@ -197,6 +200,8 @@ public:
 	static void begin();				// initialization, must call this function before calling other functions
 	static byte start_network();	// initialize network with the given mac and port
 	static byte start_ether();	// initialize ethernet with the given mac and port	
+	static void mqtt_publish(const char *topic, const char *payload);  // publish mqtt message
+
 #if defined(ARDUINO)
 	static bool load_hardware_mac(byte* buffer, bool wired=false);	// read hardware mac address
 #endif

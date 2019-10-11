@@ -88,6 +88,9 @@ extern char ether_buffer[];
 	#if defined(OSPI)
 		byte OpenSprinkler::pin_sr_data = PIN_SR_DATA;
 	#endif
+	#if defined(MQTT) && defined(OSPI)
+		struct mosquitto *mqtt_client = NULL;
+	#endif
 	// todo future: LCD define for Linux-based systems
 #endif
 
@@ -147,6 +150,7 @@ const char iopt_json_names[] PROGMEM =
 	"dns4\0"
 	"sar\0\0"
 	"ife\0\0"
+    "mqtt\0"
 	"sn1t\0"
 	"sn1o\0"
 	"sn2t\0"
@@ -232,6 +236,7 @@ const char iopt_prompts[] PROGMEM =
 	"DNS server.ip4: "
 	"Special Refresh?"
 	"IFTTT Enable:   "
+	"MQTT Enable:    "
 	"Sensor 1 type:  "
 	"Normally open?  "	
 	"Sensor 2 type:  "
@@ -300,6 +305,7 @@ const byte iopt_max[] PROGMEM = {
 	255,
 	255,
 	1,
+	255,
 	255,
 	255,
 	1,
@@ -376,6 +382,7 @@ byte OpenSprinkler::iopts[] = {
 	8,
 	0,	// special station auto refresh
 	0,	// ifttt enable bits
+	255,  // mqtt enable bits
 	0,	// sensor 1 type (see SENSOR_TYPE macro defines)
 	1,	// sensor 1 option. 0: normally closed; 1: normally open.	default 1.
 	0,	// sensor 2 type
@@ -564,6 +571,23 @@ void OpenSprinkler::reboot_dev(uint8_t cause) {
 
 /** Initialize network with the given mac address and http port */
 byte OpenSprinkler::start_network() {
+#if defined(MQTT) && defined(OSPI)
+	if (iopts[IOPT_MQTT_ENABLE]) {
+		mosquitto_lib_init();
+		int keepalive = 60;
+		bool clean_session = true;
+		mqtt_client = mosquitto_new(NULL, clean_session, NULL);
+		if (!mqtt_client) {
+			DEBUG_PRINTLN("CANNOT CREATE MQTT CLIENT");
+			return 1;
+		}
+		if (mosquitto_connect(mqtt_client, DEFAULT_MQTT_HOST, DEFAULT_MQTT_PORT, keepalive)) {
+			DEBUG_PRINTLN("CANNOT CONNECT TO MQTT");
+			return 1;
+		}
+	}
+#endif
+
 	unsigned int port = (unsigned int)(iopts[IOPT_HTTPPORT_1]<<8) + (unsigned int)iopts[IOPT_HTTPPORT_0];
 #if defined(DEMO)
 	port = 80;
@@ -593,6 +617,28 @@ void OpenSprinkler::update_dev() {
 	system(cmd);
 }
 #endif // end network init functions
+
+
+void OpenSprinkler::mqtt_publish(const char *topic, const char *payload) {
+#if defined(MQTT) && defined(OSPI)
+	int rc = mosquitto_reconnect(mqtt_client);
+	if (rc != MOSQ_ERR_SUCCESS) {
+		DEBUG_PRINT("MQTT connection failed. Error: ");
+		DEBUG_PRINTLN(rc);
+		return;
+	}
+	rc = mosquitto_publish(mqtt_client, NULL, topic, strlen(payload), payload, 0, true);
+	switch(rc) {
+		case MOSQ_ERR_SUCCESS:
+			DEBUG_PRINTLN("MQTT message pushed successfuly");
+			return;
+		default:
+			DEBUG_PRINT("MQTT unexpected error: ");
+			DEBUG_PRINTLN(rc);
+			return;
+	}
+#endif
+}
 
 #if defined(ARDUINO)
 /** Initialize LCD */
