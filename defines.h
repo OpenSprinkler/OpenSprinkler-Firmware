@@ -142,8 +142,6 @@ typedef unsigned long ulong;
 #define DEFAULT_WEATHER_URL       "weather.opensprinkler.com"
 #define DEFAULT_IFTTT_URL         "maker.ifttt.com"
 #define DEFAULT_EMPTY_STRING      ""
-#define DEFAULT_MQTT_HOST         "server"
-#define DEFAULT_MQTT_PORT         1883
 
 /** Macro define of each option
   * Refer to OpenSprinkler.cpp for details on each option
@@ -199,7 +197,6 @@ enum {
 	IOPT_DNS_IP4,
 	IOPT_SPE_AUTO_REFRESH,
 	IOPT_IFTTT_ENABLE,
-    IOPT_MQTT_ENABLE,
 	IOPT_SENSOR1_TYPE,
 	IOPT_SENSOR1_OPTION,	
 	IOPT_SENSOR2_TYPE,
@@ -226,9 +223,9 @@ enum {
 	SOPT_IFTTT_KEY,
 	SOPT_STA_SSID,
 	SOPT_STA_PASS,
+	SOPT_MQTT_OPTS,
 	//SOPT_WEATHER_KEY,
 	//SOPT_AP_PASS,
-	//SOPT_MQTT_IP,
 	NUM_SOPTS	// total number of string options
 };
 

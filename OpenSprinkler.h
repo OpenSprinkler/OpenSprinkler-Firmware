@@ -155,6 +155,8 @@ public:
 															// to handle RPi rev. 1
 #endif
 
+	static bool mqtt_enabled;
+
 	static NVConData nvdata;
 	static ConStatus status;
 	static ConStatus old_status;
@@ -200,6 +202,8 @@ public:
 	static void begin();				// initialization, must call this function before calling other functions
 	static byte start_network();	// initialize network with the given mac and port
 	static byte start_ether();	// initialize ethernet with the given mac and port	
+
+	static void reset_mqtt();
 	static void mqtt_publish(const char *topic, const char *payload);  // publish mqtt message
 
 #if defined(ARDUINO)

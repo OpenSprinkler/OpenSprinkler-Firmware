@@ -55,6 +55,7 @@ ulong OpenSprinkler::checkwt_success_lasttime;
 ulong OpenSprinkler::powerup_lasttime;
 uint8_t OpenSprinkler::last_reboot_cause = REBOOT_CAUSE_NONE;
 byte OpenSprinkler::weather_update_flag;
+bool OpenSprinkler::mqtt_enabled = false;
 
 // todo future: the following attribute bytes are for backward compatibility
 byte OpenSprinkler::attrib_mas[MAX_NUM_BOARDS];
@@ -89,6 +90,8 @@ extern char ether_buffer[];
 		byte OpenSprinkler::pin_sr_data = PIN_SR_DATA;
 	#endif
 	#if defined(MQTT) && defined(OSPI)
+		#define MQTT_SERVER_LEN 50 // App set to max 50 chars for broker name
+		#define MQTT_KEEP_ALIVE 60
 		struct mosquitto *mqtt_client = NULL;
 	#endif
 	// todo future: LCD define for Linux-based systems
@@ -150,7 +153,6 @@ const char iopt_json_names[] PROGMEM =
 	"dns4\0"
 	"sar\0\0"
 	"ife\0\0"
-    "mqtt\0"
 	"sn1t\0"
 	"sn1o\0"
 	"sn2t\0"
@@ -179,6 +181,7 @@ const char sopt_json_names[] PROGMEM =
 	"ifkey"
 	"ssid\0"
 	"pass\0"
+	"mqtt\0"
 	"apass";
 */
 
@@ -236,7 +239,6 @@ const char iopt_prompts[] PROGMEM =
 	"DNS server.ip4: "
 	"Special Refresh?"
 	"IFTTT Enable:   "
-	"MQTT Enable:    "
 	"Sensor 1 type:  "
 	"Normally open?  "	
 	"Sensor 2 type:  "
@@ -305,7 +307,6 @@ const byte iopt_max[] PROGMEM = {
 	255,
 	255,
 	1,
-	255,
 	255,
 	255,
 	1,
@@ -382,7 +383,6 @@ byte OpenSprinkler::iopts[] = {
 	8,
 	0,	// special station auto refresh
 	0,	// ifttt enable bits
-	255,  // mqtt enable bits
 	0,	// sensor 1 type (see SENSOR_TYPE macro defines)
 	1,	// sensor 1 option. 0: normally closed; 1: normally open.	default 1.
 	0,	// sensor 2 type
@@ -405,6 +405,7 @@ const char *OpenSprinkler::sopts[] = {
 	DEFAULT_LOCATION,
 	DEFAULT_JAVASCRIPT_URL,
 	DEFAULT_WEATHER_URL,
+	DEFAULT_EMPTY_STRING,
 	DEFAULT_EMPTY_STRING,
 	DEFAULT_EMPTY_STRING,
 	DEFAULT_EMPTY_STRING,
@@ -572,20 +573,10 @@ void OpenSprinkler::reboot_dev(uint8_t cause) {
 /** Initialize network with the given mac address and http port */
 byte OpenSprinkler::start_network() {
 #if defined(MQTT) && defined(OSPI)
-	if (iopts[IOPT_MQTT_ENABLE]) {
-		mosquitto_lib_init();
-		int keepalive = 60;
-		bool clean_session = true;
-		mqtt_client = mosquitto_new(NULL, clean_session, NULL);
-		if (!mqtt_client) {
-			DEBUG_PRINTLN("CANNOT CREATE MQTT CLIENT");
-			return 1;
-		}
-		if (mosquitto_connect(mqtt_client, DEFAULT_MQTT_HOST, DEFAULT_MQTT_PORT, keepalive)) {
-			DEBUG_PRINTLN("CANNOT CONNECT TO MQTT");
-			return 1;
-		}
-	}
+	mosquitto_lib_init();
+	mqtt_client = mosquitto_new(NULL, true, NULL);
+	if (mqtt_client != NULL) reset_mqtt();
+	else DEBUG_PRINTLN("MQTT failed to initialise.");
 #endif
 
 	unsigned int port = (unsigned int)(iopts[IOPT_HTTPPORT_1]<<8) + (unsigned int)iopts[IOPT_HTTPPORT_0];
@@ -618,25 +609,56 @@ void OpenSprinkler::update_dev() {
 }
 #endif // end network init functions
 
+void OpenSprinkler::reset_mqtt() {
+#if defined(MQTT) && defined(OSPI)
+	char server[MQTT_SERVER_LEN + 1];
+	int port, enable;
+
+	if (mqtt_client == NULL) return;
+
+	if (mqtt_enabled) {
+		mosquitto_disconnect(mqtt_client);
+		mqtt_enabled = false;
+	}
+
+	String config = sopt_load(SOPT_MQTT_OPTS);
+	if (config == "")
+		return;
+
+	sscanf(config.c_str(), PSTR("\"server\":\"%[^\"]\",\"port\":\%d,\"enable\":\%d"), server, &port, &enable);
+
+	if (enable) {
+		int rc = mosquitto_connect(mqtt_client, server, port, MQTT_KEEP_ALIVE);
+		if (rc != MOSQ_ERR_SUCCESS) {
+			DEBUG_PRINT("MQTT cannot connect to the broker. Error: ");
+			DEBUG_PRINTLN(rc);
+		} else {
+			mqtt_enabled = true;
+		}
+	}
+#endif
+}
 
 void OpenSprinkler::mqtt_publish(const char *topic, const char *payload) {
 #if defined(MQTT) && defined(OSPI)
+
+	if (mqtt_client == NULL) return;
+
+	DEBUG_PRINT("MQTT publishing: ");
+	DEBUG_PRINT(topic);
+	DEBUG_PRINT(" ");
+	DEBUG_PRINT(payload);
+
 	int rc = mosquitto_reconnect(mqtt_client);
-	if (rc != MOSQ_ERR_SUCCESS) {
-		DEBUG_PRINT("MQTT connection failed. Error: ");
-		DEBUG_PRINTLN(rc);
-		return;
-	}
-	rc = mosquitto_publish(mqtt_client, NULL, topic, strlen(payload), payload, 0, true);
-	switch(rc) {
-		case MOSQ_ERR_SUCCESS:
-			DEBUG_PRINTLN("MQTT message pushed successfuly");
+	if (rc == MOSQ_ERR_SUCCESS) {
+		rc = mosquitto_publish(mqtt_client, NULL, topic, strlen(payload), payload, 0, true);
+		if (rc == MOSQ_ERR_SUCCESS) {
+			DEBUG_PRINTLN(" Success");
 			return;
-		default:
-			DEBUG_PRINT("MQTT unexpected error: ");
-			DEBUG_PRINTLN(rc);
-			return;
+		}
 	}
+	DEBUG_PRINT(" Fail: ");
+	DEBUG_PRINTLN(rc);
 #endif
 }
 

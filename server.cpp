@@ -1138,12 +1138,13 @@ void server_json_controller_main() {
 	bfill.emit_p(PSTR("\"RSSI\":$D,"), (int16_t)WiFi.RSSI());
 #endif
 
-	bfill.emit_p(PSTR("\"loc\":\"$O\",\"jsp\":\"$O\",\"wsp\":\"$O\",\"wto\":{$O},\"ifkey\":\"$O\",\"wtdata\":$S,\"wterr\":$D,"),
+	bfill.emit_p(PSTR("\"loc\":\"$O\",\"jsp\":\"$O\",\"wsp\":\"$O\",\"wto\":{$O},\"ifkey\":\"$O\",\"mqtt\":{$O},\"wtdata\":$S,\"wterr\":$D,"),
 							 SOPT_LOCATION,
 							 SOPT_JAVASCRIPTURL,
 							 SOPT_WEATHERURL,
 							 SOPT_WEATHER_OPTS,
 							 SOPT_IFTTT_KEY,
+							 SOPT_MQTT_OPTS,
 							 strlen(wt_rawData)==0?"{}":wt_rawData,
 							 wt_errCode);
 
@@ -1438,6 +1439,17 @@ void server_change_options()
 		os.sopt_save(SOPT_IFTTT_KEY, tmp_buffer);
 	}
 	
+	keyfound = 0;
+	if(findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("mqtt"), true, &keyfound)) {
+		urlDecode(tmp_buffer);
+		os.sopt_save(SOPT_MQTT_OPTS, tmp_buffer);
+		os.reset_mqtt();
+	} else if (keyfound) {
+		tmp_buffer[0]=0;
+		os.sopt_save(SOPT_MQTT_OPTS, tmp_buffer);
+		os.reset_mqtt();
+	}
+
 	/*
 	// wtkey is retired
 	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("wtkey"), true, &keyfound)) {
@@ -1457,15 +1469,6 @@ void server_change_options()
 	} else if (keyfound) {
 		tmp_buffer[0]=0;
 		os.sopt_save(SOPT_BLYNK_TOKEN, tmp_buffer);
-	}
-
-	keyfound = 0;
-	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("mqtt"), true, &keyfound)) {
-		urlDecode(tmp_buffer);
-		os.sopt_save(SOPT_MQTT_IP, tmp_buffer);
-	} else if (keyfound) {
-		tmp_buffer[0]=0;
-		os.sopt_save(SOPT_MQTT_IP, tmp_buffer);
 	}
 	*/
 
