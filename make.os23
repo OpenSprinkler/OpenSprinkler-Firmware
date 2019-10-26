@@ -6,7 +6,7 @@ BOARD_TAG = 1284
 MCU = atmega1284p
 VARIANT = sanguino
 F_CPU = 16000000L
-ARDUINO_LIBS = UIPEthernet Wire SdFat SPI 
+ARDUINO_LIBS = UIPEthernet Wire SdFat SPI PubSubClient
 MONITOR_PORT = /dev/ttyUSB0
 MONITOR_BAUDRATE = 115200
 include ./Arduino.mk

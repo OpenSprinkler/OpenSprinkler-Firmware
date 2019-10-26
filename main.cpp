@@ -27,6 +27,7 @@
 #include "program.h"
 #include "weather.h"
 #include "server.h"
+#include "mqtt.h"
 
 #if defined(ARDUINO)
 	EthernetServer *m_server = NULL;
@@ -322,6 +323,10 @@ void do_setup() {
 	os.status.req_network = 0;
 	os.status.req_ntpsync = 1;
 
+	os.mqtt.start();
+	os.mqtt.setup();
+	os.status.req_mqttsetup = 0;
+
 	os.apply_all_station_bits(); // reset station bits
 
 	os.button_timeout = LCD_BACKLIGHT_TIMEOUT;
@@ -361,6 +366,10 @@ void do_setup() {
 		os.status.network_fails = 1;
 	}
 	os.status.req_network = 0;
+
+	os.mqtt.start();
+	os.mqtt.setup();
+	os.status.req_mqttsetup = 0;
 }
 #endif
 
@@ -591,6 +600,13 @@ void do_loop()
 		if (!ui_state)
 			os.lcd_print_time(os.now_tz());				// print time
 #endif
+
+		// ====== Allow MQTT to process ======
+		if (os.status.req_mqttsetup) {
+			os.mqtt.setup();
+			os.status.req_mqttsetup = 0;
+		}
+		os.mqtt.loop();
 
 		// ====== Check raindelay status ======
 		if (os.status.rain_delayed) {
@@ -1247,14 +1263,14 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 	bool ifttt_enabled = os.iopts[IOPT_IFTTT_ENABLE]&type;
 
 	// check if this type of event is enabled for push notification
-	if (!ifttt_enabled && !os.mqtt_enabled)
+	if (!ifttt_enabled && !os.mqtt.enabled())
 		return;
 
 	if (ifttt_enabled) {
 		strcpy_P(postval, PSTR("{\"value1\":\""));
 	}
 
-	if (os.mqtt_enabled) {
+	if (os.mqtt.enabled()) {
 		topic[0] = 0;
 		payload[0] = 0;
 	}
@@ -1262,7 +1278,7 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 	switch(type) {
 		case  NOTIFY_STATION_ON:
 
-			if (os.mqtt_enabled) {
+			if (os.mqtt.enabled()) {
 				sprintf_P(topic, PSTR("opensprinkler/station/%d"), lval);
 				strcpy_P(payload, PSTR("{\"state\":1}"));
 			}
@@ -1270,7 +1286,7 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 
 		case NOTIFY_STATION_OFF:
 
-			if (os.mqtt_enabled) {
+			if (os.mqtt.enabled()) {
 				sprintf_P(topic, PSTR("opensprinkler/station/%d"), lval);
 				if (os.iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_FLOW) {
 					sprintf_P(payload, PSTR("{\"state\":0,\"duration\":%d,\"flow\":%d.%02d}"), (int)fval, (int)flow_last_gpm, (int)(flow_last_gpm*100)%100);
@@ -1306,7 +1322,7 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 
 		case NOTIFY_SENSOR1:
 
-			if (os.mqtt_enabled) {
+			if (os.mqtt.enabled()) {
 				strcpy_P(topic, PSTR("opensprinkler/sensor1"));
 				sprintf_P(payload, PSTR("{\"state\":%d}"), (int)fval);
 			}
@@ -1318,7 +1334,7 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 			
 		case NOTIFY_SENSOR2:
 
-			if (os.mqtt_enabled) {
+			if (os.mqtt.enabled()) {
 				strcpy_P(topic, PSTR("opensprinkler/sensor2"));
 				sprintf_P(payload, PSTR("{\"state\":%d}"), (int)fval);
 			}
@@ -1330,7 +1346,7 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 
 		case NOTIFY_RAINDELAY:
 
-			if (os.mqtt_enabled) {
+			if (os.mqtt.enabled()) {
 				strcpy_P(topic, PSTR("opensprinkler/raindelay"));
 				sprintf_P(payload, PSTR("{\"state\":%d}"), (int)fval);
 			}
@@ -1345,7 +1361,7 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 			volume = os.iopts[IOPT_PULSE_RATE_1];
 			volume = (volume<<8)+os.iopts[IOPT_PULSE_RATE_0];
 			volume = lval*volume;
-			if (os.mqtt_enabled) {
+			if (os.mqtt.enabled()) {
 				strcpy_P(topic, PSTR("opensprinkler/sensor/flow"));
 				sprintf_P(payload, PSTR("{\"count\":%d,\"volume\":%d.%02d}"), lval, (int)volume/100, (int)volume%100);
 			}
@@ -1373,7 +1389,7 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 
 		case NOTIFY_REBOOT:
 
-			if (os.mqtt_enabled) {
+			if (os.mqtt.enabled()) {
 				strcpy_P(topic, PSTR("opensprinkler/system"));
 				strcpy_P(payload, PSTR("{\"state\":\"started\"}"));
 			}
@@ -1403,8 +1419,8 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 			break;
 	}
 
-	if (os.mqtt_enabled && strlen(topic) && strlen(payload))
-		os.mqtt_publish(topic, payload);
+	if (os.mqtt.enabled() && strlen(topic) && strlen(payload))
+		os.mqtt.publish(topic, payload);
 
 	if (ifttt_enabled) {
 		strcat_P(postval, PSTR("\"}"));

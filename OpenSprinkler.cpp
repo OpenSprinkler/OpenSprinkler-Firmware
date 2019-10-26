@@ -27,6 +27,7 @@
 #include "testmode.h"
 
 /** Declare static data members */
+OSMqtt OpenSprinkler::mqtt;
 NVConData OpenSprinkler::nvdata;
 ConStatus OpenSprinkler::status;
 ConStatus OpenSprinkler::old_status;
@@ -55,7 +56,6 @@ ulong OpenSprinkler::checkwt_success_lasttime;
 ulong OpenSprinkler::powerup_lasttime;
 uint8_t OpenSprinkler::last_reboot_cause = REBOOT_CAUSE_NONE;
 byte OpenSprinkler::weather_update_flag;
-bool OpenSprinkler::mqtt_enabled = false;
 
 // todo future: the following attribute bytes are for backward compatibility
 byte OpenSprinkler::attrib_mas[MAX_NUM_BOARDS];
@@ -66,7 +66,7 @@ byte OpenSprinkler::attrib_igrd[MAX_NUM_BOARDS];
 byte OpenSprinkler::attrib_dis[MAX_NUM_BOARDS];
 byte OpenSprinkler::attrib_seq[MAX_NUM_BOARDS];
 byte OpenSprinkler::attrib_spe[MAX_NUM_BOARDS];
-	
+
 extern char tmp_buffer[];
 extern char ether_buffer[];
 
@@ -88,11 +88,6 @@ extern char ether_buffer[];
 #else
 	#if defined(OSPI)
 		byte OpenSprinkler::pin_sr_data = PIN_SR_DATA;
-	#endif
-	#if defined(MQTT) && defined(OSPI)
-		#define MQTT_SERVER_LEN 50 // App set to max 50 chars for broker name
-		#define MQTT_KEEP_ALIVE 60
-		struct mosquitto *mqtt_client = NULL;
 	#endif
 	// todo future: LCD define for Linux-based systems
 #endif
@@ -491,14 +486,14 @@ byte OpenSprinkler::start_network() {
 			wifi_server = new ESP8266WebServer(httpport);
 		}
 	}
-
+	
 	return 1;	
 #else
 
 	if(start_ether()) {
 		m_server = new EthernetServer(httpport);
 		m_server->begin();
-			
+
 		Udp = new EthernetUDP();
 		// Start UDP service for NTP. Avoid the same port with http
 		if(httpport==8888)
@@ -507,7 +502,7 @@ byte OpenSprinkler::start_network() {
 			Udp->begin(8888);
 		return 1;
 	}
-	
+
 	return 0;
 
 #endif
@@ -572,13 +567,6 @@ void OpenSprinkler::reboot_dev(uint8_t cause) {
 
 /** Initialize network with the given mac address and http port */
 byte OpenSprinkler::start_network() {
-#if defined(MQTT) && defined(OSPI)
-	mosquitto_lib_init();
-	mqtt_client = mosquitto_new(NULL, true, NULL);
-	if (mqtt_client != NULL) reset_mqtt();
-	else DEBUG_PRINTLN("MQTT failed to initialise.");
-#endif
-
 	unsigned int port = (unsigned int)(iopts[IOPT_HTTPPORT_1]<<8) + (unsigned int)iopts[IOPT_HTTPPORT_0];
 #if defined(DEMO)
 	port = 80;
@@ -608,59 +596,6 @@ void OpenSprinkler::update_dev() {
 	system(cmd);
 }
 #endif // end network init functions
-
-void OpenSprinkler::reset_mqtt() {
-#if defined(MQTT) && defined(OSPI)
-	char server[MQTT_SERVER_LEN + 1];
-	int port, enable;
-
-	if (mqtt_client == NULL) return;
-
-	if (mqtt_enabled) {
-		mosquitto_disconnect(mqtt_client);
-		mqtt_enabled = false;
-	}
-
-	String config = sopt_load(SOPT_MQTT_OPTS);
-	if (config == "")
-		return;
-
-	sscanf(config.c_str(), PSTR("\"server\":\"%[^\"]\",\"port\":\%d,\"enable\":\%d"), server, &port, &enable);
-
-	if (enable) {
-		int rc = mosquitto_connect(mqtt_client, server, port, MQTT_KEEP_ALIVE);
-		if (rc != MOSQ_ERR_SUCCESS) {
-			DEBUG_PRINT("MQTT cannot connect to the broker. Error: ");
-			DEBUG_PRINTLN(rc);
-		} else {
-			mqtt_enabled = true;
-		}
-	}
-#endif
-}
-
-void OpenSprinkler::mqtt_publish(const char *topic, const char *payload) {
-#if defined(MQTT) && defined(OSPI)
-
-	if (mqtt_client == NULL) return;
-
-	DEBUG_PRINT("MQTT publishing: ");
-	DEBUG_PRINT(topic);
-	DEBUG_PRINT(" ");
-	DEBUG_PRINT(payload);
-
-	int rc = mosquitto_reconnect(mqtt_client);
-	if (rc == MOSQ_ERR_SUCCESS) {
-		rc = mosquitto_publish(mqtt_client, NULL, topic, strlen(payload), payload, 0, true);
-		if (rc == MOSQ_ERR_SUCCESS) {
-			DEBUG_PRINTLN(" Success");
-			return;
-		}
-	}
-	DEBUG_PRINT(" Fail: ");
-	DEBUG_PRINTLN(rc);
-#endif
-}
 
 #if defined(ARDUINO)
 /** Initialize LCD */
