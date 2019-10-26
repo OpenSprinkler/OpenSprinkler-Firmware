@@ -25,6 +25,7 @@
 #include "program.h"
 #include "server.h"
 #include "weather.h"
+#include "mqtt.h"
 
 // External variables defined in main ion file
 #if defined(ARDUINO)
@@ -1443,11 +1444,11 @@ void server_change_options()
 	if(findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("mqtt"), true, &keyfound)) {
 		urlDecode(tmp_buffer);
 		os.sopt_save(SOPT_MQTT_OPTS, tmp_buffer);
-		os.reset_mqtt();
+		os.status.req_mqttsetup = 1;
 	} else if (keyfound) {
 		tmp_buffer[0]=0;
 		os.sopt_save(SOPT_MQTT_OPTS, tmp_buffer);
-		os.reset_mqtt();
+		os.status.req_mqttsetup = 1;
 	}
 
 	/*
@@ -2307,5 +2308,3 @@ ulong getNtpTime()
 	return 0;
 }
 #endif
-
-

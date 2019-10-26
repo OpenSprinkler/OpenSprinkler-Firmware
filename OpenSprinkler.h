@@ -29,6 +29,7 @@
 #include "utils.h"
 #include "gpio.h"
 #include "images.h"
+#include "mqtt.h"
 
 #if defined(ARDUINO) // headers for ESP8266
 	#include <Arduino.h>
@@ -54,9 +55,6 @@
 	#include <netdb.h>	
 	#include <sys/stat.h>  
 	#include "etherport.h"
-	#ifdef MQTT
-		#include <mosquitto.h>
-	#endif
 #endif // end of headers
 
 /** Non-volatile data structure */
@@ -133,6 +131,7 @@ struct ConStatus {
 	byte sensor2:1;						// sensor2 status bit (when set, sensor2 on is detected)
 	byte sensor1_active:1;		// sensor1 active bit (when set, sensor1 is activated)
 	byte sensor2_active:1;		// sensor2 active bit (when set, sensor2 is activated)
+	byte req_mqttsetup:1;			// request setup mqtt
 };
 
 extern const char iopt_json_names[];
@@ -155,7 +154,7 @@ public:
 															// to handle RPi rev. 1
 #endif
 
-	static bool mqtt_enabled;
+	static OSMqtt mqtt;
 
 	static NVConData nvdata;
 	static ConStatus status;
@@ -202,9 +201,6 @@ public:
 	static void begin();				// initialization, must call this function before calling other functions
 	static byte start_network();	// initialize network with the given mac and port
 	static byte start_ether();	// initialize ethernet with the given mac and port	
-
-	static void reset_mqtt();
-	static void mqtt_publish(const char *topic, const char *payload);  // publish mqtt message
 
 #if defined(ARDUINO)
 	static bool load_hardware_mac(byte* buffer, bool wired=false);	// read hardware mac address
