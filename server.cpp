@@ -1444,11 +1444,11 @@ void server_change_options()
 	if(findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("mqtt"), true, &keyfound)) {
 		urlDecode(tmp_buffer);
 		os.sopt_save(SOPT_MQTT_OPTS, tmp_buffer);
-		os.status.req_mqttsetup = 1;
+		os.status.req_mqtt_restart = true;
 	} else if (keyfound) {
 		tmp_buffer[0]=0;
 		os.sopt_save(SOPT_MQTT_OPTS, tmp_buffer);
-		os.status.req_mqttsetup = 1;
+		os.status.req_mqtt_restart = true;
 	}
 
 	/*

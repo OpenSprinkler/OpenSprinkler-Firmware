@@ -323,9 +323,8 @@ void do_setup() {
 	os.status.req_network = 0;
 	os.status.req_ntpsync = 1;
 
-	os.mqtt.start();
-	os.mqtt.setup();
-	os.status.req_mqttsetup = 0;
+	os.mqtt.init();
+	os.status.req_mqtt_restart = true;
 
 	os.apply_all_station_bits(); // reset station bits
 
@@ -367,9 +366,8 @@ void do_setup() {
 	}
 	os.status.req_network = 0;
 
-	os.mqtt.start();
-	os.mqtt.setup();
-	os.status.req_mqttsetup = 0;
+	os.mqtt.init();
+	os.status.req_mqtt_restart = true;
 }
 #endif
 
@@ -564,6 +562,13 @@ void do_loop()
 	}
 #endif	// Process Ethernet packets
 
+	// Start up MQTT when we have a network connection
+	if (os.status.req_mqtt_restart && os.network_connected()) {
+		os.mqtt.begin();
+		os.status.req_mqtt_restart = false;
+	}
+	os.mqtt.loop();
+
 	// The main control loop runs once every second
 	if (curr_time != last_time) {
 #if defined(ESP8266)
@@ -601,13 +606,6 @@ void do_loop()
 			os.lcd_print_time(os.now_tz());				// print time
 #endif
 
-		// ====== Allow MQTT to process ======
-		if (os.status.req_mqttsetup) {
-			os.mqtt.setup();
-			os.status.req_mqttsetup = 0;
-		}
-		os.mqtt.loop();
-
 		// ====== Check raindelay status ======
 		if (os.status.rain_delayed) {
 			if (curr_time >= os.nvdata.rd_stop_time) {	// rain delay is over
@@ -624,7 +622,7 @@ void do_loop()
 			if (os.status.rain_delayed) {
 				// rain delay started, record time
 				os.raindelay_on_lasttime = curr_time;
-		        push_message(NOTIFY_RAINDELAY, LOGDATA_RAINDELAY, 1);
+				push_message(NOTIFY_RAINDELAY, LOGDATA_RAINDELAY, 1);
 
 			} else {
 				// rain delay stopped, write log

@@ -26,14 +26,25 @@
 
 class OSMqtt {
 private:
-    static bool _enabled;
     static char _id[];
     static char _host[];
     static int _port;
+    static bool _enabled;
+
+    // Following routines are platform specific versions of the public interface
+    static int _init(void);
+    static int _connect(void);
+    static int _disconnect(void);
+    static bool _connected(void);
+    static int _publish(const char *topic, const char *payload);
+    static int _loop(void);
+    static const char * _state_string(int state);
 public:
-    static void start(void);
-    static void setup(void);
-    static bool enabled(void);
+    static void init(void);
+    static void init(const char * id);
+    static void begin(void);
+    static void begin(const char * host, int port, bool enable);
+    static bool enabled(void) { return _enabled; };
     static void publish(const char *topic, const char *payload);
     static void loop(void);
 };

@@ -420,18 +420,12 @@ enum {
 		#define DEBUG_BEGIN(x)   {Serial.begin(x);}
 		#define DEBUG_PRINT(x)   {Serial.print(x);}
 		#define DEBUG_PRINTLN(x) {Serial.println(x);}
-		#define DEBUG_PRINTF(msg, ...)	{Serial.printf(msg, ##__VA_ARGS__);}
-		#define DEBUG_LOGF(msg, ...)	{time_t t = os.now_tz(); Serial.printf("%02d-%02d-%02d %02d:%02d:%02d - ", year(t), month(t), day(t), hour(t), minute(t), second(t)); Serial.printf(msg, ##__VA_ARGS__);}
 	#else
 		#include <stdio.h>
-		#include <time.h>
 		#define DEBUG_BEGIN(x)          {}  /** Serial debug functions */
 		inline  void DEBUG_PRINT(int x) {printf("%d", x);}
 		inline  void DEBUG_PRINT(const char*s) {printf("%s", s);}
 		#define DEBUG_PRINTLN(x)        {DEBUG_PRINT(x);printf("\n");}
-		#define DEBUG_PRINTF(msg, ...)	{printf(msg, ##__VA_ARGS__);}
-		#define DEBUG_TIMESTAMP()		{char tstr[21]; time_t t = time(NULL); struct tm *tm = localtime(&t); strftime(tstr, 21, "%y-%m-%d %H:%M:%S - ", tm);printf("%s", tstr);}
-		#define DEBUG_LOGF(msg, ...)	{DEBUG_TIMESTAMP(); printf(msg, ##__VA_ARGS__);}
 	#endif
   
 #else
@@ -439,8 +433,6 @@ enum {
 	#define DEBUG_BEGIN(x)   {}
 	#define DEBUG_PRINT(x)   {}
 	#define DEBUG_PRINTLN(x) {}
-	#define DEBUG_PRINTF(msg, ...)  {}
-	#define DEBUG_LOGF(msg, ...)    {}
 
 #endif
   
