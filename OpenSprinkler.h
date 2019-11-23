@@ -131,7 +131,7 @@ struct ConStatus {
 	byte sensor2:1;						// sensor2 status bit (when set, sensor2 on is detected)
 	byte sensor1_active:1;		// sensor1 active bit (when set, sensor1 is activated)
 	byte sensor2_active:1;		// sensor2 active bit (when set, sensor2 is activated)
-	byte req_mqttsetup:1;			// request setup mqtt
+	byte req_mqtt_restart:1;			// request mqtt restart
 };
 
 extern const char iopt_json_names[];
@@ -201,6 +201,7 @@ public:
 	static void begin();				// initialization, must call this function before calling other functions
 	static byte start_network();	// initialize network with the given mac and port
 	static byte start_ether();	// initialize ethernet with the given mac and port	
+	static bool network_connected();		// check if the network is up
 
 #if defined(ARDUINO)
 	static bool load_hardware_mac(byte* buffer, bool wired=false);	// read hardware mac address

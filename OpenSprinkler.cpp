@@ -542,6 +542,18 @@ byte OpenSprinkler::start_ether() {
 	return 1;
 }
 
+bool OpenSprinkler::network_connected(void) {
+#if defined (ESP8266)
+	if(m_server) {
+		return (Ethernet.linkStatus()==LinkON);
+	} else {
+		return (get_wifi_mode()==WIFI_MODE_STA && WiFi.status()==WL_CONNECTED && state==OS_STATE_CONNECTED);
+	}
+#else
+	return (Ethernet.linkStatus()==LinkON);
+#endif
+}
+
 /** Reboot controller */
 void OpenSprinkler::reboot_dev(uint8_t cause) {
 	lcd_print_line_clear_pgm(PSTR("Rebooting..."), 0);
@@ -575,6 +587,10 @@ byte OpenSprinkler::start_network() {
 
 	m_server = new EthernetServer(port);
 	return m_server->begin();
+}
+
+bool OpenSprinkler::network_connected(void) {
+	return true;
 }
 
 /** Reboot controller */
