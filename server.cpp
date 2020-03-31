@@ -2235,8 +2235,10 @@ ulong getNtpTime()
 		ntpip+=os.iopts[IOPT_NTP_IP3];
 		ntpip+=".";
 		ntpip+=os.iopts[IOPT_NTP_IP4];
-		
-		configTime(0, 0, "pool.ntp.org", ntpip.c_str(), "time.nist.gov");
+		strcpy(_ntpip, ntpip.c_str());
+		if (!os.iopts[IOPT_NTP_IP1] || os.iopts[IOPT_NTP_IP1] == '0')
+			strcpy(_ntpip, "pool.ntp.org");							   
+		configTime(0, 0, _ntpip);
 		delay(1000);
 		configured = true;
 	}
