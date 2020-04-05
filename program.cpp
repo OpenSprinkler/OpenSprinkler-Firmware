@@ -117,9 +117,11 @@ void ProgramData::moveup(byte pid) {
 	// swap program pid-1 and pid
 	ulong pos = 1+(ulong)(pid-1)*PROGRAMSTRUCT_SIZE;
 	ulong next = pos+PROGRAMSTRUCT_SIZE;
+	char buf2[PROGRAMSTRUCT_SIZE];
 	file_read_block(PROG_FILENAME, tmp_buffer, pos, PROGRAMSTRUCT_SIZE);
-	file_copy_block(PROG_FILENAME, next, pos, PROGRAMSTRUCT_SIZE, tmp_buffer);
+	file_read_block(PROG_FILENAME, buf2, next, PROGRAMSTRUCT_SIZE);
 	file_write_block(PROG_FILENAME, tmp_buffer, next, PROGRAMSTRUCT_SIZE);
+	file_write_block(PROG_FILENAME, buf2, pos, PROGRAMSTRUCT_SIZE);
 }
 
 /** Modify a program */
