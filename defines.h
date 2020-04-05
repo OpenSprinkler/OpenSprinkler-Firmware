@@ -36,7 +36,7 @@ typedef unsigned long ulong;
                             // if this number is different from the one stored in non-volatile memory
                             // a device reset will be automatically triggered
 
-#define OS_FW_MINOR      1  // Firmware minor version
+#define OS_FW_MINOR      3  // Firmware minor version
 
 /** Hardware version base numbers */
 #define OS_HW_VERSION_BASE   0x00
@@ -279,7 +279,7 @@ enum {
 	#define PIN_CURR_SENSE     7    // current sensing pin (A7)
 	#define PIN_CURR_DIGITAL  24    // digital pin index for A7
 
-	#define ETHER_BUFFER_SIZE   2048
+	#define ETHER_BUFFER_SIZE   8192
 
 	#define 	wdt_reset()   __asm__ __volatile__ ("wdr")  // watchdog timer reset
 
@@ -300,7 +300,7 @@ enum {
 
 	#define PIN_CURR_SENSE    A0
 	#define PIN_FREE_LIST     {} // no free GPIO pin at the moment
-	#define ETHER_BUFFER_SIZE   4096
+	#define ETHER_BUFFER_SIZE   8192
 
 	#define PIN_ETHER_CS       16 // ENC28J60 CS (chip select pin) is 16 on OS 3.2.
 
@@ -438,6 +438,7 @@ enum {
 /** Re-define avr-specific (e.g. PGM) types to use standard types */
 #if !defined(ARDUINO)
 	#include <stdio.h>
+	#include <stdlib.h>
 	#include <string.h>
 	#include <stddef.h>
 	inline void itoa(int v,char *s,int b)   {sprintf(s,"%d",v);}

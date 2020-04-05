@@ -358,10 +358,10 @@ byte OpenSprinkler::iopts[] = {
 	50, // lcd dimming
 	80, // boost time (only valid to DC and LATCH type)
 	0,	// weather algorithm (0 means not using weather algorithm)
-	50, // this and the next three bytes define the ntp server ip
-	97,
-	210,
-	169,
+	0,  // this and the next three bytes define the ntp server ip
+	0,
+	0,
+	0,
 	1,	// enable logging: 0: disable; 1: enable.
 	0,	// index of master2. 0: no master2 station
 	120,// master2 on adjusted time

@@ -52,11 +52,11 @@ void remote_http_callback(char*);
 
 // Small variations have been added to the timing values below
 // to minimize conflicting events
-#define NTP_SYNC_INTERVAL				86403L	// NYP sync interval, 24 hrs
-#define RTC_SYNC_INTERVAL				60			// RTC sync interval, 60 secs
+#define NTP_SYNC_INTERVAL				86413L 	// NYP sync interval, in units of seconds
+#define RTC_SYNC_INTERVAL				3607		// RTC sync interval, 3600 secs
 #define CHECK_NETWORK_INTERVAL	601			// Network checking timeout, 10 minutes
-#define CHECK_WEATHER_TIMEOUT		7201		// Weather check interval: 2 hours
-#define CHECK_WEATHER_SUCCESS_TIMEOUT 86416L // Weather check success interval: 24 hrs
+#define CHECK_WEATHER_TIMEOUT		7207L		// Weather check interval: 2 hours
+#define CHECK_WEATHER_SUCCESS_TIMEOUT 86400L // Weather check success interval: 24 hrs
 #define LCD_BACKLIGHT_TIMEOUT		15			// LCD backlight timeout: 15 secs
 #define PING_TIMEOUT						200			// Ping test timeout: 200 ms
 
@@ -556,22 +556,45 @@ void do_loop()
 
 	// The main control loop runs once every second
 	if (curr_time != last_time) {
-#if defined(ESP8266)
-		/*static uint16_t lastHeap = 0;
+#if defined(ENABLE_DEBUG)
+	/*
+	#if defined(ESP8266)
+	{
+		static uint16_t lastHeap = 0;
 		static uint32_t lastHeapTime = 0;
 		uint16_t heap = ESP.getFreeHeap();
 		if(heap != lastHeap) {
-			os.lcd.setCursor(0, -1);
-			os.lcd.print(heap);
 			DEBUG_PRINT(F("Heap:"));
 			DEBUG_PRINT(heap);
 			DEBUG_PRINT("|");
 			DEBUG_PRINTLN(curr_time - lastHeapTime);
 			lastHeap = heap;
 			lastHeapTime = curr_time;
-		}*/
+		}
+	}
+	#elif defined(ARDUINO) 
+	{
+		extern unsigned int __bss_end;
+		extern unsigned int __heap_start;
+		extern void *__brkval;
+		static int last_free_memory = 0;
+		int free_memory;
+
+		if((int)__brkval == 0)
+		   free_memory = ((int)&free_memory) - ((int)&__bss_end);
+		else
+		  free_memory = ((int)&free_memory) - ((int)__brkval);
+		if(free_memory != last_free_memory) {
+			DEBUG_PRINT(F("Heap:"));
+			DEBUG_PRINT(free_memory);
+			DEBUG_PRINT("|");
+			last_free_memory = free_memory;
+		}
+	}
+	#endif
+	*/
 #endif
-	
+
 		#if defined(ESP8266)
 		pinModeExt(PIN_SENSOR1, INPUT_PULLUP); // this seems necessary for OS 3.2
 		pinModeExt(PIN_SENSOR2, INPUT_PULLUP);
@@ -1648,10 +1671,23 @@ void perform_ntp_sync() {
 		if (!ui_state) {
 			os.lcd_print_line_clear_pgm(PSTR("NTP Syncing..."),1);
 		}
+		DEBUG_PRINTLN(F("NTP Syncing..."));
+		static ulong last_ntp_result = 0;
 		ulong t = getNtpTime();
+		if(last_ntp_result!=0) {
+			if(t>last_ntp_result-3 && t<last_ntp_result+3) {
+				DEBUG_PRINTLN(F("ntp too close"));
+				t = 0;	// too close to last_ntp_result, invalidate the result
+			} else {
+				last_ntp_result = t;
+			}
+		} else {
+			last_ntp_result = t;
+		}
 		if (t>0) {
 			setTime(t);
 			RTC.set(t);
+			DEBUG_PRINTLN(RTC.get());
 			#if !defined(ESP8266)
 			// if rtc was uninitialized and now it is, restart
 			if(rtc_zero && now()>978307200L) {
