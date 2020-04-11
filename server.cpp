@@ -562,7 +562,7 @@ void server_json_station_special() {
 
 void server_change_stations_attrib(char *p, char header, byte *attrib)
 {
-	char tbuf2[3] = {0, 0, 0};
+	char tbuf2[5] = {0, 0, 0, 0, 0};
 	byte bid;
 	tbuf2[0]=header;
 	for(bid=0;bid<os.nboards;bid++) {
@@ -596,7 +596,7 @@ void server_change_stations() {
 #endif
 	
 	byte sid;
-	char tbuf2[4] = {'s', 0, 0, 0};
+	char tbuf2[5] = {'s', 0, 0, 0, 0};
 	// process station names
 	for(sid=0;sid<os.nstations;sid++) {
 		itoa(sid, tbuf2+1, 10);
