@@ -559,7 +559,7 @@ void urlDecode (char *urlbuf) {
 }
 
 void peel_http_header(char* buffer) { // remove the HTTP header
-	int i=0;
+	uint16_t i=0;
 	bool eol=true;
 	while(i<ETHER_BUFFER_SIZE) {
 		char c = buffer[i];
