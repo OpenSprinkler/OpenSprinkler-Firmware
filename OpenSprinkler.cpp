@@ -161,6 +161,7 @@ const char iopt_json_names[] PROGMEM =
 	"subn4"
 	"wimod"
 	"reset"
+	"nortc"
 	;
 
 // for String options
@@ -245,7 +246,8 @@ const char iopt_prompts[] PROGMEM =
 	"Subnet mask3:   "
 	"Subnet mask4:   "
 	"WiFi mode?      "
-	"Factory reset?  ";
+	"Factory reset?  "
+	"Disable RTC?    ";
 	
 // string options do not have prompts 
 
@@ -314,6 +316,7 @@ const byte iopt_max[] PROGMEM = {
 	255,
 	255,
 	255,
+	1,
 	1
 };
 
@@ -389,7 +392,8 @@ byte OpenSprinkler::iopts[] = {
 	255,// subnet mask 3
 	0,
 	WIFI_MODE_AP, // wifi mode
-	0		// reset
+	0,		// reset
+	0		// RTC disable
 };
 
 /** String option values (stored in RAM) */
