@@ -1271,7 +1271,9 @@ void push_message(byte type, uint32_t lval, float fval) {
 
 		case IFTTT_STATION_RUN:
 			
-			strcat_P(postval, PSTR("Station "));
+			strcat_P(postval, PSTR(" Run on Site: "));
+			os.sopt_load(SOPT_DEVICE_NAME, postval + strlen(postval));
+			strcat_P(postval, PSTR(", Station "));
 			os.get_station_name(lval, postval+strlen(postval));
 			strcat_P(postval, PSTR(" closed. It ran for "));
 			itoa((int)fval/60, postval+strlen(postval), 10);

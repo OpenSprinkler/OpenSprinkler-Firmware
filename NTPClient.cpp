@@ -55,8 +55,10 @@ void NTPClient::begin() {
 void NTPClient::begin(int port) {
 	this->_port = port;
 
-	this->_udp->begin(this->_port);
-
+	if (!this->_udp->begin(this->_port)) {
+		Serial.println("No sockets available to use");
+	}
+	
 	this->_udpSetup = true;
 }
 

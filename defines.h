@@ -24,7 +24,7 @@
 #ifndef _DEFINES_H
 #define _DEFINES_H
 
-//#define ENABLE_DEBUG  // enable serial debug
+// #define ENABLE_DEBUG  // enable serial debug
 
 typedef unsigned char byte;
 typedef unsigned long ulong;
@@ -135,12 +135,13 @@ typedef unsigned long ulong;
 #define STATION_SPECIAL_DATA_SIZE  (TMP_BUFFER_SIZE - STATION_NAME_SIZE - 12)
 
 /** Default string option values */
-#define DEFAULT_PASSWORD          "a6d82bced638de3def1e9bbb4983225c"  // md5 of 'opendoor'
-#define DEFAULT_LOCATION          "42.36,-71.06"	// Boston,MA
-#define DEFAULT_JAVASCRIPT_URL    "https://ui.opensprinkler.com/js"
-#define DEFAULT_WEATHER_URL       "weather.opensprinkler.com"
-#define DEFAULT_IFTTT_URL         "maker.ifttt.com"
-#define DEFAULT_EMPTY_STRING      ""
+#define DEFAULT_PASSWORD          	"a6d82bced638de3def1e9bbb4983225c"  // md5 of 'opendoor'
+#define DEFAULT_LOCATION          	"42.36,-71.06"	// Boston,MA
+#define DEFAULT_DEVICE_NAME			"My OpenSprinkler"
+#define DEFAULT_JAVASCRIPT_URL    	"https://ui.opensprinkler.com/js"
+#define DEFAULT_WEATHER_URL       	"weather.opensprinkler.com"
+#define DEFAULT_IFTTT_URL         	"maker.ifttt.com"
+#define DEFAULT_EMPTY_STRING      	""
 
 /** Macro define of each option
   * Refer to OpenSprinkler.cpp for details on each option
@@ -222,6 +223,7 @@ enum {
 	SOPT_IFTTT_KEY,
 	SOPT_STA_SSID,
 	SOPT_STA_PASS,
+	SOPT_DEVICE_NAME,
 	//SOPT_WEATHER_KEY,
 	//SOPT_AP_PASS,
 	//SOPT_MQTT_IP,

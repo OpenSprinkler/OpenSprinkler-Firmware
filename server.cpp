@@ -88,18 +88,18 @@ int available_ether_buffer() {
 }
 
 // Define return error code
-#define HTML_OK								 0x00
-#define HTML_SUCCESS					 0x01
-#define HTML_UNAUTHORIZED			 0x02
-#define HTML_MISMATCH					 0x03
-#define HTML_DATA_MISSING			 0x10
-#define HTML_DATA_OUTOFBOUND	 0x11
-#define HTML_DATA_FORMATERROR  0x12
-#define HTML_RFCODE_ERROR			 0x13
-#define HTML_PAGE_NOT_FOUND		 0x20
-#define HTML_NOT_PERMITTED		 0x30
-#define HTML_UPLOAD_FAILED		 0x40
-#define HTML_REDIRECT_HOME		 0xFF
+#define HTML_OK					0x00
+#define HTML_SUCCESS			0x01
+#define HTML_UNAUTHORIZED		0x02
+#define HTML_MISMATCH			0x03
+#define HTML_DATA_MISSING		0x10
+#define HTML_DATA_OUTOFBOUND	0x11
+#define HTML_DATA_FORMATERROR	0x12
+#define HTML_RFCODE_ERROR		0x13
+#define HTML_PAGE_NOT_FOUND		0x20
+#define HTML_NOT_PERMITTED		0x30
+#define HTML_UPLOAD_FAILED		0x40
+#define HTML_REDIRECT_HOME		0xFF
 
 static const char html200OK[] PROGMEM =
 	"HTTP/1.1 200 OK\r\n"
@@ -1213,7 +1213,7 @@ void server_home()
 
 /**
  * Change controller variables
- * Command: /cv?pw=xxx&rsn=x&rbt=x&en=x&rd=x&re=x&ap=x
+ * Command: /cv?pw=xxx&rsn=x&rbt=x&en=x&rd=x&re=x&ap=x&cn=x 
  *
  * pw:	password
  * rsn: reset all stations (0 or 1)
@@ -1223,6 +1223,7 @@ void server_home()
  * re:	remote extension mode
  * ap:	reset to ap (ESP8266 only)
  * update: launch update script (for OSPi/OSBo/Linux only)
+ * cn:	controller name 
  */
 void server_change_values()
 {
@@ -1280,6 +1281,10 @@ void server_change_values()
 			os.iopts[IOPT_REMOTE_EXT_MODE] = 0;
 			os.iopts_save();
 		}
+	}
+
+	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("cn"), true)) {
+		os.sopt_save(SOPT_DEVICE_NAME, tmp_buffer);
 	}
 	
 	#if defined(ESP8266)
