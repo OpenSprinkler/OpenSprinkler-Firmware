@@ -1994,6 +1994,17 @@ void OpenSprinkler::iopts_load() {
 	status.enabled = iopts[IOPT_DEVICE_ENABLE];
 	iopts[IOPT_FW_VERSION] = OS_FW_VERSION;
 	iopts[IOPT_FW_MINOR] = OS_FW_MINOR;
+        /* Reject the former default 50.97.210.169 NTP IP address as
+         * it no longer works, yet is carried on by people's saved
+         * configs when they upgrade from older versions.
+         * IOPT_NTP_IP1 = 0 leads to the new good default behavior. */
+        if (iopts[IOPT_NTP_IP1] == 50 && iopts[IOPT_NTP_IP2] == 97 &&
+            iopts[IOPT_NTP_IP3] == 210 && iopts[IOPT_NTP_IP4] == 169) {
+            iopts[IOPT_NTP_IP1] = 0;
+            iopts[IOPT_NTP_IP2] = 0;
+            iopts[IOPT_NTP_IP3] = 0;
+            iopts[IOPT_NTP_IP4] = 0;
+        }
 }
 
 /** Save integer options to file */
