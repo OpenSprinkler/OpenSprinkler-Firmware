@@ -236,6 +236,21 @@ static byte GPIOSetEdge(int pin, const char *edge) {
 
 /** Set pin mode, in or out */
 void pinMode(int pin, byte mode) {
+#if defined(OSPI)
+	char cmd[BUFFER_MAX];
+	switch(mode) {
+		case INPUT:
+			snprintf(cmd, BUFFER_MAX, "gpio -g mode %d in", pin);
+		break;
+		case OUTPUT:
+			snprintf(cmd, BUFFER_MAX, "gpio -g mode %d out", pin);
+		break;
+		case INPUT_PULLUP:
+			snprintf(cmd, BUFFER_MAX, "gpio -g mode %d in; gpio -g mode %d up", pin);
+		break;
+	}
+	system(cmd);
+#else
 	static const char dir_str[]  = "in\0out";
 
 	char path[BUFFER_MAX];
@@ -260,6 +275,7 @@ void pinMode(int pin, byte mode) {
 	}
 
 	close(fd);
+#endif
 	return;
 }
 
