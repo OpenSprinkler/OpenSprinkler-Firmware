@@ -27,6 +27,7 @@
 #include "testmode.h"
 
 /** Declare static data members */
+OSMqtt OpenSprinkler::mqtt;
 NVConData OpenSprinkler::nvdata;
 ConStatus OpenSprinkler::status;
 ConStatus OpenSprinkler::old_status;
@@ -65,7 +66,7 @@ byte OpenSprinkler::attrib_igrd[MAX_NUM_BOARDS];
 byte OpenSprinkler::attrib_dis[MAX_NUM_BOARDS];
 byte OpenSprinkler::attrib_seq[MAX_NUM_BOARDS];
 byte OpenSprinkler::attrib_spe[MAX_NUM_BOARDS];
-	
+
 extern char tmp_buffer[];
 extern char ether_buffer[];
 
@@ -175,6 +176,7 @@ const char sopt_json_names[] PROGMEM =
 	"ifkey"
 	"ssid\0"
 	"pass\0"
+	"mqtt\0"
 	"apass";
 */
 
@@ -405,6 +407,7 @@ const char *OpenSprinkler::sopts[] = {
 	DEFAULT_EMPTY_STRING,
 	DEFAULT_EMPTY_STRING,
 	DEFAULT_EMPTY_STRING,
+	DEFAULT_EMPTY_STRING,
 	DEFAULT_EMPTY_STRING
 };
 
@@ -483,14 +486,14 @@ byte OpenSprinkler::start_network() {
 			wifi_server = new ESP8266WebServer(httpport);
 		}
 	}
-
+	
 	return 1;	
 #else
 
 	if(start_ether()) {
 		m_server = new EthernetServer(httpport);
 		m_server->begin();
-			
+
 		Udp = new EthernetUDP();
 		// Start UDP service for NTP. Avoid the same port with http
 		if(httpport==8888)
@@ -499,7 +502,7 @@ byte OpenSprinkler::start_network() {
 			Udp->begin(8888);
 		return 1;
 	}
-	
+
 	return 0;
 
 #endif
@@ -539,6 +542,18 @@ byte OpenSprinkler::start_ether() {
 	return 1;
 }
 
+bool OpenSprinkler::network_connected(void) {
+#if defined (ESP8266)
+	if(m_server) {
+		return (Ethernet.linkStatus()==LinkON);
+	} else {
+		return (get_wifi_mode()==WIFI_MODE_STA && WiFi.status()==WL_CONNECTED && state==OS_STATE_CONNECTED);
+	}
+#else
+	return (Ethernet.linkStatus()==LinkON);
+#endif
+}
+
 /** Reboot controller */
 void OpenSprinkler::reboot_dev(uint8_t cause) {
 	lcd_print_line_clear_pgm(PSTR("Rebooting..."), 0);
@@ -572,6 +587,10 @@ byte OpenSprinkler::start_network() {
 
 	m_server = new EthernetServer(port);
 	return m_server->begin();
+}
+
+bool OpenSprinkler::network_connected(void) {
+	return true;
 }
 
 /** Reboot controller */

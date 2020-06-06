@@ -66,15 +66,16 @@ typedef unsigned long ulong;
 #define STN_TYPE_HTTP        0x04	// HTTP station
 #define STN_TYPE_OTHER       0xFF
 
-/** IFTTT macro defines */
-#define IFTTT_PROGRAM_SCHED   0x01
-#define IFTTT_SENSOR1         0x02
-#define IFTTT_FLOWSENSOR      0x04
-#define IFTTT_WEATHER_UPDATE  0x08
-#define IFTTT_REBOOT          0x10
-#define IFTTT_STATION_RUN     0x20
-#define IFTTT_SENSOR2         0x40
-#define IFTTT_RAINDELAY				0x80
+/** Notification macro defines */
+#define NOTIFY_PROGRAM_SCHED   0x0001
+#define NOTIFY_SENSOR1         0x0002
+#define NOTIFY_FLOWSENSOR      0x0004
+#define NOTIFY_WEATHER_UPDATE  0x0008
+#define NOTIFY_REBOOT          0x0010
+#define NOTIFY_STATION_OFF     0x0020
+#define NOTIFY_SENSOR2         0x0040
+#define NOTIFY_RAINDELAY       0x0080
+#define NOTIFY_STATION_ON      0x0100
 
 /** HTTP request macro defines */
 #define HTTP_RQT_SUCCESS			 0
@@ -222,9 +223,9 @@ enum {
 	SOPT_IFTTT_KEY,
 	SOPT_STA_SSID,
 	SOPT_STA_PASS,
+	SOPT_MQTT_OPTS,
 	//SOPT_WEATHER_KEY,
 	//SOPT_AP_PASS,
-	//SOPT_MQTT_IP,
 	NUM_SOPTS	// total number of string options
 };
 
@@ -449,6 +450,7 @@ enum {
 	#define F(x)				 x
 	#define strcat_P     strcat
 	#define strcpy_P     strcpy
+	#define sprintf_P    sprintf
 	#include<string>
 	#define String       string
 	using namespace std;
@@ -488,5 +490,3 @@ enum {
 #define DISPLAY_MSG_MS      2000  // message display time (milliseconds)
 
 #endif  // _DEFINES_H
-
-

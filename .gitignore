@@ -5,3 +5,5 @@ wtopts.txt
 *.sh
 testmode.h
 build-1284/*
+.vscode
+.pio
