@@ -124,7 +124,13 @@ byte digitalReadExt(byte pin);
 #include "defines.h"
 #define OUTPUT 0
 #define INPUT  1
-#define INPUT_PULLUP 1
+
+#if defined(OSPI)
+#define INPUT_PULLUP 2
+#else
+#define INPUT_PULLUP INPUT
+#endif
+
 #define HIGH	 1
 #define LOW		 0
 

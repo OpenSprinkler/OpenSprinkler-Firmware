@@ -254,12 +254,19 @@ void pinMode(int pin, byte mode) {
 		return;
 	}
 
-	if (-1 == write(fd, &dir_str[INPUT==mode?0:3], INPUT==mode?2:3)) {
+	if (-1 == write(fd, &dir_str[(INPUT==mode)||(INPUT_PULLUP==mode)?0:3], (INPUT==mode)||(INPUT_PULLUP==mode)?2:3)) {
 		DEBUG_PRINTLN("failed to set direction");
 		return;
 	}
 
 	close(fd);
+#if defined(OSPI)
+	if(mode==INPUT_PULLUP) {
+		char cmd[BUFFER_MAX];
+		snprintf(cmd, BUFFER_MAX, "gpio -g mode %d up", pin);
+		system(cmd);
+	}
+#endif
 	return;
 }
 

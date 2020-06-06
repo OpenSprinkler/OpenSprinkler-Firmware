@@ -972,8 +972,8 @@ void server_json_options_main() {
 				continue;
 		#endif
 		
-		#if !defined(ESP8266)
-		// so far only OS3.x has sensor2
+		#if !(defined(ESP8266) || defined(PIN_SENSOR2))
+		// only OS 3.x or controllers that have PIN_SENSOR2 defined support sensor 2 options
 		if (oid==IOPT_SENSOR2_TYPE || oid==IOPT_SENSOR2_OPTION || oid==IOPT_SENSOR2_ON_DELAY || oid==IOPT_SENSOR2_OFF_DELAY)
 			continue;
 		#endif
