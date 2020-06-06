@@ -1133,6 +1133,10 @@ void server_json_controller_main() {
 	bfill.emit_p(PSTR("\"RSSI\":$D,"), (int16_t)WiFi.RSSI());
 #endif
 
+	byte mac[6] = {0};
+	os.load_hardware_mac(mac, m_server!=NULL);
+	bfill.emit_p(PSTR("\"mac\":[$D,$D,$D,$D,$D,$D],"), mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+
 	bfill.emit_p(PSTR("\"loc\":\"$O\",\"jsp\":\"$O\",\"wsp\":\"$O\",\"wto\":{$O},\"ifkey\":\"$O\",\"mqtt\":{$O},\"wtdata\":$S,\"wterr\":$D,"),
 							 SOPT_LOCATION,
 							 SOPT_JAVASCRIPTURL,
