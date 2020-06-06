@@ -30,22 +30,26 @@ private:
     static char _host[];
     static int _port;
     static bool _enabled;
+    static char _username[];
+    static char _password[];
 
     // Following routines are platform specific versions of the public interface
     static int _init(void);
-    static int _connect(void);
+    static int _connect(const char *username=NULL, const char *password=NULL);
     static int _disconnect(void);
     static bool _connected(void);
     static int _publish(const char *topic, const char *payload);
+    static int _subscribe(void);
     static int _loop(void);
     static const char * _state_string(int state);
 public:
     static void init(void);
-    static void init(const char * id);
+    static void init(const char *id);
     static void begin(void);
-    static void begin(const char * host, int port, bool enable);
+    static void begin(const char *host, int port, bool enable, const char *username=NULL, const char *password=NULL);
     static bool enabled(void) { return _enabled; };
     static void publish(const char *topic, const char *payload);
+    static void subscribe(void);
     static void loop(void);
 };
 

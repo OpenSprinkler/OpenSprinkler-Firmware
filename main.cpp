@@ -404,6 +404,7 @@ void do_loop()
 
 	static ulong last_time = 0;
 	static ulong last_minute = 0;
+	static ulong last_subscribe = 0;
 
 	byte bid, sid, s, pid, qid, bitvalue;
 	ProgramStruct prog;
@@ -568,6 +569,11 @@ void do_loop()
 		os.status.req_mqtt_restart = false;
 	}
 	os.mqtt.loop();
+
+	if (curr_time > last_subscribe) {
+		os.mqtt.subscribe();
+		last_subscribe = curr_time + 5;
+	}
 
 	// The main control loop runs once every second
 	if (curr_time != last_time) {

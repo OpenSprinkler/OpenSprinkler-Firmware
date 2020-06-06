@@ -62,6 +62,11 @@
 
 extern char ether_buffer[];
 extern char tmp_buffer[];
+
+// buffer to store incoming messages from mqtt broker
+extern char mqtt_buffer[];
+extern bool from_mqtt;
+
 extern OpenSprinkler os;
 extern ProgramData pd;
 extern ulong flow_count;
@@ -690,14 +695,18 @@ void manual_start_program(byte, byte);
  * uwt: use weather (i.e. watering percentage)
  */
 void server_manual_program() {
-#if defined(ESP8266)
-	char* p = NULL;
-	if(!process_password()) return;
-	if (m_client)
-		p = get_buffer;
-#else
-	char *p = get_buffer;
-#endif
+	char *p = NULL;
+	if (from_mqtt) {
+		p = mqtt_buffer;
+	} else {
+		#if defined(ESP8266)
+			if (!process_password()) return;
+			if (m_client)
+				p = get_buffer;
+		#else
+			p = get_buffer;
+		#endif
+	}
 
 	if (!findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("pid"), true))
 		handle_return(HTML_DATA_MISSING);
