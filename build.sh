@@ -11,10 +11,12 @@ done
 echo "Building OpenSprinkler..."
 
 if [ "$1" == "demo" ]; then
+	apt-get install -y libmosquitto-dev
 	g++ -o OpenSprinkler -DDEMO -m32 main.cpp OpenSprinkler.cpp program.cpp server.cpp utils.cpp weather.cpp gpio.cpp etherport.cpp mqtt.cpp -lpthread -lmosquitto
 elif [ "$1" == "osbo" ]; then
 	g++ -o OpenSprinkler -DOSBO main.cpp OpenSprinkler.cpp program.cpp server.cpp utils.cpp weather.cpp gpio.cpp etherport.cpp mqtt.cpp -lpthread
 else
+	apt-get install -y libmosquitto-dev
 	g++ -o OpenSprinkler -DOSPI main.cpp OpenSprinkler.cpp program.cpp server.cpp utils.cpp weather.cpp gpio.cpp etherport.cpp mqtt.cpp -lpthread -lmosquitto
 fi
 
