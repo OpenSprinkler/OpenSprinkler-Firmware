@@ -143,8 +143,6 @@ void OSMqtt::begin(void) {
 		sscanf(config.c_str(), MQTT_SOPT_FORMAT, host, &port, &enabled, username, password);
 	}
 
-	printf("password: (%s)\n", password);
-
 	if (strcmp(username, "") == 0) {
 		begin(host, port, (bool)enabled);	
 	} else {

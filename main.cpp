@@ -1307,7 +1307,7 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 
 			if (os.mqtt.enabled()) {
 				sprintf_P(topic, PSTR("opensprinkler/station/%d"), lval);
-				strcpy_P(payload, PSTR("{\"state\":1}"));
+				sprintf_P(payload, PSTR("{\"state %d\":1}"), lval);
 			}
 			break;
 
@@ -1316,9 +1316,9 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 			if (os.mqtt.enabled()) {
 				sprintf_P(topic, PSTR("opensprinkler/station/%d"), lval);
 				if (os.iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_FLOW) {
-					sprintf_P(payload, PSTR("{\"state\":0,\"duration\":%d,\"flow\":%d.%02d}"), (int)fval, (int)flow_last_gpm, (int)(flow_last_gpm*100)%100);
+					sprintf_P(payload, PSTR("{\"state %d\":0,\"duration\":%d,\"flow\":%d.%02d}"), lval, (int)fval, (int)flow_last_gpm, (int)(flow_last_gpm*100)%100);
 				} else {
-					sprintf_P(payload, PSTR("{\"state\":0,\"duration\":%d}"), (int)fval);
+					sprintf_P(payload, PSTR("{\"state %d\":0,\"duration\":%d}"), lval, (int)fval);
 				}
 			}
 			if (ifttt_enabled) {
