@@ -115,10 +115,11 @@ extern OpenSprinkler os;
 
 class RuntimeQueueStruct {
 public:
-	ulong		 st;	// start time
-	uint16_t dur; // water time
-	byte	sid;
-	byte	pid;
+	ulong		st;	 // start time
+	uint16_t 	dur; // water time
+	byte		sid;
+	byte		pid;
+	byte 		isPaused;
 };
 
 class ProgramData {
@@ -141,6 +142,7 @@ public:
 	static byte modify(byte pid, ProgramStruct *buf);
 	static byte set_flagbit(byte pid, byte bid, byte value);
 	static void moveup(byte pid);  
+	static void togglePause(byte pid, time_t t, uint16_t delay=0);
 	static byte del(byte pid);
 	static void drem_to_relative(byte days[2]); // absolute to relative reminder conversion
 	static void drem_to_absolute(byte days[2]);

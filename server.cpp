@@ -1566,6 +1566,7 @@ void server_json_status()
  * sid:station index (starting from 0)
  * en: enable (0 or 1)
  * t:  timer (required if en=1)
+ * tps: toggle pause station 
  */
 void server_change_manual() {
 #if defined(ESP8266)
@@ -1576,7 +1577,6 @@ void server_change_manual() {
 #else
 	char *p = get_buffer;
 #endif
-
 	int sid=-1;
 	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("sid"), true)) {
 		sid=atoi(tmp_buffer);
@@ -1587,52 +1587,72 @@ void server_change_manual() {
 
 	byte en=0;
 	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("en"), true)) {
+		printf("tmp_buffer: %s\n", tmp_buffer);
+		printf("atoi: %i\n");
 		en=atoi(tmp_buffer);
 	} else {
 		handle_return(HTML_DATA_MISSING);
 	}
 
+	printf("the value is %i\n", en);
+
 	uint16_t timer=0;
 	unsigned long curr_time = os.now_tz();
-	if (en) { // if turning on a station, must provide timer
-		if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("t"), true)) {
-			timer=(uint16_t)atol(tmp_buffer);
-			if (timer==0 || timer>64800) {
-				handle_return(HTML_DATA_OUTOFBOUND);
-			}
-			// schedule manual station
-			// skip if the station is a master station
-			// (because master cannot be scheduled independently)
-			if ((os.status.mas==sid+1) || (os.status.mas2==sid+1))
-				handle_return(HTML_NOT_PERMITTED);
 
-			RuntimeQueueStruct *q = NULL;
-			byte sqi = pd.station_qid[sid];
-			// check if the station already has a schedule
-			if (sqi!=0xFF) {	// if we, we will overwrite the schedule
-				q = pd.queue+sqi;
-			} else {	// otherwise create a new queue element
-				q = pd.enqueue();
-			}
-			// if the queue is not full
-			if (q) {
-				q->st = 0;
-				q->dur = timer;
-				q->sid = sid;
-				q->pid = 99;	// testing stations are assigned program index 99
-				schedule_all_stations(curr_time);
+	switch (en) {
+		case 0: 
+			turn_off_station(sid, curr_time);
+			break;
+		case 1: {
+			if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("t"), true)) {
+				timer=(uint16_t)atol(tmp_buffer);
+				if (timer==0 || timer>64800) {
+					handle_return(HTML_DATA_OUTOFBOUND);
+				}
+				// schedule manual station
+				// skip if the station is a master station
+				// (because master cannot be scheduled independently)
+				if ((os.status.mas==sid+1) || (os.status.mas2==sid+1))
+					handle_return(HTML_NOT_PERMITTED);
+
+				RuntimeQueueStruct *q = NULL;
+				byte sqi = pd.station_qid[sid];
+				// check if the station already has a schedule
+				if (sqi!=0xFF) {	// if we, we will overwrite the schedule
+					q = pd.queue+sqi;
+				} else {	// otherwise create a new queue element
+					q = pd.enqueue();
+				}
+				// if the queue is not full
+				if (q) {
+					q->st = 0;
+					q->dur = timer;
+					q->sid = sid;
+					q->pid = 99;	// testing stations are assigned program index 99
+					schedule_all_stations(curr_time);
+				} else {
+					handle_return(HTML_NOT_PERMITTED);
+				}
 			} else {
-				handle_return(HTML_NOT_PERMITTED);
+				handle_return(HTML_DATA_MISSING);
 			}
-		} else {
-			handle_return(HTML_DATA_MISSING);
+		break;
 		}
-	} else {	// turn off station
-		turn_off_station(sid, curr_time);
+
+		case 2: 
+			// handle a pause
+			uint16_t timer = 0;
+			if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("t"), true)) {
+				timer = (uint16_t) atol(tmp_buffer);
+				if (timer > 64800) {
+					handle_return(HTML_DATA_OUTOFBOUND);
+				}
+				// handle the rest of the pause logic here 
+			}
+			break;
 	}
 	handle_return(HTML_SUCCESS);
 }
-
 
 #if defined(ESP8266)
 int file_fgets(File file, char* buf, int maxsize) {

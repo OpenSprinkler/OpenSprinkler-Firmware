@@ -124,6 +124,30 @@ void ProgramData::moveup(byte pid) {
 	file_write_block(PROG_FILENAME, buf2, pos, PROGRAMSTRUCT_SIZE);
 }
 
+void ProgramData::togglePause(byte pid, time_t t, uint16_t delay) {
+
+	if (queue[pid].isPaused) {
+		queue[pid].isPaused = false;
+		return;
+	} else {
+		queue[pid].isPaused = true;
+	}
+
+	uint16_t curr_minute = (t % 86400L) / 60;
+
+	for (byte i = pid; i < nprograms; ++i) {
+		RuntimeQueueStruct prog = queue[i];
+		prog.st += delay;
+		prog.dur += delay;
+	}
+
+	// if a station is running when paused 
+
+	if (!delay) { // indefinite
+
+	}
+}
+
 /** Modify a program */
 byte ProgramData::modify(byte pid, ProgramStruct *buf) {
 	if (pid >= nprograms)  return 0;
