@@ -102,8 +102,7 @@ char OSMqtt::_password[MQTT_MAX_PASSWORD_LEN + 1] = {0};
 
 // external declarations and function prototypes
 char mqtt_buffer[MQTT_MAX_MESSAGE_LEN];
-bool from_mqtt = false;
-void server_manual_program();
+void server_manual_program(char * buff);
 
 // Initialise the client libraries and event handlers.
 void OSMqtt::init(void) {
@@ -143,31 +142,23 @@ void OSMqtt::begin(void) {
 		sscanf(config.c_str(), MQTT_SOPT_FORMAT, host, &port, &enabled, username, password);
 	}
 
-	if (strcmp(username, "") == 0) {
-		begin(host, port, (bool)enabled);	
-	} else {
-		begin(host, port, (bool)enabled, username, password);
-	}
+	begin(host, port, (bool)enabled, username, password);
 }
 
 // Start the MQTT service and connect to the MQTT broker.
 void OSMqtt::begin( const char * host, int port, bool enabled, const char *username, const char *password) {
-	DEBUG_LOGF("MQTT Begin: Config (%s:%d,%s) %s\n", host, port, username ? "Secure" : "Unsecure", enabled ? "Enabled" : "Disabled");
+	DEBUG_LOGF("MQTT Begin: Config (%s:%d,%s) %s\n", host, port, *username ? "Secure" : "Unsecure", enabled ? "Enabled" : "Disabled");
 
 	strncpy(_host, host, MQTT_MAX_HOST_LEN);
 	_host[MQTT_MAX_ID_LEN] = 0;
 	_port = port;
 	_enabled = enabled;
 
-	if (username) {
-		#define AUTH 
+	strncpy(_username, username, MQTT_MAX_USERNAME_LEN);
+	_username[MQTT_MAX_USERNAME_LEN] = 0;
 
-		strncpy(_username, username, MQTT_MAX_USERNAME_LEN);
-		_username[MQTT_MAX_USERNAME_LEN] = 0;
-
-		strncpy(_password, password, MQTT_MAX_PASSWORD_LEN);
-		_password[MQTT_MAX_PASSWORD_LEN] = 0;
-	}
+	strncpy(_password, password, MQTT_MAX_PASSWORD_LEN);
+	_password[MQTT_MAX_PASSWORD_LEN] = 0;
 
 	if (mqtt_client == NULL || os.status.network_fails > 0) return;
 
@@ -176,7 +167,7 @@ void OSMqtt::begin( const char * host, int port, bool enabled, const char *usern
 	}
 
 	if (_enabled) {
-		_connect(_username, _password);
+		_connect();
 	}
 }
 
@@ -194,14 +185,6 @@ void OSMqtt::publish(const char *topic, const char *payload) {
 	_publish(topic, payload);
 }
 
-void OSMqtt::subscribe(void) {
-	if (mqtt_client == NULL || !_enabled || os.status.network_fails > 0) return;
-
-	if (!_connected()) return;
-
-	_subscribe();
-}
-
 // Regularly call the loop function to ensure "keep alive" messages are sent to the broker and to reconnect if needed.
 void OSMqtt::loop(void) {
 	static unsigned long last_reconnect_attempt = 0;
@@ -211,11 +194,7 @@ void OSMqtt::loop(void) {
 	// Only attemp to reconnect every MQTT_RECONNECT_DELAY seconds to avoid blocking the main loop
 	if (!_connected() && (millis() - last_reconnect_attempt >= MQTT_RECONNECT_DELAY * 1000UL)) {
 		DEBUG_LOGF("MQTT Loop: Reconnecting\n");
-		#if defined(AUTH)
-			_connect(_username, _password);
-		#else
-			_connect();
-		#endif
+		_connect();
 		last_reconnect_attempt = millis();
 	}
 
@@ -251,9 +230,7 @@ static void on_message_cb(const char topic[], byte *payload, unsigned int length
 			mqtt_buffer[i] = payload[i];
 		}
 		mqtt_buffer[length] = '\0';
-		from_mqtt = true;
-		server_manual_program();
-		from_mqtt = false;
+		server_manual_program(mqtt_buffer);
 	}
 }
 
@@ -281,10 +258,11 @@ int OSMqtt::_init(void) {
 	return MQTT_SUCCESS;
 }
 
-int OSMqtt::_connect(const char *username, const char *password) {
+int OSMqtt::_connect(void) {
 	mqtt_client->setServer(_host, _port);
-	if (mqtt_client->connect(_id, username, password, MQTT_AVAILABILITY_TOPIC, 0, true, MQTT_OFFLINE_PAYLOAD)) {
+	if (mqtt_client->connect(_id, _username, _password, MQTT_AVAILABILITY_TOPIC, 0, true, MQTT_OFFLINE_PAYLOAD)) {
 		mqtt_client->publish(MQTT_AVAILABILITY_TOPIC, MQTT_ONLINE_PAYLOAD, true);
+		mqtt_client->subscribe(MQTT_MANUAL_PROG_TOPIC);
 	} else {
 		DEBUG_LOGF("MQTT Connect: Failed (%d)\n", mqtt_client->state());
 		return MQTT_ERROR;
@@ -302,14 +280,6 @@ bool OSMqtt::_connected(void) { return mqtt_client->connected(); }
 int OSMqtt::_publish(const char *topic, const char *payload) {
 	if (!mqtt_client->publish(topic, payload)) {
 		DEBUG_LOGF("MQTT Publish: Failed (%d)\n", mqtt_client->state());
-		return MQTT_ERROR;
-	}
-	return MQTT_SUCCESS;
-}
-
-int OSMqtt::_subscribe(void) {
-	if (!mqtt_client->subscribe(MQTT_MANUAL_PROG_TOPIC)) {
-		DEBUG_LOGF("MQTT Subscribe: Failed (%d), Connection Status (%i)\n", mqtt_client->state(), _connected());
 		return MQTT_ERROR;
 	}
 	return MQTT_SUCCESS;
@@ -351,6 +321,10 @@ static void _mqtt_connection_cb(struct mosquitto *mqtt_client, void *obj, int re
 		if (rc != MOSQ_ERR_SUCCESS) {
 			DEBUG_LOGF("MQTT Publish: Failed (%s)\n", mosquitto_strerror(rc));
 		}
+		int rv = mosquitto_subscribe(mqtt_client, NULL, MQTT_MANUAL_PROG_TOPIC, 0);
+		if (rv != MOSQ_ERR_SUCCESS) {
+			DEBUG_LOGF("MQTT Subscribe: Failed (%s)\n", mosquitto_strerror(rc));
+		}
 	}
 }
 
@@ -366,16 +340,19 @@ static void _mqtt_log_cb(struct mosquitto *mqtt_client, void *obj, int level, co
 }
 
 static void _mqtt_message_cb(struct mosquitto *mqtt_client, void *obj, const struct mosquitto_message *message) {
+		DEBUG_LOGF("MQTT Message Callback: %s (%s)\n", message->topic, (char *)message->payload);
 		if (!strcmp(message->topic, MQTT_MANUAL_PROG_TOPIC)) {
+			DEBUG_LOGF("Found MPGM\n");
 			char *mosq_message = (char *) message->payload;
 			for (int i = 0; i < message->payloadlen; i++) {
 				mqtt_buffer[i] = mosq_message[i];
 			}
 			mqtt_buffer[message->payloadlen] = 0;
-			from_mqtt = true;
-			server_manual_program();
-			from_mqtt = false;
+			DEBUG_LOGF("Calling Manual Program\n");
+			server_manual_program(mqtt_buffer);
+			DEBUG_LOGF("Done Manual Program\n");
 		}
+		DEBUG_LOGF("cb done\n");
 }
 
 int OSMqtt::_init(void) {
@@ -387,7 +364,7 @@ int OSMqtt::_init(void) {
 
 	if (mqtt_client) { mosquitto_destroy(mqtt_client); mqtt_client = NULL; };
 
-	mqtt_client = mosquitto_new("OS", true, NULL);
+	mqtt_client = mosquitto_new(NULL, true, NULL);
 	if (mqtt_client == NULL) {
 		DEBUG_PRINTF("MQTT Init: Failed to initialise client\n");
 		return MQTT_ERROR;
@@ -402,31 +379,24 @@ int OSMqtt::_init(void) {
 	return MQTT_SUCCESS;
 }
 
-int OSMqtt::_connect(const char *username, const char *password) {
-	switch(mosquitto_username_pw_set(mqtt_client, username, password)) {
-
-	case MOSQ_ERR_SUCCESS: {
-		int rc = mosquitto_connect(mqtt_client, _host, _port, MQTT_KEEPALIVE);
+int OSMqtt::_connect() {
+	if (_username[0] && _password[0]) {
+		int rc = mosquitto_username_pw_set(mqtt_client, _username, _password);
 		if (rc != MOSQ_ERR_SUCCESS) {
-			DEBUG_LOGF("MQTT Connect: Connection Failed (%s)\n", mosquitto_strerror(rc));
+			DEBUG_LOGF("MQTT Connect: Password Config Failed (%s)\n", mosquitto_strerror(rc));
 			return MQTT_ERROR;
 		}
-
-		// Allow 10ms for the Broker's ack to be received. We need this on start-up so that the
-		// connection is registered before we attempt to send our first NOTIFY_REBOOT notification. 
-		usleep(10000); 
-
-		return MQTT_SUCCESS;
 	}
 
-	case MOSQ_ERR_INVAL: 
-		DEBUG_LOGF("Input parameters are invalid\n");
-		break;
-		
-	case MOSQ_ERR_NOMEM: 
-		DEBUG_LOGF("Out of memory condition occurred\n");
-		break;
+	int rc = mosquitto_connect(mqtt_client, _host, _port, MQTT_KEEPALIVE);
+	if (rc != MOSQ_ERR_SUCCESS) {
+		DEBUG_LOGF("MQTT Connect: Connection Failed (%s)\n", mosquitto_strerror(rc));
+		return MQTT_ERROR;
 	}
+
+	// Allow 10ms for the Broker's ack to be received. We need this on start-up so that the
+	// connection is registered before we attempt to send our first NOTIFY_REBOOT notification. 
+	usleep(10000);
 
 	return MQTT_ERROR;
 }
@@ -442,15 +412,6 @@ int OSMqtt::_publish(const char *topic, const char *payload) {
 	int rc = mosquitto_publish(mqtt_client, NULL, topic, strlen(payload), payload, 0, false);
 	if (rc != MOSQ_ERR_SUCCESS) {
 		DEBUG_LOGF("MQTT Publish: Failed (%s)\n", mosquitto_strerror(rc));
-		return MQTT_ERROR;
-	}
-	return MQTT_SUCCESS;
-}
-
-int OSMqtt::_subscribe(void) { 
-	int rv = mosquitto_subscribe(mqtt_client, NULL, MQTT_MANUAL_PROG_TOPIC, 0);
-	if (rv != MOSQ_ERR_SUCCESS) {
-		DEBUG_LOGF("MQTT Subscribe: Failed (%s), Connection Status: (%i)\n", mosquitto_strerror(rv), _connected());
 		return MQTT_ERROR;
 	}
 	return MQTT_SUCCESS;

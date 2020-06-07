@@ -570,11 +570,6 @@ void do_loop()
 	}
 	os.mqtt.loop();
 
-	if (curr_time > last_subscribe) {
-		os.mqtt.subscribe();
-		last_subscribe = curr_time + 5;
-	}
-
 	// The main control loop runs once every second
 	if (curr_time != last_time) {
 #if defined(ENABLE_DEBUG)

@@ -694,19 +694,19 @@ void manual_start_program(byte, byte);
  * pid: program index (0 refers to the first program)
  * uwt: use weather (i.e. watering percentage)
  */
-void server_manual_program() {
-	char *p = NULL;
-	if (from_mqtt) {
-		p = mqtt_buffer;
-	} else {
-		#if defined(ESP8266)
-			if (!process_password()) return;
-			if (m_client)
-				p = get_buffer;
-		#else
+void server_manual_program(void);
+void server_manual_program(char * p);
+
+void server_manual_program(void) {
+	server_manual_program(get_buffer);
+}
+
+void server_manual_program(char * p) {
+	#if defined(ESP8266)
+		if (!process_password()) return;
+		if (m_client)
 			p = get_buffer;
-		#endif
-	}
+	#endif
 
 	if (!findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("pid"), true))
 		handle_return(HTML_DATA_MISSING);
