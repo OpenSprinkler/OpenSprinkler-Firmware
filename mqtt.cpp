@@ -21,8 +21,6 @@
  * <http://www.gnu.org/licenses/>.
  */
 
-#define MQTT_KEEPALIVE 60  // Must be defined before including PubSubClient
-
 #if defined(ARDUINO)
 	#include <Arduino.h>
 	#if defined(ESP8266)
@@ -69,6 +67,7 @@
 
 extern OpenSprinkler os;
 
+#define MQTT_KEEPALIVE			60
 #define MQTT_DEFAULT_PORT		1883	// Default port for MQTT. Can be overwritten through App config
 #define MQTT_MAX_HOST_LEN		50		// Note: App is set to max 50 chars for broker name
 #define MQTT_MAX_ID_LEN			16		// MQTT Client Id to uniquely reference this unit
@@ -212,6 +211,7 @@ int OSMqtt::_init(void) {
 	#endif
 
 	mqtt_client = new PubSubClient(*client);
+	mqtt_client->setKeepAlive(MQTT_KEEPALIVE);
 
 	if (mqtt_client == NULL) {
 		DEBUG_LOGF("MQTT Init: Failed to initialise client\n");
