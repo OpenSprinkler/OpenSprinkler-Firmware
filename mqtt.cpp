@@ -21,6 +21,8 @@
  * <http://www.gnu.org/licenses/>.
  */
 
+#define MQTT_KEEPALIVE 60  // Must be defined before including PubSubClient
+
 #if defined(ARDUINO)
 	#include <Arduino.h>
 	#if defined(ESP8266)
@@ -28,9 +30,6 @@
 	#endif
 	#include <UIPEthernet.h>
 	#include <PubSubClient.h>
-	#if MQTT_KEEPALIVE != 60
-		#error Set MQTT_KEEPALIVE to 60 in PubSubClient.h
-	#endif
 
 	struct PubSubClient *mqtt_client = NULL;
 
@@ -39,8 +38,6 @@
 	#include <stdio.h>
 	#include <string.h>
 	#include <mosquitto.h>
-
-	#define MQTT_KEEPALIVE 60
 
 	struct mosquitto *mqtt_client = NULL;
 #endif
