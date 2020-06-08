@@ -150,7 +150,7 @@ void OSMqtt::begin( const char * host, int port, bool enabled, const char *usern
 	DEBUG_LOGF("MQTT Begin: Config (%s:%d,%s) %s\n", host, port, *username ? "Secure" : "Unsecure", enabled ? "Enabled" : "Disabled");
 
 	strncpy(_host, host, MQTT_MAX_HOST_LEN);
-	_host[MQTT_MAX_ID_LEN] = 0;
+	_host[MQTT_MAX_HOST_LEN] = 0;
 	_port = port;
 	_enabled = enabled;
 
@@ -398,7 +398,7 @@ int OSMqtt::_connect() {
 	// connection is registered before we attempt to send our first NOTIFY_REBOOT notification. 
 	usleep(10000);
 
-	return MQTT_ERROR;
+	return MQTT_SUCCESS;
 }
 
 int OSMqtt::_disconnect(void) {
