@@ -70,10 +70,15 @@
 	#define DEBUG_DURATION()				{}
 #endif
 
+#define str(s) #s
+#define xstr(s) str(s)
+
 extern OpenSprinkler os;
 
 #define MQTT_DEFAULT_PORT		1883	// Default port for MQTT. Can be overwritten through App config
 #define MQTT_MAX_HOST_LEN		50		// Note: App is set to max 50 chars for broker name
+#define MQTT_MAX_USERNAME_LEN	20		// Note: App is set to max 20 chars for username
+#define MQTT_MAX_PASSWORD_LEN	20		// Note: App is set to max 20 chars for password
 #define MQTT_MAX_ID_LEN			16		// MQTT Client Id to uniquely reference this unit
 #define MQTT_RECONNECT_DELAY	120		// Minumum of 60 seconds between reconnect attempts
 
@@ -87,6 +92,8 @@ extern OpenSprinkler os;
 
 char OSMqtt::_id[MQTT_MAX_ID_LEN + 1] = {0};		// Id to identify the client to the broker
 char OSMqtt::_host[MQTT_MAX_HOST_LEN + 1] = {0};	// IP or host name of the broker
+char OSMqtt::_username[MQTT_MAX_USERNAME_LEN + 1] = {0};	// username to connect to the broker
+char OSMqtt::_password[MQTT_MAX_PASSWORD_LEN + 1] = {0};	// password to connect to the broker
 int OSMqtt::_port = MQTT_DEFAULT_PORT;				// Port of the broker (default 1883)
 bool OSMqtt::_enabled = false;						// Flag indicating whether MQTT is enabled
 
@@ -117,25 +124,35 @@ void OSMqtt::init(const char * clientId) {
 void OSMqtt::begin(void) {
 	DEBUG_LOGF("MQTT Begin\n");
 	char host[MQTT_MAX_HOST_LEN + 1] = {0};
+	char username[MQTT_MAX_USERNAME_LEN + 1] = {0};
+	char password[MQTT_MAX_PASSWORD_LEN + 1] = {0};
 	int port = MQTT_DEFAULT_PORT;
 	int enabled = 0;
 
-	// JSON configuration settings in the form of "{server:"host_name|IP address", port: 1883, enabled:"0|1"}"
+	// JSON configuration settings in the form of "{server:"host_name|IP address",port:1883,username:"",password:"",enabled:"0|1"}"
 	String config = os.sopt_load(SOPT_MQTT_OPTS);
 	if (config.length() != 0) {
-		sscanf(config.c_str(), "\"server\":\"%[^\"]\",\"port\":\%d,\"enable\":\%d", host, &port, &enabled);
+		sscanf(
+			config.c_str(),
+			"\"server\":\"%" xstr(MQTT_MAX_HOST_LEN) "[^\"]\",\"port\":\%d,\"username\":\"%" xstr(MQTT_MAX_USERNAME_LEN) "[^\"]\",\"password\":\"%" xstr(MQTT_MAX_PASSWORD_LEN) "[^\"]\",\"enable\":\%d",
+			host, &port, username, password, &enabled
+			);
 	}
 
-	begin(host, port, (bool)enabled);
+	begin(host, port, username, password, (bool)enabled);
 }
 
 // Start the MQTT service and connect to the MQTT broker.
-void OSMqtt::begin( const char * host, int port, bool enabled ) {
-	DEBUG_LOGF("MQTT Begin: Config (%s:%d) %s\n", host, port, enabled ? "Enabled" : "Disabled");
+void OSMqtt::begin( const char * host, int port, const char * username, const char * password, bool enabled ) {
+	DEBUG_LOGF("MQTT Begin: Config (%s:%d %s) %s\n", host, port, username, enabled ? "Enabled" : "Disabled");
 
 	strncpy(_host, host, MQTT_MAX_HOST_LEN);
-	_host[MQTT_MAX_ID_LEN] = 0;
+	_host[MQTT_MAX_HOST_LEN] = 0;
 	_port = port;
+	strncpy(_username, username, MQTT_MAX_USERNAME_LEN);
+	_username[MQTT_MAX_USERNAME_LEN] = 0;
+	strncpy(_password, password, MQTT_MAX_PASSWORD_LEN);
+	_username[MQTT_MAX_PASSWORD_LEN] = 0;
 	_enabled = enabled;
 
 	if (mqtt_client == NULL || os.status.network_fails > 0) return;
@@ -226,7 +243,12 @@ int OSMqtt::_init(void) {
 
 int OSMqtt::_connect(void) {
 	mqtt_client->setServer(_host, _port);
-	if (mqtt_client->connect(_id, NULL, NULL, MQTT_AVAILABILITY_TOPIC, 0, true, MQTT_OFFLINE_PAYLOAD)) {
+	boolean state;
+	if (username[0] == '\0')
+		state = mqtt_client->connect(_id, NULL, NULL, MQTT_AVAILABILITY_TOPIC, 0, true, MQTT_OFFLINE_PAYLOAD) {
+	else
+		state = mqtt_client->connect(_id, _username, _password, MQTT_AVAILABILITY_TOPIC, 0, true, MQTT_OFFLINE_PAYLOAD) {
+	if (state) {
 		mqtt_client->publish(MQTT_AVAILABILITY_TOPIC, MQTT_ONLINE_PAYLOAD, true);
 	} else {
 		DEBUG_LOGF("MQTT Connect: Failed (%d)\n", mqtt_client->state());
@@ -324,7 +346,12 @@ int OSMqtt::_init(void) {
 }
 
 int OSMqtt::_connect(void) {
-	int rc = mosquitto_connect(mqtt_client, _host, _port, MQTT_KEEPALIVE);
+	int rc = mosquitto_username_pw_set(mqtt_client, _username, _password);
+	if (rc != MOSQ_ERR_SUCCESS) {
+		DEBUG_LOGF("MQTT Connect: Connection Failed (%s)\n", mosquitto_strerror(rc));
+		return MQTT_ERROR;
+	}
+	rc = mosquitto_connect(mqtt_client, _host, _port, MQTT_KEEPALIVE);
 	if (rc != MOSQ_ERR_SUCCESS) {
 		DEBUG_LOGF("MQTT Connect: Connection Failed (%s)\n", mosquitto_strerror(rc));
 		return MQTT_ERROR;
@@ -332,7 +359,7 @@ int OSMqtt::_connect(void) {
 
 	// Allow 10ms for the Broker's ack to be received. We need this on start-up so that the
 	// connection is registered before we attempt to send our first NOTIFY_REBOOT notification. 
-	usleep(10000); 
+	usleep(10000);
 
 	return MQTT_SUCCESS;
 }
