@@ -51,4 +51,7 @@ public:
     static void loop(void);
 };
 
+void server_manual_program(void);
+void server_manual_program(char * p);
+
 #endif	// _MQTT_H

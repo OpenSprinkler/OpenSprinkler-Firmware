@@ -694,8 +694,6 @@ void manual_start_program(byte, byte);
  * pid: program index (0 refers to the first program)
  * uwt: use weather (i.e. watering percentage)
  */
-void server_manual_program(void);
-void server_manual_program(char * p);
 
 void server_manual_program(void) {
 	server_manual_program(get_buffer);

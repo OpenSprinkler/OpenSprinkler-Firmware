@@ -77,15 +77,15 @@ extern char tmp_buffer[];
 #define MQTT_MAX_HOST_LEN		50		// Note: App is set to max 50 chars for broker name
 #define MQTT_MAX_ID_LEN			16		// MQTT Client Id to uniquely reference this unit
 #define MQTT_RECONNECT_DELAY	120		// Minumum of 60 seconds between reconnect attempts
-#define MQTT_MAX_USERNAME_LEN 	50
-#define MQTT_MAX_PASSWORD_LEN 	50
+#define MQTT_MAX_USERNAME_LEN 	32
+#define MQTT_MAX_PASSWORD_LEN 	32
 
 #define MQTT_ROOT_TOPIC			"opensprinkler"
 #define MQTT_AVAILABILITY_TOPIC	MQTT_ROOT_TOPIC "/availability"
 #define MQTT_ONLINE_PAYLOAD		"online"
 #define MQTT_OFFLINE_PAYLOAD	"offline"
 
-#define MQTT_MANUAL_PROG_TOPIC	MQTT_ROOT_TOPIC "/mpgm"
+#define MQTT_MANUAL_PROG_TOPIC	MQTT_ROOT_TOPIC "/mp"
 #define MQTT_MAX_MESSAGE_LEN	60		// pw=(32 bit)&pid=xxx&uwt=xxx 
 
 #define MQTT_SOPT_FORMAT 		"\"server\":\"%[^\"]\",\"port\":\%d,\"enable\":\%d,\"username\":\"%[^\"]\",\"password\":\"%[^\"]\"" 
@@ -147,7 +147,7 @@ void OSMqtt::begin(void) {
 
 // Start the MQTT service and connect to the MQTT broker.
 void OSMqtt::begin( const char * host, int port, bool enabled, const char *username, const char *password) {
-	DEBUG_LOGF("MQTT Begin: Config (%s:%d,%s) %s\n", host, port, *username ? "Secure" : "Unsecure", enabled ? "Enabled" : "Disabled");
+	DEBUG_LOGF("MQTT Begin: Config (%s:%d,%s) %s\n", host, port, *username ? "Auth" : "No-Auth", enabled ? "Enabled" : "Disabled");
 
 	strncpy(_host, host, MQTT_MAX_HOST_LEN);
 	_host[MQTT_MAX_HOST_LEN] = 0;
