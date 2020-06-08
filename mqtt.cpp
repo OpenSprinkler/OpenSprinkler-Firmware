@@ -245,10 +245,10 @@ int OSMqtt::_init(void) {
 int OSMqtt::_connect(void) {
 	mqtt_client->setServer(_host, _port);
 	boolean state;
-	if (username[0] == '\0')
-		state = mqtt_client->connect(_id, NULL, NULL, MQTT_AVAILABILITY_TOPIC, 0, true, MQTT_OFFLINE_PAYLOAD) {
-	else
+	if (username[0])
 		state = mqtt_client->connect(_id, _username, _password, MQTT_AVAILABILITY_TOPIC, 0, true, MQTT_OFFLINE_PAYLOAD) {
+	else
+		state = mqtt_client->connect(_id, NULL, NULL, MQTT_AVAILABILITY_TOPIC, 0, true, MQTT_OFFLINE_PAYLOAD) {
 	if (state) {
 		mqtt_client->publish(MQTT_AVAILABILITY_TOPIC, MQTT_ONLINE_PAYLOAD, true);
 	} else {
@@ -347,10 +347,13 @@ int OSMqtt::_init(void) {
 }
 
 int OSMqtt::_connect(void) {
-	int rc = mosquitto_username_pw_set(mqtt_client, _username, _password);
-	if (rc != MOSQ_ERR_SUCCESS) {
-		DEBUG_LOGF("MQTT Connect: Connection Failed (%s)\n", mosquitto_strerror(rc));
-		return MQTT_ERROR;
+	int rc;
+	if (username[0]) {
+		rc = mosquitto_username_pw_set(mqtt_client, _username, _password);
+		if (rc != MOSQ_ERR_SUCCESS) {
+			DEBUG_LOGF("MQTT Connect: Connection Failed (%s)\n", mosquitto_strerror(rc));
+			return MQTT_ERROR;
+		}
 	}
 	rc = mosquitto_connect(mqtt_client, _host, _port, MQTT_KEEPALIVE);
 	if (rc != MOSQ_ERR_SUCCESS) {
