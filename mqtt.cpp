@@ -37,7 +37,6 @@
 #else
 	#include <time.h>
 	#include <stdio.h>
-	#include <string.h>
 	#include <mosquitto.h>
 
 	#define MQTT_KEEPALIVE 60
@@ -74,6 +73,7 @@
 #define xstr(s) str(s)
 
 extern OpenSprinkler os;
+extern char tmp_buffer[];
 
 #define MQTT_DEFAULT_PORT		1883	// Default port for MQTT. Can be overwritten through App config
 #define MQTT_MAX_HOST_LEN		50		// Note: App is set to max 50 chars for broker name
@@ -130,10 +130,11 @@ void OSMqtt::begin(void) {
 	int enabled = 0;
 
 	// JSON configuration settings in the form of "{server:"host_name|IP address",port:1883,username:"",password:"",enabled:"0|1"}"
-	String config = os.sopt_load(SOPT_MQTT_OPTS);
-	if (config.length() != 0) {
+	char *config = tmp_buffer;
+	os.sopt_load(SOPT_MQTT_OPTS, config);
+	if (*config != 0) {
 		sscanf(
-			config.c_str(),
+			config,
 			"\"server\":\"%" xstr(MQTT_MAX_HOST_LEN) "[^\"]\",\"port\":\%d,\"username\":\"%" xstr(MQTT_MAX_USERNAME_LEN) "[^\"]\",\"password\":\"%" xstr(MQTT_MAX_PASSWORD_LEN) "[^\"]\",\"enable\":\%d",
 			host, &port, username, password, &enabled
 			);
