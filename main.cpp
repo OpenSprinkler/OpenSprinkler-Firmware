@@ -1301,7 +1301,7 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 
 			if (os.mqtt.enabled()) {
 				sprintf_P(topic, PSTR("opensprinkler/station/%d/state"), lval);
-				strcpy_P(payload, PSTR("1"));
+				itoa(1, payload, 10);
 			}
 			break;
 
