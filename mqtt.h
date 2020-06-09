@@ -30,6 +30,8 @@ private:
     static char _host[];
     static int _port;
     static bool _enabled;
+    static char _username[];
+    static char _password[];
 
     // Following routines are platform specific versions of the public interface
     static int _init(void);
@@ -41,12 +43,15 @@ private:
     static const char * _state_string(int state);
 public:
     static void init(void);
-    static void init(const char * id);
+    static void init(const char *id);
     static void begin(void);
-    static void begin(const char * host, int port, bool enable);
+    static void begin(const char *host, int port, bool enable, const char *username=NULL, const char *password=NULL);
     static bool enabled(void) { return _enabled; };
     static void publish(const char *topic, const char *payload);
     static void loop(void);
 };
+
+void server_manual_program(void);
+void server_manual_program(char * p);
 
 #endif	// _MQTT_H
