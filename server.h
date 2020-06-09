@@ -28,6 +28,8 @@
 #include <stdarg.h>
 #endif
 
+char dec2hexchar(byte dec);
+
 class BufferFiller {
 	char *start; //!< Pointer to start of buffer
 	char *ptr; //!< Pointer to cursor position
@@ -59,6 +61,12 @@ public:
 			case 'S':
 				strcpy((char*) ptr, va_arg(ap, const char*));
 				break;
+			case 'X': {
+				char d = va_arg(ap, int);
+				*ptr++ = dec2hexchar((d >> 4) & 0x0F);
+				*ptr++ = dec2hexchar(d & 0x0F);
+			}
+				continue;
 			case 'F': {
 				PGM_P s = va_arg(ap, PGM_P);
 				char d;
