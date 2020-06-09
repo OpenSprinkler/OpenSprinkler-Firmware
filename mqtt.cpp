@@ -77,8 +77,8 @@ extern char tmp_buffer[];
 
 #define MQTT_DEFAULT_PORT		1883	// Default port for MQTT. Can be overwritten through App config
 #define MQTT_MAX_HOST_LEN		50		// Note: App is set to max 50 chars for broker name
-#define MQTT_MAX_USERNAME_LEN	20		// Note: App is set to max 20 chars for username
-#define MQTT_MAX_PASSWORD_LEN	20		// Note: App is set to max 20 chars for password
+#define MQTT_MAX_USERNAME_LEN	32		// Note: App is set to max 32 chars for username
+#define MQTT_MAX_PASSWORD_LEN	32		// Note: App is set to max 32 chars for password
 #define MQTT_MAX_ID_LEN			16		// MQTT Client Id to uniquely reference this unit
 #define MQTT_RECONNECT_DELAY	120		// Minumum of 60 seconds between reconnect attempts
 
@@ -129,14 +129,14 @@ void OSMqtt::begin(void) {
 	int port = MQTT_DEFAULT_PORT;
 	int enabled = 0;
 
-	// JSON configuration settings in the form of "{server:"host_name|IP address",port:1883,username:"",password:"",enabled:"0|1"}"
+	// JSON configuration settings in the form of {"en":0|1,"host":"server_name|IP address","port":1883,user:"",pass:""}
 	char *config = tmp_buffer;
 	os.sopt_load(SOPT_MQTT_OPTS, config);
 	if (*config != 0) {
 		sscanf(
 			config,
-			"\"server\":\"%" xstr(MQTT_MAX_HOST_LEN) "[^\"]\",\"port\":\%d,\"username\":\"%" xstr(MQTT_MAX_USERNAME_LEN) "[^\"]\",\"password\":\"%" xstr(MQTT_MAX_PASSWORD_LEN) "[^\"]\",\"enable\":\%d",
-			host, &port, username, password, &enabled
+			"\"en\":%d,\"host\":\"%" xstr(MQTT_MAX_HOST_LEN) "[^\"]\",\"port\":%d,\"user\":\"%" xstr(MQTT_MAX_USERNAME_LEN) "[^\"]\",\"pass\":\"%" xstr(MQTT_MAX_PASSWORD_LEN) "[^\"]\"",
+			&enabled, host, &port, username, password
 			);
 	}
 
@@ -245,7 +245,7 @@ int OSMqtt::_init(void) {
 int OSMqtt::_connect(void) {
 	mqtt_client->setServer(_host, _port);
 	boolean state;
-	if (username[0])
+	if (_username[0])
 		state = mqtt_client->connect(_id, _username, _password, MQTT_AVAILABILITY_TOPIC, 0, true, MQTT_OFFLINE_PAYLOAD) {
 	else
 		state = mqtt_client->connect(_id, NULL, NULL, MQTT_AVAILABILITY_TOPIC, 0, true, MQTT_OFFLINE_PAYLOAD) {
@@ -348,7 +348,7 @@ int OSMqtt::_init(void) {
 
 int OSMqtt::_connect(void) {
 	int rc;
-	if (username[0]) {
+	if (_username[0]) {
 		rc = mosquitto_username_pw_set(mqtt_client, _username, _password);
 		if (rc != MOSQ_ERR_SUCCESS) {
 			DEBUG_LOGF("MQTT Connect: Connection Failed (%s)\n", mosquitto_strerror(rc));
