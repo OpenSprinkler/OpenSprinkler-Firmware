@@ -304,6 +304,11 @@ void send_packet(bool final=false) {
 #endif	
 }
 
+char dec2hexchar(byte dec) {
+	if(dec<10) return '0'+dec;
+	else return 'A'+(dec-10);
+}
+
 #if defined(ESP8266)
 String two_digits(uint8_t x) {
 	return String(x/10) + (x%10);
@@ -390,11 +395,6 @@ void append_key_value(String& html, const char* key, const String& value) {
 	html += "\":\"";
 	html += value;
 	html += "\",";
-}
-
-char dec2hexchar(byte dec) {
-	if(dec<10) return '0'+dec;
-	else return 'A'+(dec-10);
 }
 
 String get_ap_ssid() {
@@ -1132,6 +1132,10 @@ void server_json_controller_main() {
 #if defined(ESP8266)
 	bfill.emit_p(PSTR("\"RSSI\":$D,"), (int16_t)WiFi.RSSI());
 #endif
+
+	byte mac[6] = {0};
+	os.load_hardware_mac(mac, m_server!=NULL);
+	bfill.emit_p(PSTR("\"mac\":\"$X:$X:$X:$X:$X:$X\","), mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 
 	bfill.emit_p(PSTR("\"loc\":\"$O\",\"jsp\":\"$O\",\"wsp\":\"$O\",\"wto\":{$O},\"ifkey\":\"$O\",\"mqtt\":{$O},\"wtdata\":$S,\"wterr\":$D,"),
 							 SOPT_LOCATION,

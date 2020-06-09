@@ -574,6 +574,8 @@ void OpenSprinkler::reboot_dev(uint8_t cause) {
 #include "etherport.h"
 #include <sys/reboot.h>
 #include <stdlib.h>
+#include <sys/ioctl.h>
+#include <net/if.h> 
 #include "utils.h"
 #include "server.h"
 
@@ -590,6 +592,37 @@ byte OpenSprinkler::start_network() {
 }
 
 bool OpenSprinkler::network_connected(void) {
+	return true;
+}
+
+// Return mac of first recognised interface and fallback to software mac
+// Note: on OSPi, operating system handles interface allocation so 'wired' ignored
+bool OpenSprinkler::load_hardware_mac(byte* mac, bool wired) {
+	const char * if_names[]  = { "eth0", "eth1", "wlan0", "wlan1" };
+	struct ifreq ifr;
+	int fd;
+
+	// Fallback to asoftware mac if interface not recognised
+	mac[0] = 0x00;
+	mac[1] = 0x69;
+	mac[2] = 0x69;
+	mac[3] = 0x2D;
+	mac[4] = 0x31;
+	mac[5] = iopts[IOPT_DEVICE_ID];
+
+	if (m_server == NULL) return true;
+
+	if ((fd = socket(AF_INET, SOCK_DGRAM, 0)) == 0) return true;
+
+	// Returns the mac address of the first interface if multiple active
+	for (int i = 0; i < sizeof(if_names)/sizeof(const char *); i++) {
+		strncpy(ifr.ifr_name, if_names[i], sizeof(ifr.ifr_name));
+		if (ioctl(fd, SIOCGIFHWADDR, &ifr) != -1) {
+			memcpy(mac, ifr.ifr_hwaddr.sa_data, 6);
+			break;
+		}
+	}
+	close(fd);
 	return true;
 }
 
