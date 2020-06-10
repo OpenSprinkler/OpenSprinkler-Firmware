@@ -29,6 +29,8 @@ private:
     static char _id[];
     static char _host[];
     static int _port;
+    static char _username[];
+    static char _password[];
     static bool _enabled;
 
     // Following routines are platform specific versions of the public interface
@@ -43,7 +45,7 @@ public:
     static void init(void);
     static void init(const char * id);
     static void begin(void);
-    static void begin(const char * host, int port, bool enable);
+    static void begin(const char * host, int port, const char * username, const char * password, bool enable);
     static bool enabled(void) { return _enabled; };
     static void publish(const char *topic, const char *payload);
     static void loop(void);
