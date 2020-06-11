@@ -129,44 +129,48 @@ void ProgramData::moveup(byte pid) {
 
 void schedule_all_stations(ulong curr_time);
 
-void ProgramData::toggle_pause(ulong curr_time, uint16_t delay) {
+void ProgramData::toggle_pause(uint16_t delay) {
 
 	byte was_paused = is_paused;
 
 	os.clear_all_station_bits();
 
 	if (was_paused) { // if station is prematurely un-paused then it is immediately scheduled
-		printf("rescheduling...\n");
-		// schedule_all_stations(curr_time);
+		// schedule the stations
+		// this is buggy at the moment 
 	} else { 
 		os.status.program_busy = 0;
 		pause_timer = delay;
-		update_pause(curr_time, delay); 
+		update_pause(delay); 
 	}
 
 	is_paused = !was_paused;
 }
 
-void ProgramData::update_pause(ulong t, uint16_t delay) {
+void ProgramData::update_pause(uint16_t delay) {
 	
 	RuntimeQueueStruct *s; 
+	ulong pause_t = os.now_tz();
 
 	for (byte i = 0; i < nqueue; i++) {
 		s = queue + i;
 		printf("prev start: (%i), delay: (%i), duration: (%i)\n", s->st, delay, s->dur);
 
 		byte op = 0;
-		if (s->st + s->dur < t) { // already run 
+		if (s->st + s->dur < pause_t) { // already run 
 			op = 1;
-			continue; // check if this is even necessary / might have already dequeued
-		} else if (s->st <= t && t <= s->st + s->dur) { // currently running 
+			continue; 
+		} else if (s->st <= pause_t) { // currently running 
 			op = 2;
-			s->dur -= (t - s->st);
-			s->st = t + delay;
-		} else if (s->st > t) { // scheduled 
+			s->dur -= (pause_t - s->st);
+			s->st = pause_t + delay;
+		} else { // scheduled 
 			op = 3;
 			s->st += delay;
 		}
+
+		// to replicate, zone 1 with 3 minutes, zone 2 (seq) with 3 minutes + pause for 2 minutes 
+		// didn't enter op 2 but instead op 3 both times. 
 		printf("new start: (%i), new dur (%i), option: (%i)\n", s->st, s->dur, op);
 	}
 }

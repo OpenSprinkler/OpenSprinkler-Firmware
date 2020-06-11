@@ -759,7 +759,7 @@ void do_loop()
 			} else {
 				pd.is_paused= 0;
 				os.clear_all_station_bits();
-				// schedule_all_stations(curr_time);
+				os.status.program_busy = 1;
 				printf("rescheduling from main...\n");
 			}
 		}
@@ -859,6 +859,7 @@ void do_loop()
 				pd.reset_runtime();
 				// reset program busy bit
 				os.status.program_busy = 0;
+				pd.is_paused = 0;
 				// log flow sensor reading if flow sensor is used
 				if(os.iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_FLOW) {
 					write_log(LOGDATA_FLOWSENSE, curr_time);

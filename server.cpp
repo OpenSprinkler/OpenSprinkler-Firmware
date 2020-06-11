@@ -1126,7 +1126,7 @@ void server_json_controller_main() {
 							pd.lastrun.station,
 							pd.lastrun.program,
 							pd.lastrun.duration,
-							pd.lastrun.endtime, 
+							pd.lastrun.endtime,
 							pd.is_paused );
 
 #if defined(ESP8266)
@@ -1544,7 +1544,8 @@ void server_json_status_main() {
 		bfill.emit_p(PSTR("$D"), (os.station_bits[(sid>>3)]>>(sid&0x07))&1);
 		if(sid!=os.nstations-1) bfill.emit_p(PSTR(","));
 	}
-	bfill.emit_p(PSTR("],\"nstations\":$D}"), os.nstations);
+
+	bfill.emit_p(PSTR("],\"nstations\":$D}"), os.nstations );
 }
 
 /** Output station status */
@@ -1567,7 +1568,6 @@ void server_json_status()
  * sid:station index (starting from 0)
  * en: enable (0 or 1)
  * t:  timer (required if en=1)
- * tp: toggle pause 
  */
 void server_change_manual() {
 #if defined(ESP8266)
@@ -1845,7 +1845,6 @@ void server_json_all() {
 
 /** 
  * Command: "/pq?"
- * pt 	: pause time 
  * dur	: duration 
  * sid 	: station id 
  */
@@ -1860,19 +1859,14 @@ void server_pause_queue() {
 		char *p = get_buffer;
 	#endif
 
-	ulong pause_time = 0;
-	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("pt"), true)) {
-		pause_time = atol(tmp_buffer);
-	}
-
 	uint16_t duration = 0;
 	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("dur"), true)) {
 		duration = atoi(tmp_buffer);
 	}
 
-	printf("data: (%lu, %i)\n", pause_time, duration);
+	printf("data: (%i)\n", duration);
 
-	pd.toggle_pause(pause_time, duration);
+	pd.toggle_pause(duration);
 
 	handle_return(HTML_SUCCESS);
 }
