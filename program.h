@@ -49,8 +49,8 @@ struct LogStruct {
 #define STARTTIME_SUNSET_BIT	13
 #define STARTTIME_SIGN_BIT		12
 
-#define PROGRAMSTRUCT_EN_BIT	 0
-#define PROGRAMSTRUCT_UWT_BIT  1
+#define PROGRAMSTRUCT_EN_BIT	0
+#define PROGRAMSTRUCT_UWT_BIT	1
 
 /** Program data structure */
 class ProgramStruct {
@@ -119,7 +119,6 @@ public:
 	uint16_t 	dur; // water time
 	byte		sid;
 	byte		pid;
-	byte 		isPaused;
 };
 
 class ProgramData {
@@ -130,6 +129,8 @@ public:
 	static byte nprograms;			// number of programs
 	static LogStruct lastrun;
 	static ulong last_seq_stop_time;	// the last stop time of a sequential station
+	static byte is_paused; // 0 false, 1 finite delay, 2 indefinite 
+	static ulong pause_timer;
 	
 	static void reset_runtime();
 	static RuntimeQueueStruct* enqueue(); // this returns a pointer to the next available slot in the queue
@@ -142,7 +143,11 @@ public:
 	static byte modify(byte pid, ProgramStruct *buf);
 	static byte set_flagbit(byte pid, byte bid, byte value);
 	static void moveup(byte pid);  
-	static void togglePause(byte pid, time_t t, uint16_t delay=0);
+
+
+	static void toggle_pause(ulong curr_time, uint16_t delay);
+	static void update_pause(ulong t, uint16_t delay);
+
 	static byte del(byte pid);
 	static void drem_to_relative(byte days[2]); // absolute to relative reminder conversion
 	static void drem_to_absolute(byte days[2]);

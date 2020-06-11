@@ -1108,7 +1108,7 @@ void server_json_controller_main() {
 	ulong curr_time = os.now_tz();
 	bfill.emit_p(PSTR("\"devt\":$L,\"nbrd\":$D,\"en\":$D,\"sn1\":$D,\"sn2\":$D,\"rd\":$D,\"rdst\":$L,"
 										"\"sunrise\":$D,\"sunset\":$D,\"eip\":$L,\"lwc\":$L,\"lswc\":$L,"
-										"\"lupt\":$L,\"lrbtc\":$D,\"lrun\":[$D,$D,$D,$L],"),
+										"\"lupt\":$L,\"lrbtc\":$D,\"lrun\":[$D,$D,$D,$L],\"pq\":$D,"),
 							curr_time,
 							os.nboards,
 							os.status.enabled,
@@ -1126,7 +1126,8 @@ void server_json_controller_main() {
 							pd.lastrun.station,
 							pd.lastrun.program,
 							pd.lastrun.duration,
-							pd.lastrun.endtime);
+							pd.lastrun.endtime, 
+							pd.is_paused );
 
 #if defined(ESP8266)
 	bfill.emit_p(PSTR("\"RSSI\":$D,"), (int16_t)WiFi.RSSI());
@@ -1560,13 +1561,13 @@ void server_json_status()
 
 /**
  * Test station (previously manual operation)
- * Command: /cm?pw=xxx&sid=x&en=x&t=x
+ * Command: /cm?pw=xxx&sid=x&en=x&t=x&tp=x 
  *
  * pw: password
  * sid:station index (starting from 0)
  * en: enable (0 or 1)
  * t:  timer (required if en=1)
- * tps: toggle pause station 
+ * tp: toggle pause 
  */
 void server_change_manual() {
 #if defined(ESP8266)
@@ -1577,6 +1578,7 @@ void server_change_manual() {
 #else
 	char *p = get_buffer;
 #endif
+
 	int sid=-1;
 	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("sid"), true)) {
 		sid=atoi(tmp_buffer);
@@ -1587,69 +1589,48 @@ void server_change_manual() {
 
 	byte en=0;
 	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("en"), true)) {
-		printf("tmp_buffer: %s\n", tmp_buffer);
-		printf("atoi: %i\n");
 		en=atoi(tmp_buffer);
 	} else {
 		handle_return(HTML_DATA_MISSING);
 	}
 
-	printf("the value is %i\n", en);
-
 	uint16_t timer=0;
 	unsigned long curr_time = os.now_tz();
+	if (en) { // if turning on a station, must provide timer
+		if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("t"), true)) {
+			timer=(uint16_t)atol(tmp_buffer);
+			if (timer==0 || timer>64800) {
+				handle_return(HTML_DATA_OUTOFBOUND);
+			}
+			// schedule manual station
+			// skip if the station is a master station
+			// (because master cannot be scheduled independently)
+			if ((os.status.mas==sid+1) || (os.status.mas2==sid+1))
+				handle_return(HTML_NOT_PERMITTED);
 
-	switch (en) {
-		case 0: 
-			turn_off_station(sid, curr_time);
-			break;
-		case 1: {
-			if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("t"), true)) {
-				timer=(uint16_t)atol(tmp_buffer);
-				if (timer==0 || timer>64800) {
-					handle_return(HTML_DATA_OUTOFBOUND);
-				}
-				// schedule manual station
-				// skip if the station is a master station
-				// (because master cannot be scheduled independently)
-				if ((os.status.mas==sid+1) || (os.status.mas2==sid+1))
-					handle_return(HTML_NOT_PERMITTED);
-
-				RuntimeQueueStruct *q = NULL;
-				byte sqi = pd.station_qid[sid];
-				// check if the station already has a schedule
-				if (sqi!=0xFF) {	// if we, we will overwrite the schedule
-					q = pd.queue+sqi;
-				} else {	// otherwise create a new queue element
-					q = pd.enqueue();
-				}
-				// if the queue is not full
-				if (q) {
-					q->st = 0;
-					q->dur = timer;
-					q->sid = sid;
-					q->pid = 99;	// testing stations are assigned program index 99
-					schedule_all_stations(curr_time);
-				} else {
-					handle_return(HTML_NOT_PERMITTED);
-				}
+			RuntimeQueueStruct *q = NULL;
+			byte sqi = pd.station_qid[sid];
+			// check if the station already has a schedule
+			if (sqi!=0xFF) {	// if we, we will overwrite the schedule
+				q = pd.queue+sqi;
+			} else {	// otherwise create a new queue element
+				q = pd.enqueue();
+			}
+			// if the queue is not full
+			if (q) {
+				q->st = 0;
+				q->dur = timer;
+				q->sid = sid;
+				q->pid = 99;	// testing stations are assigned program index 99
+				schedule_all_stations(curr_time);
 			} else {
-				handle_return(HTML_DATA_MISSING);
+				handle_return(HTML_NOT_PERMITTED);
 			}
-		break;
+		} else {
+			handle_return(HTML_DATA_MISSING);
 		}
-
-		case 2: 
-			// handle a pause
-			uint16_t timer = 0;
-			if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("t"), true)) {
-				timer = (uint16_t) atol(tmp_buffer);
-				if (timer > 64800) {
-					handle_return(HTML_DATA_OUTOFBOUND);
-				}
-				// handle the rest of the pause logic here 
-			}
-			break;
+	} else {	// turn off station
+		turn_off_station(sid, curr_time);
 	}
 	handle_return(HTML_SUCCESS);
 }
@@ -1862,6 +1843,40 @@ void server_json_all() {
 	handle_return(HTML_OK);
 }
 
+/** 
+ * Command: "/pq?"
+ * pt 	: pause time 
+ * dur	: duration 
+ * sid 	: station id 
+ */
+
+void server_pause_queue() {
+	#if defined(ESP8266)
+		char* p = NULL;
+		if(!process_password()) return;
+		if (m_client)
+			p = get_buffer;
+	#else
+		char *p = get_buffer;
+	#endif
+
+	ulong pause_time = 0;
+	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("pt"), true)) {
+		pause_time = atol(tmp_buffer);
+	}
+
+	uint16_t duration = 0;
+	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("dur"), true)) {
+		duration = atoi(tmp_buffer);
+	}
+
+	printf("data: (%lu, %i)\n", pause_time, duration);
+
+	pd.toggle_pause(pause_time, duration);
+
+	handle_return(HTML_SUCCESS);
+}
+
 #if defined(ARDUINO) && !defined(ESP8266)
 static int freeHeap () {
   extern int __heap_start, *__brkval; 
@@ -1918,6 +1933,7 @@ const char _url_keys[] PROGMEM =
 	"su"
 	"cu"
 	"ja"
+	"pq"
 #if defined(ARDUINO)  
   "db"
 #endif	
@@ -1946,6 +1962,7 @@ URLHandler urls[] = {
 	server_view_scripturl,	// su
 	server_change_scripturl,// cu
 	server_json_all,				// ja
+	server_pause_queue,		// pq	
 #if defined(ARDUINO)  
   server_json_debug,			// db
 #endif	

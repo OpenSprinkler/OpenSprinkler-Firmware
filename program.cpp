@@ -37,6 +37,9 @@ RuntimeQueueStruct ProgramData::queue[RUNTIME_QUEUE_SIZE];
 byte ProgramData::station_qid[MAX_NUM_STATIONS];
 LogStruct ProgramData::lastrun;
 ulong ProgramData::last_seq_stop_time;
+byte ProgramData::is_paused = 0;
+ulong ProgramData::pause_timer;
+
 extern char tmp_buffer[];
 
 void ProgramData::init() {
@@ -124,27 +127,47 @@ void ProgramData::moveup(byte pid) {
 	file_write_block(PROG_FILENAME, buf2, pos, PROGRAMSTRUCT_SIZE);
 }
 
-void ProgramData::togglePause(byte pid, time_t t, uint16_t delay) {
+void schedule_all_stations(ulong curr_time);
 
-	if (queue[pid].isPaused) {
-		queue[pid].isPaused = false;
-		return;
-	} else {
-		queue[pid].isPaused = true;
+void ProgramData::toggle_pause(ulong curr_time, uint16_t delay) {
+
+	byte was_paused = is_paused;
+
+	os.clear_all_station_bits();
+
+	if (was_paused) { // if station is prematurely un-paused then it is immediately scheduled
+		printf("rescheduling...\n");
+		// schedule_all_stations(curr_time);
+	} else { 
+		os.status.program_busy = 0;
+		pause_timer = delay;
+		update_pause(curr_time, delay); 
 	}
 
-	uint16_t curr_minute = (t % 86400L) / 60;
+	is_paused = !was_paused;
+}
 
-	for (byte i = pid; i < nprograms; ++i) {
-		RuntimeQueueStruct prog = queue[i];
-		prog.st += delay;
-		prog.dur += delay;
-	}
+void ProgramData::update_pause(ulong t, uint16_t delay) {
+	
+	RuntimeQueueStruct *s; 
 
-	// if a station is running when paused 
+	for (byte i = 0; i < nqueue; i++) {
+		s = queue + i;
+		printf("prev start: (%i), delay: (%i), duration: (%i)\n", s->st, delay, s->dur);
 
-	if (!delay) { // indefinite
-
+		byte op = 0;
+		if (s->st + s->dur < t) { // already run 
+			op = 1;
+			continue; // check if this is even necessary / might have already dequeued
+		} else if (s->st <= t && t <= s->st + s->dur) { // currently running 
+			op = 2;
+			s->dur -= (t - s->st);
+			s->st = t + delay;
+		} else if (s->st > t) { // scheduled 
+			op = 3;
+			s->st += delay;
+		}
+		printf("new start: (%i), new dur (%i), option: (%i)\n", s->st, s->dur, op);
 	}
 }
 

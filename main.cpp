@@ -753,6 +753,17 @@ void do_loop()
 			}
 		}//if_check_current_minute
 
+		if (pd.is_paused) {
+			if (pd.pause_timer > 0) {
+				pd.pause_timer--;
+			} else {
+				pd.is_paused= 0;
+				os.clear_all_station_bits();
+				// schedule_all_stations(curr_time);
+				printf("rescheduling from main...\n");
+			}
+		}
+		
 		// ====== Run program data ======
 		// Check if a program is running currently
 		// If so, do station run-time keeping

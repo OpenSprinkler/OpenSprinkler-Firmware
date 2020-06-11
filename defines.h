@@ -26,6 +26,10 @@
 
 // #define ENABLE_DEBUG  // enable serial debug
 
+#if !defined(ARDUINO)
+	#define ENABLE_LINUX_DEBUG // silences gpio errors 
+#endif
+
 typedef unsigned char byte;
 typedef unsigned long ulong;
   

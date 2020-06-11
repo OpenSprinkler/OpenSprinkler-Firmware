@@ -62,7 +62,12 @@ uint16_t PCA9555::i2c_read(uint8_t reg) {
 	Wire.beginTransmission(address);
 	Wire.write(reg);
 	Wire.endTransmission();
-	if(Wire.requestFrom(address, (uint8_t)2) != 2) {DEBUG_PRINTLN("GPIO error"); return 0xFFFF;}
+	if(Wire.requestFrom(address, (uint8_t)2) != 2) {
+		#ifndef ENABLE_LINUX_DEBUG
+			DEBUG_PRINTLN("GPIO error"); 
+		#endif
+		return 0xFFFF;
+	}
 	uint16_t data0 = Wire.read();
 	uint16_t data1 = Wire.read();
 	return data0+(data1<<8);
@@ -190,7 +195,9 @@ static byte GPIOExport(int pin) {
 
 	fd = open("/sys/class/gpio/export", O_WRONLY);
 	if (fd < 0) {
-		DEBUG_PRINTLN("failed to open export for writing");
+		#ifndef ENABLE_LINUX_DEBUG
+			DEBUG_PRINTLN("failed to open export for writing");
+		#endif
 		return 0;
 	}
 
@@ -207,7 +214,9 @@ static byte GPIOUnexport(int pin) {
 
 	fd = open("/sys/class/gpio/unexport", O_WRONLY);
 	if (fd < 0) {
-		DEBUG_PRINTLN("failed to open unexport for writing");
+		#ifndef ENABLE_LINUX_DEBUG
+			DEBUG_PRINTLN("failed to open unexport for writing");
+		#endif
 		return 0;
 	}
 
@@ -226,7 +235,9 @@ static byte GPIOSetEdge(int pin, const char *edge) {
 
 	fd = open(path, O_WRONLY);
 	if (fd < 0) {
-		DEBUG_PRINTLN("failed to open gpio edge for writing");
+		#ifndef ENABLE_LINUX_DEBUG
+			DEBUG_PRINTLN("failed to open gpio edge for writing");
+		#endif
 		return 0;
 	}
 	write(fd, edge, strlen(edge)+1);
@@ -250,12 +261,16 @@ void pinMode(int pin, byte mode) {
 
 	fd = open(path, O_WRONLY);
 	if (fd < 0) {
-		DEBUG_PRINTLN("failed to open gpio direction for writing");
+		#ifndef ENABLE_LINUX_DEBUG
+			DEBUG_PRINTLN("failed to open gpio direction for writing");
+		#endif
 		return;
 	}
 
 	if (-1 == write(fd, &dir_str[INPUT==mode?0:3], INPUT==mode?2:3)) {
-		DEBUG_PRINTLN("failed to set direction");
+		#ifndef ENABLE_LINUX_DEBUG
+			DEBUG_PRINTLN("failed to set direction");
+		#endif
 		return;
 	}
 
@@ -271,7 +286,9 @@ int gpio_fd_open(int pin, int mode) {
 	snprintf(path, BUFFER_MAX, "/sys/class/gpio/gpio%d/value", pin);
 	fd = open(path, mode);
 	if (fd < 0) {
-		DEBUG_PRINTLN("failed to open gpio");
+		#ifndef ENABLE_LINUX_DEBUG
+			DEBUG_PRINTLN("failed to open gpio");
+		#endif 
 		return -1;
 	}
 	return fd;
@@ -292,7 +309,9 @@ byte digitalRead(int pin) {
 	}
 
 	if (read(fd, value_str, 3) < 0) {
-		DEBUG_PRINTLN("failed to read value");
+		#ifndef ENABLE_LINUX_DEBUG
+			DEBUG_PRINTLN("failed to read value");
+		#endif
 		return 0;
 	}
 
@@ -305,7 +324,9 @@ void gpio_write(int fd, byte value) {
 	static const char value_str[] = "01";
 
 	if (1 != write(fd, &value_str[LOW==value?0:1], 1)) {
-		DEBUG_PRINT("failed to write value on pin ");
+		#ifndef ENABLE_LINUX_DEBUG
+			DEBUG_PRINT("failed to write value on pin ");
+		#endif
 	}
 }
 
@@ -374,7 +395,9 @@ static void *interruptHandler (void *arg) {
 /** Attach an interrupt function to pin */
 void attachInterrupt(int pin, const char* mode, void (*isr)(void)) {
 	if((pin<0)||(pin>GPIO_MAX)) {
-		DEBUG_PRINTLN("pin out of range");
+		#ifndef ENABLE_LINUX_DEBUG
+			DEBUG_PRINTLN("pin out of range");
+		#endif
 		return;
 	}
 
@@ -389,7 +412,9 @@ void attachInterrupt(int pin, const char* mode, void (*isr)(void)) {
 	// open gpio file
 	if(sysFds[pin]==-1) {
 		if((sysFds[pin]=open(path, O_RDWR))<0) {
-			DEBUG_PRINTLN("failed to open gpio value for reading");
+			#ifndef ENABLE_LINUX_DEBUG
+				DEBUG_PRINTLN("failed to open gpio value for reading");
+			#endif 
 			return;
 		}
 	}
