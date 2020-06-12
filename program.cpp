@@ -133,18 +133,20 @@ void ProgramData::toggle_pause(uint16_t delay) {
 
 	byte was_paused = is_paused;
 
+	is_paused = !was_paused;
+
 	os.clear_all_station_bits();
 
 	if (was_paused) { // if station is prematurely un-paused then it is immediately scheduled
-		// schedule the stations
-		// this is buggy at the moment 
+		printf("premature restart\n");
+		resume_stations();
+		pause_timer = 0;
+		os.status.program_busy = 1;
 	} else { 
-		os.status.program_busy = 0;
 		pause_timer = delay;
+		os.status.program_busy = 0;
 		update_pause(delay); 
 	}
-
-	is_paused = !was_paused;
 }
 
 void ProgramData::update_pause(uint16_t delay) {
@@ -172,6 +174,22 @@ void ProgramData::update_pause(uint16_t delay) {
 		// to replicate, zone 1 with 3 minutes, zone 2 (seq) with 3 minutes + pause for 2 minutes 
 		// didn't enter op 2 but instead op 3 both times. 
 		printf("new start: (%i), new dur (%i), option: (%i)\n", s->st, s->dur, op);
+	}
+}
+
+void ProgramData::resume_stations() {
+
+	RuntimeQueueStruct *s; 
+	ulong curr_time = os.now_tz();
+
+	for (byte i = 0; i < nqueue; i++) {
+		s = queue + i;
+		if (i == 0) { // first element has to run immediately
+			s->st = curr_time + 1;
+			printf("resume stations with time: (%i)\n", s->st);
+		} else {
+			s->st -= pause_timer - 1; 
+		}
 	}
 }
 
