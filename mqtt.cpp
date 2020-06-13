@@ -241,17 +241,16 @@ int OSMqtt::_init(void) {
 
 int OSMqtt::_connect(void) {
 	mqtt_client->setServer(_host, _port);
-	boolean state;
-	if (_username[0])
-		state = mqtt_client->connect(_id, _username, _password, MQTT_AVAILABILITY_TOPIC, 0, true, MQTT_OFFLINE_PAYLOAD);
-	else
-		state = mqtt_client->connect(_id, NULL, NULL, MQTT_AVAILABILITY_TOPIC, 0, true, MQTT_OFFLINE_PAYLOAD);
-	if (state) {
-		mqtt_client->publish(MQTT_AVAILABILITY_TOPIC, MQTT_ONLINE_PAYLOAD, true);
+
+	// Note: If (username == NULL) then password is ignored for anonymous login (i.e.no username or password)
+	//       If (username != NULL && password == NULL) then username is used without a password
+	if ( mqtt_client->connect(_id, _username[0] ? _username : NULL, _password[0] ? _password : NULL, availability_topic, 0, true, MQTT_OFFLINE_PAYLOAD) ) {
+		mqtt_client->publish(availability_topic, MQTT_ONLINE_PAYLOAD, true);
 	} else {
 		DEBUG_LOGF("MQTT Connect: Failed (%d)\n", mqtt_client->state());
 		return MQTT_ERROR;
 	}
+
 	return MQTT_SUCCESS;
 }
 
@@ -299,9 +298,9 @@ static bool _connected = false;
 static void _mqtt_connection_cb(struct mosquitto *mqtt_client, void *obj, int reason) {
 	DEBUG_LOGF("MQTT Connnection Callback: %s (%d)\n", mosquitto_strerror(reason), reason);
 
-	::_connected = true;
-
 	if (reason == 0) {
+		::_connected = true;
+
 		int rc = mosquitto_publish(mqtt_client, NULL, MQTT_AVAILABILITY_TOPIC, strlen(MQTT_ONLINE_PAYLOAD), MQTT_ONLINE_PAYLOAD, 0, true);
 		if (rc != MOSQ_ERR_SUCCESS) {
 			DEBUG_LOGF("MQTT Publish: Failed (%s)\n", mosquitto_strerror(rc));
@@ -345,13 +344,15 @@ int OSMqtt::_init(void) {
 
 int OSMqtt::_connect(void) {
 	int rc;
-	if (_username[0]) {
-		rc = mosquitto_username_pw_set(mqtt_client, _username, _password);
-		if (rc != MOSQ_ERR_SUCCESS) {
-			DEBUG_LOGF("MQTT Connect: Connection Failed (%s)\n", mosquitto_strerror(rc));
-			return MQTT_ERROR;
-		}
+	
+	// Note: If (username == NULL) then disable authentication
+	//       If (username != NULL && password == NULL) then username is used without a password
+	rc = mosquitto_username_pw_set(mqtt_client, _username[0] ? _username : NULL, _password[0] ? _password[0] : NULL);
+	if (rc != MOSQ_ERR_SUCCESS) {
+		DEBUG_LOGF("MQTT Connect: Connection Failed (%s)\n", mosquitto_strerror(rc));
+		return MQTT_ERROR;
 	}
+
 	rc = mosquitto_connect(mqtt_client, _host, _port, MQTT_KEEPALIVE);
 	if (rc != MOSQ_ERR_SUCCESS) {
 		DEBUG_LOGF("MQTT Connect: Connection Failed (%s)\n", mosquitto_strerror(rc));
