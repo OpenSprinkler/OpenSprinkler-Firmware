@@ -36,7 +36,7 @@ typedef unsigned long ulong;
                             // if this number is different from the one stored in non-volatile memory
                             // a device reset will be automatically triggered
 
-#define OS_FW_MINOR      3  // Firmware minor version
+#define OS_FW_MINOR      4  // Firmware minor version
 
 /** Hardware version base numbers */
 #define OS_HW_VERSION_BASE   0x00
@@ -220,7 +220,7 @@ enum {
 	SOPT_JAVASCRIPTURL,
 	SOPT_WEATHERURL,
 	SOPT_WEATHER_OPTS,
-	SOPT_IFTTT_KEY,
+	SOPT_IFTTT_KEY,	// todo: make this IFTTT config just like MQTT
 	SOPT_STA_SSID,
 	SOPT_STA_PASS,
 	SOPT_MQTT_OPTS,

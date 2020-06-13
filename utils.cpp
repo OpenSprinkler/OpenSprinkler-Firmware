@@ -428,7 +428,6 @@ void file_copy_block(const char *fn, ulong from, ulong to, ulong len, void *tmp)
 
 // compare a block of content
 byte file_cmp_block(const char *fn, const char *buf, ulong pos) {
-	char c;
 #if defined(ESP8266)
 
 	File f = SPIFFS.open(fn, "r");

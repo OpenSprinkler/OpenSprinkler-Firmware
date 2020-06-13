@@ -47,8 +47,8 @@
 #if defined(ENABLE_DEBUG)
 	#if defined(ARDUINO)
 		#include "TimeLib.h"
-		#define DEBUG_PRINTF(msg, ...)		{Serial.printf(msg, ##__VA_ARGS__);}
-		#define DEBUG_TIMESTAMP(msg, ...)	{time_t t = os.now_tz(); Serial.printf("%02d-%02d-%02d %02d:%02d:%02d - ", year(t), month(t), day(t), hour(t), minute(t), second(t));}
+		#define DEBUG_PRINTF(msg, ...)		{char buffer[TMP_BUFFER_SIZE]; sprintf(buffer, msg, ##__VA_ARGS__); Serial.println(buffer);}
+		#define DEBUG_TIMESTAMP(msg, ...)	{time_t t = os.now_tz(); char buffer[TMP_BUFFER_SIZE]; sprintf(buffer, "%02d-%02d-%02d %02d:%02d:%02d - ", year(t), month(t), day(t), hour(t), minute(t), second(t)); Serial.println(buffer);}
 	#else
 		#include <sys/time.h>
 		#define DEBUG_PRINTF(msg, ...)		{printf(msg, ##__VA_ARGS__);}
@@ -190,9 +190,9 @@ void OSMqtt::loop(void) {
 		last_reconnect_attempt = millis();
 	}
 
+#if defined(ENABLE_DEBUG)
 	int state = _loop();
 
-#if defined(ENABLE_DEBUG)
 	// Print a diagnostic message whenever the MQTT state changes
 	bool network = os.network_connected(), mqtt = _connected();
 	static bool last_network = 0, last_mqtt = 0;
@@ -243,9 +243,9 @@ int OSMqtt::_connect(void) {
 	mqtt_client->setServer(_host, _port);
 	boolean state;
 	if (_username[0])
-		state = mqtt_client->connect(_id, _username, _password, MQTT_AVAILABILITY_TOPIC, 0, true, MQTT_OFFLINE_PAYLOAD) {
+		state = mqtt_client->connect(_id, _username, _password, MQTT_AVAILABILITY_TOPIC, 0, true, MQTT_OFFLINE_PAYLOAD);
 	else
-		state = mqtt_client->connect(_id, NULL, NULL, MQTT_AVAILABILITY_TOPIC, 0, true, MQTT_OFFLINE_PAYLOAD) {
+		state = mqtt_client->connect(_id, NULL, NULL, MQTT_AVAILABILITY_TOPIC, 0, true, MQTT_OFFLINE_PAYLOAD);
 	if (state) {
 		mqtt_client->publish(MQTT_AVAILABILITY_TOPIC, MQTT_ONLINE_PAYLOAD, true);
 	} else {

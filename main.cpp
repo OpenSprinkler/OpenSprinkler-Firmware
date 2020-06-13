@@ -1299,6 +1299,7 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 	switch(type) {
 		case  NOTIFY_STATION_ON:
 
+			// todo: add IFTTT support for this event as well
 			if (os.mqtt.enabled()) {
 				sprintf_P(topic, PSTR("opensprinkler/station/%d"), lval);
 				strcpy_P(payload, PSTR("{\"state\":1}"));
@@ -1409,7 +1410,7 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 			break;
 
 		case NOTIFY_REBOOT:
-
+			
 			if (os.mqtt.enabled()) {
 				strcpy_P(topic, PSTR("opensprinkler/system"));
 				strcpy_P(payload, PSTR("{\"state\":\"started\"}"));

@@ -8,7 +8,7 @@ LIBS = . \
   ~/Arduino/libraries/SSD1306 \
   ~/Arduino/libraries/rc-switch \
   ~/Arduino/libraries/UIPEthernet \
-  ~/Arduino/libraries/PubSubClient \
+  ~/Arduino/libraries/pubsubclient \
 
 ESP_ROOT = $(HOME)/esp8266_2.5.2/
 ESPCORE_VERSION = 252
