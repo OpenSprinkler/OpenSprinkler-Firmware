@@ -76,10 +76,11 @@ extern char tmp_buffer[];
 #define MQTT_MAX_USERNAME_LEN	32		// Note: App is set to max 32 chars for username
 #define MQTT_MAX_PASSWORD_LEN	32		// Note: App is set to max 32 chars for password
 #define MQTT_MAX_ID_LEN			16		// MQTT Client Id to uniquely reference this unit
+#define MQTT_MAX_TOPIC_LEN		60		// Includes ROOT_TOPIC, DEVICE_TOPIC and endpoint
 #define MQTT_RECONNECT_DELAY	120		// Minumum of 60 seconds between reconnect attempts
 
 #define MQTT_ROOT_TOPIC			"opensprinkler"
-#define MQTT_AVAILABILITY_TOPIC	MQTT_ROOT_TOPIC "/availability"
+#define MQTT_AVAILABILITY_TOPIC	"availability"
 #define MQTT_ONLINE_PAYLOAD		"online"
 #define MQTT_OFFLINE_PAYLOAD	"offline"
 
@@ -93,16 +94,31 @@ char OSMqtt::_password[MQTT_MAX_PASSWORD_LEN + 1] = {0};	// password to connect 
 int OSMqtt::_port = MQTT_DEFAULT_PORT;				// Port of the broker (default 1883)
 bool OSMqtt::_enabled = false;						// Flag indicating whether MQTT is enabled
 
+/**************************** HELPERS ********************************************/
+
+int OSMqtt::_make_full_topic(char * full_topic, const char * topic)
+{
+#if defined(ENABLE_DEBUG)
+	if (strlen(MQTT_ROOT_TOPIC) + strlen(_id) + strlen(topic) + 2 > MQTT_MAX_TOPIC_LEN)
+		DEBUG_LOGF("MQTT Topic (%s) is too large. Will be truncated\n", topic);
+#endif
+
+	int len = snprintf(full_topic, MQTT_MAX_TOPIC_LEN, "%s/%s/%s", MQTT_ROOT_TOPIC, _id, topic);
+	full_topic[MQTT_MAX_TOPIC_LEN] = 0;
+
+	return len;
+}
+
+/**************************** PUBLIC INTERFACE ************************************/
+
 // Initialise the client libraries and event handlers.
 void OSMqtt::init(void) {
 	DEBUG_LOGF("MQTT Init\n");
 	char id[MQTT_MAX_ID_LEN + 1] = {0};
 
-#if defined(ARDUINO)
 	uint8_t mac[6] = {0};
 	os.load_hardware_mac(mac, m_server!=NULL);
 	snprintf(id, MQTT_MAX_ID_LEN, "OS-%02X%02X%02X%02X%02X%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-#endif
 
 	init(id);
 };
@@ -113,6 +129,7 @@ void OSMqtt::init(const char * clientId) {
 
 	strncpy(_id, clientId, MQTT_MAX_ID_LEN);
 	_id[MQTT_MAX_ID_LEN] = 0;
+	
 	_init();
 };
 
@@ -174,7 +191,10 @@ void OSMqtt::publish(const char *topic, const char *payload) {
 		return;
 	}
 
-	_publish(topic, payload);
+	char full_topic[MQTT_MAX_TOPIC_LEN + 1] = { 0 };
+	_make_full_topic(full_topic, topic);
+
+	_publish(full_topic, payload);
 }
 
 // Regularly call the loop function to ensure "keep alive" messages are sent to the broker and to reconnect if needed.
@@ -202,7 +222,7 @@ void OSMqtt::loop(void) {
 		DEBUG_LOGF("MQTT Loop: Network %s, MQTT %s, State - %s\n",
 					network ? "UP" : "DOWN",
 					mqtt ? "UP" : "DOWN",
-					_state_string(state));
+					_state_to_string(state));
 		last_state = state; last_network = network; last_mqtt = mqtt;
 	}
 #endif
@@ -240,7 +260,11 @@ int OSMqtt::_init(void) {
 }
 
 int OSMqtt::_connect(void) {
+
 	mqtt_client->setServer(_host, _port);
+
+	char availability_topic[MQTT_MAX_TOPIC_LEN + 1] = { 0 };
+	_make_full_topic(availability_topic, MQTT_AVAILABILITY_TOPIC);
 
 	// Note: If (username == NULL) then password is ignored for anonymous login (i.e.no username or password)
 	//       If (username != NULL && password == NULL) then username is used without a password
@@ -274,7 +298,7 @@ int OSMqtt::_loop(void) {
 	return mqtt_client->state();
 }
 
-const char * OSMqtt::_state_string(int rc) {
+const char * OSMqtt::_state_to_string(int rc) {
 	switch (rc) {
 		case MQTT_CONNECTION_TIMEOUT:		return "The server didn't respond within the keepalive time";
 		case MQTT_CONNECTION_LOST:			return "The network connection was lost";
@@ -295,29 +319,35 @@ const char * OSMqtt::_state_string(int rc) {
 
 static bool _connected = false;
 
-static void _mqtt_connection_cb(struct mosquitto *mqtt_client, void *obj, int reason) {
-	DEBUG_LOGF("MQTT Connnection Callback: %s (%d)\n", mosquitto_strerror(reason), reason);
+struct _mqtt_callbacks {
 
-	if (reason == 0) {
-		::_connected = true;
+	static void _mqtt_connection_cb(struct mosquitto *mqtt_client, void *obj, int reason) {
+		DEBUG_LOGF("MQTT Connnection Callback: %s (%d)\n", mosquitto_strerror(reason), reason);
 
-		int rc = mosquitto_publish(mqtt_client, NULL, MQTT_AVAILABILITY_TOPIC, strlen(MQTT_ONLINE_PAYLOAD), MQTT_ONLINE_PAYLOAD, 0, true);
-		if (rc != MOSQ_ERR_SUCCESS) {
-			DEBUG_LOGF("MQTT Publish: Failed (%s)\n", mosquitto_strerror(rc));
+		if (reason == 0) {
+			::_connected = true;
+
+			char availability_topic[MQTT_MAX_TOPIC_LEN + 1] = { 0 };
+			OSMqtt::_make_full_topic(availability_topic, MQTT_AVAILABILITY_TOPIC);
+
+			int rc = mosquitto_publish(mqtt_client, NULL, availability_topic, strlen(MQTT_ONLINE_PAYLOAD), MQTT_ONLINE_PAYLOAD, 0, true);
+			if (rc != MOSQ_ERR_SUCCESS) {
+				DEBUG_LOGF("MQTT Publish: Failed (%s)\n", mosquitto_strerror(rc));
+			}
 		}
 	}
-}
 
-static void _mqtt_disconnection_cb(struct mosquitto *mqtt_client, void *obj, int reason) {
-	DEBUG_LOGF("MQTT Disconnnection Callback: %s (%d)\n", mosquitto_strerror(reason), reason);
+	static void _mqtt_disconnection_cb(struct mosquitto *mqtt_client, void *obj, int reason) {
+		DEBUG_LOGF("MQTT Disconnnection Callback: %s (%d)\n", mosquitto_strerror(reason), reason);
 
-	::_connected = false;
-}
+		::_connected = false;
+	}
 
-static void _mqtt_log_cb(struct mosquitto *mqtt_client, void *obj, int level, const char *message){
-	if (level != MOSQ_LOG_DEBUG )
-		DEBUG_LOGF("MQTT Log Callback: %s (%d)\n", message, level);
-}
+	static void _mqtt_log_cb(struct mosquitto *mqtt_client, void *obj, int level, const char *message){
+		if (level != MOSQ_LOG_DEBUG )
+			DEBUG_LOGF("MQTT Log Callback: %s (%d)\n", message, level);
+	}
+};
 
 int OSMqtt::_init(void) {
 	int major, minor, revision;
@@ -328,26 +358,28 @@ int OSMqtt::_init(void) {
 
 	if (mqtt_client) { mosquitto_destroy(mqtt_client); mqtt_client = NULL; };
 
-	mqtt_client = mosquitto_new("OS", true, NULL);
+	mqtt_client = mosquitto_new(_id, true, NULL);
 	if (mqtt_client == NULL) {
 		DEBUG_PRINTF("MQTT Init: Failed to initialise client\n");
 		return MQTT_ERROR;
 	}
 
-	mosquitto_connect_callback_set(mqtt_client, _mqtt_connection_cb);
-	mosquitto_disconnect_callback_set(mqtt_client, _mqtt_disconnection_cb);
-	mosquitto_log_callback_set(mqtt_client, _mqtt_log_cb);
-	mosquitto_will_set(mqtt_client, MQTT_AVAILABILITY_TOPIC, strlen(MQTT_OFFLINE_PAYLOAD), MQTT_OFFLINE_PAYLOAD, 0, true);
+	char availability_topic[MQTT_MAX_TOPIC_LEN + 1] = { 0 };
+	_make_full_topic(availability_topic, MQTT_AVAILABILITY_TOPIC);
+	mosquitto_will_set(mqtt_client, availability_topic, strlen(MQTT_OFFLINE_PAYLOAD), MQTT_OFFLINE_PAYLOAD, 0, true);
+
+	mosquitto_connect_callback_set(mqtt_client, _mqtt_callbacks::_mqtt_connection_cb);
+	mosquitto_disconnect_callback_set(mqtt_client, _mqtt_callbacks::_mqtt_disconnection_cb);
+	mosquitto_log_callback_set(mqtt_client, _mqtt_callbacks::_mqtt_log_cb);
 
 	return MQTT_SUCCESS;
 }
 
 int OSMqtt::_connect(void) {
-	int rc;
-	
+
 	// Note: If (username == NULL) then disable authentication
 	//       If (username != NULL && password == NULL) then username is used without a password
-	rc = mosquitto_username_pw_set(mqtt_client, _username[0] ? _username : NULL, _password[0] ? _password[0] : NULL);
+	int rc = mosquitto_username_pw_set(mqtt_client, _username[0] ? _username : NULL, _password[0] ? _password : NULL);
 	if (rc != MOSQ_ERR_SUCCESS) {
 		DEBUG_LOGF("MQTT Connect: Connection Failed (%s)\n", mosquitto_strerror(rc));
 		return MQTT_ERROR;
@@ -386,7 +418,7 @@ int OSMqtt::_loop(void) {
 	return mosquitto_loop(mqtt_client, 0 , 1);
 }
 
-const char * OSMqtt::_state_string(int error) {
+const char * OSMqtt::_state_to_string(int error) {
 	return mosquitto_strerror(error);
 }
 #endif
