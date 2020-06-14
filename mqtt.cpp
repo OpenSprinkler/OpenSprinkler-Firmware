@@ -47,8 +47,8 @@
 #if defined(ENABLE_DEBUG)
 	#if defined(ARDUINO)
 		#include "TimeLib.h"
-		#define DEBUG_PRINTF(msg, ...)		{char buffer[TMP_BUFFER_SIZE]; sprintf(buffer, msg, ##__VA_ARGS__); Serial.println(buffer);}
-		#define DEBUG_TIMESTAMP(msg, ...)	{time_t t = os.now_tz(); char buffer[TMP_BUFFER_SIZE]; sprintf(buffer, "%02d-%02d-%02d %02d:%02d:%02d - ", year(t), month(t), day(t), hour(t), minute(t), second(t)); Serial.println(buffer);}
+		#define DEBUG_PRINTF(msg, ...)		{Serial.printf(msg, ##__VA_ARGS__);}
+		#define DEBUG_TIMESTAMP(msg, ...)	{time_t t = os.now_tz(); Serial.printf(buffer, "%02d-%02d-%02d %02d:%02d:%02d - ", year(t), month(t), day(t), hour(t), minute(t), second(t));}
 	#else
 		#include <sys/time.h>
 		#define DEBUG_PRINTF(msg, ...)		{printf(msg, ##__VA_ARGS__);}

@@ -1,7 +1,7 @@
 OFLAG = -Os
 ARDMK_DIR = .
 ARDUINO_DIR = $(HOME)/arduino-1.8.5
-ALTERNATE_CORE_PATH = $(HOME)/.arduino15/packages/MightyCore/hardware/avr/2.0.1
+ALTERNATE_CORE_PATH = $(HOME)/.arduino15/packages/MightyCore/hardware/avr/2.0.5
 BOARD_TAG = 1284
 MCU = atmega1284p
 VARIANT = sanguino
