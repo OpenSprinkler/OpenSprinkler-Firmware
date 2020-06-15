@@ -138,7 +138,6 @@ void ProgramData::toggle_pause(uint16_t delay) {
 	os.clear_all_station_bits();
 
 	if (was_paused) { // if station is prematurely un-paused then it is immediately scheduled
-		printf("premature restart\n");
 		resume_stations();
 		pause_timer = 0;
 		os.status.program_busy = 1;
@@ -151,45 +150,37 @@ void ProgramData::toggle_pause(uint16_t delay) {
 
 void ProgramData::update_pause(uint16_t delay) {
 	
-	RuntimeQueueStruct *s; 
+	RuntimeQueueStruct *s = NULL; 
 	ulong pause_t = os.now_tz();
 
 	for (byte i = 0; i < nqueue; i++) {
 		s = queue + i;
 		printf("prev start: (%i), delay: (%i), duration: (%i)\n", s->st, delay, s->dur);
 
-		byte op = 0;
 		if (s->st + s->dur < pause_t) { // already run 
-			op = 1;
 			continue; 
 		} else if (s->st <= pause_t) { // currently running 
-			op = 2;
 			s->dur -= (pause_t - s->st);
 			s->st = pause_t + delay;
 		} else { // scheduled 
-			op = 3;
 			s->st += delay;
 		}
 
-		// to replicate, zone 1 with 3 minutes, zone 2 (seq) with 3 minutes + pause for 2 minutes 
-		// didn't enter op 2 but instead op 3 both times. 
-		printf("new start: (%i), new dur (%i), option: (%i)\n", s->st, s->dur, op);
+		if (s->st + s->dur > last_seq_stop_time) {
+			last_seq_stop_time = s->st + s->dur;
+		} 
+		printf("new start: (%i), new dur (%i)\n", s->st, s->dur);
 	}
 }
 
 void ProgramData::resume_stations() {
 
-	RuntimeQueueStruct *s; 
+	RuntimeQueueStruct *s = NULL; 
 	ulong curr_time = os.now_tz();
 
 	for (byte i = 0; i < nqueue; i++) {
 		s = queue + i;
-		if (i == 0) { // first element has to run immediately
-			s->st = curr_time + 1;
-			printf("resume stations with time: (%i)\n", s->st);
-		} else {
-			s->st -= pause_timer - 1; 
-		}
+		s->st += 1 - pause_timer; 
 	}
 }
 

@@ -1148,6 +1148,11 @@ void schedule_all_stations(ulong curr_time) {
 		seq_start_time = pd.last_seq_stop_time + station_delay;
 	}
 
+	// if the queue is paused, make sure that parallel doesn't run immediately
+	if (pd.is_paused) {
+		con_start_time += pd.pause_timer - 1;
+	}
+
 	RuntimeQueueStruct *q = pd.queue;
 	byte re = os.iopts[IOPT_REMOTE_EXT_MODE];
 	// go through runtime queue and calculate start time of each station
