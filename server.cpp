@@ -1225,7 +1225,6 @@ void server_home()
  * ap:	reset to ap (ESP8266 only)
  * update: launch update script (for OSPi/OSBo/Linux only)
  * cn:	controller name 
- * ssta: shift stations
  */
 void server_change_values()
 {
@@ -1287,11 +1286,6 @@ void server_change_values()
 
 	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("cn"), true)) {
 		os.sopt_save(SOPT_DEVICE_NAME, tmp_buffer);
-	}
-
-	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("ssta"), true)) {
-		os.iopts[IOPT_SHIFT_STATIONS] = atoi(tmp_buffer);
-		printf("shift stations set to option: (%i)\n", os.iopts[IOPT_SHIFT_STATIONS]);
 	}
 	
 	#if defined(ESP8266)
