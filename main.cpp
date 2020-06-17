@@ -1077,6 +1077,42 @@ void turn_off_station(byte sid, ulong curr_time) {
 			write_log(LOGDATA_STATION, curr_time);
 			push_message(IFTTT_STATION_RUN, sid, pd.lastrun.duration);
 		}
+
+		byte sid = q -> sid;
+		byte bid = sid >> 3; // board id 
+		byte s = sid & 0x07; // what is this
+		byte re = os.iopts[IOPT_REMOTE_EXT_MODE];
+		bool is_sequential = os.attrib_seq[bid] & (1 << s) && !re;
+
+		printf("stopped station is sequential: (%i)\n", is_sequential);
+
+		/* notes on parallel zones 
+		 * 
+		 * if you have a parallel zone in your program (scheduled for later), you would 
+		 * still want that to be shifted forward upon stopping another zone. However, if 
+		 * the zone is running now, and you stop its execution, that should not move other
+		 * zones up. I had to make this change because if I had a parallel zone that was really long
+		 * and I cancelled it, it would make the start times of the other zones earlier than the curr
+		 * time or before the other sequential zone ends. 
+		 */
+
+		// if stopped prematurely and option enabled, start other stations earlier 
+		if (os.iopts[IOPT_SHIFT_STATIONS] && is_sequential) {
+			RuntimeQueueStruct *s = NULL;
+			ulong remainder = q->st + q->dur - curr_time;
+
+			for (byte i = 0; i < pd.nqueue; i++) {
+
+				if (i == sid) { continue; }
+				s = pd.queue + i;
+
+				// only shift if the station is scheduled
+				if (s->st > curr_time) {
+					s->st += 1 - remainder;
+				}
+			}
+			printf("amount left to run: (%i)\n", remainder);
+		}
 	}
 
 	// dequeue the element
