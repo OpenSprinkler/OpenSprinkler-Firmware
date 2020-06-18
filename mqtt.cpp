@@ -190,9 +190,9 @@ void OSMqtt::loop(void) {
 		last_reconnect_attempt = millis();
 	}
 
-#if defined(ENABLE_DEBUG)
 	int state = _loop();
 
+#if defined(ENABLE_DEBUG)
 	// Print a diagnostic message whenever the MQTT state changes
 	bool network = os.network_connected(), mqtt = _connected();
 	static bool last_network = 0, last_mqtt = 0;
