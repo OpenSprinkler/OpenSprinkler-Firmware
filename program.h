@@ -135,6 +135,7 @@ public:
 	static void toggle_pause(uint16_t delay);
 	static void update_pause(uint16_t delay);
 	static void resume_stations(); 
+	static void clear_pause();
 	
 	static void reset_runtime();
 	static RuntimeQueueStruct* enqueue(); // this returns a pointer to the next available slot in the queue

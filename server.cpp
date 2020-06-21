@@ -71,7 +71,7 @@ static char* get_buffer = NULL;
 BufferFiller bfill;
 
 void schedule_all_stations(ulong curr_time);
-void turn_off_station(byte sid, ulong curr_time);
+void turn_off_station(byte sid, ulong curr_time, byte shift);
 void process_dynamic_events(ulong curr_time);
 void check_network(time_t curr_time);
 void check_weather(time_t curr_time);
@@ -1562,12 +1562,13 @@ void server_json_status()
 
 /**
  * Test station (previously manual operation)
- * Command: /cm?pw=xxx&sid=x&en=x&t=x&tp=x 
+ * Command: /cm?pw=xxx&sid=x&en=x&t=x&tp=x&ssta=x 
  *
  * pw: password
  * sid:station index (starting from 0)
  * en: enable (0 or 1)
  * t:  timer (required if en=1)
+ * ssta: shift stations
  */
 void server_change_manual() {
 #if defined(ESP8266)
@@ -1630,7 +1631,11 @@ void server_change_manual() {
 			handle_return(HTML_DATA_MISSING);
 		}
 	} else {	// turn off station
-		turn_off_station(sid, curr_time);
+		byte shift = 0;
+		if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("ssta"), true)) {
+			shift = atoi(tmp_buffer);
+		}
+		turn_off_station(sid, curr_time, shift);
 	}
 	handle_return(HTML_SUCCESS);
 }

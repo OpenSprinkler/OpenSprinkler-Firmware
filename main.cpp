@@ -366,7 +366,7 @@ void do_setup() {
 
 void write_log(byte type, ulong curr_time);
 void schedule_all_stations(ulong curr_time);
-void turn_off_station(byte sid, ulong curr_time);
+void turn_off_station(byte sid, ulong curr_time, byte shift=0);
 void process_dynamic_events(ulong curr_time);
 void check_network();
 void check_weather();
@@ -760,7 +760,6 @@ void do_loop()
 				pd.is_paused= 0;
 				os.clear_all_station_bits();
 				os.status.program_busy = 1;
-				printf("rescheduling from main...\n");
 			}
 		}
 		
@@ -1043,11 +1042,18 @@ void check_weather() {
 	}
 }
 
+byte is_sequential_station(byte sid) {
+	byte bid = sid >> 3;
+	byte s = sid & 0x07;
+	
+	return os.attrib_seq[bid] & (1 << s);
+}
+
 /** Turn off a station
  * This function turns off a scheduled station
  * and writes log record
  */
-void turn_off_station(byte sid, ulong curr_time) {
+void turn_off_station(byte sid, ulong curr_time, byte shift) {
 	os.set_station_bit(sid, 0);
 
 	byte qid = pd.station_qid[sid];
@@ -1078,40 +1084,26 @@ void turn_off_station(byte sid, ulong curr_time) {
 			push_message(IFTTT_STATION_RUN, sid, pd.lastrun.duration);
 		}
 
-		byte sid = q -> sid;
-		byte bid = sid >> 3; // board id 
-		byte s = sid & 0x07; // what is this
 		byte re = os.iopts[IOPT_REMOTE_EXT_MODE];
-		bool is_sequential = os.attrib_seq[bid] & (1 << s) && !re;
 
-		printf("stopped station is sequential: (%i)\n", is_sequential);
+		if (shift && is_sequential_station(q->sid) && !re) {
 
-		/* notes on parallel zones 
-		 * 
-		 * if you have a parallel zone in your program (scheduled for later), you would 
-		 * still want that to be shifted forward upon stopping another zone. However, if 
-		 * the zone is running now, and you stop its execution, that should not move other
-		 * zones up. I had to make this change because if I had a parallel zone that was really long
-		 * and I cancelled it, it would make the start times of the other zones earlier than the curr
-		 * time or before the other sequential zone ends. 
-		 */
+			RuntimeQueueStruct *s = pd.queue;
+			ulong remainder = 0;
 
-		// if stopped prematurely and option enabled, start other stations earlier 
-		if (os.iopts[IOPT_SHIFT_STATIONS] && is_sequential) {
-			RuntimeQueueStruct *s = NULL;
-			ulong remainder = q->st + q->dur - curr_time;
+			if (q->st + q->dur > curr_time) { // remainder is non-zero
+				remainder = q->st + q->dur - curr_time;
+				for ( ; s < pd.queue + pd.nqueue; s++) {			
+					if (s == q) { continue; }
 
-			for (byte i = 0; i < pd.nqueue; i++) {
-
-				if (i == sid) { continue; }
-				s = pd.queue + i;
-
-				// only shift if the station is scheduled
-				if (s->st > curr_time) {
-					s->st += 1 - remainder;
+					// only shift if the station is scheduled
+					if (s->st > curr_time) {
+						printf("shifting station (%i)\n", s->sid);
+						s->st -= remainder; 
+						s->st += 1;
+					}
 				}
-			}
-			printf("amount left to run: (%i)\n", remainder);
+			}	
 		}
 	}
 
@@ -1184,24 +1176,21 @@ void schedule_all_stations(ulong curr_time) {
 		seq_start_time = pd.last_seq_stop_time + station_delay;
 	}
 
-	// if the queue is paused, make sure that parallel doesn't run immediately
+	// if the queue is paused, make sure that parallel stations don't run immediately
 	if (pd.is_paused) {
-		con_start_time += pd.pause_timer - 1;
+		con_start_time += pd.pause_timer; 
 	}
 
 	RuntimeQueueStruct *q = pd.queue;
 	byte re = os.iopts[IOPT_REMOTE_EXT_MODE];
+
 	// go through runtime queue and calculate start time of each station
 	for(;q<pd.queue+pd.nqueue;q++) {
 		if(q->st) continue; // if this queue element has already been scheduled, skip
 		if(!q->dur) continue; // if the element has been marked to reset, skip
-		byte sid=q->sid;
-		byte bid=sid>>3;
-		byte s=sid&0x07;
 
-		// if this is a sequential station and the controller is not in remote extension mode
 		// use sequential scheduling. station delay time apples
-		if (os.attrib_seq[bid]&(1<<s) && !re) {
+		if (is_sequential_station(q->sid) && !re) {
 			// sequential scheduling
 			q->st = seq_start_time;
 			seq_start_time += q->dur;
@@ -1238,6 +1227,7 @@ void reset_all_stations_immediate() {
 	os.clear_all_station_bits();
 	os.apply_all_station_bits();
 	pd.reset_runtime();
+	pd.clear_pause();
 }
 
 /** Reset all stations

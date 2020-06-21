@@ -184,6 +184,11 @@ void ProgramData::resume_stations() {
 	}
 }
 
+void ProgramData::clear_pause() {
+	is_paused = 0;
+	pause_timer = 0;
+}
+
 /** Modify a program */
 byte ProgramData::modify(byte pid, ProgramStruct *buf) {
 	if (pid >= nprograms)  return 0;

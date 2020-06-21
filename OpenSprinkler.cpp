@@ -161,7 +161,6 @@ const char iopt_json_names[] PROGMEM =
 	"subn4"
 	"wimod"
 	"reset"
-	"shift"
 	;
 
 // for String options
@@ -391,7 +390,6 @@ byte OpenSprinkler::iopts[] = {
 	0,
 	WIFI_MODE_AP, // wifi mode
 	0,		// reset
-	1	// shift stations
 };
 
 /** String option values (stored in RAM) */

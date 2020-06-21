@@ -215,7 +215,6 @@ enum {
 	IOPT_SUBNET_MASK4,
 	IOPT_WIFI_MODE, //ro
 	IOPT_RESET,     //ro
-	IOPT_SHIFT_STATIONS,
 	NUM_IOPTS // total number of integer options
 };
 
