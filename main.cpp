@@ -1088,6 +1088,27 @@ void turn_off_station(byte sid, ulong curr_time) {
 			push_message(NOTIFY_STATION_OFF, sid, pd.lastrun.duration);
 		}
 	}
+	
+	//Calculate the time remaining on this station. Store this as an offset to subtract from 
+	//the remaining stations that start after this station. Only for non-master stations.
+	ulong offset = 0;
+	if (curr_time>q->st && os.status.mas!=(sid+1) && os.status.mas2!=(sid+1 )){
+		offset =  q->dur - (curr_time - q->st);
+	} else
+	{
+		offset = q->dur;
+	}
+
+	if(offset>0){
+		RuntimeQueueStruct *queue = pd.queue;	
+		for(;queue<pd.queue+pd.nqueue;queue++) {
+			if (queue->st > q->st) //if the queued station starts after this station
+			{
+				queue->st = queue->st - offset;
+			}
+			
+		}
+	}
 
 	// dequeue the element
 	pd.dequeue(qid);
