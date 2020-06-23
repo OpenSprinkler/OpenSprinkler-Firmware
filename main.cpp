@@ -1098,12 +1098,15 @@ void turn_off_station(byte sid, ulong curr_time, byte shift) {
 
 					// only shift if the station is scheduled
 					if (s->st > curr_time) {
-						printf("shifting station (%i)\n", s->sid);
 						s->st -= remainder; 
 						s->st += 1;
 					}
 				}
 			}	
+		}
+	} else { // station has not started yet
+		if (pd.is_paused && pd.nqueue == 1) {
+			pd.clear_pause();
 		}
 	}
 

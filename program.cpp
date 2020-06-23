@@ -187,6 +187,7 @@ void ProgramData::resume_stations() {
 void ProgramData::clear_pause() {
 	is_paused = 0;
 	pause_timer = 0;
+	last_seq_stop_time = 0;
 }
 
 /** Modify a program */
