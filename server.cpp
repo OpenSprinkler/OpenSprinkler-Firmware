@@ -1108,7 +1108,7 @@ void server_json_controller_main() {
 	ulong curr_time = os.now_tz();
 	bfill.emit_p(PSTR("\"devt\":$L,\"nbrd\":$D,\"en\":$D,\"sn1\":$D,\"sn2\":$D,\"rd\":$D,\"rdst\":$L,"
 										"\"sunrise\":$D,\"sunset\":$D,\"eip\":$L,\"lwc\":$L,\"lswc\":$L,"
-										"\"lupt\":$L,\"lrbtc\":$D,\"lrun\":[$D,$D,$D,$L],\"pq\":$D,"),
+										"\"lupt\":$L,\"lrbtc\":$D,\"lrun\":[$D,$D,$D,$L],\"pq\":$D,\"nq\":$D,"),
 							curr_time,
 							os.nboards,
 							os.status.enabled,
@@ -1127,7 +1127,8 @@ void server_json_controller_main() {
 							pd.lastrun.program,
 							pd.lastrun.duration,
 							pd.lastrun.endtime,
-							pd.is_paused );
+							pd.is_paused,
+							pd.nqueue );
 
 #if defined(ESP8266)
 	bfill.emit_p(PSTR("\"RSSI\":$D,"), (int16_t)WiFi.RSSI());
