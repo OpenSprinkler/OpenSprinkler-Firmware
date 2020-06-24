@@ -1328,6 +1328,28 @@ byte OpenSprinkler::get_station_type(byte sid) {
 	return file_read_byte(STATIONS_FILENAME, (uint32_t)sid*sizeof(StationData)+offsetof(StationData, type));
 }
 
+byte OpenSprinkler::is_sequential_station(byte sid) {
+	byte bid = sid >> 3;
+	byte s = sid & 0x07;
+	
+	return attrib_seq[bid] & (1 << s);
+}
+
+byte OpenSprinkler::has_master(byte sid) {
+	byte bid = sid >> 3;
+	byte s = sid & 0x07;
+
+	return attrib_mas[bid] & (1 << s);
+}
+
+byte OpenSprinkler::is_running(byte sid) {
+	byte bid = sid >> 3;
+	byte s = sid & 0x07;
+
+	return station_bits[bid] & (1 << s);
+}
+
+
 /** Get station attribute */
 /*void OpenSprinkler::get_station_attrib(byte sid, StationAttrib *attrib); {
 	file_read_block(STATIONS_FILENAME, attrib, (uint32_t)sid*sizeof(StationData)+offsetof(StationData, attrib), sizeof(StationAttrib));

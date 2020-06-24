@@ -207,6 +207,10 @@ public:
 	static void get_station_name(byte sid, char buf[]); // get station name
 	static void set_station_name(byte sid, char buf[]); // set station name
 	static byte get_station_type(byte sid); // get station type
+	static byte is_sequential_station(byte sid);
+	static byte has_master(byte sid);
+	static byte is_running(byte sid);
+
 	//static StationAttrib get_station_attrib(byte sid); // get station attribute
 	static void attribs_save(); // repackage attrib bits and save (backward compatibility)
 	static void attribs_load(); // load and repackage attrib bits (backward compatibility)

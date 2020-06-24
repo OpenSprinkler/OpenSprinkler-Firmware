@@ -880,14 +880,30 @@ void do_loop()
 			for(sid=0;sid<os.nstations;sid++) {
 				// skip if this is the master station
 				if (os.status.mas == sid+1) continue;
-				bid = sid>>3;
-				s = sid&0x07;
-				// if this station is running and is set to activate master
-				if ((os.station_bits[bid]&(1<<s)) && (os.attrib_mas[bid]&(1<<s))) {
-					q=pd.queue+pd.station_qid[sid];
+
+				if (pd.phantom_station) {
+					RuntimeQueueStruct* pst = pd.phantom_station;
+					// masbit = 1;
+					if (pst->st <= curr_time && curr_time <= pst->st + pst->dur) {
+						printf("current time: (%lu), phantom station (start: %lu, end: (%lu))\n", curr_time, pst->st, pst->st + pst->dur);
+						masbit = 1;
+						break;
+					} else {
+						printf("freeing\n");
+						masbit = 1;
+						free(pd.phantom_station);
+						pd.phantom_station = NULL;
+					}
+					
+				}
+
+				q=pd.queue+pd.station_qid[sid];
+
+				if (os.is_running(q->sid) && os.has_master(q->sid)) {
+
 					// check if timing is within the acceptable range
-					if (curr_time >= q->st + mas_on_adj &&
-							curr_time <= q->st + q->dur + mas_off_adj) {
+					if (curr_time >= q->st + (mas_on_adj < 0 ? 0 : mas_on_adj) &&
+						curr_time <= q->st + q->dur + mas_off_adj) {
 						masbit = 1;
 						break;
 					}
@@ -1042,13 +1058,6 @@ void check_weather() {
 	}
 }
 
-byte is_sequential_station(byte sid) {
-	byte bid = sid >> 3;
-	byte s = sid & 0x07;
-	
-	return os.attrib_seq[bid] & (1 << s);
-}
-
 /** Turn off a station
  * This function turns off a scheduled station
  * and writes log record
@@ -1086,7 +1095,7 @@ void turn_off_station(byte sid, ulong curr_time, byte shift) {
 
 		byte re = os.iopts[IOPT_REMOTE_EXT_MODE];
 
-		if (shift && is_sequential_station(q->sid) && !re) {
+		if (shift && os.is_sequential_station(q->sid) && !re) {
 
 			RuntimeQueueStruct *s = pd.queue;
 			ulong remainder = 0;
@@ -1193,7 +1202,7 @@ void schedule_all_stations(ulong curr_time) {
 		if(!q->dur) continue; // if the element has been marked to reset, skip
 
 		// use sequential scheduling. station delay time apples
-		if (is_sequential_station(q->sid) && !re) {
+		if (os.is_sequential_station(q->sid) && !re) {
 			// sequential scheduling
 			q->st = seq_start_time;
 			seq_start_time += q->dur;
@@ -1204,6 +1213,22 @@ void schedule_all_stations(ulong curr_time) {
 			// stagger concurrent stations by 1 second
 			con_start_time++;
 		}
+
+		// handle if negative pump start time
+		if (os.has_master(q->sid)) {
+			int16_t mas_on_adj = water_time_decode_signed(os.iopts[IOPT_MASTER_ON_ADJ]);
+			if (mas_on_adj < 0) {
+				if (!pd.phantom_station) {
+					pd.phantom_station = new RuntimeQueueStruct();
+					pd.phantom_station->st = q->st;
+				}
+				printf("abs(-5) = (%i)\n", abs(mas_on_adj));
+				pd.phantom_station->dur += abs(mas_on_adj);
+				q->st += abs(mas_on_adj);
+
+				printf("start of phantom: (%lu), dur: (%lu)\n", pd.phantom_station->st, pd.phantom_station->dur);
+			}
+		}
 		/*DEBUG_PRINT("[");
 		DEBUG_PRINT(sid);
 		DEBUG_PRINT(":");
@@ -1212,6 +1237,12 @@ void schedule_all_stations(ulong curr_time) {
 		DEBUG_PRINT(q->dur);
 		DEBUG_PRINT("]");
 		DEBUG_PRINTLN(pd.nqueue);*/
+
+		if (pd.phantom_station) {
+			printf("phantom station created: (start: %lu, end: %lu, dur: %lu)\n", 
+			pd.phantom_station->st, pd.phantom_station->st + pd.phantom_station->dur, pd.phantom_station->dur);
+		}
+
 		if (!os.status.program_busy) {
 			os.status.program_busy = 1;  // set program busy bit
 			// start flow count

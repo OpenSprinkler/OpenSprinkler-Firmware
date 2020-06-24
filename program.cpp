@@ -37,8 +37,11 @@ RuntimeQueueStruct ProgramData::queue[RUNTIME_QUEUE_SIZE];
 byte ProgramData::station_qid[MAX_NUM_STATIONS];
 LogStruct ProgramData::lastrun;
 ulong ProgramData::last_seq_stop_time;
-byte ProgramData::is_paused = 0;
+byte ProgramData::is_paused;
 ulong ProgramData::pause_timer;
+
+// mock zone that is effectively turned off but treated as on to enable master functionality
+RuntimeQueueStruct* ProgramData::phantom_station = NULL;
 
 extern char tmp_buffer[];
 
