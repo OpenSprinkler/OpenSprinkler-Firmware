@@ -1335,7 +1335,7 @@ byte OpenSprinkler::is_sequential_station(byte sid) {
 	return attrib_seq[bid] & (1 << s);
 }
 
-byte OpenSprinkler::has_master(byte sid) {
+byte OpenSprinkler::bound_to_master(byte sid) {
 	byte bid = sid >> 3;
 	byte s = sid & 0x07;
 

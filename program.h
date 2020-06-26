@@ -129,7 +129,6 @@ public:
 	static byte nprograms;			// number of programs
 	static LogStruct lastrun;
 	static ulong last_seq_stop_time;	// the last stop time of a sequential station
-	static RuntimeQueueStruct* phantom_station;
 
 	static byte is_paused; 
 	static ulong pause_timer; // amount of time remaining in global pause

@@ -79,6 +79,8 @@ ulong flow_count = 0;
 byte prev_flow_state = HIGH;
 float flow_last_gpm=0;
 
+byte phantom_offset = 0;
+
 void flow_poll() {
 	#if defined(ESP8266)
 	pinModeExt(PIN_SENSOR1, INPUT_PULLUP); // this seems necessary for OS 3.2 
@@ -859,6 +861,9 @@ void do_loop()
 				// reset program busy bit
 				os.status.program_busy = 0;
 				pd.is_paused = 0;
+
+				phantom_offset = 0;
+
 				// log flow sensor reading if flow sensor is used
 				if(os.iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_FLOW) {
 					write_log(LOGDATA_FLOWSENSE, curr_time);
@@ -881,31 +886,22 @@ void do_loop()
 				// skip if this is the master station
 				if (os.status.mas == sid+1) continue;
 
-				if (pd.phantom_station) {
-					RuntimeQueueStruct* pst = pd.phantom_station;
-					// masbit = 1;
-					if (pst->st <= curr_time && curr_time <= pst->st + pst->dur) {
-						printf("current time: (%lu), phantom station (start: %lu, end: (%lu))\n", curr_time, pst->st, pst->st + pst->dur);
-						masbit = 1;
-						break;
-					} else {
-						printf("freeing\n");
-						masbit = 1;
-						free(pd.phantom_station);
-						pd.phantom_station = NULL;
-					}
-					
-				}
-
 				q=pd.queue+pd.station_qid[sid];
 
-				if (os.is_running(q->sid) && os.has_master(q->sid)) {
-
-					// check if timing is within the acceptable range
-					if (curr_time >= q->st + (mas_on_adj < 0 ? 0 : mas_on_adj) &&
-						curr_time <= q->st + q->dur + mas_off_adj) {
-						masbit = 1;
-						break;
+				if (os.bound_to_master(q->sid)) {
+					if (mas_on_adj < 0) {
+						if (curr_time < q->st && q->st - curr_time <= abs(mas_on_adj)) {
+							printf("diff: (%lu)\n", q->st - curr_time);
+							masbit = 1;
+						}
+					}
+					if (os.is_running(q->sid)) {
+						// check if timing is within the acceptable range
+						if (curr_time >= q->st + (mas_on_adj < 0 ? 0 : mas_on_adj) &&
+							curr_time <= q->st + q->dur + mas_off_adj) {
+							masbit = 1;
+							break;
+						}	
 					}
 				}
 			}
@@ -1095,26 +1091,28 @@ void turn_off_station(byte sid, ulong curr_time, byte shift) {
 
 		byte re = os.iopts[IOPT_REMOTE_EXT_MODE];
 
-		if (shift && os.is_sequential_station(q->sid) && !re) {
+		if (os.is_sequential_station(q->sid) && !re) {
+			if (shift) {
+				RuntimeQueueStruct *s = pd.queue;
+				ulong remainder = 0;
 
-			RuntimeQueueStruct *s = pd.queue;
-			ulong remainder = 0;
+				if (q->st + q->dur > curr_time) { // remainder is non-zero
+					remainder = q->st + q->dur - curr_time;
+					for ( ; s < pd.queue + pd.nqueue; s++) {			
+						if (s == q) { continue; }
 
-			if (q->st + q->dur > curr_time) { // remainder is non-zero
-				remainder = q->st + q->dur - curr_time;
-				for ( ; s < pd.queue + pd.nqueue; s++) {			
-					if (s == q) { continue; }
-
-					// only shift if the station is scheduled
-					if (s->st > curr_time) {
-						s->st -= remainder; 
-						s->st += 1;
+						// only shift if the station is scheduled
+						if (s->st > curr_time) {
+							s->st -= remainder; 
+							s->st += 1;
+						}
 					}
 				}
-			}	
+			}
 		}
 	} else { // station has not started yet
-		if (pd.is_paused && pd.nqueue == 1) {
+		if (pd.is_paused && pd.nqueue == 1) { 
+			// removing last element lifts global pause 
 			pd.clear_pause();
 		}
 	}
@@ -1177,12 +1175,15 @@ void process_dynamic_events(ulong curr_time) {
  * This function loops through the queue
  * and schedules the start time of each station
  */
+
 void schedule_all_stations(ulong curr_time) {
 
 	ulong con_start_time = curr_time + 1;		// concurrent start time
 	ulong seq_start_time = con_start_time;	// sequential start time
 
 	int16_t station_delay = water_time_decode_signed(os.iopts[IOPT_STATION_DELAY_TIME]);
+	int16_t mas_on_adj = water_time_decode_signed(os.iopts[IOPT_MASTER_ON_ADJ]);
+
 	// if the sequential queue has stations running
 	if (pd.last_seq_stop_time > curr_time) {
 		seq_start_time = pd.last_seq_stop_time + station_delay;
@@ -1215,19 +1216,14 @@ void schedule_all_stations(ulong curr_time) {
 		}
 
 		// handle if negative pump start time
-		if (os.has_master(q->sid)) {
-			int16_t mas_on_adj = water_time_decode_signed(os.iopts[IOPT_MASTER_ON_ADJ]);
-			if (mas_on_adj < 0) {
-				if (!pd.phantom_station) {
-					pd.phantom_station = new RuntimeQueueStruct();
-					pd.phantom_station->st = q->st;
-				}
-				printf("abs(-5) = (%i)\n", abs(mas_on_adj));
-				pd.phantom_station->dur += abs(mas_on_adj);
+		if (os.bound_to_master(q->sid)) {
+			if (mas_on_adj < 0 && !phantom_offset) { // don't make adjustment if master is already activated
+				printf("making phantom adjustment\n");
 				q->st += abs(mas_on_adj);
-
-				printf("start of phantom: (%lu), dur: (%lu)\n", pd.phantom_station->st, pd.phantom_station->dur);
-			}
+				phantom_offset = 1;
+			} 
+		} else {
+			phantom_offset = 0;
 		}
 		/*DEBUG_PRINT("[");
 		DEBUG_PRINT(sid);
@@ -1237,11 +1233,6 @@ void schedule_all_stations(ulong curr_time) {
 		DEBUG_PRINT(q->dur);
 		DEBUG_PRINT("]");
 		DEBUG_PRINTLN(pd.nqueue);*/
-
-		if (pd.phantom_station) {
-			printf("phantom station created: (start: %lu, end: %lu, dur: %lu)\n", 
-			pd.phantom_station->st, pd.phantom_station->st + pd.phantom_station->dur, pd.phantom_station->dur);
-		}
 
 		if (!os.status.program_busy) {
 			os.status.program_busy = 1;  // set program busy bit

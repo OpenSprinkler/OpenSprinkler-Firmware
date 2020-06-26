@@ -40,9 +40,6 @@ ulong ProgramData::last_seq_stop_time;
 byte ProgramData::is_paused;
 ulong ProgramData::pause_timer;
 
-// mock zone that is effectively turned off but treated as on to enable master functionality
-RuntimeQueueStruct* ProgramData::phantom_station = NULL;
-
 extern char tmp_buffer[];
 
 void ProgramData::init() {

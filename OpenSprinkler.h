@@ -208,7 +208,7 @@ public:
 	static void set_station_name(byte sid, char buf[]); // set station name
 	static byte get_station_type(byte sid); // get station type
 	static byte is_sequential_station(byte sid);
-	static byte has_master(byte sid);
+	static byte bound_to_master(byte sid);
 	static byte is_running(byte sid);
 
 	//static StationAttrib get_station_attrib(byte sid); // get station attribute
