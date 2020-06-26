@@ -79,8 +79,6 @@ ulong flow_count = 0;
 byte prev_flow_state = HIGH;
 float flow_last_gpm=0;
 
-byte phantom_offset = 0;
-
 void flow_poll() {
 	#if defined(ESP8266)
 	pinModeExt(PIN_SENSOR1, INPUT_PULLUP); // this seems necessary for OS 3.2 
@@ -862,8 +860,6 @@ void do_loop()
 				os.status.program_busy = 0;
 				pd.is_paused = 0;
 
-				phantom_offset = 0;
-
 				// log flow sensor reading if flow sensor is used
 				if(os.iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_FLOW) {
 					write_log(LOGDATA_FLOWSENSE, curr_time);
@@ -1216,14 +1212,11 @@ void schedule_all_stations(ulong curr_time) {
 		}
 
 		// handle if negative pump start time
-		if (os.bound_to_master(q->sid)) {
-			if (mas_on_adj < 0 && !phantom_offset) { // don't make adjustment if master is already activated
+		if (os.bound_to_master(q->sid) && curr_time < q->st && q->st - curr_time < abs(mas_on_adj)) {
+			if (mas_on_adj < 0) { // don't make adjustment if master is already activated
 				printf("making phantom adjustment\n");
 				q->st += abs(mas_on_adj);
-				phantom_offset = 1;
 			} 
-		} else {
-			phantom_offset = 0;
 		}
 		/*DEBUG_PRINT("[");
 		DEBUG_PRINT(sid);

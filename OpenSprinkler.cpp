@@ -65,6 +65,8 @@ byte OpenSprinkler::attrib_igrd[MAX_NUM_BOARDS];
 byte OpenSprinkler::attrib_dis[MAX_NUM_BOARDS];
 byte OpenSprinkler::attrib_seq[MAX_NUM_BOARDS];
 byte OpenSprinkler::attrib_spe[MAX_NUM_BOARDS];
+
+byte OpenSprinkler::master_zones[MAX_MASTER_ZONES];
 	
 extern char tmp_buffer[];
 extern char ether_buffer[];

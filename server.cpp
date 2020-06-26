@@ -1104,7 +1104,7 @@ void server_view_scripturl() {
 }
 
 void server_json_controller_main() {
-	byte bid, sid;
+	byte bid, sid, mid;
 	ulong curr_time = os.now_tz();
 	bfill.emit_p(PSTR("\"devt\":$L,\"nbrd\":$D,\"en\":$D,\"sn1\":$D,\"sn2\":$D,\"rd\":$D,\"rdst\":$L,"
 										"\"sunrise\":$D,\"sunset\":$D,\"eip\":$L,\"lwc\":$L,\"lswc\":$L,"
@@ -1174,7 +1174,12 @@ void server_json_controller_main() {
 			if(rem>65535) rem = 0;
 		}
 		bfill.emit_p(PSTR("[$D,$L,$L]"), (qid<255)?q->pid:0, rem, (qid<255)?q->st:0);
-		bfill.emit_p((sid<os.nstations-1)?PSTR(","):PSTR("]"));
+		bfill.emit_p((sid<os.nstations-1)?PSTR(","):PSTR("],"));
+	}
+	bfill.emit_p(PSTR("\"ms\":["));
+	for (mid = 0; mid < MAX_MASTER_ZONES; mid++) {
+		bfill.emit_p(PSTR("[$D, $D]"), 1, 1);
+		bfill.emit_p((mid < MAX_MASTER_ZONES - 1) ? PSTR(",") : PSTR("]"));
 	}
 	
 	//bfill.emit_p(PSTR(",\"blynk\":\"$O\""), SOPT_BLYNK_TOKEN);

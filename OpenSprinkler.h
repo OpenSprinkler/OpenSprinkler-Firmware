@@ -172,6 +172,8 @@ public:
 	static byte attrib_dis[];
 	static byte attrib_seq[];
 	static byte attrib_spe[];
+
+	static byte master_zones[];
 		
 	// variables for time keeping
 	static ulong sensor1_on_timer;	// time when sensor1 is detected on last time
