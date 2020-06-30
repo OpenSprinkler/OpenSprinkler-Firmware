@@ -66,7 +66,7 @@ byte OpenSprinkler::attrib_dis[MAX_NUM_BOARDS];
 byte OpenSprinkler::attrib_seq[MAX_NUM_BOARDS];
 byte OpenSprinkler::attrib_spe[MAX_NUM_BOARDS];
 
-byte OpenSprinkler::master_zones[MAX_MASTER_ZONES];
+byte OpenSprinkler::master[MAX_MASTER_ZONES][NUM_MASTER_OPTS];
 uint16_t OpenSprinkler::master_off_timer = 0;
 	
 extern char tmp_buffer[];
@@ -163,6 +163,7 @@ const char iopt_json_names[] PROGMEM =
 	"subn3"
 	"subn4"
 	"wimod"
+	"masli"
 	"reset"
 	;
 

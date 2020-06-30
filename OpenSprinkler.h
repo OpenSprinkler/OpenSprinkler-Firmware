@@ -173,7 +173,7 @@ public:
 	static byte attrib_seq[];
 	static byte attrib_spe[];
 
-	static byte master_zones[];
+	static byte master[MAX_MASTER_ZONES][NUM_MASTER_OPTS];
 	static uint16_t master_off_timer; // master_off_adjustment timekeeping structure, will need to turn into an array later for every master zone 
 		
 	// variables for time keeping

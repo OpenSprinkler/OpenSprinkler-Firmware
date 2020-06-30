@@ -149,6 +149,13 @@ typedef unsigned long ulong;
 
 #define MAX_MASTER_ZONES 2
 
+enum {
+	MASTER_STATION_NUM = 0, 
+	MASTER_STATION_ON_AJD, 
+	MASTER_STATION_OFF_ADJ,
+	NUM_MASTER_OPTS,
+};
+
 /** Macro define of each option
   * Refer to OpenSprinkler.cpp for details on each option
   */
@@ -216,7 +223,7 @@ enum {
 	IOPT_SUBNET_MASK3,
 	IOPT_SUBNET_MASK4,
 	IOPT_WIFI_MODE, //ro
-	MASTER_ARRAY,
+	IOPT_MASTER_ARRAY,
 	IOPT_RESET,     //ro
 	NUM_IOPTS // total number of integer options
 };

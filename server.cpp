@@ -1026,11 +1026,13 @@ void server_json_options_main() {
 	bfill.emit_p(PSTR(",\"dexp\":$D,\"mexp\":$D,\"hwt\":$D,"), os.detect_exp(), MAX_EXT_BOARDS, os.hw_type);
 
 	// print master array
-	byte masid;
+	byte masid, optidx;
 	bfill.emit_p(PSTR("\"ms\":["));
 	for (masid = 0; masid < MAX_MASTER_ZONES; masid++) {
-		bfill.emit_p(PSTR("$D"), os.master_zones[masid]);
-		bfill.emit_p((masid < MAX_MASTER_ZONES - 1) ? PSTR(",") : PSTR("]}"));
+		for (optidx = 0; optidx < NUM_MASTER_OPTS; optidx++) {
+			bfill.emit_p(PSTR("$D"), os.master[masid][optidx]);
+			bfill.emit_p((masid == MAX_MASTER_ZONES - 1 && optidx == NUM_MASTER_OPTS - 1) ? PSTR("]}") : PSTR(","));
+		}
 	}
 }
 
@@ -1399,7 +1401,6 @@ void server_change_options()
 		// json name only
 		char tbuf2[6];
 		strncpy_P0(tbuf2, iopt_json_names+oid*5, 5);
-		printf("name: %s\n", tbuf2);
 		if(findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, tbuf2)) {
 			int32_t v = atol(tmp_buffer);
 			if (oid==IOPT_MASTER_OFF_ADJ || oid==IOPT_MASTER_OFF_ADJ_2 ||
@@ -1425,8 +1426,15 @@ void server_change_options()
 		}
 	}
 	
-	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("masA"), true)) {
-		printf("found array wooohoo\n");
+	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("masli"), true)) {
+		printf("master: (%s)\n", tmp_buffer);
+		json_populate_master(tmp_buffer);
+		// for (int i = 0 ; i < MAX_MASTER_ZONES; i++) {
+		// 	for (int j = 0; j < NUM_MASTER_OPTS; j++) {
+		// 		printf("%i", os.master[i][j]);
+		// 	}
+		// }
+
 	}
 
 	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("loc"), true)) {
