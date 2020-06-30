@@ -147,6 +147,8 @@ typedef unsigned long ulong;
 #define DEFAULT_IFTTT_URL         	"maker.ifttt.com"
 #define DEFAULT_EMPTY_STRING      	""
 
+#define MAX_MASTER_ZONES 2
+
 /** Macro define of each option
   * Refer to OpenSprinkler.cpp for details on each option
   */
@@ -214,6 +216,7 @@ enum {
 	IOPT_SUBNET_MASK3,
 	IOPT_SUBNET_MASK4,
 	IOPT_WIFI_MODE, //ro
+	MASTER_ARRAY,
 	IOPT_RESET,     //ro
 	NUM_IOPTS // total number of integer options
 };

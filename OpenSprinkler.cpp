@@ -67,6 +67,7 @@ byte OpenSprinkler::attrib_seq[MAX_NUM_BOARDS];
 byte OpenSprinkler::attrib_spe[MAX_NUM_BOARDS];
 
 byte OpenSprinkler::master_zones[MAX_MASTER_ZONES];
+uint16_t OpenSprinkler::master_off_timer = 0;
 	
 extern char tmp_buffer[];
 extern char ether_buffer[];
@@ -2191,6 +2192,8 @@ void OpenSprinkler::lcd_print_station(byte line, char c) {
 		for (byte s=0; s<8; s++) {
 			byte sid = (byte)status.display_board<<3;
 			sid += (s+1);
+
+			// TODO: all of them should be labeled with M
 			if (sid == iopts[IOPT_MASTER_STATION]) {
 				lcd.print((bitvalue&1) ? c : 'M'); // print master station
 			} else if (sid == iopts[IOPT_MASTER_STATION_2]) {

@@ -876,7 +876,13 @@ void do_loop()
 		if (os.status.mas>0) {
 			int16_t mas_on_adj = water_time_decode_signed(os.iopts[IOPT_MASTER_ON_ADJ]);
 			int16_t mas_off_adj= water_time_decode_signed(os.iopts[IOPT_MASTER_OFF_ADJ]);
+
 			byte masbit = 0;
+
+			if (os.master_off_timer > 0) {
+				os.master_off_timer--;
+				masbit = 1;
+			}
 			
 			for(sid=0;sid<os.nstations;sid++) {
 				// skip if this is the master station
@@ -885,20 +891,20 @@ void do_loop()
 				q=pd.queue+pd.station_qid[sid];
 
 				if (os.bound_to_master(q->sid)) {
-					if (mas_on_adj < 0) {
-						if (curr_time < q->st && q->st - curr_time <= abs(mas_on_adj)) {
-							printf("diff: (%lu)\n", q->st - curr_time);
-							masbit = 1;
+
+					// necessary to handle individually because queue element will be dequeued: preemtiveley set a timer to handle later 
+					if (mas_off_adj > 0) {
+						if (q->st + q->dur - curr_time < mas_off_adj) {
+							os.master_off_timer = q->st + q->dur - curr_time + mas_off_adj;
 						}
 					}
-					if (os.is_running(q->sid)) {
-						// check if timing is within the acceptable range
-						if (curr_time >= q->st + (mas_on_adj < 0 ? 0 : mas_on_adj) &&
-							curr_time <= q->st + q->dur + mas_off_adj) {
-							masbit = 1;
-							break;
-						}	
-					}
+
+					// check if timing is within the acceptable range
+					if (curr_time >= q->st + mas_on_adj &&
+						curr_time <= q->st + q->dur + mas_off_adj) {
+						masbit = 1;
+						break;
+					}	
 				}
 			}
 			os.set_station_bit(os.status.mas-1, masbit);
@@ -928,7 +934,7 @@ void do_loop()
 		}		 
 
 		// process dynamic events
-		process_dynamic_events(curr_time);
+		process_dynamic_events(curr_time); // why is this called a second time? 
 
 		// activate/deactivate valves
 		os.apply_all_station_bits();
@@ -1211,13 +1217,12 @@ void schedule_all_stations(ulong curr_time) {
 			con_start_time++;
 		}
 
-		// handle if negative pump start time
-		if (os.bound_to_master(q->sid) && curr_time < q->st && q->st - curr_time < abs(mas_on_adj)) {
-			if (mas_on_adj < 0) { // don't make adjustment if master is already activated
-				printf("making phantom adjustment\n");
+		if (os.bound_to_master(q->sid) && mas_on_adj < 0) {
+			if (q->st - curr_time < abs(mas_on_adj)) {
 				q->st += abs(mas_on_adj);
-			} 
+			}
 		}
+
 		/*DEBUG_PRINT("[");
 		DEBUG_PRINT(sid);
 		DEBUG_PRINT(":");

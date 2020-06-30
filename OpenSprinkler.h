@@ -174,6 +174,7 @@ public:
 	static byte attrib_spe[];
 
 	static byte master_zones[];
+	static uint16_t master_off_timer; // master_off_adjustment timekeeping structure, will need to turn into an array later for every master zone 
 		
 	// variables for time keeping
 	static ulong sensor1_on_timer;	// time when sensor1 is detected on last time
