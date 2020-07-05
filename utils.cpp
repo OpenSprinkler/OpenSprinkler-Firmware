@@ -584,13 +584,3 @@ void peel_http_header(char* buffer) { // remove the HTTP header
 		i++;
 	}
 }
-
-void json_populate_master(char * str) {
-	byte idx = 0;
-	for (char *it = str; *it != 0; it++) {
-		if (*it != ',') {
-			os.master[idx / NUM_MASTER_OPTS][idx % NUM_MASTER_OPTS] = atoi(it);
-			idx++;
-		}
-	}
-}

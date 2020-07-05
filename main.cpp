@@ -752,16 +752,6 @@ void do_loop()
 				DEBUG_PRINTLN("");*/
 			}
 		}//if_check_current_minute
-
-		if (pd.is_paused) {
-			if (pd.pause_timer > 0) {
-				pd.pause_timer--;
-			} else {
-				pd.is_paused= 0;
-				os.clear_all_station_bits();
-				os.status.program_busy = 1;
-			}
-		}
 		
 		// ====== Run program data ======
 		// Check if a program is running currently
@@ -873,32 +863,19 @@ void do_loop()
 		}//if_some_program_is_running
 
 		// handle master
-		if (os.status.mas>0) {
+		if (os.status.mas > 0) {
 			int16_t mas_on_adj = water_time_decode_signed(os.iopts[IOPT_MASTER_ON_ADJ]);
 			int16_t mas_off_adj= water_time_decode_signed(os.iopts[IOPT_MASTER_OFF_ADJ]);
 
 			byte masbit = 0;
-
-			if (os.master_off_timer > 0) {
-				os.master_off_timer--;
-				masbit = 1;
-			}
 			
-			for(sid=0;sid<os.nstations;sid++) {
+			for(sid = 0; sid < os.nstations; sid++) {
 				// skip if this is the master station
-				if (os.status.mas == sid+1) continue;
+				if (os.status.mas == sid + 1) continue;
 
 				q=pd.queue+pd.station_qid[sid];
 
 				if (os.bound_to_master(q->sid)) {
-
-					// necessary to handle individually because queue element will be dequeued: preemtiveley set a timer to handle later 
-					if (mas_off_adj > 0) {
-						if (q->st + q->dur - curr_time < mas_off_adj) {
-							os.master_off_timer = q->st + q->dur - curr_time + mas_off_adj;
-						}
-					}
-
 					// check if timing is within the acceptable range
 					if (curr_time >= q->st + mas_on_adj &&
 						curr_time <= q->st + q->dur + mas_off_adj) {
@@ -907,31 +884,41 @@ void do_loop()
 					}	
 				}
 			}
-			os.set_station_bit(os.status.mas-1, masbit);
+			os.set_station_bit(os.status.mas - 1, masbit);
 		}
 		// handle master2
-		if (os.status.mas2>0) {
+		if (os.status.mas2 > 0) {
 			int16_t mas_on_adj_2 = water_time_decode_signed(os.iopts[IOPT_MASTER_ON_ADJ_2]);
 			int16_t mas_off_adj_2= water_time_decode_signed(os.iopts[IOPT_MASTER_OFF_ADJ_2]);
+
 			byte masbit2 = 0;
-			for(sid=0;sid<os.nstations;sid++) {
+
+			for(sid = 0; sid < os.nstations; sid++) {
 				// skip if this is the master station
-				if (os.status.mas2 == sid+1) continue;
-				bid = sid>>3;
-				s = sid&0x07;
-				// if this station is running and is set to activate master
-				if ((os.station_bits[bid]&(1<<s)) && (os.attrib_mas2[bid]&(1<<s))) {
-					q=pd.queue+pd.station_qid[sid];
-					// check if timing is within the acceptable range
+				if (os.status.mas2 == sid + 1) continue;
+
+				q=pd.queue+pd.station_qid[sid];
+
+				if (os.bound_to_master2(q->sid)) {
 					if (curr_time >= q->st + mas_on_adj_2 &&
-							curr_time <= q->st + q->dur + mas_off_adj_2) {
+						curr_time <= q->st + q->dur + mas_off_adj_2) {
 						masbit2 = 1;
 						break;
-					}
+					}	
 				}
 			}
-			os.set_station_bit(os.status.mas2-1, masbit2);
-		}		 
+			os.set_station_bit(os.status.mas2 - 1, masbit2);
+		}	
+
+		if (pd.is_paused) {
+			if (pd.pause_timer > 0) {
+				pd.pause_timer--;
+			} else {
+				pd.is_paused= 0;
+				os.clear_all_station_bits();
+				os.status.program_busy = 1;
+			}
+		}	 
 
 		// process dynamic events
 		process_dynamic_events(curr_time); // why is this called a second time? 

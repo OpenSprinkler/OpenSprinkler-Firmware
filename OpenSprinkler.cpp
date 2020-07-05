@@ -66,8 +66,6 @@ byte OpenSprinkler::attrib_dis[MAX_NUM_BOARDS];
 byte OpenSprinkler::attrib_seq[MAX_NUM_BOARDS];
 byte OpenSprinkler::attrib_spe[MAX_NUM_BOARDS];
 
-byte OpenSprinkler::master[MAX_MASTER_ZONES][NUM_MASTER_OPTS];
-uint16_t OpenSprinkler::master_off_timer = 0;
 	
 extern char tmp_buffer[];
 extern char ether_buffer[];
@@ -1344,6 +1342,13 @@ byte OpenSprinkler::bound_to_master(byte sid) {
 	byte s = sid & 0x07;
 
 	return attrib_mas[bid] & (1 << s);
+}
+
+byte OpenSprinkler::bound_to_master2(byte sid) {
+	byte bid = sid >> 3;
+	byte s = sid & 0x07;
+
+	return attrib_mas2[bid] & (1 << s);
 }
 
 byte OpenSprinkler::is_running(byte sid) {

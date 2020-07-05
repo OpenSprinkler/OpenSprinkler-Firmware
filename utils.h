@@ -54,7 +54,6 @@ byte water_time_encode_signed(int16_t i);
 int16_t water_time_decode_signed(byte i);
 void urlDecode(char*);
 void peel_http_header(char*);
-void json_populate_master(char* str);
 
 #if defined(ARDUINO)
 

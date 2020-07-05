@@ -155,7 +155,6 @@ void ProgramData::update_pause(uint16_t delay) {
 
 	for (byte i = 0; i < nqueue; i++) {
 		s = queue + i;
-		printf("prev start: (%i), delay: (%i), duration: (%i)\n", s->st, delay, s->dur);
 
 		if (s->st + s->dur < pause_t) { // already run 
 			continue; 
@@ -169,7 +168,6 @@ void ProgramData::update_pause(uint16_t delay) {
 		if (s->st + s->dur > last_seq_stop_time) {
 			last_seq_stop_time = s->st + s->dur;
 		} 
-		printf("new start: (%i), new dur (%i)\n", s->st, s->dur);
 	}
 }
 
@@ -180,7 +178,7 @@ void ProgramData::resume_stations() {
 
 	for (byte i = 0; i < nqueue; i++) {
 		s = queue + i;
-		s->st += 1 - pause_timer; 
+		s->st += 1 - pause_timer; 		
 	}
 }
 

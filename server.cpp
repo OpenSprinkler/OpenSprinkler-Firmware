@@ -1023,17 +1023,7 @@ void server_json_options_main() {
 			bfill.emit_p(PSTR(","));
 	}
 
-	bfill.emit_p(PSTR(",\"dexp\":$D,\"mexp\":$D,\"hwt\":$D,"), os.detect_exp(), MAX_EXT_BOARDS, os.hw_type);
-
-	// print master array
-	byte masid, optidx;
-	bfill.emit_p(PSTR("\"ms\":["));
-	for (masid = 0; masid < MAX_MASTER_ZONES; masid++) {
-		for (optidx = 0; optidx < NUM_MASTER_OPTS; optidx++) {
-			bfill.emit_p(PSTR("$D"), os.master[masid][optidx]);
-			bfill.emit_p((masid == MAX_MASTER_ZONES - 1 && optidx == NUM_MASTER_OPTS - 1) ? PSTR("]}") : PSTR(","));
-		}
-	}
+	bfill.emit_p(PSTR(",\"dexp\":$D,\"mexp\":$D,\"hwt\":$D}"), os.detect_exp(), MAX_EXT_BOARDS, os.hw_type);
 }
 
 /** Output Options */
@@ -1425,20 +1415,8 @@ void server_change_options()
 			if (oid>=IOPT_SENSOR1_TYPE && oid<=IOPT_SENSOR2_OFF_DELAY) sensor_change = true;
 		}
 	}
-	
-	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("masli"), true)) {
-		printf("master: (%s)\n", tmp_buffer);
-		json_populate_master(tmp_buffer);
-		// for (int i = 0 ; i < MAX_MASTER_ZONES; i++) {
-		// 	for (int j = 0; j < NUM_MASTER_OPTS; j++) {
-		// 		printf("%i", os.master[i][j]);
-		// 	}
-		// }
-
-	}
 
 	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("loc"), true)) {
-		printf("location found!\n");
 		urlDecode(tmp_buffer);
 		if (os.sopt_save(SOPT_LOCATION, tmp_buffer)) { // if location string has changed
 			weather_change = true;
@@ -1892,8 +1870,6 @@ void server_pause_queue() {
 	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("dur"), true)) {
 		duration = atoi(tmp_buffer);
 	}
-
-	printf("data: (%i)\n", duration);
 
 	pd.toggle_pause(duration);
 

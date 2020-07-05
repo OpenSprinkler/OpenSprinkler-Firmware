@@ -172,9 +172,6 @@ public:
 	static byte attrib_dis[];
 	static byte attrib_seq[];
 	static byte attrib_spe[];
-
-	static byte master[MAX_MASTER_ZONES][NUM_MASTER_OPTS];
-	static uint16_t master_off_timer; // master_off_adjustment timekeeping structure, will need to turn into an array later for every master zone 
 		
 	// variables for time keeping
 	static ulong sensor1_on_timer;	// time when sensor1 is detected on last time
@@ -212,6 +209,7 @@ public:
 	static byte get_station_type(byte sid); // get station type
 	static byte is_sequential_station(byte sid);
 	static byte bound_to_master(byte sid);
+	static byte bound_to_master2(byte sid);
 	static byte is_running(byte sid);
 
 	//static StationAttrib get_station_attrib(byte sid); // get station attribute
