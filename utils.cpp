@@ -584,3 +584,13 @@ void peel_http_header(char* buffer) { // remove the HTTP header
 		i++;
 	}
 }
+
+void populate_master() {
+	os.master[MASTER_1][MASTER_STATION_ID] = os.iopts[IOPT_MASTER_STATION];
+	os.master[MASTER_1][MASTER_STATION_ON_AJD] = os.iopts[IOPT_MASTER_ON_ADJ];
+	os.master[MASTER_1][MASTER_STATION_OFF_ADJ] = os.iopts[IOPT_MASTER_OFF_ADJ];
+
+	os.master[MASTER_2][MASTER_STATION_ID] = os.iopts[IOPT_MASTER_STATION_2];
+	os.master[MASTER_2][MASTER_STATION_ON_AJD] = os.iopts[IOPT_MASTER_ON_ADJ_2];
+	os.master[MASTER_2][MASTER_STATION_OFF_ADJ] = os.iopts[IOPT_MASTER_OFF_ADJ_2];
+}

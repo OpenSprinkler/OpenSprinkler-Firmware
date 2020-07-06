@@ -119,6 +119,7 @@ public:
 	uint16_t 	dur; // water time
 	byte		sid;
 	byte		pid;
+	ulong 		deque_time;
 };
 
 class ProgramData {

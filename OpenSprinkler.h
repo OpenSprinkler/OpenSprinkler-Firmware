@@ -172,6 +172,8 @@ public:
 	static byte attrib_dis[];
 	static byte attrib_seq[];
 	static byte attrib_spe[];
+
+	static byte master[NUM_MASTER_ZONES][NUM_MASTER_OPTS];
 		
 	// variables for time keeping
 	static ulong sensor1_on_timer;	// time when sensor1 is detected on last time
@@ -208,8 +210,9 @@ public:
 	static void set_station_name(byte sid, char buf[]); // set station name
 	static byte get_station_type(byte sid); // get station type
 	static byte is_sequential_station(byte sid);
-	static byte bound_to_master(byte sid);
-	static byte bound_to_master2(byte sid);
+	static byte bound_to_master(byte sid, byte mas);
+	static int16_t get_on_adj(byte mas);
+	static int16_t get_off_adj(byte mas);
 	static byte is_running(byte sid);
 
 	//static StationAttrib get_station_attrib(byte sid); // get station attribute

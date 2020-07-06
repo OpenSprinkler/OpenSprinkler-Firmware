@@ -805,9 +805,9 @@ void do_loop()
 
 			// finally, go through the queue again and clear up elements marked for removal
 			int qi;
-			for(qi=pd.nqueue-1;qi>=0;qi--) {
-				q=pd.queue+qi;
-				if(!q->dur || curr_time>=q->st+q->dur)	{
+			for(qi= pd.nqueue - 1; qi >= 0; qi--) {
+				q = pd.queue + qi;
+				if((!q->dur || curr_time >= q->st + q->dur) && curr_time >= q->deque_time) {
 					pd.dequeue(qi);
 				}
 			}
@@ -861,54 +861,36 @@ void do_loop()
 				os.status.mas2= os.iopts[IOPT_MASTER_STATION_2]; // update master2 station
 			}
 		}//if_some_program_is_running
+		
+		// handle master 
+		for (byte mas = MASTER_1; mas < NUM_MASTER_ZONES; mas++) {
 
-		// handle master
-		if (os.status.mas > 0) {
-			int16_t mas_on_adj = water_time_decode_signed(os.iopts[IOPT_MASTER_ON_ADJ]);
-			int16_t mas_off_adj= water_time_decode_signed(os.iopts[IOPT_MASTER_OFF_ADJ]);
+			byte mas_id = os.master[mas][MASTER_STATION_ID];
 
-			byte masbit = 0;
-			
-			for(sid = 0; sid < os.nstations; sid++) {
-				// skip if this is the master station
-				if (os.status.mas == sid + 1) continue;
+			if (mas_id) { // if this master station is set 
+				int16_t mas_on_adj = os.get_on_adj(mas);
+				int16_t mas_off_adj = os.get_off_adj(mas);
 
-				q=pd.queue+pd.station_qid[sid];
+				byte masbit = 0;
 
-				if (os.bound_to_master(q->sid)) {
-					// check if timing is within the acceptable range
-					if (curr_time >= q->st + mas_on_adj &&
-						curr_time <= q->st + q->dur + mas_off_adj) {
-						masbit = 1;
-						break;
-					}	
+				for(sid = 0; sid < os.nstations; sid++) {
+					// skip if this is the master station
+					if (mas_id == sid + 1) continue;
+
+					q=pd.queue+pd.station_qid[sid];
+
+					if (os.bound_to_master(q->sid, mas)) {
+						// check if timing is within the acceptable range
+						if (curr_time >= q->st + mas_on_adj &&
+							curr_time <= q->st + q->dur + mas_off_adj) {
+							masbit = 1;
+							break;
+						}	
+					}
 				}
+				os.set_station_bit(mas_id - 1, masbit);
 			}
-			os.set_station_bit(os.status.mas - 1, masbit);
 		}
-		// handle master2
-		if (os.status.mas2 > 0) {
-			int16_t mas_on_adj_2 = water_time_decode_signed(os.iopts[IOPT_MASTER_ON_ADJ_2]);
-			int16_t mas_off_adj_2= water_time_decode_signed(os.iopts[IOPT_MASTER_OFF_ADJ_2]);
-
-			byte masbit2 = 0;
-
-			for(sid = 0; sid < os.nstations; sid++) {
-				// skip if this is the master station
-				if (os.status.mas2 == sid + 1) continue;
-
-				q=pd.queue+pd.station_qid[sid];
-
-				if (os.bound_to_master2(q->sid)) {
-					if (curr_time >= q->st + mas_on_adj_2 &&
-						curr_time <= q->st + q->dur + mas_off_adj_2) {
-						masbit2 = 1;
-						break;
-					}	
-				}
-			}
-			os.set_station_bit(os.status.mas2 - 1, masbit2);
-		}	
 
 		if (pd.is_paused) {
 			if (pd.pause_timer > 0) {
@@ -1107,8 +1089,10 @@ void turn_off_station(byte sid, ulong curr_time, byte shift) {
 	}
 
 	// dequeue the element
-	pd.dequeue(qid);
-	pd.station_qid[sid] = 0xFF;
+	if (curr_time >= q->deque_time) {
+		pd.dequeue(qid);
+		pd.station_qid[sid] = 0xFF;
+	}
 }
 
 /** Process dynamic events
@@ -1171,7 +1155,6 @@ void schedule_all_stations(ulong curr_time) {
 	ulong seq_start_time = con_start_time;	// sequential start time
 
 	int16_t station_delay = water_time_decode_signed(os.iopts[IOPT_STATION_DELAY_TIME]);
-	int16_t mas_on_adj = water_time_decode_signed(os.iopts[IOPT_MASTER_ON_ADJ]);
 
 	// if the sequential queue has stations running
 	if (pd.last_seq_stop_time > curr_time) {
@@ -1204,11 +1187,28 @@ void schedule_all_stations(ulong curr_time) {
 			con_start_time++;
 		}
 
-		if (os.bound_to_master(q->sid) && mas_on_adj < 0) {
-			if (q->st - curr_time < abs(mas_on_adj)) {
-				q->st += abs(mas_on_adj);
+		q->deque_time = q->st + q->dur; // by default dequeue time should be when the station ends
+
+		// master adjustments 
+		int16_t start_adj = 0;
+		int16_t dequeue_adj = 0;
+
+		for (byte mas = MASTER_1; mas < NUM_MASTER_ZONES; mas++) {
+			if (os.bound_to_master(q->sid, mas)) {
+
+				int16_t mas_on_adj = os.get_on_adj(mas);
+				int16_t mas_off_adj = os.get_off_adj(mas);
+
+				start_adj = min(start_adj, mas_on_adj); 
+				dequeue_adj = max(dequeue_adj, mas_off_adj);
 			}
 		}
+
+		if (q->st - curr_time < abs(start_adj)) {
+			q->st += abs(start_adj);
+		}
+
+		q->deque_time += dequeue_adj;
 
 		/*DEBUG_PRINT("[");
 		DEBUG_PRINT(sid);

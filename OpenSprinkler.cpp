@@ -66,7 +66,8 @@ byte OpenSprinkler::attrib_dis[MAX_NUM_BOARDS];
 byte OpenSprinkler::attrib_seq[MAX_NUM_BOARDS];
 byte OpenSprinkler::attrib_spe[MAX_NUM_BOARDS];
 
-	
+byte OpenSprinkler::master[NUM_MASTER_ZONES][NUM_MASTER_OPTS];
+
 extern char tmp_buffer[];
 extern char ether_buffer[];
 
@@ -1337,18 +1338,25 @@ byte OpenSprinkler::is_sequential_station(byte sid) {
 	return attrib_seq[bid] & (1 << s);
 }
 
-byte OpenSprinkler::bound_to_master(byte sid) {
-	byte bid = sid >> 3;
-	byte s = sid & 0x07;
-
-	return attrib_mas[bid] & (1 << s);
+int16_t OpenSprinkler::get_on_adj(byte mas) {
+	return water_time_decode_signed(master[mas][MASTER_STATION_ON_AJD]);
 }
 
-byte OpenSprinkler::bound_to_master2(byte sid) {
+int16_t OpenSprinkler::get_off_adj(byte mas) {
+	return water_time_decode_signed(master[mas][MASTER_STATION_OFF_ADJ]);
+}
+
+byte OpenSprinkler::bound_to_master(byte sid, byte mas) {
 	byte bid = sid >> 3;
 	byte s = sid & 0x07;
 
-	return attrib_mas2[bid] & (1 << s);
+	// make this more robust
+
+	if (mas == MASTER_1) {
+		return attrib_mas[bid] & (1 << s);
+	} else {
+		return attrib_mas2[bid] & (1 << s);
+	}
 }
 
 byte OpenSprinkler::is_running(byte sid) {
@@ -2033,6 +2041,7 @@ void OpenSprinkler::iopts_save() {
 	nboards = iopts[IOPT_EXT_BOARDS]+1;
 	nstations = nboards * 8;
 	status.enabled = iopts[IOPT_DEVICE_ENABLE];
+	populate_master();
 }
 
 /** Load a string option from file */

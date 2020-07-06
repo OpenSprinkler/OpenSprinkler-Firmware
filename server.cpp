@@ -1023,7 +1023,16 @@ void server_json_options_main() {
 			bfill.emit_p(PSTR(","));
 	}
 
-	bfill.emit_p(PSTR(",\"dexp\":$D,\"mexp\":$D,\"hwt\":$D}"), os.detect_exp(), MAX_EXT_BOARDS, os.hw_type);
+	bfill.emit_p(PSTR(",\"dexp\":$D,\"mexp\":$D,\"hwt\":$D,"), os.detect_exp(), MAX_EXT_BOARDS, os.hw_type);
+	// print master array
+	byte masid, optidx;
+	bfill.emit_p(PSTR("\"ms\":["));
+	for (masid = 0; masid < NUM_MASTER_ZONES; masid++) {
+		for (optidx = 0; optidx < NUM_MASTER_OPTS; optidx++) {
+			bfill.emit_p(PSTR("$D"), os.master[masid][optidx]);
+			bfill.emit_p((masid == NUM_MASTER_ZONES - 1 && optidx == NUM_MASTER_OPTS - 1) ? PSTR("]}") : PSTR(","));
+		}
+	}
 }
 
 /** Output Options */

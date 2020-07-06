@@ -147,10 +147,16 @@ typedef unsigned long ulong;
 #define DEFAULT_IFTTT_URL         	"maker.ifttt.com"
 #define DEFAULT_EMPTY_STRING      	""
 
-#define MAX_MASTER_ZONES 2
+/* master properties */
 
 enum {
-	MASTER_STATION_NUM = 0, 
+	MASTER_1 = 0,
+	MASTER_2,
+	NUM_MASTER_ZONES,
+};
+
+enum {
+	MASTER_STATION_ID = 0, 
 	MASTER_STATION_ON_AJD, 
 	MASTER_STATION_OFF_ADJ,
 	NUM_MASTER_OPTS,
