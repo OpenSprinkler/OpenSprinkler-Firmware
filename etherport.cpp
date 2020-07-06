@@ -72,7 +72,7 @@ bool EthernetServer::begin()
 		DEBUG_PRINTLN("can't setsockopt IPV6_V6ONLY");
 		return false;
 	}
-	if (bind(m_sock, (struct sockaddr *) &sin, sizeof(sin)) < 0)
+	if (::bind(m_sock, (struct sockaddr *) &sin, sizeof(sin)) < 0)
 	{
 		DEBUG_PRINTLN("shell bind error");
 		return false;
