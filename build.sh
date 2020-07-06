@@ -10,22 +10,19 @@ while getopts ":s" opt; do
 done
 echo "Building OpenSprinkler..."
 
+echo "Installing required libraries..."
+apt-get install -y libmosquitto-dev
+
 if [ "$1" == "demo" ]; then
-	echo "Installing required libraries..."
-	apt-get install -y libmosquitto-dev
-	echo "Compiling firmware..."
-	g++ -o OpenSprinkler -DDEMO -m32 main.cpp OpenSprinkler.cpp program.cpp server.cpp utils.cpp weather.cpp gpio.cpp etherport.cpp mqtt.cpp -lpthread -lmosquitto
+	CFLAGS="-DDEMO -m32"
 elif [ "$1" == "osbo" ]; then
-	echo "Installing required libraries..."
-	apt-get install -y libmosquitto-dev
-	echo "Compiling firmware..."
-	g++ -o OpenSprinkler -DOSBO main.cpp OpenSprinkler.cpp program.cpp server.cpp utils.cpp weather.cpp gpio.cpp etherport.cpp mqtt.cpp -lpthread -lmosquitto
+	CFLAGS="-DOSBO"
 else
-	echo "Installing required libraries..."
-	apt-get install -y libmosquitto-dev
-	echo "Compiling firmware..."
-	g++ -o OpenSprinkler -DOSPI main.cpp OpenSprinkler.cpp program.cpp server.cpp utils.cpp weather.cpp gpio.cpp etherport.cpp mqtt.cpp -lpthread -lmosquitto
+	CFLAGS="-DOSPI"
 fi
+echo "Compiling firmware..."
+SRCS="main.cpp OpenSprinkler.cpp program.cpp server.cpp utils.cpp weather.cpp gpio.cpp etherport.cpp mqtt.cpp"
+g++ -o OpenSprinkler $CFLAGS $SRCS -lpthread -lmosquitto
 
 if [ ! "$SILENT" = true ] && [ -f OpenSprinkler.launch ] && [ ! -f /etc/init.d/OpenSprinkler.sh ]; then
 
