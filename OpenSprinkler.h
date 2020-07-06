@@ -270,6 +270,21 @@ public:
 	static void lcd_print_station(byte line, char c);				// print station bits of the board selected by display_board
 	static void lcd_print_version(byte v);									 // print version number
 
+	static String time2str(uint32_t t) {
+		uint16_t h = hour(t);
+		uint16_t m = minute(t);
+		uint16_t s = second(t);
+		String str = "";
+		str+=h/10;
+		str+=h%10;
+		str+=":";
+		str+=m/10;
+		str+=m%10;
+		str+=":";
+		str+=s/10;
+		str+=s%10;
+		return str;
+	}
 	// -- UI and buttons
 	static byte button_read(byte waitmode); // Read button value. options for 'waitmodes' are:
 																					// BUTTON_WAIT_NONE, BUTTON_WAIT_RELEASE, BUTTON_WAIT_HOLD

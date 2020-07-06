@@ -1473,7 +1473,7 @@ void server_change_options()
 	// if not using NTP and manually setting time
 	if (!os.iopts[IOPT_USE_NTP] && findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("ttt"), true)) {
 		unsigned long t;
-		t = atol(tmp_buffer);
+		t = strtoul(tmp_buffer, NULL, 0);
 		// before chaging time, reset all stations to avoid messing up with timing
 		reset_all_stations_immediate();
 #if defined(ARDUINO)
@@ -1688,11 +1688,11 @@ void server_json_log() {
 	{
 		if (!findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("start"), true)) handle_return(HTML_DATA_MISSING);
 
-		start = atol(tmp_buffer) / 86400L;
+		start = strtoul(tmp_buffer, NULL, 0) / 86400L;
 
 		if (!findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("end"), true)) handle_return(HTML_DATA_MISSING);
 		
-		end = atol(tmp_buffer) / 86400L;
+		end = strtoul(tmp_buffer, NULL, 0) / 86400L;
 
 		// start must be prior to end, and can't retrieve more than 365 days of data
 		if ((start>end) || (end-start)>365)  handle_return(HTML_DATA_OUTOFBOUND);
@@ -2200,19 +2200,20 @@ ulong getNtpTime()
 			delay(1000);
 		}
 		ulong gt = 0;
-		byte tick=0;
-		if (ntp->update()) {
-			do {
+		byte tries=0;
+		while(tries<5) {
+			if (ntp->update()) {
 				gt = ntp->getEpochTime();
-				tick++;
+				if(gt>978307200L) break;
+				tries++;
 				delay(1000);
-			} while(gt<978307200L && tick<20);
-			if(gt<978307200L) {
-				DEBUG_PRINTLN(F("NTP-E failed!"));
-				gt=0;
-			} else {
-				DEBUG_PRINTLN(F("NTP-E done."));
 			}
+		}
+		if(gt<978307200L) {
+			DEBUG_PRINTLN(F("NTP-E failed!"));
+			gt=0;
+		} else {
+			DEBUG_PRINTLN(F("NTP-E done."));
 		}
 		return gt;
 	}
@@ -2240,12 +2241,13 @@ ulong getNtpTime()
 		configured = true;
 	}
 	ulong gt = 0;
-	byte tick=0;
-	do {
+	byte tries=0;
+	while(tries<5) {
 		gt = time(nullptr);
-		tick++;
+		if(gt>978307200L) break;
+		tries++;
 		delay(1000);
-	} while(gt<978307200L && tick<20);
+	};
 	if(gt<978307200L)  {
 		DEBUG_PRINTLN(F("NTP failed!"));
 		gt=0;

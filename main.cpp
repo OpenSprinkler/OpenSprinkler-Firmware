@@ -54,9 +54,9 @@ void remote_http_callback(char*);
 // Small variations have been added to the timing values below
 // to minimize conflicting events
 #define NTP_SYNC_INTERVAL				86413L 	// NYP sync interval, in units of seconds
-#define RTC_SYNC_INTERVAL				3607		// RTC sync interval, 3600 secs
-#define CHECK_NETWORK_INTERVAL	601			// Network checking timeout, 10 minutes
-#define CHECK_WEATHER_TIMEOUT		7207L		// Weather check interval: 2 hours
+#define RTC_SYNC_INTERVAL				3607		// RTC sync interval
+#define CHECK_NETWORK_INTERVAL	601			// Network checking timeout
+#define CHECK_WEATHER_TIMEOUT		21613L  // Weather check interval
 #define CHECK_WEATHER_SUCCESS_TIMEOUT 86400L // Weather check success interval: 24 hrs
 #define LCD_BACKLIGHT_TIMEOUT		15			// LCD backlight timeout: 15 secs
 #define PING_TIMEOUT						200			// Ping test timeout: 200 ms
@@ -292,6 +292,7 @@ void do_setup() {
 #endif
 
 	DEBUG_BEGIN(115200);
+	DEBUG_PRINTLN("");
 	
 	os.begin();					 // OpenSprinkler init
 	os.options_setup();  // Setup options
@@ -321,7 +322,7 @@ void do_setup() {
 		os.status.network_fails = 1;
 	}
 	os.status.req_network = 0;
-	os.status.req_ntpsync = 1;
+	os.status.req_ntpsync = 0;
 
 	os.mqtt.init();
 	os.status.req_mqtt_restart = true;
@@ -412,13 +413,56 @@ void do_loop()
 	os.status.mas2= os.iopts[IOPT_MASTER_STATION_2];
 	time_t curr_time = os.now_tz();
 	
+	#define PHY_TIMEOUT 8	// ray debug
+	static ulong phy_timeout = 0;
+	static ulong last_cli_time = 0;
+	static ulong last_mqtt_time = 0;
+	static ulong last_scheduler_time = 0;
+	static ulong last_checkwt_time = 0;
+	static ulong last_pushmsg_time = 0;
+
 	// ====== Process Ethernet packets ======
 #if defined(ARDUINO)	// Process Ethernet packets for Arduino
 	#if defined(ESP8266)
 	static ulong connecting_timeout;
 	if (m_server) {	// if wired Ethernet
 		led_blink_ms = 0;
+
+		ulong maintain = millis(); // ray debug
 		Ethernet.maintain(); // todo: is this necessary?
+		maintain = millis()-maintain;
+		
+		if(curr_time >= phy_timeout) { // ray debug
+			if(phy_timeout && curr_time > phy_timeout + PHY_TIMEOUT)
+			{
+				DEBUG_PRINT(F("crash detected --"));
+				uint16_t phy = Enc28J60.PhyStatus();
+				uint16_t heap = ESP.getFreeHeap();
+
+				DEBUG_PRINT(curr_time);
+				DEBUG_PRINT("|");
+				DEBUG_PRINT(os.time2str(curr_time));
+				DEBUG_PRINT("|PHY:");
+				DEBUG_PRINT(phy);
+				DEBUG_PRINT("|MAN:");
+				DEBUG_PRINT(maintain);
+				DEBUG_PRINT("|CLI:");
+				DEBUG_PRINT(last_cli_time);
+				DEBUG_PRINT("|MQT:");
+				DEBUG_PRINT(last_mqtt_time);
+				DEBUG_PRINT("|SCH:");
+				DEBUG_PRINT(last_scheduler_time);
+				DEBUG_PRINT("|CWT:");
+				DEBUG_PRINT(last_checkwt_time);
+				DEBUG_PRINT("|PUS:");
+				DEBUG_PRINT(last_pushmsg_time);
+				DEBUG_PRINTLN("");
+				os.status.safe_reboot = 1;
+			}
+			phy_timeout = curr_time + PHY_TIMEOUT;
+		}
+
+		last_cli_time = millis(); // ray debug
 		EthernetClient client = m_server->available();
 		if (client) {
 			while (true) {
@@ -439,6 +483,8 @@ void do_loop()
 				}
 			}
 		}
+		last_cli_time = millis()-last_cli_time;
+
 	} else {	
 		switch(os.state) {
 		case OS_STATE_INITIAL:
@@ -562,53 +608,19 @@ void do_loop()
 	}
 #endif	// Process Ethernet packets
 
+	last_mqtt_time = millis();
 	// Start up MQTT when we have a network connection
 	if (os.status.req_mqtt_restart && os.network_connected()) {
 		os.mqtt.begin();
 		os.status.req_mqtt_restart = false;
 	}
 	os.mqtt.loop();
+	last_mqtt_time = millis()-last_mqtt_time;
 
 	// The main control loop runs once every second
 	if (curr_time != last_time) {
-#if defined(ENABLE_DEBUG)
-	/*
-	#if defined(ESP8266)
-	{
-		static uint16_t lastHeap = 0;
-		static uint32_t lastHeapTime = 0;
-		uint16_t heap = ESP.getFreeHeap();
-		if(heap != lastHeap) {
-			DEBUG_PRINT(F("Heap:"));
-			DEBUG_PRINT(heap);
-			DEBUG_PRINT("|");
-			DEBUG_PRINTLN(curr_time - lastHeapTime);
-			lastHeap = heap;
-			lastHeapTime = curr_time;
-		}
-	}
-	#elif defined(ARDUINO) 
-	{
-		extern unsigned int __bss_end;
-		extern unsigned int __heap_start;
-		extern void *__brkval;
-		static int last_free_memory = 0;
-		int free_memory;
 
-		if((int)__brkval == 0)
-		   free_memory = ((int)&free_memory) - ((int)&__bss_end);
-		else
-		  free_memory = ((int)&free_memory) - ((int)__brkval);
-		if(free_memory != last_free_memory) {
-			DEBUG_PRINT(F("Heap:"));
-			DEBUG_PRINT(free_memory);
-			DEBUG_PRINT("|");
-			last_free_memory = free_memory;
-		}
-	}
-	#endif
-	*/
-#endif
+		last_scheduler_time = millis();
 
 		#if defined(ESP8266)
 		pinModeExt(PIN_SENSOR1, INPUT_PULLUP); // this seems necessary for OS 3.2
@@ -746,7 +758,11 @@ void do_loop()
 							}// if water_time
 						}// if prog.durations[sid]
 					}// for sid
-					if(match_found) push_message(NOTIFY_PROGRAM_SCHED, pid, prog.use_weather?os.iopts[IOPT_WATER_PERCENTAGE]:100);
+					if(match_found) {
+						last_pushmsg_time = millis();
+						push_message(NOTIFY_PROGRAM_SCHED, pid, prog.use_weather?os.iopts[IOPT_WATER_PERCENTAGE]:100);
+						last_pushmsg_time = millis() - last_pushmsg_time;
+					}
 				}// if check_match
 			}// for pid
 
@@ -970,20 +986,23 @@ void do_loop()
 				flowcount_rt_start = flow_count;
 			}
 		}
+		last_scheduler_time = millis()-last_scheduler_time;
 
 		// perform ntp sync
 		// instead of using curr_time, which may change due to NTP sync itself
 		// we use Arduino's millis() method
 		//if (curr_time % NTP_SYNC_INTERVAL == 0) os.status.req_ntpsync = 1;
-		if((millis()/1000) % NTP_SYNC_INTERVAL==0) os.status.req_ntpsync = 1;
+		if((millis()/1000) % NTP_SYNC_INTERVAL==15) os.status.req_ntpsync = 1;
 		perform_ntp_sync();
 
 		// check network connection
 		if (curr_time && (curr_time % CHECK_NETWORK_INTERVAL==0))  os.status.req_network = 1;
 		check_network();
 
+		last_checkwt_time = millis();
 		// check weather
 		check_weather();
+		last_checkwt_time = millis() - last_checkwt_time;
 
 		byte wuf = os.weather_update_flag;
 		if(wuf) {
@@ -1385,10 +1404,10 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 			volume = lval*volume;
 			if (os.mqtt.enabled()) {
 				strcpy_P(topic, PSTR("opensprinkler/sensor/flow"));
-				sprintf_P(payload, PSTR("{\"count\":%d,\"volume\":%d.%02d}"), lval, (int)volume/100, (int)volume%100);
+				sprintf_P(payload, PSTR("{\"count\":%lu,\"volume\":%d.%02d}"), lval, (int)volume/100, (int)volume%100);
 			}
 			if (ifttt_enabled) {
-				sprintf_P(postval+strlen(postval), PSTR("Flow count: %d, volume: %d.%02d"), lval, (int)volume/100, (int)volume%100);
+				sprintf_P(postval+strlen(postval), PSTR("Flow count: %lu, volume: %d.%02d"), lval, (int)volume/100, (int)volume%100);
 			}
 			break;
 

@@ -44,11 +44,11 @@
 
 // Debug routines to help identify any blocking of the event loop for an extended period
 
-#if defined(ENABLE_DEBUG)
+#if defined(ENABLE_DEBUG1)
 	#if defined(ARDUINO)
 		#include "TimeLib.h"
 		#define DEBUG_PRINTF(msg, ...)		{Serial.printf(msg, ##__VA_ARGS__);}
-		#define DEBUG_TIMESTAMP(msg, ...)	{time_t t = os.now_tz(); Serial.printf(buffer, "%02d-%02d-%02d %02d:%02d:%02d - ", year(t), month(t), day(t), hour(t), minute(t), second(t));}
+		#define DEBUG_TIMESTAMP(msg, ...)	{time_t t = os.now_tz(); Serial.printf("%02d-%02d-%02d %02d:%02d:%02d - ", year(t), month(t), day(t), hour(t), minute(t), second(t));}
 	#else
 		#include <sys/time.h>
 		#define DEBUG_PRINTF(msg, ...)		{printf(msg, ##__VA_ARGS__);}

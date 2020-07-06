@@ -1627,7 +1627,7 @@ void remote_http_callback(char* buffer) {
 */
 }
 
-#define SERVER_CONNECT_NTRIES 3
+#define SERVER_CONNECT_NTRIES 1
 
 int8_t OpenSprinkler::send_http_request(uint32_t ip4, uint16_t port, char* p, void(*callback)(char*), uint16_t timeout) {
 	static byte ip[4];
@@ -1650,8 +1650,18 @@ int8_t OpenSprinkler::send_http_request(uint32_t ip4, uint16_t port, char* p, vo
 	#endif
 	
 	byte nk;
+	unsigned long ts;
 	for(nk=0;nk<SERVER_CONNECT_NTRIES;nk++) {
-		if(client->connect(IPAddress(ip), port))	break;
+		DEBUG_PRINT(F("CONN\t"));
+		DEBUG_PRINT(ip4);
+		DEBUG_PRINT(F("\tattempt "));
+		DEBUG_PRINT(nk+1);
+		DEBUG_PRINT("\t");
+		ts=now();
+		DEBUG_PRINT(time2str(now_tz()));
+		DEBUG_PRINT("\t");
+		if(client->connect(IPAddress(ip), port)==1)	break;
+		DEBUG_PRINTLN(now()-ts);
 		delay(500);
 	}
 	if(nk==SERVER_CONNECT_NTRIES) { client->stop(); return HTTP_RQT_CONNECT_ERR; }
@@ -1671,6 +1681,7 @@ int8_t OpenSprinkler::send_http_request(uint32_t ip4, uint16_t port, char* p, vo
 	uint32_t stoptime = millis()+timeout;
 
 #if defined(ARDUINO)
+
 	while(client->connected() || client->available()) {
 		if(client->available()) {
 			client->read((uint8_t*)ether_buffer, ETHER_BUFFER_SIZE);
@@ -1690,6 +1701,7 @@ int8_t OpenSprinkler::send_http_request(uint32_t ip4, uint16_t port, char* p, vo
 		}
 	}
 #endif
+
 	client->stop();
 	if(strlen(ether_buffer)==0) return HTTP_RQT_EMPTY_RETURN;
 	if(callback) callback(ether_buffer);
@@ -1712,10 +1724,24 @@ int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char*
 	#endif
 	
 	byte nk;
+	unsigned long ts;
 	for(nk=0;nk<SERVER_CONNECT_NTRIES;nk++) {
-		if(client->connect(server, port))	break;
+		DEBUG_PRINT(F("CONN\t"));
+		DEBUG_PRINT(server);
+		DEBUG_PRINT(F("\tattempt "));
+		DEBUG_PRINT(nk+1);
+		DEBUG_PRINT("\t");
+		ts=now();
+		DEBUG_PRINT(time2str(now_tz()));
+		DEBUG_PRINT("\t");
+		int ret = client->connect(server, port);
+		DEBUG_PRINT(ret);
+		DEBUG_PRINT("\t");
+		if(ret==1)	break;
+		DEBUG_PRINTLN(now()-ts);
 		delay(500);
 	}
+	DEBUG_PRINTLN("");
 	if(nk==SERVER_CONNECT_NTRIES) { client->stop(); return HTTP_RQT_CONNECT_ERR; }
 
 #else
@@ -2010,7 +2036,7 @@ void OpenSprinkler::options_setup() {
 			lcd_print_pgm(PSTR(" AC"));
 		}
 		delay(1500);
-		#if defined(ESP8266)
+		#if defined(ARDUINO)
 		lcd.setCursor(2, 1);
 		lcd_print_pgm(PSTR("FW "));
 		lcd.print((char)('0'+(OS_FW_VERSION/100)));
