@@ -610,6 +610,7 @@ bool OpenSprinkler::load_hardware_mac(byte* mac, bool wired) {
 	mac[4] = 0x31;
 	mac[5] = iopts[IOPT_DEVICE_ID];
 
+#if !defined(__FreeBSD__)
 	if (m_server == NULL) return true;
 
 	if ((fd = socket(AF_INET, SOCK_DGRAM, 0)) == 0) return true;
@@ -623,6 +624,7 @@ bool OpenSprinkler::load_hardware_mac(byte* mac, bool wired) {
 		}
 	}
 	close(fd);
+#endif
 	return true;
 }
 
