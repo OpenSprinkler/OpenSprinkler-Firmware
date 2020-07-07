@@ -211,6 +211,7 @@ public:
 	static byte get_station_type(byte sid); // get station type
 	static byte is_sequential_station(byte sid);
 	static byte bound_to_master(byte sid, byte mas);
+	static byte station_running(byte sid);
 	static int16_t get_on_adj(byte mas);
 	static int16_t get_off_adj(byte mas);
 	static byte is_running(byte sid);

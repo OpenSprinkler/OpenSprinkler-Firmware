@@ -71,7 +71,7 @@ static char* get_buffer = NULL;
 BufferFiller bfill;
 
 void schedule_all_stations(ulong curr_time);
-void turn_off_station(byte sid, ulong curr_time, byte shift);
+void turn_off_station(byte sid, ulong curr_time, byte shift, byte dqueue);
 void process_dynamic_events(ulong curr_time);
 void check_network(time_t curr_time);
 void check_weather(time_t curr_time);
@@ -1646,7 +1646,7 @@ void server_change_manual() {
 		if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("ssta"), true)) {
 			shift = atoi(tmp_buffer);
 		}
-		turn_off_station(sid, curr_time, shift);
+		turn_off_station(sid, curr_time, shift, 1);
 	}
 	handle_return(HTML_SUCCESS);
 }

@@ -366,7 +366,9 @@ void do_setup() {
 
 void write_log(byte type, ulong curr_time);
 void schedule_all_stations(ulong curr_time);
-void turn_off_station(byte sid, ulong curr_time, byte shift=0);
+void turn_off_station(byte sid, ulong curr_time, byte shift=0, byte dqueue=1);
+void handle_expired_station(byte sid, ulong curr_time);
+void station_time_keeping(byte sid, ulong curr_time);
 void process_dynamic_events(ulong curr_time);
 void check_network();
 void check_weather();
@@ -770,10 +772,10 @@ void do_loop()
 				pd.station_qid[sid]=qid;
 			}
 			// next, go through the stations and perform time keeping
-			for(bid=0;bid<os.nboards; bid++) {
+			for (bid = 0; bid < os.nboards; bid++) {
 				bitvalue = os.station_bits[bid];
-				for(s=0;s<8;s++) {
-					byte sid = bid*8+s;
+				for (s = 0; s < 8; s++) {
+					byte sid = bid * 8 + s;
 
 					// skip master station
 					if (os.status.mas == sid+1) continue;
@@ -783,10 +785,7 @@ void do_loop()
 					q = pd.queue + pd.station_qid[sid];
 					// check if this station is scheduled, either running or waiting to run
 					if (q->st > 0) {
-						// if so, check if we should turn it off
-						if (curr_time >= q->st+q->dur) {
-							turn_off_station(sid, curr_time);
-						}
+						handle_expired_station(sid, curr_time);
 					}
 					// if current station is not running, check if we should turn it on
 					if(!((bitvalue>>s)&1)) {
@@ -807,7 +806,7 @@ void do_loop()
 			int qi;
 			for(qi= pd.nqueue - 1; qi >= 0; qi--) {
 				q = pd.queue + qi;
-				if((!q->dur || curr_time >= q->st + q->dur) && curr_time >= q->deque_time) {
+				if(!q->dur || curr_time >= q->deque_time) {
 					pd.dequeue(qi);
 				}
 			}
@@ -877,7 +876,7 @@ void do_loop()
 					// skip if this is the master station
 					if (mas_id == sid + 1) continue;
 
-					q=pd.queue+pd.station_qid[sid];
+					q = pd.queue + pd.station_qid[sid];
 
 					if (os.bound_to_master(q->sid, mas)) {
 						// check if timing is within the acceptable range
@@ -900,7 +899,7 @@ void do_loop()
 				os.clear_all_station_bits();
 				os.status.program_busy = 1;
 			}
-		}	 
+		} 
 
 		// process dynamic events
 		process_dynamic_events(curr_time); // why is this called a second time? 
@@ -1029,27 +1028,27 @@ void check_weather() {
  * This function turns off a scheduled station
  * and writes log record
  */
-void turn_off_station(byte sid, ulong curr_time, byte shift) {
+void turn_off_station(byte sid, ulong curr_time, byte shift, byte dqueue) {
 	os.set_station_bit(sid, 0);
 
 	byte qid = pd.station_qid[sid];
 	// ignore if we are turning off a station that's not running or scheduled to run
-	if (qid>=pd.nqueue)  return;
+	if (qid >= pd.nqueue)  return;
 
 	// RAH implementation of flow sensor
-	if (flow_gallons>1) {
-		if(flow_stop<=flow_begin) flow_last_gpm = 0;
-		else flow_last_gpm = (float) 60000/(float)((flow_stop-flow_begin)/(flow_gallons-1));
+	if (flow_gallons > 1) {
+		if(flow_stop <= flow_begin) flow_last_gpm = 0;
+		else flow_last_gpm = (float) 60000 / (float)((flow_stop-flow_begin) / (flow_gallons - 1));
 	}// RAH calculate GPM, 1 pulse per gallon
 	else {flow_last_gpm = 0;}  // RAH if not one gallon (two pulses) measured then record 0 gpm
 
-	RuntimeQueueStruct *q = pd.queue+qid;
+	RuntimeQueueStruct *q = pd.queue + qid;
 
 	// check if the current time is past the scheduled start time,
 	// because we may be turning off a station that hasn't started yet
 	if (curr_time > q->st) {
 		// record lastrun log (only for non-master stations)
-		if(os.status.mas!=(sid+1) && os.status.mas2!=(sid+1)) {
+		if(os.status.mas != (sid + 1) && os.status.mas2 != (sid + 1)) {
 			pd.lastrun.station = sid;
 			pd.lastrun.program = q->pid;
 			pd.lastrun.duration = curr_time - q->st;
@@ -1081,17 +1080,30 @@ void turn_off_station(byte sid, ulong curr_time, byte shift) {
 				}
 			}
 		}
-	} else { // station has not started yet
+	} else { // station has not started yet TODO: why in else statement????
 		if (pd.is_paused && pd.nqueue == 1) { 
 			// removing last element lifts global pause 
 			pd.clear_pause();
 		}
 	}
 
-	// dequeue the element
+	if (dqueue) {
+		pd.dequeue(qid);
+		pd.station_qid[sid] = 0xFF;
+	}
+}
+
+void handle_expired_station(byte sid, ulong curr_time) {
+	byte qid = pd.station_qid[sid];
+	RuntimeQueueStruct *q = pd.queue + pd.station_qid[sid];
+
 	if (curr_time >= q->deque_time) {
 		pd.dequeue(qid);
 		pd.station_qid[sid] = 0xFF;
+	} else if (curr_time >= q->st + q->dur) {
+		if (os.station_running(sid)) {
+			turn_off_station(sid, curr_time, 0, 0);
+		}
 	}
 }
 
@@ -1170,11 +1182,11 @@ void schedule_all_stations(ulong curr_time) {
 	byte re = os.iopts[IOPT_REMOTE_EXT_MODE];
 
 	// go through runtime queue and calculate start time of each station
-	for(;q<pd.queue+pd.nqueue;q++) {
-		if(q->st) continue; // if this queue element has already been scheduled, skip
-		if(!q->dur) continue; // if the element has been marked to reset, skip
+	for(; q<pd.queue+pd.nqueue; q++) {
+		if (q->st) continue; // if this queue element has already been scheduled, skip
+		if (!q->dur) continue; // if the element has been marked to reset, skip
 
-		// use sequential scheduling. station delay time apples
+		// use sequential scheduling. apply station delay time
 		if (os.is_sequential_station(q->sid) && !re) {
 			// sequential scheduling
 			q->st = seq_start_time;
@@ -1187,28 +1199,31 @@ void schedule_all_stations(ulong curr_time) {
 			con_start_time++;
 		}
 
-		q->deque_time = q->st + q->dur; // by default dequeue time should be when the station ends
-
 		// master adjustments 
 		int16_t start_adj = 0;
 		int16_t dequeue_adj = 0;
 
 		for (byte mas = MASTER_1; mas < NUM_MASTER_ZONES; mas++) {
-			if (os.bound_to_master(q->sid, mas)) {
+
+			byte masid = os.master[mas][MASTER_STATION_ID];
+
+			if (masid && os.bound_to_master(q->sid, mas)) {
 
 				int16_t mas_on_adj = os.get_on_adj(mas);
 				int16_t mas_off_adj = os.get_off_adj(mas);
 
-				start_adj = min(start_adj, mas_on_adj); 
+				printf("start_adj: %i, mas_on_adj: %i\n", start_adj, mas_on_adj);
+				start_adj = min(start_adj, mas_on_adj);
 				dequeue_adj = max(dequeue_adj, mas_off_adj);
 			}
 		}
 
+		// handle negative on time adjustment
 		if (q->st - curr_time < abs(start_adj)) {
 			q->st += abs(start_adj);
 		}
 
-		q->deque_time += dequeue_adj;
+		q->deque_time = q->st + q->dur + dequeue_adj;
 
 		/*DEBUG_PRINT("[");
 		DEBUG_PRINT(sid);
@@ -1227,6 +1242,8 @@ void schedule_all_stations(ulong curr_time) {
 				os.sensor1_active_lasttime = curr_time;
 			}
 		}
+
+		printf("diff: %lu\n", q->st - curr_time);
 	}
 }
 

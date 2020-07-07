@@ -134,7 +134,7 @@ public:
 	static byte is_paused; 
 	static ulong pause_timer; // amount of time remaining in global pause
 	static void toggle_pause(uint16_t delay);
-	static void update_pause(uint16_t delay);
+	static void set_pause(uint16_t delay);
 	static void resume_stations(); 
 	static void clear_pause();
 	

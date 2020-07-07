@@ -1338,6 +1338,10 @@ byte OpenSprinkler::is_sequential_station(byte sid) {
 	return attrib_seq[bid] & (1 << s);
 }
 
+byte OpenSprinkler::station_running(byte sid) {
+	return station_bits[(sid >> 3)] >> (sid & 0x07) & 1;
+}
+
 int16_t OpenSprinkler::get_on_adj(byte mas) {
 	return water_time_decode_signed(master[mas][MASTER_STATION_ON_AJD]);
 }

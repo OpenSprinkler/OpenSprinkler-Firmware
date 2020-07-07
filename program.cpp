@@ -137,49 +137,53 @@ void ProgramData::toggle_pause(uint16_t delay) {
 
 	os.clear_all_station_bits();
 
-	if (was_paused) { // if station is prematurely un-paused then it is immediately scheduled
+	if (was_paused) {
 		resume_stations();
-		pause_timer = 0;
-		os.status.program_busy = 1;
 	} else { 
-		pause_timer = delay;
-		os.status.program_busy = 0;
-		update_pause(delay); 
+		set_pause(delay); 
 	}
 }
 
-void ProgramData::update_pause(uint16_t delay) {
+void ProgramData::set_pause(uint16_t delay) {
+
+	pause_timer = delay;
+	os.status.program_busy = 0;
 	
-	RuntimeQueueStruct *s = NULL; 
+	RuntimeQueueStruct *q = queue; 
 	ulong pause_t = os.now_tz();
 
-	for (byte i = 0; i < nqueue; i++) {
-		s = queue + i;
-
-		if (s->st + s->dur < pause_t) { // already run 
+	for (; q < queue + nqueue; q++) {
+		if (q->st + q->dur < pause_t) { // already run 
 			continue; 
-		} else if (s->st <= pause_t) { // currently running 
-			s->dur -= (pause_t - s->st);
-			s->st = pause_t + delay;
+		} else if (q->st <= pause_t) { // currently running 
+			q->dur -= (pause_t - q->st);
+			q->st = pause_t + delay;
 		} else { // scheduled 
-			s->st += delay;
+			q->st += delay;
 		}
 
-		if (s->st + s->dur > last_seq_stop_time) {
-			last_seq_stop_time = s->st + s->dur;
+		q->deque_time += delay;
+
+		if (q->st + q->dur > last_seq_stop_time) {
+			last_seq_stop_time = q->st + q->dur;
 		} 
 	}
 }
 
 void ProgramData::resume_stations() {
 
-	RuntimeQueueStruct *s = NULL; 
+	RuntimeQueueStruct *q = queue; 
 	ulong curr_time = os.now_tz();
 
-	for (byte i = 0; i < nqueue; i++) {
-		s = queue + i;
-		s->st += 1 - pause_timer; 		
+	for (; q < queue + nqueue; q++) {
+		q->st -= pause_timer;
+		q->deque_time -= pause_timer;
+		q->st += 1;
+		q->deque_time += 1;
 	}
+
+	pause_timer = 0;
+	os.status.program_busy = 1; 
 }
 
 void ProgramData::clear_pause() {
