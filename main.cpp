@@ -368,7 +368,6 @@ void write_log(byte type, ulong curr_time);
 void schedule_all_stations(ulong curr_time);
 void turn_off_station(byte sid, ulong curr_time, byte shift=0, byte dqueue=1);
 void handle_expired_station(byte sid, ulong curr_time);
-void station_time_keeping(byte sid, ulong curr_time);
 void process_dynamic_events(ulong curr_time);
 void check_network();
 void check_weather();
@@ -783,15 +782,10 @@ void do_loop()
 					if (pd.station_qid[sid]==255) continue;
 
 					q = pd.queue + pd.station_qid[sid];
-					// check if this station is scheduled, either running or waiting to run
-					if (q->st > 0) {
-						handle_expired_station(sid, curr_time);
-					}
-					// if current station is not running, check if we should turn it on
-					if(!((bitvalue>>s)&1)) {
-						if (curr_time >= q->st && curr_time < q->st+q->dur) {
 
-							//turn_on_station(sid);
+					// if current station is not running, check if we should turn it on
+					if(!((bitvalue >> s) & 1)) {
+						if (curr_time >= q->st && curr_time < q->st+q->dur) {
 							os.set_station_bit(sid, 1);
 
 							// RAH implementation of flow sensor
@@ -799,8 +793,13 @@ void do_loop()
 
 						} //if curr_time > scheduled_start_time
 					} // if current station is not running
-				}//end_s
-			}//end_bid
+
+					// check if this station should be removed
+					if (q->st > 0) {
+						handle_expired_station(sid, curr_time);
+					}
+				} //end_s
+			} //end_bid
 
 			// finally, go through the queue again and clear up elements marked for removal
 			int qi;
@@ -843,12 +842,15 @@ void do_loop()
 				// turn off all stations
 				os.clear_all_station_bits();
 				os.apply_all_station_bits();
+
 				// reset runtime
 				pd.reset_runtime();
+
 				// reset program busy bit
 				os.status.program_busy = 0;
-				pd.is_paused = 0;
 
+				pd.clear_pause();
+				
 				// log flow sensor reading if flow sensor is used
 				if(os.iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_FLOW) {
 					write_log(LOGDATA_FLOWSENSE, curr_time);
@@ -891,13 +893,12 @@ void do_loop()
 			}
 		}
 
-		if (pd.is_paused) {
+		if (pd.pause_state) {
 			if (pd.pause_timer > 0) {
 				pd.pause_timer--;
 			} else {
-				pd.is_paused= 0;
 				os.clear_all_station_bits();
-				os.status.program_busy = 1;
+				pd.clear_pause();
 			}
 		} 
 
@@ -1048,7 +1049,7 @@ void turn_off_station(byte sid, ulong curr_time, byte shift, byte dqueue) {
 	// because we may be turning off a station that hasn't started yet
 	if (curr_time > q->st) {
 		// record lastrun log (only for non-master stations)
-		if(os.status.mas != (sid + 1) && os.status.mas2 != (sid + 1)) {
+		if (os.status.mas != (sid + 1) && os.status.mas2 != (sid + 1)) {
 			pd.lastrun.station = sid;
 			pd.lastrun.program = q->pid;
 			pd.lastrun.duration = curr_time - q->st;
@@ -1080,11 +1081,6 @@ void turn_off_station(byte sid, ulong curr_time, byte shift, byte dqueue) {
 				}
 			}
 		}
-	} else { // station has not started yet TODO: why in else statement????
-		if (pd.is_paused && pd.nqueue == 1) { 
-			// removing last element lifts global pause 
-			pd.clear_pause();
-		}
 	}
 
 	if (dqueue) {
@@ -1095,13 +1091,18 @@ void turn_off_station(byte sid, ulong curr_time, byte shift, byte dqueue) {
 
 void handle_expired_station(byte sid, ulong curr_time) {
 	byte qid = pd.station_qid[sid];
+	byte sta_on = os.is_running(sid);
 	RuntimeQueueStruct *q = pd.queue + pd.station_qid[sid];
 
 	if (curr_time >= q->deque_time) {
-		pd.dequeue(qid);
-		pd.station_qid[sid] = 0xFF;
+		if (sta_on) {
+			turn_off_station(sid, curr_time, 0, 1);
+		} else {
+			pd.dequeue(qid);
+			pd.station_qid[sid] = 0xFF;
+		}
 	} else if (curr_time >= q->st + q->dur) {
-		if (os.station_running(sid)) {
+		if (sta_on) {
 			turn_off_station(sid, curr_time, 0, 0);
 		}
 	}
@@ -1174,7 +1175,7 @@ void schedule_all_stations(ulong curr_time) {
 	}
 
 	// if the queue is paused, make sure that parallel stations don't run immediately
-	if (pd.is_paused) {
+	if (pd.pause_state) {
 		con_start_time += pd.pause_timer; 
 	}
 
@@ -1212,7 +1213,6 @@ void schedule_all_stations(ulong curr_time) {
 				int16_t mas_on_adj = os.get_on_adj(mas);
 				int16_t mas_off_adj = os.get_off_adj(mas);
 
-				printf("start_adj: %i, mas_on_adj: %i\n", start_adj, mas_on_adj);
 				start_adj = min(start_adj, mas_on_adj);
 				dequeue_adj = max(dequeue_adj, mas_off_adj);
 			}
@@ -1242,8 +1242,6 @@ void schedule_all_stations(ulong curr_time) {
 				os.sensor1_active_lasttime = curr_time;
 			}
 		}
-
-		printf("diff: %lu\n", q->st - curr_time);
 	}
 }
 
@@ -1270,7 +1268,6 @@ void reset_all_stations() {
 		q->dur = 0;
 	}
 }
-
 
 /** Manually start a program
  * If pid==0, this is a test program (1 minute per station)

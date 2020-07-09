@@ -37,7 +37,7 @@ RuntimeQueueStruct ProgramData::queue[RUNTIME_QUEUE_SIZE];
 byte ProgramData::station_qid[MAX_NUM_STATIONS];
 LogStruct ProgramData::lastrun;
 ulong ProgramData::last_seq_stop_time;
-byte ProgramData::is_paused;
+byte ProgramData::pause_state;
 ulong ProgramData::pause_timer;
 
 extern char tmp_buffer[];
@@ -73,7 +73,9 @@ RuntimeQueueStruct* ProgramData::enqueue() {
  */
 // this removes an element from the queue
 void ProgramData::dequeue(byte qid) {
-	if (qid>=nqueue)	return;
+	if (qid>=nqueue) {
+		return;
+	}
 	if (qid<nqueue-1) {
 		queue[qid] = queue[nqueue-1]; // copy the last element to the dequeud element to fill the space
 		if(station_qid[queue[qid].sid] == nqueue-1) // fix queue index if necessary
@@ -127,27 +129,22 @@ void ProgramData::moveup(byte pid) {
 	file_write_block(PROG_FILENAME, buf2, pos, PROGRAMSTRUCT_SIZE);
 }
 
-void schedule_all_stations(ulong curr_time);
-
 void ProgramData::toggle_pause(uint16_t delay) {
-
-	byte was_paused = is_paused;
-
-	is_paused = !was_paused;
 
 	os.clear_all_station_bits();
 
-	if (was_paused) {
+	if (pause_state) { // was paused
 		resume_stations();
 	} else { 
 		set_pause(delay); 
 	}
+
+	pause_state = !pause_state;
 }
 
 void ProgramData::set_pause(uint16_t delay) {
 
 	pause_timer = delay;
-	os.status.program_busy = 0;
 	
 	RuntimeQueueStruct *q = queue; 
 	ulong pause_t = os.now_tz();
@@ -182,12 +179,11 @@ void ProgramData::resume_stations() {
 		q->deque_time += 1;
 	}
 
-	pause_timer = 0;
-	os.status.program_busy = 1; 
+	clear_pause();
 }
 
 void ProgramData::clear_pause() {
-	is_paused = 0;
+	pause_state = 0;
 	pause_timer = 0;
 	last_seq_stop_time = 0;
 }

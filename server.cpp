@@ -1136,7 +1136,7 @@ void server_json_controller_main() {
 							pd.lastrun.program,
 							pd.lastrun.duration,
 							pd.lastrun.endtime,
-							pd.is_paused,
+							pd.pause_state,
 							pd.nqueue );
 
 #if defined(ESP8266)

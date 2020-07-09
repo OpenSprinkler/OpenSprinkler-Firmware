@@ -131,7 +131,7 @@ public:
 	static LogStruct lastrun;
 	static ulong last_seq_stop_time;	// the last stop time of a sequential station
 
-	static byte is_paused; 
+	static byte pause_state; 
 	static ulong pause_timer; // amount of time remaining in global pause
 	static void toggle_pause(uint16_t delay);
 	static void set_pause(uint16_t delay);
