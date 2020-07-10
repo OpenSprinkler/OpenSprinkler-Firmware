@@ -568,6 +568,7 @@ void server_change_stations_attrib(char *p, char header, byte *attrib)
 	for(bid=0;bid<os.nboards;bid++) {
 		itoa(bid, tbuf2+1, 10);
 		if(findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, tbuf2)) {
+			printf("data: %i\n", atoi(tmp_buffer));
 			attrib[bid] = atoi(tmp_buffer);
 		}
 	}
@@ -647,7 +648,7 @@ void server_change_stations() {
 					handle_return(HTML_DATA_OUTOFBOUND);
 				}
 			}
-			// write spe data
+			// write special data
 			file_write_block(STATIONS_FILENAME, tmp_buffer,
 				(uint32_t)sid*sizeof(StationData)+offsetof(StationData,type), STATION_SPECIAL_DATA_SIZE+1);
 

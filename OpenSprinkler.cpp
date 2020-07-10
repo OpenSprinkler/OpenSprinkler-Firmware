@@ -162,7 +162,6 @@ const char iopt_json_names[] PROGMEM =
 	"subn3"
 	"subn4"
 	"wimod"
-	"masli"
 	"reset"
 	;
 
@@ -390,7 +389,7 @@ byte OpenSprinkler::iopts[] = {
 	255,// subnet mask 1
 	255,// subnet mask 2
 	255,// subnet mask 3
-	0,
+	0,  // subnet mask 4
 	WIFI_MODE_AP, // wifi mode
 	0,		// reset
 };
@@ -1353,14 +1352,20 @@ int16_t OpenSprinkler::get_off_adj(byte mas) {
 byte OpenSprinkler::bound_to_master(byte sid, byte mas) {
 	byte bid = sid >> 3;
 	byte s = sid & 0x07;
+	byte attributes = 0;
 
-	// make this more robust
-
-	if (mas == MASTER_1) {
-		return attrib_mas[bid] & (1 << s);
-	} else {
-		return attrib_mas2[bid] & (1 << s);
+	switch (mas)
+	{
+	case MASTER_1:
+		attributes= attrib_mas[bid];
+		break;
+	case MASTER_2:
+		attributes = attrib_mas2[bid];
+	default:
+		break;
 	}
+
+	return attributes & (1 << s);
 }
 
 byte OpenSprinkler::is_running(byte sid) {
@@ -1369,7 +1374,6 @@ byte OpenSprinkler::is_running(byte sid) {
 
 	return station_bits[bid] & (1 << s);
 }
-
 
 /** Get station attribute */
 /*void OpenSprinkler::get_station_attrib(byte sid, StationAttrib *attrib); {

@@ -795,7 +795,7 @@ void do_loop()
 					} // if current station is not running
 
 					// check if this station should be removed
-					if (q->st > 0) {
+					if (q->st > 0) { // return a value depending on whether or not a value was dequeued
 						handle_expired_station(sid, curr_time);
 					}
 				} //end_s
@@ -1083,7 +1083,7 @@ void turn_off_station(byte sid, ulong curr_time, byte shift, byte dqueue) {
 		}
 	}
 
-	if (dqueue) {
+	if (dqueue) { // force dequeue
 		pd.dequeue(qid);
 		pd.station_qid[sid] = 0xFF;
 	}
