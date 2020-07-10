@@ -366,7 +366,7 @@ void do_setup() {
 
 void write_log(byte type, ulong curr_time);
 void schedule_all_stations(ulong curr_time);
-void turn_off_station(byte sid, ulong curr_time, byte shift=0, byte dqueue=1);
+void turn_off_station(byte sid, ulong curr_time, byte shift=0);
 void handle_expired_station(byte sid, ulong curr_time);
 void process_dynamic_events(ulong curr_time);
 void check_network();
@@ -796,7 +796,7 @@ void do_loop()
 
 					// check if this station should be removed
 					if (q->st > 0) { // return a value depending on whether or not a value was dequeued
-						handle_expired_station(sid, curr_time);
+						turn_off_station(sid, curr_time);
 					}
 				} //end_s
 			} //end_bid
@@ -1027,12 +1027,30 @@ void check_weather() {
 
 /** Turn off a station
  * This function turns off a scheduled station
- * and writes log record
+ * writes a log record and determines if 
+ * the station should be removed from the queue 
  */
-void turn_off_station(byte sid, ulong curr_time, byte shift, byte dqueue) {
-	os.set_station_bit(sid, 0);
+void turn_off_station(byte sid, ulong curr_time, byte shift) {
 
 	byte qid = pd.station_qid[sid];
+	RuntimeQueueStruct *q = pd.queue + qid;
+	byte force_dequeue = 0;
+	byte station_bit = os.is_running(sid);
+
+	if (curr_time >= q->deque_time) {
+		if (station_bit) {
+			force_dequeue = 1;
+		} else { // if already off just remove from the queue
+			pd.dequeue(qid);
+			pd.station_qid[sid] = 0xFF;
+			return;
+		}
+	} else if (curr_time >= q->st + q->dur) { // end time and dequeue time are not equal
+		if (!station_bit) { return; }
+	} else { return; }
+
+	os.set_station_bit(sid, 0);
+
 	// ignore if we are turning off a station that's not running or scheduled to run
 	if (qid >= pd.nqueue)  return;
 
@@ -1042,8 +1060,6 @@ void turn_off_station(byte sid, ulong curr_time, byte shift, byte dqueue) {
 		else flow_last_gpm = (float) 60000 / (float)((flow_stop-flow_begin) / (flow_gallons - 1));
 	}// RAH calculate GPM, 1 pulse per gallon
 	else {flow_last_gpm = 0;}  // RAH if not one gallon (two pulses) measured then record 0 gpm
-
-	RuntimeQueueStruct *q = pd.queue + qid;
 
 	// check if the current time is past the scheduled start time,
 	// because we may be turning off a station that hasn't started yet
@@ -1083,28 +1099,9 @@ void turn_off_station(byte sid, ulong curr_time, byte shift, byte dqueue) {
 		}
 	}
 
-	if (dqueue) { // force dequeue
+	if (force_dequeue) {
 		pd.dequeue(qid);
 		pd.station_qid[sid] = 0xFF;
-	}
-}
-
-void handle_expired_station(byte sid, ulong curr_time) {
-	byte qid = pd.station_qid[sid];
-	byte sta_on = os.is_running(sid);
-	RuntimeQueueStruct *q = pd.queue + pd.station_qid[sid];
-
-	if (curr_time >= q->deque_time) {
-		if (sta_on) {
-			turn_off_station(sid, curr_time, 0, 1);
-		} else {
-			pd.dequeue(qid);
-			pd.station_qid[sid] = 0xFF;
-		}
-	} else if (curr_time >= q->st + q->dur) {
-		if (sta_on) {
-			turn_off_station(sid, curr_time, 0, 0);
-		}
 	}
 }
 
