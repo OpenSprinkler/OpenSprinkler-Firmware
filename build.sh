@@ -1,4 +1,6 @@
-#!/bin/bash
+#!/usr/bin/env bash
+
+UNAME_s=$(uname -s)
 
 while getopts ":s" opt; do
   case $opt in
@@ -11,7 +13,14 @@ done
 echo "Building OpenSprinkler..."
 
 echo "Installing required libraries..."
-apt-get install -y libmosquitto-dev
+case $UNAME_s in
+FreeBSD)
+	pkg install -y mosquitto
+	;;
+*)
+	apt-get install -y libmosquitto-dev
+	;;
+esac
 
 if [ "$1" == "demo" ]; then
 	CFLAGS="-DDEMO -m32"
@@ -22,9 +31,15 @@ else
 fi
 echo "Compiling firmware..."
 SRCS="main.cpp OpenSprinkler.cpp program.cpp server.cpp utils.cpp weather.cpp gpio.cpp etherport.cpp mqtt.cpp"
-g++ -o OpenSprinkler $CFLAGS $SRCS -lpthread -lmosquitto
+if [ $UNAME_s = FreeBSD ]; then
+	CXX=c++
+	CFLAGS="$CFLAGS -I/usr/local/include -L/usr/local/lib"
+else
+	CXX=g++
+fi
+$CXX -o OpenSprinkler $CFLAGS $SRCS -lpthread -lmosquitto
 
-if [ ! "$SILENT" = true ] && [ -f OpenSprinkler.launch ] && [ ! -f /etc/init.d/OpenSprinkler.sh ]; then
+if [ "$UNAME_s" != FreeBSD ] && [ ! "$SILENT" = true ] && [ -f OpenSprinkler.launch ] && [ ! -f /etc/init.d/OpenSprinkler.sh ]; then
 
 	read -p "Do you want to start OpenSprinkler on startup? " -n 1 -r
 	echo
