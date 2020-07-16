@@ -560,8 +560,7 @@ void server_json_station_special() {
 }
 
 
-void server_change_stations_attrib(char *p, char header, byte *attrib)
-{
+void server_change_stations_attrib(char *p, char header, byte *attrib) {
 	char tbuf2[5] = {0, 0, 0, 0, 0};
 	byte bid;
 	tbuf2[0]=header;
@@ -581,7 +580,7 @@ void server_change_stations_attrib(char *p, char header, byte *attrib)
  * m?: master operation bit field (? is board index, starting from 0)
  * i?: ignore rain bit field
  * n?: master2 operation bit field
- * d?: disable sation bit field
+ * d?: disable station bit field
  * q?: station sequeitnal bit field
  * p?: station special flag bit field
  */
@@ -619,7 +618,10 @@ void server_change_stations() {
 	if(findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("sid"), true)) {
 		sid = atoi(tmp_buffer);
 		if(sid<0 || sid>os.nstations) handle_return(HTML_DATA_OUTOFBOUND);
-		if(findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("st"), true) &&
+		if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("gid"), true)) {
+			os.set_station_gid(sid, atoi(tmp_buffer));
+		}
+		else if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("st"), true) &&
 			 findKeyVal(p, tmp_buffer+1, TMP_BUFFER_SIZE-1, PSTR("sd"), true)) {
 
 			tmp_buffer[0]-='0';
@@ -652,9 +654,7 @@ void server_change_stations() {
 				(uint32_t)sid*sizeof(StationData)+offsetof(StationData,type), STATION_SPECIAL_DATA_SIZE+1);
 
 		} else {
-
 			handle_return(HTML_DATA_MISSING);
-
 		}
 	}
 
@@ -1182,7 +1182,7 @@ void server_json_controller_main() {
 			rem = (curr_time >= q->st) ? (q->st+q->dur-curr_time) : q->dur;
 			if(rem>65535) rem = 0;
 		}
-		bfill.emit_p(PSTR("[$D,$L,$L]"), (qid<255)?q->pid:0, rem, (qid<255)?q->st:0);
+		bfill.emit_p(PSTR("[$D,$L,$L,$D]"), (qid<255)?q->pid:0, rem, (qid<255)?q->st:0, os.attrib_grp[sid]);
 		bfill.emit_p((sid<os.nstations-1)?PSTR(","):PSTR("]"));
 	}
 	

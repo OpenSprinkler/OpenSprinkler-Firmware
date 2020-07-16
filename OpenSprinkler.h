@@ -75,8 +75,7 @@ struct StationAttrib {	// station attributes
 	byte igrd:1;// ignore rain delay
 	byte unused:1;
 	
-	byte gid:4; // group id: reserved for the future
-	byte dummy:4;
+	byte gid; // group id: reserved for the future 
 	byte reserved[2]; // reserved bytes for the future
 }; // total is 4 bytes so far
 
@@ -172,6 +171,7 @@ public:
 	static byte attrib_dis[];
 	static byte attrib_seq[];
 	static byte attrib_spe[];
+	static byte attrib_grp[];
 
 	static byte master[NUM_MASTER_ZONES][NUM_MASTER_OPTS];
 		
@@ -215,6 +215,8 @@ public:
 	static int16_t get_on_adj(byte mas);
 	static int16_t get_off_adj(byte mas);
 	static byte is_running(byte sid);
+	static byte get_station_gid(byte sid);
+	static void set_station_gid(byte sid, byte gid);
 
 	//static StationAttrib get_station_attrib(byte sid); // get station attribute
 	static void attribs_save(); // repackage attrib bits and save (backward compatibility)

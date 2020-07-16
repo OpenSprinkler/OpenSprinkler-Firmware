@@ -66,6 +66,9 @@ byte OpenSprinkler::attrib_dis[MAX_NUM_BOARDS];
 byte OpenSprinkler::attrib_seq[MAX_NUM_BOARDS];
 byte OpenSprinkler::attrib_spe[MAX_NUM_BOARDS];
 
+// sequential groups 
+byte OpenSprinkler::attrib_grp[MAX_NUM_STATIONS];
+
 byte OpenSprinkler::master[NUM_MASTER_ZONES][NUM_MASTER_OPTS];
 
 extern char tmp_buffer[];
@@ -1375,6 +1378,14 @@ byte OpenSprinkler::is_running(byte sid) {
 	return station_bits[bid] & (1 << s);
 }
 
+byte OpenSprinkler::get_station_gid(byte sid) {
+	return attrib_grp[sid];
+}
+
+void OpenSprinkler::set_station_gid(byte sid, byte gid) {
+	attrib_grp[sid] = gid;
+}
+
 /** Get station attribute */
 /*void OpenSprinkler::get_station_attrib(byte sid, StationAttrib *attrib); {
 	file_read_block(STATIONS_FILENAME, attrib, (uint32_t)sid*sizeof(StationData)+offsetof(StationData, attrib), sizeof(StationAttrib));
@@ -1383,11 +1394,14 @@ byte OpenSprinkler::is_running(byte sid) {
 /** Save all station attribs to file (backward compatibility) */
 void OpenSprinkler::attribs_save() {
 	// re-package attribute bits and save
-	byte bid, s, sid=0;
+	byte bid, s, sid=0, gid;
 	StationAttrib at;
 	byte ty = STN_TYPE_STANDARD;
 	for(bid=0;bid<MAX_NUM_BOARDS;bid++) {
 		for(s=0;s<8;s++,sid++) {
+
+			gid = get_station_gid(sid);
+
 			at.mas = (attrib_mas[bid]>>s) & 1;
 			at.igs = (attrib_igs[bid]>>s) & 1;
 			at.mas2= (attrib_mas2[bid]>>s)& 1;
@@ -1395,9 +1409,21 @@ void OpenSprinkler::attribs_save() {
 			at.igrd= (attrib_igrd[bid]>>s) & 1;			 
 			at.dis = (attrib_dis[bid]>>s) & 1;
 			at.seq = (attrib_seq[bid]>>s) & 1;
-			at.gid = 0;
-			file_write_block(STATIONS_FILENAME, &at, (uint32_t)sid*sizeof(StationData)+offsetof(StationData, attrib), 1); // attribte bits are 1 byte long
-			if(attrib_spe[bid]>>s==0) {
+
+			// should sequential flag override gid? 
+
+			if (gid == PARALLEL_GROUP_ID) {
+				at.gid = PARALLEL_GROUP_ID;
+				at.seq = 0;
+			} else if (!at.seq) {
+				at.gid = PARALLEL_GROUP_ID; 
+			} else {
+				at.gid = gid;
+			}
+			
+			set_station_gid(sid, at.gid); // update ram version
+			file_write_block(STATIONS_FILENAME, &at, (uint32_t)sid*sizeof(StationData)+offsetof(StationData, attrib), sizeof(StationAttrib)); // attribte bits are 1 byte long
+			if(attrib_spe[bid] >> s == 0) {
 				// if station special bit is 0, make sure to write type STANDARD
 				file_write_block(STATIONS_FILENAME, &ty, (uint32_t)sid*sizeof(StationData)+offsetof(StationData, type), 1); // attribte bits are 1 byte long
 			}
@@ -1419,6 +1445,7 @@ void OpenSprinkler::attribs_load() {
 	memset(attrib_dis, 0, nboards);
 	memset(attrib_seq, 0, nboards);
 	memset(attrib_spe, 0, nboards);
+	memset(attrib_grp, 0, MAX_NUM_STATIONS);
 								
 	for(bid=0;bid<MAX_NUM_BOARDS;bid++) {
 		for(s=0;s<8;s++,sid++) {
@@ -1430,6 +1457,7 @@ void OpenSprinkler::attribs_load() {
 			attrib_igrd[bid]|= (at.igrd<<s);
 			attrib_dis[bid] |= (at.dis<<s);
 			attrib_seq[bid] |= (at.seq<<s);
+			attrib_grp[sid] = at.gid;
 			file_read_block(STATIONS_FILENAME, &ty, (uint32_t)sid*sizeof(StationData)+offsetof(StationData, type), 1);
 			if(ty!=STN_TYPE_STANDARD) {
 				attrib_spe[bid] |= (1<<s);

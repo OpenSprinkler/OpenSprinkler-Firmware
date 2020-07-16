@@ -162,6 +162,9 @@ enum {
 	NUM_MASTER_OPTS,
 };
 
+#define NUM_SEQ_GROUPS		4
+#define PARALLEL_GROUP_ID	255
+
 /** Macro define of each option
   * Refer to OpenSprinkler.cpp for details on each option
   */

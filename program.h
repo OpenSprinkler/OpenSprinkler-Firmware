@@ -129,7 +129,7 @@ public:
 	static byte station_qid[];	// this array stores the queue element index for each scheduled station
 	static byte nprograms;			// number of programs
 	static LogStruct lastrun;
-	static ulong last_seq_stop_time;	// the last stop time of a sequential station
+	static ulong last_seq_stop_time[];	// the last stop time of a sequential station
 
 	static byte pause_state; 
 	static ulong pause_timer; // amount of time remaining in global pause

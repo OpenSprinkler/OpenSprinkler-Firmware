@@ -36,7 +36,8 @@ byte ProgramData::nqueue = 0;
 RuntimeQueueStruct ProgramData::queue[RUNTIME_QUEUE_SIZE];
 byte ProgramData::station_qid[MAX_NUM_STATIONS];
 LogStruct ProgramData::lastrun;
-ulong ProgramData::last_seq_stop_time;
+ulong ProgramData::last_seq_stop_time[NUM_SEQ_GROUPS];
+// ulong ProgramData::last_seq_stop_time[NUM_SEQ_GROUPS];
 byte ProgramData::pause_state;
 ulong ProgramData::pause_timer;
 
@@ -50,7 +51,7 @@ void ProgramData::init() {
 void ProgramData::reset_runtime() {
 	memset(station_qid, 0xFF, MAX_NUM_STATIONS);	// reset station qid to 0xFF
 	nqueue = 0;
-	last_seq_stop_time = 0;
+	memset(last_seq_stop_time, 0, sizeof(last_seq_stop_time));
 }
 
 /** Insert a new element to the queue
@@ -160,9 +161,10 @@ void ProgramData::set_pause(uint16_t delay) {
 		}
 
 		q->deque_time += delay;
-
-		if (q->st + q->dur > last_seq_stop_time) {
-			last_seq_stop_time = q->st + q->dur;
+		
+		byte gid = os.get_station_gid(q->sid);
+		if (q->st + q->dur > last_seq_stop_time[gid]) {
+			last_seq_stop_time[gid] = q->st + q->dur;
 		} 
 	}
 }
@@ -185,7 +187,7 @@ void ProgramData::resume_stations() {
 void ProgramData::clear_pause() {
 	pause_state = 0;
 	pause_timer = 0;
-	last_seq_stop_time = 0;
+	memset(last_seq_stop_time, 0x00, NUM_SEQ_GROUPS);
 }
 
 /** Modify a program */
