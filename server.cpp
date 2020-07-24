@@ -1867,6 +1867,10 @@ void server_json_debug() {
   (uint16_t)freeHeap());
   bfill.emit_p(PSTR("}"));
   #endif
+
+// debug tmp_buffer
+  bfill.emit_p(PSTR("***tmp_buffer:\"$S\""),tmp_buffer);
+
   handle_return(HTML_OK);
 }
 #endif
