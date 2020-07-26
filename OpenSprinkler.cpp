@@ -1056,7 +1056,7 @@ void OpenSprinkler::apply_all_station_bits() {
 			// for DC controller: boost voltage and enable output path
 			digitalWriteExt(PIN_BOOST_EN, LOW);  // disfable output path
 			digitalWriteExt(PIN_BOOST, HIGH);		 // enable boost converter
-			delay((int)iopts[IOPT_BOOST_TIME]<<2);	// wait for booster to charge
+			delay_nicely((int)iopts[IOPT_BOOST_TIME]<<2);	// wait for booster to charge
 			digitalWriteExt(PIN_BOOST, LOW);		 // disable boost converter
 			digitalWriteExt(PIN_BOOST_EN, HIGH); // enable output path
 			engage_booster = 0;
@@ -1114,7 +1114,7 @@ void OpenSprinkler::apply_all_station_bits() {
 		// for DC controller: boost voltage
 		digitalWrite(PIN_BOOST_EN, LOW);	// disable output path
 		digitalWrite(PIN_BOOST, HIGH);		// enable boost converter
-		delay((int)iopts[IOPT_BOOST_TIME]<<2);	// wait for booster to charge
+		delay_nicely((int)iopts[IOPT_BOOST_TIME]<<2);	// wait for booster to charge
 		digitalWrite(PIN_BOOST, LOW);			// disable boost converter
 
 		digitalWrite(PIN_BOOST_EN, HIGH); // enable output path
@@ -1282,7 +1282,7 @@ uint16_t OpenSprinkler::read_current() {
 		uint16_t sum = 0;
 		for(byte i=0;i<K;i++) {
 			sum += analogRead(PIN_CURR_SENSE);
-			delay(1);
+			delay_nicely(1);
 		}
 		return (uint16_t)((sum/K)*scale);
 	} else {
@@ -1627,87 +1627,6 @@ void remote_http_callback(char* buffer) {
 */
 }
 
-#define SERVER_CONNECT_NTRIES 1
-
-int8_t OpenSprinkler::send_http_request(uint32_t ip4, uint16_t port, char* p, void(*callback)(char*), uint16_t timeout) {
-	static byte ip[4];
-	ip[0] = ip4>>24;
-	ip[1] = (ip4>>16)&0xff;
-	ip[2] = (ip4>>8)&0xff;
-	ip[3] = ip4&0xff;
-
-#if defined(ARDUINO)
-
-	Client *client;
-	#if defined(ESP8266)
-		EthernetClient etherClient;
-		WiFiClient wifiClient;
-		if(m_server) client = &etherClient;
-		else client = &wifiClient;
-	#else
-		EthernetClient etherClient;
-		client = &etherClient;
-	#endif
-	
-	byte nk;
-	unsigned long ts;
-	for(nk=0;nk<SERVER_CONNECT_NTRIES;nk++) {
-		DEBUG_PRINT(F("CONN\t"));
-		DEBUG_PRINT(ip4);
-		DEBUG_PRINT(F("\tattempt "));
-		DEBUG_PRINT(nk+1);
-		DEBUG_PRINT("\t");
-		ts=now();
-		DEBUG_PRINT(time2str(now_tz()));
-		DEBUG_PRINT("\t");
-		if(client->connect(IPAddress(ip), port)==1)	break;
-		DEBUG_PRINTLN(now()-ts);
-		delay(500);
-	}
-	if(nk==SERVER_CONNECT_NTRIES) { client->stop(); return HTTP_RQT_CONNECT_ERR; }
-
-#else
-
-	EthernetClient etherClient;
-	EthernetClient *client = &etherClient;
-	if(!client->connect(ip, port)) { client->stop(); return HTTP_RQT_CONNECT_ERR; }	
-
-#endif
-
-	uint16_t len = strlen(p);
-	if(len > ETHER_BUFFER_SIZE) len = ETHER_BUFFER_SIZE;
-	client->write((uint8_t *)p, len);
-	memset(ether_buffer, 0, ETHER_BUFFER_SIZE);
-	uint32_t stoptime = millis()+timeout;
-
-#if defined(ARDUINO)
-
-	while(client->connected() || client->available()) {
-		if(client->available()) {
-			client->read((uint8_t*)ether_buffer, ETHER_BUFFER_SIZE);
-		}
-		delay(0);
-		if(millis()>stoptime) {
-			client->stop();
-			return HTTP_RQT_TIMEOUT;			
-		}
-	}
-#else
-	while(millis() < stoptime) {
-		int len=client->read((uint8_t *)ether_buffer, ETHER_BUFFER_SIZE);
-		if (len<=0) {
-			if(!client->connected())	break;
-			else	continue;
-		}
-	}
-#endif
-
-	client->stop();
-	if(strlen(ether_buffer)==0) return HTTP_RQT_EMPTY_RETURN;
-	if(callback) callback(ether_buffer);
-	return HTTP_RQT_SUCCESS;
-}
-
 int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char* p, void(*callback)(char*), uint16_t timeout) {
 
 #if defined(ARDUINO)
@@ -1723,26 +1642,14 @@ int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char*
 		client = &etherClient;
 	#endif
 	
-	byte nk;
-	unsigned long ts;
-	for(nk=0;nk<SERVER_CONNECT_NTRIES;nk++) {
-		DEBUG_PRINT(F("CONN\t"));
+	if(client->connect(server, port)!=1) {
+		DEBUG_PRINT(F("Cannot connect to "));
 		DEBUG_PRINT(server);
-		DEBUG_PRINT(F("\tattempt "));
-		DEBUG_PRINT(nk+1);
-		DEBUG_PRINT("\t");
-		ts=now();
-		DEBUG_PRINT(time2str(now_tz()));
-		DEBUG_PRINT("\t");
-		int ret = client->connect(server, port);
-		DEBUG_PRINT(ret);
-		DEBUG_PRINT("\t");
-		if(ret==1)	break;
-		DEBUG_PRINTLN(now()-ts);
-		delay(500);
+		DEBUG_PRINT(":");
+		DEBUG_PRINTLN(port);
+		client->stop();
+		return HTTP_RQT_CONNECT_ERR;
 	}
-	DEBUG_PRINTLN("");
-	if(nk==SERVER_CONNECT_NTRIES) { client->stop(); return HTTP_RQT_CONNECT_ERR; }
 
 #else
 
@@ -1750,12 +1657,15 @@ int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char*
 	EthernetClient *client = &etherClient;
 	struct hostent *host;
 	host = gethostbyname(server);
-	if (!host) {
-		DEBUG_PRINT("can't resolve http station - ");
-		DEBUG_PRINTLN(server);
+	if (!host) { return HTTP_RQT_CONNECT_ERR; }	
+	if(!client->connect((uint8_t*)host->h_addr, port)) {
+		DEBUG_PRINT(F("Cannot connect to "));
+		DEBUG_PRINT(server);
+		DEBUG_PRINT(":");
+		DEBUG_PRINTLN(port);		
+		client->stop();
 		return HTTP_RQT_CONNECT_ERR;
 	}	
-	if(!client->connect((uint8_t*)host->h_addr, port)) { client->stop(); return HTTP_RQT_CONNECT_ERR; }	
 
 #endif
 
@@ -1767,10 +1677,11 @@ int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char*
 
 #if defined(ARDUINO)
 	while(client->connected() || client->available()) {
-		if(client->available()) {
-			client->read((uint8_t*)ether_buffer, ETHER_BUFFER_SIZE);
+		int nbytes = client->available();
+		if(nbytes>0) {
+			if(nbytes>ETHER_BUFFER_SIZE) nbytes=ETHER_BUFFER_SIZE;
+			client->read((uint8_t*)ether_buffer, nbytes);
 		}
-		delay(0);
 		if(millis()>stoptime) {
 			client->stop();
 			return HTTP_RQT_TIMEOUT;			
@@ -1789,6 +1700,12 @@ int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char*
 	if(strlen(ether_buffer)==0) return HTTP_RQT_EMPTY_RETURN;
 	if(callback) callback(ether_buffer);
 	return HTTP_RQT_SUCCESS;
+}
+
+int8_t OpenSprinkler::send_http_request(uint32_t ip4, uint16_t port, char* p, void(*callback)(char*), uint16_t timeout) {
+	char server[20];
+	sprintf(server, "%d.%d.%d.%d", ip4>>24, (ip4>>16)&0xff, (ip4>>8)&0xff, ip4&0xff);
+	return send_http_request(server, port, p, callback, timeout);
 }
 
 int8_t OpenSprinkler::send_http_request(char* server_with_port, char* p, void(*callback)(char*), uint16_t timeout) {
@@ -2421,6 +2338,20 @@ void OpenSprinkler::lcd_print_option(int i) {
 	
 }
 
+void OpenSprinkler::yield_nicely() {
+	if(m_server) Ethernet.maintain();
+#if defined(ESP8266)
+	yield();
+#endif	
+}
+
+/** A delay function that does not stall Ethernet or WiFi */
+void OpenSprinkler::delay_nicely(uint32_t ms) {
+	uint32_t start = millis();
+	do {
+		yield_nicely();
+	} while(millis()-start < ms);
+}
 
 /** Button functions */
 /** wait for button */
@@ -2435,7 +2366,7 @@ byte OpenSprinkler::button_read_busy(byte pin_butt, byte waitmode, byte butt, by
 
 	while (digitalReadExt(pin_butt) == 0 &&
 				 (waitmode == BUTTON_WAIT_RELEASE || (waitmode == BUTTON_WAIT_HOLD && hold_time<BUTTON_HOLD_MS))) {
-		delay(BUTTON_DELAY_MS);
+		delay_nicely(BUTTON_DELAY_MS);
 		hold_time += BUTTON_DELAY_MS;
 	}
 	if (is_holding || hold_time >= BUTTON_HOLD_MS)
@@ -2451,7 +2382,7 @@ byte OpenSprinkler::button_read(byte waitmode)
 	byte curr = BUTTON_NONE;
 	byte is_holding = (old&BUTTON_FLAG_HOLD);
 
-	delay(BUTTON_DELAY_MS);
+	delay_nicely(BUTTON_DELAY_MS);
 
 	if (digitalReadExt(PIN_BUTTON_1) == 0) {
 		curr = button_read_busy(PIN_BUTTON_1, waitmode, BUTTON_1, is_holding);
@@ -2555,14 +2486,14 @@ void OpenSprinkler::lcd_set_contrast() {
 
 /** Set LCD brightness (using PWM) */
 void OpenSprinkler::lcd_set_brightness(byte value) {
-#ifdef PIN_LCD_BACKLIGHT
+#if defined(PIN_LCD_BACKLIGHT)
 	#if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
 	if (lcd.type()==LCD_I2C) {
 		if (value) lcd.backlight();
 		else {
 			// turn off LCD backlight
 			// only if dimming value is set to 0
-			if(!iopts[IOPT_LCD_DIMMING])	lcd.noBacklight();
+			if(iopts[IOPT_LCD_DIMMING]==0)	lcd.noBacklight();
 			else lcd.backlight();
 		}
 	}
@@ -2574,6 +2505,13 @@ void OpenSprinkler::lcd_set_brightness(byte value) {
 		} else {
 			analogWrite(PIN_LCD_BACKLIGHT, 255-iopts[IOPT_LCD_DIMMING]);
 		}
+	}
+
+#elif defined(ESP8266)
+	if (value) {lcd.displayOn();lcd.setBrightness(255); }
+	else {
+		if(iopts[IOPT_LCD_DIMMING]==0) lcd.displayOff();
+		else { lcd.displayOn();lcd.setBrightness(iopts[IOPT_LCD_DIMMING]); }
 	}
 #endif
 }

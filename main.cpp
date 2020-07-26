@@ -53,17 +53,18 @@ void remote_http_callback(char*);
 
 // Small variations have been added to the timing values below
 // to minimize conflicting events
-#define NTP_SYNC_INTERVAL				86413L 	// NYP sync interval, in units of seconds
+#define NTP_SYNC_INTERVAL				86413L 	// NYP sync interval
 #define RTC_SYNC_INTERVAL				3607		// RTC sync interval
 #define CHECK_NETWORK_INTERVAL	601			// Network checking timeout
 #define CHECK_WEATHER_TIMEOUT		21613L  // Weather check interval
-#define CHECK_WEATHER_SUCCESS_TIMEOUT 86400L // Weather check success interval: 24 hrs
+#define CHECK_WEATHER_SUCCESS_TIMEOUT 86400L // Weather check success interval
 #define LCD_BACKLIGHT_TIMEOUT		15			// LCD backlight timeout: 15 secs
 #define PING_TIMEOUT						200			// Ping test timeout: 200 ms
-
+#define UI_STATE_MACHINE_INTERVAL	200		// how often does ui_state_machine run: 100ms
+#define CLIENT_READ_TIMEOUT			3000		// client read timeout: 3000ms
 // Define buffers: need them to be sufficiently large to cover string option reading
-char ether_buffer[ETHER_BUFFER_SIZE+TMP_BUFFER_SIZE]; // ethernet buffer
-char tmp_buffer[TMP_BUFFER_SIZE+MAX_SOPTS_SIZE+1];		 // scratch buffer
+char ether_buffer[ETHER_BUFFER_SIZE*2]; // ethernet buffer, make it twice as large to allow overflow
+char tmp_buffer[TMP_BUFFER_SIZE*2]; // scratch buffer, make it twice as large to allow overflow
 
 // ====== Object defines ======
 OpenSprinkler os; // OpenSprinkler object
@@ -118,18 +119,24 @@ bool ui_confirm(PGM_P str) {
 	os.lcd_print_line_clear_pgm(str, 0);
 	os.lcd_print_line_clear_pgm(PSTR("(B1:No, B3:Yes)"), 1);
 	byte button;
-	ulong timeout = millis()+4000;
+	ulong start = millis();
 	do {
 		button = os.button_read(BUTTON_WAIT_NONE);
 		if((button&BUTTON_MASK)==BUTTON_3 && (button&BUTTON_FLAG_DOWN)) return true;
 		if((button&BUTTON_MASK)==BUTTON_1 && (button&BUTTON_FLAG_DOWN)) return false;
-		delay(10);
-	} while(millis() < timeout);
+		os.delay_nicely(10);
+	} while(millis() - start < 2500);
 	return false;
 }
 
 void ui_state_machine() {
- 
+
+	// to avoid ui_state_machine taking too much computation time
+	// we run it only every UI_STATE_MACHINE_INTERVAL ms
+	static uint32_t last_usm = 0;
+	if(millis() - last_usm <= UI_STATE_MACHINE_INTERVAL) { return; }
+	last_usm = millis();
+
 #if defined(ESP8266)
 	// process screen led
 	static ulong led_toggle_timeout = 0;
@@ -292,7 +299,7 @@ void do_setup() {
 #endif
 
 	DEBUG_BEGIN(115200);
-	DEBUG_PRINTLN("");
+	DEBUG_PRINTLN(F("started"));
 	
 	os.begin();					 // OpenSprinkler init
 	os.options_setup();  // Setup options
@@ -413,13 +420,9 @@ void do_loop()
 	os.status.mas2= os.iopts[IOPT_MASTER_STATION_2];
 	time_t curr_time = os.now_tz();
 	
-	#define PHY_TIMEOUT 8	// ray debug
+	#define PHY_TIMEOUT 10	// ray debug
 	static ulong phy_timeout = 0;
 	static ulong last_cli_time = 0;
-	static ulong last_mqtt_time = 0;
-	static ulong last_scheduler_time = 0;
-	static ulong last_checkwt_time = 0;
-	static ulong last_pushmsg_time = 0;
 
 	// ====== Process Ethernet packets ======
 #if defined(ARDUINO)	// Process Ethernet packets for Arduino
@@ -428,62 +431,60 @@ void do_loop()
 	if (m_server) {	// if wired Ethernet
 		led_blink_ms = 0;
 
-		ulong maintain = millis(); // ray debug
-		Ethernet.maintain(); // todo: is this necessary?
-		maintain = millis()-maintain;
-		
+#if defined(ENABLE_DEBUG)
 		if(curr_time >= phy_timeout) { // ray debug
-			if(phy_timeout && curr_time > phy_timeout + PHY_TIMEOUT)
-			{
-				DEBUG_PRINT(F("crash detected --"));
-				uint16_t phy = Enc28J60.PhyStatus();
-				uint16_t heap = ESP.getFreeHeap();
+			#define NET_ENC28J60_EIR  	0x1C
+			#define NET_ENC28J60_ESTAT	0x1D
+			#define NET_ENC28J60_ECON1	0x1F
 
-				DEBUG_PRINT(curr_time);
-				DEBUG_PRINT("|");
-				DEBUG_PRINT(os.time2str(curr_time));
-				DEBUG_PRINT("|PHY:");
-				DEBUG_PRINT(phy);
-				DEBUG_PRINT("|MAN:");
-				DEBUG_PRINT(maintain);
-				DEBUG_PRINT("|CLI:");
-				DEBUG_PRINT(last_cli_time);
-				DEBUG_PRINT("|MQT:");
-				DEBUG_PRINT(last_mqtt_time);
-				DEBUG_PRINT("|SCH:");
-				DEBUG_PRINT(last_scheduler_time);
-				DEBUG_PRINT("|CWT:");
-				DEBUG_PRINT(last_checkwt_time);
-				DEBUG_PRINT("|PUS:");
-				DEBUG_PRINT(last_pushmsg_time);
-				DEBUG_PRINTLN("");
-				os.status.safe_reboot = 1;
+			uint16_t estat = Enc28J60.readReg((uint8_t) NET_ENC28J60_ESTAT);
+			uint16_t eir = Enc28J60.readReg((uint8_t) NET_ENC28J60_EIR);
+			uint16_t econ1 = Enc28J60.readReg((uint8_t) NET_ENC28J60_ECON1);
+
+			DEBUG_PRINT(os.time2str(curr_time));
+			DEBUG_PRINT(F("|EIR:"));
+			DEBUG_PRINT(eir);
+			DEBUG_PRINT(F("|ESTAT:"));
+			DEBUG_PRINT(estat);
+			DEBUG_PRINT(F("|ECON1:"));
+			DEBUG_PRINT(econ1);
+			DEBUG_PRINT(F("|CLI:"));
+			DEBUG_PRINT(last_cli_time);
+			DEBUG_PRINT(F("|RAM:"));
+			DEBUG_PRINT(ESP.getFreeHeap());
+			DEBUG_PRINTLN("");
+			last_cli_time = 0;
+				
+			if(phy_timeout && curr_time > phy_timeout * 2) {
+				DEBUG_PRINTLN("crash detected!");
+				os.status.safe_reboot = 1;				
 			}
 			phy_timeout = curr_time + PHY_TIMEOUT;
 		}
+#endif
 
-		last_cli_time = millis(); // ray debug
+		unsigned long cli_time = micros(); // ray debug
+		Ethernet.maintain();
 		EthernetClient client = m_server->available();
 		if (client) {
-			while (true) {
-				int len = client.read((uint8_t*) ether_buffer, ETHER_BUFFER_SIZE);
-				if (len <= 0) {
-					if(!client.connected()) {
+			ulong cli_timeout = millis() + CLIENT_READ_TIMEOUT;
+			while(client.connected() && millis() < cli_timeout) {
+				size_t size;
+				if((size=client.available())>0) {
+					if(size>ETHER_BUFFER_SIZE) size=ETHER_BUFFER_SIZE;
+					int len = client.read((uint8_t*) ether_buffer, size);
+					if(len>0) {
+						m_client = &client;
+						ether_buffer[len] = 0;	// properly end the buffer
+						handle_web_request(ether_buffer);
+						m_client = NULL;
 						break;
-					} else {
-						continue;
 					}
-
-				} else {
-					m_client = &client;
-					ether_buffer[len] = 0;	// put a zero at the end of the packet
-					handle_web_request(ether_buffer);
-					m_client= 0;
-					break;
 				}
 			}
+			client.stop();
 		}
-		last_cli_time = millis()-last_cli_time;
+		last_cli_time += (micros()-cli_time);
 
 	} else {	
 		switch(os.state) {
@@ -558,32 +559,72 @@ void do_loop()
 	
 	#else // AVR
 	
+#if defined(ENABLE_DEBUG)	
+	if(curr_time >= phy_timeout) { // ray debug
+
+		#define NET_ENC28J60_EIR  	0x1C
+		#define NET_ENC28J60_ESTAT	0x1D
+		#define NET_ENC28J60_ECON1	0x1F
+
+		uint16_t estat = Enc28J60.readReg((uint8_t) NET_ENC28J60_ESTAT);
+		uint16_t eir = Enc28J60.readReg((uint8_t) NET_ENC28J60_EIR);
+		uint16_t econ1 = Enc28J60.readReg((uint8_t) NET_ENC28J60_ECON1);
+
+		DEBUG_PRINT(os.time2str(curr_time));
+		DEBUG_PRINT(F("|EIR:"));
+		DEBUG_PRINT(eir);
+		DEBUG_PRINT(F("|ESTAT:"));
+		DEBUG_PRINT(estat);
+		DEBUG_PRINT(F("|ECON1:"));
+		DEBUG_PRINT(econ1);
+		DEBUG_PRINT(F("|CLI:"));
+		DEBUG_PRINT(last_cli_time);
+		DEBUG_PRINT(F("|RAM:"));
+		{
+			extern int __heap_start, *__brkval;
+			int v;
+			DEBUG_PRINT( (int) &v - (__brkval == 0 ? (int) &__heap_start : (int) __brkval));
+		}
+		last_cli_time = 0;
+		DEBUG_PRINTLN();
+			
+		if(phy_timeout && curr_time > phy_timeout + 1) {
+			DEBUG_PRINTLN("crash detected!");
+			os.status.safe_reboot = 1;				
+		}
+		phy_timeout = curr_time + PHY_TIMEOUT;
+	}
+#endif
+
+	unsigned long cli_time = micros();
+	Ethernet.maintain();	
 	EthernetClient client = m_server->available();
+
 	if (client) {
-		while(true) {
-			int len = client.read((uint8_t*) ether_buffer, ETHER_BUFFER_SIZE);
-			if (len <=0) {
-				if(!client.connected()) {
+		ulong cli_timeout = millis() + CLIENT_READ_TIMEOUT;
+		while(client.connected() && millis() < cli_timeout) {
+			size_t size;
+			if((size=client.available())>0) {
+				if(size>ETHER_BUFFER_SIZE) size=ETHER_BUFFER_SIZE;
+				int len = client.read((uint8_t*) ether_buffer, size);
+				if(len>0) {
+					m_client = &client;
+					ether_buffer[len] = 0;	// properly end the buffer
+					handle_web_request(ether_buffer);
+					m_client = NULL;
 					break;
-				} else {
-					continue;
 				}
-			} else {
-				m_client = &client;
-				ether_buffer[len] = 0;	// put a zero at the end of the packet
-				handle_web_request(ether_buffer);
-				m_client = NULL;
-				break;
 			}
 		}
+		client.stop();
 	}
+	last_cli_time += (micros()-cli_time);
 
-	Ethernet.maintain();
-	 
 	wdt_reset();	// reset watchdog timer
 	wdt_timeout = 0;
+
 	#endif
-		
+	
 	ui_state_machine();
 
 #else // Process Ethernet packets for RPI/BBB
@@ -608,19 +649,15 @@ void do_loop()
 	}
 #endif	// Process Ethernet packets
 
-	last_mqtt_time = millis();
 	// Start up MQTT when we have a network connection
-	if (os.status.req_mqtt_restart && os.network_connected()) {
+/*	if (os.status.req_mqtt_restart && os.network_connected()) {
 		os.mqtt.begin();
 		os.status.req_mqtt_restart = false;
 	}
-	os.mqtt.loop();
-	last_mqtt_time = millis()-last_mqtt_time;
+	os.mqtt.loop(); */
 
 	// The main control loop runs once every second
 	if (curr_time != last_time) {
-
-		last_scheduler_time = millis();
 
 		#if defined(ESP8266)
 		pinModeExt(PIN_SENSOR1, INPUT_PULLUP); // this seems necessary for OS 3.2
@@ -717,7 +754,6 @@ void do_loop()
 			last_minute = curr_minute;
 			// check through all programs
 			for(pid=0; pid<pd.nprograms; pid++) {
-				delay(0);
 				pd.read(pid, &prog);	// todo future: reduce load time
 				if(prog.check_match(curr_time)) {
 					// program match found
@@ -759,9 +795,7 @@ void do_loop()
 						}// if prog.durations[sid]
 					}// for sid
 					if(match_found) {
-						last_pushmsg_time = millis();
 						push_message(NOTIFY_PROGRAM_SCHED, pid, prog.use_weather?os.iopts[IOPT_WATER_PERCENTAGE]:100);
-						last_pushmsg_time = millis() - last_pushmsg_time;
 					}
 				}// if check_match
 			}// for pid
@@ -986,7 +1020,6 @@ void do_loop()
 				flowcount_rt_start = flow_count;
 			}
 		}
-		last_scheduler_time = millis()-last_scheduler_time;
 
 		// perform ntp sync
 		// instead of using curr_time, which may change due to NTP sync itself
@@ -999,10 +1032,8 @@ void do_loop()
 		if (curr_time && (curr_time % CHECK_NETWORK_INTERVAL==0))  os.status.req_network = 1;
 		check_network();
 
-		last_checkwt_time = millis();
 		// check weather
 		check_weather();
-		last_checkwt_time = millis() - last_checkwt_time;
 
 		byte wuf = os.weather_update_flag;
 		if(wuf) {
@@ -1019,7 +1050,6 @@ void do_loop()
 			reboot_notification = 0;
 			push_message(NOTIFY_REBOOT);
 		}
-
 	}
 
 	#if !defined(ARDUINO)

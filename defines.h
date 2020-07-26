@@ -280,7 +280,7 @@ enum {
 	#define PIN_CURR_SENSE     7    // current sensing pin (A7)
 	#define PIN_CURR_DIGITAL  24    // digital pin index for A7
 
-	#define ETHER_BUFFER_SIZE   8192
+	#define ETHER_BUFFER_SIZE   2048
 
 	#define 	wdt_reset()   __asm__ __volatile__ ("wdr")  // watchdog timer reset
 
@@ -301,7 +301,7 @@ enum {
 
 	#define PIN_CURR_SENSE    A0
 	#define PIN_FREE_LIST     {} // no free GPIO pin at the moment
-	#define ETHER_BUFFER_SIZE   8192
+	#define ETHER_BUFFER_SIZE   2048
 
 	#define PIN_ETHER_CS       16 // ENC28J60 CS (chip select pin) is 16 on OS 3.2.
 
