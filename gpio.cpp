@@ -413,10 +413,10 @@ void attachInterrupt(int pin, const char* mode, void (*isr)(void)) {
 
 	pthread_t threadId ;
 	pthread_mutex_lock (&pinMutex) ;
-		pinPass = pin ;
-		pthread_create (&threadId, NULL, interruptHandler, NULL) ;
-		while (pinPass != -1)
-			delay(1) ;
+	pinPass = pin ;
+	pthread_create (&threadId, NULL, interruptHandler, NULL) ;
+	while (pinPass != -1)
+		delay(1) ;
 	pthread_mutex_unlock (&pinMutex) ;
 }
 #else
