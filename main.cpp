@@ -53,15 +53,16 @@ void remote_http_callback(char*);
 
 // Small variations have been added to the timing values below
 // to minimize conflicting events
-#define NTP_SYNC_INTERVAL				86413L 	// NYP sync interval
-#define RTC_SYNC_INTERVAL				3607		// RTC sync interval
-#define CHECK_NETWORK_INTERVAL	601			// Network checking timeout
-#define CHECK_WEATHER_TIMEOUT		21613L  // Weather check interval
-#define CHECK_WEATHER_SUCCESS_TIMEOUT 86400L // Weather check success interval
-#define LCD_BACKLIGHT_TIMEOUT		15			// LCD backlight timeout: 15 secs
-#define PING_TIMEOUT						200			// Ping test timeout: 200 ms
-#define UI_STATE_MACHINE_INTERVAL	200		// how often does ui_state_machine run: 100ms
-#define CLIENT_READ_TIMEOUT			3000		// client read timeout: 3000ms
+#define NTP_SYNC_INTERVAL				86413L 	// NYP sync interval (in seconds)
+#define RTC_SYNC_INTERVAL				3607		// RTC sync interval (in seconds)
+#define CHECK_NETWORK_INTERVAL	601			// Network checking timeout (in seconds)
+#define CHECK_WEATHER_TIMEOUT		21613L  // Weather check interval (in seconds)
+#define CHECK_WEATHER_SUCCESS_TIMEOUT 86400L // Weather check success interval (in seconds)
+#define LCD_BACKLIGHT_TIMEOUT		  15		// LCD backlight timeout (in seconds))
+#define PING_TIMEOUT						  200		// Ping test timeout (in ms)
+#define UI_STATE_MACHINE_INTERVAL	50		// how often does ui_state_machine run (in ms)
+#define CLIENT_READ_TIMEOUT			  5			// client read timeout (in seconds)
+#define DHCP_CHECKLEASE_INTERVAL  3600L // DHCP check lease interval (in seconds)
 // Define buffers: need them to be sufficiently large to cover string option reading
 char ether_buffer[ETHER_BUFFER_SIZE*2]; // ethernet buffer, make it twice as large to allow overflow
 char tmp_buffer[TMP_BUFFER_SIZE*2]; // scratch buffer, make it twice as large to allow overflow
@@ -420,10 +421,6 @@ void do_loop()
 	os.status.mas2= os.iopts[IOPT_MASTER_STATION_2];
 	time_t curr_time = os.now_tz();
 	
-	#define PHY_TIMEOUT 10	// ray debug
-	static ulong phy_timeout = 0;
-	static ulong last_cli_time = 0;
-
 	// ====== Process Ethernet packets ======
 #if defined(ARDUINO)	// Process Ethernet packets for Arduino
 	#if defined(ESP8266)
@@ -431,46 +428,17 @@ void do_loop()
 	if (m_server) {	// if wired Ethernet
 		led_blink_ms = 0;
 
-#if defined(ENABLE_DEBUG)
-		if(curr_time >= phy_timeout) { // ray debug
-			#define NET_ENC28J60_EIR  	0x1C
-			#define NET_ENC28J60_ESTAT	0x1D
-			#define NET_ENC28J60_ECON1	0x1F
-
-			uint16_t estat = Enc28J60.readReg((uint8_t) NET_ENC28J60_ESTAT);
-			uint16_t eir = Enc28J60.readReg((uint8_t) NET_ENC28J60_EIR);
-			uint16_t econ1 = Enc28J60.readReg((uint8_t) NET_ENC28J60_ECON1);
-
-			DEBUG_PRINT(os.time2str(curr_time));
-			DEBUG_PRINT(F("|EIR:"));
-			DEBUG_PRINT(eir);
-			DEBUG_PRINT(F("|ESTAT:"));
-			DEBUG_PRINT(estat);
-			DEBUG_PRINT(F("|ECON1:"));
-			DEBUG_PRINT(econ1);
-			DEBUG_PRINT(F("|CLI:"));
-			DEBUG_PRINT(last_cli_time);
-			DEBUG_PRINT(F("|RAM:"));
-			DEBUG_PRINT(ESP.getFreeHeap());
-			DEBUG_PRINTLN("");
-			last_cli_time = 0;
-				
-			if(phy_timeout && curr_time > phy_timeout * 2) {
-				DEBUG_PRINTLN("crash detected!");
-				os.status.safe_reboot = 1;				
-			}
-			phy_timeout = curr_time + PHY_TIMEOUT;
+		static unsigned long dhcp_timeout = 0;
+		if(curr_time > dhcp_timeout) {
+			Ethernet.maintain();
+			dhcp_timeout = curr_time + DHCP_CHECKLEASE_INTERVAL;
 		}
-#endif
-
-		unsigned long cli_time = micros(); // ray debug
-		Ethernet.maintain();
 		EthernetClient client = m_server->available();
 		if (client) {
-			ulong cli_timeout = millis() + CLIENT_READ_TIMEOUT;
-			while(client.connected() && millis() < cli_timeout) {
-				size_t size;
-				if((size=client.available())>0) {
+			ulong cli_timeout = now()+CLIENT_READ_TIMEOUT;
+			while(client.connected() && now()<cli_timeout) {
+				size_t size = client.available();
+				if(size>0) {
 					if(size>ETHER_BUFFER_SIZE) size=ETHER_BUFFER_SIZE;
 					int len = client.read((uint8_t*) ether_buffer, size);
 					if(len>0) {
@@ -484,7 +452,6 @@ void do_loop()
 			}
 			client.stop();
 		}
-		last_cli_time += (micros()-cli_time);
 
 	} else {	
 		switch(os.state) {
@@ -525,6 +492,7 @@ void do_loop()
 			} else {
 				if(millis()>connecting_timeout) {
 					os.state = OS_STATE_INITIAL;
+					WiFi.disconnect(true);
 					DEBUG_PRINTLN(F("timeout"));
 				}
 			}
@@ -551,6 +519,7 @@ void do_loop()
 				} else {
 					DEBUG_PRINTLN(F("WiFi disconnected, going back to initial"));
 					os.state = OS_STATE_INITIAL;
+					WiFi.disconnect(true);
 				}
 			}
 			break;
@@ -559,52 +528,17 @@ void do_loop()
 	
 	#else // AVR
 	
-#if defined(ENABLE_DEBUG)	
-	if(curr_time >= phy_timeout) { // ray debug
-
-		#define NET_ENC28J60_EIR  	0x1C
-		#define NET_ENC28J60_ESTAT	0x1D
-		#define NET_ENC28J60_ECON1	0x1F
-
-		uint16_t estat = Enc28J60.readReg((uint8_t) NET_ENC28J60_ESTAT);
-		uint16_t eir = Enc28J60.readReg((uint8_t) NET_ENC28J60_EIR);
-		uint16_t econ1 = Enc28J60.readReg((uint8_t) NET_ENC28J60_ECON1);
-
-		DEBUG_PRINT(os.time2str(curr_time));
-		DEBUG_PRINT(F("|EIR:"));
-		DEBUG_PRINT(eir);
-		DEBUG_PRINT(F("|ESTAT:"));
-		DEBUG_PRINT(estat);
-		DEBUG_PRINT(F("|ECON1:"));
-		DEBUG_PRINT(econ1);
-		DEBUG_PRINT(F("|CLI:"));
-		DEBUG_PRINT(last_cli_time);
-		DEBUG_PRINT(F("|RAM:"));
-		{
-			extern int __heap_start, *__brkval;
-			int v;
-			DEBUG_PRINT( (int) &v - (__brkval == 0 ? (int) &__heap_start : (int) __brkval));
-		}
-		last_cli_time = 0;
-		DEBUG_PRINTLN();
-			
-		if(phy_timeout && curr_time > phy_timeout + 1) {
-			DEBUG_PRINTLN("crash detected!");
-			os.status.safe_reboot = 1;				
-		}
-		phy_timeout = curr_time + PHY_TIMEOUT;
+	static unsigned long dhcp_timeout = 0;
+	if(curr_time > dhcp_timeout) {
+		Ethernet.maintain();
+		dhcp_timeout = curr_time + DHCP_CHECKLEASE_INTERVAL;
 	}
-#endif
-
-	unsigned long cli_time = micros();
-	Ethernet.maintain();	
 	EthernetClient client = m_server->available();
-
 	if (client) {
-		ulong cli_timeout = millis() + CLIENT_READ_TIMEOUT;
-		while(client.connected() && millis() < cli_timeout) {
-			size_t size;
-			if((size=client.available())>0) {
+		ulong cli_timeout = now() + CLIENT_READ_TIMEOUT;
+		while(client.connected() && now() < cli_timeout) {
+			size_t size = client.available();
+			if(size>0) {
 				if(size>ETHER_BUFFER_SIZE) size=ETHER_BUFFER_SIZE;
 				int len = client.read((uint8_t*) ether_buffer, size);
 				if(len>0) {
@@ -618,7 +552,6 @@ void do_loop()
 		}
 		client.stop();
 	}
-	last_cli_time += (micros()-cli_time);
 
 	wdt_reset();	// reset watchdog timer
 	wdt_timeout = 0;

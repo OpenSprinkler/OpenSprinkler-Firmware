@@ -2339,9 +2339,9 @@ void OpenSprinkler::lcd_print_option(int i) {
 }
 
 void OpenSprinkler::yield_nicely() {
-	if(m_server) Ethernet.maintain();
+	if(m_server) Ethernet.tick();
 #if defined(ESP8266)
-	yield();
+	delay(0);
 #endif	
 }
 
@@ -2349,7 +2349,8 @@ void OpenSprinkler::yield_nicely() {
 void OpenSprinkler::delay_nicely(uint32_t ms) {
 	uint32_t start = millis();
 	do {
-		yield_nicely();
+		//yield_nicely();
+		delay(1);
 	} while(millis()-start < ms);
 }
 

@@ -1942,7 +1942,7 @@ void on_sta_upload() {
 		Update.end();
 		DEBUG_PRINTLN(F("aborted"));
 	}
-	yield();
+	delay(0);
 }
 
 void on_ap_upload() { 
@@ -1969,7 +1969,7 @@ void on_ap_upload() {
 		Update.end();
 		DEBUG_PRINTLN(F("aborted"));
 	}
-	yield();
+	delay(0);
 }
 
 void start_server_client() {
