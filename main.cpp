@@ -330,7 +330,7 @@ void do_setup() {
 		os.status.network_fails = 1;
 	}
 	os.status.req_network = 0;
-	os.status.req_ntpsync = 0;
+	os.status.req_ntpsync = 1;
 
 	os.mqtt.init();
 	os.status.req_mqtt_restart = true;
@@ -427,6 +427,45 @@ void do_loop()
 	static ulong connecting_timeout;
 	if (m_server) {	// if wired Ethernet
 		led_blink_ms = 0;
+
+		#if defined(ENABLE_DEBUG)
+			// this section prints out ENC28J60 register values onto LCD
+			#define PHY_TIMEOUT 10
+			static ulong phy_timeout = 0;
+			static ulong ncrashes = 0;
+			if(curr_time >= phy_timeout) {
+				#define NET_ENC28J60_EIR  	0x1C
+				#define NET_ENC28J60_ESTAT	0x1D
+				#define NET_ENC28J60_ECON1	0x1F
+				#define NET_ENC28J60_EIE    0x1B
+				#define NET_ENC28J60_ERXFCON (0x18|0x20)
+
+				uint16_t estat = Enc28J60.readReg((uint8_t) NET_ENC28J60_ESTAT);
+				uint16_t eir = Enc28J60.readReg((uint8_t) NET_ENC28J60_EIR);
+				uint16_t econ1 = Enc28J60.readReg((uint8_t) NET_ENC28J60_ECON1);
+				uint16_t erxfcon = Enc28J60.readReg((uint8_t) NET_ENC28J60_ERXFCON);
+				uint16_t eie = Enc28J60.readReg((uint8_t) NET_ENC28J60_EIE);
+
+				os.lcd.setCursor(0,-1);
+				os.lcd.print(eir, HEX);
+				os.lcd.print("|");
+				os.lcd.print(estat, HEX);
+				os.lcd.print("|");
+				os.lcd.print(econ1, HEX);
+				os.lcd.print("|");
+				os.lcd.print(erxfcon, HEX);
+				os.lcd.print("|");
+				os.lcd.print(eie, HEX);
+
+
+				if(phy_timeout && curr_time > phy_timeout + PHY_TIMEOUT*2) {
+					ncrashes ++;
+					//os.status.safe_reboot = 1;
+				}
+				phy_timeout = curr_time + PHY_TIMEOUT;
+			}		
+
+		#endif
 
 		static unsigned long dhcp_timeout = 0;
 		if(curr_time > dhcp_timeout) {
@@ -957,8 +996,8 @@ void do_loop()
 		// perform ntp sync
 		// instead of using curr_time, which may change due to NTP sync itself
 		// we use Arduino's millis() method
-		//if (curr_time % NTP_SYNC_INTERVAL == 0) os.status.req_ntpsync = 1;
-		if((millis()/1000) % NTP_SYNC_INTERVAL==15) os.status.req_ntpsync = 1;
+		if (curr_time % NTP_SYNC_INTERVAL == 0) os.status.req_ntpsync = 1;
+		//if((millis()/1000) % NTP_SYNC_INTERVAL==15) os.status.req_ntpsync = 1;
 		perform_ntp_sync();
 
 		// check network connection
@@ -1019,7 +1058,12 @@ void check_weather() {
 		}
 	} else if (!os.checkwt_lasttime || (ntz > os.checkwt_lasttime + CHECK_WEATHER_TIMEOUT)) {
 		os.checkwt_lasttime = ntz;
+		if (!ui_state) {
+			os.lcd_print_line_clear_pgm(PSTR("Check Weather..."),1);
+		}
+		DEBUG_PRINT(F("check weather:"));
 		GetWeather();
+		DEBUG_PRINTLN(wt_errCode);
 	}
 }
 
