@@ -2154,12 +2154,9 @@ ulong getNtpTime()
 		ulong gt = 0;
 		byte tries=0;
 		while(tries<5) {
-			if (ntp->update()) {
-				gt = ntp->getEpochTime();
-				if(gt>978307200L) break;
-				tries++;
-				os.delay_nicely(1000);
-			}
+			if (ntp->update() && (gt = ntp->getEpochTime()) > 978307200L) break;
+			tries++;
+			os.delay_nicely(1000);
 		}
 		if(gt<978307200L) {
 			DEBUG_PRINTLN(F("NTP-E failed!"));
