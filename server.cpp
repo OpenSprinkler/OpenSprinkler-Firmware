@@ -622,7 +622,7 @@ void server_change_stations() {
 			os.set_station_gid(sid, atoi(tmp_buffer));
 		}
 		else if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("st"), true) &&
-			 findKeyVal(p, tmp_buffer+1, TMP_BUFFER_SIZE-1, PSTR("sd"), true)) {
+			findKeyVal(p, tmp_buffer+1, TMP_BUFFER_SIZE-1, PSTR("sd"), true)) {
 
 			tmp_buffer[0]-='0';
 			tmp_buffer[STATION_SPECIAL_DATA_SIZE] = 0;

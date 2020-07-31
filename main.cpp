@@ -831,7 +831,7 @@ void do_loop()
 				sst = q->st + q->dur;
 				if (sst > curr_time) {
 					// only need to update last_seq_stop_time for sequential stations
-					if (os.attrib_seq[bid] & (1 << s) && !re) {
+					if (os.is_sequential_station(sid) && !re) {
 						pd.last_seq_stop_time[gid] = (sst > pd.last_seq_stop_time[gid]) ? sst : pd.last_seq_stop_time[gid];
 					}
 				}
@@ -1086,13 +1086,17 @@ void turn_off_station(byte sid, ulong curr_time, byte shift) {
 
 				if (q->st + q->dur > curr_time) { // remainder is non-zero
 					remainder = q->st + q->dur - curr_time;
-					for ( ; s < pd.queue + pd.nqueue; s++) {			
+					for ( ; s < pd.queue + pd.nqueue; s++) {	
+
+						// ignore station to be removed and stations in other groups		
 						if (s == q || os.get_station_gid(s->sid) != gid) { continue; }
 
 						// only shift if the station is scheduled
 						if (s->st > curr_time) {
 							s->st -= remainder; 
 							s->st += 1;
+							s->deque_time -= remainder;
+							s->deque_time += 1;
 						}
 					}
 				}
@@ -1165,6 +1169,39 @@ void process_dynamic_events(ulong curr_time) {
 	}
 }
 
+/* Scheduler 
+ * this function determines the appropriate start and dequeue times
+ * of stations bound to master stations with on and off adjustments
+ */
+void handle_master_adjustments(ulong curr_time, RuntimeQueueStruct *q) {
+
+	printf("station: %i\n", q->sid);
+
+	int16_t start_adj = 0;
+	int16_t dequeue_adj = 0;
+
+	for (byte mas = MASTER_1; mas < NUM_MASTER_ZONES; mas++) {
+
+		byte masid = os.master[mas][MASTER_STATION_ID];
+
+		if (masid && os.bound_to_master(q->sid, mas)) {
+
+			int16_t mas_on_adj = os.get_on_adj(mas);
+			int16_t mas_off_adj = os.get_off_adj(mas);
+
+			start_adj = min(start_adj, mas_on_adj);
+			dequeue_adj = max(dequeue_adj, mas_off_adj);
+		}
+	}
+
+	// negative on time adjustment
+	if (q->st - curr_time < abs(start_adj)) {
+		q->st += abs(start_adj);
+	}
+
+	q->deque_time = q->st + q->dur + dequeue_adj;
+}
+
 /** Scheduler
  * This function loops through the queue
  * and schedules the start time of each station
@@ -1204,38 +1241,13 @@ void schedule_all_stations(ulong curr_time) {
 				pd.last_seq_stop_time[gid] = q->st; // initialize
 			}
 			pd.last_seq_stop_time[gid] += q->dur + station_delay;
-			printf("start time is: %lu\n", q->st);
+			printf("start time is: %lu\n", q->st);	
 		} else {
 			// otherwise, concurrent scheduling
 			q->st = con_start_time;
 			// stagger concurrent stations by 1 second
 			con_start_time++;
 		}
-
-		// master adjustments 
-		int16_t start_adj = 0;
-		int16_t dequeue_adj = 0;
-
-		for (byte mas = MASTER_1; mas < NUM_MASTER_ZONES; mas++) {
-
-			byte masid = os.master[mas][MASTER_STATION_ID];
-
-			if (masid && os.bound_to_master(q->sid, mas)) {
-
-				int16_t mas_on_adj = os.get_on_adj(mas);
-				int16_t mas_off_adj = os.get_off_adj(mas);
-
-				start_adj = min(start_adj, mas_on_adj);
-				dequeue_adj = max(dequeue_adj, mas_off_adj);
-			}
-		}
-
-		// handle negative on time adjustment
-		if (q->st - curr_time < abs(start_adj)) {
-			q->st += abs(start_adj);
-		}
-
-		q->deque_time = q->st + q->dur + dequeue_adj;
 
 		/*DEBUG_PRINT("[");
 		DEBUG_PRINT(sid);
@@ -1245,6 +1257,8 @@ void schedule_all_stations(ulong curr_time) {
 		DEBUG_PRINT(q->dur);
 		DEBUG_PRINT("]");
 		DEBUG_PRINTLN(pd.nqueue);*/
+
+		handle_master_adjustments(curr_time, q);
 
 		if (!os.status.program_busy) {
 			os.status.program_busy = 1;  // set program busy bit

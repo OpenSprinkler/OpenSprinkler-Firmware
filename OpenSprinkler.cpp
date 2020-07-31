@@ -1334,14 +1334,24 @@ byte OpenSprinkler::get_station_type(byte sid) {
 }
 
 byte OpenSprinkler::is_sequential_station(byte sid) {
-	byte bid = sid >> 3;
-	byte s = sid & 0x07;
-	
-	return attrib_seq[bid] & (1 << s);
+	return get_station_gid(sid) != PARALLEL_GROUP_ID; 
+}
+
+byte OpenSprinkler::is_master_station(byte sid) {
+	for (byte mas = 0; mas < NUM_MASTER_ZONES; mas++) {
+		if (get_master_id(mas) && get_master_id(mas) - 1 == sid) {
+			return 1;
+		}
+	}
+	return 0;
 }
 
 byte OpenSprinkler::station_running(byte sid) {
 	return station_bits[(sid >> 3)] >> (sid & 0x07) & 1;
+}
+
+byte OpenSprinkler::get_master_id(byte mas) {
+	return master[mas][MASTER_STATION_ID];
 }
 
 int16_t OpenSprinkler::get_on_adj(byte mas) {
@@ -1357,15 +1367,14 @@ byte OpenSprinkler::bound_to_master(byte sid, byte mas) {
 	byte s = sid & 0x07;
 	byte attributes = 0;
 
-	switch (mas)
-	{
-	case MASTER_1:
-		attributes= attrib_mas[bid];
-		break;
-	case MASTER_2:
-		attributes = attrib_mas2[bid];
-	default:
-		break;
+	switch (mas) {
+		case MASTER_1:
+			attributes= attrib_mas[bid];
+			break;
+		case MASTER_2:
+			attributes = attrib_mas2[bid];
+		default:
+			break;
 	}
 
 	return attributes & (1 << s);
@@ -1400,8 +1409,6 @@ void OpenSprinkler::attribs_save() {
 	for(bid=0;bid<MAX_NUM_BOARDS;bid++) {
 		for(s=0;s<8;s++,sid++) {
 
-			gid = get_station_gid(sid);
-
 			at.mas = (attrib_mas[bid]>>s) & 1;
 			at.igs = (attrib_igs[bid]>>s) & 1;
 			at.mas2= (attrib_mas2[bid]>>s)& 1;
@@ -1409,19 +1416,9 @@ void OpenSprinkler::attribs_save() {
 			at.igrd= (attrib_igrd[bid]>>s) & 1;			 
 			at.dis = (attrib_dis[bid]>>s) & 1;
 			at.seq = (attrib_seq[bid]>>s) & 1;
-
-			// should sequential flag override gid? 
-
-			if (gid == PARALLEL_GROUP_ID) {
-				at.gid = PARALLEL_GROUP_ID;
-				at.seq = 0;
-			} else if (!at.seq) {
-				at.gid = PARALLEL_GROUP_ID; 
-			} else {
-				at.gid = gid;
-			}
-			
+			at.gid = is_master_station(sid) ? MASTER_GROUP_ID : get_station_gid(sid);
 			set_station_gid(sid, at.gid); // update ram version
+
 			file_write_block(STATIONS_FILENAME, &at, (uint32_t)sid*sizeof(StationData)+offsetof(StationData, attrib), sizeof(StationAttrib)); // attribte bits are 1 byte long
 			if(attrib_spe[bid] >> s == 0) {
 				// if station special bit is 0, make sure to write type STANDARD
