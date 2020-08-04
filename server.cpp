@@ -560,7 +560,7 @@ void server_json_station_special() {
 }
 
 
-void server_change_stations_attrib(char *p, char header, byte *attrib) {
+void server_change_board_attrib(char *p, char header, byte *attrib) {
 	char tbuf2[5] = {0, 0, 0, 0, 0};
 	byte bid;
 	tbuf2[0]=header;
@@ -568,6 +568,22 @@ void server_change_stations_attrib(char *p, char header, byte *attrib) {
 		itoa(bid, tbuf2+1, 10);
 		if(findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, tbuf2)) {
 			attrib[bid] = atoi(tmp_buffer);
+		}
+	}
+}
+
+void server_change_stations_attrib(char *p, char header, byte *attrib) {
+	char tbuf2[6] = {0, 0, 0, 0, 0, 0};
+	byte bid, s, sid;
+	tbuf2[0] = header;
+	for (bid = 0; bid < os.nboards; bid++) {
+		for (s = 0; s < 8; s++) {
+			sid = bid * 8 + s;
+			itoa(sid, tbuf2 + 1, 10);
+			if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, tbuf2)) {
+				printf("setting: %i, value: %i\n", sid, atoi(tmp_buffer));
+				attrib[sid] = atoi(tmp_buffer);
+			}
 		}
 	}
 }
@@ -605,30 +621,28 @@ void server_change_stations() {
 		}
 	}
 
-	server_change_stations_attrib(p, 'm', os.attrib_mas); // master1
-	server_change_stations_attrib(p, 'i', os.attrib_igrd); // ignore rain delay
-	server_change_stations_attrib(p, 'j', os.attrib_igs); // ignore sensor1
-	server_change_stations_attrib(p, 'k', os.attrib_igs2); // ignore sensor2
-	server_change_stations_attrib(p, 'n', os.attrib_mas2); // master2
-	server_change_stations_attrib(p, 'd', os.attrib_dis); // disable
-	server_change_stations_attrib(p, 'q', os.attrib_seq); // sequential
-	server_change_stations_attrib(p, 'p', os.attrib_spe); // special
+	server_change_board_attrib(p, 'm', os.attrib_mas); // master1
+	server_change_board_attrib(p, 'i', os.attrib_igrd); // ignore rain delay
+	server_change_board_attrib(p, 'j', os.attrib_igs); // ignore sensor1
+	server_change_board_attrib(p, 'k', os.attrib_igs2); // ignore sensor2
+	server_change_board_attrib(p, 'n', os.attrib_mas2); // master2
+	server_change_board_attrib(p, 'd', os.attrib_dis); // disable
+	server_change_board_attrib(p, 'q', os.attrib_seq); // sequential
+	server_change_board_attrib(p, 'p', os.attrib_spe); // special
+	server_change_stations_attrib(p, 'g', os.attrib_grp); // sequential groups 
 
 	/* handle special data */
 	if(findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("sid"), true)) {
 		sid = atoi(tmp_buffer);
-		if(sid<0 || sid>os.nstations) handle_return(HTML_DATA_OUTOFBOUND);
-		if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("gid"), true)) {
-			os.set_station_gid(sid, atoi(tmp_buffer));
-		}
-		else if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("st"), true) &&
+		if (sid<0 || sid>os.nstations) handle_return(HTML_DATA_OUTOFBOUND); 
+		if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("st"), true) &&
 			findKeyVal(p, tmp_buffer+1, TMP_BUFFER_SIZE-1, PSTR("sd"), true)) {
 
 			tmp_buffer[0]-='0';
 			tmp_buffer[STATION_SPECIAL_DATA_SIZE] = 0;
 
 			// only process GPIO and HTTP stations for OS 2.3, above, and OSPi
-			if(tmp_buffer[0] == STN_TYPE_GPIO) {
+			if (tmp_buffer[0] == STN_TYPE_GPIO) {
 				// check that pin does not clash with OSPi pins
 				byte gpio = (tmp_buffer[1] - '0') * 10 + tmp_buffer[2] - '0';
 				byte activeState = tmp_buffer[3] - '0';
