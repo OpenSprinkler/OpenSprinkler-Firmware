@@ -432,19 +432,20 @@ void do_loop()
 			// this section prints out ENC28J60 register values onto LCD
 			#define PHY_TIMEOUT 10
 			static ulong phy_timeout = 0;
-			static ulong ncrashes = 0;
+			static ulong n_reinits = 0;
 			if(curr_time >= phy_timeout) {
-				#define NET_ENC28J60_EIR  	0x1C
-				#define NET_ENC28J60_ESTAT	0x1D
-				#define NET_ENC28J60_ECON1	0x1F
-				#define NET_ENC28J60_EIE    0x1B
-				#define NET_ENC28J60_ERXFCON (0x18|0x20)
+				#define ENC28J60_EIR  	0x1C
+				#define ENC28J60_ESTAT	0x1D
+				#define ENC28J60_ECON1	0x1F
 
-				uint16_t estat = Enc28J60.readReg((uint8_t) NET_ENC28J60_ESTAT);
-				uint16_t eir = Enc28J60.readReg((uint8_t) NET_ENC28J60_EIR);
-				uint16_t econ1 = Enc28J60.readReg((uint8_t) NET_ENC28J60_ECON1);
-				uint16_t erxfcon = Enc28J60.readReg((uint8_t) NET_ENC28J60_ERXFCON);
-				uint16_t eie = Enc28J60.readReg((uint8_t) NET_ENC28J60_EIE);
+				#define ENC28J60_EIR_RXERIF			0x01
+				#define ENC28J60_ESTAT_BUFER		0x40
+				#define ENC28J60_ESTAT_LATCOL		0x10
+				#define ENC28J60_ESTAT_TXABRT		0x02
+				#define ENC28J60_ECON1_RXEN			0x04
+				uint16_t estat = Enc28J60.readReg((uint8_t) ENC28J60_ESTAT);
+				uint16_t eir = Enc28J60.readReg((uint8_t) ENC28J60_EIR);
+				uint16_t econ1 = Enc28J60.readReg((uint8_t) ENC28J60_ECON1);
 
 				os.lcd.setCursor(0,-1);
 				os.lcd.print(eir, HEX);
@@ -453,15 +454,18 @@ void do_loop()
 				os.lcd.print("|");
 				os.lcd.print(econ1, HEX);
 				os.lcd.print("|");
-				os.lcd.print(erxfcon, HEX);
-				os.lcd.print("|");
-				os.lcd.print(eie, HEX);
+				os.lcd.print(n_reinits);
+				os.lcd.print(F("         "));
 
-
-				if(phy_timeout && curr_time > phy_timeout + PHY_TIMEOUT*2) {
-					ncrashes ++;
-					//os.status.safe_reboot = 1;
+				/* Detect possible enc28j60 problems */
+				if( (eir & ENC28J60_EIR_RXERIF) || (estat & ENC28J60_ESTAT_BUFER) ||
+					  (estat & ENC28J60_ESTAT_LATCOL) || (estat & ENC28J60_ESTAT_TXABRT) || 
+					  ((econ1 & ENC28J60_ECON1_RXEN) == 0) ) {
+					os.load_hardware_mac((uint8_t*)tmp_buffer, true);
+					Enc28J60Network::init((uint8_t*)tmp_buffer);
+					n_reinits ++;
 				}
+
 				phy_timeout = curr_time + PHY_TIMEOUT;
 			}		
 
@@ -622,11 +626,12 @@ void do_loop()
 #endif	// Process Ethernet packets
 
 	// Start up MQTT when we have a network connection
-/*	if (os.status.req_mqtt_restart && os.network_connected()) {
+	if (os.status.req_mqtt_restart && os.network_connected()) {
+		DEBUG_PRINTLN(F("req_mqtt_restart"));
 		os.mqtt.begin();
 		os.status.req_mqtt_restart = false;
 	}
-	os.mqtt.loop(); */
+	os.mqtt.loop();
 
 	// The main control loop runs once every second
 	if (curr_time != last_time) {
