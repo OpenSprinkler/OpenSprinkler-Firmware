@@ -373,7 +373,7 @@ void do_setup() {
 
 void write_log(byte type, ulong curr_time);
 void schedule_all_stations(ulong curr_time);
-void turn_on_station(byte sid);
+void turn_on_station(byte sid, ulong finish_time);
 void turn_off_station(byte sid, ulong curr_time);
 void process_dynamic_events(ulong curr_time);
 void check_network();
@@ -807,7 +807,7 @@ void do_loop()
 					// if current station is not running, check if we should turn it on
 					if(!((bitvalue>>s)&1)) {
 						if (curr_time >= q->st && curr_time < q->st+q->dur) {
-							turn_on_station(sid);
+							turn_on_station(sid, q->st+q->dur);
 						} //if curr_time > scheduled_start_time
 					} // if current station is not running
 				}//end_s
@@ -875,6 +875,7 @@ void do_loop()
 			int16_t mas_on_adj = water_time_decode_signed(os.iopts[IOPT_MASTER_ON_ADJ]);
 			int16_t mas_off_adj= water_time_decode_signed(os.iopts[IOPT_MASTER_OFF_ADJ]);
 			byte masbit = 0;
+			ulong finish = 0;
 			
 			for(sid=0;sid<os.nstations;sid++) {
 				// skip if this is the master station
@@ -888,17 +889,19 @@ void do_loop()
 					if (curr_time >= q->st + mas_on_adj &&
 							curr_time <= q->st + q->dur + mas_off_adj) {
 						masbit = 1;
+						finish = q->st + q->dur + mas_off_adj;
 						break;
 					}
 				}
 			}
-			os.set_station_bit(os.status.mas-1, masbit);
+			os.set_station_bit(os.status.mas-1, masbit, finish);
 		}
 		// handle master2
 		if (os.status.mas2>0) {
 			int16_t mas_on_adj_2 = water_time_decode_signed(os.iopts[IOPT_MASTER_ON_ADJ_2]);
 			int16_t mas_off_adj_2= water_time_decode_signed(os.iopts[IOPT_MASTER_OFF_ADJ_2]);
 			byte masbit2 = 0;
+			ulong finish2 = 0;
 			for(sid=0;sid<os.nstations;sid++) {
 				// skip if this is the master station
 				if (os.status.mas2 == sid+1) continue;
@@ -911,11 +914,12 @@ void do_loop()
 					if (curr_time >= q->st + mas_on_adj_2 &&
 							curr_time <= q->st + q->dur + mas_off_adj_2) {
 						masbit2 = 1;
+						finish2 = q->st + q->dur + mas_off_adj_2;
 						break;
 					}
 				}
 			}
-			os.set_station_bit(os.status.mas2-1, masbit2);
+			os.set_station_bit(os.status.mas2-1, masbit2, finish2);
 		}		 
 
 		// process dynamic events
@@ -1044,11 +1048,11 @@ void check_weather() {
 /** Turn on a station
  * This function turns on a scheduled station
  */
-void turn_on_station(byte sid) {
+void turn_on_station(byte sid, ulong finish_time) {
 	// RAH implementation of flow sensor
 	flow_start=0;
 
-	if (os.set_station_bit(sid, 1)) {
+	if (os.set_station_bit(sid, 1, finish_time)) {
 		push_message(NOTIFY_STATION_ON, sid);
 	}
 }
@@ -1058,7 +1062,7 @@ void turn_on_station(byte sid) {
  * and writes log record
  */
 void turn_off_station(byte sid, ulong curr_time) {
-	os.set_station_bit(sid, 0);
+	os.set_station_bit(sid, 0, os.now_tz());
 
 	byte qid = pd.station_qid[sid];
 	// ignore if we are turning off a station that's not running or scheduled to run

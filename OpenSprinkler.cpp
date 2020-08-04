@@ -37,6 +37,7 @@ byte OpenSprinkler::hw_rev;
 byte OpenSprinkler::nboards;
 byte OpenSprinkler::nstations;
 byte OpenSprinkler::station_bits[MAX_NUM_BOARDS];
+ulong OpenSprinkler::station_finish[MAX_NUM_STATIONS]; 
 byte OpenSprinkler::engage_booster;
 uint16_t OpenSprinkler::baseline_current;
 
@@ -1131,14 +1132,21 @@ void OpenSprinkler::apply_all_station_bits() {
 
 	if(iopts[IOPT_SPE_AUTO_REFRESH]) {
 		// handle refresh of RF and remote stations
-		// we refresh the station whose index is the current time modulo MAX_NUM_STATIONS
+		// we refresh the station whose index is the next in line 
 		static byte last_sid = 0;
-		byte sid = now() % MAX_NUM_STATIONS;
-		if (sid != last_sid) {	// avoid refreshing the same station twice in a roll
-			last_sid = sid;
-			bid=sid>>3;
-			s=sid&0x07;
-			switch_special_station(sid, (station_bits[bid]>>s)&0x01);
+		//byte sid = now() % MAX_NUM_STATIONS;
+		byte sid = last_sid + 1;
+		if (sid == MAX_NUM_STATIONS) { // reached the end, roll back to the first station
+			sid = 0; 
+		}
+		last_sid = sid;
+		bid=sid>>3;
+		s=sid&0x07;
+		if (station_finish[sid] > now_tz()) {
+			switch_special_station(sid, (station_bits[bid]>>s)&0x01, station_finish[sid] - now_tz());
+		}
+		else {
+			switch_special_station(sid, (station_bits[bid]>>s)&0x01, 0);	
 		}
 	}
 }
@@ -1465,7 +1473,7 @@ byte OpenSprinkler::weekday_today() {
 }
 
 /** Switch special station */
-void OpenSprinkler::switch_special_station(byte sid, byte value) {
+void OpenSprinkler::switch_special_station(byte sid, byte value, ulong duration) {
 	// check if this is a special station
 	byte stype = get_station_type(sid);
 	if(stype!=STN_TYPE_STANDARD) {
@@ -1479,7 +1487,7 @@ void OpenSprinkler::switch_special_station(byte sid, byte value) {
 			break;
 			
 		case STN_TYPE_REMOTE:
-			switch_remotestation((RemoteStationData *)pdata->sped, value);
+			switch_remotestation((RemoteStationData *)pdata->sped, value, duration);
 			break;
 			
 		case STN_TYPE_GPIO:
@@ -1498,15 +1506,19 @@ void OpenSprinkler::switch_special_station(byte sid, byte value) {
  * You have to call apply_all_station_bits next to apply the bits
  * (which results in physical actions of opening/closing valves).
  */
-byte OpenSprinkler::set_station_bit(byte sid, byte value) {
+byte OpenSprinkler::set_station_bit(byte sid, byte value, ulong finish) {
 	byte *data = station_bits+(sid>>3);  // pointer to the station byte
 	byte mask = (byte)1<<(sid&0x07); // mask
 	if (value) {
 		if((*data)&mask) return 0;	// if bit is already set, return no change
 		else {
+			if(finish < now_tz()) { //check for invalid cases
+				finish = now_tz();
+			}
+			station_finish[sid] = finish;
 			(*data) = (*data) | mask;
 			engage_booster = true; // if bit is changing from 0 to 1, set engage_booster
-			switch_special_station(sid, 1); // handle special stations
+			switch_special_station(sid, 1, station_finish[sid] - now_tz()); // handle special stations
 			return 1;
 		}
 	} else {
@@ -1516,7 +1528,7 @@ byte OpenSprinkler::set_station_bit(byte sid, byte value) {
 			if(hw_type == HW_TYPE_LATCH) {
 				engage_booster = true;	// if LATCH controller, engage booster when bit changes
 			}
-			switch_special_station(sid, 0); // handle special stations
+			switch_special_station(sid, 0, now_tz()); // handle special stations
 			return 255;
 		}
 	}
@@ -1527,7 +1539,7 @@ byte OpenSprinkler::set_station_bit(byte sid, byte value) {
 void OpenSprinkler::clear_all_station_bits() {
 	byte sid;
 	for(sid=0;sid<=MAX_NUM_STATIONS;sid++) {
-		set_station_bit(sid, 0);
+		set_station_bit(sid, 0, now_tz());
 	}
 }
 
@@ -1778,7 +1790,7 @@ int8_t OpenSprinkler::send_http_request(char* server_with_port, char* p, void(*c
  * The remote controller is assumed to have the same
  * password as the main controller
  */
-void OpenSprinkler::switch_remotestation(RemoteStationData *data, bool turnon) {
+void OpenSprinkler::switch_remotestation(RemoteStationData *data, bool turnon, ulong duration) {
 	RemoteStationData copy;
 	memcpy((char*)&copy, (char*)data, sizeof(RemoteStationData));
 	
@@ -1796,11 +1808,12 @@ void OpenSprinkler::switch_remotestation(RemoteStationData *data, bool turnon) {
 	char *p = tmp_buffer;
 	BufferFiller bf = p;
 	// MAX_NUM_STATIONS is the refresh cycle
-	uint16_t timer = iopts[IOPT_SPE_AUTO_REFRESH]?2*MAX_NUM_STATIONS:64800;  
-	bf.emit_p(PSTR("GET /cm?pw=$O&sid=$D&en=$D&t=$D"),
+	//uint16_t timer = iopts[IOPT_SPE_AUTO_REFRESH]?2*MAX_NUM_STATIONS:64800;  
+	//check Duration for valid values
+	bf.emit_p(PSTR("GET /cm?pw=$O&sid=$D&en=$D&t=$L"),
 						SOPT_PASSWORD,
 						(int)hex2ulong(copy.sid, sizeof(copy.sid)),
-						turnon, timer);
+						turnon, duration);
 	bf.emit_p(PSTR(" HTTP/1.0\r\nHOST: $D.$D.$D.$D\r\n\r\n"),
 						ip[0],ip[1],ip[2],ip[3]);
 
