@@ -469,44 +469,43 @@ void(* resetFunc) (void) = 0; // AVR software reset function
 byte OpenSprinkler::start_network() {
 	lcd_print_line_clear_pgm(PSTR("Starting..."), 1);
 	uint16_t httpport = (uint16_t)(iopts[IOPT_HTTPPORT_1]<<8) + (uint16_t)iopts[IOPT_HTTPPORT_0];
-	if(m_server)	{ delete m_server; m_server = 0; }
-	if(Udp) { delete Udp; Udp = 0; }
+	if(m_server)	{ delete m_server; m_server = NULL; }
+	if(udp) { delete udp; udp = NULL; }
 	
-#if defined(ESP8266)
 	if (start_ether()) {
 		m_server = new EthernetServer(httpport);
 		m_server->begin();
+
+		udp = new EthernetUDP();
+		udp->begin((httpport==8000) ? 8888 : 8000); // start udp on a different port than httpport
+
+#if defined(ESP8266)
+		// turn off WiFi when ether is active
 		// todo: add option to keep both ether and wifi active
 		WiFi.mode(WIFI_OFF);
-	} else {
-		if(wifi_server) { delete wifi_server; wifi_server = 0; }
+#endif
+
+		return 1;
+
+	}	else {
+
+#if defined(ESP8266)
+		if(wifi_server) { delete wifi_server; wifi_server = NULL; }
 		if(get_wifi_mode()==WIFI_MODE_AP) {
 			wifi_server = new ESP8266WebServer(80);
 		} else {
 			wifi_server = new ESP8266WebServer(httpport);
 		}
-	}
-	
-	return 1;	
-#else
 
-	if(start_ether()) {
-		m_server = new EthernetServer(httpport);
-		m_server->begin();
+		udp = new WiFiUDP();
+		udp->begin((httpport==8000) ? 8888 : 8000); // start udp on a different port than httpport
 
-		Udp = new EthernetUDP();
-		// Start UDP service for NTP. Avoid the same port with http
-		if(httpport==8888)
-			Udp->begin(8000);
-		else
-			Udp->begin(8888);
 		return 1;
+#endif
+
 	}
 
 	return 0;
-
-#endif
-
 }
 
 byte OpenSprinkler::start_ether() {
@@ -537,7 +536,6 @@ byte OpenSprinkler::start_ether() {
 		IPAddress subn(iopts+IOPT_SUBNET_MASK1);
 		Ethernet.begin((uint8_t*)tmp_buffer, staticip, dns, gateway, subn);
 	}
-	//if(Ethernet.linkStatus() != LinkON) return 0;
 
 	return 1;
 }
@@ -1642,11 +1640,18 @@ int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char*
 		client = &etherClient;
 	#endif
 	
-	if(client->connect(server, port)!=1) {
+	#define HTTP_CONNECT_NTRIES 3
+	byte tries = 0;
+	do {
+		if(client->connect(server, port)==1) break;
+		tries++;
+	} while(tries<HTTP_CONNECT_NTRIES);
+
+	if(tries==HTTP_CONNECT_NTRIES) {
 		DEBUG_PRINT(F("Cannot connect to "));
 		DEBUG_PRINT(server);
 		DEBUG_PRINT(":");
-		DEBUG_PRINTLN(port);
+		DEBUG_PRINTLN(port);			
 		client->stop();
 		return HTTP_RQT_CONNECT_ERR;
 	}
@@ -1671,12 +1676,14 @@ int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char*
 
 	uint16_t len = strlen(p);
 	if(len > ETHER_BUFFER_SIZE) len = ETHER_BUFFER_SIZE;
-	client->write((uint8_t *)p, len);
+	if(client->connected()) {
+		client->write((uint8_t *)p, len);
+	}
 	memset(ether_buffer, 0, ETHER_BUFFER_SIZE);
 	uint32_t stoptime = millis()+timeout;
 
 #if defined(ARDUINO)
-	while(client->connected() || client->available()) {
+	while(client->connected()) {
 		int nbytes = client->available();
 		if(nbytes>0) {
 			if(nbytes>ETHER_BUFFER_SIZE) nbytes=ETHER_BUFFER_SIZE;
@@ -1688,11 +1695,12 @@ int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char*
 		}
 	}
 #else
-	while(millis() < stoptime) {
+	while(client->connected()) {
 		int len=client->read((uint8_t *)ether_buffer, ETHER_BUFFER_SIZE);
-		if (len<=0) {
-			if(!client->connected())	break;
-			else	continue;
+		if (len<=0) continue;
+		if(millis()>stoptime) {
+			client->stop();
+			return HTTP_RQT_TIMEOUT;
 		}
 	}
 #endif

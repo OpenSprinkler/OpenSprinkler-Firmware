@@ -32,7 +32,7 @@
 #if defined(ARDUINO)
 	EthernetServer *m_server = NULL;
 	EthernetClient *m_client = NULL;
-	EthernetUDP		 *Udp = NULL;
+	UDP	*udp = NULL;
 	#if defined(ESP8266)
 		ESP8266WebServer *wifi_server = NULL;
 		static uint16_t led_blink_ms = LED_FAST_BLINK;
@@ -1753,21 +1753,12 @@ void check_network() {
 /** Perform NTP sync */
 void perform_ntp_sync() {
 #if defined(ARDUINO)
-	// do not perform sync if this option is disabled, or if network is not available, or if a program is running
+	// do not perform ntp if this option is disabled, or if a program is currently running
 	if (!os.iopts[IOPT_USE_NTP] || os.status.program_busy) return;
-	#if defined(ESP8266)
-	if (!m_server) {
-		if (os.get_wifi_mode()!=WIFI_MODE_STA || WiFi.status()!=WL_CONNECTED || os.state!=OS_STATE_CONNECTED) return;
-	}
-	#else
-	if (os.status.network_fails>0) return;
-	#endif
+	// do not perform ntp if network is not connected
+	if (!os.network_connected()) return;
 
 	if (os.status.req_ntpsync) {
-		// check if rtc is uninitialized
-		// 978307200 is Jan 1, 2001, 00:00:00
-		boolean rtc_zero = (now()<=978307200L);
-		
 		os.status.req_ntpsync = 0;
 		if (!ui_state) {
 			os.lcd_print_line_clear_pgm(PSTR("NTP Syncing..."),1);
@@ -1775,13 +1766,9 @@ void perform_ntp_sync() {
 		DEBUG_PRINTLN(F("NTP Syncing..."));
 		static ulong last_ntp_result = 0;
 		ulong t = getNtpTime();
-		if(last_ntp_result!=0) {
-			if(t>last_ntp_result-3 && t<last_ntp_result+3) {
-				DEBUG_PRINTLN(F("ntp too close"));
-				t = 0;	// too close to last_ntp_result, invalidate the result
-			} else {
-				last_ntp_result = t;
-			}
+		if(last_ntp_result>3 && t>last_ntp_result-3 && t<last_ntp_result+3) {
+			DEBUG_PRINTLN(F("error: result too close to last"));
+			t = 0;	// invalidate the result
 		} else {
 			last_ntp_result = t;
 		}
@@ -1789,12 +1776,6 @@ void perform_ntp_sync() {
 			setTime(t);
 			RTC.set(t);
 			DEBUG_PRINTLN(RTC.get());
-			#if !defined(ESP8266)
-			// if rtc was uninitialized and now it is, restart
-			if(rtc_zero && now()>978307200L) {
-				os.reboot_dev(REBOOT_CAUSE_NTP);
-			}
-			#endif
 		}
 	}
 #else

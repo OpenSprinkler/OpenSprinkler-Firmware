@@ -2119,102 +2119,25 @@ void handle_web_request(char *p) {
 	}
 }
 
-#if defined(ESP8266)
-#include "NTPClient.h"
-static EthernetUDP udp;
-static NTPClient *ntp = 0;
-extern EthernetServer *m_server;
-static char _ntpip[16];
-#endif
-
 #if defined(ARDUINO)
 /** NTP sync request */
-ulong getNtpTime()
-{
-#if defined(ESP8266)
-	if (m_server) {
-		if (!ntp) {
-			String ntpip = "";
-			ntpip+=os.iopts[IOPT_NTP_IP1];
-			ntpip+=".";
-			ntpip+=os.iopts[IOPT_NTP_IP2];
-			ntpip+=".";
-			ntpip+=os.iopts[IOPT_NTP_IP3];
-			ntpip+=".";
-			ntpip+=os.iopts[IOPT_NTP_IP4];
-			strcpy(_ntpip, ntpip.c_str());
-			if (!os.iopts[IOPT_NTP_IP1] || os.iopts[IOPT_NTP_IP1] == '0')
-				strcpy(_ntpip, "pool.ntp.org");
+ulong getNtpTime() {
 
-			DEBUG_PRINTLN(_ntpip);
-			ntp = new NTPClient(udp, _ntpip);
-			ntp->begin();
-			os.delay_nicely(1000);
-		}
-		ulong gt = 0;
-		byte tries=0;
-		while(tries<5) {
-			if (ntp->update() && (gt = ntp->getEpochTime()) > 978307200L) break;
-			tries++;
-			os.delay_nicely(1000);
-		}
-		if(gt<978307200L) {
-			DEBUG_PRINTLN(F("NTP-E failed!"));
-			gt=0;
-		} else {
-			DEBUG_PRINTLN(F("NTP-E done."));
-		}
-		return gt;
-	}
-	
-	static bool configured = false;
-		
-	if (os.state!=OS_STATE_CONNECTED || WiFi.status()!=WL_CONNECTED) return 0;
-	
-	if(!configured) {
-		String ntpip = "";
-		ntpip+=os.iopts[IOPT_NTP_IP1];
-		ntpip+=".";
-		ntpip+=os.iopts[IOPT_NTP_IP2];
-		ntpip+=".";
-		ntpip+=os.iopts[IOPT_NTP_IP3];
-		ntpip+=".";
-		ntpip+=os.iopts[IOPT_NTP_IP4];
-		
-		strcpy(_ntpip, ntpip.c_str());
-		if (!os.iopts[IOPT_NTP_IP1] || os.iopts[IOPT_NTP_IP1] == '0')
-				strcpy(_ntpip, "pool.ntp.org");
-		DEBUG_PRINTLN(_ntpip);
-		configTime(0, 0, _ntpip, "time.nist.gov");
-		os.delay_nicely(1000);
-		configured = true;
-	}
-	ulong gt = 0;
-	byte tries=0;
-	while(tries<5) {
-		gt = time(nullptr);
-		if(gt>978307200L) break;
-		tries++;
-		os.delay_nicely(1000);
-	};
-	if(gt<978307200L)  {
-		DEBUG_PRINTLN(F("NTP failed!"));
-		gt=0;
-	} else {
-		DEBUG_PRINTLN(F("NTP done."));
-	}  
-	return gt;
-	
-#else
-	// the following is from Arduino UdpNtpClient code
-	const int NTP_PACKET_SIZE = 48;
+	// only proceed if we are connected
+	if(!os.network_connected()) return 0;
+
+	#define NTP_PACKET_SIZE 48
+	#define NTP_PORT 123
+	#define NTP_NTRIES 3
+
 	static byte packetBuffer[NTP_PACKET_SIZE];
 	byte ntpip[4] = {
 		os.iopts[IOPT_NTP_IP1],
 		os.iopts[IOPT_NTP_IP2],
 		os.iopts[IOPT_NTP_IP3],
 		os.iopts[IOPT_NTP_IP4]};
-	byte tick=0;
+	byte tries=0;
+	ulong gt = 0;
 	do {
 		// sendNtpPacket
 		memset(packetBuffer, 0, NTP_PACKET_SIZE);
@@ -2227,37 +2150,36 @@ ulong getNtpTime()
 		packetBuffer[13]	= 0x4E;
 		packetBuffer[14]	= 49;
 		packetBuffer[15]	= 52;
-		// all NTP fields have been given values, now
-		// you can send a packet requesting a timestamp:
+		// by default use pool.ntp.org if ntp ip is unset
+		DEBUG_PRINT(F("using: "));
 		if (!os.iopts[IOPT_NTP_IP1] || os.iopts[IOPT_NTP_IP1] == '0') {
-			DEBUG_PRINTLN(F("using pool.ntp"));
-			Udp->beginPacket("pool.ntp.org", 123); // NTP requests are to port 123
+			DEBUG_PRINTLN(F("pool.ntp.org"));
+			udp->beginPacket("pool.ntp.org", NTP_PORT);
 		} else {
-			DEBUG_PRINTLN(ntpip[0]);
-			Udp->beginPacket(ntpip, 123);
-			
+			DEBUG_PRINTLN(IPAddress(ntpip[0],ntpip[1],ntpip[2],ntpip[3]));
+			udp->beginPacket(ntpip, NTP_PORT);
 		}
-		Udp->write(packetBuffer, NTP_PACKET_SIZE);
-		Udp->endPacket();
+		udp->write(packetBuffer, NTP_PACKET_SIZE);
+		udp->endPacket();
 		// end of sendNtpPacket
 		
-		// wait for response
-		os.delay_nicely(1000);
-		if(Udp->parsePacket()) {
-			Udp->read(packetBuffer, NTP_PACKET_SIZE);
-			unsigned long highWord = word(packetBuffer[40], packetBuffer[41]);
-			unsigned long lowWord = word(packetBuffer[42], packetBuffer[43]);
-			// combine the four bytes (two words) into a long integer
-			// this is NTP time (seconds since Jan 1 1900):
-			unsigned long secsSince1900 = highWord << 16 | lowWord;
-			// Unix time starts on Jan 1 1970. In seconds, that's 2208988800:
-			const unsigned long seventyYears = 2208988800UL;
-			// subtract seventy years:
-			return secsSince1900 - seventyYears;
+		// process response
+		ulong timeout = millis()+1000;
+		while(millis() < timeout) {
+			if(udp->parsePacket()) {
+				udp->read(packetBuffer, NTP_PACKET_SIZE);
+				ulong highWord = word(packetBuffer[40], packetBuffer[41]);
+				ulong lowWord = word(packetBuffer[42], packetBuffer[43]);
+				ulong secsSince1900 = highWord << 16 | lowWord;
+				ulong seventyYears = 2208988800UL;
+				ulong gt = secsSince1900 - seventyYears;
+				// check validity: has to be larger than 1/1/2020 12:00:00
+				if(gt>1577836800UL) return gt;
+			}
 		}
-		tick ++;
-	} while(tick<5);
-#endif
+		tries ++;
+	} while(tries<NTP_NTRIES);
+	if(tries==NTP_NTRIES) {DEBUG_PRINTLN(F("NTP failed"));}
 	return 0;
 }
 #endif
