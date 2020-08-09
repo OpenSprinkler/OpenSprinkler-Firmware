@@ -1145,7 +1145,7 @@ void OpenSprinkler::apply_all_station_bits() {
 void OpenSprinkler::detect_binarysensor_status(ulong curr_time) {
 	// sensor_type: 0 if normally closed, 1 if normally open
 	if(iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_RAIN || iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_SOIL) {
-		pinModeExt(PIN_SENSOR1, INPUT_PULLUP); // this seems necessary for OS 3.2
+		if(hw_rev==2)	pinModeExt(PIN_SENSOR1, INPUT_PULLUP); // this seems necessary for OS 3.2
 		byte val = digitalReadExt(PIN_SENSOR1);
 		status.sensor1 = (val == iopts[IOPT_SENSOR1_OPTION]) ? 0 : 1;
 		if(status.sensor1) {
@@ -1175,7 +1175,7 @@ void OpenSprinkler::detect_binarysensor_status(ulong curr_time) {
 // ESP8266 is guaranteed to have sensor 2
 #if defined(ESP8266) || defined(PIN_SENSOR2)
 	if(iopts[IOPT_SENSOR2_TYPE]==SENSOR_TYPE_RAIN || iopts[IOPT_SENSOR2_TYPE]==SENSOR_TYPE_SOIL) {
-		pinModeExt(PIN_SENSOR2, INPUT_PULLUP); // this seems necessary for OS 3.2	
+		if(hw_rev==2)	pinModeExt(PIN_SENSOR2, INPUT_PULLUP); // this seems necessary for OS 3.2	
 		byte val = digitalReadExt(PIN_SENSOR2);
 		status.sensor2 = (val == iopts[IOPT_SENSOR2_OPTION]) ? 0 : 1;
 		if(status.sensor2) {
@@ -1205,30 +1205,27 @@ void OpenSprinkler::detect_binarysensor_status(ulong curr_time) {
 #endif
 }
 
-
 /** Return program switch status */
 byte OpenSprinkler::detect_programswitch_status(ulong curr_time) {
 	byte ret = 0;
 	if(iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_PSWITCH) {
-		static ulong keydown_time = 0;
-		pinModeExt(PIN_SENSOR1, INPUT_PULLUP); // this seems necessary for OS 3.2
-		status.sensor1 = (digitalReadExt(PIN_SENSOR1) != iopts[IOPT_SENSOR1_OPTION]);
-		byte val = (digitalReadExt(PIN_SENSOR1) == iopts[IOPT_SENSOR1_OPTION]);
-		if(!val && !keydown_time) keydown_time = curr_time;
-		else if(val && keydown_time && (curr_time > keydown_time)) {
-			keydown_time = 0;
+		static byte sensor1_hist = 0;
+		if(hw_rev==2) pinModeExt(PIN_SENSOR1, INPUT_PULLUP); // this seems necessary for OS 3.2
+		status.sensor1 = (digitalReadExt(PIN_SENSOR1) != iopts[IOPT_SENSOR1_OPTION]); // is switch activated?
+		sensor1_hist = (sensor1_hist<<1) | status.sensor1;
+		// basic noise filtering: only trigger if sensor matches pattern:
+		// i.e. two consecutive lows followed by two consecutive highs
+		if((sensor1_hist&0b1111) == 0b0011) {
 			ret |= 0x01;
 		}
 	}
 #if defined(ESP8266) || defined(PIN_SENSOR2)	
 	if(iopts[IOPT_SENSOR2_TYPE]==SENSOR_TYPE_PSWITCH) {
-		static ulong keydown_time_2 = 0;
-		pinModeExt(PIN_SENSOR2, INPUT_PULLUP); // this seems necessary for OS 3.2		
-		status.sensor2 = (digitalReadExt(PIN_SENSOR2) != iopts[IOPT_SENSOR2_OPTION]);
-		byte val = (digitalReadExt(PIN_SENSOR2) == iopts[IOPT_SENSOR2_OPTION]);
-		if(!val && !keydown_time_2) keydown_time_2 = curr_time;
-		else if(val && keydown_time_2 && (curr_time > keydown_time_2)) {
-			keydown_time_2 = 0;
+		static byte sensor2_hist = 0;
+		if(hw_rev==2) pinModeExt(PIN_SENSOR2, INPUT_PULLUP); // this seems necessary for OS 3.2
+		status.sensor2 = (digitalReadExt(PIN_SENSOR2) != iopts[IOPT_SENSOR2_OPTION]); // is sensor activated?
+		sensor2_hist = (sensor2_hist<<1) | status.sensor2;
+		if((sensor2_hist&0b1111) == 0b0011) {
 			ret |= 0x02;
 		}
 	}
@@ -1643,15 +1640,16 @@ int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char*
 	#define HTTP_CONNECT_NTRIES 3
 	byte tries = 0;
 	do {
+		DEBUG_PRINT(F("host: " ));
+		DEBUG_PRINT(server);
+		DEBUG_PRINT(":");
+		DEBUG_PRINTLN(port);
 		if(client->connect(server, port)==1) break;
 		tries++;
 	} while(tries<HTTP_CONNECT_NTRIES);
 
 	if(tries==HTTP_CONNECT_NTRIES) {
-		DEBUG_PRINT(F("Cannot connect to "));
-		DEBUG_PRINT(server);
-		DEBUG_PRINT(":");
-		DEBUG_PRINTLN(port);			
+		DEBUG_PRINTLN(F("failed."));
 		client->stop();
 		return HTTP_RQT_CONNECT_ERR;
 	}

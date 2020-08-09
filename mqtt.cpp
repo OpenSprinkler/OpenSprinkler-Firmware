@@ -242,15 +242,24 @@ int OSMqtt::_init(void) {
 int OSMqtt::_connect(void) {
 	mqtt_client->setServer(_host, _port);
 	boolean state;
-	if (_username[0])
-		state = mqtt_client->connect(_id, _username, _password, MQTT_AVAILABILITY_TOPIC, 0, true, MQTT_OFFLINE_PAYLOAD);
-	else
-		state = mqtt_client->connect(_id, NULL, NULL, MQTT_AVAILABILITY_TOPIC, 0, true, MQTT_OFFLINE_PAYLOAD);
-	if (state) {
-		mqtt_client->publish(MQTT_AVAILABILITY_TOPIC, MQTT_ONLINE_PAYLOAD, true);
-	} else {
+	#define MQTT_CONNECT_NTRIES 3
+	byte tries = 0;
+	do {
+		DEBUG_PRINT(F("mqtt: "));
+		DEBUG_PRINTLN(_host);
+		if (_username[0])
+			state = mqtt_client->connect(_id, _username, _password, MQTT_AVAILABILITY_TOPIC, 0, true, MQTT_OFFLINE_PAYLOAD);
+		else
+			state = mqtt_client->connect(_id, NULL, NULL, MQTT_AVAILABILITY_TOPIC, 0, true, MQTT_OFFLINE_PAYLOAD);
+		if(state) break;
+		tries++;
+	} while(tries<MQTT_CONNECT_NTRIES);
+
+	if(tries==MQTT_CONNECT_NTRIES) {
 		DEBUG_LOGF("MQTT Connect: Failed (%d)\r\n", mqtt_client->state());
 		return MQTT_ERROR;
+	} else {
+		mqtt_client->publish(MQTT_AVAILABILITY_TOPIC, MQTT_ONLINE_PAYLOAD, true);
 	}
 	return MQTT_SUCCESS;
 }

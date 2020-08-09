@@ -84,7 +84,7 @@ float flow_last_gpm=0;
 
 void flow_poll() {
 	#if defined(ESP8266)
-	pinModeExt(PIN_SENSOR1, INPUT_PULLUP); // this seems necessary for OS 3.2 
+	if(os.hw_rev == 2) pinModeExt(PIN_SENSOR1, INPUT_PULLUP); // this seems necessary for OS 3.2 
 	#endif
 	byte curr_flow_state = digitalReadExt(PIN_SENSOR1);
 	if(!(prev_flow_state==HIGH && curr_flow_state==LOW)) {	// only record on falling edge
@@ -637,8 +637,10 @@ void do_loop()
 	if (curr_time != last_time) {
 
 		#if defined(ESP8266)
-		pinModeExt(PIN_SENSOR1, INPUT_PULLUP); // this seems necessary for OS 3.2
-		pinModeExt(PIN_SENSOR2, INPUT_PULLUP);
+		if(os.hw_rev==2) {
+			pinModeExt(PIN_SENSOR1, INPUT_PULLUP); // this seems necessary for OS 3.2
+			pinModeExt(PIN_SENSOR2, INPUT_PULLUP);
+		}
 		#endif
 		
 		last_time = curr_time;
@@ -1066,9 +1068,7 @@ void check_weather() {
 		if (!ui_state) {
 			os.lcd_print_line_clear_pgm(PSTR("Check Weather..."),1);
 		}
-		DEBUG_PRINT(F("check weather:"));
 		GetWeather();
-		DEBUG_PRINTLN(wt_errCode);
 	}
 }
 

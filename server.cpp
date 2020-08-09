@@ -2151,7 +2151,7 @@ ulong getNtpTime() {
 		packetBuffer[14]	= 49;
 		packetBuffer[15]	= 52;
 		// by default use pool.ntp.org if ntp ip is unset
-		DEBUG_PRINT(F("using: "));
+		DEBUG_PRINT(F("ntp: "));
 		if (!os.iopts[IOPT_NTP_IP1] || os.iopts[IOPT_NTP_IP1] == '0') {
 			DEBUG_PRINTLN(F("pool.ntp.org"));
 			udp->beginPacket("pool.ntp.org", NTP_PORT);
