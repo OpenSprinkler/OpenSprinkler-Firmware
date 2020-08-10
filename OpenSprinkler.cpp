@@ -1373,6 +1373,7 @@ byte OpenSprinkler::bound_to_master(byte sid, byte mas) {
 			break;
 		case MASTER_2:
 			attributes = attrib_mas2[bid];
+			break;
 		default:
 			break;
 	}
@@ -1416,7 +1417,7 @@ void OpenSprinkler::attribs_save() {
 			at.igrd= (attrib_igrd[bid]>>s) & 1;			 
 			at.dis = (attrib_dis[bid]>>s) & 1;
 			at.seq = (attrib_seq[bid]>>s) & 1;
-			at.gid = is_master_station(sid) ? MASTER_GROUP_ID : get_station_gid(sid);
+			at.gid = get_station_gid(sid);
 			set_station_gid(sid, at.gid); // update ram version
 
 			file_write_block(STATIONS_FILENAME, &at, (uint32_t)sid*sizeof(StationData)+offsetof(StationData, attrib), sizeof(StationAttrib)); // attribte bits are 1 byte long
@@ -2066,6 +2067,7 @@ void OpenSprinkler::iopts_load() {
 	status.enabled = iopts[IOPT_DEVICE_ENABLE];
 	iopts[IOPT_FW_VERSION] = OS_FW_VERSION;
 	iopts[IOPT_FW_MINOR] = OS_FW_MINOR;
+	populate_master();
 }
 
 /** Save integer options to file */
@@ -2074,7 +2076,6 @@ void OpenSprinkler::iopts_save() {
 	nboards = iopts[IOPT_EXT_BOARDS]+1;
 	nstations = nboards * 8;
 	status.enabled = iopts[IOPT_DEVICE_ENABLE];
-	populate_master();
 }
 
 /** Load a string option from file */

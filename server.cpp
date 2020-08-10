@@ -581,7 +581,6 @@ void server_change_stations_attrib(char *p, char header, byte *attrib) {
 			sid = bid * 8 + s;
 			itoa(sid, tbuf2 + 1, 10);
 			if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, tbuf2)) {
-				printf("setting: %i, value: %i\n", sid, atoi(tmp_buffer));
 				attrib[sid] = atoi(tmp_buffer);
 			}
 		}
@@ -599,6 +598,7 @@ void server_change_stations_attrib(char *p, char header, byte *attrib) {
  * d?: disable station bit field
  * q?: station sequeitnal bit field
  * p?: station special flag bit field
+ * g?: sequential group id
  */
 void server_change_stations() {
 #if defined(ESP8266)
