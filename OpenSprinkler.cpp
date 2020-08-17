@@ -1129,14 +1129,16 @@ void OpenSprinkler::apply_all_station_bits() {
 
 	if(iopts[IOPT_SPE_AUTO_REFRESH]) {
 		// handle refresh of RF and remote stations
-		// we refresh the station whose index is the current time modulo MAX_NUM_STATIONS
-		static byte last_sid = 0;
-		byte sid = now() % MAX_NUM_STATIONS;
-		if (sid != last_sid) {	// avoid refreshing the same station twice in a roll
-			last_sid = sid;
-			bid=sid>>3;
-			s=sid&0x07;
-			switch_special_station(sid, (station_bits[bid]>>s)&0x01);
+		// we refresh the station that's next in line
+		static byte next_sid_to_refresh = MAX_NUM_STATIONS>>1;
+		static byte lastnow = 0;
+		byte _now = (now() & 0xFF);
+		if (lastnow != _now) {	// perform this no more than once per second
+			lastnow = _now;
+			next_sid_to_refresh = (next_sid_to_refresh+1) % MAX_NUM_STATIONS;
+			bid=next_sid_to_refresh>>3;
+			s=next_sid_to_refresh&0x07;
+			switch_special_station(next_sid_to_refresh, (station_bits[bid]>>s)&0x01);
 		}
 	}
 }
@@ -1744,8 +1746,9 @@ void OpenSprinkler::switch_remotestation(RemoteStationData *data, bool turnon) {
 	// because remote station data is loaded at the beginning
 	char *p = tmp_buffer;
 	BufferFiller bf = p;
-	// MAX_NUM_STATIONS is the refresh cycle
-	uint16_t timer = iopts[IOPT_SPE_AUTO_REFRESH]?2*MAX_NUM_STATIONS:64800;  
+	// if auto refresh is enabled, we give a fixed duration each time, and auto refresh will renew it periodically
+	// if no auto refresh, we will give the maximum allowed duration, and station will be turned off when off command is sent
+	uint16_t timer = iopts[IOPT_SPE_AUTO_REFRESH]?4*MAX_NUM_STATIONS:64800;  
 	bf.emit_p(PSTR("GET /cm?pw=$O&sid=$D&en=$D&t=$D"),
 						SOPT_PASSWORD,
 						(int)hex2ulong(copy.sid, sizeof(copy.sid)),

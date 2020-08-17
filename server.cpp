@@ -1566,7 +1566,7 @@ void server_change_manual() {
 			RuntimeQueueStruct *q = NULL;
 			byte sqi = pd.station_qid[sid];
 			// check if the station already has a schedule
-			if (sqi!=0xFF) {	// if we, we will overwrite the schedule
+			if (sqi!=0xFF) {	// if so, we will overwrite the schedule
 				q = pd.queue+sqi;
 			} else {	// otherwise create a new queue element
 				q = pd.enqueue();
