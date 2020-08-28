@@ -26,7 +26,7 @@
 #include "OpenSprinkler.h"
 #include "program.h"
 #include "weather.h"
-#include "server.h"
+#include "server_ops.h"
 #include "mqtt.h"
 
 #if defined(ARDUINO)
