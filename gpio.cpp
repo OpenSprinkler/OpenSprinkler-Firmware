@@ -25,7 +25,7 @@
 
 #if defined(ARDUINO)
 
-#if defined(ESP8266)
+#if defined(ESP8266) || defined(ESP32)
 
 #include <Wire.h>
 #include "defines.h"
@@ -62,7 +62,7 @@ uint16_t PCA9555::i2c_read(uint8_t reg) {
 	Wire.beginTransmission(address);
 	Wire.write(reg);
 	Wire.endTransmission();
-	if(Wire.requestFrom(address, (uint8_t)2) != 2) {DEBUG_PRINTLN("GPIO error"); return 0xFFFF;}
+	if(Wire.requestFrom(address, (uint8_t)2) != 2) {DEBUG_PRINTLN("PCA9555 GPIO error"); return 0xFFFF;}
 	uint16_t data0 = Wire.read();
 	uint16_t data1 = Wire.read();
 	return data0+(data1<<8);
@@ -80,7 +80,7 @@ void PCA9555::i2c_write(uint8_t reg, uint16_t v){
 uint16_t PCF8575::i2c_read(uint8_t reg) {
 	if(address==255)	return 0xFFFF;
 	Wire.beginTransmission(address);
-	if(Wire.requestFrom(address, (uint8_t)2) != 2) return 0xFFFF;
+	if(Wire.requestFrom(address, (uint8_t)2) != 2) {DEBUG_PRINTLN("PCF8575 GPIO error"); return 0xFFFF;}
 	uint16_t data0 = Wire.read();
 	uint16_t data1 = Wire.read();
 	Wire.endTransmission();
@@ -99,8 +99,12 @@ void PCF8575::i2c_write(uint8_t reg, uint16_t v) {
 uint16_t PCF8574::i2c_read(uint8_t reg) {
 	if(address==255)	return 0xFFFF;
 	Wire.beginTransmission(address);
-	if(Wire.requestFrom(address, (uint8_t)1) != 1) return 0xFFFF;
+	if(Wire.requestFrom(address, (uint8_t)1) != 1) {DEBUG_PRINTLN("PCF8574 GPIO error"); return 0xFFFF;}
 	uint16_t data = Wire.read();
+	DEBUG_PRINT("PCF8574 address read request: ");
+	DEBUG_PRINT(address);
+	DEBUG_PRINT(" Data: ");
+	DEBUG_PRINTLN(data);
 	Wire.endTransmission();
 	return data; 
 }

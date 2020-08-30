@@ -27,8 +27,9 @@ extern OpenSprinkler os;
 
 #if defined(ARDUINO)	// Arduino
 
-	#if defined(ESP8266)
-		#include <FS.h>
+	#if defined(ESP8266) || defined(ESP32)
+		#include "FS.h"
+		//#include <FS.h>
 	#else
 		#include <avr/eeprom.h>
 		#include "SdFat.h"
@@ -188,7 +189,27 @@ void write_to_file(const char *fn, const char *data, ulong size, ulong pos, bool
 		f.write((byte*)data, size);
 	}
 	f.close();
-	
+
+#elif defined(ESP32)
+
+  DEBUG_PRINT("write_to_file() "); DEBUG_PRINTLN(fn);
+  File f;
+  if(trunc) {
+    f = SPIFFS.open(fn, "w");
+  } else {
+    f = SPIFFS.open(fn, "r+");
+    if(!f) f = SPIFFS.open(fn, "w");
+  }    
+  if(!f) return;
+  f.seek(0, SeekSet);
+  if(pos) f.seek(pos, SeekSet);
+  if(size==0) {
+    f.write((byte*)" ", 1);  // hack to circumvent SPIFFS bug involving writing empty file
+  } else {
+    f.write((byte*)data, size);
+  }
+  f.close();
+
 #elif defined(ARDUINO)
 
 	sd.chdir("/");
@@ -234,6 +255,23 @@ void read_from_file(const char *fn, char *data, ulong maxsize, ulong pos) {
 	f.close();
 	return;
 
+#elif defined(ESP32)
+
+  DEBUG_PRINT("read_from_file() "); DEBUG_PRINTLN(fn);
+  File f = SPIFFS.open(fn, "r");
+  if(!f) {
+    data[0]=0;
+    return;  // return with empty string
+  }
+  f.seek(0, SeekSet);
+  if(pos)  f.seek(pos, SeekSet);
+  int len = f.read((byte*)data, maxsize);
+  if(len>0) data[len]=0;
+  if(len==1 && data[0]==' ') data[0] = 0;  // hack to circumvent SPIFFS bug involving writing empty file
+  data[maxsize-1]=0;
+  f.close();
+  return;
+
 #elif defined(ARDUINO)
 
 	sd.chdir("/");
@@ -277,7 +315,7 @@ void read_from_file(const char *fn, char *data, ulong maxsize, ulong pos) {
 }
 
 void remove_file(const char *fn) {
-#if defined(ESP8266)
+#if defined(ESP8266) || defined(ESP32)
 
 	if(!SPIFFS.exists(fn)) return;
 	SPIFFS.remove(fn);
@@ -296,7 +334,7 @@ void remove_file(const char *fn) {
 }
 
 bool file_exists(const char *fn) {
-#if defined(ESP8266)
+#if defined(ESP8266) || defined(ESP32)
 
 	return SPIFFS.exists(fn);
 
@@ -322,6 +360,16 @@ void file_read_block(const char *fn, void *dst, ulong pos, ulong len) {
 	// do not use File.readBytes or readBytesUntil because it's very slow  
 	File f = SPIFFS.open(fn, "r");
 	if(f) {
+		f.seek(pos, SeekSet);
+		f.read((byte*)dst, len);
+		f.close();
+	}
+
+#elif defined(ESP32)
+  
+	File f = SPIFFS.open(fn, "r");
+	if(f) {
+		f.seek(0, SeekSet);
 		f.seek(pos, SeekSet);
 		f.read((byte*)dst, len);
 		f.close();
@@ -355,6 +403,23 @@ void file_write_block(const char *fn, const void *src, ulong pos, ulong len) {
 	File f = SPIFFS.open(fn, "r+");
 	if(!f) f = SPIFFS.open(fn, "w");
 	if(f) {
+		f.seek(pos, SeekSet);
+		f.write((byte*)src, len);
+		f.close();
+	}
+
+#elif defined(ESP32)
+
+//  DEBUG_PRINT("file_write_block() "); DEBUG_PRINTLN(fn);
+	File f;
+	
+	if(SPIFFS.exists(fn))
+		f = SPIFFS.open(fn, "r+");
+	else
+		f = SPIFFS.open(fn, "w");
+	
+	if(f) {
+		f.seek(0,SeekSet);
 		f.seek(pos, SeekSet);
 		f.write((byte*)src, len);
 		f.close();
@@ -394,6 +459,17 @@ void file_copy_block(const char *fn, ulong from, ulong to, ulong len, void *tmp)
 
 	File f = SPIFFS.open(fn, "r+");
 	if(!f) return;
+	f.seek(from, SeekSet);
+	f.read((byte*)tmp, len);
+	f.seek(to, SeekSet);
+	f.write((byte*)tmp, len);
+	f.close();
+
+#elif defined(ESP32)
+
+	File f = SPIFFS.open(fn, "r+");
+	if(!f) return;
+	f.seek(0,SeekSet);
 	f.seek(from, SeekSet);
 	f.read((byte*)tmp, len);
 	f.seek(to, SeekSet);
@@ -442,6 +518,21 @@ byte file_cmp_block(const char *fn, const char *buf, ulong pos) {
 		return (*buf==c)?0:1;
 	}
 
+#elif defined(ESP32)
+
+  File f = SPIFFS.open(fn, "r");
+  if(f) {
+    f.seek(0, SeekSet);
+    f.seek(pos, SeekSet);
+    char c = f.read();
+    while(*buf && (c==*buf)) {
+      buf++;
+      c=f.read();
+    }
+    f.close();
+    return (*buf==c)?0:1;
+  }
+
 #elif defined(ARDUINO)
 
 	sd.chdir("/");
@@ -482,6 +573,7 @@ byte file_read_byte(const char *fn, ulong pos) {
 }
 
 void file_write_byte(const char *fn, ulong pos, byte v) {
+	DEBUG_PRINT("file_write_byte() "); DEBUG_PRINTLN(fn);
 	file_write_block(fn, &v, pos, 1);
 }
 

@@ -13,7 +13,7 @@ enum {
 	NUM_CUSTOM_ICONS
 };
 
-#if defined(ESP8266) || defined(PIN_SENSOR2)
+#if defined(ESP8266) || defined(PIN_SENSOR2) || defined(ESP32)
 enum {
 	LCD_CURSOR_REMOTEXT = 11,
 	LCD_CURSOR_RAINDELAY,// 12
@@ -32,7 +32,7 @@ enum {
 #endif
 
 
-#if defined(ESP8266)
+#if defined(ESP8266) || defined(ESP32)
 
 #define WiFi_Logo_width 60
 #define WiFi_Logo_height 36

@@ -38,7 +38,7 @@
 	#include <UIPEthernet.h>
 	#include "I2CRTC.h"
 
-	#if defined(ESP8266)
+	#if defined(ESP8266) || defined(ESP32)
 		#include <FS.h>
 		#include <RCSwitch.h>
 		#include "SSD1306Display.h"
@@ -47,6 +47,9 @@
 		#include <SdFat.h>
 		#include "LiquidCrystal.h"
 	#endif
+	#if defined(ESP32)
+    	#include <SPIFFS.h>
+  	#endif
 	
 #else // headers for RPI/BBB/LINUX
 	#include <time.h>
@@ -141,7 +144,7 @@ class OpenSprinkler {
 public:
 
 	// data members
-#if defined(ESP8266)
+#if defined(ESP8266) || defined(ESP32)
 	static SSD1306Display lcd;	// 128x64 OLED display
 #elif defined(ARDUINO)
 	static LiquidCrystal lcd; // 16x2 character LCD
@@ -257,7 +260,7 @@ public:
 	static int8_t send_http_request(char* server_with_port, char* p, void(*callback)(char*)=NULL, uint16_t timeout=3000);  
 	// -- LCD functions
 #if defined(ARDUINO) // LCD functions for Arduino
-	#if defined(ESP8266)
+	#if defined(ESP8266) || defined(ESP32)
 	static void lcd_print_pgm(PGM_P str); // ESP8266 does not allow PGM_P followed by PROGMEM
 	static void lcd_print_line_clear_pgm(PGM_P str, byte line);
 	#else
@@ -281,7 +284,7 @@ public:
 	static void lcd_set_brightness(byte value=1);
 	static void lcd_set_contrast();
 
-	#if defined(ESP8266)
+	#if defined(ESP8266) || defined(ESP32)
 	static IOEXP *mainio, *drio;
 	static IOEXP *expanders[];
 	static RCSwitch rfswitch;
@@ -289,7 +292,7 @@ public:
 	static void flash_screen();
 	static void toggle_screen_led();
 	static void set_screen_led(byte status);	
-	static byte get_wifi_mode() {return wifi_testmode ? WIFI_MODE_STA : iopts[IOPT_WIFI_MODE];}
+	static byte get_wifi_mode() {return wifi_testmode ? WIFI_M_STA : iopts[IOPT_WIFI_MODE];}
 	static byte wifi_testmode;
 	static String wifi_ssid, wifi_pass;
 	static void config_ip();
@@ -304,7 +307,7 @@ private:
 	static void lcd_start();
 	static byte button_read_busy(byte pin_butt, byte waitmode, byte butt, byte is_holding);
 
-	#if defined(ESP8266)
+	#if defined(ESP8266) || defined(ESP32)
 	static void latch_boost();
 	static void latch_open(byte sid);
 	static void latch_close(byte sid);
@@ -324,6 +327,8 @@ private:
 	extern EthernetUDP		*Udp;  
 	#if defined(ESP8266)
 	extern ESP8266WebServer *wifi_server;
+	#elif defined(ESP32)
+  	extern WebServer *wifi_server;
 	#endif
 #else
 	extern EthernetServer *m_server;

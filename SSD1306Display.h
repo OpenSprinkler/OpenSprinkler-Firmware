@@ -1,7 +1,7 @@
 #ifndef SSD1306_DISPLAY_H
 #define SSD1306_DISPLAY_H
 
-#if defined(ESP8266)
+#if defined(ESP8266) || defined(ESP32)
 
 #include <SSD1306.h>
 #include "font.h"

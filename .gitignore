@@ -10,3 +10,4 @@ build-1284/*
 *.map
 .cache/
 .pioenvs/
+build_output

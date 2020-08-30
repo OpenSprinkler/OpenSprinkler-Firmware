@@ -1,7 +1,7 @@
 #ifndef LIQUID_CRYSTAL_DUAL_H
 #define LIQUID_CRYSTAL_DUAL_H
 
-#if defined(ARDUINO) && !defined(ESP8266)
+#if defined(ARDUINO) && (!defined(ESP8266) && !defined(ESP32))
 
 #include <inttypes.h>
 #include <Print.h>

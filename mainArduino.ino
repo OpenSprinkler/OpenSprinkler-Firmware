@@ -1,6 +1,6 @@
 #include <Wire.h>
 
-#if defined(ESP8266)
+#if defined(ESP8266) || defined(ESP32)
 	struct tcp_pcb;
 	extern struct tcp_pcb* tcp_tw_pcbs;
 	extern "C" void tcp_abort (struct tcp_pcb* pcb);

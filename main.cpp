@@ -33,8 +33,12 @@
 	EthernetServer *m_server = NULL;
 	EthernetClient *m_client = NULL;
 	EthernetUDP		 *Udp = NULL;
-	#if defined(ESP8266)
+	#if defined(ESP8266) || defined(ESP32)	  
+	#if defined(ESP8266)	
 		ESP8266WebServer *wifi_server = NULL;
+    #elif defined(ESP32)
+      	WebServer *wifi_server = NULL;
+    #endif 	
 		static uint16_t led_blink_ms = LED_FAST_BLINK;
 	#else
 		SdFat sd;																	// SD card object
@@ -81,7 +85,7 @@ byte prev_flow_state = HIGH;
 float flow_last_gpm=0;
 
 void flow_poll() {
-	#if defined(ESP8266)
+	#if defined(ESP8266) || defined(ESP32)
 	pinModeExt(PIN_SENSOR1, INPUT_PULLUP); // this seems necessary for OS 3.2 
 	#endif
 	byte curr_flow_state = digitalReadExt(PIN_SENSOR1);
@@ -130,7 +134,7 @@ bool ui_confirm(PGM_P str) {
 
 void ui_state_machine() {
  
-#if defined(ESP8266)
+#if defined(ESP8266) || defined(ESP32)
 	// process screen led
 	static ulong led_toggle_timeout = 0;
 	if(led_blink_ms) {
@@ -167,7 +171,7 @@ void ui_state_machine() {
 				} else if (digitalReadExt(PIN_BUTTON_2)==0) { // if B2 is pressed while holding B1, display gateway IP
 					os.lcd.clear(0, 1);
 					os.lcd.setCursor(0, 0);
-					#if defined(ESP8266)
+					#if defined(ESP8266) || defined(ESP32)
 					if (!m_server) { os.lcd.print(WiFi.gatewayIP()); }
 					else
 					#endif
@@ -182,7 +186,7 @@ void ui_state_machine() {
 			} else {	// clicking B1: display device IP and port
 				os.lcd.clear(0, 1);  
 				os.lcd.setCursor(0, 0);
-				#if defined(ESP8266)
+				#if defined(ESP8266) || defined(ESP32)
 				if (!m_server) { os.lcd.print(WiFi.localIP());	}
 				else
 				#endif
@@ -215,7 +219,7 @@ void ui_state_machine() {
 			} else {	// clicking B2: display MAC
 				os.lcd.clear(0, 1);
 				byte mac[6];
-				#if defined(ESP8266)
+				#if defined(ESP8266) || defined(ESP32)
 				os.load_hardware_mac(mac, m_server!=NULL);
 				#else
 				os.load_hardware_mac(mac);
@@ -233,7 +237,7 @@ void ui_state_machine() {
 					os.lcd.print(os.last_reboot_cause);
 					ui_state = UI_STATE_DISP_IP;							
 				} else if(digitalReadExt(PIN_BUTTON_2)==0) {	// if B2 is pressed while holding B3, reset to AP and reboot
-					#if defined(ESP8266)
+					#if defined(ESP8266) || defined(ESP32)
 					if(!ui_confirm(PSTR("Reset to AP?"))) {ui_state = UI_STATE_DEFAULT; break;}
 					os.reset_to_ap();
 					#endif
@@ -283,7 +287,7 @@ void ui_state_machine() {
 // ======================
 void do_setup() {
 	/* Clear WDT reset flag. */
-#if defined(ESP8266)
+#if defined(ESP8266) || defined(ESP32)
 	if(wifi_server) { delete wifi_server; wifi_server = NULL; }
 	WiFi.persistent(false);
 	led_blink_ms = LED_FAST_BLINK;
@@ -304,7 +308,7 @@ void do_setup() {
 	os.lcd_print_time(os.now_tz());  // display time to LCD
 	os.powerup_lasttime = os.now_tz();
 	
-#if !defined(ESP8266)
+#if !defined(ESP8266) && !defined(ESP32)
 	// enable WDT
 	/* In order to change WDE or the prescaler, we need to
 	 * set WDCE (This will allow updates for 4 clock cycles).
@@ -334,7 +338,7 @@ void do_setup() {
 // Arduino software reset function
 void(* sysReset) (void) = 0;
 
-#if !defined(ESP8266)
+#if !defined(ESP8266) && !defined(ESP32)
 volatile byte wdt_timeout = 0;
 /** WDT interrupt service routine */
 ISR(WDT_vect)
@@ -381,7 +385,7 @@ void check_weather();
 void perform_ntp_sync();
 void delete_log(char *name);
 
-#if defined(ESP8266)
+#if defined(ESP8266) || defined(ESP32)
 void start_server_ap();
 void start_server_client();
 unsigned long reboot_timer = 0;
@@ -414,7 +418,7 @@ void do_loop()
 	
 	// ====== Process Ethernet packets ======
 #if defined(ARDUINO)	// Process Ethernet packets for Arduino
-	#if defined(ESP8266)
+	#if defined(ESP8266) || defined(ESP32)
 	static ulong connecting_timeout;
 	if (m_server) {	// if wired Ethernet
 		led_blink_ms = 0;
@@ -442,7 +446,7 @@ void do_loop()
 	} else {	
 		switch(os.state) {
 		case OS_STATE_INITIAL:
-			if(os.get_wifi_mode()==WIFI_MODE_AP) {
+			if(os.get_wifi_mode()==WIFI_M_AP) {
 				start_server_ap();
 				os.state = OS_STATE_CONNECTED;
 				connecting_timeout = 0;
@@ -474,6 +478,10 @@ void do_loop()
 				os.save_wifi_ip();
 				start_server_client();
 				os.state = OS_STATE_CONNECTED;
+#if defined(ESP32)
+				if(MDNS.begin(MDNS_NAME))
+          			DEBUG_PRINTLN("mDNS responder started");
+#endif
 				connecting_timeout = 0;
 			} else {
 				if(millis()>connecting_timeout) {
@@ -484,15 +492,15 @@ void do_loop()
 			break;
 			
 		case OS_STATE_CONNECTED:
-			if(os.get_wifi_mode() == WIFI_MODE_AP) {
+			if(os.get_wifi_mode() == WIFI_M_AP) {
 				wifi_server->handleClient();
 				connecting_timeout = 0;
-				if(os.get_wifi_mode()==WIFI_MODE_STA) {
+				if(os.get_wifi_mode()==WIFI_M_STA) {
 					// already in STA mode, waiting to reboot
 					break;
 				}
 				if(WiFi.status()==WL_CONNECTED && WiFi.localIP()) {
-					os.iopts[IOPT_WIFI_MODE] = WIFI_MODE_STA;
+					os.iopts[IOPT_WIFI_MODE] = WIFI_M_STA;
 					os.iopts_save();
 					os.reboot_dev(REBOOT_CAUSE_WIFIDONE);
 				}
@@ -573,7 +581,7 @@ void do_loop()
 	if (curr_time != last_time) {
 #if defined(ENABLE_DEBUG)
 	/*
-	#if defined(ESP8266)
+	#if defined(ESP8266) || defined(ESP32)
 	{
 		static uint16_t lastHeap = 0;
 		static uint32_t lastHeapTime = 0;
@@ -610,7 +618,7 @@ void do_loop()
 	*/
 #endif
 
-		#if defined(ESP8266)
+		#if defined(ESP8266) || defined(ESP32)
 		pinModeExt(PIN_SENSOR1, INPUT_PULLUP); // this seems necessary for OS 3.2
 		pinModeExt(PIN_SENSOR2, INPUT_PULLUP);
 		#endif
@@ -618,7 +626,7 @@ void do_loop()
 		last_time = curr_time;
 		if (os.button_timeout) os.button_timeout--;
 		
-		#if defined(ESP8266)
+		#if defined(ESP8266) || defined(ESP32)
 		if(reboot_timer && millis() > reboot_timer) {
 			os.reboot_dev(REBOOT_CAUSE_TIMER);
 		}
@@ -928,8 +936,8 @@ void do_loop()
 		// process LCD display
 		if (!ui_state) {
 			os.lcd_print_station(1, ui_anim_chars[(unsigned long)curr_time%3]);
-			#if defined(ESP8266)
-			if(os.get_wifi_mode()==WIFI_MODE_STA && WiFi.status()==WL_CONNECTED && WiFi.localIP()) {
+			#if defined(ESP8266) || defined(ESP32)
+			if(os.get_wifi_mode()==WIFI_M_STA && WiFi.status()==WL_CONNECTED && WiFi.localIP()) {
 				os.lcd.setCursor(0, 2);
 				os.lcd.clear(2, 2);
 				if(os.status.program_busy) {
@@ -1016,9 +1024,9 @@ void check_weather() {
 	if (os.status.network_fails>0 || os.iopts[IOPT_REMOTE_EXT_MODE]) return;
 	if (os.status.program_busy) return;
 	
-#if defined(ESP8266)
+#if defined(ESP8266) || defined(ESP32)
 	if (!m_server) {
-		if (os.get_wifi_mode()!=WIFI_MODE_STA || WiFi.status()!=WL_CONNECTED || os.state!=OS_STATE_CONNECTED) return;
+		if (os.get_wifi_mode()!=WIFI_M_STA || WiFi.status()!=WL_CONNECTED || os.state!=OS_STATE_CONNECTED) return;
 	}
 #endif
 
@@ -1418,7 +1426,7 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 			if (ifttt_enabled) {
 				#if defined(ARDUINO)
 					strcat_P(postval, PSTR("Rebooted. Device IP: "));
-					#if defined(ESP8266)
+					#if defined(ESP8266) || defined(ESP32)
 					{
 						IPAddress _ip;
 						if (m_server) {
@@ -1464,7 +1472,11 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 // ====== LOGGING FUNCTIONS =======
 // ================================
 #if defined(ARDUINO)
-char LOG_PREFIX[] = "/logs/";
+  #if defined(ESP32)
+     char LOG_PREFIX[] = "/logs";
+  #else
+  char LOG_PREFIX[] = "/logs/";
+  #endif
 #else
 char LOG_PREFIX[] = "./logs/";
 #endif
@@ -1474,12 +1486,15 @@ char LOG_PREFIX[] = "./logs/";
  */
 void make_logfile_name(char *name) {
 #if defined(ARDUINO)
-	#if !defined(ESP8266)
+	#if !defined(ESP8266) && !defined(ESP32)
 	sd.chdir("/");
 	#endif
 #endif
 	strcpy(tmp_buffer+TMP_BUFFER_SIZE-10, name);
 	strcpy(tmp_buffer, LOG_PREFIX);
+#if defined(ESP32)
+  	strcat_P(tmp_buffer, PSTR("/"));
+#endif 
 	strcat(tmp_buffer, tmp_buffer+TMP_BUFFER_SIZE-10);
 	strcat_P(tmp_buffer, PSTR(".txt"));
 }
@@ -1518,6 +1533,18 @@ void write_log(byte type, ulong curr_time) {
 		if(!file) return;
 	}
 	file.seek(0, SeekEnd);
+	#elif defined(ESP32)
+
+  	File file;
+  
+  	if( SPIFFS.exists(tmp_buffer) )
+    		file = SPIFFS.open(tmp_buffer, "r+"); 
+  	else 
+    		file = SPIFFS.open(tmp_buffer, "w");
+
+  	if(!file) return;
+  		file.seek(0, SeekEnd);
+
 	#else
 	sd.chdir("/");
 	if (sd.chdir(LOG_PREFIX) == false) {
@@ -1603,7 +1630,7 @@ void write_log(byte type, ulong curr_time) {
 	strcat_P(tmp_buffer, PSTR("]\r\n"));
 
 #if defined(ARDUINO)
-	#if defined(ESP8266)
+	#if defined(ESP8266) || defined(ESP32)
 	file.write((byte*)tmp_buffer, strlen(tmp_buffer));
 	#else
 	file.write(tmp_buffer);
@@ -1623,12 +1650,21 @@ void delete_log(char *name) {
 	if (!os.iopts[IOPT_ENABLE_LOGGING]) return;
 #if defined(ARDUINO)
 
-	#if defined(ESP8266)
+	#if defined(ESP8266) || defined(ESP32)
 	if (strncmp(name, "all", 3) == 0) {
 		// delete all log files
-		Dir dir = SPIFFS.openDir(LOG_PREFIX);
-		while (dir.next()) {
-			SPIFFS.remove(dir.fileName());
+		#if defined(ESP8266)
+			Dir dir = SPIFFS.openDir(LOG_PREFIX);
+				while (dir.next()) {
+					SPIFFS.remove(dir.fileName()); 
+		
+		#elif defined(ESP32)
+			File root = SPIFFS.open(LOG_PREFIX);
+			File file = root.openNextFile();   
+			while(file){
+				SPIFFS.remove(file.name());
+				file = root.openNextFile();
+		#endif
 		}
 	} else {
 		// delete a single log file
@@ -1724,9 +1760,9 @@ void perform_ntp_sync() {
 #if defined(ARDUINO)
 	// do not perform sync if this option is disabled, or if network is not available, or if a program is running
 	if (!os.iopts[IOPT_USE_NTP] || os.status.program_busy) return;
-	#if defined(ESP8266)
+	#if defined(ESP8266) || defined(ESP32)
 	if (!m_server) {
-		if (os.get_wifi_mode()!=WIFI_MODE_STA || WiFi.status()!=WL_CONNECTED || os.state!=OS_STATE_CONNECTED) return;
+		if (os.get_wifi_mode()!=WIFI_M_STA || WiFi.status()!=WL_CONNECTED || os.state!=OS_STATE_CONNECTED) return;
 	}
 	#else
 	if (os.status.network_fails>0) return;
@@ -1758,7 +1794,7 @@ void perform_ntp_sync() {
 			setTime(t);
 			RTC.set(t);
 			DEBUG_PRINTLN(RTC.get());
-			#if !defined(ESP8266)
+			#if !defined(ESP8266) && !defined(ESP32)
 			// if rtc was uninitialized and now it is, restart
 			if(rtc_zero && now()>978307200L) {
 				os.reboot_dev(REBOOT_CAUSE_NTP);

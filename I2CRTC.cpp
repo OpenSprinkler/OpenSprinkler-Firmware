@@ -29,6 +29,10 @@
 
 #include "I2CRTC.h"
 #include <Wire.h>
+#if defined(ESP32)
+  #include "defines.h"
+  #include "OpenSprinkler.h"
+#endif
 
 static uint8_t _addrs[] = {DS1307_ADDR, MCP7940_ADDR, PCF8563_ADDR};
 
@@ -36,7 +40,11 @@ uint8_t I2CRTC::addr = 0;
 
 I2CRTC::I2CRTC()
 {
-	Wire.begin();
+	#if defined(ESP32)
+	if(!Wire.begin(SDA_PIN,SCL_PIN)) DEBUG_PRINT("Error initiating I2CRTC");
+	#else
+	Wire.begin(); // init I2C
+	#endif
 }
 
 bool I2CRTC::detect()

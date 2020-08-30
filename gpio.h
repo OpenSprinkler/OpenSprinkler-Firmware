@@ -26,9 +26,11 @@
 
 #if defined(ARDUINO)
 
-#if defined(ESP8266)
+#if defined(ESP8266) || defined(ESP32)
 
 #include "Arduino.h"
+
+#include "defines.h"
 
 // PCA9555 register defines
 #define NXP_INPUT_REG  0
@@ -39,6 +41,9 @@
 #define IOEXP_TYPE_8574 0
 #define IOEXP_TYPE_8575 1
 #define IOEXP_TYPE_9555 2
+#if defined(ESP32)
+#define IOEXP_TYPE_BUILD_IN_GPIO 3
+#endif
 #define IOEXP_TYPE_UNKNOWN 254
 #define IOEXP_TYPE_NONEXIST 255
 
@@ -49,6 +54,8 @@ public:
 	virtual void pinMode(uint8_t pin, uint8_t IOMode) { }
 	virtual uint16_t i2c_read(uint8_t reg) { return 0xFFFF; }
 	virtual void i2c_write(uint8_t reg, uint16_t v) { }
+	virtual void i2c_write(uint16_t v) { }
+	virtual void set_pins_output_mode() { }
 
 	void digitalWrite(uint16_t v) {
 		i2c_write(NXP_OUTPUT_REG, v);
