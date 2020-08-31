@@ -113,6 +113,22 @@ private:
 	uint8_t inputmask = 0;	// mask bits for input pins
 };
 
+#if defined(ESP32)
+class BUILD_IN_GPIO : public IOEXP {
+public:
+  BUILD_IN_GPIO() { type = IOEXP_TYPE_BUILD_IN_GPIO; }
+/*  void pinMode(uint8_t pin, uint8_t IOMode) { 
+    if(IOMode!=OUTPUT) inputmask |= (1<<pin);
+  }
+  uint16_t i2c_read(uint8_t reg);*/
+  void set_pins_output_mode () ;
+  void i2c_write( uint16_t v);
+private:
+  uint8_t inputmask = 0;  // mask bits for input pins
+  uint8_t on_board_gpin_list[8] = ON_BOARD_GPIN_LIST; // list of gpins 
+};
+#endif
+
 //void pcf_write(int addr, byte data);
 //byte pcf_read(int addr);
 //void pcf_write16(int addr, uint16_t data);

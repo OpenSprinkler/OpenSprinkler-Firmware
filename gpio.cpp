@@ -116,6 +116,28 @@ void PCF8574::i2c_write(uint8_t reg, uint16_t v) {
 	Wire.endTransmission();  
 }
 
+#if defined(ESP32)
+
+void BUILD_IN_GPIO::set_pins_output_mode (){
+  int i;
+  for (i=0; i<8; i++)
+    if ( on_board_gpin_list[i] != 255){
+      //pinModeExt( on_board_gpin_list[i], OUTPUT);
+    }
+}
+
+
+void BUILD_IN_GPIO::i2c_write(uint16_t v){
+  v = (uint8_t)(v&0xFF) | inputmask;
+  int i;
+  for (i=0; i<8; i++)
+    if ( on_board_gpin_list[i] != 255){
+      digitalWriteExt( on_board_gpin_list[i], ((v)>>(i)) & 1);
+    }
+}
+
+#endif
+
 #include "OpenSprinkler.h"
 
 extern OpenSprinkler os;

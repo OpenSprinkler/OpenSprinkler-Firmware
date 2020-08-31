@@ -19,6 +19,18 @@ void do_setup();
 void do_loop();
 
 void setup() {
+#if defined(ESP32)
+/* Seting internal station pins to prevent unstable behavior on startup */
+  int i;
+  unsigned int pin_list[] = ON_BOARD_GPIN_LIST;
+  for( i=0; i<8; i++ ){
+    if(pin_list[i] !=255){
+      pinMode(pin_list[i], OUTPUT);
+      digitalWrite(pin_list[i], ~STATION_LOGIC);
+    }
+  }
+
+#endif
   do_setup();
 }
 

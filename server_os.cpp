@@ -23,7 +23,7 @@
 
 #include "OpenSprinkler.h"
 #include "program.h"
-#include "server_ops.h"
+#include "server_os.h"
 #include "weather.h"
 #include "mqtt.h"
 
@@ -976,7 +976,7 @@ void server_json_options_main() {
 				continue;
 		#endif
 		
-		#if !(defined(ESP8266) || defined(ESP32) || defined(PIN_SENSOR2))
+		#if !(defined(ESP8266) || defined(ESP32)) || defined(PIN_SENSOR2)
 		// only OS 3.x or controllers that have PIN_SENSOR2 defined support sensor 2 options
 		if (oid==IOPT_SENSOR2_TYPE || oid==IOPT_SENSOR2_OPTION || oid==IOPT_SENSOR2_ON_DELAY || oid==IOPT_SENSOR2_OFF_DELAY)
 			continue;

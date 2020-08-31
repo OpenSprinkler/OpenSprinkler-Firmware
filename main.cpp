@@ -26,7 +26,7 @@
 #include "OpenSprinkler.h"
 #include "program.h"
 #include "weather.h"
-#include "server_ops.h"
+#include "server_os.h"
 #include "mqtt.h"
 
 #if defined(ARDUINO)
@@ -1472,11 +1472,11 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 // ====== LOGGING FUNCTIONS =======
 // ================================
 #if defined(ARDUINO)
-  #if defined(ESP32)
-     char LOG_PREFIX[] = "/logs";
-  #else
-  char LOG_PREFIX[] = "/logs/";
-  #endif
+	#if defined(ESP32)
+	char LOG_PREFIX[] = "/logs";
+	#else
+	char LOG_PREFIX[] = "/logs/";
+	#endif
 #else
 char LOG_PREFIX[] = "./logs/";
 #endif
@@ -1492,9 +1492,9 @@ void make_logfile_name(char *name) {
 #endif
 	strcpy(tmp_buffer+TMP_BUFFER_SIZE-10, name);
 	strcpy(tmp_buffer, LOG_PREFIX);
-#if defined(ESP32)
-  	strcat_P(tmp_buffer, PSTR("/"));
-#endif 
+	#if defined(ESP32)
+	strcat_P(tmp_buffer, PSTR("/"));
+	#endif 
 	strcat(tmp_buffer, tmp_buffer+TMP_BUFFER_SIZE-10);
 	strcat_P(tmp_buffer, PSTR(".txt"));
 }
@@ -1533,18 +1533,18 @@ void write_log(byte type, ulong curr_time) {
 		if(!file) return;
 	}
 	file.seek(0, SeekEnd);
+
 	#elif defined(ESP32)
-
-  	File file;
   
-  	if( SPIFFS.exists(tmp_buffer) )
-    		file = SPIFFS.open(tmp_buffer, "r+"); 
-  	else 
-    		file = SPIFFS.open(tmp_buffer, "w");
+  File file;
+  
+  if( SPIFFS.exists(tmp_buffer) )
+    file = SPIFFS.open(tmp_buffer, "r+"); 
+  else 
+    file = SPIFFS.open(tmp_buffer, "w");
 
-  	if(!file) return;
-  		file.seek(0, SeekEnd);
-
+  if(!file) return;
+  file.seek(0, SeekEnd);	
 	#else
 	sd.chdir("/");
 	if (sd.chdir(LOG_PREFIX) == false) {
@@ -1653,18 +1653,18 @@ void delete_log(char *name) {
 	#if defined(ESP8266) || defined(ESP32)
 	if (strncmp(name, "all", 3) == 0) {
 		// delete all log files
-		#if defined(ESP8266)
-			Dir dir = SPIFFS.openDir(LOG_PREFIX);
-				while (dir.next()) {
-					SPIFFS.remove(dir.fileName()); 
-		
-		#elif defined(ESP32)
-			File root = SPIFFS.open(LOG_PREFIX);
-			File file = root.openNextFile();   
-			while(file){
-				SPIFFS.remove(file.name());
-				file = root.openNextFile();
-		#endif
+	#if defined(ESP8266)
+	  Dir dir = SPIFFS.openDir(LOG_PREFIX);
+		  while (dir.next()) {
+			  SPIFFS.remove(dir.fileName()); 
+ 
+	#elif defined(ESP32)
+	File root = SPIFFS.open(LOG_PREFIX);
+	File file = root.openNextFile();   
+		while(file){
+		SPIFFS.remove(file.name());
+		file = root.openNextFile();
+	#endif
 		}
 	} else {
 		// delete a single log file

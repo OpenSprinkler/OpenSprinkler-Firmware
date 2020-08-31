@@ -22,8 +22,9 @@
  */
 
 #include "OpenSprinkler.h"
-#include "server_ops.h"
+#include "server_os.h"
 #include "gpio.h"
+#include "testmode.h"
 
 /** Declare static data members */
 OSMqtt OpenSprinkler::mqtt;
@@ -602,7 +603,7 @@ void OpenSprinkler::reboot_dev(uint8_t cause) {
 #include <sys/ioctl.h>
 #include <net/if.h> 
 #include "utils.h"
-#include "server_ops.h"
+#include "server_os.h"
 
 /** Initialize network with the given mac address and http port */
 byte OpenSprinkler::start_network() {
@@ -814,7 +815,7 @@ void OpenSprinkler::begin() {
 	// revision 2 only for ESP32
 	drio = new PCA9555(ACDR_I2CADDR);
 	mainio = drio;
-	hw_rev = 2;
+	hw_rev = 3;
 	mainio->i2c_write(NXP_CONFIG_REG, V2_IO_CONFIG);
 	mainio->i2c_write(NXP_OUTPUT_REG, V2_IO_OUTPUT);
 	
@@ -1144,6 +1145,15 @@ void OpenSprinkler::apply_all_station_bits() {
 			reg = (reg&0xFF00) | station_bits[0]; // output channels are the low 8-bit
 			drio->i2c_write(NXP_OUTPUT_REG, reg); // write value to register
 		}
+#if defined(ESP32)
+			else if(drio->type == IOEXP_TYPE_BUILD_IN_GPIO){
+        if (STATION_LOGIC)
+          drio->i2c_write(station_bits[0]);
+        else
+          drio->i2c_write(~station_bits[0]);
+		}
+
+#endif     
 		// Handle expansion boards
 		for(int i=0;i<MAX_EXT_BOARDS/2;i++) {
 			uint16_t data = station_bits[i*2+2];

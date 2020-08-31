@@ -48,6 +48,7 @@ typedef unsigned long ulong;
 #define HW_TYPE_LATCH        0x1A   // DC powered, for DC latching solenoids only, with boost converter and H-bridges
 #define HW_TYPE_UNKNOWN      0xFF
 
+#if !defined(ESP32)
 /** Data file names */
 #define IOPTS_FILENAME        "iopts.dat"   // integer options data file
 #define SOPTS_FILENAME        "sopts.dat"   // string options data file
@@ -55,6 +56,7 @@ typedef unsigned long ulong;
 #define NVCON_FILENAME        "nvcon.dat"   // non-volatile controller data file, see OpenSprinkler.h --> struct NVConData
 #define PROG_FILENAME         "prog.dat"    // program data file
 #define DONE_FILENAME         "done.dat"    // used to indicate the completion of all files
+#endif
 
 /** Station macro defines */
 #define STN_TYPE_STANDARD    0x00
@@ -363,6 +365,14 @@ enum {
 
 #elif defined(ESP32)
 
+	/** Data file names for esp32 / in filename is needed to work correctly*/
+	#define IOPTS_FILENAME        "/iopts.dat"   // integer options data file
+	#define SOPTS_FILENAME        "/sopts.dat"   // string options data file
+	#define STATIONS_FILENAME     "/stns.dat"    // stations data file
+	#define NVCON_FILENAME        "/nvcon.dat"   // non-volatile controller data file, see OpenSprinkler.h --> struct NVConData
+	#define PROG_FILENAME         "/prog.dat"    // program data file
+	#define DONE_FILENAME         "/done.dat"    // used to indicate the completion of all files
+
 	#define MDNS_NAME "opensprinkler" // mDNS name for OS controler
 	#define OS_HW_VERSION    (OS_HW_VERSION_BASE+40)
 	//#define RFTX // uncoment when planning to use RX controler
@@ -412,6 +422,9 @@ enum {
 	#define PIN_ETHER_CS         255 // ENC28J60 CS (chip select pin) is 16 on OS 3.2.
 	#define PIN_CURR_SENSE       34
 	#define PIN_FREE_LIST        {} // no free GPIO pin at the moment
+	#define ON_BOARD_GPIN_LIST     {255,17,18,19,16,255,255,255} //  ESP32 on board gpins to be usead as sections, 255 - pin not defined
+  	#define STATION_LOGIC  0 // GPIO logic ex. for relays conneted to grand 0 meens ON
+
 
 #elif defined(OSPI) // for OSPi
 
