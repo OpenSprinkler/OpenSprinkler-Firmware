@@ -1,5 +1,5 @@
 ============================================
-==== AriloSprinkler ESP32 Firmware ====
+====== AriloSprinkler ESP32 Firmware =======
 ============================================
 
 This is a fork of the OpenSprinkler firmware targetting the ESP32. The ESP32 code is based on the fork from J.Charer.
