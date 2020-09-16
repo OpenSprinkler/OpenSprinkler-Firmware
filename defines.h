@@ -36,7 +36,7 @@ typedef unsigned long ulong;
 #define TMP_BUFFER_SIZE      255   // scratch buffer size
 
 /** Firmware version, hardware version, and maximal values */
-#define OS_FW_VERSION  219  // Firmware version: 219 means 2.1.9
+#define OS_FW_VERSION  220  // Firmware version: 220 means 2.2.0
                             // if this number is different from the one stored in non-volatile memory
                             // a device reset will be automatically triggered
 
@@ -162,9 +162,15 @@ enum {
 	NUM_MASTER_OPTS,
 };
 
-// num groups does not include parallel 
+// Sequential Groups 
 #define NUM_SEQ_GROUPS		4
 #define PARALLEL_GROUP_ID	255
+
+// Date Range
+#define DATE_STR_LEN 		6 // "MM/DD"
+#define encode(month, day)  (month * (1 << 5) + day)
+#define MIN_ENCODED_DATE 	encode(1, 1)
+#define MAX_ENCODED_DATE 	encode(12, 31)
 
 /** Macro define of each option
   * Refer to OpenSprinkler.cpp for details on each option

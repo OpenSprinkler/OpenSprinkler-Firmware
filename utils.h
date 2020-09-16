@@ -34,6 +34,8 @@
 #endif
 #include "defines.h"
 
+const char month_days[] = {31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+
 // File reading/writing functions
 void write_to_file(const char *fname, const char *data, ulong size, ulong pos=0, bool trunc=true);
 void read_from_file(const char *fname, char *data, ulong maxsize=TMP_BUFFER_SIZE, int pos=0);
@@ -54,6 +56,14 @@ byte water_time_encode_signed(int16_t i);
 int16_t water_time_decode_signed(byte i);
 void urlDecode(char*);
 void peel_http_header(char*);
+
+// date range helpers
+int16_t encode_date(const char* date_str);
+void verify_date(int *month, int *day); 
+byte extract_date(char *date_str, char *date_extract);
+int days_in_month(int month, int year); 
+byte is_digit(char c);
+
 void populate_master();
 
 #if defined(ARDUINO)

@@ -99,6 +99,9 @@ public:
 	int16_t starttimes[MAX_NUM_STARTTIMES];
 
 	uint16_t durations[MAX_NUM_STATIONS];  // duration / water time of each station
+
+	int16_t daterange[2]; 
+	byte enable_daterange; 
 	
 	char name[PROGRAM_NAME_SIZE];
 

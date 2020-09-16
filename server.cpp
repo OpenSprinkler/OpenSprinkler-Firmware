@@ -860,7 +860,8 @@ void server_moveup_program() {
 
 /**
  * Change a program
- * Command: /cp?pw=xxx&pid=x&v=[flag,days0,days1,[start0,start1,start2,start3],[dur0,dur1,dur2..]]&name=x
+ * Command: /cp?pw=xxx&pid=x&v=[flag,days0,days1,[start0,start1,start2,start3],
+ * 				[dur0,dur1,dur2..]]&name=x&from=xx&to=xx
  *
  * pw:		password
  * pid:		program index
@@ -868,6 +869,9 @@ void server_moveup_program() {
  * start?:up to 4 start times
  * dur?:	station water time
  * name:	program name
+ * endr: 	enable date range 
+ * from 	lower bound of date range (negative if disabled)
+ * to 		upper bound of date range 
 */
 const char _str_program[] PROGMEM = "Program ";
 void server_change_program() {
@@ -883,7 +887,6 @@ void server_change_program() {
 	byte i;
 
 	ProgramStruct prog;
-
 	// parse program index
 	if (!findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("pid"), true)) handle_return(HTML_DATA_MISSING);
 	
@@ -913,6 +916,31 @@ void server_change_program() {
 		itoa((pid==-1)? (pd.nprograms+1): (pid+1), prog.name+8, 10);
 	}
 
+	// parse date range parameters 
+	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("endr"), true)) {
+		prog.enable_daterange = atoi(tmp_buffer);
+		if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("from"), true)) {
+			char date_buffer[DATE_STR_LEN];
+			if (!extract_date(tmp_buffer, date_buffer)) {
+				handle_return(HTML_DATA_FORMATERROR); 
+			}
+			prog.daterange[0] = encode_date(date_buffer); 
+
+			if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("to"), true)) {
+				if (!extract_date(tmp_buffer, date_buffer)) {
+					handle_return(HTML_DATA_FORMATERROR);
+				} 
+				prog.daterange[1] = encode_date(date_buffer);
+			} else {
+				handle_return(HTML_DATA_MISSING);
+			}
+		} else {
+			handle_return(HTML_DATA_MISSING);
+		}
+	} else {
+		handle_return(HTML_DATA_MISSING);
+	}
+	
 	// do a full string decoding
 	if(p) urlDecode(p);
 
@@ -1087,11 +1115,13 @@ void server_json_programs_main() {
 		// program name
 		strncpy(tmp_buffer, prog.name, PROGRAM_NAME_SIZE);
 		tmp_buffer[PROGRAM_NAME_SIZE] = 0;	// make sure the string ends
-		bfill.emit_p(PSTR("$S"), tmp_buffer);
+		bfill.emit_p(PSTR("$S\","), tmp_buffer);
+		
+		bfill.emit_p(PSTR("[$D, $D, $D]"), prog.enable_daterange, prog.daterange[0], prog.daterange[1]);
 		if(pid!=pd.nprograms-1) {
-			bfill.emit_p(PSTR("\"],"));
+			bfill.emit_p(PSTR("],"));
 		} else {
-			bfill.emit_p(PSTR("\"]"));
+			bfill.emit_p(PSTR("]"));
 		}
 		// push out a packet if available
 		// buffer size is getting small
@@ -1507,6 +1537,7 @@ void server_change_options()
 	if (err)	handle_return(HTML_DATA_OUTOFBOUND);
 
 	os.iopts_save();
+	populate_master();
 
 	if(time_change) {
 		os.status.req_ntpsync = 1;

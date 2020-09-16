@@ -255,6 +255,12 @@ byte ProgramStruct::check_day_match(time_t t) {
 	byte wd = (weekday_t+5)%7;
 	byte dt = day_t;
 
+	// check daterange
+	int16_t curr_date_encoded = encode(month_t, day_t); 
+	if (curr_date_encoded < daterange[0] || curr_date_encoded > daterange[1]) {
+		return 0;
+	}
+	
 	// check day match
 	switch(type) {
 		case PROGRAM_TYPE_WEEKLY:

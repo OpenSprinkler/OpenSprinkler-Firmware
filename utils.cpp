@@ -526,6 +526,75 @@ int16_t water_time_decode_signed(byte i) {
 	return ((int16_t)i-120)*5;
 }
 
+// "06/12" --> 198
+int16_t encode_date(const char* date_str) {
+	char date[6]; 
+	strcpy(date, date_str); 
+	char *token_month, *token_day; 
+	int month_val = 0, day_val = 1, encoded; 
+	token_month = strtok(date, "/");
+	if (token_month == NULL) {
+		return MIN_ENCODED_DATE;
+	}
+	token_day = strtok(NULL, "/");
+	month_val = atoi(token_month);
+	day_val = (token_day == NULL) ? 1 : atoi(token_day);
+	verify_date(&month_val, &day_val);
+	encoded = encode(month_val, day_val); 
+	if (encoded > MAX_ENCODED_DATE) {
+		return MAX_ENCODED_DATE;
+	}
+	if (encoded < MIN_ENCODED_DATE) {
+		return MIN_ENCODED_DATE;
+	}
+	return encoded;
+}
+
+int days_in_month(int month) {
+	if (month < 1) {
+		return 0; 
+	}
+	return month_days[month - 1];
+}
+
+void verify_date(int *month, int *day) {
+  if (*month < 1) *month = 1; 
+  if (*month > 12) *month = 12; 
+  if (*day < 1) *day = 1; 
+  if (*day > days_in_month(*month)) {
+    *day = days_in_month(*month);
+  }
+}
+
+byte is_digit(char c) {
+	return (48 <= c && c <= 57);
+}
+
+byte extract_date(char *date_str, char *date_extract) {
+	char *extract_idx = date_extract; 
+  	byte slash_found = 0; 
+
+	for (; *date_str != 0; date_str++) {
+		if (extract_idx - date_extract >= DATE_STR_LEN - 1) { 
+			break; 
+		}
+		if (is_digit(*date_str)) {
+			*extract_idx++ = *date_str;  
+		}
+		if (slash_found && !is_digit(*date_str)) {
+			break;
+		}
+		if (*date_str == '/') {
+			*extract_idx++ = *date_str;  
+			slash_found = 1;
+		}
+	}
+	if (!slash_found) {
+		return 0; 
+	}
+  	*extract_idx = 0;
+	return 1; 
+}
 
 /** Convert a single hex digit character to its integer value */
 static unsigned char h2int(char c) {
