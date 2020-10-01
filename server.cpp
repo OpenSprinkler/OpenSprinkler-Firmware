@@ -39,7 +39,8 @@
 		extern EthernetServer *m_server;
 		extern EthernetClient *m_client;
 		
-		#define handle_return(x) {if(m_client) {return_code=x; return;} else {if(x==HTML_OK) server_send_html(ether_buffer); else server_send_result(x); return;}}
+		// Due to using ESP8266WebServer in WiFi mode, the return mechanism is different when it's in WiFi mode vs. wired Ethernet (i.e. when m_client!=NULL)
+		#define handle_return(x) {if(m_client) {return_code=x; return;} else {if(x==HTML_OK) server_send_content(); else server_send_result(x); wifi_server->client().stop(); return;}}
 
 	#else
 
@@ -136,48 +137,25 @@ static const char htmlReturnHome[] PROGMEM =
 ;
 
 void print_html_standard_header() {
-#if defined(ESP8266)
-	if (m_client) {
-		bfill.emit_p(PSTR("$F$F$F$F\r\n"), html200OK, htmlContentHTML, htmlNoCache, htmlAccessControl);
-		return;
-	}
-	// else
-	wifi_server->sendHeader("Cache-Control", "max-age=0, no-cache, no-store, must-revalidate");
-	wifi_server->sendHeader("Access-Control-Allow-Origin", "*");
-#elif defined(ARDUINO)
 	bfill.emit_p(PSTR("$F$F$F$F\r\n"), html200OK, htmlContentHTML, htmlNoCache, htmlAccessControl);
-#else
-	m_client->write((const uint8_t *)html200OK, strlen(html200OK));
+	// todo: streamline this part as well
+	/*m_client->write((const uint8_t *)html200OK, strlen(html200OK));
 	m_client->write((const uint8_t *)htmlContentHTML, strlen(htmlContentHTML));
 	m_client->write((const uint8_t *)htmlNoCache, strlen(htmlNoCache));
 	m_client->write((const uint8_t *)htmlAccessControl, strlen(htmlAccessControl));
-	m_client->write((const uint8_t *)"\r\n", 2);
-#endif
+	m_client->write((const uint8_t *)"\r\n", 2);*/
 }
 
 void print_json_header(bool bracket=true) {
-#if defined(ESP8266)
-	if (m_client) {
-		bfill.emit_p(PSTR("$F$F$F$F\r\n"), html200OK, htmlContentJSON, htmlAccessControl, htmlNoCache);
-		if(bracket) bfill.emit_p(PSTR("{"));
-		return;
-	}
-	// else
-	wifi_server->sendHeader("Cache-Control", "max-age=0, no-cache, no-store, must-revalidate");
-	wifi_server->sendHeader("Content-Type", "application/json");
-	wifi_server->sendHeader("Access-Control-Allow-Origin", "*");
-	if(bracket) bfill.emit_p(PSTR("{"));
-#elif defined(ARDUINO)
 	bfill.emit_p(PSTR("$F$F$F$F\r\n"), html200OK, htmlContentJSON, htmlAccessControl, htmlNoCache);
 	if(bracket) bfill.emit_p(PSTR("{"));
-#else
-	m_client->write((const uint8_t *)html200OK, strlen(html200OK));
+	// todo: streamline
+	/*m_client->write((const uint8_t *)html200OK, strlen(html200OK));
 	m_client->write((const uint8_t *)htmlContentJSON, strlen(htmlContentJSON));
 	m_client->write((const uint8_t *)htmlNoCache, strlen(htmlNoCache));
 	m_client->write((const uint8_t *)htmlAccessControl, strlen(htmlAccessControl));
 	if(bracket) m_client->write((const uint8_t *)"\r\n{", 3);
-	else m_client->write((const uint8_t *)"\r\n", 2);
-#endif
+	else m_client->write((const uint8_t *)"\r\n", 2);*/
 }
 
 byte findKeyVal (const char *str,char *strbuf, uint16_t maxlen,const char *key,bool key_in_pgm=false,uint8_t *keyfound=NULL) {
@@ -273,35 +251,19 @@ void send_packet(bool final=false) {
 #if defined(ESP8266)
 	if (m_client) {
 		m_client->write((const uint8_t *)ether_buffer, strlen(ether_buffer));
-		if (final)
-			m_client->stop();
-		else
-			rewind_ether_buffer();
-		return;
-	}
-	// else
-	if(final || available_ether_buffer()<250) {
+		if (final) { m_client->stop(); }
+	} else {
 		wifi_server->sendContent(ether_buffer);
-		if(final)
-			wifi_server->client().stop();			 
-		else
-			rewind_ether_buffer();
+		if(final) { wifi_server->client().stop(); }
 	}
-#elif defined(ARDUINO)
-	if(final || available_ether_buffer()<250) {
-		m_client->write(ether_buffer, strlen(ether_buffer));
-		if(final)
-			m_client->stop();			 
-		else
-			rewind_ether_buffer();
-	}
+	rewind_ether_buffer();
+	return;
 #else
 	m_client->write((const uint8_t *)ether_buffer, strlen(ether_buffer));
-	if (final)
-		m_client->stop();
-	else
-		rewind_ether_buffer();
-#endif	
+	if(final) { m_client->stop(); }
+	rewind_ether_buffer();
+	return;
+#endif
 }
 
 char dec2hexchar(byte dec) {
@@ -318,44 +280,34 @@ String toHMS(ulong t) {
 	return two_digits(t/3600)+":"+two_digits((t/60)%60)+":"+two_digits(t%60);
 }
 
-void server_send_html(String html) {
-	if (m_client) {
-		return;
-	}
-	// else
-	wifi_server->send(200, "text/html", html);
+void server_send_content() {
+	if (m_client) { return; }
+	wifi_server->sendContent(ether_buffer);
+	wifi_server->client().stop();
+	rewind_ether_buffer();	
 }
 
-void server_send_json(String json) {
-	if (m_client) {
-		return;
-	}
-	// else
-	wifi_server->send(200, "application/json", json);
+void server_send_html(String html) {
+	if (m_client) {	return;	}
+	wifi_server->send(200, "text/html", html);
+	wifi_server->client().stop();
 }
 
 void server_send_result(byte code) {
 	rewind_ether_buffer();
-	String html = F("{\"result\":");
-	html += code;
-	html += "}";
 	print_json_header(false);
-	server_send_json(html);
+	bfill.emit_p(PSTR("{\"result\":$D}"), code);
+	server_send_content();
 }
 
 void server_send_result(byte code, const char* item) {
 	rewind_ether_buffer();
-	String html = F("{\"result\":");
-	html += code;
-	html += F(",\"item\":\"");
-	if(item) html += item;
-	html += "\"";
-	html += "}";
 	print_json_header(false);
-	server_send_json(html);
+	bfill.emit_p(PSTR("{\"result\":$D,\"item\":\"$S\"}"), code, item);
+	server_send_content();
 }
 
-bool get_value_by_key(const char* key, long& val) {
+/*bool get_value_by_key(const char* key, long& val) {
 	if(wifi_server->hasArg(key)) {
 		val = wifi_server->arg(key).toInt();	 
 		return true;
@@ -395,7 +347,7 @@ void append_key_value(String& html, const char* key, const String& value) {
 	html += "\":\"";
 	html += value;
 	html += "\",";
-}
+}*/
 
 String get_ap_ssid() {
 	static String ap_ssid;
@@ -441,10 +393,9 @@ void on_ap_change_config() {
 
 void on_ap_try_connect() {
 	if(os.get_wifi_mode()!=WIFI_MODE_AP) return;
-	String html = "{";
 	ulong ip = (WiFi.status()==WL_CONNECTED)?(uint32_t)WiFi.localIP():0;
-	append_key_value(html, "ip", ip);
-	html.remove(html.length()-1);  
+	String html = "{\"ip\":";
+	html += ip;
 	html += "}";
 	server_send_html(html);
 	if(WiFi.status() == WL_CONNECTED && WiFi.localIP()) {
@@ -482,7 +433,7 @@ boolean check_password(char *p)
 		rewind_ether_buffer();
 		print_json_header();
 		bfill.emit_p(PSTR("\"$F\":$D}"), iopt_json_names+0, os.iopts[0]);
-		server_send_html(ether_buffer);
+		server_send_content();
 	} else {
 		server_send_result(HTML_UNAUTHORIZED);
 	}
@@ -518,7 +469,7 @@ void server_json_stations_main() {
 		bfill.emit_p(PSTR("\"$S\""), tmp_buffer);
 		if(sid!=os.nstations-1)
 			bfill.emit_p(PSTR(","));
-		if (available_ether_buffer() < 60) {
+		if (available_ether_buffer() <=0 ) {
 			send_packet();
 		}
 	}
@@ -555,6 +506,9 @@ void server_json_station_special() {
 			else {comma=1;}
 			bfill.emit_p(PSTR("\"$D\":{\"st\":$D,\"sd\":\"$S\"}"), sid, data->type, data->sped);
 		}
+		if (available_ether_buffer() <=0 ) {
+			send_packet();
+		}		
 	}
 	bfill.emit_p(PSTR("}"));
 	handle_return(HTML_OK);
@@ -1004,8 +958,8 @@ void server_json_options_main() {
 	 
 #if defined(ARDUINO)
 		#if defined(ESP8266)
-		// for SSD1306, no LCD parameters
-		if(oid==IOPT_LCD_CONTRAST || oid==IOPT_LCD_BACKLIGHT || oid==IOPT_LCD_DIMMING) continue;
+		// for SSD1306, we can't adjust contrast or backlight
+		if(oid==IOPT_LCD_CONTRAST || oid==IOPT_LCD_BACKLIGHT) continue;
 		#else
 		if (os.lcd.type() == LCD_I2C) {
 			// for I2C type LCD, we can't adjust contrast or backlight
@@ -1073,7 +1027,7 @@ void server_json_programs_main() {
 		}
 		// push out a packet if available
 		// buffer size is getting small
-		if (available_ether_buffer() < 250) {
+		if (available_ether_buffer() <= 0) {
 			send_packet();
 		}
 	}
@@ -1167,7 +1121,7 @@ void server_json_controller_main() {
 	for(sid=0;sid<os.nstations;sid++) {
 		// if available ether buffer is getting small
 		// send out a packet
-		if(available_ether_buffer() < 60) {
+		if(available_ether_buffer() <= 0) {
 			send_packet();
 		}
 		unsigned long rem = 0;
@@ -1473,7 +1427,7 @@ void server_change_options()
 	// if not using NTP and manually setting time
 	if (!os.iopts[IOPT_USE_NTP] && findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("ttt"), true)) {
 		unsigned long t;
-		t = atol(tmp_buffer);
+		t = strtoul(tmp_buffer, NULL, 0);
 		// before chaging time, reset all stations to avoid messing up with timing
 		reset_all_stations_immediate();
 #if defined(ARDUINO)
@@ -1612,7 +1566,7 @@ void server_change_manual() {
 			RuntimeQueueStruct *q = NULL;
 			byte sqi = pd.station_qid[sid];
 			// check if the station already has a schedule
-			if (sqi!=0xFF) {	// if we, we will overwrite the schedule
+			if (sqi!=0xFF) {	// if so, we will overwrite the schedule
 				q = pd.queue+sqi;
 			} else {	// otherwise create a new queue element
 				q = pd.enqueue();
@@ -1688,11 +1642,11 @@ void server_json_log() {
 	{
 		if (!findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("start"), true)) handle_return(HTML_DATA_MISSING);
 
-		start = atol(tmp_buffer) / 86400L;
+		start = strtoul(tmp_buffer, NULL, 0) / 86400L;
 
 		if (!findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("end"), true)) handle_return(HTML_DATA_MISSING);
 		
-		end = atol(tmp_buffer) / 86400L;
+		end = strtoul(tmp_buffer, NULL, 0) / 86400L;
 
 		// start must be prior to end, and can't retrieve more than 365 days of data
 		if ((start>end) || (end-start)>365)  handle_return(HTML_DATA_OUTOFBOUND);
@@ -1784,7 +1738,7 @@ void server_json_log() {
 			bfill.emit_p(PSTR("$S"), tmp_buffer);
 			// if the available ether buffer size is getting small
 			// push out a packet
-			if (available_ether_buffer() < 60) {
+			if (available_ether_buffer() <= 0) {
 				send_packet();
 			}
 		}
@@ -1858,15 +1812,15 @@ void server_json_debug() {
   rewind_ether_buffer();
   print_json_header();
   bfill.emit_p(PSTR("\"date\":\"$S\",\"time\":\"$S\",\"heap\":$D"), __DATE__, __TIME__,
-  #if defined(ESP8266)
+#if defined(ESP8266)
   (uint16_t)ESP.getFreeHeap());
   FSInfo fs_info;
 	SPIFFS.info(fs_info);
   bfill.emit_p(PSTR(",\"flash\":$D,\"used\":$D}"), fs_info.totalBytes, fs_info.usedBytes);
-  #else
+ #else
   (uint16_t)freeHeap());
   bfill.emit_p(PSTR("}"));
-  #endif
+ #endif
   handle_return(HTML_OK);
 }
 #endif
@@ -1988,7 +1942,7 @@ void on_sta_upload() {
 		Update.end();
 		DEBUG_PRINTLN(F("aborted"));
 	}
-	delay(0);		 
+	delay(0);
 }
 
 void on_ap_upload() { 
@@ -2163,107 +2117,27 @@ void handle_web_request(char *p) {
 		}
 		send_packet(true);
 	}
-	//delay(50); // add a bit of delay here
-
 }
-
-#if defined(ESP8266)
-#include "NTPClient.h"
-static EthernetUDP udp;
-static NTPClient *ntp = 0;
-extern EthernetServer *m_server;
-static char _ntpip[16];
-#endif
 
 #if defined(ARDUINO)
 /** NTP sync request */
-ulong getNtpTime()
-{
-#if defined(ESP8266)
-	if (m_server) {
-		if (!ntp) {
-			String ntpip = "";
-			ntpip+=os.iopts[IOPT_NTP_IP1];
-			ntpip+=".";
-			ntpip+=os.iopts[IOPT_NTP_IP2];
-			ntpip+=".";
-			ntpip+=os.iopts[IOPT_NTP_IP3];
-			ntpip+=".";
-			ntpip+=os.iopts[IOPT_NTP_IP4];
-			strcpy(_ntpip, ntpip.c_str());
-			if (!os.iopts[IOPT_NTP_IP1] || os.iopts[IOPT_NTP_IP1] == '0')
-				strcpy(_ntpip, "pool.ntp.org");
+ulong getNtpTime() {
 
-			DEBUG_PRINTLN(_ntpip);
-			ntp = new NTPClient(udp, _ntpip);
-			ntp->begin();
-			delay(1000);
-		}
-		ulong gt = 0;
-		byte tick=0;
-		if (ntp->update()) {
-			do {
-				gt = ntp->getEpochTime();
-				tick++;
-				delay(1000);
-			} while(gt<978307200L && tick<20);
-			if(gt<978307200L) {
-				DEBUG_PRINTLN(F("NTP-E failed!"));
-				gt=0;
-			} else {
-				DEBUG_PRINTLN(F("NTP-E done."));
-			}
-		}
-		return gt;
-	}
-	
-	static bool configured = false;
-		
-	if (os.state!=OS_STATE_CONNECTED || WiFi.status()!=WL_CONNECTED) return 0;
-	
-	if(!configured) {
-		String ntpip = "";
-		ntpip+=os.iopts[IOPT_NTP_IP1];
-		ntpip+=".";
-		ntpip+=os.iopts[IOPT_NTP_IP2];
-		ntpip+=".";
-		ntpip+=os.iopts[IOPT_NTP_IP3];
-		ntpip+=".";
-		ntpip+=os.iopts[IOPT_NTP_IP4];
-		
-		strcpy(_ntpip, ntpip.c_str());
-		if (!os.iopts[IOPT_NTP_IP1] || os.iopts[IOPT_NTP_IP1] == '0')
-				strcpy(_ntpip, "pool.ntp.org");
-		DEBUG_PRINTLN(_ntpip);
-		configTime(0, 0, _ntpip, "time.nist.gov");
-		delay(1000);
-		configured = true;
-	}
-	ulong gt = 0;
-	byte tick=0;
-	do {
-		gt = time(nullptr);
-		tick++;
-		delay(1000);
-	} while(gt<978307200L && tick<20);
-	if(gt<978307200L)  {
-		DEBUG_PRINTLN(F("NTP failed!"));
-		gt=0;
-	} else {
-		DEBUG_PRINTLN(F("NTP done."));
-	}  
-	return gt;
-	
-#else
-	// the following is from Arduino UdpNtpClient code
-	const int NTP_PACKET_SIZE = 48;
+	// only proceed if we are connected
+	if(!os.network_connected()) return 0;
+
+	#define NTP_PACKET_SIZE 48
+	#define NTP_PORT 123
+	#define NTP_NTRIES 3
+
 	static byte packetBuffer[NTP_PACKET_SIZE];
 	byte ntpip[4] = {
 		os.iopts[IOPT_NTP_IP1],
 		os.iopts[IOPT_NTP_IP2],
 		os.iopts[IOPT_NTP_IP3],
 		os.iopts[IOPT_NTP_IP4]};
-	byte tick=0;
+	byte tries=0;
+	ulong gt = 0;
 	do {
 		// sendNtpPacket
 		memset(packetBuffer, 0, NTP_PACKET_SIZE);
@@ -2276,37 +2150,36 @@ ulong getNtpTime()
 		packetBuffer[13]	= 0x4E;
 		packetBuffer[14]	= 49;
 		packetBuffer[15]	= 52;
-		// all NTP fields have been given values, now
-		// you can send a packet requesting a timestamp:
+		// by default use pool.ntp.org if ntp ip is unset
+		DEBUG_PRINT(F("ntp: "));
 		if (!os.iopts[IOPT_NTP_IP1] || os.iopts[IOPT_NTP_IP1] == '0') {
-			DEBUG_PRINTLN(F("using pool.ntp"));
-			Udp->beginPacket("pool.ntp.org", 123); // NTP requests are to port 123
+			DEBUG_PRINTLN(F("pool.ntp.org"));
+			udp->beginPacket("pool.ntp.org", NTP_PORT);
 		} else {
-			DEBUG_PRINTLN(ntpip[0]);
-			Udp->beginPacket(ntpip, 123);
-			
+			DEBUG_PRINTLN(IPAddress(ntpip[0],ntpip[1],ntpip[2],ntpip[3]));
+			udp->beginPacket(ntpip, NTP_PORT);
 		}
-		Udp->write(packetBuffer, NTP_PACKET_SIZE);
-		Udp->endPacket();
+		udp->write(packetBuffer, NTP_PACKET_SIZE);
+		udp->endPacket();
 		// end of sendNtpPacket
 		
-		// wait for response
-		delay(1000);
-		if(Udp->parsePacket()) {
-			Udp->read(packetBuffer, NTP_PACKET_SIZE);
-			unsigned long highWord = word(packetBuffer[40], packetBuffer[41]);
-			unsigned long lowWord = word(packetBuffer[42], packetBuffer[43]);
-			// combine the four bytes (two words) into a long integer
-			// this is NTP time (seconds since Jan 1 1900):
-			unsigned long secsSince1900 = highWord << 16 | lowWord;
-			// Unix time starts on Jan 1 1970. In seconds, that's 2208988800:
-			const unsigned long seventyYears = 2208988800UL;
-			// subtract seventy years:
-			return secsSince1900 - seventyYears;
+		// process response
+		ulong timeout = millis()+1000;
+		while(millis() < timeout) {
+			if(udp->parsePacket()) {
+				udp->read(packetBuffer, NTP_PACKET_SIZE);
+				ulong highWord = word(packetBuffer[40], packetBuffer[41]);
+				ulong lowWord = word(packetBuffer[42], packetBuffer[43]);
+				ulong secsSince1900 = highWord << 16 | lowWord;
+				ulong seventyYears = 2208988800UL;
+				ulong gt = secsSince1900 - seventyYears;
+				// check validity: has to be larger than 1/1/2020 12:00:00
+				if(gt>1577836800UL) return gt;
+			}
 		}
-		tick ++;
-	} while(tick<5);
-#endif
+		tries ++;
+	} while(tries<NTP_NTRIES);
+	if(tries==NTP_NTRIES) {DEBUG_PRINTLN(F("NTP failed"));}
 	return 0;
 }
 #endif
