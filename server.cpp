@@ -507,7 +507,6 @@ void server_json_stations_main() {
 	server_json_stations_attrib(PSTR("ignore_sn1"), os.attrib_igs);
 	server_json_stations_attrib(PSTR("ignore_sn2"), os.attrib_igs2);
 	server_json_stations_attrib(PSTR("stn_dis"), os.attrib_dis);
-	server_json_stations_attrib(PSTR("stn_seq"), os.attrib_seq);
 	server_json_stations_attrib(PSTR("stn_spe"), os.attrib_spe);
 
 	bfill.emit_p(PSTR("\"snames\":["));
@@ -627,7 +626,6 @@ void server_change_stations() {
 	server_change_board_attrib(p, 'k', os.attrib_igs2); // ignore sensor2
 	server_change_board_attrib(p, 'n', os.attrib_mas2); // master2
 	server_change_board_attrib(p, 'd', os.attrib_dis); // disable
-	server_change_board_attrib(p, 'q', os.attrib_seq); // sequential
 	server_change_board_attrib(p, 'p', os.attrib_spe); // special
 	server_change_stations_attrib(p, 'g', os.attrib_grp); // sequential groups 
 
@@ -885,13 +883,17 @@ void server_change_program() {
 #endif
 
 	byte i;
+	byte value_not_req = 0; 
 
 	ProgramStruct prog;
+
 	// parse program index
 	if (!findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("pid"), true)) handle_return(HTML_DATA_MISSING);
 	
 	int pid=atoi(tmp_buffer);
 	if (!(pid>=-1 && pid< pd.nprograms)) handle_return(HTML_DATA_OUTOFBOUND);
+
+	pd.read(pid, &prog);
 
 	// check if "en" parameter is present
 	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("en"), true)) {
@@ -916,36 +918,36 @@ void server_change_program() {
 		itoa((pid==-1)? (pd.nprograms+1): (pid+1), prog.name+8, 10);
 	}
 
-	// parse date range parameters 
-	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("endr"), true)) {
-		prog.enable_daterange = atoi(tmp_buffer);
-		if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("from"), true)) {
-			char date_buffer[DATE_STR_LEN];
-			if (!extract_date(tmp_buffer, date_buffer)) {
-				handle_return(HTML_DATA_FORMATERROR); 
-			}
-			prog.daterange[0] = encode_date(date_buffer); 
+	// toggle enable date range 
+	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("endr"), true, &value_not_req)) {
+		prog.enable_daterange = atoi(tmp_buffer);	
+	}
 
-			if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("to"), true)) {
-				if (!extract_date(tmp_buffer, date_buffer)) {
-					handle_return(HTML_DATA_FORMATERROR);
-				} 
-				prog.daterange[1] = encode_date(date_buffer);
-			} else {
-				handle_return(HTML_DATA_MISSING);
-			}
-		} else {
-			handle_return(HTML_DATA_MISSING);
+	char date_buffer[DATE_STR_LEN];
+	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("from"), true, &value_not_req)) {
+		if (!extract_date(tmp_buffer, date_buffer)) {
+			handle_return(HTML_DATA_FORMATERROR); 
 		}
-	} else {
-		handle_return(HTML_DATA_MISSING);
+		prog.daterange[0] = encode_date(date_buffer); 
+	}
+	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("to"), true, &value_not_req)) {
+		if (!extract_date(tmp_buffer, date_buffer)) {
+			handle_return(HTML_DATA_FORMATERROR);
+		} 
+		prog.daterange[1] = encode_date(date_buffer);
 	}
 	
 	// do a full string decoding
 	if(p) urlDecode(p);
 
 #if defined(ESP8266)
-	if(!findKeyVal(p,tmp_buffer,TMP_BUFFER_SIZE, "v",false)) handle_return(HTML_DATA_MISSING);
+	if(!findKeyVal(p,tmp_buffer,TMP_BUFFER_SIZE, "v",false)) {
+		// if new, has to contain value parameter 
+		if (!value_not_req || pid == -1) handle_return(HTML_DATA_MISSING); 
+		if(!pd.modify(pid, &prog)) handle_return(HTML_DATA_OUTOFBOUND);
+
+		// TODO, excluding v sets program struct values to empty
+	}
 	char *pv = tmp_buffer+1;	
 #else
 	// parse ad-hoc v=[...
@@ -960,10 +962,10 @@ void server_change_program() {
 		}
 	}
 
-	if(!found)	handle_return(HTML_DATA_MISSING);
+	if(!found && !value_not_req) handle_return(HTML_DATA_MISSING);
 	pv+=3;
 #endif
-	
+
 	// parse headers
 	*(char*)(&prog) = parse_listdata(&pv);
 	prog.days[0]= parse_listdata(&pv);

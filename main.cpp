@@ -1106,7 +1106,7 @@ void turn_off_station(byte sid, ulong curr_time, byte shift) {
 			pd.lastrun.endtime = curr_time;
 
 			// log station run
-			write_log(LOGDATA_STATION, curr_time);
+			write_log(LOGDATA_STATION, curr_time); // LOG_TODO
 			push_message(IFTTT_STATION_RUN, sid, pd.lastrun.duration);
 		}
 	}
@@ -1523,7 +1523,7 @@ static const char log_type_names[] PROGMEM =
 	"cu\0";
 
 /** write run record to log on SD card */
-void write_log(byte type, ulong curr_time) {
+void write_log(byte type, ulong curr_time) { // TODO_LOG
 
 	if (!os.iopts[IOPT_ENABLE_LOGGING]) return;
 

@@ -63,7 +63,6 @@ byte OpenSprinkler::attrib_mas2[MAX_NUM_BOARDS];
 byte OpenSprinkler::attrib_igs2[MAX_NUM_BOARDS];
 byte OpenSprinkler::attrib_igrd[MAX_NUM_BOARDS];
 byte OpenSprinkler::attrib_dis[MAX_NUM_BOARDS];
-byte OpenSprinkler::attrib_seq[MAX_NUM_BOARDS];
 byte OpenSprinkler::attrib_spe[MAX_NUM_BOARDS];
 
 // sequential groups 
@@ -1416,7 +1415,6 @@ void OpenSprinkler::attribs_save() {
 			at.igs2= (attrib_igs2[bid]>>s) & 1;
 			at.igrd= (attrib_igrd[bid]>>s) & 1;			 
 			at.dis = (attrib_dis[bid]>>s) & 1;
-			at.seq = (attrib_seq[bid]>>s) & 1;
 			at.gid = get_station_gid(sid);
 			set_station_gid(sid, at.gid); // update ram version
 
@@ -1441,7 +1439,6 @@ void OpenSprinkler::attribs_load() {
 	memset(attrib_igs2, 0, nboards);
 	memset(attrib_igrd, 0, nboards);
 	memset(attrib_dis, 0, nboards);
-	memset(attrib_seq, 0, nboards);
 	memset(attrib_spe, 0, nboards);
 	memset(attrib_grp, 0, MAX_NUM_STATIONS);
 								
@@ -1454,7 +1451,6 @@ void OpenSprinkler::attribs_load() {
 			attrib_igs2[bid]|= (at.igs2<<s);
 			attrib_igrd[bid]|= (at.igrd<<s);
 			attrib_dis[bid] |= (at.dis<<s);
-			attrib_seq[bid] |= (at.seq<<s);
 			attrib_grp[sid] = at.gid;
 			file_read_block(STATIONS_FILENAME, &ty, (uint32_t)sid*sizeof(StationData)+offsetof(StationData, type), 1);
 			if(ty!=STN_TYPE_STANDARD) {
@@ -1903,7 +1899,6 @@ void OpenSprinkler::options_setup() {
 		StationAttrib at;
 		memset(&at, 0, sizeof(StationAttrib));
 		at.mas=1;
-		at.seq=1;
 		pdata->attrib=at; // mas:1 seq:1
 		pdata->type=STN_TYPE_STANDARD;
 		pdata->sped[0]='0';

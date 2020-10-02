@@ -106,7 +106,7 @@ public:
 	char name[PROGRAM_NAME_SIZE];
 
 	byte check_match(time_t t);
-	int16_t starttime_decode(int16_t t);
+	int16_t starttime_decode(int16_t t);	
 	
 protected:
 
