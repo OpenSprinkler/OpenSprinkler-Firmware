@@ -25,6 +25,7 @@
 #include "server_os.h"
 #include "gpio.h"
 #include "testmode.h"
+#include "rf_lora.h"
 
 /** Declare static data members */
 OSMqtt OpenSprinkler::mqtt;
@@ -713,6 +714,12 @@ void OpenSprinkler::begin() {
 
 #if defined(ESP32)
     if(!Wire.begin(SDA_PIN,SCL_PIN)) DEBUG_PRINT("Error initiating I2C");
+	
+	// Initialize LORA module if present
+	#if defined(LORA_ENABLE)
+	loraInit();
+	#endif
+
 #ifdef ENABLE_DEBUG
     scan_i2c();
 #endif

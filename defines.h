@@ -410,21 +410,23 @@ enum {
 	#define V2_IO_CONFIG         0x1F00 // config bits
 	#define V2_IO_OUTPUT         0x1F00 // output bits
 	#define V2_PIN_BUTTON_1      4 // button 1
-	#define V2_PIN_BUTTON_2      13 // button 2
-	#define V2_PIN_BUTTON_3      IOEXP_PIN+12 // button 3
+	#define V2_PIN_BUTTON_2      0 // 13 // button 2
+	#define V2_PIN_BUTTON_3      IOEXP_PIN+12//IOEXP_PIN+14 //+12 // button 3
 	#define V2_PIN_RFTX          15
-	#define V2_PIN_BOOST         IOEXP_PIN+13
-	#define V2_PIN_BOOST_EN      IOEXP_PIN+14
-	#define V2_PIN_LATCH_COM     IOEXP_PIN+15  
-	#define V2_PIN_SENSOR1       14  // sensor 1
-	#define V2_PIN_SENSOR2       15 // sensor 2
+	#define V2_PIN_BOOST         IOEXP_PIN+10
+	#define V2_PIN_BOOST_EN      IOEXP_PIN+11
+	#define V2_PIN_LATCH_COM     IOEXP_PIN+12
+	#define V2_PIN_SENSOR1       15 // 14  // sensor 1
+	#define V2_PIN_SENSOR2       14 // 16 // sensor 2
  
-	#define PIN_ETHER_CS         255 // ENC28J60 CS (chip select pin) is 16 on OS 3.2.
+	#define PIN_ETHER_CS         IOEXP_PIN+15 // 255 // ENC28J60 CS (chip select pin) is 16 on OS 3.2.
 	#define PIN_CURR_SENSE       34
 	#define PIN_FREE_LIST        {} // no free GPIO pin at the moment
-	#define ON_BOARD_GPIN_LIST     {255,17,18,19,16,255,255,255} //  ESP32 on board gpins to be usead as sections, 255 - pin not defined
-  	#define STATION_LOGIC  0 // GPIO logic ex. for relays conneted to grand 0 meens ON
+	#define ON_BOARD_GPIN_LIST   {255,255,255,255,255,255,255,255} //  ESP32 on board gpins to be usead as sections, 255 - pin not defined
+  	#define STATION_LOGIC  		 0 // GPIO logic ex. for relays conneted to grand 0 meens ON
 
+	// Config defines (to be removed)
+	#define LORA_ENABLE 		 // If defined, LORA module present
 
 #elif defined(OSPI) // for OSPi
 

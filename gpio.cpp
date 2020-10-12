@@ -122,7 +122,7 @@ void BUILD_IN_GPIO::set_pins_output_mode (){
   int i;
   for (i=0; i<8; i++)
     if ( on_board_gpin_list[i] != 255){
-      //pinModeExt( on_board_gpin_list[i], OUTPUT);
+      pinModeExt( on_board_gpin_list[i], OUTPUT);
     }
 }
 

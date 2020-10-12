@@ -1009,6 +1009,10 @@ void do_loop()
 			push_message(NOTIFY_REBOOT);
 		}
 
+		// LORA module transceiver state machine
+		#if defined(ESP32) && defined(LORA_ENABLE)
+		#endif
+
 	}
 
 	#if !defined(ARDUINO)
@@ -1536,15 +1540,15 @@ void write_log(byte type, ulong curr_time) {
 
 	#elif defined(ESP32)
   
-  File file;
-  
-  if( SPIFFS.exists(tmp_buffer) )
-    file = SPIFFS.open(tmp_buffer, "r+"); 
-  else 
-    file = SPIFFS.open(tmp_buffer, "w");
+	File file;
+	
+	if( SPIFFS.exists(tmp_buffer) )
+		file = SPIFFS.open(tmp_buffer, "r+"); 
+	else 
+		file = SPIFFS.open(tmp_buffer, "w");
 
-  if(!file) return;
-  file.seek(0, SeekEnd);	
+	if(!file) return;
+	file.seek(0, SeekEnd);	
 	#else
 	sd.chdir("/");
 	if (sd.chdir(LOG_PREFIX) == false) {
