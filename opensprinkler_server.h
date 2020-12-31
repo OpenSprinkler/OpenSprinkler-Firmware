@@ -21,12 +21,15 @@
  * <http://www.gnu.org/licenses/>. 
  */
  
-#ifndef _SERVER_H
-#define _SERVER_H
+#ifndef _OPENSPRINKLER_SERVER_H
+#define _OPENSPRINKLER_SERVER_H
 
 #if !defined(ARDUINO)
 #include <stdarg.h>
+#else 
+#include <Arduino.h>
 #endif
+#include <utils.h>
 
 char dec2hexchar(byte dec);
 

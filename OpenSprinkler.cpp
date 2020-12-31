@@ -22,7 +22,7 @@
  */
 
 #include "OpenSprinkler.h"
-#include "server.h"
+#include "opensprinkler_server.h"
 #include "gpio.h"
 #include "testmode.h"
 
