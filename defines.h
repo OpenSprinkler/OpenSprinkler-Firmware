@@ -24,7 +24,7 @@
 #ifndef _DEFINES_H
 #define _DEFINES_H
 
-//#define ENABLE_DEBUG  // enable serial debug
+#define ENABLE_DEBUG  // enable serial debug
 
 typedef unsigned char byte;
 typedef unsigned long ulong;
@@ -32,11 +32,11 @@ typedef unsigned long ulong;
 #define TMP_BUFFER_SIZE      255   // scratch buffer size
 
 /** Firmware version, hardware version, and maximal values */
-#define OS_FW_VERSION  219  // Firmware version: 219 means 2.1.9
+#define OS_FW_VERSION  220  // Firmware version: 220 means 2.2.0
                             // if this number is different from the one stored in non-volatile memory
                             // a device reset will be automatically triggered
 
-#define OS_FW_MINOR      4  // Firmware minor version
+#define OS_FW_MINOR      0  // Firmware minor version
 
 /** Hardware version base numbers */
 #define OS_HW_VERSION_BASE   0x00
@@ -280,7 +280,7 @@ enum {
 	#define PIN_CURR_SENSE     7    // current sensing pin (A7)
 	#define PIN_CURR_DIGITAL  24    // digital pin index for A7
 
-	#define ETHER_BUFFER_SIZE   8192
+	#define ETHER_BUFFER_SIZE   2048
 
 	#define 	wdt_reset()   __asm__ __volatile__ ("wdr")  // watchdog timer reset
 
@@ -301,7 +301,7 @@ enum {
 
 	#define PIN_CURR_SENSE    A0
 	#define PIN_FREE_LIST     {} // no free GPIO pin at the moment
-	#define ETHER_BUFFER_SIZE   8192
+	#define ETHER_BUFFER_SIZE   2048
 
 	#define PIN_ETHER_CS       16 // ENC28J60 CS (chip select pin) is 16 on OS 3.2.
 

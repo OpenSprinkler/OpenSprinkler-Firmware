@@ -270,12 +270,29 @@ public:
 	static void lcd_print_station(byte line, char c);				// print station bits of the board selected by display_board
 	static void lcd_print_version(byte v);									 // print version number
 
+	static String time2str(uint32_t t) {
+		uint16_t h = hour(t);
+		uint16_t m = minute(t);
+		uint16_t s = second(t);
+		String str = "";
+		str+=h/10;
+		str+=h%10;
+		str+=":";
+		str+=m/10;
+		str+=m%10;
+		str+=":";
+		str+=s/10;
+		str+=s%10;
+		return str;
+	}
 	// -- UI and buttons
 	static byte button_read(byte waitmode); // Read button value. options for 'waitmodes' are:
 																					// BUTTON_WAIT_NONE, BUTTON_WAIT_RELEASE, BUTTON_WAIT_HOLD
 																					// return values are 'OR'ed with flags
 																					// check defines.h for details
 
+	static void yield_nicely();
+	static void delay_nicely(uint32_t ms);
 	// -- UI functions --
 	static void ui_set_options(int oid);		// ui for setting options (oid-> starting option index)
 	static void lcd_set_brightness(byte value=1);
@@ -320,8 +337,7 @@ private:
 // todo
 #if defined(ARDUINO)
 	extern EthernetServer *m_server;
-	extern EthernetClient *m_client;
-	extern EthernetUDP		*Udp;  
+	extern UDP *udp;  
 	#if defined(ESP8266)
 	extern ESP8266WebServer *wifi_server;
 	#endif
