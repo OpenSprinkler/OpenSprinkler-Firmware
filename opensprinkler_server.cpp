@@ -23,7 +23,7 @@
 
 #include "OpenSprinkler.h"
 #include "program.h"
-#include "server.h"
+#include "opensprinkler_server.h"
 #include "weather.h"
 #include "mqtt.h"
 

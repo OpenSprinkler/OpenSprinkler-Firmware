@@ -26,7 +26,7 @@
 #include "OpenSprinkler.h"
 #include "program.h"
 #include "weather.h"
-#include "server.h"
+#include "opensprinkler_server.h"
 #include "mqtt.h"
 
 #if defined(ARDUINO)
@@ -1065,9 +1065,11 @@ void check_weather() {
 		}
 	} else if (!os.checkwt_lasttime || (ntz > os.checkwt_lasttime + CHECK_WEATHER_TIMEOUT)) {
 		os.checkwt_lasttime = ntz;
+		#if defined(ARDUINO)
 		if (!ui_state) {
 			os.lcd_print_line_clear_pgm(PSTR("Check Weather..."),1);
 		}
+		#endif
 		GetWeather();
 	}
 }
