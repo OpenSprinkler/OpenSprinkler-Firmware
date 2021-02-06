@@ -1777,6 +1777,9 @@ void OpenSprinkler::switch_httpstation(HTTPStationData *data, bool turnon) {
 
 	char *p = tmp_buffer;
 	BufferFiller bf = p;
+	
+	if(cmd==NULL || server==NULL) return; // proceed only if cmd and server are valid
+	
 	bf.emit_p(PSTR("GET /$S HTTP/1.0\r\nHOST: $S\r\n\r\n"), cmd, server);
 
 	send_http_request(server, atoi(port), p, remote_http_callback);
