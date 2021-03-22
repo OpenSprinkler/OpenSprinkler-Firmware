@@ -771,6 +771,12 @@ void OpenSprinkler::begin() {
 		}		 
 	}
 	
+	// The ESP12F_Relay_X4 board is sometimes detected as OS 3.1 and sometimes as OS 3.2.
+	// To be safe the used pins are re-assigned independently from the revision detection:
+	PIN_BUTTON_1 = 2;
+	PIN_BUTTON_2 = 0;
+	PIN_BUTTON_3 = 15;
+
 	/* detect expanders */
 	for(byte i=0;i<(MAX_NUM_BOARDS)/2;i++)
 		expanders[i] = NULL;
@@ -925,9 +931,10 @@ void OpenSprinkler::begin() {
 	// set button pins
 	// enable internal pullup
 	pinMode(PIN_BUTTON_1, INPUT_PULLUP);
-	pinMode(PIN_BUTTON_2, INPUT_PULLUP);
-	pinMode(PIN_BUTTON_3, INPUT_PULLUP);
-	
+	// No internal pullup needed on ESP12F_Relay_X4 board! GPIO0 (B2) has an external pull-up and GPIO15 (B3) a pull-down:
+	pinMode(PIN_BUTTON_2, INPUT);
+	pinMode(PIN_BUTTON_3, INPUT);
+
 	// detect and check RTC type
 	RTC.detect();
 
@@ -1042,104 +1049,12 @@ void OpenSprinkler::latch_apply_all_station_bits() {
  * !!! This will activate/deactivate valves !!!
  */
 void OpenSprinkler::apply_all_station_bits() {
-
-#if defined(ESP8266)
-	if(hw_type==HW_TYPE_LATCH) {
-		// if controller type is latching, the control mechanism is different
-		// hence will be handled separately
-		latch_apply_all_station_bits(); 
-	} else {
-		// Handle DC booster
-		if(hw_type==HW_TYPE_DC && engage_booster) {
-			// for DC controller: boost voltage and enable output path
-			digitalWriteExt(PIN_BOOST_EN, LOW);  // disfable output path
-			digitalWriteExt(PIN_BOOST, HIGH);		 // enable boost converter
-			delay_nicely((int)iopts[IOPT_BOOST_TIME]<<2);	// wait for booster to charge
-			digitalWriteExt(PIN_BOOST, LOW);		 // disable boost converter
-			digitalWriteExt(PIN_BOOST_EN, HIGH); // enable output path
-			engage_booster = 0;
-		}
-
-		// Handle driver board (on main controller)
-		if(drio->type==IOEXP_TYPE_8574) {
-			/* revision 0 uses PCF8574 with active low logic, so all bits must be flipped */
-			drio->i2c_write(NXP_OUTPUT_REG, ~station_bits[0]);
-		} else if(drio->type==IOEXP_TYPE_9555) {
-			/* revision 1 uses PCA9555 with active high logic */
-			uint16_t reg = drio->i2c_read(NXP_OUTPUT_REG);	// read current output reg value
-			reg = (reg&0xFF00) | station_bits[0]; // output channels are the low 8-bit
-			drio->i2c_write(NXP_OUTPUT_REG, reg); // write value to register
-		}
-			
-		// Handle expansion boards
-		for(int i=0;i<MAX_EXT_BOARDS/2;i++) {
-			uint16_t data = station_bits[i*2+2];
-			data = (data<<8) + station_bits[i*2+1];
-			if(expanders[i]->type==IOEXP_TYPE_9555) {
-				expanders[i]->i2c_write(NXP_OUTPUT_REG, data);
-			} else {
-				expanders[i]->i2c_write(NXP_OUTPUT_REG, ~data);
-			}
-		}
-	}
-		
-	byte bid, s, sbits;  
-#else
-	digitalWrite(PIN_SR_LATCH, LOW);
-	byte bid, s, sbits;
-
-	// Shift out all station bit values
-	// from the highest bit to the lowest
-	for(bid=0;bid<=MAX_EXT_BOARDS;bid++) {
-		if (status.enabled)
-			sbits = station_bits[MAX_EXT_BOARDS-bid];
-		else
-			sbits = 0;
-
-		for(s=0;s<8;s++) {
-			digitalWrite(PIN_SR_CLOCK, LOW);
-	#if defined(OSPI) // if OSPI, use dynamically assigned pin_sr_data
-			digitalWrite(pin_sr_data, (sbits & ((byte)1<<(7-s))) ? HIGH : LOW );
-	#else
-			digitalWrite(PIN_SR_DATA, (sbits & ((byte)1<<(7-s))) ? HIGH : LOW );
-	#endif
-			digitalWrite(PIN_SR_CLOCK, HIGH);
-		}
-	}
-
-	#if defined(ARDUINO)
-	if((hw_type==HW_TYPE_DC) && engage_booster) {
-		// for DC controller: boost voltage
-		digitalWrite(PIN_BOOST_EN, LOW);	// disable output path
-		digitalWrite(PIN_BOOST, HIGH);		// enable boost converter
-		delay_nicely((int)iopts[IOPT_BOOST_TIME]<<2);	// wait for booster to charge
-		digitalWrite(PIN_BOOST, LOW);			// disable boost converter
-
-		digitalWrite(PIN_BOOST_EN, HIGH); // enable output path
-		digitalWrite(PIN_SR_LATCH, HIGH);
-		engage_booster = 0;
-	} else {
-		digitalWrite(PIN_SR_LATCH, HIGH);
-	}
-	#else
-	digitalWrite(PIN_SR_LATCH, HIGH);
-	#endif
-#endif
-
-
-	if(iopts[IOPT_SPE_AUTO_REFRESH]) {
-		// handle refresh of RF and remote stations
-		// we refresh the station that's next in line
-		static byte next_sid_to_refresh = MAX_NUM_STATIONS>>1;
-		static byte lastnow = 0;
-		byte _now = (now() & 0xFF);
-		if (lastnow != _now) {	// perform this no more than once per second
-			lastnow = _now;
-			next_sid_to_refresh = (next_sid_to_refresh+1) % MAX_NUM_STATIONS;
-			bid=next_sid_to_refresh>>3;
-			s=next_sid_to_refresh&0x07;
-			switch_special_station(next_sid_to_refresh, (station_bits[bid]>>s)&0x01);
-		}
+	// On the ESP12F_Relay_X4 board the relays for station 1...4 are connected to GPIO 16, 14, 12 and 13:
+	const uint8_t stationGPIO[] = {16, 14, 12, 13};
+	for (uint8_t i = 0; i < 4; i++) {
+		pinMode(stationGPIO[i], OUTPUT);
+		bool isActive = station_bits[0] & 1 << i;
+		digitalWrite(stationGPIO[i], isActive ? HIGH : LOW);
 	}
 }
 

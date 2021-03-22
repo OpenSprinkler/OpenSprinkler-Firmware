@@ -299,7 +299,7 @@ void do_setup() {
 	MCUSR &= ~(1<<WDRF);
 #endif
 
-	DEBUG_BEGIN(115200);
+	DEBUG_BEGIN(74880); // The ESP8266's genuine baud rate
 	DEBUG_PRINTLN(F("started"));
 	
 	os.begin();					 // OpenSprinkler init
@@ -961,12 +961,6 @@ void do_loop()
 			if(os.get_wifi_mode()==WIFI_MODE_STA && WiFi.status()==WL_CONNECTED && WiFi.localIP()) {
 				os.lcd.setCursor(0, 2);
 				os.lcd.clear(2, 2);
-				if(os.status.program_busy) {
-					os.lcd.print(F("curr: "));
-					uint16_t curr = os.read_current();
-					os.lcd.print(curr);
-					os.lcd.print(F(" mA"));
-				}
 			}
 			#endif
 		}
