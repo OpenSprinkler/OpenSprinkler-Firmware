@@ -1418,10 +1418,10 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 			volume = lval*volume;
 			if (os.mqtt.enabled()) {
 				strcpy_P(topic, PSTR("opensprinkler/sensor/flow"));
-				sprintf_P(payload, PSTR("{\"count\":%lu,\"volume\":%d.%02d}"), lval, (int)volume/100, (int)volume%100);
+				sprintf_P(payload, PSTR("{\"count\":%u,\"volume\":%d.%02d}"), lval, (int)volume/100, (int)volume%100);
 			}
 			if (ifttt_enabled) {
-				sprintf_P(postval+strlen(postval), PSTR("Flow count: %lu, volume: %d.%02d"), lval, (int)volume/100, (int)volume%100);
+				sprintf_P(postval+strlen(postval), PSTR("Flow count: %u, volume: %d.%02d"), lval, (int)volume/100, (int)volume%100);
 			}
 			break;
 
