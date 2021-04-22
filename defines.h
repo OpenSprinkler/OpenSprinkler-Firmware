@@ -156,15 +156,15 @@ enum {
 };
 
 enum {
-	MASTER_STATION_ID = 0, 
-	MASTER_STATION_ON_AJD, 
+	MASTER_STATION_ID = 0,
+	MASTER_STATION_ON_AJD,
 	MASTER_STATION_OFF_ADJ,
 	NUM_MASTER_OPTS,
 };
 
-// Sequential Groups 
+// Sequential Groups
 #define NUM_SEQ_GROUPS		4
-#define PARALLEL_GROUP_ID	255
+#define PARALLEL_GROUP_ID	15
 
 // Date Range
 #define DATE_STR_LEN 		6 // "MM/DD"

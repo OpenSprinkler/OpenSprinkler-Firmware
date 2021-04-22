@@ -70,11 +70,14 @@ struct StationAttrib {	// station attributes
 	byte igs:1;	// ignore sensor 1
 	byte mas2:1;
 	byte dis:1;
+	byte unused:1;
 	byte igs2:1;// ignore sensor 2
 	byte igrd:1;// ignore rain delay
-	byte unused:1;
-	byte gid: 1; // group id 
-	
+	byte unused2:1;
+
+	byte gid:4;
+	byte dummy:4;
+
 	byte reserved[2]; // reserved bytes for the future
 }; // total is 4 bytes so far
 
