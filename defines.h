@@ -164,8 +164,7 @@ enum {
 };
 
 // Sequential Groups
-#define NUM_SEQ_GROUPS		4
-#define PARALLEL_GROUP_ID	15
+#define NUM_SEQ_GROUPS		16
 
 // Date Range
 #define DATE_STR_LEN 		6 // "MM/DD"

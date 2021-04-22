@@ -473,6 +473,7 @@ void server_json_stations_main() {
 	server_json_board_attrib(PSTR("ignore_sn1"), os.attrib_igs);
 	server_json_board_attrib(PSTR("ignore_sn2"), os.attrib_igs2);
 	server_json_board_attrib(PSTR("stn_dis"), os.attrib_dis);
+	server_json_board_attrib(PSTR("stn_seq"), os.attrib_seq);
 	server_json_board_attrib(PSTR("stn_spe"), os.attrib_spe);
 	server_json_stations_attrib(PSTR("stn_grp"), os.attrib_grp);
 
@@ -596,6 +597,7 @@ void server_change_stations() {
 	server_change_board_attrib(p, 'k', os.attrib_igs2); // ignore sensor2
 	server_change_board_attrib(p, 'n', os.attrib_mas2); // master2
 	server_change_board_attrib(p, 'd', os.attrib_dis); // disable
+	server_change_board_attrib(p, 'q', os.attrib_seq); // sequential
 	server_change_board_attrib(p, 'p', os.attrib_spe); // special
 	server_change_stations_attrib(p, 'g', os.attrib_grp); // sequential groups
 
