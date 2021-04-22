@@ -890,37 +890,37 @@ void server_change_program() {
 		itoa((pid==-1)? (pd.nprograms+1): (pid+1), prog.name+8, 10);
 	}
 
-	// toggle enable date range 
-	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("endr"), true, &value_not_req)) {
-		prog.enable_daterange = atoi(tmp_buffer);	
-	}
+	// toggle enable date range
+	// if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("endr"), true, &value_not_req)) {
+		// prog.enable_daterange = atoi(tmp_buffer);
+	// }
 
-	char date_buffer[DATE_STR_LEN];
-	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("from"), true, &value_not_req)) {
-		if (!extract_date(tmp_buffer, date_buffer)) {
-			handle_return(HTML_DATA_FORMATERROR); 
-		}
-		prog.daterange[0] = encode_date(date_buffer); 
-	}
-	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("to"), true, &value_not_req)) {
-		if (!extract_date(tmp_buffer, date_buffer)) {
-			handle_return(HTML_DATA_FORMATERROR);
-		} 
-		prog.daterange[1] = encode_date(date_buffer);
-	}
-	
+	// char date_buffer[DATE_STR_LEN];
+	// if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("from"), true, &value_not_req)) {
+	// 	if (!extract_date(tmp_buffer, date_buffer)) {
+	// 		handle_return(HTML_DATA_FORMATERROR);
+	// 	}
+	// 	prog.daterange[0] = encode_date(date_buffer);
+	// }
+	// if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("to"), true, &value_not_req)) {
+	// 	if (!extract_date(tmp_buffer, date_buffer)) {
+	// 		handle_return(HTML_DATA_FORMATERROR);
+	// 	}
+	// 	prog.daterange[1] = encode_date(date_buffer);
+	// }
+
 	// do a full string decoding
 	if(p) urlDecode(p);
 
 #if defined(ESP8266)
 	if(!findKeyVal(p,tmp_buffer,TMP_BUFFER_SIZE, "v",false)) {
-		// if new, has to contain value parameter 
-		if (!value_not_req || pid == -1) handle_return(HTML_DATA_MISSING); 
+		// if new, has to contain value parameter
+		if (!value_not_req || pid == -1) handle_return(HTML_DATA_MISSING);
 		if(!pd.modify(pid, &prog)) handle_return(HTML_DATA_OUTOFBOUND);
 
 		// TODO, excluding v sets program struct values to empty
 	}
-	char *pv = tmp_buffer+1;	
+	char *pv = tmp_buffer+1;
 #else
 	// parse ad-hoc v=[...
 	// search for the start of v=[
@@ -1089,9 +1089,10 @@ void server_json_programs_main() {
 		// program name
 		strncpy(tmp_buffer, prog.name, PROGRAM_NAME_SIZE);
 		tmp_buffer[PROGRAM_NAME_SIZE] = 0;	// make sure the string ends
-		bfill.emit_p(PSTR("$S\","), tmp_buffer);
-		
-		bfill.emit_p(PSTR("[$D, $D, $D]"), prog.enable_daterange, prog.daterange[0], prog.daterange[1]);
+		bfill.emit_p(PSTR("$S\""), tmp_buffer);
+		// bfill.emit_p(PSTR("$S\","), tmp_buffer);
+
+		// bfill.emit_p(PSTR("[$D, $D, $D]"), prog.enable_daterange, prog.daterange[0], prog.daterange[1]);
 		if(pid!=pd.nprograms-1) {
 			bfill.emit_p(PSTR("],"));
 		} else {
