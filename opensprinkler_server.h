@@ -21,12 +21,14 @@
  * <http://www.gnu.org/licenses/>. 
  */
  
-#ifndef _SERVER_H
-#define _SERVER_H
+#ifndef _OPENSPRINKLER_SERVER_H
+#define _OPENSPRINKLER_SERVER_H
 
 #if !defined(ARDUINO)
 #include <stdarg.h>
 #endif
+
+char dec2hexchar(byte dec);
 
 class BufferFiller {
 	char *start; //!< Pointer to start of buffer
@@ -59,6 +61,12 @@ public:
 			case 'S':
 				strcpy((char*) ptr, va_arg(ap, const char*));
 				break;
+			case 'X': {
+				char d = va_arg(ap, int);
+				*ptr++ = dec2hexchar((d >> 4) & 0x0F);
+				*ptr++ = dec2hexchar(d & 0x0F);
+			}
+				continue;
 			case 'F': {
 				PGM_P s = va_arg(ap, PGM_P);
 				char d;
@@ -86,4 +94,4 @@ public:
 };
 
 
-#endif // _SERVER_H
+#endif // _OPENSPRINKLER_SERVER_H

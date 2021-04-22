@@ -22,11 +22,12 @@
  */
 
 #include "OpenSprinkler.h"
-#include "server.h"
+#include "opensprinkler_server.h"
 #include "gpio.h"
 #include "testmode.h"
 
 /** Declare static data members */
+OSMqtt OpenSprinkler::mqtt;
 NVConData OpenSprinkler::nvdata;
 ConStatus OpenSprinkler::status;
 ConStatus OpenSprinkler::old_status;
@@ -65,7 +66,7 @@ byte OpenSprinkler::attrib_igrd[MAX_NUM_BOARDS];
 byte OpenSprinkler::attrib_dis[MAX_NUM_BOARDS];
 byte OpenSprinkler::attrib_spe[MAX_NUM_BOARDS];
 
-// sequential groups 
+// sequential groups
 byte OpenSprinkler::attrib_grp[MAX_NUM_STATIONS];
 
 byte OpenSprinkler::master[NUM_MASTER_ZONES][NUM_MASTER_OPTS];
@@ -179,6 +180,7 @@ const char sopt_json_names[] PROGMEM =
 	"ifkey"
 	"ssid\0"
 	"pass\0"
+	"mqtt\0"
 	"apass";
 */
 
@@ -237,7 +239,7 @@ const char iopt_prompts[] PROGMEM =
 	"Special Refresh?"
 	"IFTTT Enable:   "
 	"Sensor 1 type:  "
-	"Normally open?  "	
+	"Normally open?  "
 	"Sensor 2 type:  "
 	"Normally open?  "
 	"Sn1 on adjust:  "
@@ -250,8 +252,8 @@ const char iopt_prompts[] PROGMEM =
 	"Subnet mask4:   "
 	"WiFi mode?      "
 	"Factory reset?  ";
-	
-// string options do not have prompts 
+
+// string options do not have prompts
 
 /** Option maximum values (stored in PROGMEM to reduce RAM usage) */
 const byte iopt_max[] PROGMEM = {
@@ -409,6 +411,7 @@ const char *OpenSprinkler::sopts[] = {
 	DEFAULT_EMPTY_STRING,
 	DEFAULT_EMPTY_STRING,
 	DEFAULT_EMPTY_STRING,
+	DEFAULT_EMPTY_STRING,
 	DEFAULT_EMPTY_STRING
 };
 
@@ -470,50 +473,49 @@ void(* resetFunc) (void) = 0; // AVR software reset function
 byte OpenSprinkler::start_network() {
 	lcd_print_line_clear_pgm(PSTR("Starting..."), 1);
 	uint16_t httpport = (uint16_t)(iopts[IOPT_HTTPPORT_1]<<8) + (uint16_t)iopts[IOPT_HTTPPORT_0];
-	if(m_server)	{ delete m_server; m_server = 0; }
-	if(Udp) { delete Udp; Udp = 0; }
-	
-#if defined(ESP8266)
+	if(m_server)	{ delete m_server; m_server = NULL; }
+	if(udp) { delete udp; udp = NULL; }
+
 	if (start_ether()) {
 		m_server = new EthernetServer(httpport);
 		m_server->begin();
+
+		udp = new EthernetUDP();
+		udp->begin((httpport==8000) ? 8888 : 8000); // start udp on a different port than httpport
+
+#if defined(ESP8266)
+		// turn off WiFi when ether is active
 		// todo: add option to keep both ether and wifi active
 		WiFi.mode(WIFI_OFF);
-	} else {
-		if(wifi_server) { delete wifi_server; wifi_server = 0; }
+#endif
+
+		return 1;
+
+	}	else {
+
+#if defined(ESP8266)
+		if(wifi_server) { delete wifi_server; wifi_server = NULL; }
 		if(get_wifi_mode()==WIFI_MODE_AP) {
 			wifi_server = new ESP8266WebServer(80);
 		} else {
 			wifi_server = new ESP8266WebServer(httpport);
 		}
-	}
 
-	return 1;	
-#else
+		udp = new WiFiUDP();
+		udp->begin((httpport==8000) ? 8888 : 8000); // start udp on a different port than httpport
 
-	if(start_ether()) {
-		m_server = new EthernetServer(httpport);
-		m_server->begin();
-			
-		Udp = new EthernetUDP();
-		// Start UDP service for NTP. Avoid the same port with http
-		if(httpport==8888)
-			Udp->begin(8000);
-		else
-			Udp->begin(8888);
 		return 1;
-	}
-	
-	return 0;
-
 #endif
 
+	}
+
+	return 0;
 }
 
 byte OpenSprinkler::start_ether() {
 #if defined(ESP8266)
 	if(hw_rev<2) return 0;	// ethernet capability is only available after hw_rev 2
-#endif	
+#endif
 	Ethernet.init(PIN_ETHER_CS);	// make sure to call this before any Ethernet calls
 	load_hardware_mac((uint8_t*)tmp_buffer, true);
 	// detect if Enc28J60 exists
@@ -523,14 +525,14 @@ byte OpenSprinkler::start_ether() {
 	if(erevid==0 || erevid==255) return 0;
 
 	lcd_print_line_clear_pgm(PSTR("Start wired link"), 1);
-	
+
 	if (iopts[IOPT_USE_DHCP]) {
 		if(!Ethernet.begin((uint8_t*)tmp_buffer))	return 0;
 		memcpy(iopts+IOPT_STATIC_IP1, &(Ethernet.localIP()[0]), 4);
 		memcpy(iopts+IOPT_GATEWAY_IP1, &(Ethernet.gatewayIP()[0]),4);
 		memcpy(iopts+IOPT_DNS_IP1, &(Ethernet.dnsServerIP()[0]), 4);
 		memcpy(iopts+IOPT_SUBNET_MASK1, &(Ethernet.subnetMask()[0]), 4);
-		iopts_save();			
+		iopts_save();
 	} else {
 		IPAddress staticip(iopts+IOPT_STATIC_IP1);
 		IPAddress gateway(iopts+IOPT_GATEWAY_IP1);
@@ -538,9 +540,20 @@ byte OpenSprinkler::start_ether() {
 		IPAddress subn(iopts+IOPT_SUBNET_MASK1);
 		Ethernet.begin((uint8_t*)tmp_buffer, staticip, dns, gateway, subn);
 	}
-	//if(Ethernet.linkStatus() != LinkON) return 0;
 
 	return 1;
+}
+
+bool OpenSprinkler::network_connected(void) {
+#if defined (ESP8266)
+	if(m_server) {
+		return (Ethernet.linkStatus()==LinkON);
+	} else {
+		return (get_wifi_mode()==WIFI_MODE_STA && WiFi.status()==WL_CONNECTED && state==OS_STATE_CONNECTED);
+	}
+#else
+	return (Ethernet.linkStatus()==LinkON);
+#endif
 }
 
 /** Reboot controller */
@@ -563,8 +576,10 @@ void OpenSprinkler::reboot_dev(uint8_t cause) {
 #include "etherport.h"
 #include <sys/reboot.h>
 #include <stdlib.h>
+#include <sys/ioctl.h>
+#include <net/if.h>
 #include "utils.h"
-#include "server.h"
+#include "opensprinkler_server.h"
 
 /** Initialize network with the given mac address and http port */
 byte OpenSprinkler::start_network() {
@@ -576,6 +591,41 @@ byte OpenSprinkler::start_network() {
 
 	m_server = new EthernetServer(port);
 	return m_server->begin();
+}
+
+bool OpenSprinkler::network_connected(void) {
+	return true;
+}
+
+// Return mac of first recognised interface and fallback to software mac
+// Note: on OSPi, operating system handles interface allocation so 'wired' ignored
+bool OpenSprinkler::load_hardware_mac(byte* mac, bool wired) {
+	const char * if_names[]  = { "eth0", "eth1", "wlan0", "wlan1" };
+	struct ifreq ifr;
+	int fd;
+
+	// Fallback to asoftware mac if interface not recognised
+	mac[0] = 0x00;
+	mac[1] = 0x69;
+	mac[2] = 0x69;
+	mac[3] = 0x2D;
+	mac[4] = 0x31;
+	mac[5] = iopts[IOPT_DEVICE_ID];
+
+	if (m_server == NULL) return true;
+
+	if ((fd = socket(AF_INET, SOCK_DGRAM, 0)) == 0) return true;
+
+	// Returns the mac address of the first interface if multiple active
+	for (int i = 0; i < sizeof(if_names)/sizeof(const char *); i++) {
+		strncpy(ifr.ifr_name, if_names[i], sizeof(ifr.ifr_name));
+		if (ioctl(fd, SIOCGIFHWADDR, &ifr) != -1) {
+			memcpy(mac, ifr.ifr_hwaddr.sa_data, 6);
+			break;
+		}
+	}
+	close(fd);
+	return true;
 }
 
 /** Reboot controller */
@@ -638,14 +688,14 @@ void OpenSprinkler::begin() {
 
 	hw_type = HW_TYPE_UNKNOWN;
 	hw_rev = 0;
-		
+
 #if defined(ESP8266)
 
 	/* check hardware type */
 	if(detect_i2c(ACDR_I2CADDR)) hw_type = HW_TYPE_AC;
 	else if(detect_i2c(DCDR_I2CADDR)) hw_type = HW_TYPE_DC;
 	else if(detect_i2c(LADR_I2CADDR)) hw_type = HW_TYPE_LATCH;
-	
+
 	/* detect hardware revision type */
 	if(detect_i2c(MAIN_I2CADDR)) {	// check if main PCF8574 exists
 		/* assign revision 0 pins */
@@ -658,7 +708,7 @@ void OpenSprinkler::begin() {
 		PIN_BOOST_EN = V0_PIN_BOOST_EN;
 		PIN_SENSOR1 = V0_PIN_SENSOR1;
 		PIN_SENSOR2 = V0_PIN_SENSOR2;
-		
+
 		// on revision 0, main IOEXP and driver IOEXP are two separate PCF8574 chips
 		if(hw_type==HW_TYPE_DC) {
 			drio = new PCF8574(DCDR_I2CADDR);
@@ -670,14 +720,14 @@ void OpenSprinkler::begin() {
 
 		mainio = new PCF8574(MAIN_I2CADDR);
 		mainio->i2c_write(0, 0x0F); // set lower four bits of main PCF8574 (8-ch) to high
-		
+
 		digitalWriteExt(V0_PIN_PWR_TX, 1); // turn on TX power
 		digitalWriteExt(V0_PIN_PWR_RX, 1); // turn on RX power
 		pinModeExt(PIN_BUTTON_2, INPUT_PULLUP);
 		digitalWriteExt(PIN_BOOST, LOW);
 		digitalWriteExt(PIN_BOOST_EN, LOW);
 		digitalWriteExt(PIN_LATCH_COM, LOW);
-		
+
 	} else {
 
 		if(hw_type==HW_TYPE_DC) {
@@ -712,7 +762,7 @@ void OpenSprinkler::begin() {
 			hw_rev = 2;
 			mainio->i2c_write(NXP_CONFIG_REG, V2_IO_CONFIG);
 			mainio->i2c_write(NXP_OUTPUT_REG, V2_IO_OUTPUT);
-			
+
 			PIN_BUTTON_1 = V2_PIN_BUTTON_1;
 			PIN_BUTTON_2 = V2_PIN_BUTTON_2;
 			PIN_BUTTON_3 = V2_PIN_BUTTON_3;
@@ -722,9 +772,9 @@ void OpenSprinkler::begin() {
 			PIN_LATCH_COM = V2_PIN_LATCH_COM;
 			PIN_SENSOR1 = V2_PIN_SENSOR1;
 			PIN_SENSOR2 = V2_PIN_SENSOR2;
-		}		 
+		}
 	}
-	
+
 	/* detect expanders */
 	for(byte i=0;i<(MAX_NUM_BOARDS)/2;i++)
 		expanders[i] = NULL;
@@ -763,7 +813,7 @@ void OpenSprinkler::begin() {
 	// OS 3.0 has two independent sensors
 	pinModeExt(PIN_SENSOR1, INPUT_PULLUP);
 	pinModeExt(PIN_SENSOR2, INPUT_PULLUP);
-	
+
 #else
 	// pull shift register OE low to enable output
 	digitalWrite(PIN_SR_OE, LOW);
@@ -785,7 +835,7 @@ void OpenSprinkler::begin() {
 	nvdata.sunrise_time = 360;	// 6:00am default sunrise
 	nvdata.sunset_time = 1080;	// 6:00pm default sunset
 	nvdata.reboot_cause = REBOOT_CAUSE_POWERON;
-	
+
 	nboards = 1;
 	nstations = nboards*8;
 
@@ -800,7 +850,7 @@ void OpenSprinkler::begin() {
 		status.has_curr_sense = 1;	// OS3.0 has current sensing capacility
 		// measure baseline current
 		baseline_current = 80;
-		
+
 	#else // OS 2.3 specific detections
 
 		// detect hardware type
@@ -842,13 +892,13 @@ void OpenSprinkler::begin() {
 	lcd.createChar(ICON_RAINDELAY, _iconimage_raindelay);
 	lcd.createChar(ICON_RAIN, _iconimage_rain);
 	lcd.createChar(ICON_SOIL, _iconimage_soil);
-	
+
 	#if defined(ESP8266)
 
 		/* create custom characters */
 		lcd.createChar(ICON_ETHER_CONNECTED, _iconimage_ether_connected);
 		lcd.createChar(ICON_ETHER_DISCONNECTED, _iconimage_ether_disconnected);
-		
+
 		lcd.setCursor(0,0);
 		lcd.print(F("Init file system"));
 		lcd.setCursor(0,1);
@@ -860,9 +910,9 @@ void OpenSprinkler::begin() {
 		}
 
 		state = OS_STATE_INITIAL;
-		
+
 	#else
-	
+
 		// set sd cs pin high to release SD
 		pinMode(PIN_SD_CS, OUTPUT);
 		digitalWrite(PIN_SD_CS, HIGH);
@@ -873,15 +923,15 @@ void OpenSprinkler::begin() {
 			lcd_print_pgm(PSTR("Error Code: 0x2D"));
 			while(1){}
 		}
-		
+
 	#endif
-		
+
 	// set button pins
 	// enable internal pullup
 	pinMode(PIN_BUTTON_1, INPUT_PULLUP);
 	pinMode(PIN_BUTTON_2, INPUT_PULLUP);
 	pinMode(PIN_BUTTON_3, INPUT_PULLUP);
-	
+
 	// detect and check RTC type
 	RTC.detect();
 
@@ -913,7 +963,7 @@ void OpenSprinkler::latch_setallzonepins(byte value) {
 		drio->i2c_write(NXP_OUTPUT_REG, reg); // write value to register
 	}
 	// Handle all expansion boards
-	for(byte i=0;i<MAX_EXT_BOARDS/2;i++) {	// 
+	for(byte i=0;i<MAX_EXT_BOARDS/2;i++) {	//
 		if(expanders[i]->type==IOEXP_TYPE_9555) {
 			expanders[i]->i2c_write(NXP_OUTPUT_REG, value?0xFFFF:0x0000);
 		}
@@ -930,7 +980,7 @@ void OpenSprinkler::latch_setzonepin(byte sid, byte value) {
 			if(value) reg |= (1<<sid);
 			else reg &= (~(1<<sid));
 			drio->i2c_write(NXP_OUTPUT_REG, reg); // write value to register
-		}		 
+		}
 	} else {	// on expander
 		byte bid=(sid-8)>>4;
 		uint16_t s=(sid-8)&0x0F;
@@ -1001,14 +1051,14 @@ void OpenSprinkler::apply_all_station_bits() {
 	if(hw_type==HW_TYPE_LATCH) {
 		// if controller type is latching, the control mechanism is different
 		// hence will be handled separately
-		latch_apply_all_station_bits(); 
+		latch_apply_all_station_bits();
 	} else {
 		// Handle DC booster
 		if(hw_type==HW_TYPE_DC && engage_booster) {
 			// for DC controller: boost voltage and enable output path
 			digitalWriteExt(PIN_BOOST_EN, LOW);  // disfable output path
 			digitalWriteExt(PIN_BOOST, HIGH);		 // enable boost converter
-			delay((int)iopts[IOPT_BOOST_TIME]<<2);	// wait for booster to charge
+			delay_nicely((int)iopts[IOPT_BOOST_TIME]<<2);	// wait for booster to charge
 			digitalWriteExt(PIN_BOOST, LOW);		 // disable boost converter
 			digitalWriteExt(PIN_BOOST_EN, HIGH); // enable output path
 			engage_booster = 0;
@@ -1024,7 +1074,7 @@ void OpenSprinkler::apply_all_station_bits() {
 			reg = (reg&0xFF00) | station_bits[0]; // output channels are the low 8-bit
 			drio->i2c_write(NXP_OUTPUT_REG, reg); // write value to register
 		}
-			
+
 		// Handle expansion boards
 		for(int i=0;i<MAX_EXT_BOARDS/2;i++) {
 			uint16_t data = station_bits[i*2+2];
@@ -1036,8 +1086,8 @@ void OpenSprinkler::apply_all_station_bits() {
 			}
 		}
 	}
-		
-	byte bid, s, sbits;  
+
+	byte bid, s, sbits;
 #else
 	digitalWrite(PIN_SR_LATCH, LOW);
 	byte bid, s, sbits;
@@ -1066,7 +1116,7 @@ void OpenSprinkler::apply_all_station_bits() {
 		// for DC controller: boost voltage
 		digitalWrite(PIN_BOOST_EN, LOW);	// disable output path
 		digitalWrite(PIN_BOOST, HIGH);		// enable boost converter
-		delay((int)iopts[IOPT_BOOST_TIME]<<2);	// wait for booster to charge
+		delay_nicely((int)iopts[IOPT_BOOST_TIME]<<2);	// wait for booster to charge
 		digitalWrite(PIN_BOOST, LOW);			// disable boost converter
 
 		digitalWrite(PIN_BOOST_EN, HIGH); // enable output path
@@ -1083,14 +1133,16 @@ void OpenSprinkler::apply_all_station_bits() {
 
 	if(iopts[IOPT_SPE_AUTO_REFRESH]) {
 		// handle refresh of RF and remote stations
-		// we refresh the station whose index is the current time modulo MAX_NUM_STATIONS
-		static byte last_sid = 0;
-		byte sid = now() % MAX_NUM_STATIONS;
-		if (sid != last_sid) {	// avoid refreshing the same station twice in a roll
-			last_sid = sid;
-			bid=sid>>3;
-			s=sid&0x07;
-			switch_special_station(sid, (station_bits[bid]>>s)&0x01);
+		// we refresh the station that's next in line
+		static byte next_sid_to_refresh = MAX_NUM_STATIONS>>1;
+		static byte lastnow = 0;
+		byte _now = (now() & 0xFF);
+		if (lastnow != _now) {	// perform this no more than once per second
+			lastnow = _now;
+			next_sid_to_refresh = (next_sid_to_refresh+1) % MAX_NUM_STATIONS;
+			bid=next_sid_to_refresh>>3;
+			s=next_sid_to_refresh&0x07;
+			switch_special_station(next_sid_to_refresh, (station_bits[bid]>>s)&0x01);
 		}
 	}
 }
@@ -1099,7 +1151,7 @@ void OpenSprinkler::apply_all_station_bits() {
 void OpenSprinkler::detect_binarysensor_status(ulong curr_time) {
 	// sensor_type: 0 if normally closed, 1 if normally open
 	if(iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_RAIN || iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_SOIL) {
-		pinModeExt(PIN_SENSOR1, INPUT_PULLUP); // this seems necessary for OS 3.2
+		if(hw_rev==2)	pinModeExt(PIN_SENSOR1, INPUT_PULLUP); // this seems necessary for OS 3.2
 		byte val = digitalReadExt(PIN_SENSOR1);
 		status.sensor1 = (val == iopts[IOPT_SENSOR1_OPTION]) ? 0 : 1;
 		if(status.sensor1) {
@@ -1129,7 +1181,7 @@ void OpenSprinkler::detect_binarysensor_status(ulong curr_time) {
 // ESP8266 is guaranteed to have sensor 2
 #if defined(ESP8266) || defined(PIN_SENSOR2)
 	if(iopts[IOPT_SENSOR2_TYPE]==SENSOR_TYPE_RAIN || iopts[IOPT_SENSOR2_TYPE]==SENSOR_TYPE_SOIL) {
-		pinModeExt(PIN_SENSOR2, INPUT_PULLUP); // this seems necessary for OS 3.2	
+		if(hw_rev==2)	pinModeExt(PIN_SENSOR2, INPUT_PULLUP); // this seems necessary for OS 3.2
 		byte val = digitalReadExt(PIN_SENSOR2);
 		status.sensor2 = (val == iopts[IOPT_SENSOR2_OPTION]) ? 0 : 1;
 		if(status.sensor2) {
@@ -1146,7 +1198,7 @@ void OpenSprinkler::detect_binarysensor_status(ulong curr_time) {
 		} else {
 			if(!sensor2_off_timer) {
 				ulong delay_time = (ulong)iopts[IOPT_SENSOR2_OFF_DELAY]*60;
-				sensor2_off_timer = curr_time + (delay_time>5?delay_time:5);			
+				sensor2_off_timer = curr_time + (delay_time>5?delay_time:5);
 				sensor2_on_timer = 0;
 			} else {
 				if(curr_time > sensor2_off_timer) {
@@ -1159,30 +1211,27 @@ void OpenSprinkler::detect_binarysensor_status(ulong curr_time) {
 #endif
 }
 
-
 /** Return program switch status */
 byte OpenSprinkler::detect_programswitch_status(ulong curr_time) {
 	byte ret = 0;
 	if(iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_PSWITCH) {
-		static ulong keydown_time = 0;
-		pinModeExt(PIN_SENSOR1, INPUT_PULLUP); // this seems necessary for OS 3.2
-		status.sensor1 = (digitalReadExt(PIN_SENSOR1) != iopts[IOPT_SENSOR1_OPTION]);
-		byte val = (digitalReadExt(PIN_SENSOR1) == iopts[IOPT_SENSOR1_OPTION]);
-		if(!val && !keydown_time) keydown_time = curr_time;
-		else if(val && keydown_time && (curr_time > keydown_time)) {
-			keydown_time = 0;
+		static byte sensor1_hist = 0;
+		if(hw_rev==2) pinModeExt(PIN_SENSOR1, INPUT_PULLUP); // this seems necessary for OS 3.2
+		status.sensor1 = (digitalReadExt(PIN_SENSOR1) != iopts[IOPT_SENSOR1_OPTION]); // is switch activated?
+		sensor1_hist = (sensor1_hist<<1) | status.sensor1;
+		// basic noise filtering: only trigger if sensor matches pattern:
+		// i.e. two consecutive lows followed by two consecutive highs
+		if((sensor1_hist&0b1111) == 0b0011) {
 			ret |= 0x01;
 		}
 	}
-#if defined(ESP8266) || defined(PIN_SENSOR2)	
+#if defined(ESP8266) || defined(PIN_SENSOR2)
 	if(iopts[IOPT_SENSOR2_TYPE]==SENSOR_TYPE_PSWITCH) {
-		static ulong keydown_time_2 = 0;
-		pinModeExt(PIN_SENSOR2, INPUT_PULLUP); // this seems necessary for OS 3.2		
-		status.sensor2 = (digitalReadExt(PIN_SENSOR2) != iopts[IOPT_SENSOR2_OPTION]);
-		byte val = (digitalReadExt(PIN_SENSOR2) == iopts[IOPT_SENSOR2_OPTION]);
-		if(!val && !keydown_time_2) keydown_time_2 = curr_time;
-		else if(val && keydown_time_2 && (curr_time > keydown_time_2)) {
-			keydown_time_2 = 0;
+		static byte sensor2_hist = 0;
+		if(hw_rev==2) pinModeExt(PIN_SENSOR2, INPUT_PULLUP); // this seems necessary for OS 3.2
+		status.sensor2 = (digitalReadExt(PIN_SENSOR2) != iopts[IOPT_SENSOR2_OPTION]); // is sensor activated?
+		sensor2_hist = (sensor2_hist<<1) | status.sensor2;
+		if((sensor2_hist&0b1111) == 0b0011) {
 			ret |= 0x02;
 		}
 	}
@@ -1225,7 +1274,7 @@ uint16_t OpenSprinkler::read_current() {
 			scale = 3.45;
 			#else
 			scale = 11.39;
-			#endif		 
+			#endif
 		} else {
 			scale = 0.0;	// for other controllers, current is 0
 		}
@@ -1234,7 +1283,7 @@ uint16_t OpenSprinkler::read_current() {
 		uint16_t sum = 0;
 		for(byte i=0;i<K;i++) {
 			sum += analogRead(PIN_CURR_SENSE);
-			delay(1);
+			delay_nicely(1);
 		}
 		return (uint16_t)((sum/K)*scale);
 	} else {
@@ -1263,7 +1312,7 @@ int OpenSprinkler::detect_exp() {
 	// Reverse this fomular we have:
 	//		n = (1024 * 9.4 / ADC - 9.4) / 1.6
 	int n = (int)((1024 * 9.4 / analogRead(PIN_EXP_SENSE) - 9.4) / 1.6 + 0.33);
-	return n;	
+	return n;
 	#endif
 #else
 	return -1;
@@ -1317,7 +1366,7 @@ void OpenSprinkler::set_station_data(byte sid, StationData* data) {
 /** Get station name */
 void OpenSprinkler::get_station_name(byte sid, char tmp[]) {
 	tmp[STATION_NAME_SIZE]=0;
-	file_read_block(STATIONS_FILENAME, tmp, (uint32_t)sid*sizeof(StationData)+offsetof(StationData, name), STATION_NAME_SIZE); 
+	file_read_block(STATIONS_FILENAME, tmp, (uint32_t)sid*sizeof(StationData)+offsetof(StationData, name), STATION_NAME_SIZE);
 }
 
 /** Set station name */
@@ -1333,7 +1382,7 @@ byte OpenSprinkler::get_station_type(byte sid) {
 }
 
 byte OpenSprinkler::is_sequential_station(byte sid) {
-	return get_station_gid(sid) != PARALLEL_GROUP_ID; 
+	return get_station_gid(sid) != PARALLEL_GROUP_ID;
 }
 
 byte OpenSprinkler::is_master_station(byte sid) {
@@ -1413,7 +1462,7 @@ void OpenSprinkler::attribs_save() {
 			at.igs = (attrib_igs[bid]>>s) & 1;
 			at.mas2= (attrib_mas2[bid]>>s)& 1;
 			at.igs2= (attrib_igs2[bid]>>s) & 1;
-			at.igrd= (attrib_igrd[bid]>>s) & 1;			 
+			at.igrd= (attrib_igrd[bid]>>s) & 1;
 			at.dis = (attrib_dis[bid]>>s) & 1;
 			at.gid = get_station_gid(sid);
 			set_station_gid(sid, at.gid); // update ram version
@@ -1441,7 +1490,7 @@ void OpenSprinkler::attribs_load() {
 	memset(attrib_dis, 0, nboards);
 	memset(attrib_spe, 0, nboards);
 	memset(attrib_grp, 0, MAX_NUM_STATIONS);
-								
+
 	for(bid=0;bid<MAX_NUM_BOARDS;bid++) {
 		for(s=0;s<8;s++,sid++) {
 			file_read_block(STATIONS_FILENAME, &at, (uint32_t)sid*sizeof(StationData)+offsetof(StationData, attrib), sizeof(StationAttrib));
@@ -1490,19 +1539,19 @@ void OpenSprinkler::switch_special_station(byte sid, byte value) {
 		StationData *pdata=(StationData*) tmp_buffer;
 		get_station_data(sid, pdata);
 		switch(stype) {
-		
+
 		case STN_TYPE_RF:
 			switch_rfstation((RFStationData *)pdata->sped, value);
 			break;
-			
+
 		case STN_TYPE_REMOTE:
 			switch_remotestation((RemoteStationData *)pdata->sped, value);
 			break;
-			
+
 		case STN_TYPE_GPIO:
 			switch_gpiostation((GPIOStationData *)pdata->sped, value);
 			break;
-			
+
 		case STN_TYPE_HTTP:
 			switch_httpstation((HTTPStationData *)pdata->sped, value);
 			break;
@@ -1644,75 +1693,6 @@ void remote_http_callback(char* buffer) {
 */
 }
 
-#define SERVER_CONNECT_NTRIES 3
-
-int8_t OpenSprinkler::send_http_request(uint32_t ip4, uint16_t port, char* p, void(*callback)(char*), uint16_t timeout) {
-	static byte ip[4];
-	ip[0] = ip4>>24;
-	ip[1] = (ip4>>16)&0xff;
-	ip[2] = (ip4>>8)&0xff;
-	ip[3] = ip4&0xff;
-
-#if defined(ARDUINO)
-
-	Client *client;
-	#if defined(ESP8266)
-		EthernetClient etherClient;
-		WiFiClient wifiClient;
-		if(m_server) client = &etherClient;
-		else client = &wifiClient;
-	#else
-		EthernetClient etherClient;
-		client = &etherClient;
-	#endif
-	
-	byte nk;
-	for(nk=0;nk<SERVER_CONNECT_NTRIES;nk++) {
-		if(client->connect(IPAddress(ip), port))	break;
-		delay(500);
-	}
-	if(nk==SERVER_CONNECT_NTRIES) { client->stop(); return HTTP_RQT_CONNECT_ERR; }
-
-#else
-
-	EthernetClient etherClient;
-	EthernetClient *client = &etherClient;
-	if(!client->connect(ip, port)) { client->stop(); return HTTP_RQT_CONNECT_ERR; }	
-
-#endif
-
-	uint16_t len = strlen(p);
-	if(len > ETHER_BUFFER_SIZE) len = ETHER_BUFFER_SIZE;
-	client->write((uint8_t *)p, len);
-	memset(ether_buffer, 0, ETHER_BUFFER_SIZE);
-	uint32_t stoptime = millis()+timeout;
-
-#if defined(ARDUINO)
-	while(client->connected() || client->available()) {
-		if(client->available()) {
-			client->read((uint8_t*)ether_buffer, ETHER_BUFFER_SIZE);
-		}
-		delay(0);
-		if(millis()>stoptime) {
-			client->stop();
-			return HTTP_RQT_TIMEOUT;			
-		}
-	}
-#else
-	while(millis() < stoptime) {
-		int len=client->read((uint8_t *)ether_buffer, ETHER_BUFFER_SIZE);
-		if (len<=0) {
-			if(!client->connected())	break;
-			else	continue;
-		}
-	}
-#endif
-	client->stop();
-	if(strlen(ether_buffer)==0) return HTTP_RQT_EMPTY_RETURN;
-	if(callback) callback(ether_buffer);
-	return HTTP_RQT_SUCCESS;
-}
-
 int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char* p, void(*callback)(char*), uint16_t timeout) {
 
 #if defined(ARDUINO)
@@ -1727,13 +1707,23 @@ int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char*
 		EthernetClient etherClient;
 		client = &etherClient;
 	#endif
-	
-	byte nk;
-	for(nk=0;nk<SERVER_CONNECT_NTRIES;nk++) {
-		if(client->connect(server, port))	break;
-		delay(500);
+
+	#define HTTP_CONNECT_NTRIES 3
+	byte tries = 0;
+	do {
+		DEBUG_PRINT(F("host: " ));
+		DEBUG_PRINT(server);
+		DEBUG_PRINT(":");
+		DEBUG_PRINTLN(port);
+		if(client->connect(server, port)==1) break;
+		tries++;
+	} while(tries<HTTP_CONNECT_NTRIES);
+
+	if(tries==HTTP_CONNECT_NTRIES) {
+		DEBUG_PRINTLN(F("failed."));
+		client->stop();
+		return HTTP_RQT_CONNECT_ERR;
 	}
-	if(nk==SERVER_CONNECT_NTRIES) { client->stop(); return HTTP_RQT_CONNECT_ERR; }
 
 #else
 
@@ -1741,38 +1731,45 @@ int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char*
 	EthernetClient *client = &etherClient;
 	struct hostent *host;
 	host = gethostbyname(server);
-	if (!host) {
-		DEBUG_PRINT("can't resolve http station - ");
-		DEBUG_PRINTLN(server);
+	if (!host) { return HTTP_RQT_CONNECT_ERR; }
+	if(!client->connect((uint8_t*)host->h_addr, port)) {
+		DEBUG_PRINT(F("Cannot connect to "));
+		DEBUG_PRINT(server);
+		DEBUG_PRINT(":");
+		DEBUG_PRINTLN(port);
+		client->stop();
 		return HTTP_RQT_CONNECT_ERR;
-	}	
-	if(!client->connect((uint8_t*)host->h_addr, port)) { client->stop(); return HTTP_RQT_CONNECT_ERR; }	
+	}
 
 #endif
 
 	uint16_t len = strlen(p);
 	if(len > ETHER_BUFFER_SIZE) len = ETHER_BUFFER_SIZE;
-	client->write((uint8_t *)p, len);
+	if(client->connected()) {
+		client->write((uint8_t *)p, len);
+	}
 	memset(ether_buffer, 0, ETHER_BUFFER_SIZE);
 	uint32_t stoptime = millis()+timeout;
 
 #if defined(ARDUINO)
-	while(client->connected() || client->available()) {
-		if(client->available()) {
-			client->read((uint8_t*)ether_buffer, ETHER_BUFFER_SIZE);
+	while(client->connected()) {
+		int nbytes = client->available();
+		if(nbytes>0) {
+			if(nbytes>ETHER_BUFFER_SIZE) nbytes=ETHER_BUFFER_SIZE;
+			client->read((uint8_t*)ether_buffer, nbytes);
 		}
-		delay(0);
 		if(millis()>stoptime) {
 			client->stop();
-			return HTTP_RQT_TIMEOUT;			
+			return HTTP_RQT_TIMEOUT;
 		}
 	}
 #else
-	while(millis() < stoptime) {
+	while(client->connected()) {
 		int len=client->read((uint8_t *)ether_buffer, ETHER_BUFFER_SIZE);
-		if (len<=0) {
-			if(!client->connected())	break;
-			else	continue;
+		if (len<=0) continue;
+		if(millis()>stoptime) {
+			client->stop();
+			return HTTP_RQT_TIMEOUT;
 		}
 	}
 #endif
@@ -1780,6 +1777,12 @@ int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char*
 	if(strlen(ether_buffer)==0) return HTTP_RQT_EMPTY_RETURN;
 	if(callback) callback(ether_buffer);
 	return HTTP_RQT_SUCCESS;
+}
+
+int8_t OpenSprinkler::send_http_request(uint32_t ip4, uint16_t port, char* p, void(*callback)(char*), uint16_t timeout) {
+	char server[20];
+	sprintf(server, "%d.%d.%d.%d", ip4>>24, (ip4>>16)&0xff, (ip4>>8)&0xff, ip4&0xff);
+	return send_http_request(server, port, p, callback, timeout);
 }
 
 int8_t OpenSprinkler::send_http_request(char* server_with_port, char* p, void(*callback)(char*), uint16_t timeout) {
@@ -1798,7 +1801,7 @@ int8_t OpenSprinkler::send_http_request(char* server_with_port, char* p, void(*c
 void OpenSprinkler::switch_remotestation(RemoteStationData *data, bool turnon) {
 	RemoteStationData copy;
 	memcpy((char*)&copy, (char*)data, sizeof(RemoteStationData));
-	
+
 	uint32_t ip4 = hex2ulong(copy.ip, sizeof(copy.ip));
 	uint16_t port = (uint16_t)hex2ulong(copy.port, sizeof(copy.port));
 
@@ -1807,13 +1810,14 @@ void OpenSprinkler::switch_remotestation(RemoteStationData *data, bool turnon) {
 	ip[1] = (ip4>>16)&0xff;
 	ip[2] = (ip4>>8)&0xff;
 	ip[3] = ip4&0xff;
-	
+
 	// use tmp_buffer starting at a later location
 	// because remote station data is loaded at the beginning
 	char *p = tmp_buffer;
 	BufferFiller bf = p;
-	// MAX_NUM_STATIONS is the refresh cycle
-	uint16_t timer = iopts[IOPT_SPE_AUTO_REFRESH]?2*MAX_NUM_STATIONS:64800;  
+	// if auto refresh is enabled, we give a fixed duration each time, and auto refresh will renew it periodically
+	// if no auto refresh, we will give the maximum allowed duration, and station will be turned off when off command is sent
+	uint16_t timer = iopts[IOPT_SPE_AUTO_REFRESH]?4*MAX_NUM_STATIONS:64800;
 	bf.emit_p(PSTR("GET /cm?pw=$O&sid=$D&en=$D&t=$D"),
 						SOPT_PASSWORD,
 						(int)hex2ulong(copy.sid, sizeof(copy.sid)),
@@ -1842,6 +1846,9 @@ void OpenSprinkler::switch_httpstation(HTTPStationData *data, bool turnon) {
 
 	char *p = tmp_buffer;
 	BufferFiller bf = p;
+
+	if(cmd==NULL || server==NULL) return; // proceed only if cmd and server are valid
+
 	bf.emit_p(PSTR("GET /$S HTTP/1.0\r\nHOST: $S\r\n\r\n"), cmd, server);
 
 	send_http_request(server, atoi(port), p, remote_http_callback);
@@ -1860,7 +1867,7 @@ void OpenSprinkler::options_setup() {
 		lcd_print_line_clear_pgm(PSTR("Please Wait..."), 1);
 #else
 		DEBUG_PRINT("resetting options...");
-#endif		
+#endif
 
 		// 0. remove existing files
 		if(file_read_byte(IOPTS_FILENAME, IOPT_RESET)==0xAA) {
@@ -1886,11 +1893,11 @@ void OpenSprinkler::options_setup() {
 		for(int i=0; i<NUM_SOPTS; i++) {
 			file_write_block(SOPTS_FILENAME, tmp_buffer, (ulong)MAX_SOPTS_SIZE*i, MAX_SOPTS_SIZE);
 		}
-		// write string options 
+		// write string options
 		for(int i=0; i<NUM_SOPTS; i++) {
 			sopt_save(i, sopts[i]);
 		}
-		
+
 		// 2. write station data
 		StationData *pdata=(StationData*)tmp_buffer;
 		pdata->name[0]='S';
@@ -1915,20 +1922,20 @@ void OpenSprinkler::options_setup() {
 			}
 			file_write_block(STATIONS_FILENAME, pdata, sizeof(StationData)*i, sizeof(StationData));
 		}
-		
+
 		attribs_load(); // load and repackage attrib bits (for backward compatibility)
-		
+
 		// 3. write non-volatile controller status
 		nvdata.reboot_cause = REBOOT_CAUSE_RESET;
 		nvdata_save();
 		last_reboot_cause = nvdata.reboot_cause;
-		
+
 		// 4. write program data: just need to write a program counter: 0
 		file_write_byte(PROG_FILENAME, 0, 0);
-		
+
 		// 5. write 'done' file
 		file_write_byte(DONE_FILENAME, 0, 1);
-		
+
 	} else	{
 
 		iopts_load();
@@ -1966,7 +1973,7 @@ void OpenSprinkler::options_setup() {
 			button = button_read(BUTTON_WAIT_NONE);
 		} while(!((button&BUTTON_MASK)==BUTTON_3 && (button&BUTTON_FLAG_DOWN)));
 		// set test mode parameters
-		
+
 		//iopts[IOPT_WIFI_MODE] = WIFI_MODE_STA;
 		wifi_testmode = 1;
 		#if defined(TESTMODE_SSID)
@@ -1978,7 +1985,7 @@ void OpenSprinkler::options_setup() {
 		#endif
 		button = 0;
 	#endif
-	
+
 		break;
 
 	case BUTTON_3:
@@ -2026,7 +2033,7 @@ void OpenSprinkler::options_setup() {
 			lcd_print_pgm(PSTR(" AC"));
 		}
 		delay(1500);
-		#if defined(ESP8266)
+		#if defined(ARDUINO)
 		lcd.setCursor(2, 1);
 		lcd_print_pgm(PSTR("FW "));
 		lcd.print((char)('0'+(OS_FW_VERSION/100)));
@@ -2063,6 +2070,17 @@ void OpenSprinkler::iopts_load() {
 	iopts[IOPT_FW_VERSION] = OS_FW_VERSION;
 	iopts[IOPT_FW_MINOR] = OS_FW_MINOR;
 	populate_master();
+	/* Reject the former default 50.97.210.169 NTP IP address as
+	 * it no longer works, yet is carried on by people's saved
+	 * configs when they upgrade from older versions.
+	 * IOPT_NTP_IP1 = 0 leads to the new good default behavior. */
+	if (iopts[IOPT_NTP_IP1] == 50 && iopts[IOPT_NTP_IP2] == 97 &&
+		iopts[IOPT_NTP_IP3] == 210 && iopts[IOPT_NTP_IP4] == 169) {
+		iopts[IOPT_NTP_IP1] = 0;
+		iopts[IOPT_NTP_IP2] = 0;
+		iopts[IOPT_NTP_IP3] = 0;
+		iopts[IOPT_NTP_IP4] = 0;
+	}
 }
 
 /** Save integer options to file */
@@ -2099,7 +2117,7 @@ bool OpenSprinkler::sopt_save(byte oid, const char *buf) {
 	}
 	return true;
 }
-	
+
 // ==============================
 // Controller Operation Functions
 // ==============================
@@ -2213,8 +2231,8 @@ void OpenSprinkler::lcd_print_mac(const byte *mac) {
 		lcd_print_pgm(PSTR(" (WiFi MAC)"));
 	}
 #else
-	lcd_print_pgm(PSTR(" (MAC)"));	
-#endif	
+	lcd_print_pgm(PSTR(" (MAC)"));
+#endif
 }
 
 /** print station bits */
@@ -2254,12 +2272,12 @@ void OpenSprinkler::lcd_print_station(byte line, char c) {
 		lcd.setCursor(LCD_CURSOR_REMOTEXT, 1);
 		lcd.write(ICON_REMOTEXT);
 	}
-	
+
 	if(status.rain_delayed) {
 		lcd.setCursor(LCD_CURSOR_RAINDELAY, 1);
 		lcd.write(ICON_RAINDELAY);
 	}
-	
+
 	// write sensor 1 icon
 	lcd.setCursor(LCD_CURSOR_SENSOR1, 1);
 	switch(iopts[IOPT_SENSOR1_TYPE]) {
@@ -2276,8 +2294,8 @@ void OpenSprinkler::lcd_print_station(byte line, char c) {
 			lcd.write(status.sensor1?'P':'p');
 			break;
 	}
-	
-	// write sensor 2 icon	
+
+	// write sensor 2 icon
 	lcd.setCursor(LCD_CURSOR_SENSOR2, 1);
 	switch(iopts[IOPT_SENSOR2_TYPE]) {
 		case SENSOR_TYPE_RAIN:
@@ -2354,7 +2372,7 @@ void OpenSprinkler::lcd_print_option(int i) {
 		{
 		int16_t t=water_time_decode_signed(iopts[i]);
 		if(t>=0)	lcd_print_pgm(PSTR("+"));
-		lcd.print(t);		 
+		lcd.print(t);
 		}
 		break;
 	case IOPT_HTTPPORT_0:
@@ -2400,9 +2418,24 @@ void OpenSprinkler::lcd_print_option(int i) {
 	if (i==IOPT_WATER_PERCENTAGE)  lcd_print_pgm(PSTR("%"));
 	else if (i==IOPT_MASTER_ON_ADJ || i==IOPT_MASTER_OFF_ADJ || i==IOPT_MASTER_ON_ADJ_2 || i==IOPT_MASTER_OFF_ADJ_2)
 		lcd_print_pgm(PSTR(" sec"));
-	
+
 }
 
+void OpenSprinkler::yield_nicely() {
+	if(m_server) Ethernet.tick();
+#if defined(ESP8266)
+	delay(0);
+#endif
+}
+
+/** A delay function that does not stall Ethernet or WiFi */
+void OpenSprinkler::delay_nicely(uint32_t ms) {
+	uint32_t start = millis();
+	do {
+		//yield_nicely();
+		delay(1);
+	} while(millis()-start < ms);
+}
 
 /** Button functions */
 /** wait for button */
@@ -2417,7 +2450,7 @@ byte OpenSprinkler::button_read_busy(byte pin_butt, byte waitmode, byte butt, by
 
 	while (digitalReadExt(pin_butt) == 0 &&
 				 (waitmode == BUTTON_WAIT_RELEASE || (waitmode == BUTTON_WAIT_HOLD && hold_time<BUTTON_HOLD_MS))) {
-		delay(BUTTON_DELAY_MS);
+		delay_nicely(BUTTON_DELAY_MS);
 		hold_time += BUTTON_DELAY_MS;
 	}
 	if (is_holding || hold_time >= BUTTON_HOLD_MS)
@@ -2433,7 +2466,7 @@ byte OpenSprinkler::button_read(byte waitmode)
 	byte curr = BUTTON_NONE;
 	byte is_holding = (old&BUTTON_FLAG_HOLD);
 
-	delay(BUTTON_DELAY_MS);
+	delay_nicely(BUTTON_DELAY_MS);
 
 	if (digitalReadExt(PIN_BUTTON_1) == 0) {
 		curr = button_read_busy(PIN_BUTTON_1, waitmode, BUTTON_1, is_holding);
@@ -2451,7 +2484,7 @@ byte OpenSprinkler::button_read(byte waitmode)
 		ret |= BUTTON_FLAG_UP;
 
 	old = curr;
-	
+
 	return ret;
 }
 
@@ -2537,14 +2570,14 @@ void OpenSprinkler::lcd_set_contrast() {
 
 /** Set LCD brightness (using PWM) */
 void OpenSprinkler::lcd_set_brightness(byte value) {
-#ifdef PIN_LCD_BACKLIGHT
+#if defined(PIN_LCD_BACKLIGHT)
 	#if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
 	if (lcd.type()==LCD_I2C) {
 		if (value) lcd.backlight();
 		else {
 			// turn off LCD backlight
 			// only if dimming value is set to 0
-			if(!iopts[IOPT_LCD_DIMMING])	lcd.noBacklight();
+			if(iopts[IOPT_LCD_DIMMING]==0)	lcd.noBacklight();
 			else lcd.backlight();
 		}
 	}
@@ -2557,6 +2590,13 @@ void OpenSprinkler::lcd_set_brightness(byte value) {
 			analogWrite(PIN_LCD_BACKLIGHT, 255-iopts[IOPT_LCD_DIMMING]);
 		}
 	}
+
+#elif defined(ESP8266)
+	if (value) {lcd.displayOn();lcd.setBrightness(255); }
+	else {
+		if(iopts[IOPT_LCD_DIMMING]==0) lcd.displayOff();
+		else { lcd.displayOn();lcd.setBrightness(iopts[IOPT_LCD_DIMMING]); }
+	}
 #endif
 }
 #endif	// end of LCD and button functions
@@ -2567,7 +2607,7 @@ void OpenSprinkler::flash_screen() {
 	lcd.setCursor(0, -1);
 	lcd.print(F(" OpenSprinkler"));
 	lcd.drawXbm(34, 24, WiFi_Logo_width, WiFi_Logo_height, (const byte*) WiFi_Logo_image);
-	lcd.setCursor(0, 2);	
+	lcd.setCursor(0, 2);
 	lcd.display();
 	delay(1500);
 	lcd.clear();
@@ -2598,18 +2638,18 @@ void OpenSprinkler::config_ip() {
 		byte *_ip = iopts+IOPT_STATIC_IP1;
 		IPAddress dvip(_ip[0], _ip[1], _ip[2], _ip[3]);
 		if(dvip==(uint32_t)0x00000000) return;
-		
+
 		_ip = iopts+IOPT_GATEWAY_IP1;
 		IPAddress gwip(_ip[0], _ip[1], _ip[2], _ip[3]);
 		if(gwip==(uint32_t)0x00000000) return;
-		
+
 		_ip = iopts+IOPT_SUBNET_MASK1;
 		IPAddress subn(_ip[0], _ip[1], _ip[2], _ip[3]);
 		if(subn==(uint32_t)0x00000000) return;
-		
+
 		_ip = iopts+IOPT_DNS_IP1;
 		IPAddress dnsip(_ip[0], _ip[1], _ip[2], _ip[3]);
-		
+
 		WiFi.config(dvip, gwip, subn, dnsip);
 	}
 }

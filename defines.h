@@ -27,12 +27,12 @@
 // #define ENABLE_DEBUG  // enable serial debug
 
 #if !defined(ARDUINO)
-	#define ENABLE_LINUX_DEBUG // silences gpio errors 
+	#define ENABLE_LINUX_DEBUG // silences gpio errors
 #endif
 
 typedef unsigned char byte;
 typedef unsigned long ulong;
-  
+
 #define TMP_BUFFER_SIZE      255   // scratch buffer size
 
 /** Firmware version, hardware version, and maximal values */
@@ -40,7 +40,7 @@ typedef unsigned long ulong;
                             // if this number is different from the one stored in non-volatile memory
                             // a device reset will be automatically triggered
 
-#define OS_FW_MINOR      3  // Firmware minor version
+#define OS_FW_MINOR      7  // Firmware minor version
 
 /** Hardware version base numbers */
 #define OS_HW_VERSION_BASE   0x00
@@ -70,15 +70,16 @@ typedef unsigned long ulong;
 #define STN_TYPE_HTTP        0x04	// HTTP station
 #define STN_TYPE_OTHER       0xFF
 
-/** IFTTT macro defines */
-#define IFTTT_PROGRAM_SCHED   0x01
-#define IFTTT_SENSOR1         0x02
-#define IFTTT_FLOWSENSOR      0x04
-#define IFTTT_WEATHER_UPDATE  0x08
-#define IFTTT_REBOOT          0x10
-#define IFTTT_STATION_RUN     0x20
-#define IFTTT_SENSOR2         0x40
-#define IFTTT_RAINDELAY				0x80
+/** Notification macro defines */
+#define NOTIFY_PROGRAM_SCHED   0x0001
+#define NOTIFY_SENSOR1         0x0002
+#define NOTIFY_FLOWSENSOR      0x0004
+#define NOTIFY_WEATHER_UPDATE  0x0008
+#define NOTIFY_REBOOT          0x0010
+#define NOTIFY_STATION_OFF     0x0020
+#define NOTIFY_SENSOR2         0x0040
+#define NOTIFY_RAINDELAY       0x0080
+#define NOTIFY_STATION_ON      0x0100
 
 /** HTTP request macro defines */
 #define HTTP_RQT_SUCCESS			 0
@@ -227,7 +228,7 @@ enum {
 	IOPT_SPE_AUTO_REFRESH,
 	IOPT_IFTTT_ENABLE,
 	IOPT_SENSOR1_TYPE,
-	IOPT_SENSOR1_OPTION,	
+	IOPT_SENSOR1_OPTION,
 	IOPT_SENSOR2_TYPE,
 	IOPT_SENSOR2_OPTION,
 	IOPT_SENSOR1_ON_DELAY,
@@ -249,13 +250,13 @@ enum {
 	SOPT_JAVASCRIPTURL,
 	SOPT_WEATHERURL,
 	SOPT_WEATHER_OPTS,
-	SOPT_IFTTT_KEY,
+	SOPT_IFTTT_KEY,	// todo: make this IFTTT config just like MQTT
 	SOPT_STA_SSID,
 	SOPT_STA_PASS,
 	SOPT_DEVICE_NAME,
+	SOPT_MQTT_OPTS,
 	//SOPT_WEATHER_KEY,
 	//SOPT_AP_PASS,
-	//SOPT_MQTT_IP,
 	NUM_SOPTS	// total number of string options
 };
 
@@ -303,20 +304,20 @@ enum {
 	#define PIN_BOOST_EN      23    // boost voltage enable pin
 
 	#define PIN_ETHER_CS       4    // Ethernet controller chip select pin
-	#define PIN_SENSOR1				11		// 
+	#define PIN_SENSOR1				11		//
 	#define PIN_SD_CS          0    // SD card chip select pin
 	#define PIN_FLOWSENSOR_INT 1    // flow sensor interrupt pin (INT1)
 	#define PIN_EXP_SENSE      4    // expansion board sensing pin (A4)
 	#define PIN_CURR_SENSE     7    // current sensing pin (A7)
 	#define PIN_CURR_DIGITAL  24    // digital pin index for A7
 
-	#define ETHER_BUFFER_SIZE   8192
+	#define ETHER_BUFFER_SIZE   2048
 
 	#define 	wdt_reset()   __asm__ __volatile__ ("wdr")  // watchdog timer reset
 
 	#define pinModeExt        pinMode
 	#define digitalReadExt    digitalRead
-	#define digitalWriteExt   digitalWrite  
+	#define digitalWriteExt   digitalWrite
 
 #elif defined(ESP8266) // for ESP8266
 
@@ -331,11 +332,11 @@ enum {
 
 	#define PIN_CURR_SENSE    A0
 	#define PIN_FREE_LIST     {} // no free GPIO pin at the moment
-	#define ETHER_BUFFER_SIZE   8192
+	#define ETHER_BUFFER_SIZE   2048
 
 	#define PIN_ETHER_CS       16 // ENC28J60 CS (chip select pin) is 16 on OS 3.2.
 
-	/* To accommodate different OS30 versions, we use software defines pins */ 
+	/* To accommodate different OS30 versions, we use software defines pins */
 	extern byte PIN_BUTTON_1;
 	extern byte PIN_BUTTON_2;
 	extern byte PIN_BUTTON_3;
@@ -389,7 +390,7 @@ enum {
 	#define V2_PIN_RFTX          15
 	#define V2_PIN_BOOST         IOEXP_PIN+13
 	#define V2_PIN_BOOST_EN      IOEXP_PIN+14
-	#define V2_PIN_LATCH_COM     IOEXP_PIN+15  
+	#define V2_PIN_LATCH_COM     IOEXP_PIN+15
 	#define V2_PIN_SENSOR1       3  // sensor 1
 	#define V2_PIN_SENSOR2       10 // sensor 2
 
@@ -404,9 +405,9 @@ enum {
 	#define PIN_SENSOR1				14
 	#define PIN_SENSOR2				23
 	#define PIN_RFTX          15    // RF transmitter pin
-	#define PIN_BUTTON_1      23    // button 1
-	#define PIN_BUTTON_2      24    // button 2
-	#define PIN_BUTTON_3      25    // button 3
+	//#define PIN_BUTTON_1      23    // button 1
+	//#define PIN_BUTTON_2      24    // button 2
+	//#define PIN_BUTTON_3      25    // button 3
 
 	#define PIN_FREE_LIST		{5,6,7,8,9,10,11,12,13,16,18,19,20,21,23,24,25,26}  // free GPIO pins
 	#define ETHER_BUFFER_SIZE   16384
@@ -457,7 +458,7 @@ enum {
 		inline  void DEBUG_PRINT(const char*s) {printf("%s", s);}
 		#define DEBUG_PRINTLN(x)        {DEBUG_PRINT(x);printf("\n");}
 	#endif
-  
+
 #else
 
 	#define DEBUG_BEGIN(x)   {}
@@ -465,7 +466,7 @@ enum {
 	#define DEBUG_PRINTLN(x) {}
 
 #endif
-  
+
 /** Re-define avr-specific (e.g. PGM) types to use standard types */
 #if !defined(ARDUINO)
 	#include <stdio.h>
@@ -480,6 +481,7 @@ enum {
 	#define F(x)				 x
 	#define strcat_P     strcat
 	#define strcpy_P     strcpy
+	#define sprintf_P    sprintf
 	#include<string>
 	#define String       string
 	using namespace std;
@@ -519,5 +521,3 @@ enum {
 #define DISPLAY_MSG_MS      2000  // message display time (milliseconds)
 
 #endif  // _DEFINES_H
-
-

@@ -29,6 +29,7 @@
 #include "utils.h"
 #include "gpio.h"
 #include "images.h"
+#include "mqtt.h"
 
 #if defined(ARDUINO) // headers for ESP8266
 	#include <Arduino.h>
@@ -131,6 +132,7 @@ struct ConStatus {
 	byte sensor2:1;						// sensor2 status bit (when set, sensor2 on is detected)
 	byte sensor1_active:1;		// sensor1 active bit (when set, sensor1 is activated)
 	byte sensor2_active:1;		// sensor2 active bit (when set, sensor2 is activated)
+	byte req_mqtt_restart:1;			// request mqtt restart
 };
 
 extern const char iopt_json_names[];
@@ -152,6 +154,8 @@ public:
 	static byte pin_sr_data;		// RPi shift register data pin
 															// to handle RPi rev. 1
 #endif
+
+	static OSMqtt mqtt;
 
 	static NVConData nvdata;
 	static ConStatus status;
@@ -200,9 +204,8 @@ public:
 	static void begin();				// initialization, must call this function before calling other functions
 	static byte start_network();	// initialize network with the given mac and port
 	static byte start_ether();	// initialize ethernet with the given mac and port	
-#if defined(ARDUINO)
+	static bool network_connected();		// check if the network is up
 	static bool load_hardware_mac(byte* buffer, bool wired=false);	// read hardware mac address
-#endif
 	static time_t now_tz();
 	// -- station names and attributes
 	static void get_station_data(byte sid, StationData* data); // get station data
@@ -281,12 +284,29 @@ public:
 	static void lcd_print_station(byte line, char c);				// print station bits of the board selected by display_board
 	static void lcd_print_version(byte v);									 // print version number
 
+	static String time2str(uint32_t t) {
+		uint16_t h = hour(t);
+		uint16_t m = minute(t);
+		uint16_t s = second(t);
+		String str = "";
+		str+=h/10;
+		str+=h%10;
+		str+=":";
+		str+=m/10;
+		str+=m%10;
+		str+=":";
+		str+=s/10;
+		str+=s%10;
+		return str;
+	}
 	// -- UI and buttons
 	static byte button_read(byte waitmode); // Read button value. options for 'waitmodes' are:
 																					// BUTTON_WAIT_NONE, BUTTON_WAIT_RELEASE, BUTTON_WAIT_HOLD
 																					// return values are 'OR'ed with flags
 																					// check defines.h for details
 
+	static void yield_nicely();
+	static void delay_nicely(uint32_t ms);
 	// -- UI functions --
 	static void ui_set_options(int oid);		// ui for setting options (oid-> starting option index)
 	static void lcd_set_brightness(byte value=1);
@@ -331,8 +351,7 @@ private:
 // todo
 #if defined(ARDUINO)
 	extern EthernetServer *m_server;
-	extern EthernetClient *m_client;
-	extern EthernetUDP		*Udp;  
+	extern UDP *udp;  
 	#if defined(ESP8266)
 	extern ESP8266WebServer *wifi_server;
 	#endif

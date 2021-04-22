@@ -18,9 +18,9 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see
- * <http://www.gnu.org/licenses/>. 
+ * <http://www.gnu.org/licenses/>.
  */
- 
+
 #include "gpio.h"
 
 #if defined(ARDUINO)
@@ -33,18 +33,18 @@
 byte IOEXP::detectType(uint8_t address) {
 	Wire.beginTransmission(address);
 	if(Wire.endTransmission()!=0) return IOEXP_TYPE_NONEXIST; // this I2C address does not exist
-	
+
 	Wire.beginTransmission(address);
 	Wire.write(NXP_INVERT_REG); // ask for polarity register
 	Wire.endTransmission();
-	
+
 	if(Wire.requestFrom(address, (uint8_t)2) != 2) return IOEXP_TYPE_UNKNOWN;
 	uint8_t low = Wire.read();
 	uint8_t high = Wire.read();
 	if(low==0x00 && high==0x00) {
 		return IOEXP_TYPE_9555; // PCA9555 has polarity register which inits to 0
 	}
-	return IOEXP_TYPE_8575;  
+	return IOEXP_TYPE_8575;
 }
 
 void PCA9555::pinMode(uint8_t pin, uint8_t IOMode) {
@@ -64,7 +64,7 @@ uint16_t PCA9555::i2c_read(uint8_t reg) {
 	Wire.endTransmission();
 	if(Wire.requestFrom(address, (uint8_t)2) != 2) {
 		#ifndef ENABLE_LINUX_DEBUG
-			DEBUG_PRINTLN("GPIO error"); 
+			DEBUG_PRINTLN("GPIO error");
 		#endif
 		return 0xFFFF;
 	}
@@ -107,14 +107,14 @@ uint16_t PCF8574::i2c_read(uint8_t reg) {
 	if(Wire.requestFrom(address, (uint8_t)1) != 1) return 0xFFFF;
 	uint16_t data = Wire.read();
 	Wire.endTransmission();
-	return data; 
+	return data;
 }
 
 void PCF8574::i2c_write(uint8_t reg, uint16_t v) {
 	if(address==255)	return;
 	Wire.beginTransmission(address);
 	Wire.write((uint8_t)(v&0xFF) | inputmask);
-	Wire.endTransmission();  
+	Wire.endTransmission();
 }
 
 #include "OpenSprinkler.h"
@@ -267,14 +267,19 @@ void pinMode(int pin, byte mode) {
 		return;
 	}
 
-	if (-1 == write(fd, &dir_str[INPUT==mode?0:3], INPUT==mode?2:3)) {
-		#ifndef ENABLE_LINUX_DEBUG
-			DEBUG_PRINTLN("failed to set direction");
-		#endif
+	if (-1 == write(fd, &dir_str[(INPUT==mode)||(INPUT_PULLUP==mode)?0:3], (INPUT==mode)||(INPUT_PULLUP==mode)?2:3)) {
+		DEBUG_PRINTLN("failed to set direction");
 		return;
 	}
 
 	close(fd);
+#if defined(OSPI)
+	if(mode==INPUT_PULLUP) {
+		char cmd[BUFFER_MAX];
+		snprintf(cmd, BUFFER_MAX, "gpio -g mode %d up", pin);
+		system(cmd);
+	}
+#endif
 	return;
 }
 
@@ -288,7 +293,7 @@ int gpio_fd_open(int pin, int mode) {
 	if (fd < 0) {
 		#ifndef ENABLE_LINUX_DEBUG
 			DEBUG_PRINTLN("failed to open gpio");
-		#endif 
+		#endif
 		return -1;
 	}
 	return fd;
@@ -414,7 +419,7 @@ void attachInterrupt(int pin, const char* mode, void (*isr)(void)) {
 		if((sysFds[pin]=open(path, O_RDWR))<0) {
 			#ifndef ENABLE_LINUX_DEBUG
 				DEBUG_PRINTLN("failed to open gpio value for reading");
-			#endif 
+			#endif
 			return;
 		}
 	}
