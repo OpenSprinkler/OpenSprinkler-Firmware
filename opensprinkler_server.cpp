@@ -90,18 +90,18 @@ int available_ether_buffer() {
 }
 
 // Define return error code
-#define HTML_OK					0x00
-#define HTML_SUCCESS			0x01
-#define HTML_UNAUTHORIZED		0x02
-#define HTML_MISMATCH			0x03
-#define HTML_DATA_MISSING		0x10
-#define HTML_DATA_OUTOFBOUND	0x11
-#define HTML_DATA_FORMATERROR	0x12
-#define HTML_RFCODE_ERROR		0x13
-#define HTML_PAGE_NOT_FOUND		0x20
-#define HTML_NOT_PERMITTED		0x30
-#define HTML_UPLOAD_FAILED		0x40
-#define HTML_REDIRECT_HOME		0xFF
+#define HTML_OK								 0x00
+#define HTML_SUCCESS					 0x01
+#define HTML_UNAUTHORIZED			 0x02
+#define HTML_MISMATCH					 0x03
+#define HTML_DATA_MISSING			 0x10
+#define HTML_DATA_OUTOFBOUND	 0x11
+#define HTML_DATA_FORMATERROR  0x12
+#define HTML_RFCODE_ERROR			 0x13
+#define HTML_PAGE_NOT_FOUND		 0x20
+#define HTML_NOT_PERMITTED		 0x30
+#define HTML_UPLOAD_FAILED		 0x40
+#define HTML_REDIRECT_HOME		 0xFF
 
 static const char html200OK[] PROGMEM =
 	"HTTP/1.1 200 OK\r\n"
@@ -604,15 +604,15 @@ void server_change_stations() {
 	/* handle special data */
 	if(findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("sid"), true)) {
 		sid = atoi(tmp_buffer);
-		if (sid<0 || sid>os.nstations) handle_return(HTML_DATA_OUTOFBOUND);
-		if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("st"), true) &&
-			findKeyVal(p, tmp_buffer+1, TMP_BUFFER_SIZE-1, PSTR("sd"), true)) {
+		if(sid<0 || sid>os.nstations) handle_return(HTML_DATA_OUTOFBOUND);
+		if(findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("st"), true) &&
+			 findKeyVal(p, tmp_buffer+1, TMP_BUFFER_SIZE-1, PSTR("sd"), true)) {
 
 			tmp_buffer[0]-='0';
 			tmp_buffer[STATION_SPECIAL_DATA_SIZE] = 0;
 
 			// only process GPIO and HTTP stations for OS 2.3, above, and OSPi
-			if (tmp_buffer[0] == STN_TYPE_GPIO) {
+			if(tmp_buffer[0] == STN_TYPE_GPIO) {
 				// check that pin does not clash with OSPi pins
 				byte gpio = (tmp_buffer[1] - '0') * 10 + tmp_buffer[2] - '0';
 				byte activeState = tmp_buffer[3] - '0';
@@ -920,7 +920,7 @@ void server_change_program() {
 
 		// TODO, excluding v sets program struct values to empty
 	}
-	char *pv = tmp_buffer+1;
+	char *pv = tmp_buffer+1;	
 #else
 	// parse ad-hoc v=[...
 	// search for the start of v=[
@@ -937,7 +937,7 @@ void server_change_program() {
 	if(!found && !value_not_req) handle_return(HTML_DATA_MISSING);
 	pv+=3;
 #endif
-
+	
 	// parse headers
 	*(char*)(&prog) = parse_listdata(&pv);
 	prog.days[0]= parse_listdata(&pv);
@@ -1317,7 +1317,7 @@ void server_change_values()
 			os.iopts_save();
 		}
 	}
-
+	
 	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("cn"), true)) {
 		os.sopt_save(SOPT_DEVICE_NAME, tmp_buffer);
 	}
@@ -1583,7 +1583,7 @@ void server_json_status_main() {
 		if(sid!=os.nstations-1) bfill.emit_p(PSTR(","));
 	}
 
-	bfill.emit_p(PSTR("],\"nstations\":$D}"), os.nstations );
+	bfill.emit_p(PSTR("],\"nstations\":$D}"), os.nstations);
 }
 
 /** Output station status */

@@ -18,9 +18,9 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see
- * <http://www.gnu.org/licenses/>.
+ * <http://www.gnu.org/licenses/>. 
  */
-
+ 
 #include "gpio.h"
 
 #if defined(ARDUINO)
@@ -33,18 +33,18 @@
 byte IOEXP::detectType(uint8_t address) {
 	Wire.beginTransmission(address);
 	if(Wire.endTransmission()!=0) return IOEXP_TYPE_NONEXIST; // this I2C address does not exist
-
+	
 	Wire.beginTransmission(address);
 	Wire.write(NXP_INVERT_REG); // ask for polarity register
 	Wire.endTransmission();
-
+	
 	if(Wire.requestFrom(address, (uint8_t)2) != 2) return IOEXP_TYPE_UNKNOWN;
 	uint8_t low = Wire.read();
 	uint8_t high = Wire.read();
 	if(low==0x00 && high==0x00) {
 		return IOEXP_TYPE_9555; // PCA9555 has polarity register which inits to 0
 	}
-	return IOEXP_TYPE_8575;
+	return IOEXP_TYPE_8575;  
 }
 
 void PCA9555::pinMode(uint8_t pin, uint8_t IOMode) {
@@ -107,14 +107,14 @@ uint16_t PCF8574::i2c_read(uint8_t reg) {
 	if(Wire.requestFrom(address, (uint8_t)1) != 1) return 0xFFFF;
 	uint16_t data = Wire.read();
 	Wire.endTransmission();
-	return data;
+	return data; 
 }
 
 void PCF8574::i2c_write(uint8_t reg, uint16_t v) {
 	if(address==255)	return;
 	Wire.beginTransmission(address);
 	Wire.write((uint8_t)(v&0xFF) | inputmask);
-	Wire.endTransmission();
+	Wire.endTransmission();  
 }
 
 #include "OpenSprinkler.h"
@@ -196,7 +196,7 @@ static byte GPIOExport(int pin) {
 	fd = open("/sys/class/gpio/export", O_WRONLY);
 	if (fd < 0) {
 		#ifndef ENABLE_LINUX_DEBUG
-			DEBUG_PRINTLN("failed to open export for writing");
+		DEBUG_PRINTLN("failed to open export for writing");
 		#endif
 		return 0;
 	}
@@ -215,7 +215,7 @@ static byte GPIOUnexport(int pin) {
 	fd = open("/sys/class/gpio/unexport", O_WRONLY);
 	if (fd < 0) {
 		#ifndef ENABLE_LINUX_DEBUG
-			DEBUG_PRINTLN("failed to open unexport for writing");
+		DEBUG_PRINTLN("failed to open unexport for writing");
 		#endif
 		return 0;
 	}
@@ -236,7 +236,7 @@ static byte GPIOSetEdge(int pin, const char *edge) {
 	fd = open(path, O_WRONLY);
 	if (fd < 0) {
 		#ifndef ENABLE_LINUX_DEBUG
-			DEBUG_PRINTLN("failed to open gpio edge for writing");
+		DEBUG_PRINTLN("failed to open gpio edge for writing");
 		#endif
 		return 0;
 	}
@@ -262,7 +262,7 @@ void pinMode(int pin, byte mode) {
 	fd = open(path, O_WRONLY);
 	if (fd < 0) {
 		#ifndef ENABLE_LINUX_DEBUG
-			DEBUG_PRINTLN("failed to open gpio direction for writing");
+		DEBUG_PRINTLN("failed to open gpio direction for writing");
 		#endif
 		return;
 	}
@@ -292,7 +292,7 @@ int gpio_fd_open(int pin, int mode) {
 	fd = open(path, mode);
 	if (fd < 0) {
 		#ifndef ENABLE_LINUX_DEBUG
-			DEBUG_PRINTLN("failed to open gpio");
+		DEBUG_PRINTLN("failed to open gpio");
 		#endif
 		return -1;
 	}
@@ -315,7 +315,7 @@ byte digitalRead(int pin) {
 
 	if (read(fd, value_str, 3) < 0) {
 		#ifndef ENABLE_LINUX_DEBUG
-			DEBUG_PRINTLN("failed to read value");
+		DEBUG_PRINTLN("failed to read value");
 		#endif
 		return 0;
 	}
@@ -330,7 +330,7 @@ void gpio_write(int fd, byte value) {
 
 	if (1 != write(fd, &value_str[LOW==value?0:1], 1)) {
 		#ifndef ENABLE_LINUX_DEBUG
-			DEBUG_PRINT("failed to write value on pin ");
+		DEBUG_PRINT("failed to write value on pin ");
 		#endif
 	}
 }
@@ -401,7 +401,7 @@ static void *interruptHandler (void *arg) {
 void attachInterrupt(int pin, const char* mode, void (*isr)(void)) {
 	if((pin<0)||(pin>GPIO_MAX)) {
 		#ifndef ENABLE_LINUX_DEBUG
-			DEBUG_PRINTLN("pin out of range");
+		DEBUG_PRINTLN("pin out of range");
 		#endif
 		return;
 	}
@@ -418,7 +418,7 @@ void attachInterrupt(int pin, const char* mode, void (*isr)(void)) {
 	if(sysFds[pin]==-1) {
 		if((sysFds[pin]=open(path, O_RDWR))<0) {
 			#ifndef ENABLE_LINUX_DEBUG
-				DEBUG_PRINTLN("failed to open gpio value for reading");
+			DEBUG_PRINTLN("failed to open gpio value for reading");
 			#endif
 			return;
 		}

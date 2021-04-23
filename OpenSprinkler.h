@@ -75,7 +75,7 @@ struct StationAttrib {	// station attributes
 	byte igs2:1;// ignore sensor 2
 	byte igrd:1;// ignore rain delay
 	byte unused:1;
-
+	
 	byte gid:4;
 	byte dummy:4;
 

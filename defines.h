@@ -24,7 +24,7 @@
 #ifndef _DEFINES_H
 #define _DEFINES_H
 
-// #define ENABLE_DEBUG  // enable serial debug
+//#define ENABLE_DEBUG  // enable serial debug
 
 #if !defined(ARDUINO)
 	#define ENABLE_LINUX_DEBUG // silences gpio errors
@@ -32,7 +32,7 @@
 
 typedef unsigned char byte;
 typedef unsigned long ulong;
-
+  
 #define TMP_BUFFER_SIZE      255   // scratch buffer size
 
 /** Firmware version, hardware version, and maximal values */
@@ -140,13 +140,13 @@ typedef unsigned long ulong;
 #define STATION_SPECIAL_DATA_SIZE  (TMP_BUFFER_SIZE - STATION_NAME_SIZE - 12)
 
 /** Default string option values */
-#define DEFAULT_PASSWORD          	"a6d82bced638de3def1e9bbb4983225c"  // md5 of 'opendoor'
-#define DEFAULT_LOCATION          	"42.36,-71.06"	// Boston,MA
+#define DEFAULT_PASSWORD          "a6d82bced638de3def1e9bbb4983225c"  // md5 of 'opendoor'
+#define DEFAULT_LOCATION          "42.36,-71.06"	// Boston,MA
 #define DEFAULT_DEVICE_NAME			"My OpenSprinkler"
-#define DEFAULT_JAVASCRIPT_URL    	"https://ui.opensprinkler.com/js"
-#define DEFAULT_WEATHER_URL       	"weather.opensprinkler.com"
-#define DEFAULT_IFTTT_URL         	"maker.ifttt.com"
-#define DEFAULT_EMPTY_STRING      	""
+#define DEFAULT_JAVASCRIPT_URL    "https://ui.opensprinkler.com/js"
+#define DEFAULT_WEATHER_URL       "weather.opensprinkler.com"
+#define DEFAULT_IFTTT_URL         "maker.ifttt.com"
+#define DEFAULT_EMPTY_STRING      ""
 
 /* master properties */
 
@@ -227,7 +227,7 @@ enum {
 	IOPT_SPE_AUTO_REFRESH,
 	IOPT_IFTTT_ENABLE,
 	IOPT_SENSOR1_TYPE,
-	IOPT_SENSOR1_OPTION,
+	IOPT_SENSOR1_OPTION,	
 	IOPT_SENSOR2_TYPE,
 	IOPT_SENSOR2_OPTION,
 	IOPT_SENSOR1_ON_DELAY,
@@ -303,7 +303,7 @@ enum {
 	#define PIN_BOOST_EN      23    // boost voltage enable pin
 
 	#define PIN_ETHER_CS       4    // Ethernet controller chip select pin
-	#define PIN_SENSOR1				11		//
+	#define PIN_SENSOR1				11		// 
 	#define PIN_SD_CS          0    // SD card chip select pin
 	#define PIN_FLOWSENSOR_INT 1    // flow sensor interrupt pin (INT1)
 	#define PIN_EXP_SENSE      4    // expansion board sensing pin (A4)
@@ -316,7 +316,7 @@ enum {
 
 	#define pinModeExt        pinMode
 	#define digitalReadExt    digitalRead
-	#define digitalWriteExt   digitalWrite
+	#define digitalWriteExt   digitalWrite  
 
 #elif defined(ESP8266) // for ESP8266
 
@@ -335,7 +335,7 @@ enum {
 
 	#define PIN_ETHER_CS       16 // ENC28J60 CS (chip select pin) is 16 on OS 3.2.
 
-	/* To accommodate different OS30 versions, we use software defines pins */
+	/* To accommodate different OS30 versions, we use software defines pins */ 
 	extern byte PIN_BUTTON_1;
 	extern byte PIN_BUTTON_2;
 	extern byte PIN_BUTTON_3;
@@ -389,7 +389,7 @@ enum {
 	#define V2_PIN_RFTX          15
 	#define V2_PIN_BOOST         IOEXP_PIN+13
 	#define V2_PIN_BOOST_EN      IOEXP_PIN+14
-	#define V2_PIN_LATCH_COM     IOEXP_PIN+15
+	#define V2_PIN_LATCH_COM     IOEXP_PIN+15  
 	#define V2_PIN_SENSOR1       3  // sensor 1
 	#define V2_PIN_SENSOR2       10 // sensor 2
 
@@ -457,7 +457,7 @@ enum {
 		inline  void DEBUG_PRINT(const char*s) {printf("%s", s);}
 		#define DEBUG_PRINTLN(x)        {DEBUG_PRINT(x);printf("\n");}
 	#endif
-
+  
 #else
 
 	#define DEBUG_BEGIN(x)   {}
@@ -465,7 +465,7 @@ enum {
 	#define DEBUG_PRINTLN(x) {}
 
 #endif
-
+  
 /** Re-define avr-specific (e.g. PGM) types to use standard types */
 #if !defined(ARDUINO)
 	#include <stdio.h>

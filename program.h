@@ -26,7 +26,7 @@
 #define _PROGRAM_H
 
 #define MAX_NUM_PROGRAMS		40		// maximum number of programs
-#define MAX_NUM_STARTTIMES		 4
+#define MAX_NUM_STARTTIMES	4
 #define PROGRAM_NAME_SIZE		32
 #define RUNTIME_QUEUE_SIZE	MAX_NUM_STATIONS
 #define PROGRAMSTRUCT_SIZE	sizeof(ProgramStruct)
@@ -41,16 +41,16 @@ struct LogStruct {
 };
 
 #define PROGRAM_TYPE_WEEKLY		0
-#define PROGRAM_TYPE_BIWEEKLY 	1
+#define PROGRAM_TYPE_BIWEEKLY 1
 #define PROGRAM_TYPE_MONTHLY	2
-#define PROGRAM_TYPE_INTERVAL 	3
+#define PROGRAM_TYPE_INTERVAL 3
 
-#define STARTTIME_SUNRISE_BIT 	14
+#define STARTTIME_SUNRISE_BIT 14
 #define STARTTIME_SUNSET_BIT	13
 #define STARTTIME_SIGN_BIT		12
 
-#define PROGRAMSTRUCT_EN_BIT	0
-#define PROGRAMSTRUCT_UWT_BIT	1
+#define PROGRAMSTRUCT_EN_BIT	 0
+#define PROGRAMSTRUCT_UWT_BIT  1
 
 /** Program data structure */
 class ProgramStruct {
@@ -99,12 +99,12 @@ public:
 	int16_t starttimes[MAX_NUM_STARTTIMES];
 
 	uint16_t durations[MAX_NUM_STATIONS];  // duration / water time of each station
-
+	
 	char name[PROGRAM_NAME_SIZE];
 
 	byte check_match(time_t t);
 	int16_t starttime_decode(int16_t t);
-
+	
 protected:
 
 	byte check_day_match(time_t t);
@@ -115,10 +115,10 @@ extern OpenSprinkler os;
 
 class RuntimeQueueStruct {
 public:
-	ulong		st;	 // start time
-	uint16_t 	dur; // water time
-	byte		sid;
-	byte		pid;
+	ulong		 st;	// start time
+	uint16_t dur; // water time
+	byte	sid;
+	byte	pid;
 	ulong 		deque_time;
 };
 
