@@ -256,9 +256,16 @@ byte ProgramStruct::check_day_match(time_t t) {
 	byte dt = day_t;
 
 	// check daterange
-	int16_t curr_date_encoded = encode(month_t, day_t); 
-	if (curr_date_encoded < daterange[0] || curr_date_encoded > daterange[1]) {
-		return 0;
+	int16_t curr_date_encoded = encode(month_t, day_t);
+	if (daterange[1] > daterange[0]) {
+		if (curr_date_encoded < daterange[0] || curr_date_encoded > daterange[1]) {
+			return 0;
+		}
+	} else {
+		// Handle cases where the date range overlapps the new year
+		if (curr_date_encoded > daterange[0] && curr_date_encoded < daterange[1]) {
+			return 0;
+		}
 	}
 	
 	// check day match

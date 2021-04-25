@@ -27,7 +27,7 @@
 
 #define MAX_NUM_PROGRAMS		40		// maximum number of programs
 #define MAX_NUM_STARTTIMES	4
-#define PROGRAM_NAME_SIZE		32
+#define PROGRAM_NAME_SIZE		28
 #define RUNTIME_QUEUE_SIZE	MAX_NUM_STATIONS
 #define PROGRAMSTRUCT_SIZE	sizeof(ProgramStruct)
 #include "OpenSprinkler.h"
@@ -75,7 +75,7 @@ public:
 	byte starttime_type: 1;
 
 	// misc. data
-	byte dummy1: 1;
+	byte enable_daterange: 1;
 	
 	// weekly:	 days[0][0..6] correspond to Monday till Sunday
 	// bi-weekly:days[0][0..6] and [1][0..6] store two weeks
@@ -100,10 +100,9 @@ public:
 
 	uint16_t durations[MAX_NUM_STATIONS];  // duration / water time of each station
 
-	int16_t daterange[2]; 
-	byte enable_daterange; 
-	
 	char name[PROGRAM_NAME_SIZE];
+  
+	int16_t daterange[2];
 
 	byte check_match(time_t t);
 	int16_t starttime_decode(int16_t t);	
