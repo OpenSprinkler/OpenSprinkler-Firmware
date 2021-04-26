@@ -895,18 +895,15 @@ void server_change_program() {
 		prog.enable_daterange = atoi(tmp_buffer);	
 	}
 
-	char date_buffer[DATE_STR_LEN];
 	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("from"), true, &value_not_req)) {
-		if (!extract_date(tmp_buffer, date_buffer)) {
+		if (!extract_date(tmp_buffer, &prog.daterange[0])) {
 			handle_return(HTML_DATA_FORMATERROR); 
 		}
-		prog.daterange[0] = encode_date(date_buffer); 
 	}
 	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("to"), true, &value_not_req)) {
-		if (!extract_date(tmp_buffer, date_buffer)) {
+		if (!extract_date(tmp_buffer, &prog.daterange[1])) {
 			handle_return(HTML_DATA_FORMATERROR);
 		} 
-		prog.daterange[1] = encode_date(date_buffer);
 	}
 	
 	// do a full string decoding

@@ -58,11 +58,9 @@ void urlDecode(char *);
 void peel_http_header(char*);
 
 // date range helpers
-int16_t encode_date(const char* date_str);
 void verify_date(int *month, int *day); 
-byte extract_date(char *date_str, char *date_extract);
+byte extract_date(char *date_str, int16_t *date_extract);
 int days_in_month(int month, int year); 
-byte is_digit(char c);
 
 void populate_master();
 
