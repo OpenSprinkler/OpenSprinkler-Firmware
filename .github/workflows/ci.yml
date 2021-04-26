@@ -38,4 +38,4 @@ jobs:
       # Finally, we compile towards the selected target
       - name: Compile OpenSprinkler
         run: |
-          sudo sh ./build.sh ${{ matrix.target }} -s
+          sudo sh ./build.sh ${{ matrix.target }}
