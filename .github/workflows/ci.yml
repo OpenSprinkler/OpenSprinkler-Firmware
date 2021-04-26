@@ -1,5 +1,3 @@
-# This is a basic workflow to help you get started with Actions
-
 name: CI
 
 # Controls when the action will run. 
@@ -33,14 +31,11 @@ jobs:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v2
 
-      # We then install the platform, which one will be determined
-      # dynamically by the build matrix.
       - name: Install preconditions
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential libmosquitto-dev 
-      # Finally, we compile the sketch, using the FQBN that was set
-      # in the build matrix.
+      # Finally, we compile towards the selected target
       - name: Compile OpenSprinkler
         run: |
           sh ./build.sh ${{ matrix.target }} -s
