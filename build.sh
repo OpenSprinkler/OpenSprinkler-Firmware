@@ -4,7 +4,7 @@
 COMPILER=g++
 COMPILERARGS=""
 
-while g$COMPILERARGS etopts ":s:c:a:" opt; do
+while getopts ":s:c:a:" opt; do
   case $opt in
     s)
 	  SILENT=true
