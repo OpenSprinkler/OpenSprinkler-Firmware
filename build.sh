@@ -18,6 +18,13 @@ while g$COMPILERARGS etopts ":s:c:a:" opt; do
 	  ;;
   esac
 done
+
+# Check compiler exists or fail
+$COMPILER -v
+if [[ $? -ne 0 ]] ; then
+    exit 2
+fi
+
 echo "Building OpenSprinkler..."
 
 if [ "$1" == "demo" ]; then
