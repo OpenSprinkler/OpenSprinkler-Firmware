@@ -21,8 +21,14 @@ jobs:
         target: ["ospi", "osbo", "demo"]
         include:
           - target: "ospi"
+            compiler: "arm-linux-gnueabihf-g++"
+            compiler-args: "-march=armv6 -mfpu=vfp -mfloat-abi=hard"
           - target: "osbo"
+            compiler: "arm-linux-gnueabihf-g++"
+            compiler-args: "-march=armv6 -mfpu=vfp -mfloat-abi=hard"
           - target: "demo"
+            compiler: "g++"
+            compiler-args: ""
 
     # The type of runner that the job will run on
     runs-on: ubuntu-latest
@@ -40,4 +46,4 @@ jobs:
       # Finally, we compile towards the selected target
       - name: Compile OpenSprinkler
         run: |
-          sudo ./build.sh ${{ matrix.target }} -s
+          sudo ./build.sh ${{ matrix.target }} -s -c ${{ matrix.compiler }} -a {{ matrix.compiler-args }
