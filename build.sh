@@ -37,6 +37,11 @@ else
 	$COMPILER -o OpenSprinkler -DOSPI $COMPILERARGS main.cpp OpenSprinkler.cpp program.cpp opensprinkler_server.cpp utils.cpp weather.cpp gpio.cpp etherport.cpp mqtt.cpp -lpthread -lmosquitto
 fi
 
+# Exit with errorcode 1 on compiler errors
+if [[ $? -ne 0 ]] ; then
+    exit 1
+fi
+
 if [ ! "$SILENT" = true ] && [ -f OpenSprinkler.launch ] && [ ! -f /etc/init.d/OpenSprinkler.sh ]; then
 
 	read -p "Do you want to start OpenSprinkler on startup? " -n 1 -r
