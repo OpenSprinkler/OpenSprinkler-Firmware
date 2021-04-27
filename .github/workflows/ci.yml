@@ -35,7 +35,8 @@ jobs:
       - name: Install preconditions
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential libmosquitto-dev 
+          sudo apt-get install -y build-essential libmosquitto-dev g++-arm-linux-gnueabihf gdb-multiarch
+          arm-linux-gnueabihf-gcc -v
       # Finally, we compile towards the selected target
       - name: Compile OpenSprinkler
         run: |
