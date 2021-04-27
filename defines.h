@@ -167,7 +167,6 @@ enum {
 #define NUM_SEQ_GROUPS		16
 
 // Date Range
-#define DATE_STR_LEN 		6 // "MM/DD"
 #define encode(month, day)  (month * (1 << 5) + day)
 #define MIN_ENCODED_DATE 	encode(1, 1)
 #define MAX_ENCODED_DATE 	encode(12, 31)

@@ -1405,7 +1405,6 @@ void server_change_options()
 	byte err = 0;
 	byte prev_value;
 	byte max_value;
-
 	for (byte oid=0; oid<NUM_IOPTS; oid++) {
 
 		// skip options that cannot be set through /co command
@@ -1888,7 +1887,6 @@ void server_json_all() {
 /** 
  * Command: "/pq?"
  * dur	: duration 
- * sid 	: station id 
  */
 
 void server_pause_queue() {

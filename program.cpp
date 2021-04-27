@@ -74,9 +74,7 @@ RuntimeQueueStruct* ProgramData::enqueue() {
  */
 // this removes an element from the queue
 void ProgramData::dequeue(byte qid) {
-	if (qid>=nqueue) {
-		return;
-	}
+	if (qid>=nqueue)	return;
 	if (qid<nqueue-1) {
 		queue[qid] = queue[nqueue-1]; // copy the last element to the dequeud element to fill the space
 		if(station_qid[queue[qid].sid] == nqueue-1) // fix queue index if necessary
@@ -256,18 +254,20 @@ byte ProgramStruct::check_day_match(time_t t) {
 	byte dt = day_t;
 
 	// check daterange
-	int16_t curr_date_encoded = encode(month_t, day_t);
-	if (daterange[1] > daterange[0]) {
-		if (curr_date_encoded < daterange[0] || curr_date_encoded > daterange[1]) {
-			return 0;
-		}
-	} else {
-		// Handle cases where the date range overlapps the new year
-		if (curr_date_encoded > daterange[0] && curr_date_encoded < daterange[1]) {
-			return 0;
+    if (enable_daterange) {
+		int16_t curr_date_encoded = encode(month_t, day_t);
+		if (daterange[1] > daterange[0]) {
+			if (curr_date_encoded < daterange[0] || curr_date_encoded > daterange[1]) {
+				return 0;
+			}
+		} else {
+			// Handle cases where the date range overlapps the new year
+			if (curr_date_encoded > daterange[0] && curr_date_encoded < daterange[1]) {
+				return 0;
+			}
 		}
 	}
-	
+
 	// check day match
 	switch(type) {
 		case PROGRAM_TYPE_WEEKLY:
