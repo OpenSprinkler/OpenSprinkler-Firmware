@@ -1,12 +1,19 @@
 #!/bin/bash
 
-# Default compiler
+# Default settings
 COMPILER=g++
 COMPILERARGS=""
+INSTALLPREREQ=true
+SILENT=false
 
-while getopts "sc:a:" opt; do
+while getopts "snc:a:" opt; do
   case "${opt}" in
-    s)
+    n)
+	  echo "## No Prerequisites will be installed"
+	  INSTALLPREREQ=false
+	  ;;
+	s)
+	  echo "## Silent"
 	  SILENT=true
       ;;
 	c)
@@ -28,22 +35,21 @@ if [[ $? -ne 0 ]] ; then
     exit 2
 fi
 
-echo "Building OpenSprinkler..."
+if [[ $INSTALLPREREQ -ne false ]] ; then
+	echo "## Installing required libraries..."
+	apt-get install -y libmosquitto-dev
+fi
+
+echo "## Building OpenSprinkler..."
 
 if [ "$1" == "demo" ]; then
-	echo "Installing required libraries..."
-	apt-get install -y libmosquitto-dev
-	echo "Compiling firmware..."
+	echo "## Compiling firmware DEMO..."
 	$COMPILER -o OpenSprinkler -DDEMO $COMPILERARGS -m32 main.cpp OpenSprinkler.cpp program.cpp opensprinkler_server.cpp utils.cpp weather.cpp gpio.cpp etherport.cpp mqtt.cpp -lpthread -lmosquitto
 elif [ "$1" == "osbo" ]; then
-	echo "Installing required libraries..."
-	apt-get install -y libmosquitto-dev
-	echo "Compiling firmware..."
+	echo "## Compiling firmware for OpenSprinkler OSBO..."
 	$COMPILER -o OpenSprinkler -DOSBO $COMPILERARGS main.cpp OpenSprinkler.cpp program.cpp opensprinkler_server.cpp utils.cpp weather.cpp gpio.cpp etherport.cpp mqtt.cpp -lpthread -lmosquitto
 else
-	echo "Installing required libraries..."
-	apt-get install -y libmosquitto-dev
-	echo "Compiling firmware..."
+	echo "## Compiling firmware for OpenSprinkler-PI..."
 	$COMPILER -o OpenSprinkler -DOSPI $COMPILERARGS main.cpp OpenSprinkler.cpp program.cpp opensprinkler_server.cpp utils.cpp weather.cpp gpio.cpp etherport.cpp mqtt.cpp -lpthread -lmosquitto
 fi
 
