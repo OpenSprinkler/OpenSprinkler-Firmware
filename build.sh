@@ -5,7 +5,7 @@ COMPILER=g++
 COMPILERARGS=""
 
 while getopts ":s:c:a:" opt; do
-  case $opt in
+  case "${opt}" in
     s)
 	  SILENT=true
       ;;
