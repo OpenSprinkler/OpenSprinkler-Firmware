@@ -8,16 +8,19 @@ while getopts ":s:c:a:" opt; do
   case $opt in
     s)
 	  SILENT=true
-	  command shift
       ;;
 	c)
 	  COMPILER=${OPTARG}
+	  echo "## Configured compiler ${COMPILER}"
 	  ;;
 	a)
 	  COMPILERARGS=${OPTARG}
+	  echo "## Configured compiler arguments ${COMPILERARGS}"
 	  ;;
   esac
 done
+
+shift $((OPTIND-1))  #This tells getopts to move on to the next argument.
 
 # Check compiler exists or fail
 $COMPILER -v
