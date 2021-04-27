@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Default compiler
-COMPILER=$COMPILER
+COMPILER=g++
 COMPILERARGS=""
 
 while g$COMPILERARGS etopts ":s:c:a:" opt; do
