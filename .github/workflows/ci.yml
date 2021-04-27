@@ -20,15 +20,23 @@ jobs:
       matrix:
         target: ["ospi", "osbo", "demo"]
         include:
+          # For cross compilation to ARM use the following example
+          # - target: "ospi"
+          #   compiler: "arm-linux-gnueabihf-g++"
+          #   compiler-args: "-march=armv6 -mfpu=vfp -mfloat-abi=hard"
+          #   build-packages: "g++-arm-linux-gnueabihf gdb-multiarch"
           - target: "ospi"
-            compiler: "arm-linux-gnueabihf-g++"
-            compiler-args: "-march=armv6 -mfpu=vfp -mfloat-abi=hard"
+            compiler: "g++"
+            compiler-args: ""
+            build-packages: ""
           - target: "osbo"
-            compiler: "arm-linux-gnueabihf-g++"
-            compiler-args: "-march=armv6 -mfpu=vfp -mfloat-abi=hard"
+            compiler: "g++"
+            compiler-args: ""
+            build-packages: ""
           - target: "demo"
             compiler: "g++"
             compiler-args: ""
+            build-packages: ""
 
     # The type of runner that the job will run on
     runs-on: ubuntu-latest
@@ -41,7 +49,7 @@ jobs:
       - name: Install preconditions
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential libmosquitto-dev g++-arm-linux-gnueabihf gdb-multiarch
+          sudo apt-get install -y build-essential libmosquitto-dev ${{ matrix.build-packages }}
           arm-linux-gnueabihf-gcc -v
       # Finally, we compile towards the selected target
       - name: Compile OpenSprinkler
