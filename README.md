@@ -78,3 +78,8 @@ It's also important to use a rechargeable battery LIR2332!
 Distributed under the GNU General Public License license. See [LICENSE.txt](LICENSE.txt) for more information.
 
 [https://github.com/ThFischer/OpenSprinkler-Firmware/tree/ESP-12F-4CH-Relay-Board](https://github.com/ThFischer/OpenSprinkler-Firmware/tree/ESP-12F-4CH-Relay-Board)
+
+## Update:
+Since the WiFi connectitivity was quite poor I added an [external antenna](https://www.amazon.de/gp/product/B07SSYSZM9).
+See https://www.instructables.com/External-Antenna-for-ESP8266/ for more details.
+![Eexternal antenna](ESP12F_Relay_X4/ExternalAntenna.jpg)
