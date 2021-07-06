@@ -2128,8 +2128,17 @@ ulong getNtpTime() {
 
 	#define NTP_PACKET_SIZE 48
 	#define NTP_PORT 123
-	#define NTP_NTRIES 3
-
+	#define NTP_NTRIES 10
+	#define N_PUBLIC_SERVERS 5
+	
+	static const char* public_ntp_servers[] = {
+		"time.google.com",
+		"time.nist.gov",
+		"time.windows.com",
+		"time.cloudflare.com",
+		"pool.ntp.org" };
+	static uint8_t sidx = 0;
+		
 	static byte packetBuffer[NTP_PACKET_SIZE];
 	byte ntpip[4] = {
 		os.iopts[IOPT_NTP_IP1],
@@ -2138,7 +2147,7 @@ ulong getNtpTime() {
 		os.iopts[IOPT_NTP_IP4]};
 	byte tries=0;
 	ulong gt = 0;
-	do {
+	while(tries<NTP_NTRIES) {
 		// sendNtpPacket
 		memset(packetBuffer, 0, NTP_PACKET_SIZE);
 		packetBuffer[0] = 0b11100011;		// LI, Version, Mode
@@ -2150,21 +2159,35 @@ ulong getNtpTime() {
 		packetBuffer[13]	= 0x4E;
 		packetBuffer[14]	= 49;
 		packetBuffer[15]	= 52;
-		// by default use pool.ntp.org if ntp ip is unset
+		
+		// use one of the public NTP servers if ntp ip is unset
+		
 		DEBUG_PRINT(F("ntp: "));
+		int ret;
 		if (!os.iopts[IOPT_NTP_IP1] || os.iopts[IOPT_NTP_IP1] == '0') {
-			DEBUG_PRINTLN(F("pool.ntp.org"));
-			udp->beginPacket("pool.ntp.org", NTP_PORT);
+			DEBUG_PRINT(public_ntp_servers[sidx]);
+			ret = udp->beginPacket(public_ntp_servers[sidx], NTP_PORT);
 		} else {
 			DEBUG_PRINTLN(IPAddress(ntpip[0],ntpip[1],ntpip[2],ntpip[3]));
-			udp->beginPacket(ntpip, NTP_PORT);
+			ret = udp->beginPacket(ntpip, NTP_PORT);
+		}
+		if(ret!=1) {
+			DEBUG_PRINT(F(" not available (ret: "));
+			DEBUG_PRINT(ret);
+			DEBUG_PRINTLN(")");
+			udp->stop();
+			tries++;
+			sidx=(sidx+1)%N_PUBLIC_SERVERS;
+			continue;
+		} else {
+			DEBUG_PRINTLN(F(" connected"));
 		}
 		udp->write(packetBuffer, NTP_PACKET_SIZE);
 		udp->endPacket();
 		// end of sendNtpPacket
 		
 		// process response
-		ulong timeout = millis()+1000;
+		ulong timeout = millis()+2000;
 		while(millis() < timeout) {
 			if(udp->parsePacket()) {
 				udp->read(packetBuffer, NTP_PACKET_SIZE);
@@ -2174,12 +2197,17 @@ ulong getNtpTime() {
 				ulong seventyYears = 2208988800UL;
 				ulong gt = secsSince1900 - seventyYears;
 				// check validity: has to be larger than 1/1/2020 12:00:00
-				if(gt>1577836800UL) return gt;
+				if(gt>1577836800UL) {
+					udp->stop();
+					return gt;
+				}
 			}
 		}
-		tries ++;
-	} while(tries<NTP_NTRIES);
-	if(tries==NTP_NTRIES) {DEBUG_PRINTLN(F("NTP failed"));}
+		tries++;
+		sidx=(sidx+1)%N_PUBLIC_SERVERS;
+	} 
+	if(tries==NTP_NTRIES) {DEBUG_PRINTLN(F("NTP failed!!"));}
+	udp->stop();
 	return 0;
 }
 #endif
