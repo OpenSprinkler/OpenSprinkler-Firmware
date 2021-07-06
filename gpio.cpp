@@ -77,6 +77,34 @@ void PCA9555::i2c_write(uint8_t reg, uint16_t v){
 	Wire.endTransmission();
 }
 
+void PCA9555::shift_out(uint8_t plat, uint8_t pclk, uint8_t pdat, uint8_t v) {
+	if(plat<IOEXP_PIN || pclk<IOEXP_PIN || pdat<IOEXP_PIN)
+		return;	// the definition of each pin must be offset by IOEXP_PIN to begin with
+	
+	plat-=IOEXP_PIN;
+	pclk-=IOEXP_PIN;
+	pdat-=IOEXP_PIN;
+	
+	uint16_t output = i2c_read(NXP_OUTPUT_REG); // keep a copy of the current output registers
+	
+	output &= ~(1<<plat); i2c_write(NXP_OUTPUT_REG, output); // set latch low
+
+	for(uint8_t s=0;s<8;s++) {
+		output &= ~(1<<pclk); i2c_write(NXP_OUTPUT_REG, output); // set clock low
+
+		if(v & ((byte)1<<(7-s))) {
+			output |= (1<<pdat);
+		} else {
+			output &= ~(1<<pdat);
+		}
+		i2c_write(NXP_OUTPUT_REG, output); // set data pin according to bits in v
+
+		output |= (1<<pclk); i2c_write(NXP_OUTPUT_REG, output); // set clock high
+	}
+	
+	output |= (1<<plat); i2c_write(NXP_OUTPUT_REG, output); // set latch high
+}
+
 uint16_t PCF8575::i2c_read(uint8_t reg) {
 	if(address==255)	return 0xFFFF;
 	Wire.beginTransmission(address);
