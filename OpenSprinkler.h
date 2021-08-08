@@ -224,6 +224,8 @@ public:
 	static void nvdata_save();
 
 	static void options_setup();
+	static void pre_factory_reset();
+	static void factory_reset();
 	static void iopts_load();
 	static void iopts_save();
 	static bool sopt_save(byte oid, const char *buf);

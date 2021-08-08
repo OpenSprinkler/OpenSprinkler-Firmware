@@ -53,8 +53,7 @@ void remote_http_callback(char*);
 
 // Small variations have been added to the timing values below
 // to minimize conflicting events
-#define NTP_SYNC_INTERVAL				86413L 	// NYP sync interval (in seconds)
-#define RTC_SYNC_INTERVAL				3607		// RTC sync interval (in seconds)
+#define NTP_SYNC_INTERVAL				86413L 	// NTP sync interval (in seconds)
 #define CHECK_NETWORK_INTERVAL	601			// Network checking timeout (in seconds)
 #define CHECK_WEATHER_TIMEOUT		21613L  // Weather check interval (in seconds)
 #define CHECK_WEATHER_SUCCESS_TIMEOUT 86400L // Weather check success interval (in seconds)
@@ -307,9 +306,8 @@ void do_setup() {
 
 	pd.init();						// ProgramData init
 
-	setSyncInterval(RTC_SYNC_INTERVAL);  // RTC sync interval
-	// if rtc exists, sets it as time sync source
-	setSyncProvider(RTC.get);
+	// set time using RTC if it exists
+	if(RTC.exists())	setTime(RTC.get());
 	os.lcd_print_time(os.now_tz());  // display time to LCD
 	os.powerup_lasttime = os.now_tz();
 	
@@ -443,9 +441,9 @@ void do_loop()
 				#define ENC28J60_ESTAT_LATCOL		0x10
 				#define ENC28J60_ESTAT_TXABRT		0x02
 				#define ENC28J60_ECON1_RXEN			0x04
-				uint16_t estat = Enc28J60.readReg((uint8_t) ENC28J60_ESTAT);
-				uint16_t eir = Enc28J60.readReg((uint8_t) ENC28J60_EIR);
-				uint16_t econ1 = Enc28J60.readReg((uint8_t) ENC28J60_ECON1);
+				uint16_t estat = Enc28J60Network::readReg((uint8_t) ENC28J60_ESTAT);
+				uint16_t eir = Enc28J60Network::readReg((uint8_t) ENC28J60_EIR);
+				uint16_t econ1 = Enc28J60Network::readReg((uint8_t) ENC28J60_ECON1);
 
 				os.lcd.setCursor(0,-1);
 				os.lcd.print(eir, HEX);

@@ -513,10 +513,13 @@ byte OpenSprinkler::start_ether() {
 	if(hw_rev<2) return 0;	// ethernet capability is only available after hw_rev 2
 #endif	
 	Ethernet.init(PIN_ETHER_CS);	// make sure to call this before any Ethernet calls
+	Enc28J60Network::initSPI();
 	load_hardware_mac((uint8_t*)tmp_buffer, true);
 	// detect if Enc28J60 exists
 	Enc28J60Network::init((uint8_t*)tmp_buffer);
 	uint8_t erevid = Enc28J60Network::geterevid();
+	DEBUG_PRINT(F("erevid:"));
+	DEBUG_PRINTLN(erevid);
 	// a valid chip must have erevid > 0 and < 255
 	if(erevid==0 || erevid==255) return 0;
 
@@ -1840,89 +1843,89 @@ void OpenSprinkler::switch_httpstation(HTTPStationData *data, bool turnon) {
 	send_http_request(server, atoi(port), p, remote_http_callback);
 }
 
+/** Prepare factory reset */
+void OpenSprinkler::pre_factory_reset() {
+	// for ESP8266: wipe out flash
+	#if defined(ESP8266)
+	lcd_print_line_clear_pgm(PSTR("Wiping flash.."), 0);
+	lcd_print_line_clear_pgm(PSTR("Please Wait..."), 1);
+	SPIFFS.format();
+	#else
+	// remove 'done' file as an indicator for reset
+	// todo os2.3 and ospi: delete log files and/or wipe SD card
+	remove_file(DONE_FILENAME);
+	#endif
+}
+
+/** Factory reset */
+void OpenSprinkler::factory_reset() {
+#if defined(ARDUINO)
+	lcd_print_line_clear_pgm(PSTR("Factory reset"), 0);
+	lcd_print_line_clear_pgm(PSTR("Please Wait..."), 1);
+#else
+	DEBUG_PRINT("factory reset...");
+#endif		
+
+	// 1. reset integer options (by saving default values)
+	iopts_save();
+	// reset string options by first wiping the file clean then write default values
+	memset(tmp_buffer, 0, MAX_SOPTS_SIZE);
+	for(int i=0; i<NUM_SOPTS; i++) {
+		file_write_block(SOPTS_FILENAME, tmp_buffer, (ulong)MAX_SOPTS_SIZE*i, MAX_SOPTS_SIZE);
+	}
+	for(int i=0; i<NUM_SOPTS; i++) {
+		sopt_save(i, sopts[i]);
+	}
+	
+	// 2. write default station data
+	StationData *pdata=(StationData*)tmp_buffer;
+	pdata->name[0]='S';
+	pdata->name[3]=0;
+	pdata->name[4]=0;
+	StationAttrib at;
+	memset(&at, 0, sizeof(StationAttrib));
+	at.mas=1;
+	at.seq=1;
+	pdata->attrib=at; // mas:1 seq:1
+	pdata->type=STN_TYPE_STANDARD;
+	pdata->sped[0]='0';
+	pdata->sped[1]=0;
+	for(int i=0; i<MAX_NUM_STATIONS; i++) {
+		int sid=i+1;
+		if(i<99) {
+			pdata->name[1]='0'+(sid/10); // default station name
+			pdata->name[2]='0'+(sid%10);
+		} else {
+			pdata->name[1]='0'+(sid/100);
+			pdata->name[2]='0'+((sid%100)/10);
+			pdata->name[3]='0'+(sid%10);
+		}
+		file_write_block(STATIONS_FILENAME, pdata, sizeof(StationData)*i, sizeof(StationData));
+	}
+	
+	attribs_load(); // load and repackage attrib bits (for backward compatibility)
+	
+	// 3. write non-volatile controller status
+	nvdata.reboot_cause = REBOOT_CAUSE_RESET;
+	nvdata_save();
+	last_reboot_cause = nvdata.reboot_cause;
+	
+	// 4. write program data: just need to write a program counter: 0
+	file_write_byte(PROG_FILENAME, 0, 0);
+	
+	// 5. write 'done' file
+	file_write_byte(DONE_FILENAME, 0, 1);
+}
+
 /** Setup function for options */
 void OpenSprinkler::options_setup() {
 
 	// Check reset conditions:
 	if (file_read_byte(IOPTS_FILENAME, IOPT_FW_VERSION)<219 ||	// fw version is invalid (<219)
-			!file_exists(DONE_FILENAME) ||													// done file doesn't exist
-			file_read_byte(IOPTS_FILENAME, IOPT_RESET)==0xAA)  {	 // reset flag is on
+			!file_exists(DONE_FILENAME)) {													// done file doesn't exist
 
-#if defined(ARDUINO)
-		lcd_print_line_clear_pgm(PSTR("Resetting..."), 0);
-		lcd_print_line_clear_pgm(PSTR("Please Wait..."), 1);
-#else
-		DEBUG_PRINT("resetting options...");
-#endif		
+		factory_reset();
 
-		// 0. remove existing files
-		if(file_read_byte(IOPTS_FILENAME, IOPT_RESET)==0xAA) {
-			// this is an explicit reset request, simply perform a format
-			#if defined(ESP8266)
-			SPIFFS.format();
-			#else
-			// todo future: delete log files
-			#endif
-		}
-
-		remove_file(DONE_FILENAME);
-		/*remove_file(IOPTS_FILENAME);
-		remove_file(SOPTS_FILENAME);
-		remove_file(STATIONS_FILENAME);
-		remove_file(NVCON_FILENAME);
-		remove_file(PROG_FILENAME);*/
-
-		// 1. write all options
-		iopts_save();
-		// wipe out sopts file first
-		memset(tmp_buffer, 0, MAX_SOPTS_SIZE);
-		for(int i=0; i<NUM_SOPTS; i++) {
-			file_write_block(SOPTS_FILENAME, tmp_buffer, (ulong)MAX_SOPTS_SIZE*i, MAX_SOPTS_SIZE);
-		}
-		// write string options 
-		for(int i=0; i<NUM_SOPTS; i++) {
-			sopt_save(i, sopts[i]);
-		}
-		
-		// 2. write station data
-		StationData *pdata=(StationData*)tmp_buffer;
-		pdata->name[0]='S';
-		pdata->name[3]=0;
-		pdata->name[4]=0;
-		StationAttrib at;
-		memset(&at, 0, sizeof(StationAttrib));
-		at.mas=1;
-		at.seq=1;
-		pdata->attrib=at; // mas:1 seq:1
-		pdata->type=STN_TYPE_STANDARD;
-		pdata->sped[0]='0';
-		pdata->sped[1]=0;
-		for(int i=0; i<MAX_NUM_STATIONS; i++) {
-			int sid=i+1;
-			if(i<99) {
-				pdata->name[1]='0'+(sid/10); // default station name
-				pdata->name[2]='0'+(sid%10);
-			} else {
-				pdata->name[1]='0'+(sid/100);
-				pdata->name[2]='0'+((sid%100)/10);
-				pdata->name[3]='0'+(sid%10);
-			}
-			file_write_block(STATIONS_FILENAME, pdata, sizeof(StationData)*i, sizeof(StationData));
-		}
-		
-		attribs_load(); // load and repackage attrib bits (for backward compatibility)
-		
-		// 3. write non-volatile controller status
-		nvdata.reboot_cause = REBOOT_CAUSE_RESET;
-		nvdata_save();
-		last_reboot_cause = nvdata.reboot_cause;
-		
-		// 4. write program data: just need to write a program counter: 0
-		file_write_byte(PROG_FILENAME, 0, 0);
-		
-		// 5. write 'done' file
-		file_write_byte(DONE_FILENAME, 0, 1);
-		
 	} else	{
 
 		iopts_load();
@@ -1946,7 +1949,8 @@ void OpenSprinkler::options_setup() {
 		// if BUTTON_1 is pressed during startup, go to 'reset all options'
 		ui_set_options(IOPT_RESET);
 		if (iopts[IOPT_RESET]) {
-			reboot_dev(REBOOT_CAUSE_NONE);
+			pre_factory_reset();
+			reboot_dev(REBOOT_CAUSE_RESET);
 		}
 		break;
 
@@ -1987,7 +1991,8 @@ void OpenSprinkler::options_setup() {
 		lcd.clear();
 		ui_set_options(0);
 		if (iopts[IOPT_RESET]) {
-			reboot_dev(REBOOT_CAUSE_NONE);
+			pre_factory_reset();
+			reboot_dev(REBOOT_CAUSE_RESET);
 		}
 		break;
 	}
@@ -2502,10 +2507,6 @@ void OpenSprinkler::ui_set_options(int oid)
 		case BUTTON_3:
 			if (!(button & BUTTON_FLAG_DOWN)) break;
 			if (button & BUTTON_FLAG_HOLD) {
-				// if IOPT_RESET is set to nonzero, change it to reset condition value
-				if (iopts[IOPT_RESET]) {
-					iopts[IOPT_RESET] = 0xAA;
-				}
 				// long press, save options
 				iopts_save();
 				finished = true;

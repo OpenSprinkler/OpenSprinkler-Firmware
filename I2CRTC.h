@@ -24,6 +24,7 @@ class I2CRTC
 	static void read(tmElements_t &tm);
 	static void write(tmElements_t &tm);
 	static bool detect();
+	static bool exists();
 	
 	private:
 	static uint8_t dec2bcd(uint8_t num);
