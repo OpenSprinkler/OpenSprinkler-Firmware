@@ -902,7 +902,7 @@ void server_change_program() {
 	}
 
 	// process interval day remainder (relative-> absolute)
-	if (prog.type == PROGRAM_TYPE_INTERVAL && prog.days[1] > 1) {
+	if (prog.type == PROGRAM_TYPE_INTERVAL && prog.days[1] >= 1) {
 		pd.drem_to_absolute(prog.days);
 	}
 
@@ -1000,7 +1000,7 @@ void server_json_programs_main() {
 	ProgramStruct prog;
 	for(pid=0;pid<pd.nprograms;pid++) {
 		pd.read(pid, &prog);
-		if (prog.type == PROGRAM_TYPE_INTERVAL && prog.days[1] > 1) {
+		if (prog.type == PROGRAM_TYPE_INTERVAL && prog.days[1] >= 1) {
 			pd.drem_to_relative(prog.days);
 		}
 
