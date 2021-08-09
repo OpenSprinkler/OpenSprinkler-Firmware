@@ -341,7 +341,6 @@ private:
 // todo
 #if defined(ARDUINO)
 	extern EthernetServer *m_server;
-	extern UDP *udp;  
 	#if defined(ESP8266)
 	extern ESP8266WebServer *wifi_server;
 	#endif

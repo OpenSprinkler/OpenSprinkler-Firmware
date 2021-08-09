@@ -2126,6 +2126,16 @@ ulong getNtpTime() {
 	// only proceed if we are connected
 	if(!os.network_connected()) return 0;
 
+	uint16_t port = (uint16_t)(os.iopts[IOPT_HTTPPORT_1]<<8) + (uint16_t)os.iopts[IOPT_HTTPPORT_0];
+	port = (port==8000) ? 8888:8000; // use a different port than http port
+	UDP *udp = NULL;
+	#if defined(ESP8266)
+		if(m_server) udp = new EthernetUDP();
+		else udp = new WiFiUDP();
+	#else
+		udp = new EthernetUDP();
+	#endif
+
 	#define NTP_PACKET_SIZE 48
 	#define NTP_PORT 123
 	#define NTP_NTRIES 10
@@ -2149,6 +2159,8 @@ ulong getNtpTime() {
 	ulong gt = 0;
 	while(tries<NTP_NTRIES) {
 		// sendNtpPacket
+		udp->begin(port);
+
 		memset(packetBuffer, 0, NTP_PACKET_SIZE);
 		packetBuffer[0] = 0b11100011;		// LI, Version, Mode
 		packetBuffer[1] = 0;		 // Stratum, or type of clock
@@ -2199,15 +2211,18 @@ ulong getNtpTime() {
 				// check validity: has to be larger than 1/1/2020 12:00:00
 				if(gt>1577836800UL) {
 					udp->stop();
+					delete udp;
 					return gt;
 				}
 			}
 		}
 		tries++;
+		udp->stop();
 		sidx=(sidx+1)%N_PUBLIC_SERVERS;
 	} 
 	if(tries==NTP_NTRIES) {DEBUG_PRINTLN(F("NTP failed!!"));}
 	udp->stop();
+	delete udp;
 	return 0;
 }
 #endif

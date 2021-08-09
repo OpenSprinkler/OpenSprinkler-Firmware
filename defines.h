@@ -106,6 +106,7 @@ typedef unsigned long ulong;
 #define REBOOT_CAUSE_WEATHER_FAIL 8
 #define REBOOT_CAUSE_NETWORK_FAIL 9
 #define REBOOT_CAUSE_NTP          10
+#define REBOOT_CAUSE_PROGRAM			11
 #define REBOOT_CAUSE_POWERON      99
 
 

@@ -32,7 +32,6 @@
 #if defined(ARDUINO)
 	EthernetServer *m_server = NULL;
 	EthernetClient *m_client = NULL;
-	UDP	*udp = NULL;
 	#if defined(ESP8266)
 		ESP8266WebServer *wifi_server = NULL;
 		static uint16_t led_blink_ms = LED_FAST_BLINK;
@@ -385,6 +384,7 @@ void turn_off_station(byte sid, ulong curr_time);
 void process_dynamic_events(ulong curr_time);
 void check_network();
 void check_weather();
+bool process_special_program_command(const char*);
 void perform_ntp_sync();
 void delete_log(char *name);
 
@@ -734,6 +734,9 @@ void do_loop()
 				pd.read(pid, &prog);	// todo future: reduce load time
 				if(prog.check_match(curr_time)) {
 					// program match found
+					// check and process special program command
+					if(process_special_program_command(prog.name))	continue;
+					
 					// process all selected stations
 					for(sid=0;sid<os.nstations;sid++) {
 						bid=sid>>3;
@@ -1032,6 +1035,18 @@ void do_loop()
 	#if !defined(ARDUINO)
 		delay(1); // For OSPI/OSBO/LINUX, sleep 1 ms to minimize CPU usage
 	#endif
+}
+
+/** Check and process special program command */
+bool process_special_program_command(const char* pname) {
+	if(pname[0]==':') {	// special command start with :
+		if(strncmp(pname, ":>reboot", 8) == 0) {
+			reboot_timer = millis()+90000; // set a timer to reboot in 90 seconds
+			// this is to avoid the same command being executed again right after reboot
+			return true;
+		}
+	}
+	return false;
 }
 
 /** Make weather query */

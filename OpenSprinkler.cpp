@@ -470,14 +470,13 @@ byte OpenSprinkler::start_network() {
 	lcd_print_line_clear_pgm(PSTR("Starting..."), 1);
 	uint16_t httpport = (uint16_t)(iopts[IOPT_HTTPPORT_1]<<8) + (uint16_t)iopts[IOPT_HTTPPORT_0];
 	if(m_server)	{ delete m_server; m_server = NULL; }
-	if(udp) { delete udp; udp = NULL; }
 	
 	if (start_ether()) {
 		m_server = new EthernetServer(httpport);
 		m_server->begin();
 
-		udp = new EthernetUDP();
-		udp->begin((httpport==8000) ? 8888 : 8000); // start udp on a different port than httpport
+		//udp = new EthernetUDP();
+		//udp->begin((httpport==8000) ? 8888 : 8000); // start udp on a different port than httpport
 
 #if defined(ESP8266)
 		// turn off WiFi when ether is active
@@ -497,8 +496,8 @@ byte OpenSprinkler::start_network() {
 			wifi_server = new ESP8266WebServer(httpport);
 		}
 
-		udp = new WiFiUDP();
-		udp->begin((httpport==8000) ? 8888 : 8000); // start udp on a different port than httpport
+		//udp = new WiFiUDP();
+		//udp->begin((httpport==8000) ? 8888 : 8000); // start udp on a different port than httpport
 
 		return 1;
 #endif
