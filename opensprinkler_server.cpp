@@ -1376,13 +1376,11 @@ void server_change_options()
 	}
 	uint8_t keyfound = 0;
 	if(findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("wto"), true)) {
-		DEBUG_PRINT(F("wto:"));
-		DEBUG_PRINTLN(tmp_buffer);
 		urlDecode(tmp_buffer);
-		DEBUG_PRINTLN(tmp_buffer);
 		if (os.sopt_save(SOPT_WEATHER_OPTS, tmp_buffer)) {
 			weather_change = true;	// if wto has changed
 		}
+		DEBUG_PRINTLN(os.sopt_load(SOPT_WEATHER_OPTS));
 	}
 	
 	keyfound = 0;

@@ -80,6 +80,8 @@ ulong flow_count = 0;
 byte prev_flow_state = HIGH;
 float flow_last_gpm=0;
 
+unsigned long reboot_timer = 0;
+
 void flow_poll() {
 	#if defined(ESP8266)
 	if(os.hw_rev == 2) pinModeExt(PIN_SENSOR1, INPUT_PULLUP); // this seems necessary for OS 3.2 
@@ -391,7 +393,6 @@ void delete_log(char *name);
 #if defined(ESP8266)
 void start_server_ap();
 void start_server_client();
-unsigned long reboot_timer = 0;
 #endif
 
 void handle_web_request(char *p);
@@ -644,11 +645,9 @@ void do_loop()
 		last_time = curr_time;
 		if (os.button_timeout) os.button_timeout--;
 		
-		#if defined(ESP8266)
 		if(reboot_timer && millis() > reboot_timer) {
 			os.reboot_dev(REBOOT_CAUSE_TIMER);
 		}
-		#endif
 			
 #if defined(ARDUINO)
 		if (!ui_state)
