@@ -35,7 +35,7 @@
 	#include <Arduino.h>
 	#include <Wire.h>
 	#include <SPI.h>
-	#include <UIPEthernet.h>
+	#include <Ethernet.h>
 	#include "I2CRTC.h"
 
 	#if defined(ESP8266)
@@ -293,8 +293,6 @@ public:
 																					// return values are 'OR'ed with flags
 																					// check defines.h for details
 
-	static void yield_nicely();
-	static void delay_nicely(uint32_t ms);
 	// -- UI functions --
 	static void ui_set_options(int oid);		// ui for setting options (oid-> starting option index)
 	static void lcd_set_brightness(byte value=1);

@@ -512,15 +512,8 @@ byte OpenSprinkler::start_ether() {
 	if(hw_rev<2) return 0;	// ethernet capability is only available after hw_rev 2
 #endif	
 	Ethernet.init(PIN_ETHER_CS);	// make sure to call this before any Ethernet calls
-	Enc28J60Network::initSPI();
+	if(Ethernet.hardwareStatus()==EthernetNoHardware) return 0;
 	load_hardware_mac((uint8_t*)tmp_buffer, true);
-	// detect if Enc28J60 exists
-	Enc28J60Network::init((uint8_t*)tmp_buffer);
-	uint8_t erevid = Enc28J60Network::geterevid();
-	DEBUG_PRINT(F("erevid:"));
-	DEBUG_PRINTLN(erevid);
-	// a valid chip must have erevid > 0 and < 255
-	if(erevid==0 || erevid==255) return 0;
 
 	lcd_print_line_clear_pgm(PSTR("Start wired link"), 1);
 	
@@ -1111,7 +1104,7 @@ void OpenSprinkler::apply_all_station_bits() {
 			// for DC controller: boost voltage and enable output path
 			digitalWriteExt(PIN_BOOST_EN, LOW);  // disfable output path
 			digitalWriteExt(PIN_BOOST, HIGH);		 // enable boost converter
-			delay_nicely((int)iopts[IOPT_BOOST_TIME]<<2);	// wait for booster to charge
+			delay((int)iopts[IOPT_BOOST_TIME]<<2);	// wait for booster to charge
 			digitalWriteExt(PIN_BOOST, LOW);		 // disable boost converter
 			digitalWriteExt(PIN_BOOST_EN, HIGH); // enable output path
 			engage_booster = 0;
@@ -1169,7 +1162,7 @@ void OpenSprinkler::apply_all_station_bits() {
 		// for DC controller: boost voltage
 		digitalWrite(PIN_BOOST_EN, LOW);	// disable output path
 		digitalWrite(PIN_BOOST, HIGH);		// enable boost converter
-		delay_nicely((int)iopts[IOPT_BOOST_TIME]<<2);	// wait for booster to charge
+		delay((int)iopts[IOPT_BOOST_TIME]<<2);	// wait for booster to charge
 		digitalWrite(PIN_BOOST, LOW);			// disable boost converter
 
 		digitalWrite(PIN_BOOST_EN, HIGH); // enable output path
@@ -1336,7 +1329,7 @@ uint16_t OpenSprinkler::read_current() {
 		uint16_t sum = 0;
 		for(byte i=0;i<K;i++) {
 			sum += analogRead(PIN_CURR_SENSE);
-			delay_nicely(1);
+			delay(1);
 		}
 		return (uint16_t)((sum/K)*scale);
 	} else {
@@ -2409,22 +2402,6 @@ void OpenSprinkler::lcd_print_option(int i) {
 	
 }
 
-void OpenSprinkler::yield_nicely() {
-	if(m_server) Ethernet.tick();
-#if defined(ESP8266)
-	delay(0);
-#endif	
-}
-
-/** A delay function that does not stall Ethernet or WiFi */
-void OpenSprinkler::delay_nicely(uint32_t ms) {
-	uint32_t start = millis();
-	do {
-		//yield_nicely();
-		delay(1);
-	} while(millis()-start < ms);
-}
-
 /** Button functions */
 /** wait for button */
 byte OpenSprinkler::button_read_busy(byte pin_butt, byte waitmode, byte butt, byte is_holding) {
@@ -2438,7 +2415,7 @@ byte OpenSprinkler::button_read_busy(byte pin_butt, byte waitmode, byte butt, by
 
 	while (digitalReadExt(pin_butt) == 0 &&
 				 (waitmode == BUTTON_WAIT_RELEASE || (waitmode == BUTTON_WAIT_HOLD && hold_time<BUTTON_HOLD_MS))) {
-		delay_nicely(BUTTON_DELAY_MS);
+		delay(BUTTON_DELAY_MS);
 		hold_time += BUTTON_DELAY_MS;
 	}
 	if (is_holding || hold_time >= BUTTON_HOLD_MS)
@@ -2454,7 +2431,7 @@ byte OpenSprinkler::button_read(byte waitmode)
 	byte curr = BUTTON_NONE;
 	byte is_holding = (old&BUTTON_FLAG_HOLD);
 
-	delay_nicely(BUTTON_DELAY_MS);
+	delay(BUTTON_DELAY_MS);
 
 	if (digitalReadExt(PIN_BUTTON_1) == 0) {
 		curr = button_read_busy(PIN_BUTTON_1, waitmode, BUTTON_1, is_holding);
