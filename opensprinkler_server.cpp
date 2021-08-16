@@ -1380,7 +1380,7 @@ void server_change_options()
 		if (os.sopt_save(SOPT_WEATHER_OPTS, tmp_buffer)) {
 			weather_change = true;	// if wto has changed
 		}
-		DEBUG_PRINTLN(os.sopt_load(SOPT_WEATHER_OPTS));
+		//DEBUG_PRINTLN(os.sopt_load(SOPT_WEATHER_OPTS));
 	}
 	
 	keyfound = 0;
