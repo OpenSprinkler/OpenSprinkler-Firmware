@@ -1188,7 +1188,7 @@ void server_change_values()
 {
 #if defined(ESP8266)
 	char *p = NULL;
-	extern unsigned long reboot_timer;
+	extern uint32_t reboot_timer;
 	if(!process_password()) return;
 	if (m_client)
 		p = get_buffer;  
@@ -1207,7 +1207,8 @@ void server_change_values()
 
 	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("rbt"), true) && atoi(tmp_buffer) > 0) {
 		#if defined(ESP8266)
-			reboot_timer = millis() + 1000;
+			os.status.safe_reboot = 0;
+			reboot_timer = os.now_tz() + 2;
 			handle_return(HTML_SUCCESS);
 		#else
 			print_html_standard_header();

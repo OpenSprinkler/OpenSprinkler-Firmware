@@ -80,7 +80,7 @@ ulong flow_count = 0;
 byte prev_flow_state = HIGH;
 float flow_last_gpm=0;
 
-unsigned long reboot_timer = 0;
+uint32_t reboot_timer = 0;
 
 void flow_poll() {
 	#if defined(ESP8266)
@@ -386,7 +386,7 @@ void turn_off_station(byte sid, ulong curr_time);
 void process_dynamic_events(ulong curr_time);
 void check_network();
 void check_weather();
-bool process_special_program_command(const char*);
+bool process_special_program_command(const char*, uint32_t curr_time);
 void perform_ntp_sync();
 void delete_log(char *name);
 
@@ -644,11 +644,7 @@ void do_loop()
 		
 		last_time = curr_time;
 		if (os.button_timeout) os.button_timeout--;
-		
-		if(reboot_timer && millis() > reboot_timer) {
-			os.reboot_dev(REBOOT_CAUSE_TIMER);
-		}
-			
+
 #if defined(ARDUINO)
 		if (!ui_state)
 			os.lcd_print_time(os.now_tz());				// print time
@@ -734,7 +730,7 @@ void do_loop()
 				if(prog.check_match(curr_time)) {
 					// program match found
 					// check and process special program command
-					if(process_special_program_command(prog.name))	continue;
+					if(process_special_program_command(prog.name, curr_time))	continue;
 					
 					// process all selected stations
 					for(sid=0;sid<os.nstations;sid++) {
@@ -971,8 +967,11 @@ void do_loop()
 			#endif
 		}
 		
+#endif		
+		
+		// handle reboot request
 		// check safe_reboot condition
-		if (os.status.safe_reboot) {
+		if (os.status.safe_reboot && (curr_time > reboot_timer)) {
 			// if no program is running at the moment
 			if (!os.status.program_busy) {
 				// and if no program is scheduled to run in the next minute
@@ -988,8 +987,9 @@ void do_loop()
 					os.reboot_dev(os.nvdata.reboot_cause);
 				}
 			}
+		} else if(reboot_timer && (curr_time > reboot_timer)) {
+			os.reboot_dev(REBOOT_CAUSE_TIMER);		
 		}
-#endif
 
 		// real-time flow count
 		static ulong flowcount_rt_start = 0;
@@ -1037,10 +1037,16 @@ void do_loop()
 }
 
 /** Check and process special program command */
-bool process_special_program_command(const char* pname) {
+bool process_special_program_command(const char* pname, uint32_t curr_time) {
 	if(pname[0]==':') {	// special command start with :
-		if(strncmp(pname, ":>reboot", 8) == 0) {
-			reboot_timer = millis()+90000; // set a timer to reboot in 90 seconds
+		if(strncmp(pname, ":>reboot_now", 12) == 0) {
+			os.status.safe_reboot = 0; // reboot regardless of program status
+			reboot_timer = curr_time + 65; // set a timer to reboot in 65 seconds
+			// this is to avoid the same command being executed again right after reboot
+			return true;
+		} else if(strncmp(pname, ":>reboot", 8) == 0) {
+			os.status.safe_reboot = 1; // by default reboot should only happen when controller is idle
+			reboot_timer = curr_time + 65; // set a timer to reboot in 65 seconds
 			// this is to avoid the same command being executed again right after reboot
 			return true;
 		}
