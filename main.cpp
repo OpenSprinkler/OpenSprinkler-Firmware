@@ -32,7 +32,6 @@
 #if defined(ARDUINO)
 	EthernetServer *m_server = NULL;
 	EthernetClient *m_client = NULL;
-	UDP	*udp = NULL;
 	#if defined(ESP8266)
 		ESP8266WebServer *wifi_server = NULL;
 		static uint16_t led_blink_ms = LED_FAST_BLINK;
@@ -53,8 +52,7 @@ void remote_http_callback(char*);
 
 // Small variations have been added to the timing values below
 // to minimize conflicting events
-#define NTP_SYNC_INTERVAL				86413L 	// NYP sync interval (in seconds)
-#define RTC_SYNC_INTERVAL				3607		// RTC sync interval (in seconds)
+#define NTP_SYNC_INTERVAL				86413L 	// NTP sync interval (in seconds)
 #define CHECK_NETWORK_INTERVAL	601			// Network checking timeout (in seconds)
 #define CHECK_WEATHER_TIMEOUT		21613L  // Weather check interval (in seconds)
 #define CHECK_WEATHER_SUCCESS_TIMEOUT 86400L // Weather check success interval (in seconds)
@@ -81,6 +79,8 @@ ulong flow_begin, flow_start, flow_stop, flow_gallons;
 ulong flow_count = 0;
 byte prev_flow_state = HIGH;
 float flow_last_gpm=0;
+
+uint32_t reboot_timer = 0;
 
 void flow_poll() {
 	#if defined(ESP8266)
@@ -125,7 +125,7 @@ bool ui_confirm(PGM_P str) {
 		button = os.button_read(BUTTON_WAIT_NONE);
 		if((button&BUTTON_MASK)==BUTTON_3 && (button&BUTTON_FLAG_DOWN)) return true;
 		if((button&BUTTON_MASK)==BUTTON_1 && (button&BUTTON_FLAG_DOWN)) return false;
-		os.delay_nicely(10);
+		delay(10);
 	} while(millis() - start < 2500);
 	return false;
 }
@@ -307,9 +307,8 @@ void do_setup() {
 
 	pd.init();						// ProgramData init
 
-	setSyncInterval(RTC_SYNC_INTERVAL);  // RTC sync interval
-	// if rtc exists, sets it as time sync source
-	setSyncProvider(RTC.get);
+	// set time using RTC if it exists
+	if(RTC.exists())	setTime(RTC.get());
 	os.lcd_print_time(os.now_tz());  // display time to LCD
 	os.powerup_lasttime = os.now_tz();
 	
@@ -387,13 +386,13 @@ void turn_off_station(byte sid, ulong curr_time);
 void process_dynamic_events(ulong curr_time);
 void check_network();
 void check_weather();
+bool process_special_program_command(const char*, uint32_t curr_time);
 void perform_ntp_sync();
 void delete_log(char *name);
 
 #if defined(ESP8266)
 void start_server_ap();
 void start_server_client();
-unsigned long reboot_timer = 0;
 #endif
 
 void handle_web_request(char *p);
@@ -443,9 +442,9 @@ void do_loop()
 				#define ENC28J60_ESTAT_LATCOL		0x10
 				#define ENC28J60_ESTAT_TXABRT		0x02
 				#define ENC28J60_ECON1_RXEN			0x04
-				uint16_t estat = Enc28J60.readReg((uint8_t) ENC28J60_ESTAT);
-				uint16_t eir = Enc28J60.readReg((uint8_t) ENC28J60_EIR);
-				uint16_t econ1 = Enc28J60.readReg((uint8_t) ENC28J60_ECON1);
+				uint16_t estat = Enc28J60Network::readReg((uint8_t) ENC28J60_ESTAT);
+				uint16_t eir = Enc28J60Network::readReg((uint8_t) ENC28J60_EIR);
+				uint16_t econ1 = Enc28J60Network::readReg((uint8_t) ENC28J60_ECON1);
 
 				os.lcd.setCursor(0,-1);
 				os.lcd.print(eir, HEX);
@@ -645,13 +644,7 @@ void do_loop()
 		
 		last_time = curr_time;
 		if (os.button_timeout) os.button_timeout--;
-		
-		#if defined(ESP8266)
-		if(reboot_timer && millis() > reboot_timer) {
-			os.reboot_dev(REBOOT_CAUSE_TIMER);
-		}
-		#endif
-			
+
 #if defined(ARDUINO)
 		if (!ui_state)
 			os.lcd_print_time(os.now_tz());				// print time
@@ -736,6 +729,9 @@ void do_loop()
 				pd.read(pid, &prog);	// todo future: reduce load time
 				if(prog.check_match(curr_time)) {
 					// program match found
+					// check and process special program command
+					if(process_special_program_command(prog.name, curr_time))	continue;
+					
 					// process all selected stations
 					for(sid=0;sid<os.nstations;sid++) {
 						bid=sid>>3;
@@ -971,8 +967,11 @@ void do_loop()
 			#endif
 		}
 		
+#endif		
+		
+		// handle reboot request
 		// check safe_reboot condition
-		if (os.status.safe_reboot) {
+		if (os.status.safe_reboot && (curr_time > reboot_timer)) {
 			// if no program is running at the moment
 			if (!os.status.program_busy) {
 				// and if no program is scheduled to run in the next minute
@@ -988,8 +987,9 @@ void do_loop()
 					os.reboot_dev(os.nvdata.reboot_cause);
 				}
 			}
+		} else if(reboot_timer && (curr_time > reboot_timer)) {
+			os.reboot_dev(REBOOT_CAUSE_TIMER);		
 		}
-#endif
 
 		// real-time flow count
 		static ulong flowcount_rt_start = 0;
@@ -1034,6 +1034,24 @@ void do_loop()
 	#if !defined(ARDUINO)
 		delay(1); // For OSPI/OSBO/LINUX, sleep 1 ms to minimize CPU usage
 	#endif
+}
+
+/** Check and process special program command */
+bool process_special_program_command(const char* pname, uint32_t curr_time) {
+	if(pname[0]==':') {	// special command start with :
+		if(strncmp(pname, ":>reboot_now", 12) == 0) {
+			os.status.safe_reboot = 0; // reboot regardless of program status
+			reboot_timer = curr_time + 65; // set a timer to reboot in 65 seconds
+			// this is to avoid the same command being executed again right after reboot
+			return true;
+		} else if(strncmp(pname, ":>reboot", 8) == 0) {
+			os.status.safe_reboot = 1; // by default reboot should only happen when controller is idle
+			reboot_timer = curr_time + 65; // set a timer to reboot in 65 seconds
+			// this is to avoid the same command being executed again right after reboot
+			return true;
+		}
+	}
+	return false;
 }
 
 /** Make weather query */

@@ -902,7 +902,7 @@ void server_change_program() {
 	}
 
 	// process interval day remainder (relative-> absolute)
-	if (prog.type == PROGRAM_TYPE_INTERVAL && prog.days[1] > 1) {
+	if (prog.type == PROGRAM_TYPE_INTERVAL && prog.days[1] >= 1) {
 		pd.drem_to_absolute(prog.days);
 	}
 
@@ -1000,7 +1000,7 @@ void server_json_programs_main() {
 	ProgramStruct prog;
 	for(pid=0;pid<pd.nprograms;pid++) {
 		pd.read(pid, &prog);
-		if (prog.type == PROGRAM_TYPE_INTERVAL && prog.days[1] > 1) {
+		if (prog.type == PROGRAM_TYPE_INTERVAL && prog.days[1] >= 1) {
 			pd.drem_to_relative(prog.days);
 		}
 
@@ -1188,7 +1188,7 @@ void server_change_values()
 {
 #if defined(ESP8266)
 	char *p = NULL;
-	extern unsigned long reboot_timer;
+	extern uint32_t reboot_timer;
 	if(!process_password()) return;
 	if (m_client)
 		p = get_buffer;  
@@ -1207,7 +1207,8 @@ void server_change_values()
 
 	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("rbt"), true) && atoi(tmp_buffer) > 0) {
 		#if defined(ESP8266)
-			reboot_timer = millis() + 1000;
+			os.status.safe_reboot = 0;
+			reboot_timer = os.now_tz() + 2;
 			handle_return(HTML_SUCCESS);
 		#else
 			print_html_standard_header();
@@ -1380,6 +1381,7 @@ void server_change_options()
 		if (os.sopt_save(SOPT_WEATHER_OPTS, tmp_buffer)) {
 			weather_change = true;	// if wto has changed
 		}
+		//DEBUG_PRINTLN(os.sopt_load(SOPT_WEATHER_OPTS));
 	}
 	
 	keyfound = 0;
@@ -2126,10 +2128,29 @@ ulong getNtpTime() {
 	// only proceed if we are connected
 	if(!os.network_connected()) return 0;
 
+	uint16_t port = (uint16_t)(os.iopts[IOPT_HTTPPORT_1]<<8) + (uint16_t)os.iopts[IOPT_HTTPPORT_0];
+	port = (port==8000) ? 8888:8000; // use a different port than http port
+	UDP *udp = NULL;
+	#if defined(ESP8266)
+		if(m_server) udp = new EthernetUDP();
+		else udp = new WiFiUDP();
+	#else
+		udp = new EthernetUDP();
+	#endif
+
 	#define NTP_PACKET_SIZE 48
 	#define NTP_PORT 123
-	#define NTP_NTRIES 3
-
+	#define NTP_NTRIES 10
+	#define N_PUBLIC_SERVERS 5
+	
+	static const char* public_ntp_servers[] = {
+		"time.google.com",
+		"time.nist.gov",
+		"time.windows.com",
+		"time.cloudflare.com",
+		"pool.ntp.org" };
+	static uint8_t sidx = 0;
+		
 	static byte packetBuffer[NTP_PACKET_SIZE];
 	byte ntpip[4] = {
 		os.iopts[IOPT_NTP_IP1],
@@ -2138,8 +2159,10 @@ ulong getNtpTime() {
 		os.iopts[IOPT_NTP_IP4]};
 	byte tries=0;
 	ulong gt = 0;
-	do {
+	while(tries<NTP_NTRIES) {
 		// sendNtpPacket
+		udp->begin(port);
+
 		memset(packetBuffer, 0, NTP_PACKET_SIZE);
 		packetBuffer[0] = 0b11100011;		// LI, Version, Mode
 		packetBuffer[1] = 0;		 // Stratum, or type of clock
@@ -2150,21 +2173,35 @@ ulong getNtpTime() {
 		packetBuffer[13]	= 0x4E;
 		packetBuffer[14]	= 49;
 		packetBuffer[15]	= 52;
-		// by default use pool.ntp.org if ntp ip is unset
+		
+		// use one of the public NTP servers if ntp ip is unset
+		
 		DEBUG_PRINT(F("ntp: "));
+		int ret;
 		if (!os.iopts[IOPT_NTP_IP1] || os.iopts[IOPT_NTP_IP1] == '0') {
-			DEBUG_PRINTLN(F("pool.ntp.org"));
-			udp->beginPacket("pool.ntp.org", NTP_PORT);
+			DEBUG_PRINT(public_ntp_servers[sidx]);
+			ret = udp->beginPacket(public_ntp_servers[sidx], NTP_PORT);
 		} else {
 			DEBUG_PRINTLN(IPAddress(ntpip[0],ntpip[1],ntpip[2],ntpip[3]));
-			udp->beginPacket(ntpip, NTP_PORT);
+			ret = udp->beginPacket(ntpip, NTP_PORT);
+		}
+		if(ret!=1) {
+			DEBUG_PRINT(F(" not available (ret: "));
+			DEBUG_PRINT(ret);
+			DEBUG_PRINTLN(")");
+			udp->stop();
+			tries++;
+			sidx=(sidx+1)%N_PUBLIC_SERVERS;
+			continue;
+		} else {
+			DEBUG_PRINTLN(F(" connected"));
 		}
 		udp->write(packetBuffer, NTP_PACKET_SIZE);
 		udp->endPacket();
 		// end of sendNtpPacket
 		
 		// process response
-		ulong timeout = millis()+1000;
+		ulong timeout = millis()+2000;
 		while(millis() < timeout) {
 			if(udp->parsePacket()) {
 				udp->read(packetBuffer, NTP_PACKET_SIZE);
@@ -2174,12 +2211,20 @@ ulong getNtpTime() {
 				ulong seventyYears = 2208988800UL;
 				ulong gt = secsSince1900 - seventyYears;
 				// check validity: has to be larger than 1/1/2020 12:00:00
-				if(gt>1577836800UL) return gt;
+				if(gt>1577836800UL) {
+					udp->stop();
+					delete udp;
+					return gt;
+				}
 			}
 		}
-		tries ++;
-	} while(tries<NTP_NTRIES);
-	if(tries==NTP_NTRIES) {DEBUG_PRINTLN(F("NTP failed"));}
+		tries++;
+		udp->stop();
+		sidx=(sidx+1)%N_PUBLIC_SERVERS;
+	} 
+	if(tries==NTP_NTRIES) {DEBUG_PRINTLN(F("NTP failed!!"));}
+	udp->stop();
+	delete udp;
 	return 0;
 }
 #endif
