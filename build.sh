@@ -23,6 +23,7 @@ elif [ "$1" == "osbo" ]; then
 else
 	echo "Installing required libraries..."
 	apt-get install -y libmosquitto-dev
+	apt-get install -y wiringpi
 	echo "Compiling firmware..."
 	g++ -o OpenSprinkler -DOSPI main.cpp OpenSprinkler.cpp program.cpp opensprinkler_server.cpp utils.cpp weather.cpp gpio.cpp etherport.cpp mqtt.cpp -lpthread -lmosquitto
 fi
