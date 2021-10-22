@@ -42,7 +42,7 @@ It's also important to use a rechargeable battery LIR2332!
 * [Push Buttons](https://www.conrad.com/p/diptronics-dtsm-66n-v-b-pushbutton-12-v-dc-005-a-1-x-offon-momentary-1-pcs-707570)
   * Wiring: `ESP12F_Relay_X4` <—> `Button` <—> `Powering`:
     * `IO2` <—> `Button 1` <—> `GND`
-    * `IO0` <—> `Button 2` <—> `GND`
+    * `IO0` <—> `Button 2` <—> `GND`  (IO0 has an external pull up resistor on the board!)
     * `IO15` <—> `Button 3` <—> `3.3V`  (IO15 has an external pull down resistor on the board!)
 
 * [USB to TTL Serial Adapter 3.3V](https://www.amazon.com/dp/B089YTXK8V)

@@ -355,8 +355,8 @@ enum {
 	#define V2_IO_OUTPUT         0x1F00 // output bits
 	#define V2_PIN_BUTTON_1      2 // button 1
 	#define V2_PIN_BUTTON_2      0 // button 2
-	#define V2_PIN_BUTTON_3      IOEXP_PIN+12 // button 3
-	#define V2_PIN_RFTX          15
+	#define V2_PIN_BUTTON_3      15 // button 3
+	#define V2_PIN_RFTX          IOEXP_PIN+12
 	#define V2_PIN_BOOST         IOEXP_PIN+13
 	#define V2_PIN_BOOST_EN      IOEXP_PIN+14
 	#define V2_PIN_LATCH_COM     IOEXP_PIN+15  

@@ -169,7 +169,7 @@ void ui_state_machine() {
 		switch (button & BUTTON_MASK) {
 		case BUTTON_1:
 			if (button & BUTTON_FLAG_HOLD) {	// holding B1
-				if (digitalReadExt(PIN_BUTTON_3)==0) { // if B3 is pressed while holding B1, run a short test (internal test)
+				if (digitalReadExt(PIN_BUTTON_3)==1) { // if B3 is pressed while holding B1, run a short test (internal test)
 					if(!ui_confirm(PSTR("Start 2s test?"))) {ui_state = UI_STATE_DEFAULT; break;}
 					manual_start_program(255, 0);
 				} else if (digitalReadExt(PIN_BUTTON_2)==0) { // if B2 is pressed while holding B1, display gateway IP
@@ -210,7 +210,7 @@ void ui_state_machine() {
 					os.lcd.setCursor(0, 1);
 					os.lcd_print_pgm(PSTR("(eip)"));
 					ui_state = UI_STATE_DISP_IP;
-				} else if (digitalReadExt(PIN_BUTTON_3)==0) {  // if B3 is pressed while holding B2, display last successful weather call
+				} else if (digitalReadExt(PIN_BUTTON_3)==1) {  // if B3 is pressed while holding B2, display last successful weather call
 					//os.lcd.clear(0, 1);
 					os.lcd_print_time(os.checkwt_success_lasttime);
 					os.lcd.setCursor(0, 1);

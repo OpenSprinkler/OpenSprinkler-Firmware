@@ -931,9 +931,8 @@ void OpenSprinkler::begin() {
 	// set button pins
 	// enable internal pullup
 	pinMode(PIN_BUTTON_1, INPUT_PULLUP);
-	// No internal pullup needed on ESP12F_Relay_X4 board! GPIO0 (B2) has an external pull-up and GPIO15 (B3) a pull-down:
-	pinMode(PIN_BUTTON_2, INPUT);
-	pinMode(PIN_BUTTON_3, INPUT);
+	pinMode(PIN_BUTTON_2, INPUT); // External pull up connected at ESP12F_Relay_X4!
+	pinMode(PIN_BUTTON_3, INPUT); // External pull down connected at ESP12F_Relay_X4!
 
 	// detect and check RTC type
 	RTC.detect();
@@ -2316,7 +2315,7 @@ byte OpenSprinkler::button_read(byte waitmode)
 		curr = button_read_busy(PIN_BUTTON_1, waitmode, BUTTON_1, is_holding);
 	} else if (digitalReadExt(PIN_BUTTON_2) == 0) {
 		curr = button_read_busy(PIN_BUTTON_2, waitmode, BUTTON_2, is_holding);
-	} else if (digitalReadExt(PIN_BUTTON_3) == 0) {
+	} else if (digitalReadExt(PIN_BUTTON_3) == 1) {
 		curr = button_read_busy(PIN_BUTTON_3, waitmode, BUTTON_3, is_holding);
 	}
 
