@@ -767,12 +767,13 @@ void OpenSprinkler::begin() {
 		}
 	}
 
+	// Other ESP8266 boards are sometimes detected as OS 3.1 and sometimes as OS 3.2.
+	// To be safe these pins are re-assigned according V2 revision:
 	if (ESP12F_RELAY_X4) {
-		// The ESP12F_Relay_X4 board is sometimes detected as OS 3.1 and sometimes as OS 3.2.
-		// To be safe the used pins are re-assigned independently from the detected revision:
-		PIN_BUTTON_1 = 2;
-		PIN_BUTTON_2 = 0;
-		PIN_BUTTON_3 = 15;
+		PIN_BUTTON_1 = V2_PIN_BUTTON_1;
+		PIN_BUTTON_2 = V2_PIN_BUTTON_2;
+		PIN_BUTTON_3 = V2_PIN_BUTTON_3;
+		PIN_RFTX     = V2_PIN_RFTX;
 	}
 
 	/* detect expanders */
@@ -928,12 +929,13 @@ void OpenSprinkler::begin() {
 
 	// set button pins
 	// enable internal pullup
-	pinMode(PIN_BUTTON_1, INPUT_PULLUP);
 	if (ESP12F_RELAY_X4) {
 		// On ESP12F_Relay_X4 board the GPIO0 (button 2) has already a pullup resistor and GPIO15 (button 3) a pulldown:
+		pinMode(PIN_BUTTON_1, INPUT_PULLUP);
 		pinMode(PIN_BUTTON_2, INPUT);
 		pinMode(PIN_BUTTON_3, INPUT);
 	} else {
+		pinMode(PIN_BUTTON_1, INPUT_PULLUP);
 		pinMode(PIN_BUTTON_2, INPUT_PULLUP);
 		pinMode(PIN_BUTTON_3, INPUT_PULLUP);
 	}
@@ -2462,7 +2464,7 @@ byte OpenSprinkler::button_read(byte waitmode)
 		curr = button_read_busy(PIN_BUTTON_1, waitmode, BUTTON_1, is_holding);
 	} else if (digitalReadExt(PIN_BUTTON_2) == 0) {
 		curr = button_read_busy(PIN_BUTTON_2, waitmode, BUTTON_2, is_holding);
-	} else if (digitalReadExt(PIN_BUTTON_3) == (ESP12F_RELAY_X4 ? 1 : 0)) {
+	} else if (digitalReadExt(PIN_BUTTON_3) == 0) {
 		curr = button_read_busy(PIN_BUTTON_3, waitmode, BUTTON_3, is_holding);
 	}
 

@@ -25,6 +25,8 @@
 #define _DEFINES_H
 
 #define ESP12F_RELAY_X4 true
+#define IGNORE_CURR true
+#define BUTTON_3_PULLDOWN true
 
 //#define ENABLE_DEBUG  // enable serial debug
 
