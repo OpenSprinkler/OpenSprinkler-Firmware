@@ -32,7 +32,6 @@
 #if defined(ARDUINO)
 	EthernetServer *m_server = NULL;
 	EthernetClient *m_client = NULL;
-	UDP	*udp = NULL;
 	#if defined(ESP8266)
 		ESP8266WebServer *wifi_server = NULL;
 		static uint16_t led_blink_ms = LED_FAST_BLINK;
@@ -53,8 +52,7 @@ void remote_http_callback(char*);
 
 // Small variations have been added to the timing values below
 // to minimize conflicting events
-#define NTP_SYNC_INTERVAL				86413L 	// NYP sync interval (in seconds)
-#define RTC_SYNC_INTERVAL				3607		// RTC sync interval (in seconds)
+#define NTP_SYNC_INTERVAL				86413L 	// NTP sync interval (in seconds)
 #define CHECK_NETWORK_INTERVAL	601			// Network checking timeout (in seconds)
 #define CHECK_WEATHER_TIMEOUT		21613L  // Weather check interval (in seconds)
 #define CHECK_WEATHER_SUCCESS_TIMEOUT 86400L // Weather check success interval (in seconds)
@@ -82,9 +80,11 @@ ulong flow_count = 0;
 byte prev_flow_state = HIGH;
 float flow_last_gpm=0;
 
+uint32_t reboot_timer = 0;
+
 void flow_poll() {
 	#if defined(ESP8266)
-	if(os.hw_rev == 2) pinModeExt(PIN_SENSOR1, INPUT_PULLUP); // this seems necessary for OS 3.2 
+	if(os.hw_rev == 2) pinModeExt(PIN_SENSOR1, INPUT_PULLUP); // this seems necessary for OS 3.2
 	#endif
 	byte curr_flow_state = digitalReadExt(PIN_SENSOR1);
 	if(!(prev_flow_state==HIGH && curr_flow_state==LOW)) {	// only record on falling edge
@@ -125,7 +125,7 @@ bool ui_confirm(PGM_P str) {
 		button = os.button_read(BUTTON_WAIT_NONE);
 		if((button&BUTTON_MASK)==BUTTON_3 && (button&BUTTON_FLAG_DOWN)) return true;
 		if((button&BUTTON_MASK)==BUTTON_1 && (button&BUTTON_FLAG_DOWN)) return false;
-		os.delay_nicely(10);
+		delay(10);
 	} while(millis() - start < 2500);
 	return false;
 }
@@ -147,7 +147,7 @@ void ui_state_machine() {
 			led_toggle_timeout = millis() + led_blink_ms;
 		}
 	}
-#endif	
+#endif
 
 	if (!os.button_timeout) {
 		os.lcd_set_brightness(0);
@@ -169,7 +169,7 @@ void ui_state_machine() {
 		switch (button & BUTTON_MASK) {
 		case BUTTON_1:
 			if (button & BUTTON_FLAG_HOLD) {	// holding B1
-				if (digitalReadExt(PIN_BUTTON_3)==1) { // if B3 is pressed while holding B1, run a short test (internal test)
+				if (digitalReadExt(PIN_BUTTON_3)==(ESP12F_RELAY_X4 ? 1 : 0)) { // if B3 is pressed while holding B1, run a short test (internal test)
 					if(!ui_confirm(PSTR("Start 2s test?"))) {ui_state = UI_STATE_DEFAULT; break;}
 					manual_start_program(255, 0);
 				} else if (digitalReadExt(PIN_BUTTON_2)==0) { // if B2 is pressed while holding B1, display gateway IP
@@ -188,7 +188,7 @@ void ui_state_machine() {
 					reset_all_stations();
 				}
 			} else {	// clicking B1: display device IP and port
-				os.lcd.clear(0, 1);  
+				os.lcd.clear(0, 1);
 				os.lcd.setCursor(0, 0);
 				#if defined(ESP8266)
 				if (!m_server) { os.lcd.print(WiFi.localIP());	}
@@ -210,12 +210,12 @@ void ui_state_machine() {
 					os.lcd.setCursor(0, 1);
 					os.lcd_print_pgm(PSTR("(eip)"));
 					ui_state = UI_STATE_DISP_IP;
-				} else if (digitalReadExt(PIN_BUTTON_3)==1) {  // if B3 is pressed while holding B2, display last successful weather call
+				} else if (digitalReadExt(PIN_BUTTON_3)==(ESP12F_RELAY_X4 ? 1 : 0)) {  // if B3 is pressed while holding B2, display last successful weather call
 					//os.lcd.clear(0, 1);
 					os.lcd_print_time(os.checkwt_success_lasttime);
 					os.lcd.setCursor(0, 1);
 					os.lcd_print_pgm(PSTR("(lswc)"));
-					ui_state = UI_STATE_DISP_IP;					
+					ui_state = UI_STATE_DISP_IP;
 				} else {	// if no other button is clicked, reboot
 					if(!ui_confirm(PSTR("Reboot device?"))) {ui_state = UI_STATE_DEFAULT; break;}
 					os.reboot_dev(REBOOT_CAUSE_BUTTON);
@@ -239,7 +239,7 @@ void ui_state_machine() {
 					os.lcd.setCursor(0, 1);
 					os.lcd_print_pgm(PSTR("(lupt) cause:"));
 					os.lcd.print(os.last_reboot_cause);
-					ui_state = UI_STATE_DISP_IP;							
+					ui_state = UI_STATE_DISP_IP;
 				} else if(digitalReadExt(PIN_BUTTON_2)==0) {	// if B2 is pressed while holding B3, reset to AP and reboot
 					#if defined(ESP8266)
 					if(!ui_confirm(PSTR("Reset to AP?"))) {ui_state = UI_STATE_DEFAULT; break;}
@@ -299,20 +299,23 @@ void do_setup() {
 	MCUSR &= ~(1<<WDRF);
 #endif
 
-	DEBUG_BEGIN(74880); // The ESP8266's genuine baud rate
+	if (ESP12F_RELAY_X4) {
+		DEBUG_BEGIN(74880); // The ESP8266's genuine baud rate
+	} else {
+		DEBUG_BEGIN(115200);
+	}
 	DEBUG_PRINTLN(F("started"));
-	
+
 	os.begin();					 // OpenSprinkler init
 	os.options_setup();  // Setup options
 
 	pd.init();						// ProgramData init
 
-	setSyncInterval(RTC_SYNC_INTERVAL);  // RTC sync interval
-	// if rtc exists, sets it as time sync source
-	setSyncProvider(RTC.get);
+	// set time using RTC if it exists
+	if(RTC.exists())	setTime(RTC.get());
 	os.lcd_print_time(os.now_tz());  // display time to LCD
 	os.powerup_lasttime = os.now_tz();
-	
+
 #if !defined(ESP8266)
 	// enable WDT
 	/* In order to change WDE or the prescaler, we need to
@@ -387,13 +390,13 @@ void turn_off_station(byte sid, ulong curr_time);
 void process_dynamic_events(ulong curr_time);
 void check_network();
 void check_weather();
+bool process_special_program_command(const char*, uint32_t curr_time);
 void perform_ntp_sync();
 void delete_log(char *name);
 
 #if defined(ESP8266)
 void start_server_ap();
 void start_server_client();
-unsigned long reboot_timer = 0;
 #endif
 
 void handle_web_request(char *p);
@@ -420,7 +423,7 @@ void do_loop()
 	os.status.mas = os.iopts[IOPT_MASTER_STATION];
 	os.status.mas2= os.iopts[IOPT_MASTER_STATION_2];
 	time_t curr_time = os.now_tz();
-	
+
 	// ====== Process Ethernet packets ======
 #if defined(ARDUINO)	// Process Ethernet packets for Arduino
 	#if defined(ESP8266)
@@ -443,9 +446,9 @@ void do_loop()
 				#define ENC28J60_ESTAT_LATCOL		0x10
 				#define ENC28J60_ESTAT_TXABRT		0x02
 				#define ENC28J60_ECON1_RXEN			0x04
-				uint16_t estat = Enc28J60.readReg((uint8_t) ENC28J60_ESTAT);
-				uint16_t eir = Enc28J60.readReg((uint8_t) ENC28J60_EIR);
-				uint16_t econ1 = Enc28J60.readReg((uint8_t) ENC28J60_ECON1);
+				uint16_t estat = Enc28J60Network::readReg((uint8_t) ENC28J60_ESTAT);
+				uint16_t eir = Enc28J60Network::readReg((uint8_t) ENC28J60_EIR);
+				uint16_t econ1 = Enc28J60Network::readReg((uint8_t) ENC28J60_ECON1);
 
 				os.lcd.setCursor(0,-1);
 				os.lcd.print(eir, HEX);
@@ -459,7 +462,7 @@ void do_loop()
 
 				/* Detect possible enc28j60 problems */
 				if( (eir & ENC28J60_EIR_RXERIF) || (estat & ENC28J60_ESTAT_BUFER) ||
-					  (estat & ENC28J60_ESTAT_LATCOL) || (estat & ENC28J60_ESTAT_TXABRT) || 
+					  (estat & ENC28J60_ESTAT_LATCOL) || (estat & ENC28J60_ESTAT_TXABRT) ||
 					  ((econ1 & ENC28J60_ECON1_RXEN) == 0) ) {
 					os.load_hardware_mac((uint8_t*)tmp_buffer, true);
 					Enc28J60Network::init((uint8_t*)tmp_buffer);
@@ -467,7 +470,7 @@ void do_loop()
 				}
 
 				phy_timeout = curr_time + PHY_TIMEOUT;
-			}		
+			}
 
 		#endif
 
@@ -496,7 +499,7 @@ void do_loop()
 			client.stop();
 		}
 
-	} else {	
+	} else {
 		switch(os.state) {
 		case OS_STATE_INITIAL:
 			if(os.get_wifi_mode()==WIFI_MODE_AP) {
@@ -510,19 +513,19 @@ void do_loop()
 				os.state = OS_STATE_CONNECTING;
 				connecting_timeout = millis() + 120000L;
 				os.lcd.setCursor(0, -1);
-				os.lcd.print(F("Connecting to..."));			
+				os.lcd.print(F("Connecting to..."));
 				os.lcd.setCursor(0, 2);
 				os.lcd.print(os.wifi_ssid);
 			}
 			break;
-			
+
 		case OS_STATE_TRY_CONNECT:
-			led_blink_ms = LED_SLOW_BLINK;	
+			led_blink_ms = LED_SLOW_BLINK;
 			start_network_sta_with_ap(os.wifi_ssid.c_str(), os.wifi_pass.c_str());
 			os.config_ip();
 			os.state = OS_STATE_CONNECTED;
 			break;
-		 
+
 		case OS_STATE_CONNECTING:
 			if(WiFi.status() == WL_CONNECTED) {
 				led_blink_ms = 0;
@@ -540,7 +543,7 @@ void do_loop()
 				}
 			}
 			break;
-			
+
 		case OS_STATE_CONNECTED:
 			if(os.get_wifi_mode() == WIFI_MODE_AP) {
 				wifi_server->handleClient();
@@ -568,9 +571,9 @@ void do_loop()
 			break;
 		}
 	}
-	
+
 	#else // AVR
-	
+
 	static unsigned long dhcp_timeout = 0;
 	if(curr_time > dhcp_timeout) {
 		Ethernet.maintain();
@@ -600,7 +603,7 @@ void do_loop()
 	wdt_timeout = 0;
 
 	#endif
-	
+
 	ui_state_machine();
 
 #else // Process Ethernet packets for RPI/BBB
@@ -642,16 +645,10 @@ void do_loop()
 			pinModeExt(PIN_SENSOR2, INPUT_PULLUP);
 		}
 		#endif
-		
+
 		last_time = curr_time;
 		if (os.button_timeout) os.button_timeout--;
-		
-		#if defined(ESP8266)
-		if(reboot_timer && millis() > reboot_timer) {
-			os.reboot_dev(REBOOT_CAUSE_TIMER);
-		}
-		#endif
-			
+
 #if defined(ARDUINO)
 		if (!ui_state)
 			os.lcd_print_time(os.now_tz());				// print time
@@ -682,7 +679,7 @@ void do_loop()
 			}
 			os.old_status.rain_delayed = os.status.rain_delayed;
 		}
-	
+
 		// ====== Check binary (i.e. rain or soil) sensor status ======
 		os.detect_binarysensor_status(curr_time);
 
@@ -701,14 +698,14 @@ void do_loop()
 		if(os.old_status.sensor2_active != os.status.sensor2_active) {
 			// send notification when sensor1 becomes active
 			if(os.status.sensor2_active) {
-				os.sensor2_active_lasttime = curr_time;				
+				os.sensor2_active_lasttime = curr_time;
 				push_message(NOTIFY_SENSOR2, LOGDATA_SENSOR2, 1);
 			} else {
 				write_log(LOGDATA_SENSOR2, curr_time);
 				push_message(NOTIFY_SENSOR2, LOGDATA_SENSOR2, 0);
 			}
 		}
-		os.old_status.sensor2_active = os.status.sensor2_active;			
+		os.old_status.sensor2_active = os.status.sensor2_active;
 
 		// ===== Check program switch status =====
 		byte pswitch = os.detect_programswitch_status(curr_time);
@@ -721,7 +718,7 @@ void do_loop()
 		if (pswitch & 0x02) {
 			if(pd.nprograms > 1)	manual_start_program(2, 0);
 		}
-		
+
 
 		// ====== Schedule program data ======
 		ulong curr_minute = curr_time / 60;
@@ -736,6 +733,9 @@ void do_loop()
 				pd.read(pid, &prog);	// todo future: reduce load time
 				if(prog.check_match(curr_time)) {
 					// program match found
+					// check and process special program command
+					if(process_special_program_command(prog.name, curr_time))	continue;
+					
 					// process all selected stations
 					for(sid=0;sid<os.nstations;sid++) {
 						bid=sid>>3;
@@ -904,7 +904,7 @@ void do_loop()
 			int16_t mas_on_adj = water_time_decode_signed(os.iopts[IOPT_MASTER_ON_ADJ]);
 			int16_t mas_off_adj= water_time_decode_signed(os.iopts[IOPT_MASTER_OFF_ADJ]);
 			byte masbit = 0;
-			
+
 			for(sid=0;sid<os.nstations;sid++) {
 				// skip if this is the master station
 				if (os.status.mas == sid+1) continue;
@@ -945,7 +945,7 @@ void do_loop()
 				}
 			}
 			os.set_station_bit(os.status.mas2-1, masbit2);
-		}		 
+		}
 
 		// process dynamic events
 		process_dynamic_events(curr_time);
@@ -962,11 +962,23 @@ void do_loop()
 				os.lcd.setCursor(0, 2);
 				os.lcd.clear(2, 2);
 			}
+			// Ignored on ESP12F_RELAY_X4 board, because it doesn't have a shunt to meassure the current:
+			if (!ESP12F_RELAY_X4) {
+				if(os.status.program_busy) {
+					os.lcd.print(F("curr: "));
+					uint16_t curr = os.read_current();
+					os.lcd.print(curr);
+					os.lcd.print(F(" mA"));
+				}
+			}
 			#endif
 		}
-		
+
+#endif
+
+		// handle reboot request
 		// check safe_reboot condition
-		if (os.status.safe_reboot) {
+		if (os.status.safe_reboot && (curr_time > reboot_timer)) {
 			// if no program is running at the moment
 			if (!os.status.program_busy) {
 				// and if no program is scheduled to run in the next minute
@@ -982,8 +994,9 @@ void do_loop()
 					os.reboot_dev(os.nvdata.reboot_cause);
 				}
 			}
+		} else if(reboot_timer && (curr_time > reboot_timer)) {
+			os.reboot_dev(REBOOT_CAUSE_TIMER);
 		}
-#endif
 
 		// real-time flow count
 		static ulong flowcount_rt_start = 0;
@@ -1030,6 +1043,24 @@ void do_loop()
 	#endif
 }
 
+/** Check and process special program command */
+bool process_special_program_command(const char* pname, uint32_t curr_time) {
+	if(pname[0]==':') {	// special command start with :
+		if(strncmp(pname, ":>reboot_now", 12) == 0) {
+			os.status.safe_reboot = 0; // reboot regardless of program status
+			reboot_timer = curr_time + 65; // set a timer to reboot in 65 seconds
+			// this is to avoid the same command being executed again right after reboot
+			return true;
+		} else if(strncmp(pname, ":>reboot", 8) == 0) {
+			os.status.safe_reboot = 1; // by default reboot should only happen when controller is idle
+			reboot_timer = curr_time + 65; // set a timer to reboot in 65 seconds
+			// this is to avoid the same command being executed again right after reboot
+			return true;
+		}
+	}
+	return false;
+}
+
 /** Make weather query */
 void check_weather() {
 	// do not check weather if
@@ -1037,7 +1068,7 @@ void check_weather() {
 	// - the controller is in remote extension mode
 	if (os.status.network_fails>0 || os.iopts[IOPT_REMOTE_EXT_MODE]) return;
 	if (os.status.program_busy) return;
-	
+
 #if defined(ESP8266)
 	if (!m_server) {
 		if (os.get_wifi_mode()!=WIFI_MODE_STA || WiFi.status()!=WL_CONNECTED || os.state!=OS_STATE_CONNECTED) return;
@@ -1135,7 +1166,7 @@ void process_dynamic_events(ulong curr_time) {
 	if((os.iopts[IOPT_SENSOR1_TYPE] == SENSOR_TYPE_RAIN || os.iopts[IOPT_SENSOR1_TYPE] == SENSOR_TYPE_SOIL)
 		 && os.status.sensor1_active)
 		sn1 = true;
-		
+
 	if((os.iopts[IOPT_SENSOR2_TYPE] == SENSOR_TYPE_RAIN || os.iopts[IOPT_SENSOR2_TYPE] == SENSOR_TYPE_SOIL)
 		 && os.status.sensor2_active)
 		sn2 = true;
@@ -1146,13 +1177,13 @@ void process_dynamic_events(ulong curr_time) {
 		igs = os.attrib_igs[bid];
 		igs2= os.attrib_igs2[bid];
 		igrd= os.attrib_igrd[bid];
-		
+
 		for(s=0;s<8;s++) {
 			sid=bid*8+s;
 
-			// ignore master stations because they are handled separately			 
+			// ignore master stations because they are handled separately
 			if (os.status.mas == sid+1) continue;
-			if (os.status.mas2== sid+1) continue;			 
+			if (os.status.mas2== sid+1) continue;
 			// If this is a normal program (not a run-once or test program)
 			// and either the controller is disabled, or
 			// if raining and ignore rain bit is cleared
@@ -1271,7 +1302,7 @@ void manual_start_program(byte pid, byte uwt) {
 		s=sid&0x07;
 		// skip if the station is a master station (because master cannot be scheduled independently
 		if ((os.status.mas==sid+1) || (os.status.mas2==sid+1))
-			continue;		 
+			continue;
 		dur = 60;
 		if(pid==255)	dur=2;
 		else if(pid>0)
@@ -1380,7 +1411,7 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 				strcat_P(postval, ((int)fval)?PSTR("activated."):PSTR("de-activated."));
 			}
 			break;
-			
+
 		case NOTIFY_SENSOR2:
 
 			if (os.mqtt.enabled()) {
@@ -1437,7 +1468,7 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 			break;
 
 		case NOTIFY_REBOOT:
-			
+
 			if (os.mqtt.enabled()) {
 				strcpy_P(topic, PSTR("opensprinkler/system"));
 				strcpy_P(payload, PSTR("{\"state\":\"started\"}"));
@@ -1534,8 +1565,8 @@ void write_log(byte type, ulong curr_time) {
 	ultoa(curr_time / 86400, tmp_buffer, 10);
 	make_logfile_name(tmp_buffer);
 
-	// Step 1: open file if exists, or create new otherwise, 
-	// and move file pointer to the end  
+	// Step 1: open file if exists, or create new otherwise,
+	// and move file pointer to the end
 #if defined(ARDUINO) // prepare log folder for Arduino
 
 	#if defined(ESP8266)
@@ -1560,7 +1591,7 @@ void write_log(byte type, ulong curr_time) {
 		return;
 	}
 	#endif
-	
+
 #else // prepare log folder for RPI/BBB
 	struct stat st;
 	if(stat(get_filename_fullpath(LOG_PREFIX), &st)) {
@@ -1576,7 +1607,7 @@ void write_log(byte type, ulong curr_time) {
 	}
 	fseek(file, 0, SEEK_END);
 #endif	// prepare log folder
-	
+
 	// Step 2: prepare data buffer
 	strcpy_P(tmp_buffer, PSTR("["));
 
@@ -1679,7 +1710,7 @@ void delete_log(char *name) {
 		sd.remove(tmp_buffer);
 	}
 	#endif
-	
+
 #else // delete_log implementation for RPI/BBB
 	if (strncmp(name, "all", 3) == 0) {
 		// delete the log folder
@@ -1736,7 +1767,7 @@ void check_network() {
 			os.nvdata.reboot_cause = REBOOT_CAUSE_NETWORK_FAIL;
 			os.status.safe_reboot = 1;
 		} else if (os.status.network_fails>2) {
-			// if failed more than twice, try to reconnect		
+			// if failed more than twice, try to reconnect
 			if (os.start_network())
 				os.status.network_fails=0;
 		}

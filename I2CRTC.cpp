@@ -39,6 +39,10 @@ I2CRTC::I2CRTC()
 	Wire.begin();
 }
 
+bool I2CRTC::exists() {
+	return (addr!=0);
+}
+
 bool I2CRTC::detect()
 {
 	addr = 0;

@@ -35,7 +35,7 @@
 	#include <Arduino.h>
 	#include <Wire.h>
 	#include <SPI.h>
-	#include <UIPEthernet.h>
+	#include <Ethernet.h>
 	#include "I2CRTC.h"
 
 	#if defined(ESP8266)
@@ -224,6 +224,8 @@ public:
 	static void nvdata_save();
 
 	static void options_setup();
+	static void pre_factory_reset();
+	static void factory_reset();
 	static void iopts_load();
 	static void iopts_save();
 	static bool sopt_save(byte oid, const char *buf);
@@ -291,8 +293,6 @@ public:
 																					// return values are 'OR'ed with flags
 																					// check defines.h for details
 
-	static void yield_nicely();
-	static void delay_nicely(uint32_t ms);
 	// -- UI functions --
 	static void ui_set_options(int oid);		// ui for setting options (oid-> starting option index)
 	static void lcd_set_brightness(byte value=1);
@@ -327,6 +327,8 @@ private:
 	static void latch_close(byte sid);
 	static void latch_setzonepin(byte sid, byte value);
 	static void latch_setallzonepins(byte value);
+	static void latch_disable_alloutputs_v2();
+	static void latch_setzoneoutput_v2(byte sid, byte A, byte K);
 	static void latch_apply_all_station_bits();
 	static byte prev_station_bits[];
 	#endif
@@ -337,7 +339,6 @@ private:
 // todo
 #if defined(ARDUINO)
 	extern EthernetServer *m_server;
-	extern UDP *udp;  
 	#if defined(ESP8266)
 	extern ESP8266WebServer *wifi_server;
 	#endif

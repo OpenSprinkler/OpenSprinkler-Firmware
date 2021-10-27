@@ -49,7 +49,9 @@ public:
 	virtual void pinMode(uint8_t pin, uint8_t IOMode) { }
 	virtual uint16_t i2c_read(uint8_t reg) { return 0xFFFF; }
 	virtual void i2c_write(uint8_t reg, uint16_t v) { }
-
+	// software implementation of shift register out
+	virtual void shift_out(uint8_t plat, uint8_t pclk, uint8_t pdat, uint8_t v) { }
+	
 	void digitalWrite(uint16_t v) {
 		i2c_write(NXP_OUTPUT_REG, v);
 	}
@@ -80,6 +82,7 @@ public:
 	void pinMode(uint8_t pin, uint8_t IOMode);
 	uint16_t i2c_read(uint8_t reg);
 	void i2c_write(uint8_t reg, uint16_t v);
+	void shift_out(uint8_t plat, uint8_t pclk, uint8_t pdat, uint8_t v);
 };
 
 class PCF8575 : public IOEXP {

@@ -24,11 +24,13 @@
 #ifndef _DEFINES_H
 #define _DEFINES_H
 
+#define ESP12F_RELAY_X4 true
+
 //#define ENABLE_DEBUG  // enable serial debug
 
 typedef unsigned char byte;
 typedef unsigned long ulong;
-  
+
 #define TMP_BUFFER_SIZE      255   // scratch buffer size
 
 /** Firmware version, hardware version, and maximal values */
@@ -36,7 +38,7 @@ typedef unsigned long ulong;
                             // if this number is different from the one stored in non-volatile memory
                             // a device reset will be automatically triggered
 
-#define OS_FW_MINOR      7  // Firmware minor version
+#define OS_FW_MINOR      9  // Firmware minor version
 
 /** Hardware version base numbers */
 #define OS_HW_VERSION_BASE   0x00
@@ -106,6 +108,7 @@ typedef unsigned long ulong;
 #define REBOOT_CAUSE_WEATHER_FAIL 8
 #define REBOOT_CAUSE_NETWORK_FAIL 9
 #define REBOOT_CAUSE_NTP          10
+#define REBOOT_CAUSE_PROGRAM			11
 #define REBOOT_CAUSE_POWERON      99
 
 
@@ -198,7 +201,7 @@ enum {
 	IOPT_SPE_AUTO_REFRESH,
 	IOPT_IFTTT_ENABLE,
 	IOPT_SENSOR1_TYPE,
-	IOPT_SENSOR1_OPTION,	
+	IOPT_SENSOR1_OPTION,
 	IOPT_SENSOR2_TYPE,
 	IOPT_SENSOR2_OPTION,
 	IOPT_SENSOR1_ON_DELAY,
@@ -273,7 +276,7 @@ enum {
 	#define PIN_BOOST_EN      23    // boost voltage enable pin
 
 	#define PIN_ETHER_CS       4    // Ethernet controller chip select pin
-	#define PIN_SENSOR1				11		// 
+	#define PIN_SENSOR1				11		//
 	#define PIN_SD_CS          0    // SD card chip select pin
 	#define PIN_FLOWSENSOR_INT 1    // flow sensor interrupt pin (INT1)
 	#define PIN_EXP_SENSE      4    // expansion board sensing pin (A4)
@@ -286,7 +289,7 @@ enum {
 
 	#define pinModeExt        pinMode
 	#define digitalReadExt    digitalRead
-	#define digitalWriteExt   digitalWrite  
+	#define digitalWriteExt   digitalWrite
 
 #elif defined(ESP8266) // for ESP8266
 
@@ -305,7 +308,7 @@ enum {
 
 	#define PIN_ETHER_CS       16 // ENC28J60 CS (chip select pin) is 16 on OS 3.2.
 
-	/* To accommodate different OS30 versions, we use software defines pins */ 
+	/* To accommodate different OS30 versions, we use software defines pins */
 	extern byte PIN_BUTTON_1;
 	extern byte PIN_BUTTON_2;
 	extern byte PIN_BUTTON_3;
@@ -314,6 +317,8 @@ enum {
 	extern byte PIN_BOOST;
 	extern byte PIN_BOOST_EN;
 	extern byte PIN_LATCH_COM;
+	extern byte PIN_LATCH_COMA;
+	extern byte PIN_LATCH_COMK;
 	extern byte PIN_SENSOR1;
 	extern byte PIN_SENSOR2;
 	extern byte PIN_IOEXP_INT;
@@ -351,15 +356,24 @@ enum {
 
 	/* OS30 revision 2 pin defines */
 	// pins on PCA9555A IO expander have pin numbers IOEXP_PIN+i
-	#define V2_IO_CONFIG         0x1F00 // config bits
-	#define V2_IO_OUTPUT         0x1F00 // output bits
+	#define V2_IO_CONFIG         0x1000 // config bits
+	#define V2_IO_OUTPUT         0x1E00 // output bits
 	#define V2_PIN_BUTTON_1      2 // button 1
 	#define V2_PIN_BUTTON_2      0 // button 2
-	#define V2_PIN_BUTTON_3      15 // button 3
-	#define V2_PIN_RFTX          IOEXP_PIN+12
+	#ifdef ESP12F_RELAY_X4
+		#define V2_PIN_BUTTON_3    15 // button 3
+		#define V2_PIN_RFTX        IOEXP_PIN+12
+	#else
+		#define V2_PIN_BUTTON_3    IOEXP_PIN+12 // button 3
+		#define V2_PIN_RFTX        15
+	#endif
 	#define V2_PIN_BOOST         IOEXP_PIN+13
 	#define V2_PIN_BOOST_EN      IOEXP_PIN+14
-	#define V2_PIN_LATCH_COM     IOEXP_PIN+15  
+	#define V2_PIN_LATCH_COMA    IOEXP_PIN+8  // latch COM+ (anode)
+	#define V2_PIN_SRLAT         IOEXP_PIN+9  // shift register latch
+	#define V2_PIN_SRCLK         IOEXP_PIN+10 // shift register clock
+	#define V2_PIN_SRDAT         IOEXP_PIN+11 // shift register data
+	#define V2_PIN_LATCH_COMK    IOEXP_PIN+15 // latch COM- (cathode)
 	#define V2_PIN_SENSOR1       3  // sensor 1
 	#define V2_PIN_SENSOR2       10 // sensor 2
 
@@ -427,7 +441,7 @@ enum {
 		inline  void DEBUG_PRINT(const char*s) {printf("%s", s);}
 		#define DEBUG_PRINTLN(x)        {DEBUG_PRINT(x);printf("\n");}
 	#endif
-  
+
 #else
 
 	#define DEBUG_BEGIN(x)   {}
@@ -435,7 +449,7 @@ enum {
 	#define DEBUG_PRINTLN(x) {}
 
 #endif
-  
+
 /** Re-define avr-specific (e.g. PGM) types to use standard types */
 #if !defined(ARDUINO)
 	#include <stdio.h>
