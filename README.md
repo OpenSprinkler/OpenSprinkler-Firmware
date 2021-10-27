@@ -85,4 +85,4 @@ See https://www.instructables.com/External-Antenna-for-ESP8266/ for more details
 ![Eexternal antenna](ESP12F_Relay_X4/ExternalAntenna.jpg)
 
 ## Another variant …
-In [this branch](/tree/NODEMCU_74HC595) you can find a variant that uses a NodeMCU, 74HC595 ShiftRegister and 8Ch Relay board
+In [this branch](https://github.com/ThFischer/OpenSprinkler-for-ESP12F_Relay_X4/tree/NODEMCU_74HC595) you can find a variant that uses a NodeMCU, 74HC595 ShiftRegister and 8Ch Relay board
