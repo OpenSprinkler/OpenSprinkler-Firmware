@@ -735,7 +735,7 @@ void do_loop()
 					// program match found
 					// check and process special program command
 					if(process_special_program_command(prog.name, curr_time))	continue;
-					
+
 					// process all selected stations
 					for(sid=0;sid<os.nstations;sid++) {
 						bid=sid>>3;
@@ -962,8 +962,8 @@ void do_loop()
 				os.lcd.setCursor(0, 2);
 				os.lcd.clear(2, 2);
 			}
-			// Ignored on ESP12F_RELAY_X4 board, because it doesn't have a shunt to meassure the current:
 			if (!ESP12F_RELAY_X4) {
+				// Ignored on ESP12F_RELAY_X4 board, because it doesn't have a shunt to meassure the current:
 				if(os.status.program_busy) {
 					os.lcd.print(F("curr: "));
 					uint16_t curr = os.read_current();

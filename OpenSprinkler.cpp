@@ -767,9 +767,9 @@ void OpenSprinkler::begin() {
 		}
 	}
 
-	// The ESP12F_Relay_X4 board is sometimes detected as OS 3.1 and sometimes as OS 3.2.
-	// To be safe the used pins are re-assigned independently from the detected revision:
 	if (ESP12F_RELAY_X4) {
+		// The ESP12F_Relay_X4 board is sometimes detected as OS 3.1 and sometimes as OS 3.2.
+		// To be safe the used pins are re-assigned independently from the detected revision:
 		PIN_BUTTON_1 = 2;
 		PIN_BUTTON_2 = 0;
 		PIN_BUTTON_3 = 15;

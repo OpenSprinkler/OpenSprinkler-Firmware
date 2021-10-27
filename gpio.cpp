@@ -177,9 +177,9 @@ byte digitalReadExt(byte pin) {
 		// a pin on IO expander
 		//return pcf_read(MAIN_I2CADDR)&(1<<(pin-IOEXP_PIN));
 	} else {
-		// On ESP12F_Relay_X4 board the GPIO15 pin (PIN_BUTTON_3) has an external pull down (1K).
-		// Therefore button 3 is HIGH when pressed and the digitalRead result must be negated:
 		if (ESP12F_RELAY_X4 && pin == PIN_BUTTON_3) {
+			// On ESP12F_Relay_X4 board the GPIO15 pin (PIN_BUTTON_3) has an external pull down (1K).
+			// Therefore button 3 is HIGH when pressed and the digitalRead result must be negated:
 			return !digitalRead(pin);
 		}
 
