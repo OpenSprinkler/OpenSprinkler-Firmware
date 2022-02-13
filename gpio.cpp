@@ -62,7 +62,7 @@ uint16_t PCA9555::i2c_read(uint8_t reg) {
 	Wire.beginTransmission(address);
 	Wire.write(reg);
 	Wire.endTransmission();
-	if(Wire.requestFrom(address, (uint8_t)2) != 2) {return 0xFFFF;}
+	if(Wire.requestFrom(address, (uint8_t)2) != 2) {return 0xFFFF; Serial.println("GPIO error");}
 	uint16_t data0 = Wire.read();
 	uint16_t data1 = Wire.read();
 	return data0+(data1<<8);

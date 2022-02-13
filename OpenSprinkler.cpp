@@ -771,7 +771,6 @@ void OpenSprinkler::begin() {
 	for(byte i=0;i<(MAX_NUM_BOARDS)/2;i++)
 		expanders[i] = NULL;
 	detect_expanders();
-
 #else
 
 	// shift register setup
@@ -894,7 +893,7 @@ void OpenSprinkler::begin() {
 		lcd.setCursor(0,0);
 		lcd.print(F("Init file system"));
 		lcd.setCursor(0,1);
-		if(!SPIFFS.begin()) {
+		if(!LittleFS.begin()) {
 			// !!! flash init failed, stall as we cannot proceed
 			lcd.setCursor(0, 0);
 			lcd_print_pgm(PSTR("Error Code: 0x2D"));
@@ -1436,8 +1435,8 @@ byte OpenSprinkler::get_station_type(byte sid) {
 void OpenSprinkler::attribs_save() {
 	// re-package attribute bits and save
 	byte bid, s, sid=0;
-	StationAttrib at;
-	byte ty = STN_TYPE_STANDARD;
+	StationAttrib at, at0;
+	byte ty = STN_TYPE_STANDARD, ty0;
 	for(bid=0;bid<MAX_NUM_BOARDS;bid++) {
 		for(s=0;s<8;s++,sid++) {
 			at.mas = (attrib_mas[bid]>>s) & 1;
@@ -1448,10 +1447,16 @@ void OpenSprinkler::attribs_save() {
 			at.dis = (attrib_dis[bid]>>s) & 1;
 			at.seq = (attrib_seq[bid]>>s) & 1;
 			at.gid = 0;
-			file_write_block(STATIONS_FILENAME, &at, (uint32_t)sid*sizeof(StationData)+offsetof(StationData, attrib), 1); // attribte bits are 1 byte long
+			// only write if content has changed
+			file_read_block(STATIONS_FILENAME, &at0, (uint32_t)sid*sizeof(StationData)+offsetof(StationData, attrib), 1);
+			if(*((byte*)&at) != *((byte*)&at0))
+				file_write_block(STATIONS_FILENAME, &at, (uint32_t)sid*sizeof(StationData)+offsetof(StationData, attrib), 1); // attribte bits are 1 byte long
 			if(attrib_spe[bid]>>s==0) {
 				// if station special bit is 0, make sure to write type STANDARD
-				file_write_block(STATIONS_FILENAME, &ty, (uint32_t)sid*sizeof(StationData)+offsetof(StationData, type), 1); // attribte bits are 1 byte long
+				// only write if content has changed
+				file_read_block(STATIONS_FILENAME, &ty0, (uint32_t)sid*sizeof(StationData)+offsetof(StationData, type), 1);
+				if(ty!=ty0)
+					file_write_block(STATIONS_FILENAME, &ty, (uint32_t)sid*sizeof(StationData)+offsetof(StationData, type), 1); // attribte bits are 1 byte long
 			}
 		}
 	}
@@ -1841,7 +1846,7 @@ void OpenSprinkler::pre_factory_reset() {
 	#if defined(ESP8266)
 	lcd_print_line_clear_pgm(PSTR("Wiping flash.."), 0);
 	lcd_print_line_clear_pgm(PSTR("Please Wait..."), 1);
-	SPIFFS.format();
+	LittleFS.format();
 	#else
 	// remove 'done' file as an indicator for reset
 	// todo os2.3 and ospi: delete log files and/or wipe SD card

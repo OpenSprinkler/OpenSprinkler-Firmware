@@ -29,6 +29,7 @@ extern OpenSprinkler os;
 
 	#if defined(ESP8266)
 		#include <FS.h>
+		#include <LittleFS.h>
 	#else
 		#include <avr/eeprom.h>
 		#include "SdFat.h"
@@ -169,21 +170,22 @@ unsigned int detect_rpi_rev() {
 
 #endif
 
+/*
 void write_to_file(const char *fn, const char *data, ulong size, ulong pos, bool trunc) {
 
 #if defined(ESP8266)
 
 	File f;
 	if(trunc) {
-		f = SPIFFS.open(fn, "w");
+		f = LittleFS.open(fn, "w");
 	} else {
-		f = SPIFFS.open(fn, "r+");
-		if(!f) f = SPIFFS.open(fn, "w");
+		f = LittleFS.open(fn, "r+");
+		if(!f) f = LittleFS.open(fn, "w");
 	}		 
 	if(!f) return;
 	if(pos) f.seek(pos, SeekSet);
 	if(size==0) {
-		f.write((byte*)" ", 1);  // hack to circumvent SPIFFS bug involving writing empty file
+		f.write((byte*)" ", 1);  // hack to circumvent FS bug involving writing empty file
 	} else {
 		f.write((byte*)data, size);
 	}
@@ -221,7 +223,7 @@ void write_to_file(const char *fn, const char *data, ulong size, ulong pos, bool
 void read_from_file(const char *fn, char *data, ulong maxsize, ulong pos) {
 #if defined(ESP8266)
 
-	File f = SPIFFS.open(fn, "r");
+	File f = LittleFS.open(fn, "r");
 	if(!f) {
 		data[0]=0;
 		return;  // return with empty string
@@ -229,7 +231,7 @@ void read_from_file(const char *fn, char *data, ulong maxsize, ulong pos) {
 	if(pos)  f.seek(pos, SeekSet);
 	int len = f.read((byte*)data, maxsize);
 	if(len>0) data[len]=0;
-	if(len==1 && data[0]==' ') data[0] = 0;  // hack to circumvent SPIFFS bug involving writing empty file
+	if(len==1 && data[0]==' ') data[0] = 0;  // hack to circumvent FS bug involving writing empty file
 	data[maxsize-1]=0;
 	f.close();
 	return;
@@ -275,12 +277,13 @@ void read_from_file(const char *fn, char *data, ulong maxsize, ulong pos) {
 
 #endif
 }
+*/
 
 void remove_file(const char *fn) {
 #if defined(ESP8266)
 
-	if(!SPIFFS.exists(fn)) return;
-	SPIFFS.remove(fn);
+	if(!LittleFS.exists(fn)) return;
+	LittleFS.remove(fn);
 
 #elif defined(ARDUINO)
 
@@ -298,7 +301,7 @@ void remove_file(const char *fn) {
 bool file_exists(const char *fn) {
 #if defined(ESP8266)
 
-	return SPIFFS.exists(fn);
+	return LittleFS.exists(fn);
 
 #elif defined(ARDUINO)
 
@@ -320,7 +323,7 @@ void file_read_block(const char *fn, void *dst, ulong pos, ulong len) {
 #if defined(ESP8266)
 
 	// do not use File.readBytes or readBytesUntil because it's very slow  
-	File f = SPIFFS.open(fn, "r");
+	File f = LittleFS.open(fn, "r");
 	if(f) {
 		f.seek(pos, SeekSet);
 		f.read((byte*)dst, len);
@@ -352,8 +355,8 @@ void file_read_block(const char *fn, void *dst, ulong pos, ulong len) {
 void file_write_block(const char *fn, const void *src, ulong pos, ulong len) {
 #if defined(ESP8266)
 
-	File f = SPIFFS.open(fn, "r+");
-	if(!f) f = SPIFFS.open(fn, "w");
+	File f = LittleFS.open(fn, "r+");
+	if(!f) f = LittleFS.open(fn, "w");
 	if(f) {
 		f.seek(pos, SeekSet);
 		f.write((byte*)src, len);
@@ -392,7 +395,7 @@ void file_copy_block(const char *fn, ulong from, ulong to, ulong len, void *tmp)
 	if(tmp==NULL) { return; }
 #if defined(ESP8266)
 
-	File f = SPIFFS.open(fn, "r+");
+	File f = LittleFS.open(fn, "r+");
 	if(!f) return;
 	f.seek(from, SeekSet);
 	f.read((byte*)tmp, len);
@@ -430,7 +433,7 @@ void file_copy_block(const char *fn, ulong from, ulong to, ulong len, void *tmp)
 byte file_cmp_block(const char *fn, const char *buf, ulong pos) {
 #if defined(ESP8266)
 
-	File f = SPIFFS.open(fn, "r");
+	File f = LittleFS.open(fn, "r");
 	if(f) {
 		f.seek(pos, SeekSet);
 		char c = f.read();

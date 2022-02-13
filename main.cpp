@@ -1563,9 +1563,9 @@ void write_log(byte type, ulong curr_time) {
 #if defined(ARDUINO) // prepare log folder for Arduino
 
 	#if defined(ESP8266)
-	File file = SPIFFS.open(tmp_buffer, "r+");
+	File file = LittleFS.open(tmp_buffer, "r+");
 	if(!file) {
-		file = SPIFFS.open(tmp_buffer, "w");
+		file = LittleFS.open(tmp_buffer, "w");
 		if(!file) return;
 	}
 	file.seek(0, SeekEnd);
@@ -1677,15 +1677,15 @@ void delete_log(char *name) {
 	#if defined(ESP8266)
 	if (strncmp(name, "all", 3) == 0) {
 		// delete all log files
-		Dir dir = SPIFFS.openDir(LOG_PREFIX);
+		Dir dir = LittleFS.openDir(LOG_PREFIX);
 		while (dir.next()) {
-			SPIFFS.remove(dir.fileName());
+			LittleFS.remove(dir.fileName());
 		}
 	} else {
 		// delete a single log file
 		make_logfile_name(name);
-		if(!SPIFFS.exists(tmp_buffer)) return;
-		SPIFFS.remove(tmp_buffer);
+		if(!LittleFS.exists(tmp_buffer)) return;
+		LittleFS.remove(tmp_buffer);
 	}
 	#else
 	if (strncmp(name, "all", 3) == 0) {

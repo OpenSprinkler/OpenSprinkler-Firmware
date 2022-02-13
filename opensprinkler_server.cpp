@@ -33,6 +33,7 @@
 	#if defined(ESP8266)
 
 		#include <FS.h>
+		#include <LittleFS.h>
 		#include "espconnect.h"
 	 
 		extern ESP8266WebServer *wifi_server;
@@ -614,7 +615,6 @@ void server_change_stations() {
 	}
 
 	os.attribs_save();
-	
 	handle_return(HTML_SUCCESS);
 }
 
@@ -1679,7 +1679,7 @@ void server_json_log() {
 		make_logfile_name(tmp_buffer);
 
 #if defined(ESP8266)
-		File file = SPIFFS.open(tmp_buffer, "r");
+		File file = LittleFS.open(tmp_buffer, "r");
 		if(!file) continue;
 #elif defined(ARDUINO)
 		if (!sd.exists(tmp_buffer)) continue;
@@ -1817,7 +1817,7 @@ void server_json_debug() {
 #if defined(ESP8266)
   (uint16_t)ESP.getFreeHeap());
   FSInfo fs_info;
-	SPIFFS.info(fs_info);
+	LittleFS.info(fs_info);
   bfill.emit_p(PSTR(",\"flash\":$D,\"used\":$D}"), fs_info.totalBytes, fs_info.usedBytes);
  #else
   (uint16_t)freeHeap());

@@ -40,6 +40,7 @@
 
 	#if defined(ESP8266)
 		#include <FS.h>
+		#include <LittleFS.h>
 		#include <RCSwitch.h>
 		#include "SSD1306Display.h"
 		#include "espconnect.h"
