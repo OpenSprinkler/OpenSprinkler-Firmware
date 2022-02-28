@@ -36,12 +36,9 @@
 		#include <LittleFS.h>
 		#include "espconnect.h"
 	 
-		extern ESP8266WebServer *wifi_server;
-		extern EthernetServer *m_server;
-		extern EthernetClient *m_client;
-		
-		// Due to using ESP8266WebServer in WiFi mode, the return mechanism is different when it's in WiFi mode vs. wired Ethernet (i.e. when m_client!=NULL)
-		#define handle_return(x) {if(m_client) {return_code=x; return;} else {if(x==HTML_OK) server_send_content(); else server_send_result(x); wifi_server->client().stop(); return;}}
+		extern ESP8266WebServer *w_server;
+		extern ENC28J60lwIP eth;
+		#define handle_return(x) {if(x==HTML_OK) server_send_content(); else server_send_result(x); w_server->client().stop(); return;}
 
 	#else
 
@@ -163,14 +160,14 @@ byte findKeyVal (const char *str,char *strbuf, uint16_t maxlen,const char *key,b
 	uint8_t found=0;
 #if defined(ESP8266)
 	// for ESP8266: there are two cases:
-	// case 1: if str is NULL, we assume the key-val to search is already parsed in wifi_server
+	// case 1: if str is NULL, we assume the key-val to search is already parsed in w_server
 	if(str==NULL) {
 		char _key[10];
 		if(key_in_pgm) strcpy_P(_key, key);
 		else strcpy(_key, key);
-		if(wifi_server->hasArg(_key)) {
+		if(w_server->hasArg(_key)) {
 			// copy value to buffer, and make sure it ends properly
-			strncpy(strbuf, wifi_server->arg(_key).c_str(), maxlen);
+			strncpy(strbuf, w_server->arg(_key).c_str(), maxlen);
 			strbuf[maxlen-1]=0;
 			found=1;
 		} else {
@@ -250,13 +247,8 @@ void rewind_ether_buffer() {
 
 void send_packet(bool final=false) {
 #if defined(ESP8266)
-	if (m_client) {
-		m_client->write((const uint8_t *)ether_buffer, strlen(ether_buffer));
-		if (final) { m_client->stop(); }
-	} else {
-		wifi_server->sendContent(ether_buffer);
-		if(final) { wifi_server->client().stop(); }
-	}
+	w_server->sendContent(ether_buffer);
+	if(final) { w_server->client().stop(); }
 	rewind_ether_buffer();
 	return;
 #else
@@ -282,16 +274,14 @@ String toHMS(ulong t) {
 }
 
 void server_send_content() {
-	if (m_client) { return; }
-	wifi_server->sendContent(ether_buffer);
-	wifi_server->client().stop();
+	w_server->sendContent(ether_buffer);
+	w_server->client().stop();
 	rewind_ether_buffer();	
 }
 
 void server_send_html(String html) {
-	if (m_client) {	return;	}
-	wifi_server->send(200, "text/html", html);
-	wifi_server->client().stop();
+	w_server->send(200, "text/html", html);
+	w_server->client().stop();
 }
 
 void server_send_result(byte code) {
@@ -309,8 +299,8 @@ void server_send_result(byte code, const char* item) {
 }
 
 /*bool get_value_by_key(const char* key, long& val) {
-	if(wifi_server->hasArg(key)) {
-		val = wifi_server->arg(key).toInt();	 
+	if(w_server->hasArg(key)) {
+		val = w_server->arg(key).toInt();	 
 		return true;
 	} else {
 		return false;
@@ -318,8 +308,8 @@ void server_send_result(byte code, const char* item) {
 }
 
 bool get_value_by_key(const char* key, String& val) {
-	if(wifi_server->hasArg(key)) {
-		val = wifi_server->arg(key);	 
+	if(w_server->hasArg(key)) {
+		val = w_server->arg(key);	 
 		return true;
 	} else {
 		return false;
@@ -378,9 +368,9 @@ void on_ap_scan() {
 
 void on_ap_change_config() {
 	if(os.get_wifi_mode()!=WIFI_MODE_AP) return;
-	if(wifi_server->hasArg("ssid")&&wifi_server->arg("ssid").length()!=0) {
-		os.wifi_ssid = wifi_server->arg("ssid");
-		os.wifi_pass = wifi_server->arg("pass"); 
+	if(w_server->hasArg("ssid")&&w_server->arg("ssid").length()!=0) {
+		os.wifi_ssid = w_server->arg("ssid");
+		os.wifi_pass = w_server->arg("pass"); 
 		os.sopt_save(SOPT_STA_SSID, os.wifi_ssid.c_str());
 		os.sopt_save(SOPT_STA_PASS, os.wifi_pass.c_str());
 		server_send_result(HTML_SUCCESS);
@@ -419,16 +409,17 @@ boolean check_password(char *p)
 	return true;
 #endif
 	if (os.iopts[IOPT_IGNORE_PASSWORD])  return true;
+#if !defined(ESP8266)
 	if (m_client && !p) {
 		p = get_buffer;
 	}  
+#endif
 	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("pw"), true)) {
 		urlDecode(tmp_buffer);
 		if (os.password_verify(tmp_buffer))
 			return true;
 	}
 #if defined(ESP8266)
-	if(m_client) { return false; }
 	/* some pages will output fwv if password check has failed */
 	if(fwv_on_fail) {
 		rewind_ether_buffer();
@@ -545,8 +536,6 @@ void server_change_stations() {
 #if defined(ESP8266)
 	char* p = NULL;
 	if(!process_password()) return;
-	if (m_client)
-		p = get_buffer;  
 #else
 	char* p = get_buffer;
 #endif
@@ -594,9 +583,7 @@ void server_change_stations() {
 				}
 				if (!found || activeState > 1) handle_return(HTML_DATA_OUTOFBOUND);
 			} else if (tmp_buffer[0] == STN_TYPE_HTTP) {
-				#if defined(ESP8266)	// ESP8266 performs automatic decoding so no need to do it again
-					if(m_server) urlDecode(tmp_buffer + 1);
-				#else
+				#if !defined(ESP8266)
 					urlDecode(tmp_buffer + 1);
 				#endif
 				if (strlen(tmp_buffer+1) > sizeof(HTTPStationData)) {
@@ -647,8 +634,6 @@ void server_manual_program() {
 #if defined(ESP8266)
 	char* p = NULL;
 	if(!process_password()) return;
-	if (m_client)
-		p = get_buffer;
 #else
 	char *p = get_buffer;
 #endif
@@ -685,8 +670,6 @@ void server_change_runonce() {
 #if defined(ESP8266)
 	char* p = NULL;
 	if(!process_password()) return;
-	if (m_client)
-		p = get_buffer;
 	if(!findKeyVal(p,tmp_buffer,TMP_BUFFER_SIZE, "t", false)) handle_return(HTML_DATA_MISSING);
 	char *pv = tmp_buffer+1;
 #else
@@ -750,8 +733,6 @@ void server_delete_program() {
 #if defined(ESP8266)
 	char *p = NULL;
 	if(!process_password()) return;
-	if (m_client)
-		p = get_buffer;  
 #else
 	char *p = get_buffer;
 #endif
@@ -781,8 +762,6 @@ void server_moveup_program() {
 #if defined(ESP8266)
 	char *p = NULL;
 	if(!process_password()) return;
-	if (m_client)
-		p = get_buffer;  
 #else
 	char *p = get_buffer;
 #endif
@@ -815,8 +794,6 @@ void server_change_program() {
 #if defined(ESP8266)
 	char *p = NULL;
 	if(!process_password()) return;
-	if (m_client)
-		p = get_buffer;
 #else
 	char *p = get_buffer;
 #endif
@@ -1088,7 +1065,7 @@ void server_json_controller_main() {
 #endif
 
 	byte mac[6] = {0};
-	os.load_hardware_mac(mac, m_server!=NULL);
+	os.load_hardware_mac(mac, useEth);
 	bfill.emit_p(PSTR("\"mac\":\"$X:$X:$X:$X:$X:$X\","), mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 
 	bfill.emit_p(PSTR("\"loc\":\"$O\",\"jsp\":\"$O\",\"wsp\":\"$O\",\"wto\":{$O},\"ifkey\":\"$O\",\"mqtt\":{$O},\"wtdata\":$S,\"wterr\":$D,"),
@@ -1190,8 +1167,6 @@ void server_change_values()
 	char *p = NULL;
 	extern uint32_t reboot_timer;
 	if(!process_password()) return;
-	if (m_client)
-		p = get_buffer;  
 #else
 	char *p = get_buffer;
 #endif	
@@ -1274,8 +1249,6 @@ void server_change_scripturl() {
 #if defined(ESP8266)
 	char *p = NULL;
 	if(!process_password()) return;
-	if (m_client)
-		p = get_buffer;  
 #else  
 	char *p = get_buffer;
 #endif
@@ -1313,8 +1286,6 @@ void server_change_options()
 #if defined(ESP8266)
 	char *p = NULL;
 	if(!process_password()) return;
-	if (m_client)
-		p = get_buffer;  
 #else  
 	char *p = get_buffer;
 #endif
@@ -1476,8 +1447,6 @@ void server_change_password() {
 #if defined(ESP8266)
 	char* p = NULL;
 	if(!process_password()) return;
-	if (m_client)
-		p = get_buffer;  
 #else
 	char* p = get_buffer;
 #endif
@@ -1530,8 +1499,6 @@ void server_change_manual() {
 #if defined(ESP8266)
 	char *p = NULL;
 	if(!process_password()) return;
-	if (m_client)
-		p = get_buffer;  
 #else
 	char *p = get_buffer;
 #endif
@@ -1625,8 +1592,6 @@ void server_json_log() {
 #if defined(ESP8266)
 	char *p = NULL;
 	if(!process_password()) return;
-	if (m_client)
-		p = get_buffer;  
 #else
 	char *p = get_buffer;
 #endif
@@ -1666,7 +1631,7 @@ void server_json_log() {
 	rewind_ether_buffer();
 	print_json_header(false);
 	//bfill.emit_p(PSTR("$F$F$F$F\r\n"), html200OK, htmlContentJSON, htmlAccessControl, htmlNoCache);
-	//wifi_server->sendContent(ether_buffer);
+	//w_server->sendContent(ether_buffer);
 #else
 	print_json_header(false);
 #endif
@@ -1762,8 +1727,6 @@ void server_delete_log() {
 #if defined(ESP8266)
 	char *p = NULL;
 	if(!process_password()) return;
-	if (m_client)
-		p = get_buffer;  
 #else  
 	char *p = get_buffer;
 #endif
@@ -1919,7 +1882,7 @@ void on_sta_upload_fin() {
 void on_ap_upload_fin() { on_sta_upload_fin(); }
 
 void on_sta_upload() {
-	HTTPUpload& upload = wifi_server->upload();
+	HTTPUpload& upload = w_server->upload();
 	if(upload.status == UPLOAD_FILE_START){
 		WiFiUDP::stopAll();
 		DEBUG_PRINT(F("upload: "));
@@ -1948,7 +1911,7 @@ void on_sta_upload() {
 }
 
 void on_ap_upload() { 
-	HTTPUpload& upload = wifi_server->upload();
+	HTTPUpload& upload = w_server->upload();
 	if(upload.status == UPLOAD_FILE_START){
 		DEBUG_PRINT(F("upload: "));
 		DEBUG_PRINTLN(upload.filename);
@@ -1975,12 +1938,12 @@ void on_ap_upload() {
 }
 
 void start_server_client() {
-	if(!wifi_server) return;
+	if(!w_server) return;
 	
-	wifi_server->on("/", server_home);	// handle home page
-	wifi_server->on("/index.html", server_home);
-	wifi_server->on("/update", HTTP_GET, on_sta_update); // handle firmware update
-	wifi_server->on("/update", HTTP_POST, on_sta_upload_fin, on_sta_upload);	
+	w_server->on("/", server_home);	// handle home page
+	w_server->on("/index.html", server_home);
+	w_server->on("/update", HTTP_GET, on_sta_update); // handle firmware update
+	w_server->on("/update", HTTP_POST, on_sta_upload_fin, on_sta_upload);	
 	
 	// set up all other handlers
 	char uri[4];
@@ -1989,25 +1952,25 @@ void start_server_client() {
 	for(int i=0;i<sizeof(urls)/sizeof(URLHandler);i++) {
 		uri[1]=pgm_read_byte(_url_keys+2*i);
 		uri[2]=pgm_read_byte(_url_keys+2*i+1);
-		wifi_server->on(uri, urls[i]);
+		w_server->on(uri, urls[i]);
 	}
-	wifi_server->begin();
+	w_server->begin();
 }
 
 void start_server_ap() {
-	if(!wifi_server) return;
+	if(!w_server) return;
 	
 	scanned_ssids = scan_network();
 	String ap_ssid = get_ap_ssid();
 	start_network_ap(ap_ssid.c_str(), NULL);
 	delay(500);
-	wifi_server->on("/", on_ap_home);
-	wifi_server->on("/jsap", on_ap_scan);
-	wifi_server->on("/ccap", on_ap_change_config);
-	wifi_server->on("/jtap", on_ap_try_connect);
-	wifi_server->on("/update", HTTP_GET, on_ap_update);
-	wifi_server->on("/update", HTTP_POST, on_ap_upload_fin, on_ap_upload);
-	wifi_server->onNotFound(on_ap_home);
+	w_server->on("/", on_ap_home);
+	w_server->on("/jsap", on_ap_scan);
+	w_server->on("/ccap", on_ap_change_config);
+	w_server->on("/jtap", on_ap_try_connect);
+	w_server->on("/update", HTTP_GET, on_ap_update);
+	w_server->on("/update", HTTP_POST, on_ap_upload_fin, on_ap_upload);
+	w_server->onNotFound(on_ap_home);
 
 	// set up all other handlers
 	char uri[4];
@@ -2016,10 +1979,10 @@ void start_server_ap() {
 	for(int i=0;i<sizeof(urls)/sizeof(URLHandler);i++) {
 		uri[1]=pgm_read_byte(_url_keys+2*i);
 		uri[2]=pgm_read_byte(_url_keys+2*i+1);
-		wifi_server->on(uri, urls[i]);
+		w_server->on(uri, urls[i]);
 	}
 	
-	wifi_server->begin();
+	w_server->begin();
 	os.lcd.setCursor(0, -1);
 	os.lcd.print(F("OSAP:"));
 	os.lcd.print(ap_ssid);
@@ -2089,11 +2052,11 @@ void handle_web_request(char *p) {
 					}
 				}
 				if (ret == -1) {
-					if (m_client)
-						m_client->stop();
 #if defined(ESP8266)
-					else
-						 wifi_server->client().stop();
+						w_server->client().stop();
+#else
+						if (m_client)
+							m_client->stop();
 #endif
 					return;
 				}				 
@@ -2122,7 +2085,41 @@ void handle_web_request(char *p) {
 }
 
 #if defined(ARDUINO)
+#define NTP_NTRIES 10
 /** NTP sync request */
+#if defined(ESP8266)
+ulong getNtpTime() {
+	static bool configured = false;
+	if(!configured) {
+		byte ntpip[4] = {
+		os.iopts[IOPT_NTP_IP1],
+		os.iopts[IOPT_NTP_IP2],
+		os.iopts[IOPT_NTP_IP3],
+		os.iopts[IOPT_NTP_IP4]};	// todo: handle changes to ntpip dynamically
+		if (!os.iopts[IOPT_NTP_IP1] || os.iopts[IOPT_NTP_IP1] == '0') {
+			DEBUG_PRINTLN(F("using default time servers"));
+			configTime(0, 0, "time.google.com", "time.nist.gov", "time.windows.com");
+		} else {
+			DEBUG_PRINTLN(F("using custom time server"));
+			String ntp = IPAddress(ntpip[0],ntpip[1],ntpip[2],ntpip[3]).toString();
+			configTime(0, 0, ntp.c_str(), "time.google.com", "time.nist.gov");
+		}
+		configured = true;
+	}
+	byte tries = 0;
+	ulong gt = 0;
+	while(tries<NTP_NTRIES) {
+		gt = time(NULL);
+		DEBUG_PRINT(gt);
+		DEBUG_PRINT("|");
+		if(gt>1577836800UL)	break;
+		else gt = 0;
+		delay(1000);
+		tries++;
+	}
+	return gt;
+}
+#else	// AVR
 ulong getNtpTime() {
 
 	// only proceed if we are connected
@@ -2130,17 +2127,10 @@ ulong getNtpTime() {
 
 	uint16_t port = (uint16_t)(os.iopts[IOPT_HTTPPORT_1]<<8) + (uint16_t)os.iopts[IOPT_HTTPPORT_0];
 	port = (port==8000) ? 8888:8000; // use a different port than http port
-	UDP *udp = NULL;
-	#if defined(ESP8266)
-		if(m_server) udp = new EthernetUDP();
-		else udp = new WiFiUDP();
-	#else
-		udp = new EthernetUDP();
-	#endif
+	UDP *udp = new EthernetUDP();
 
 	#define NTP_PACKET_SIZE 48
 	#define NTP_PORT 123
-	#define NTP_NTRIES 10
 	#define N_PUBLIC_SERVERS 5
 	
 	static const char* public_ntp_servers[] = {
@@ -2227,4 +2217,5 @@ ulong getNtpTime() {
 	delete udp;
 	return 0;
 }
+#endif
 #endif

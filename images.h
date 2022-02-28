@@ -2,14 +2,14 @@
 #define IMAGES_H
 
 enum {
-	ICON_CONNECTED = 0,
-	ICON_DISCONNECTED,
+	ICON_ETHER_CONNECTED = 0,
+	ICON_ETHER_DISCONNECTED,
+	ICON_WIFI_CONNECTED,
+	ICON_WIFI_DISCONNECTED,
 	ICON_REMOTEXT,
 	ICON_RAINDELAY,
 	ICON_RAIN,
 	ICON_SOIL,
-	ICON_ETHER_CONNECTED,
-	ICON_ETHER_DISCONNECTED,
 	NUM_CUSTOM_ICONS
 };
 
@@ -63,14 +63,14 @@ const char WiFi_Logo_image[] PROGMEM = {
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 	};
 
-const char _iconimage_connected[] PROGMEM = {
+const char _iconimage_wifi_connected[] PROGMEM = {
 	0x00, 0x00, 0x00, 0x00,
 	0x00, 0x00, 0x80, 0x80,
 	0xA0, 0xA0, 0xA8, 0xA8,
 	0xAA, 0xAA, 0x00, 0x00,
 	};
 
-const char _iconimage_disconnected[] PROGMEM = {
+const char _iconimage_wifi_disconnected[] PROGMEM = {
 	0x00, 0x00, 0x00, 0x11,
 	0x0A, 0x04, 0x8A, 0x91,
 	0xA0, 0xA0, 0xA8, 0xA8,

@@ -469,31 +469,41 @@ void(* resetFunc) (void) = 0; // AVR software reset function
 byte OpenSprinkler::start_network() {
 	lcd_print_line_clear_pgm(PSTR("Starting..."), 1);
 	uint16_t httpport = (uint16_t)(iopts[IOPT_HTTPPORT_1]<<8) + (uint16_t)iopts[IOPT_HTTPPORT_0];
+#if !defined(ESP8266)
 	if(m_server)	{ delete m_server; m_server = NULL; }
-	
+#endif
+
 	if (start_ether()) {
+
+#if defined(ESP8266)
+		if(w_server) { delete w_server; w_server = NULL; }
+		w_server = new ESP8266WebServer(httpport);
+		useEth = true;
+#else // AVR
 		m_server = new EthernetServer(httpport);
 		m_server->begin();
+		useEth = true;
+#endif
 
 		//udp = new EthernetUDP();
 		//udp->begin((httpport==8000) ? 8888 : 8000); // start udp on a different port than httpport
 
-#if defined(ESP8266)
+//#if defined(ESP8266)
 		// turn off WiFi when ether is active
 		// todo: add option to keep both ether and wifi active
-		WiFi.mode(WIFI_OFF);
-#endif
+		// lwip: WiFi.mode(WIFI_OFF);
+//#endif
 
 		return 1;
 
 	}	else {
 
 #if defined(ESP8266)
-		if(wifi_server) { delete wifi_server; wifi_server = NULL; }
+		if(w_server) { delete w_server; w_server = NULL; }
 		if(get_wifi_mode()==WIFI_MODE_AP) {
-			wifi_server = new ESP8266WebServer(80);
+			w_server = new ESP8266WebServer(80);
 		} else {
-			wifi_server = new ESP8266WebServer(httpport);
+			w_server = new ESP8266WebServer(httpport);
 		}
 
 		//udp = new WiFiUDP();
@@ -510,7 +520,47 @@ byte OpenSprinkler::start_network() {
 byte OpenSprinkler::start_ether() {
 #if defined(ESP8266)
 	if(hw_rev<2) return 0;	// ethernet capability is only available after hw_rev 2
-#endif	
+	
+  SPI.begin();
+  SPI.setBitOrder(MSBFIRST);
+  SPI.setDataMode(SPI_MODE0);
+  SPI.setFrequency(4000000);
+	
+	eth.setDefault();	
+	load_hardware_mac((uint8_t*)tmp_buffer, true);
+	if(!eth.begin((uint8_t*)tmp_buffer))	return 0;
+		
+	lcd_print_line_clear_pgm(PSTR("Start wired link"), 1);
+	
+	// todo: lwip add timeout
+  while (!eth.connected()) {
+    DEBUG_PRINT(".");
+    delay(1000);
+  }	
+
+  DEBUG_PRINTLN();
+  DEBUG_PRINT("eth.ip:");
+  DEBUG_PRINTLN(eth.localIP());
+  DEBUG_PRINT("eth.dns:");
+	DEBUG_PRINTLN(WiFi.dnsIP());
+  	
+	if (iopts[IOPT_USE_DHCP]) {
+		memcpy(iopts+IOPT_STATIC_IP1, &(eth.localIP()[0]), 4);
+		memcpy(iopts+IOPT_GATEWAY_IP1, &(eth.gatewayIP()[0]),4);
+		memcpy(iopts+IOPT_DNS_IP1, &(WiFi.dnsIP()[0]), 4); // todo: lwip need dns ip
+		memcpy(iopts+IOPT_SUBNET_MASK1, &(eth.subnetMask()[0]), 4);
+		iopts_save();			
+	} else {
+		IPAddress staticip(iopts+IOPT_STATIC_IP1);
+		IPAddress gateway(iopts+IOPT_GATEWAY_IP1);
+		IPAddress dns(iopts+IOPT_DNS_IP1);
+		IPAddress subn(iopts+IOPT_SUBNET_MASK1);
+		eth.config(staticip, gateway, subn, dns);
+	}
+
+	return 1;
+	
+#else
 	Ethernet.init(PIN_ETHER_CS);	// make sure to call this before any Ethernet calls
 	if(Ethernet.hardwareStatus()==EthernetNoHardware) return 0;
 	load_hardware_mac((uint8_t*)tmp_buffer, true);
@@ -533,15 +583,14 @@ byte OpenSprinkler::start_ether() {
 	}
 
 	return 1;
+#endif
 }
 
 bool OpenSprinkler::network_connected(void) {
 #if defined (ESP8266)
-	if(m_server) {
-		return (Ethernet.linkStatus()==LinkON);
-	} else {
+	if(useEth) return true; // todo: fix this
+	else
 		return (get_wifi_mode()==WIFI_MODE_STA && WiFi.status()==WL_CONNECTED && state==OS_STATE_CONNECTED);
-	}
 #else
 	return (Ethernet.linkStatus()==LinkON);
 #endif
@@ -877,8 +926,8 @@ void OpenSprinkler::begin() {
 
 	lcd_start();
 
-	lcd.createChar(ICON_CONNECTED, _iconimage_connected);
-	lcd.createChar(ICON_DISCONNECTED, _iconimage_disconnected);
+	lcd.createChar(ICON_ETHER_CONNECTED, _iconimage_ether_connected);
+	lcd.createChar(ICON_ETHER_DISCONNECTED, _iconimage_ether_disconnected);
 	lcd.createChar(ICON_REMOTEXT, _iconimage_remotext);
 	lcd.createChar(ICON_RAINDELAY, _iconimage_raindelay);
 	lcd.createChar(ICON_RAIN, _iconimage_rain);
@@ -887,8 +936,8 @@ void OpenSprinkler::begin() {
 	#if defined(ESP8266)
 
 		/* create custom characters */
-		lcd.createChar(ICON_ETHER_CONNECTED, _iconimage_ether_connected);
-		lcd.createChar(ICON_ETHER_DISCONNECTED, _iconimage_ether_disconnected);
+		lcd.createChar(ICON_WIFI_CONNECTED, _iconimage_wifi_connected);
+		lcd.createChar(ICON_WIFI_DISCONNECTED, _iconimage_wifi_disconnected);
 		
 		lcd.setCursor(0,0);
 		lcd.print(F("Init file system"));
@@ -1685,10 +1734,8 @@ int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char*
 
 	Client *client;
 	#if defined(ESP8266)
-		EthernetClient etherClient;
 		WiFiClient wifiClient;
-		if(m_server) client = &etherClient;
-		else client = &wifiClient;
+		client = &wifiClient;
 	#else
 		EthernetClient etherClient;
 		client = &etherClient;
@@ -1697,10 +1744,13 @@ int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char*
 	#define HTTP_CONNECT_NTRIES 3
 	byte tries = 0;
 	do {
-		DEBUG_PRINT(F("host: " ));
 		DEBUG_PRINT(server);
 		DEBUG_PRINT(":");
-		DEBUG_PRINTLN(port);
+		DEBUG_PRINT(port);
+		DEBUG_PRINT("(");
+		DEBUG_PRINT(tries);
+		DEBUG_PRINTLN(")");
+		
 		if(client->connect(server, port)==1) break;
 		tries++;
 	} while(tries<HTTP_CONNECT_NTRIES);
@@ -1710,7 +1760,6 @@ int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char*
 		client->stop();
 		return HTTP_RQT_CONNECT_ERR;
 	}
-
 #else
 
 	EthernetClient etherClient;
@@ -1733,22 +1782,25 @@ int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char*
 	if(len > ETHER_BUFFER_SIZE) len = ETHER_BUFFER_SIZE;
 	if(client->connected()) {
 		client->write((uint8_t *)p, len);
+	} else {
+		DEBUG_PRINTLN(F("clint no longer connected"));
 	}
 	memset(ether_buffer, 0, ETHER_BUFFER_SIZE);
 	uint32_t stoptime = millis()+timeout;
 
-#if defined(ARDUINO)
-	while(client->connected()) {
-		int nbytes = client->available();
-		if(nbytes>0) {
-			if(nbytes>ETHER_BUFFER_SIZE) nbytes=ETHER_BUFFER_SIZE;
-			client->read((uint8_t*)ether_buffer, nbytes);
-		}
+/*#if defined(ARDUINO)
+	while(client->available()==0) {
 		if(millis()>stoptime) {
 			client->stop();
-			return HTTP_RQT_TIMEOUT;			
-		}
+			return HTTP_RQT_TIMEOUT;
+		}		
 	}
+	int nbytes = client->available();
+	if(nbytes>0) {
+		if(nbytes>ETHER_BUFFER_SIZE) nbytes=ETHER_BUFFER_SIZE;
+		client->read((uint8_t*)ether_buffer, nbytes);
+	}
+	
 #else
 	while(client->connected()) {
 		int len=client->read((uint8_t *)ether_buffer, ETHER_BUFFER_SIZE);
@@ -1758,7 +1810,20 @@ int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char*
 			return HTTP_RQT_TIMEOUT;
 		}
 	}
-#endif
+#endif*/
+
+	while(client->available()==0) {
+		if(millis()>stoptime) {
+			client->stop();
+			return HTTP_RQT_TIMEOUT;
+		}		
+	}
+	int nbytes = client->available();
+	if(nbytes>0) {
+		if(nbytes>ETHER_BUFFER_SIZE) nbytes=ETHER_BUFFER_SIZE;
+		client->read((uint8_t*)ether_buffer, nbytes);
+	}
+
 	client->stop();
 	if(strlen(ether_buffer)==0) return HTTP_RQT_EMPTY_RETURN;
 	if(callback) callback(ether_buffer);
@@ -2212,15 +2277,11 @@ void OpenSprinkler::lcd_print_mac(const byte *mac) {
 		lcd.print((mac[i]&0x0F), HEX);
 		if(i==4) lcd.setCursor(0, 1);
 	}
-#if defined(ESP8266)
-	if(m_server) {
+	if(useEth) {
 		lcd_print_pgm(PSTR(" (Ether MAC)"));
 	} else {
 		lcd_print_pgm(PSTR(" (WiFi MAC)"));
 	}
-#else
-	lcd_print_pgm(PSTR(" (MAC)"));	
-#endif	
 }
 
 /** print station bits */
@@ -2301,12 +2362,13 @@ void OpenSprinkler::lcd_print_station(byte line, char c) {
 
 	lcd.setCursor(LCD_CURSOR_NETWORK, 1);
 #if defined(ESP8266)
-	if(m_server)
-		lcd.write(Ethernet.linkStatus()==LinkON?ICON_ETHER_CONNECTED:ICON_ETHER_DISCONNECTED);
+	if(useEth) {
+		lcd.write(eth.connected()?ICON_ETHER_CONNECTED:ICON_ETHER_DISCONNECTED);	// todo: need to detect ether status
+	}
 	else
-		lcd.write(WiFi.status()==WL_CONNECTED?ICON_CONNECTED:ICON_DISCONNECTED);
+		lcd.write(WiFi.status()==WL_CONNECTED?ICON_WIFI_CONNECTED:ICON_WIFI_DISCONNECTED);
 #else
-	lcd.write(status.network_fails>2?ICON_DISCONNECTED:ICON_CONNECTED);  // if network failure detection is more than 2, display disconnect icon
+	lcd.write(status.network_fails>2?ICON_ETHER_DISCONNECTED:ICON_ETHER_CONNECTED);  // if network failure detection is more than 2, display disconnect icon
 #endif
 }
 
@@ -2621,6 +2683,7 @@ void OpenSprinkler::config_ip() {
 }
 
 void OpenSprinkler::save_wifi_ip() {
+	// todo: handle wired ethernet
 	if(iopts[IOPT_USE_DHCP] && WiFi.status() == WL_CONNECTED) {
 		memcpy(iopts+IOPT_STATIC_IP1, &(WiFi.localIP()[0]), 4);
 		memcpy(iopts+IOPT_GATEWAY_IP1, &(WiFi.gatewayIP()[0]),4);

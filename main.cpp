@@ -30,13 +30,16 @@
 #include "mqtt.h"
 
 #if defined(ARDUINO)
-	EthernetServer *m_server = NULL;
-	EthernetClient *m_client = NULL;
 	#if defined(ESP8266)
-		ESP8266WebServer *wifi_server = NULL;
+		ESP8266WebServer *w_server = NULL;	// due to lwIP, both WiFi and wired use the unified w_server variable
+		ENC28J60lwIP eth(PIN_ETHER_CS);
+		bool useEth = false;
 		static uint16_t led_blink_ms = LED_FAST_BLINK;
 	#else
-		SdFat sd;																	// SD card object
+		EthernetServer *m_server = NULL;
+		EthernetClient *m_client = NULL;
+		SdFat sd;	// SD card object
+		bool useEth = true;
 	#endif
 	unsigned long getNtpTime();
 #else // header and defs for RPI/BBB
@@ -176,10 +179,11 @@ void ui_state_machine() {
 					os.lcd.clear(0, 1);
 					os.lcd.setCursor(0, 0);
 					#if defined(ESP8266)
-					if (!m_server) { os.lcd.print(WiFi.gatewayIP()); }
-					else
-					#endif
+					if (useEth) {	os.lcd.print(eth.gatewayIP());	}
+					else { os.lcd.print(WiFi.gatewayIP()); }
+					#else
 					{	os.lcd.print(Ethernet.gatewayIP());	}
+					#endif
 					os.lcd.setCursor(0, 1);
 					os.lcd_print_pgm(PSTR("(gwip)"));
 					ui_state = UI_STATE_DISP_IP;
@@ -191,10 +195,11 @@ void ui_state_machine() {
 				os.lcd.clear(0, 1);  
 				os.lcd.setCursor(0, 0);
 				#if defined(ESP8266)
-				if (!m_server) { os.lcd.print(WiFi.localIP());	}
-				else
-				#endif
+				if (useEth) { os.lcd.print(eth.localIP()); }
+				else { os.lcd.print(WiFi.localIP()); }
+				#else
 				{ os.lcd.print(Ethernet.localIP()); }
+				#endif
 				os.lcd.setCursor(0, 1);
 				os.lcd_print_pgm(PSTR(":"));
 				uint16_t httpport = (uint16_t)(os.iopts[IOPT_HTTPPORT_1]<<8) + (uint16_t)os.iopts[IOPT_HTTPPORT_0];
@@ -223,11 +228,7 @@ void ui_state_machine() {
 			} else {	// clicking B2: display MAC
 				os.lcd.clear(0, 1);
 				byte mac[6];
-				#if defined(ESP8266)
-				os.load_hardware_mac(mac, m_server!=NULL);
-				#else
-				os.load_hardware_mac(mac);
-				#endif
+				os.load_hardware_mac(mac, useEth);
 				os.lcd_print_mac(mac);
 				ui_state = UI_STATE_DISP_GW;
 			}
@@ -292,7 +293,7 @@ void ui_state_machine() {
 void do_setup() {
 	/* Clear WDT reset flag. */
 #if defined(ESP8266)
-	if(wifi_server) { delete wifi_server; wifi_server = NULL; }
+	if(w_server) { delete w_server; w_server = NULL; }
 	WiFi.persistent(false);
 	led_blink_ms = LED_FAST_BLINK;
 #else
@@ -328,6 +329,7 @@ void do_setup() {
 	} else {
 		os.status.network_fails = 1;
 	}
+	
 	os.status.req_network = 0;
 	os.status.req_ntpsync = 1;
 
@@ -424,148 +426,83 @@ void do_loop()
 #if defined(ARDUINO)	// Process Ethernet packets for Arduino
 	#if defined(ESP8266)
 	static ulong connecting_timeout;
-	if (m_server) {	// if wired Ethernet
-		led_blink_ms = 0;
-
-		#if defined(ENABLE_DEBUG)
-			// this section prints out ENC28J60 register values onto LCD
-			#define PHY_TIMEOUT 10
-			static ulong phy_timeout = 0;
-			static ulong n_reinits = 0;
-			if(curr_time >= phy_timeout) {
-				#define ENC28J60_EIR  	0x1C
-				#define ENC28J60_ESTAT	0x1D
-				#define ENC28J60_ECON1	0x1F
-
-				#define ENC28J60_EIR_RXERIF			0x01
-				#define ENC28J60_ESTAT_BUFER		0x40
-				#define ENC28J60_ESTAT_LATCOL		0x10
-				#define ENC28J60_ESTAT_TXABRT		0x02
-				#define ENC28J60_ECON1_RXEN			0x04
-				uint16_t estat = Enc28J60Network::readReg((uint8_t) ENC28J60_ESTAT);
-				uint16_t eir = Enc28J60Network::readReg((uint8_t) ENC28J60_EIR);
-				uint16_t econ1 = Enc28J60Network::readReg((uint8_t) ENC28J60_ECON1);
-
-				os.lcd.setCursor(0,-1);
-				os.lcd.print(eir, HEX);
-				os.lcd.print("|");
-				os.lcd.print(estat, HEX);
-				os.lcd.print("|");
-				os.lcd.print(econ1, HEX);
-				os.lcd.print("|");
-				os.lcd.print(n_reinits);
-				os.lcd.print(F("         "));
-
-				/* Detect possible enc28j60 problems */
-				if( (eir & ENC28J60_EIR_RXERIF) || (estat & ENC28J60_ESTAT_BUFER) ||
-					  (estat & ENC28J60_ESTAT_LATCOL) || (estat & ENC28J60_ESTAT_TXABRT) || 
-					  ((econ1 & ENC28J60_ECON1_RXEN) == 0) ) {
-					os.load_hardware_mac((uint8_t*)tmp_buffer, true);
-					Enc28J60Network::init((uint8_t*)tmp_buffer);
-					n_reinits ++;
-				}
-
-				phy_timeout = curr_time + PHY_TIMEOUT;
-			}		
-
-		#endif
-
-		static unsigned long dhcp_timeout = 0;
-		if(curr_time > dhcp_timeout) {
-			Ethernet.maintain();
-			dhcp_timeout = curr_time + DHCP_CHECKLEASE_INTERVAL;
-		}
-		EthernetClient client = m_server->available();
-		if (client) {
-			ulong cli_timeout = now()+CLIENT_READ_TIMEOUT;
-			while(client.connected() && now()<cli_timeout) {
-				size_t size = client.available();
-				if(size>0) {
-					if(size>ETHER_BUFFER_SIZE) size=ETHER_BUFFER_SIZE;
-					int len = client.read((uint8_t*) ether_buffer, size);
-					if(len>0) {
-						m_client = &client;
-						ether_buffer[len] = 0;	// properly end the buffer
-						handle_web_request(ether_buffer);
-						m_client = NULL;
-						break;
-					}
-				}
-			}
-			client.stop();
-		}
-
-	} else {	
-		switch(os.state) {
-		case OS_STATE_INITIAL:
-			if(os.get_wifi_mode()==WIFI_MODE_AP) {
-				start_server_ap();
-				os.state = OS_STATE_CONNECTED;
-				connecting_timeout = 0;
-			} else {
-				led_blink_ms = LED_SLOW_BLINK;
-				start_network_sta(os.wifi_ssid.c_str(), os.wifi_pass.c_str());
-				os.config_ip();
-				os.state = OS_STATE_CONNECTING;
-				connecting_timeout = millis() + 120000L;
-				os.lcd.setCursor(0, -1);
-				os.lcd.print(F("Connecting to..."));			
-				os.lcd.setCursor(0, 2);
-				os.lcd.print(os.wifi_ssid);
-			}
-			break;
-			
-		case OS_STATE_TRY_CONNECT:
-			led_blink_ms = LED_SLOW_BLINK;	
-			start_network_sta_with_ap(os.wifi_ssid.c_str(), os.wifi_pass.c_str());
-			os.config_ip();
+	switch(os.state) {
+	case OS_STATE_INITIAL:
+		if(useEth) {
+			led_blink_ms = 0;
+			os.set_screen_led(LOW);
+			os.lcd.clear();
+			os.save_wifi_ip();
+			start_server_client();
 			os.state = OS_STATE_CONNECTED;
-			break;
-		 
-		case OS_STATE_CONNECTING:
-			if(WiFi.status() == WL_CONNECTED) {
-				led_blink_ms = 0;
-				os.set_screen_led(LOW);
-				os.lcd.clear();
-				os.save_wifi_ip();
-				start_server_client();
-				os.state = OS_STATE_CONNECTED;
+			connecting_timeout = 0;			
+		}
+		else if(os.get_wifi_mode()==WIFI_MODE_AP) {
+			start_server_ap();
+			os.state = OS_STATE_CONNECTED;
+			connecting_timeout = 0;
+		} else {
+			led_blink_ms = LED_SLOW_BLINK;
+			start_network_sta(os.wifi_ssid.c_str(), os.wifi_pass.c_str());
+			os.config_ip();
+			os.state = OS_STATE_CONNECTING;
+			connecting_timeout = millis() + 120000L;
+			os.lcd.setCursor(0, -1);
+			os.lcd.print(F("Connecting to..."));			
+			os.lcd.setCursor(0, 2);
+			os.lcd.print(os.wifi_ssid);
+		}
+		break;
+		
+	case OS_STATE_TRY_CONNECT:
+		led_blink_ms = LED_SLOW_BLINK;	
+		start_network_sta_with_ap(os.wifi_ssid.c_str(), os.wifi_pass.c_str());
+		os.config_ip();
+		os.state = OS_STATE_CONNECTED;
+		break;
+	 
+	case OS_STATE_CONNECTING:
+		if(WiFi.status() == WL_CONNECTED) {
+			led_blink_ms = 0;
+			os.set_screen_led(LOW);
+			os.lcd.clear();
+			os.save_wifi_ip();
+			start_server_client();
+			os.state = OS_STATE_CONNECTED;
+			connecting_timeout = 0;
+		} else {
+			if(millis()>connecting_timeout) {
+				os.state = OS_STATE_INITIAL;
+				WiFi.disconnect(true);
+				DEBUG_PRINTLN(F("timeout"));
+			}
+		}
+		break;
+		
+	case OS_STATE_CONNECTED:
+		if(os.get_wifi_mode() == WIFI_MODE_AP) {
+			w_server->handleClient();
+			connecting_timeout = 0;
+			if(os.get_wifi_mode()==WIFI_MODE_STA) {
+				// already in STA mode, waiting to reboot
+				break;
+			}
+			if(WiFi.status()==WL_CONNECTED && WiFi.localIP()) {
+				os.iopts[IOPT_WIFI_MODE] = WIFI_MODE_STA;
+				os.iopts_save();
+				os.reboot_dev(REBOOT_CAUSE_WIFIDONE);
+			}
+		} else {
+			if(useEth || WiFi.status() == WL_CONNECTED) {
+				w_server->handleClient();
 				connecting_timeout = 0;
 			} else {
-				if(millis()>connecting_timeout) {
-					os.state = OS_STATE_INITIAL;
-					WiFi.disconnect(true);
-					DEBUG_PRINTLN(F("timeout"));
-				}
+				DEBUG_PRINTLN(F("WiFi disconnected, going back to initial"));
+				os.state = OS_STATE_INITIAL;
+				WiFi.disconnect(true);
 			}
-			break;
-			
-		case OS_STATE_CONNECTED:
-			if(os.get_wifi_mode() == WIFI_MODE_AP) {
-				wifi_server->handleClient();
-				connecting_timeout = 0;
-				if(os.get_wifi_mode()==WIFI_MODE_STA) {
-					// already in STA mode, waiting to reboot
-					break;
-				}
-				if(WiFi.status()==WL_CONNECTED && WiFi.localIP()) {
-					os.iopts[IOPT_WIFI_MODE] = WIFI_MODE_STA;
-					os.iopts_save();
-					os.reboot_dev(REBOOT_CAUSE_WIFIDONE);
-				}
-			}
-			else {
-				if(WiFi.status() == WL_CONNECTED) {
-					wifi_server->handleClient();
-					connecting_timeout = 0;
-				} else {
-					DEBUG_PRINTLN(F("WiFi disconnected, going back to initial"));
-					os.state = OS_STATE_INITIAL;
-					WiFi.disconnect(true);
-				}
-			}
-			break;
 		}
+		break;
 	}
 	
 	#else // AVR
@@ -1063,7 +1000,7 @@ void check_weather() {
 	if (os.status.program_busy) return;
 	
 #if defined(ESP8266)
-	if (!m_server) {
+	if (!useEth) { // todo: what about useEth==true?
 		if (os.get_wifi_mode()!=WIFI_MODE_STA || WiFi.status()!=WL_CONNECTED || os.state!=OS_STATE_CONNECTED) return;
 	}
 #endif
@@ -1472,8 +1409,9 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 					#if defined(ESP8266)
 					{
 						IPAddress _ip;
-						if (m_server) {
-							_ip = Ethernet.localIP();
+						if (useEth) {
+							//_ip = Ethernet.localIP();
+							_ip = eth.localIP();
 						} else {
 							_ip = WiFi.localIP();
 						}

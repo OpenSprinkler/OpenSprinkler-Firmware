@@ -131,9 +131,8 @@ static void getweather_callback_with_peel_header(char* buffer) {
 
 void GetWeather() {
 #if defined(ESP8266)
-	if(!m_server) {
+	if (!useEth)
 		if (os.state!=OS_STATE_CONNECTED || WiFi.status()!=WL_CONNECTED) return;
-	}
 #endif
 	// use temp buffer to construct get command
 	BufferFiller bf = tmp_buffer;

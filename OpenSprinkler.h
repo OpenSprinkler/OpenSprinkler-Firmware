@@ -35,18 +35,19 @@
 	#include <Arduino.h>
 	#include <Wire.h>
 	#include <SPI.h>
-	#include <Ethernet.h>
 	#include "I2CRTC.h"
 
 	#if defined(ESP8266)
 		#include <FS.h>
 		#include <LittleFS.h>
+		#include <ENC28J60lwIP.h>
 		#include <RCSwitch.h>
 		#include "SSD1306Display.h"
 		#include "espconnect.h"
 	#else
 		#include <SdFat.h>
 		#include "LiquidCrystal.h"
+		#include <Ethernet.h>
 	#endif
 	
 #else // headers for RPI/BBB/LINUX
@@ -57,6 +58,16 @@
 	#include <sys/stat.h>  
 	#include "etherport.h"
 #endif // end of headers
+
+#if defined(ARDUINO)
+	#if defined(ESP8266)
+	extern ESP8266WebServer *w_server;
+	extern ENC28J60lwIP eth;
+	#else
+	extern EthernetServer *m_server;
+	#endif
+	extern bool useEth;
+#endif
 
 /** Non-volatile data structure */
 struct NVConData {
@@ -307,7 +318,7 @@ public:
 	static void flash_screen();
 	static void toggle_screen_led();
 	static void set_screen_led(byte status);	
-	static byte get_wifi_mode() {return wifi_testmode ? WIFI_MODE_STA : iopts[IOPT_WIFI_MODE];}
+	static byte get_wifi_mode() { if (useEth) return WIFI_MODE_STA; else return wifi_testmode ? WIFI_MODE_STA : iopts[IOPT_WIFI_MODE];}
 	static byte wifi_testmode;
 	static String wifi_ssid, wifi_pass;
 	static void config_ip();
@@ -336,15 +347,5 @@ private:
 #endif // LCD functions
 	static byte engage_booster;
 };
-
-// todo
-#if defined(ARDUINO)
-	extern EthernetServer *m_server;
-	#if defined(ESP8266)
-	extern ESP8266WebServer *wifi_server;
-	#endif
-#else
-	extern EthernetServer *m_server;
-#endif
 
 #endif	// _OPENSPRINKLER_H

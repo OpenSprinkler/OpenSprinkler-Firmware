@@ -6,9 +6,9 @@ LIBS = . \
   $(ESP_LIBS)/ESP8266WebServer \
   $(ESP_LIBS)/ESP8266mDNS \
   $(ESP_LIBS)/LittleFS \
+	$(ESP_LIBS)/lwIP_enc28j60 \
   ~/Arduino/libraries/SSD1306 \
   ~/Arduino/libraries/rc-switch \
-  ~/Arduino/libraries/EthernetENC \
   ~/Arduino/libraries/pubsubclient \
 
 ESP_ROOT = $(HOME)/esp8266_3.0/

@@ -25,8 +25,10 @@
 	#include <Arduino.h>
 	#if defined(ESP8266)
 		#include <ESP8266WiFi.h>
+		#include <ENC28J60lwIP.h>		
+	#else
+		#include <Ethernet.h>		
 	#endif
-	#include <Ethernet.h>
 	#include <PubSubClient.h>
 
 	struct PubSubClient *mqtt_client = NULL;
@@ -100,7 +102,11 @@ void OSMqtt::init(void) {
 
 #if defined(ARDUINO)
 	uint8_t mac[6] = {0};
-	os.load_hardware_mac(mac, m_server!=NULL);
+	#if defined(ESP8266)
+	os.load_hardware_mac(mac, useEth);
+	#else
+	os.load_hardware_mac(mac, true);
+	#endif	
 	snprintf(id, MQTT_MAX_ID_LEN, "OS-%02X%02X%02X%02X%02X%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 #endif
 
@@ -213,8 +219,9 @@ void OSMqtt::loop(void) {
 
 	#if defined(ESP8266)
 		WiFiClient wifiClient;
+	#else
+		EthernetClient ethClient;
 	#endif
-	EthernetClient ethClient;
 
 int OSMqtt::_init(void) {
 	Client * client = NULL;
@@ -222,8 +229,7 @@ int OSMqtt::_init(void) {
     if (mqtt_client) { delete mqtt_client; mqtt_client = 0; }
 
 	#if defined(ESP8266)
-		if (m_server) client = &ethClient;
-		else client = &wifiClient;
+		client = &wifiClient;
 	#else
 		client = &ethClient;
 	#endif
