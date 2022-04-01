@@ -1,12 +1,15 @@
 OFLAG = -Os
 ARDMK_DIR = .
-ARDUINO_DIR = $(HOME)/arduino-1.8.5
+ARDUINO_DIR = $(HOME)/arduino-1.8.15
 ALTERNATE_CORE_PATH = $(HOME)/.arduino15/packages/MightyCore/hardware/avr/2.0.5
+# If compiling on macOS, use the following instead
+#ARDUINO_DIR = $(HOME)/Documents/Arduino/libraries
+#ALTERNATE_CORE_PATH = $(HOME)/Library/Arduino15/packages/MightyCore/hardware/avr/2.0.5
 BOARD_TAG = 1284
 MCU = atmega1284p
 VARIANT = sanguino
 F_CPU = 16000000L
-ARDUINO_LIBS = UIPEthernet Wire SdFat SPI pubsubclient
+ARDUINO_LIBS = EthernetENC Wire SdFat SPI pubsubclient
 MONITOR_PORT = /dev/ttyUSB0
 MONITOR_BAUDRATE = 115200
 include ./Arduino.mk

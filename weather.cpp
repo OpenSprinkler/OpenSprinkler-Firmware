@@ -24,7 +24,7 @@
 #include <stdlib.h>
 #include "OpenSprinkler.h"
 #include "utils.h"
-#include "server.h"
+#include "opensprinkler_server.h"
 #include "weather.h"
 
 extern OpenSprinkler os; // OpenSprinkler object
@@ -125,15 +125,15 @@ static void getweather_callback(char* buffer) {
 }
 
 static void getweather_callback_with_peel_header(char* buffer) {
+	DEBUG_PRINTLN(buffer);
 	peel_http_header(buffer);
 	getweather_callback(buffer);
 }
 
 void GetWeather() {
 #if defined(ESP8266)
-	if(!m_server) {
+	if (!useEth)
 		if (os.state!=OS_STATE_CONNECTED || WiFi.status()!=WL_CONNECTED) return;
-	}
 #endif
 	// use temp buffer to construct get command
 	BufferFiller bf = tmp_buffer;
@@ -174,6 +174,8 @@ void GetWeather() {
 	strcat(ether_buffer, " HTTP/1.0\r\nHOST: ");
 	strcat(ether_buffer, host);
 	strcat(ether_buffer, "\r\n\r\n");
+
+	DEBUG_PRINTLN(ether_buffer);
 
 	wt_errCode = HTTP_RQT_NOT_RECEIVED;
 	int ret = os.send_http_request(host, ether_buffer, getweather_callback_with_peel_header);
