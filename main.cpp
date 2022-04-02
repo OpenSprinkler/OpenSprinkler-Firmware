@@ -33,6 +33,7 @@
 #if defined(ARDUINO)
 	#if defined(ESP8266)
 		#include <ESP8266Ping.h>
+		extern "C" struct netif* eagle_lwip_getif (int netif_index);
 		ESP8266WebServer *w_server = NULL;	// due to lwIP, both WiFi and wired use the unified w_server variable
 		ENC28J60lwIP eth(PIN_ETHER_CS);
 		bool useEth = false;
@@ -397,6 +398,7 @@ void delete_log(char *name);
 #if defined(ESP8266)
 void start_server_ap();
 void start_server_client();
+bool check_enc28j60();
 #endif
 
 void handle_web_request(char *p);
@@ -938,6 +940,29 @@ void do_loop()
 				flowcount_rt_start = flow_count;
 			}
 		}
+
+		// dhcp and hw check:
+		static unsigned long dhcp_timeout = 0;
+		if(curr_time > dhcp_timeout) {
+			if (useEth) {
+				netif* intf = (netif*) eth.getNetIf();
+				dhcp_renew(intf);
+
+				if (dhcp_timeout > 0 && !check_enc28j60()) {
+					eth.resetEther();
+					if (!eth.connected()) {
+						os.nvdata.reboot_cause = REBOOT_CAUSE_NETWORK_FAIL;
+						os.status.safe_reboot = 1;
+					}
+				}
+			}
+			else if (WiFi.status() == WL_CONNECTED && os.get_wifi_mode()==WIFI_MODE_STA) {
+				netif* intf = eagle_lwip_getif(STATION_IF);
+				dhcp_renew(intf);
+			}
+			dhcp_timeout = curr_time + DHCP_CHECKLEASE_INTERVAL;
+		}
+
 
 		// perform ntp sync
 		// instead of using curr_time, which may change due to NTP sync itself
@@ -1713,7 +1738,7 @@ void check_network() {
 #endif
 #if defined(ARDUINO)
 #if defined(ESP8266)
-#if defined(CHECK_NET)
+
 	if (os.status.program_busy) {return;}
 
 	// check network condition periodically
@@ -1733,9 +1758,9 @@ void check_network() {
 		} else { //Ethernet
 			//if (!eth.connected()) return;
 			//failed = !Ping.ping(eth.gatewayIP(), 1); 
-			//os.status.req_ntpsync = 1;
-			//failed = !perform_ntp_sync();
-			failed = !eth.connected();
+			os.status.req_ntpsync = 1;
+			failed = !getNtpTime();
+			//failed = !eth.connected();
 		}
 
 		DEBUG_PRINT(F("check_network: failed="));
@@ -1760,10 +1785,32 @@ void check_network() {
 	}
 #endif
 #endif
-#endif
 }
 
-
+#if defined(ARDUINO)
+#if defined(ESP8266)
+#define NET_ENC28J60_EIR                                 0x1C
+#define NET_ENC28J60_ESTAT                               0x1D
+#define NET_ENC28J60_ECON1                               0x1F
+#define NET_ENC28J60_EIR_RXERIF                          0x01
+#define NET_ENC28J60_ESTAT_BUFFER                        0x40
+#define NET_ENC28J60_ECON1_RXEN                          0x04
+bool check_enc28j60()
+{
+	uint8_t stateEconRxen = eth.readreg((uint8_t) NET_ENC28J60_ECON1) & NET_ENC28J60_ECON1_RXEN;
+    // ESTAT.BUFFER rised on TX or RX error
+    // I think the test of this register is not necessary - EIR.RXERIF state checking may be enough
+    uint8_t stateEstatBuffer = eth.readreg((uint8_t) NET_ENC28J60_ESTAT) & NET_ENC28J60_ESTAT_BUFFER;
+    // EIR.RXERIF set on RX error
+    uint8_t stateEirRxerif = eth.readreg((uint8_t) NET_ENC28J60_EIR) & NET_ENC28J60_EIR_RXERIF;
+    if (!stateEconRxen || (stateEstatBuffer && stateEirRxerif)) {
+		DEBUG_PRINTLN(F("ENC28J60 FAILED - REBOOT!"))
+		return false;
+	}
+	return true;
+}
+#endif
+#endif
 
 /** Perform NTP sync */
 bool perform_ntp_sync() {
