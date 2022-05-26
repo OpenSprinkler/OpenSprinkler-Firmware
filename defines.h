@@ -36,7 +36,7 @@ typedef unsigned long ulong;
                             // if this number is different from the one stored in non-volatile memory
                             // a device reset will be automatically triggered
 
-#define OS_FW_MINOR      105  // Firmware minor version
+#define OS_FW_MINOR      106  // Firmware minor version
 
 /** Hardware version base numbers */
 #define OS_HW_VERSION_BASE   0x00
@@ -110,6 +110,8 @@ typedef unsigned long ulong;
 #define REBOOT_CAUSE_PROGRAM			11
 #define REBOOT_CAUSE_POWERON      99
 
+/** Too much current */
+#define MAX_CURRENT 3010 //Max mA
 
 /** WiFi defines */
 #define WIFI_MODE_AP       0xA9

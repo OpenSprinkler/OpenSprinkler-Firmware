@@ -903,6 +903,12 @@ void do_loop()
 					uint16_t curr = os.read_current();
 					os.lcd.print(curr);
 					os.lcd.print(F(" mA"));
+					
+					//Stop all stations if power usage is higher than MAX_CURRENT:
+					if (curr >= MAX_CURRENT) {
+						reset_all_stations_immediate();
+						write_log(LOGDATA_CURRENT, curr_time);
+					}
 				}
 			}
 			#endif

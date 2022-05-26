@@ -534,7 +534,8 @@ byte OpenSprinkler::start_ether() {
 	lcd_print_line_clear_pgm(PSTR("Start wired link"), 1);
 
 	// todo: lwip add timeout
-  while (!eth.connected()) {
+	int n = iopts[IOPT_USE_DHCP]?30:2;
+  while (!eth.connected() && n-- >0) {
     DEBUG_PRINT(".");
     delay(1000);
   }
