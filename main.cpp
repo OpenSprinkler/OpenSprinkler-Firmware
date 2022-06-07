@@ -952,17 +952,27 @@ void do_loop()
 		if(curr_time > dhcp_timeout) {
 			if (useEth) {
 				netif* intf = (netif*) eth.getNetIf();
-				dhcp_renew(intf);
+				if (os.iopts[IOPT_USE_DHCP])
+					dhcp_renew(intf);
 
-				if (dhcp_timeout > 0 && !check_enc28j60()) {
+				if (dhcp_timeout > 0 && !check_enc28j60()) { //ENC28J60 REGISTER CHECK!!
+					DEBUG_PRINT("Reconnect");
 					eth.resetEther();
+	
+					// todo: lwip add timeout
+					int n = os.iopts[IOPT_USE_DHCP]?30:2;
+  					while (!eth.connected() && n-- >0) {
+    					DEBUG_PRINT(".");
+    					delay(1000);
+  					}					
+
 					if (!eth.connected()) {
 						os.nvdata.reboot_cause = REBOOT_CAUSE_NETWORK_FAIL;
 						os.status.safe_reboot = 1;
 					}
 				}
 			}
-			else if (WiFi.status() == WL_CONNECTED && os.get_wifi_mode()==WIFI_MODE_STA) {
+			else if (os.iopts[IOPT_USE_DHCP] && WiFi.status() == WL_CONNECTED && os.get_wifi_mode()==WIFI_MODE_STA) {
 				netif* intf = eagle_lwip_getif(STATION_IF);
 				dhcp_renew(intf);
 			}
