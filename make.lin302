@@ -5,7 +5,7 @@ LIBS = . \
   $(ESP_LIBS)/ESP8266WiFi \
   $(ESP_LIBS)/ESP8266WebServer \
   $(ESP_LIBS)/ESP8266mDNS \
-  /data/libs/LittleFS \
+  $(ESO_LIBS)/LittleFS \
   /data/libs/lwIP_enc28j60 \
   /data/libs/SSD1306 \
   /data/libs/rc-switch \

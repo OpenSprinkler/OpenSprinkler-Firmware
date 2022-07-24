@@ -365,11 +365,15 @@ ISR(WDT_vect)
 
 void do_setup() {
 	initialiseEpoch();	 // initialize time reference for millis() and micros()
+	DEBUG_PRINT("do_setup1...");
 	os.begin();					 // OpenSprinkler init
+	DEBUG_PRINT("do_setup2...");
 	os.options_setup();  // Setup options
+	DEBUG_PRINT("do_setup3...");
 
 	pd.init();						// ProgramData init
 
+	DEBUG_PRINT("do_setup4...");
 	if (os.start_network()) {  // initialize network
 		DEBUG_PRINTLN("network established.");
 		os.status.network_fails = 0;

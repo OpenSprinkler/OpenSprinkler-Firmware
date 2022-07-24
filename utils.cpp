@@ -301,7 +301,14 @@ void remove_file(const char *fn) {
 bool file_exists(const char *fn) {
 #if defined(ESP8266)
 
-	return LittleFS.exists(fn);
+	//return LittleFS.exists(fn);
+	File f = LittleFS.open(fn, "r");
+	if (f) {
+		f.close();
+		return true;
+	}
+	return false;
+
 
 #elif defined(ARDUINO)
 

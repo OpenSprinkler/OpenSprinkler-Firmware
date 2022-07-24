@@ -529,6 +529,14 @@ byte OpenSprinkler::start_ether() {
 	eth.setDefault();
 	load_hardware_mac((uint8_t*)tmp_buffer, true);
 
+	if (!iopts[IOPT_USE_DHCP]) {
+		IPAddress staticip(iopts+IOPT_STATIC_IP1);
+		IPAddress gateway(iopts+IOPT_GATEWAY_IP1);
+		IPAddress dns(iopts+IOPT_DNS_IP1);
+		IPAddress subn(iopts+IOPT_SUBNET_MASK1);
+		eth.config(staticip, gateway, subn, dns);
+	}
+
 	if(!eth.begin((uint8_t*)tmp_buffer))	return 0;
 
 	lcd_print_line_clear_pgm(PSTR("Start wired link"), 1);
@@ -552,12 +560,6 @@ byte OpenSprinkler::start_ether() {
 		memcpy(iopts+IOPT_DNS_IP1, &(WiFi.dnsIP()[0]), 4); // todo: lwip need dns ip
 		memcpy(iopts+IOPT_SUBNET_MASK1, &(eth.subnetMask()[0]), 4);
 		iopts_save();
-	} else {
-		IPAddress staticip(iopts+IOPT_STATIC_IP1);
-		IPAddress gateway(iopts+IOPT_GATEWAY_IP1);
-		IPAddress dns(iopts+IOPT_DNS_IP1);
-		IPAddress subn(iopts+IOPT_SUBNET_MASK1);
-		eth.config(staticip, gateway, subn, dns);
 	}
 
 	return 1;
@@ -925,6 +927,7 @@ void OpenSprinkler::begin() {
 		baseline_current = 0;
 
 	#endif
+	
 
 	lcd_start();
 
@@ -2002,23 +2005,28 @@ void OpenSprinkler::factory_reset() {
 /** Setup function for options */
 void OpenSprinkler::options_setup() {
 
+	DEBUG_PRINT("option_setup...");
 	// Check reset conditions:
-	if (file_read_byte(IOPTS_FILENAME, IOPT_FW_VERSION)<219 ||	// fw version is invalid (<219)
-			!file_exists(DONE_FILENAME)) {													// done file doesn't exist
+	if (file_read_byte(IOPTS_FILENAME, IOPT_FW_VERSION)<220 ||	// fw version is invalid (<219)
+			!file_exists(DONE_FILENAME)) { // done file doesn't exist
 
 		factory_reset();
 
 	} else	{
 
 		iopts_load();
+
 		nvdata_load();
+
 		last_reboot_cause = nvdata.reboot_cause;
 		nvdata.reboot_cause = REBOOT_CAUSE_POWERON;
 		nvdata_save();
+
 		#if defined(ESP8266)
 		wifi_ssid = sopt_load(SOPT_STA_SSID);
 		wifi_pass = sopt_load(SOPT_STA_PASS);
 		#endif
+
 		attribs_load();
 	}
 
