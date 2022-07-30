@@ -5,7 +5,7 @@ LIBS = . \
   $(ESP_LIBS)/ESP8266WiFi \
   $(ESP_LIBS)/ESP8266WebServer \
   $(ESP_LIBS)/ESP8266mDNS \
-  $(ESO_LIBS)/LittleFS \
+  $(ESP_LIBS)/LittleFS \
   /data/libs/lwIP_enc28j60 \
   /data/libs/SSD1306 \
   /data/libs/rc-switch \
@@ -28,6 +28,7 @@ FLASH_SPEED = 80
 F_CPU = 160000000L
 
 BOARD = generic
+board_build.filesystem = littlefs
 
 EXCLUDE_DIRS = ./build-1284
 

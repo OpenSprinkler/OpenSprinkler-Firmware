@@ -307,14 +307,20 @@ void do_setup() {
 	DEBUG_PRINTLN(F("started"));
 
 	os.begin();					 // OpenSprinkler init
+	DEBUG_PRINTLN("do_setup1...");
 	os.options_setup();  // Setup options
+	DEBUG_PRINTLN("do_setup2...");
 
 	pd.init();						// ProgramData init
+	DEBUG_PRINTLN("do_setup3...");
 
 	// set time using RTC if it exists
 	if(RTC.exists())	setTime(RTC.get());
+	DEBUG_PRINTLN("do_setup4...");
+
 	os.lcd_print_time(os.now_tz());  // display time to LCD
 	os.powerup_lasttime = os.now_tz();
+	DEBUG_PRINTLN("do_setup5...");
 
 #if !defined(ESP8266)
 	// enable WDT
@@ -342,6 +348,8 @@ void do_setup() {
 	os.apply_all_station_bits(); // reset station bits
 
 	os.button_timeout = LCD_BACKLIGHT_TIMEOUT;
+	DEBUG_PRINTLN("do_setup6...");
+
 }
 
 // Arduino software reset function
@@ -365,15 +373,11 @@ ISR(WDT_vect)
 
 void do_setup() {
 	initialiseEpoch();	 // initialize time reference for millis() and micros()
-	DEBUG_PRINT("do_setup1...");
 	os.begin();					 // OpenSprinkler init
-	DEBUG_PRINT("do_setup2...");
 	os.options_setup();  // Setup options
-	DEBUG_PRINT("do_setup3...");
 
 	pd.init();						// ProgramData init
 
-	DEBUG_PRINT("do_setup4...");
 	if (os.start_network()) {  // initialize network
 		DEBUG_PRINTLN("network established.");
 		os.status.network_fails = 0;
@@ -1765,6 +1769,7 @@ void check_network() {
 	if (os.status.req_network) {
 		os.status.req_network = 0;
 
+		DEBUG_PRINT(F("check_network begin"));
 		// change LCD icon to indicate it's checking network
 		if (!ui_state) {
 	 		os.lcd.setCursor(LCD_CURSOR_NETWORK, 1);

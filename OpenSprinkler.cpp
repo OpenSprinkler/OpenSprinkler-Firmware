@@ -1934,7 +1934,13 @@ void OpenSprinkler::pre_factory_reset() {
 	#if defined(ESP8266)
 	lcd_print_line_clear_pgm(PSTR("Wiping flash.."), 0);
 	lcd_print_line_clear_pgm(PSTR("Please Wait..."), 1);
-	LittleFS.format();
+	while (!LittleFS.format()) {
+		DEBUG_PRINT("ERROR FORMATTING LitteFS");
+		delay(100);
+		LittleFS.end();
+		LittleFS.begin();
+		delay(100);
+	}
 	#else
 	// remove 'done' file as an indicator for reset
 	// todo os2.3 and ospi: delete log files and/or wipe SD card
