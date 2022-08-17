@@ -29,16 +29,16 @@
 
 // External variables defined in main ion file
 #if defined(ARDUINO)
-	
+
 	#if defined(ESP8266)
 
 		#include <FS.h>
 		#include "espconnect.h"
-	 
+
 		extern ESP8266WebServer *wifi_server;
 		extern EthernetServer *m_server;
 		extern EthernetClient *m_client;
-		
+
 		// Due to using ESP8266WebServer in WiFi mode, the return mechanism is different when it's in WiFi mode vs. wired Ethernet (i.e. when m_client!=NULL)
 		#define handle_return(x) {if(m_client) {return_code=x; return;} else {if(x==HTML_OK) server_send_content(); else server_send_result(x); wifi_server->client().stop(); return;}}
 
@@ -183,7 +183,7 @@ byte findKeyVal (const char *str,char *strbuf, uint16_t maxlen,const char *key,b
 	uint16_t i=0;
 	const char *kp;
 	kp=key;
-#if defined(ARDUINO)	
+#if defined(ARDUINO)
 	if (key_in_pgm) {
 		// key is in program memory space
 		while(*str &&  *str!=' ' && *str!='\n' && found==0){
@@ -284,7 +284,7 @@ void server_send_content() {
 	if (m_client) { return; }
 	wifi_server->sendContent(ether_buffer);
 	wifi_server->client().stop();
-	rewind_ether_buffer();	
+	rewind_ether_buffer();
 }
 
 void server_send_html(String html) {
@@ -309,7 +309,7 @@ void server_send_result(byte code, const char* item) {
 
 /*bool get_value_by_key(const char* key, long& val) {
 	if(wifi_server->hasArg(key)) {
-		val = wifi_server->arg(key).toInt();	 
+		val = wifi_server->arg(key).toInt();
 		return true;
 	} else {
 		return false;
@@ -318,7 +318,7 @@ void server_send_result(byte code, const char* item) {
 
 bool get_value_by_key(const char* key, String& val) {
 	if(wifi_server->hasArg(key)) {
-		val = wifi_server->arg(key);	 
+		val = wifi_server->arg(key);
 		return true;
 	} else {
 		return false;
@@ -379,7 +379,7 @@ void on_ap_change_config() {
 	if(os.get_wifi_mode()!=WIFI_MODE_AP) return;
 	if(wifi_server->hasArg("ssid")&&wifi_server->arg("ssid").length()!=0) {
 		os.wifi_ssid = wifi_server->arg("ssid");
-		os.wifi_pass = wifi_server->arg("pass"); 
+		os.wifi_pass = wifi_server->arg("pass");
 		os.sopt_save(SOPT_STA_SSID, os.wifi_ssid.c_str());
 		os.sopt_save(SOPT_STA_PASS, os.wifi_pass.c_str());
 		server_send_result(HTML_SUCCESS);
@@ -401,7 +401,7 @@ void on_ap_try_connect() {
 	if(WiFi.status() == WL_CONNECTED && WiFi.localIP()) {
 		// IP received by client, restart
 		//os.reboot_dev(REBOOT_CAUSE_WIFIDONE);
-	}  
+	}
 }
 
 #endif
@@ -420,7 +420,7 @@ boolean check_password(char *p)
 	if (os.iopts[IOPT_IGNORE_PASSWORD])  return true;
 	if (m_client && !p) {
 		p = get_buffer;
-	}  
+	}
 	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("pw"), true)) {
 		urlDecode(tmp_buffer);
 		if (os.password_verify(tmp_buffer))
@@ -455,7 +455,7 @@ void server_json_stations_attrib(const char* name, byte *attrib)
 void server_json_stations_main() {
 	server_json_stations_attrib(PSTR("masop"), os.attrib_mas);
 	server_json_stations_attrib(PSTR("masop2"), os.attrib_mas2);
-	server_json_stations_attrib(PSTR("ignore_rain"), os.attrib_igrd);  
+	server_json_stations_attrib(PSTR("ignore_rain"), os.attrib_igrd);
 	server_json_stations_attrib(PSTR("ignore_sn1"), os.attrib_igs);
 	server_json_stations_attrib(PSTR("ignore_sn2"), os.attrib_igs2);
 	server_json_stations_attrib(PSTR("stn_dis"), os.attrib_dis);
@@ -508,7 +508,7 @@ void server_json_station_special() {
 		}
 		if (available_ether_buffer() <=0 ) {
 			send_packet();
-		}		
+		}
 	}
 	bfill.emit_p(PSTR("}"));
 	handle_return(HTML_OK);
@@ -545,11 +545,11 @@ void server_change_stations() {
 	char* p = NULL;
 	if(!process_password()) return;
 	if (m_client)
-		p = get_buffer;  
+		p = get_buffer;
 #else
 	char* p = get_buffer;
 #endif
-	
+
 	byte sid;
 	char tbuf2[5] = {'s', 0, 0, 0, 0};
 	// process station names
@@ -614,7 +614,7 @@ void server_change_stations() {
 	}
 
 	os.attribs_save();
-	
+
 	handle_return(HTML_SUCCESS);
 }
 
@@ -691,7 +691,7 @@ void server_change_runonce() {
 	char *pv = tmp_buffer+1;
 #else
 	char *p = get_buffer;
-	
+
 	// decode url first
 	if(p) urlDecode(p);
 	// search for the start of t=[
@@ -751,7 +751,7 @@ void server_delete_program() {
 	char *p = NULL;
 	if(!process_password()) return;
 	if (m_client)
-		p = get_buffer;  
+		p = get_buffer;
 #else
 	char *p = get_buffer;
 #endif
@@ -782,14 +782,14 @@ void server_moveup_program() {
 	char *p = NULL;
 	if(!process_password()) return;
 	if (m_client)
-		p = get_buffer;  
+		p = get_buffer;
 #else
 	char *p = get_buffer;
 #endif
 
 	if (!findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("pid"), true))
 		handle_return(HTML_DATA_MISSING);
-		
+
 	int pid=atoi(tmp_buffer);
 	if (!(pid>=1 && pid< pd.nprograms))
 		handle_return(HTML_DATA_OUTOFBOUND);
@@ -827,7 +827,7 @@ void server_change_program() {
 
 	// parse program index
 	if (!findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("pid"), true)) handle_return(HTML_DATA_MISSING);
-	
+
 	int pid=atoi(tmp_buffer);
 	if (!(pid>=-1 && pid< pd.nprograms)) handle_return(HTML_DATA_OUTOFBOUND);
 
@@ -844,7 +844,7 @@ void server_change_program() {
 		pd.set_flagbit(pid, PROGRAMSTRUCT_UWT_BIT, (tmp_buffer[0]=='0')?0:1);
 		handle_return(HTML_SUCCESS);
 	}
-	
+
 	// parse program name
 	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("name"), true)) {
 		urlDecode(tmp_buffer);
@@ -859,7 +859,7 @@ void server_change_program() {
 
 #if defined(ESP8266)
 	if(!findKeyVal(p,tmp_buffer,TMP_BUFFER_SIZE, "v",false)) handle_return(HTML_DATA_MISSING);
-	char *pv = tmp_buffer+1;	
+	char *pv = tmp_buffer+1;
 #else
 	// parse ad-hoc v=[...
 	// search for the start of v=[
@@ -876,7 +876,7 @@ void server_change_program() {
 	if(!found)	handle_return(HTML_DATA_MISSING);
 	pv+=3;
 #endif
-	
+
 	// parse headers
 	*(char*)(&prog) = parse_listdata(&pv);
 	prog.days[0]= parse_listdata(&pv);
@@ -925,20 +925,20 @@ void server_json_options_main() {
 				(oid>=IOPT_SUBNET_MASK1 && oid<=IOPT_SUBNET_MASK4))
 				continue;
 		#endif
-		
+
 		#if !(defined(ESP8266) || defined(PIN_SENSOR2))
 		// only OS 3.x or controllers that have PIN_SENSOR2 defined support sensor 2 options
 		if (oid==IOPT_SENSOR2_TYPE || oid==IOPT_SENSOR2_OPTION || oid==IOPT_SENSOR2_ON_DELAY || oid==IOPT_SENSOR2_OFF_DELAY)
 			continue;
 		#endif
-		
+
 		int32_t v=os.iopts[oid];
 		if (oid==IOPT_MASTER_OFF_ADJ || oid==IOPT_MASTER_OFF_ADJ_2 ||
 				oid==IOPT_MASTER_ON_ADJ  || oid==IOPT_MASTER_ON_ADJ_2 ||
 				oid==IOPT_STATION_DELAY_TIME) {
 			v=water_time_decode_signed(v);
 		}
-		
+
 		#if defined(ARDUINO)
 		if (oid==IOPT_BOOST_TIME) {
 			if (os.hw_type==HW_TYPE_AC || os.hw_type==HW_TYPE_UNKNOWN) continue;
@@ -947,15 +947,15 @@ void server_json_options_main() {
 		#else
 		if (oid==IOPT_BOOST_TIME) continue;
 		#endif
-		
+
 		#if defined(ESP8266)
 		if (oid==IOPT_HW_VERSION) {
 			v+=os.hw_rev;	// for OS3.x, add hardware revision number
 		}
 		#endif
-		
+
 		if (oid==IOPT_SEQUENTIAL_RETIRED || oid==IOPT_URS_RETIRED || oid==IOPT_RSO_RETIRED) continue;
-	 
+
 #if defined(ARDUINO)
 		#if defined(ESP8266)
 		// for SSD1306, we can't adjust contrast or backlight
@@ -1111,7 +1111,7 @@ void server_json_controller_main() {
 	if(os.iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_FLOW) {
 		bfill.emit_p(PSTR("\"flcrt\":$L,\"flwrt\":$D,"), os.flowcount_rt, FLOWCOUNT_RT_WINDOW);
 	}
-	
+
 	bfill.emit_p(PSTR("\"sbits\":["));
 	// print sbits
 	for(bid=0;bid<os.nboards;bid++)
@@ -1134,10 +1134,22 @@ void server_json_controller_main() {
 		bfill.emit_p(PSTR("[$D,$L,$L]"), (qid<255)?q->pid:0, rem, (qid<255)?q->st:0);
 		bfill.emit_p((sid<os.nstations-1)?PSTR(","):PSTR("]"));
 	}
-	
+
 	//bfill.emit_p(PSTR(",\"blynk\":\"$O\""), SOPT_BLYNK_TOKEN);
 	//bfill.emit_p(PSTR(",\"mqtt\":\"$O\""), SOPT_MQTT_IP);
-	
+
+	byte gpioList[] = PIN_FREE_LIST;
+	bfill.emit_p(PSTR(",\"gpio\":["));
+	for (byte i = 0; i < sizeof(gpioList); ++i)
+	{
+		if(i != sizeof(gpioList) - 1) {
+			bfill.emit_p(PSTR("$D,"), gpioList[i]);
+		} else {
+			bfill.emit_p(PSTR("$D"), gpioList[i]);
+		}
+	}
+	bfill.emit_p(PSTR("]"));
+
 	bfill.emit_p(PSTR("}"));
 }
 
@@ -1160,7 +1172,7 @@ void server_home()
 #endif
 
 	print_html_standard_header();
-	
+
 	bfill.emit_p(PSTR("<!DOCTYPE html>\n<html>\n<head>\n$F</head>\n<body>\n<script>"), htmlMobileHeader);
 	// send server variables and javascript packets
 	bfill.emit_p(PSTR("var ver=$D,ipas=$D;</script>\n"),
@@ -1191,10 +1203,10 @@ void server_change_values()
 	extern uint32_t reboot_timer;
 	if(!process_password()) return;
 	if (m_client)
-		p = get_buffer;  
+		p = get_buffer;
 #else
 	char *p = get_buffer;
-#endif	
+#endif
 	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("rsn"), true)) {
 		reset_all_stations();
 	}
@@ -1242,11 +1254,11 @@ void server_change_values()
 			os.iopts_save();
 		}
 	}
-	
+
 	#if defined(ESP8266)
 	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("ap"), true)) {
 		os.reset_to_ap();
-	}  
+	}
 	#endif
 	handle_return(HTML_SUCCESS);
 }
@@ -1275,11 +1287,11 @@ void server_change_scripturl() {
 	char *p = NULL;
 	if(!process_password()) return;
 	if (m_client)
-		p = get_buffer;  
-#else  
+		p = get_buffer;
+#else
 	char *p = get_buffer;
 #endif
-	
+
 #if defined(DEMO)
 	handle_return(HTML_REDIRECT_HOME);
 #endif
@@ -1314,8 +1326,8 @@ void server_change_options()
 	char *p = NULL;
 	if(!process_password()) return;
 	if (m_client)
-		p = get_buffer;  
-#else  
+		p = get_buffer;
+#else
 	char *p = get_buffer;
 #endif
 
@@ -1339,7 +1351,7 @@ void server_change_options()
 			continue;
 		prev_value = os.iopts[oid];
 		max_value = pgm_read_byte(iopt_max+oid);
-		
+
 		// will no longer support oxx option names
 		// json name only
 		char tbuf2[6];
@@ -1358,9 +1370,9 @@ void server_change_options()
 				os.iopts[oid] = v;
 			} else {
 				err = 1;
-			}		 
+			}
 		}
-		
+
 		if (os.iopts[oid] != prev_value) {	// if value has changed
 			if (oid==IOPT_TIMEZONE || oid==IOPT_USE_NTP)		time_change = true;
 			if (oid>=IOPT_NTP_IP1 && oid<=IOPT_NTP_IP4)			time_change = true;
@@ -1383,7 +1395,7 @@ void server_change_options()
 		}
 		//DEBUG_PRINTLN(os.sopt_load(SOPT_WEATHER_OPTS));
 	}
-	
+
 	keyfound = 0;
 	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("ifkey"), true, &keyfound)) {
 		urlDecode(tmp_buffer);
@@ -1392,7 +1404,7 @@ void server_change_options()
 		tmp_buffer[0]=0;
 		os.sopt_save(SOPT_IFTTT_KEY, tmp_buffer);
 	}
-	
+
 	keyfound = 0;
 	if(findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("mqtt"), true, &keyfound)) {
 		urlDecode(tmp_buffer);
@@ -1415,7 +1427,7 @@ void server_change_options()
 		tmp_buffer[0]=0;
 		os.sopt_save(SOPT_WEATHER_KEY, tmp_buffer);
 	}
-	
+
 	keyfound = 0;
 	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("blynk"), true, &keyfound)) {
 		urlDecode(tmp_buffer);
@@ -1448,7 +1460,7 @@ void server_change_options()
 	if(weather_change) {
 		os.iopts[IOPT_WATER_PERCENTAGE] = 100; // reset watering percentage to 100%
 		wt_rawData[0] = 0; 		// reset wt_rawData and errCode
-		wt_errCode = HTTP_RQT_NOT_RECEIVED;		
+		wt_errCode = HTTP_RQT_NOT_RECEIVED;
 		os.checkwt_lasttime = 0;	// force weather update
 	}
 
@@ -1477,7 +1489,7 @@ void server_change_password() {
 	char* p = NULL;
 	if(!process_password()) return;
 	if (m_client)
-		p = get_buffer;  
+		p = get_buffer;
 #else
 	char* p = get_buffer;
 #endif
@@ -1531,7 +1543,7 @@ void server_change_manual() {
 	char *p = NULL;
 	if(!process_password()) return;
 	if (m_client)
-		p = get_buffer;  
+		p = get_buffer;
 #else
 	char *p = get_buffer;
 #endif
@@ -1626,7 +1638,7 @@ void server_json_log() {
 	char *p = NULL;
 	if(!process_password()) return;
 	if (m_client)
-		p = get_buffer;  
+		p = get_buffer;
 #else
 	char *p = get_buffer;
 #endif
@@ -1647,7 +1659,7 @@ void server_json_log() {
 		start = strtoul(tmp_buffer, NULL, 0) / 86400L;
 
 		if (!findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("end"), true)) handle_return(HTML_DATA_MISSING);
-		
+
 		end = strtoul(tmp_buffer, NULL, 0) / 86400L;
 
 		// start must be prior to end, and can't retrieve more than 365 days of data
@@ -1763,8 +1775,8 @@ void server_delete_log() {
 	char *p = NULL;
 	if(!process_password()) return;
 	if (m_client)
-		p = get_buffer;  
-#else  
+		p = get_buffer;
+#else
 	char *p = get_buffer;
 #endif
 
@@ -1803,9 +1815,9 @@ void server_json_all() {
 
 #if defined(ARDUINO) && !defined(ESP8266)
 static int freeHeap () {
-  extern int __heap_start, *__brkval; 
-  int v; 
-  return (int) &v - (__brkval == 0 ? (int) &__heap_start : (int) __brkval); 
+  extern int __heap_start, *__brkval;
+  int v;
+  return (int) &v - (__brkval == 0 ? (int) &__heap_start : (int) __brkval);
 }
 #endif
 
@@ -1857,9 +1869,9 @@ const char _url_keys[] PROGMEM =
 	"su"
 	"cu"
 	"ja"
-#if defined(ARDUINO)  
+#if defined(ARDUINO)
   "db"
-#endif	
+#endif
 	;
 
 // Server function handlers
@@ -1869,7 +1881,7 @@ URLHandler urls[] = {
 	server_delete_program,	// dp
 	server_change_program,	// cp
 	server_change_runonce,	// cr
-	server_manual_program,	// mp  
+	server_manual_program,	// mp
 	server_moveup_program,	// up
 	server_json_programs,		// jp
 	server_change_options,	// co
@@ -1885,9 +1897,9 @@ URLHandler urls[] = {
 	server_view_scripturl,	// su
 	server_change_scripturl,// cu
 	server_json_all,				// ja
-#if defined(ARDUINO)  
+#if defined(ARDUINO)
   server_json_debug,			// db
-#endif	
+#endif
 };
 
 // handle Ethernet request
@@ -1911,7 +1923,7 @@ void on_sta_upload_fin() {
 	if(!Update.end(true) || Update.hasError()) {
 		handle_return(HTML_UPLOAD_FAILED);
 	}
-	
+
 	server_send_result(HTML_SUCCESS);
 	os.reboot_dev(REBOOT_CAUSE_FWUPDATE);
 }
@@ -1929,17 +1941,17 @@ void on_sta_upload() {
 			DEBUG_PRINT(F("begin failed "));
 			DEBUG_PRINTLN(maxSketchSpace);
 		}
-		
+
 	} else if(upload.status == UPLOAD_FILE_WRITE) {
 		DEBUG_PRINT(".");
 		if(Update.write(upload.buf, upload.currentSize) != upload.currentSize) {
 			DEBUG_PRINTLN(F("size mismatch"));
 		}
-			
+
 	} else if(upload.status == UPLOAD_FILE_END) {
-		
+
 		DEBUG_PRINTLN(F("completed"));
-	 
+
 	} else if(upload.status == UPLOAD_FILE_ABORTED){
 		Update.end();
 		DEBUG_PRINTLN(F("aborted"));
@@ -1947,7 +1959,7 @@ void on_sta_upload() {
 	delay(0);
 }
 
-void on_ap_upload() { 
+void on_ap_upload() {
 	HTTPUpload& upload = wifi_server->upload();
 	if(upload.status == UPLOAD_FILE_START){
 		DEBUG_PRINT(F("upload: "));
@@ -1955,18 +1967,18 @@ void on_ap_upload() {
 		uint32_t maxSketchSpace = (ESP.getFreeSketchSpace()-0x1000)&0xFFFFF000;
 		if(!Update.begin(maxSketchSpace)) {
 			DEBUG_PRINTLN(F("begin failed"));
-			DEBUG_PRINTLN(maxSketchSpace);			
+			DEBUG_PRINTLN(maxSketchSpace);
 		}
 	} else if(upload.status == UPLOAD_FILE_WRITE) {
 		DEBUG_PRINT(".");
 		if(Update.write(upload.buf, upload.currentSize) != upload.currentSize) {
 			DEBUG_PRINTLN(F("size mismatch"));
 		}
-			
+
 	} else if(upload.status == UPLOAD_FILE_END) {
-		
+
 		DEBUG_PRINTLN(F("completed"));
-			 
+
 	} else if(upload.status == UPLOAD_FILE_ABORTED){
 		Update.end();
 		DEBUG_PRINTLN(F("aborted"));
@@ -1976,12 +1988,12 @@ void on_ap_upload() {
 
 void start_server_client() {
 	if(!wifi_server) return;
-	
+
 	wifi_server->on("/", server_home);	// handle home page
 	wifi_server->on("/index.html", server_home);
 	wifi_server->on("/update", HTTP_GET, on_sta_update); // handle firmware update
-	wifi_server->on("/update", HTTP_POST, on_sta_upload_fin, on_sta_upload);	
-	
+	wifi_server->on("/update", HTTP_POST, on_sta_upload_fin, on_sta_upload);
+
 	// set up all other handlers
 	char uri[4];
 	uri[0]='/';
@@ -1996,7 +2008,7 @@ void start_server_client() {
 
 void start_server_ap() {
 	if(!wifi_server) return;
-	
+
 	scanned_ssids = scan_network();
 	String ap_ssid = get_ap_ssid();
 	start_network_ap(ap_ssid.c_str(), NULL);
@@ -2018,7 +2030,7 @@ void start_server_ap() {
 		uri[2]=pgm_read_byte(_url_keys+2*i+1);
 		wifi_server->on(uri, urls[i]);
 	}
-	
+
 	wifi_server->begin();
 	os.lcd.setCursor(0, -1);
 	os.lcd.print(F("OSAP:"));
@@ -2096,7 +2108,7 @@ void handle_web_request(char *p) {
 						 wifi_server->client().stop();
 #endif
 					return;
-				}				 
+				}
 				switch(ret) {
 				case HTML_OK:
 					break;
@@ -2142,7 +2154,7 @@ ulong getNtpTime() {
 	#define NTP_PORT 123
 	#define NTP_NTRIES 10
 	#define N_PUBLIC_SERVERS 5
-	
+
 	static const char* public_ntp_servers[] = {
 		"time.google.com",
 		"time.nist.gov",
@@ -2150,7 +2162,7 @@ ulong getNtpTime() {
 		"time.cloudflare.com",
 		"pool.ntp.org" };
 	static uint8_t sidx = 0;
-		
+
 	static byte packetBuffer[NTP_PACKET_SIZE];
 	byte ntpip[4] = {
 		os.iopts[IOPT_NTP_IP1],
@@ -2173,9 +2185,9 @@ ulong getNtpTime() {
 		packetBuffer[13]	= 0x4E;
 		packetBuffer[14]	= 49;
 		packetBuffer[15]	= 52;
-		
+
 		// use one of the public NTP servers if ntp ip is unset
-		
+
 		DEBUG_PRINT(F("ntp: "));
 		int ret;
 		if (!os.iopts[IOPT_NTP_IP1] || os.iopts[IOPT_NTP_IP1] == '0') {
@@ -2199,7 +2211,7 @@ ulong getNtpTime() {
 		udp->write(packetBuffer, NTP_PACKET_SIZE);
 		udp->endPacket();
 		// end of sendNtpPacket
-		
+
 		// process response
 		ulong timeout = millis()+2000;
 		while(millis() < timeout) {
@@ -2221,7 +2233,7 @@ ulong getNtpTime() {
 		tries++;
 		udp->stop();
 		sidx=(sidx+1)%N_PUBLIC_SERVERS;
-	} 
+	}
 	if(tries==NTP_NTRIES) {DEBUG_PRINTLN(F("NTP failed!!"));}
 	udp->stop();
 	delete udp;
