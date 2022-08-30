@@ -26,7 +26,7 @@
 
 //#define ENABLE_DEBUG  // enable serial debug
 
-typedef unsigned char byte;
+//typedef unsigned char byte;
 typedef unsigned long ulong;
   
 #define TMP_BUFFER_SIZE      255   // scratch buffer size
