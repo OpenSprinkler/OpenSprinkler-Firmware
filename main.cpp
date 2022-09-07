@@ -453,6 +453,7 @@ void do_loop()
 			start_server_ap();
 			os.state = OS_STATE_CONNECTED;
 			connecting_timeout = 0;
+			WiFi.setAutoReconnect(true);
 		} else {
 			led_blink_ms = LED_SLOW_BLINK;
 			start_network_sta(os.wifi_ssid.c_str(), os.wifi_pass.c_str());
@@ -463,6 +464,7 @@ void do_loop()
 			os.lcd.print(F("Connecting to..."));
 			os.lcd.setCursor(0, 2);
 			os.lcd.print(os.wifi_ssid);
+			WiFi.setAutoReconnect(true);
 		}
 		break;
 
@@ -674,8 +676,20 @@ void do_loop()
 		if (curr_minute != last_minute) {
 			last_minute = curr_minute;
 			// check through all programs
+
+			// Check weather 60s before program start:
 			for(pid=0; pid<pd.nprograms; pid++) {
 				pd.read(pid, &prog);	// todo future: reduce load time
+				if(prog.check_match(curr_time+60)) {
+					// Check and update weather if weatherdata is older than 30min:
+					if (os.checkwt_success_lasttime && (!os.checkwt_lasttime || os.now_tz() > os.checkwt_lasttime + 30*60)) {
+						os.checkwt_lasttime = 0;
+						os.checkwt_success_lasttime = 0;
+						check_weather();
+					}
+					break;
+				}
+
 				if(prog.check_match(curr_time)) {
 					// program match found
 					// check and process special program command

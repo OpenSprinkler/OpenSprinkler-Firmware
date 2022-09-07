@@ -259,6 +259,7 @@ int OSMqtt::_connect(void) {
 			state = mqtt_client->connect(_id, NULL, NULL, MQTT_AVAILABILITY_TOPIC, 0, true, MQTT_OFFLINE_PAYLOAD);
 		if(state) break;
 		tries++;
+		delay(10);
 	} while(tries<MQTT_CONNECT_NTRIES);
 
 	if(tries==MQTT_CONNECT_NTRIES) {
