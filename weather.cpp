@@ -42,6 +42,7 @@ void write_log(byte type, ulong curr_time);
 
 static void getweather_callback(char* buffer) {
 	char *p = buffer;
+	DEBUG_PRINTLN(p);
 	/* scan the buffer until the first & symbol */
 	while(*p && *p!='&') {
 		p++;
@@ -49,7 +50,6 @@ static void getweather_callback(char* buffer) {
 	if (*p != '&')	return;
 	int v;
 	bool save_nvdata = false;
-	
 	// first check errCode, only update lswc timestamp if errCode is 0
 	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("errCode"), true)) {
 		wt_errCode = atoi(tmp_buffer);

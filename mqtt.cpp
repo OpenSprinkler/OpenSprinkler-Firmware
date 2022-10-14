@@ -26,7 +26,7 @@
 	#if defined(ESP8266)
 		#include <ESP8266WiFi.h>
 	#endif
-	#include <Ethernet.h>
+	#include <UIPEthernet.h>
 	#include <PubSubClient.h>
 
 	struct PubSubClient *mqtt_client = NULL;
