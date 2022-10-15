@@ -969,6 +969,7 @@ void do_loop()
 			}
 		}
 
+#if defined(ESP8266)
 		// dhcp and hw check:
 		static unsigned long dhcp_timeout = 0;
 		if(curr_time > dhcp_timeout) {
@@ -1000,7 +1001,7 @@ void do_loop()
 			}
 			dhcp_timeout = curr_time + DHCP_CHECKLEASE_INTERVAL;
 		}
-
+#endif
 
 		// perform ntp sync
 		// instead of using curr_time, which may change due to NTP sync itself
@@ -1234,7 +1235,12 @@ void schedule_all_stations(ulong curr_time) {
 			// otherwise, concurrent scheduling
 			q->st = con_start_time;
 			// stagger concurrent stations by 1 second
-			con_start_time++;
+			//con_start_time++;
+			// stagger concurrent stations by delay time
+			if (station_delay>0)
+				con_start_time += station_delay;
+			else
+				con_start_time++;
 		}
 		/*DEBUG_PRINT("[");
 		DEBUG_PRINT(sid);

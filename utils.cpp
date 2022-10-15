@@ -326,6 +326,39 @@ bool file_exists(const char *fn) {
 }
 
 // file functions
+ulong file_size(const char *fn) {
+	ulong size = 0;
+#if defined(ESP8266)
+
+	// do not use File.readBytes or readBytesUntil because it's very slow  
+	File f = LittleFS.open(fn, "r");
+	if(f) {
+		size = f.size();
+		f.close();
+	}
+
+#elif defined(ARDUINO)
+
+	sd.chdir("/");
+	SdFile file;
+	if(file.open(fn, O_READ)) {
+		size = file.size();
+		file.close();
+	}
+
+#else
+
+	FILE *fp = fopen(get_filename_fullpath(fn), "rb");
+	if(fp) {
+		fseek(fp, 0, SEEK_END);
+		size = ftell(fp);
+		fclose(fp);
+	}  
+
+#endif
+	return size;
+}
+
 void file_read_block(const char *fn, void *dst, ulong pos, ulong len) {
 #if defined(ESP8266)
 

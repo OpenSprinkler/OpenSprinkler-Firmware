@@ -26,6 +26,7 @@
 #include "opensprinkler_server.h"
 #include "weather.h"
 #include "mqtt.h"
+#include "sensors.h"
 
 // External variables defined in main ion file
 #if defined(ARDUINO)
@@ -1065,7 +1066,11 @@ void server_json_controller_main() {
 #endif
 
 	byte mac[6] = {0};
+#if defined(ESP8266)
 	os.load_hardware_mac(mac, useEth);
+#else
+	os.load_hardware_mac(mac, false;
+#endif
 	bfill.emit_p(PSTR("\"mac\":\"$X:$X:$X:$X:$X:$X\","), mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 
 	bfill.emit_p(PSTR("\"loc\":\"$O\",\"jsp\":\"$O\",\"wsp\":\"$O\",\"wto\":{$O},\"ifkey\":\"$O\",\"mqtt\":{$O},\"wtdata\":$S,\"wterr\":$D,"),
@@ -1739,6 +1744,168 @@ void server_delete_log() {
 	handle_return(HTML_SUCCESS);
 }
 
+/**
+ * Modus RS485 Sensor config
+ * {"nr":1,"type":1,"name":"myname","ip":123456789,"port":3000,"id":1,"ri":1000,"enable":1,"log":1}
+ */
+void server_sensor_config() {
+#if defined(ESP8266)
+	char *p = NULL;
+	if(!process_password()) return;
+#else  
+	char *p = get_buffer;
+#endif
+	if (!findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("nr"), true))
+		handle_return(HTML_DATA_MISSING);
+	uint nr = strtoul(tmp_buffer, NULL, 0); // Sensor nr
+
+	if (!findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("type"), true))
+		handle_return(HTML_DATA_MISSING);
+	uint type = strtoul(tmp_buffer, NULL, 0); // Sensor type
+
+	if (type == 0) {
+		sensor_delete(nr);
+		handle_return(HTML_SUCCESS);
+		return;
+	}
+
+	if (!findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("name"), true))
+		handle_return(HTML_DATA_MISSING);
+	char name[30];
+	strlcpy(name, tmp_buffer, sizeof(name)-1); // Sensor nr
+
+	if (!findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("ip"), true))
+		handle_return(HTML_DATA_MISSING);
+	uint32_t ip = strtoul(tmp_buffer, NULL, 0); // Sensor ip
+
+	if (!findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("port"), true))
+		handle_return(HTML_DATA_MISSING);
+	uint port = strtoul(tmp_buffer, NULL, 0); // Sensor port
+
+	if (!findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("id"), true))
+		handle_return(HTML_DATA_MISSING);
+	uint id = strtoul(tmp_buffer, NULL, 0); // Sensor modbus id
+
+	if (!findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("ri"), true))
+		handle_return(HTML_DATA_MISSING);
+	uint ri = strtoul(tmp_buffer, NULL, 0); // Read Interval (s)
+
+	uint enable = 1;
+	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("enable"), true))
+		enable = strtoul(tmp_buffer, NULL, 0); // 1=enable/0=disable
+
+	uint log = 1;
+	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("log"), true))
+		log = strtoul(tmp_buffer, NULL, 0); // 1=logging enabled/0=logging disabled
+
+	sensor_define(nr, name, type, ip, port, id, ri, enable, log);
+
+	handle_return(HTML_SUCCESS);
+}
+
+/**
+ * @brief return a 485 sensor
+ * 
+ */
+void server_sensor_get() {
+#if defined(ESP8266)
+	char *p = NULL;
+	if(!process_password()) return;
+#else  
+	char *p = get_buffer;
+#endif
+	if (!findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("nr"), true))
+		handle_return(HTML_DATA_MISSING);
+	uint nr = strtoul(tmp_buffer, NULL, 0); // Sensor nr
+
+	Sensor_t *sensor = sensor_by_nr(nr);
+	if (!sensor)
+	{
+		server_send_result(255);
+		return;
+	}
+
+	print_json_header(false);
+	bfill.emit_p(PSTR("{\"nr\":$D,\"type\":$D,\"name\":\"$S\",\"ip\":$L,\"port\":$D,\"id\":$D,\"ri\":$D,\"lnd\":$L,\"ld\":$F,\"enable\":$D,\"log\":$D}"),
+		sensor->nr, 
+		sensor->type,
+		sensor->name,
+		sensor->ip,
+		sensor->port,
+		sensor->id,
+		sensor->read_interval,
+		sensor->last_native_data,
+		sensor->last_data,
+		sensor->enable,
+		sensor->log);
+
+	handle_return(HTML_OK);
+}
+
+/**
+ * @brief Lists all sensors
+ * 
+ */
+void server_sensor_list() {
+#if defined(ESP8266)
+	char *p = NULL;
+	if(!process_password()) return;
+#else  
+	char *p = get_buffer;
+#endif
+
+	Sensor_t *sensor = sensors;
+	print_json_header(true);
+	bfill.emit_p(PSTR("{\"count\":$D},"), sensor_count());
+
+	bfill.emit_p(PSTR("["));
+	while (sensor) {
+		bfill.emit_p(PSTR("{\"nr\":$D,\"type\":$D,\"name\":\"$S\",\"ip\":$L,\"port\":$D,\"id\":$D,\"ri\":$D,\"lnd\":$L,\"ld\":$F,\"enable\":$D,\"log\":$D}"),
+			sensor->nr, 
+			sensor->type,
+			sensor->name,
+			sensor->ip,
+			sensor->port,
+			sensor->id,
+			sensor->read_interval,
+			sensor->last_native_data,
+			sensor->last_data,
+			sensor->enable,
+			sensor->log);
+		sensor = sensor ->next;
+		if (sensor)
+			bfill.emit_p(PSTR(","));
+		send_packet();
+	}
+	bfill.emit_p(PSTR("]"));
+	bfill.emit_p(PSTR("}"));
+
+	handle_return(HTML_OK);
+}
+
+void serverlog_list() {
+	#if defined(ESP8266)
+	char *p = NULL;
+	if(!process_password()) return;
+#else  
+	char *p = get_buffer;
+#endif
+
+
+	print_json_header(true);
+}
+
+void serverlog_clear() {
+	 #if defined(ESP8266)
+	char *p = NULL;
+	if(!process_password()) return;
+#else  
+	char *p = get_buffer;
+#endif
+
+	handle_return(HTML_OK);
+}
+
 /** Output all JSON data, including jc, jp, jo, js, jn */
 void server_json_all() {
 #if defined(ESP8266)
@@ -1820,6 +1987,11 @@ const char _url_keys[] PROGMEM =
 	"su"
 	"cu"
 	"ja"
+	"sc"
+	"sl"
+	"sg"
+	"so"
+	"sn"
 #if defined(ARDUINO)  
   "db"
 #endif	
@@ -1848,6 +2020,11 @@ URLHandler urls[] = {
 	server_view_scripturl,	// su
 	server_change_scripturl,// cu
 	server_json_all,				// ja
+	server_sensor_config,    // sc
+	server_sensor_list,      // sl
+	server_sensor_get,       // sg
+	serverlog_list,          // so
+	serverlog_clear,         // sn
 #if defined(ARDUINO)  
   server_json_debug,			// db
 #endif	

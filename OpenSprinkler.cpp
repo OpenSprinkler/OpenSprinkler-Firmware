@@ -627,6 +627,7 @@ void OpenSprinkler::reboot_dev(uint8_t cause) {
 
 /** Initialize network with the given mac address and http port */
 byte OpenSprinkler::start_network() {
+#if defined(ESP8266)
 	unsigned int port = (unsigned int)(iopts[IOPT_HTTPPORT_1]<<8) + (unsigned int)iopts[IOPT_HTTPPORT_0];
 #if defined(DEMO)
 	port = 80;
@@ -635,6 +636,9 @@ byte OpenSprinkler::start_network() {
 
 	m_server = new EthernetServer(port);
 	return m_server->begin();
+#else
+	return 1;
+#endif
 }
 
 bool OpenSprinkler::network_connected(void) {
@@ -644,6 +648,7 @@ bool OpenSprinkler::network_connected(void) {
 // Return mac of first recognised interface and fallback to software mac
 // Note: on OSPi, operating system handles interface allocation so 'wired' ignored
 bool OpenSprinkler::load_hardware_mac(byte* mac, bool wired) {
+#if defined(ESP8266)
 	const char * if_names[]  = { "eth0", "eth1", "wlan0", "wlan1" };
 	struct ifreq ifr;
 	int fd;
@@ -669,6 +674,7 @@ bool OpenSprinkler::load_hardware_mac(byte* mac, bool wired) {
 		}
 	}
 	close(fd);
+#endif
 	return true;
 }
 
@@ -1835,6 +1841,7 @@ int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char*
 	}
 #endif*/
 
+/*#if defined(ARDUINO)
 	while(client->available()==0) {
 		if(millis()>stoptime) {
 			client->stop();
@@ -1846,7 +1853,40 @@ int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char*
 		if(nbytes>ETHER_BUFFER_SIZE) nbytes=ETHER_BUFFER_SIZE;
 		client->read((uint8_t*)ether_buffer, nbytes);
 	}
+#endif*/
 
+
+	int pos = 0;
+#if defined(ARDUINO)
+	while(pos < ETHER_BUFFER_SIZE) {
+		int nbytes = client->available();
+		if(nbytes>0) {
+			if(pos+nbytes>ETHER_BUFFER_SIZE) nbytes=ETHER_BUFFER_SIZE-pos; // cannot read more than buffer size
+			client->read((uint8_t*)ether_buffer+pos, nbytes);
+			pos+=nbytes;
+		} else if (!client->connected())
+			break;
+		yield();
+
+		if(millis()>stoptime) {
+			DEBUG_PRINTLN(F("host timeout occured"));
+			//return HTTP_RQT_TIMEOUT; // instead of returning with timeout, we'll work with data received so far
+			break;
+		}
+	}
+#else
+	while(client->connected()) {
+		int len=client->read((uint8_t *)ether_buffer+pos, ETHER_BUFFER_SIZE);
+		if (len<=0) continue;
+		pos+=len;
+		if(millis()>stoptime) {
+			DEBUG_PRINTLN(F("host timeout occured"));
+			//return HTTP_RQT_TIMEOUT; // instead of returning with timeout, we'll work with data received so far
+			break;
+		}
+	}
+#endif
+	ether_buffer[pos]=0; // properly end buffer with 0
 	client->stop();
 	if(strlen(ether_buffer)==0) return HTTP_RQT_EMPTY_RETURN;
 	if(callback) callback(ether_buffer);
