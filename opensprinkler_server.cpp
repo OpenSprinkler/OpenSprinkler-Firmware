@@ -1769,6 +1769,10 @@ void server_sensor_config() {
 		return;
 	}
 
+	if (!findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("group"), true))
+		handle_return(HTML_DATA_MISSING);
+	uint group = strtoul(tmp_buffer, NULL, 0); // Sensor group
+
 	if (!findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("name"), true))
 		handle_return(HTML_DATA_MISSING);
 	char name[30];
@@ -1798,7 +1802,7 @@ void server_sensor_config() {
 	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("log"), true))
 		log = strtoul(tmp_buffer, NULL, 0); // 1=logging enabled/0=logging disabled
 
-	sensor_define(nr, name, type, ip, port, id, ri, enable, log);
+	sensor_define(nr, name, type, group, ip, port, id, ri, enable, log);
 
 	handle_return(HTML_SUCCESS);
 }
@@ -1826,9 +1830,10 @@ void server_sensor_get() {
 	}
 
 	print_json_header(false);
-	bfill.emit_p(PSTR("{\"nr\":$D,\"type\":$D,\"name\":\"$S\",\"ip\":$L,\"port\":$D,\"id\":$D,\"ri\":$D,\"lnd\":$L,\"ld\":$F,\"enable\":$D,\"log\":$D}"),
+	bfill.emit_p(PSTR("{\"nr\":$D,\"type\":$D,\"group\":$D,\"name\":\"$S\",\"ip\":$L,\"port\":$D,\"id\":$D,\"ri\":$D,\"lnd\":$L,\"ld\":$F,\"enable\":$D,\"log\":$D}"),
 		sensor->nr, 
 		sensor->type,
+		sensor->group,
 		sensor->name,
 		sensor->ip,
 		sensor->port,
@@ -1860,9 +1865,10 @@ void server_sensor_list() {
 
 	bfill.emit_p(PSTR("["));
 	while (sensor) {
-		bfill.emit_p(PSTR("{\"nr\":$D,\"type\":$D,\"name\":\"$S\",\"ip\":$L,\"port\":$D,\"id\":$D,\"ri\":$D,\"lnd\":$L,\"ld\":$F,\"enable\":$D,\"log\":$D}"),
+		bfill.emit_p(PSTR("{\"nr\":$D,\"type\":$D,\"group\":$D,\"name\":\"$S\",\"ip\":$L,\"port\":$D,\"id\":$D,\"ri\":$D,\"lnd\":$L,\"ld\":$F,\"enable\":$D,\"log\":$D}"),
 			sensor->nr, 
 			sensor->type,
+			sensor->group,
 			sensor->name,
 			sensor->ip,
 			sensor->port,

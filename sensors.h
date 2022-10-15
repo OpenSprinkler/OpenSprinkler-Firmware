@@ -50,6 +50,7 @@ typedef struct Sensor {
 	uint     nr;   //1..n sensor-nr, 0=deleted
 	char     name[30];
 	uint     type; //1..n type definition, 0=deleted
+	uint     group;            // group assignment,0=no group
 	uint32_t ip;
 	uint     port;
 	uint     id; //modbus id
@@ -82,10 +83,12 @@ uint16_t CRC16 (const uint8_t *nData, uint16_t wLength);
 
 //Sensor API functions:
 void sensor_delete(uint nr);
-void sensor_define(uint nr, char *name, uint type, uint32_t ip, uint port, uint id, uint ri, byte enabled, byte log);
+void sensor_define(uint nr, char *name, uint type, uint group, uint32_t ip, uint port, uint id, uint ri, byte enabled, byte log);
 void sensor_load();
 void sensor_save();
 uint sensor_count();
+void sensor_update_groups();
+
 Sensor_t *sensor_by_nr(uint nr);
 Sensor_t *sensor_by_idx(uint idx);
 

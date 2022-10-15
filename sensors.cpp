@@ -103,11 +103,12 @@ void sensor_delete(uint nr) {
  * 
  * @param nr  > 0
  * @param type > 0 add/modify, 0=delete
+ * @param group group assignment
  * @param ip 
  * @param port 
  * @param id 
  */
-void sensor_define(uint nr, char *name, uint type, uint32_t ip, uint port, uint id, uint ri, byte enable, byte log) {
+void sensor_define(uint nr, char *name, uint type, uint group, uint32_t ip, uint port, uint id, uint ri, byte enable, byte log) {
 
 	if (nr == 0 || type == 0)
 		return;
@@ -117,6 +118,7 @@ void sensor_define(uint nr, char *name, uint type, uint32_t ip, uint port, uint 
 	while (sensor) {
 		if (sensor->nr == nr) { //Modify existing
 			sensor->type = type;
+			sensor->group = group;
 			strlcpy(sensor->name, name, sizeof(sensor->name)-1);
 			sensor->ip = ip;
 			sensor->port = port;
@@ -138,6 +140,7 @@ void sensor_define(uint nr, char *name, uint type, uint32_t ip, uint port, uint 
 	Sensor_t *new_sensor = new Sensor_t;
 	memset(new_sensor, 0, sizeof(Sensor_t));
 	new_sensor->type = type;
+	new_sensor->group = group;
 	strlcpy(sensor->name, name, sizeof(sensor->name)-1);
 	new_sensor->ip = ip;
 	new_sensor->port = port;
@@ -260,10 +263,10 @@ SensorLog_t *sensorlog_load(ulong idx) {
 
 int read_sensor(Sensor_t *sensor, uint32_t *result) {
 
-if (!sensor || !sensor->enable)
-	return HTTP_RQT_NOT_RECEIVED;
+	if (!sensor || !sensor->enable)
+		return HTTP_RQT_NOT_RECEIVED;
 
-sensor->last_read = millis();
+	sensor->last_read = millis();
 
 #if defined(ARDUINO)
 
@@ -384,3 +387,49 @@ sensor->last_read = millis();
 	return HTTP_RQT_NOT_RECEIVED;
 }
 
+void sensor_update_groups() {
+	Sensor_t *sensor = sensors;	
+
+	while (sensor) {
+		switch(sensor->type) {
+			case SENSOR_GROUP_MIN:
+			case SENSOR_GROUP_MAX:
+			case SENSOR_GROUP_AVG:
+			case SENSOR_GROUP_SUM: {
+				int nr = sensor->nr;
+				Sensor_t *group = sensors;
+				double value = 0;
+				int n = 0;
+				while (group) {
+					if (group->nr != nr && group->group == nr && group->enable) {
+						switch(sensor->type) {
+							case SENSOR_GROUP_MIN:
+								if (n++ == 0) value = group->last_data;
+								else if (group->last_data < value) value = group->last_data;
+								break;
+							case SENSOR_GROUP_MAX:
+								if (n++ == 0) value = group->last_data;
+								else if (group->last_data > value) value = group->last_data;
+								break;
+							case SENSOR_GROUP_AVG:
+							case SENSOR_GROUP_SUM:
+								n++;
+								value += group->last_data;
+								break;
+						}
+					}
+					group = group->next;
+				}
+				if (sensor->type == SENSOR_GROUP_AVG && n>0) {
+					value = value / n;
+				}
+				sensor->last_data = value;
+				sensor->last_native_data = 0;
+				sensor->last_read = millis();
+				break;
+			}
+		}
+
+		sensor = sensor->next;
+	}
+}
