@@ -15,7 +15,7 @@ table#rd td {	border: 1px solid black; border-collapse: collapse;}</style>
 <table cellspacing=16>
 <tr><td><input type='text' name='ssid' id='ssid' style='font-size:14pt;height:28px;'></td><td>(Your WiFi SSID)</td></tr>
 <tr><td><input type='password' name='pass' id='pass' style='font-size:14pt;height:28px;'></td><td>(Your WiFi Password)</td></tr>
-<tr><td><input type='text' name='auth' id='auth' style='font-size:14pt;height:28px;'></td><td><label id='lbl_auth'>(Blynk Token, Optional)</label></td></tr>
+<tr><td><input type='text' name='otc' id='otc' style='font-size:14pt;height:28px;'></td><td><label id='lbl_otc'>(OTC Token, Optional)</label></td></tr>
 <tr><td colspan=2><p id='msg'></p></td></tr>
 <tr><td><button type='button' id='butt' onclick='sf();' style='height:36px;width:180px'>Submit</button></td><td></td></tr>
 </table>
@@ -45,12 +45,12 @@ xhr.onreadystatechange=function() {
 if(xhr.readyState==4 && xhr.status==200) {
 var jd=JSON.parse(xhr.responseText);
 if(jd.result==1) { id('butt').innerHTML='Connecting...'; id('msg').innerHTML='<font color=gray>Connecting, please wait...</font>'; tci=setInterval(tryConnect, 1000); return; }
-id('msg').innerHTML='<b><font color=red>Error code: '+jd.result+', item: '+jd.item+'</font></b>'; id('butt').innerHTML='Submit'; id('butt').disabled=false;id('ssid').disabled=false;id('pass').disabled=false;id('auth').disabled=false;
+id('msg').innerHTML='<b><font color=red>Error code: '+jd.result+', item: '+jd.item+'</font></b>'; id('butt').innerHTML='Submit'; id('butt').disabled=false;id('ssid').disabled=false;id('pass').disabled=false;id('otc').disabled=false;
 }
 };
-var comm='ccap?ssid='+encodeURIComponent(id('ssid').value)+'&pass='+encodeURIComponent(id('pass').value)+'&auth='+id('auth').value;
+var comm='ccap?ssid='+encodeURIComponent(id('ssid').value)+'&pass='+encodeURIComponent(id('pass').value)+'&otc='+id('otc').value;
 xhr.open('GET', comm, true); xhr.send();
-id('butt').disabled=true;id('ssid').disabled=true;id('pass').disabled=true;id('auth').disabled=true;
+id('butt').disabled=true;id('ssid').disabled=true;id('pass').disabled=true;id('otc').disabled=true;
 }
 
 function loadSSIDs() {

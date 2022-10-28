@@ -21,8 +21,6 @@
 
 #include "espconnect.h"
 
-const char html_ap_redirect[] PROGMEM = "<h3>WiFi config saved. Now switching to station mode.</h3>";
-
 String scan_network() {
 	WiFi.mode(WIFI_STA);
 	WiFi.disconnect();
@@ -61,12 +59,13 @@ void start_network_ap(const char *ssid, const char *pass) {
 
 void start_network_sta_with_ap(const char *ssid, const char *pass) {
 	if(!ssid || !pass) return;
+	if(WiFi.getMode()!=WIFI_AP_STA) WiFi.mode(WIFI_AP_STA);
 	WiFi.begin(ssid, pass);
 }
 
 void start_network_sta(const char *ssid, const char *pass) {
 	if(!ssid || !pass) return;
-	WiFi.mode(WIFI_STA);
+	if(WiFi.getMode()!=WIFI_STA) WiFi.mode(WIFI_STA);
 	WiFi.begin(ssid, pass);
 }
 #endif

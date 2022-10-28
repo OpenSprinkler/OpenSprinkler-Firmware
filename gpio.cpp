@@ -158,13 +158,6 @@ void digitalWriteExt(byte pin, byte value) {
 	if(pin>=IOEXP_PIN) {
 
 		os.mainio->digitalWrite(pin-IOEXP_PIN, value);
-	/*
-		// a pin on IO expander
-		byte data=pcf_read(MAIN_I2CADDR);
-		if(value) data|=(1<<(pin-IOEXP_PIN));
-		else		 data&=~(1<<(pin-IOEXP_PIN));
-		data |= MAIN_INPUTMASK; // make sure to enforce 1 for input pins
-		pcf_write(MAIN_I2CADDR, data);*/
 	} else {
 		digitalWrite(pin, value);
 	}

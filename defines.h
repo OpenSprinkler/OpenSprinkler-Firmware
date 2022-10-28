@@ -142,6 +142,8 @@ typedef unsigned long ulong;
 #define DEFAULT_JAVASCRIPT_URL    "https://ui.opensprinkler.com/js"
 #define DEFAULT_WEATHER_URL       "weather.opensprinkler.com"
 #define DEFAULT_IFTTT_URL         "maker.ifttt.com"
+#define DEFAULT_OTC_SERVER        "ws.cloud.openthings.io"
+#define DEFAULT_OTC_PORT          80
 #define DEFAULT_EMPTY_STRING      ""
 
 /** Macro define of each option
@@ -225,6 +227,7 @@ enum {
 	SOPT_STA_SSID,
 	SOPT_STA_PASS,
 	SOPT_MQTT_OPTS,
+	SOPT_OTC_OPTS,
 	//SOPT_WEATHER_KEY,
 	//SOPT_AP_PASS,
 	NUM_SOPTS	// total number of string options
@@ -336,7 +339,7 @@ enum {
 	#define V0_PIN_SENSOR1       12 // sensor 1
 	#define V0_PIN_SENSOR2       13 // sensor 2
 
-	/* OS30 revision 1 pin defines */
+	/* OS31 pin defines */
 	// pins on PCA9555A IO expander have pin numbers IOEXP_PIN+i
 	#define V1_IO_CONFIG         0x1F00 // config bits
 	#define V1_IO_OUTPUT         0x1F00 // output bits
@@ -352,7 +355,7 @@ enum {
 	#define V1_PIN_SENSOR1       IOEXP_PIN+8 // sensor 1
 	#define V1_PIN_SENSOR2       IOEXP_PIN+9 // sensor 2
 
-	/* OS30 revision 2 pin defines */
+	/* OS32 pin defines */
 	// pins on PCA9555A IO expander have pin numbers IOEXP_PIN+i
 	#define V2_IO_CONFIG         0x1000 // config bits
 	#define V2_IO_OUTPUT         0x1E00 // output bits

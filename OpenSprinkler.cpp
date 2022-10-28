@@ -31,6 +31,7 @@ OSMqtt OpenSprinkler::mqtt;
 NVConData OpenSprinkler::nvdata;
 ConStatus OpenSprinkler::status;
 ConStatus OpenSprinkler::old_status;
+OTCConfig OpenSprinkler::otc;
 byte OpenSprinkler::hw_type;
 byte OpenSprinkler::hw_rev;
 
@@ -164,23 +165,7 @@ const char iopt_json_names[] PROGMEM =
 	"reset"
 	;
 
-// for String options
-/*
-const char sopt_json_names[] PROGMEM =
-	"dkey\0"
-	"loc\0\0"
-	"jsp\0\0"
-	"wsp\0\0"
-	"wtkey"
-	"wto\0\0"
-	"ifkey"
-	"ssid\0"
-	"pass\0"
-	"mqtt\0"
-	"apass";
-*/
-
-/** Option promopts (stored in PROGMEM to reduce RAM usage) */
+/** Option prompts (stored in PROGMEM to reduce RAM usage) */
 // Each string is strictly 16 characters
 // with SPACE fillings if less
 const char iopt_prompts[] PROGMEM =
@@ -408,7 +393,6 @@ const char *OpenSprinkler::sopts[] = {
 	DEFAULT_EMPTY_STRING,
 	DEFAULT_EMPTY_STRING,
 	DEFAULT_EMPTY_STRING,
-	DEFAULT_EMPTY_STRING
 };
 
 /** Weekday strings (stored in PROGMEM to reduce RAM usage) */
@@ -469,52 +453,42 @@ void(* resetFunc) (void) = 0; // AVR software reset function
 byte OpenSprinkler::start_network() {
 	lcd_print_line_clear_pgm(PSTR("Starting..."), 1);
 	uint16_t httpport = (uint16_t)(iopts[IOPT_HTTPPORT_1]<<8) + (uint16_t)iopts[IOPT_HTTPPORT_0];
-#if !defined(ESP8266)
-	if(m_server)	{ delete m_server; m_server = NULL; }
-#endif
-
-	if (start_ether()) {
 
 #if defined(ESP8266)
-		if(w_server) { delete w_server; w_server = NULL; }
-		w_server = new ESP8266WebServer(httpport);
+
+	if (start_ether()) {
 		useEth = true;
-#else // AVR
+	} else {
+		useEth = false;
+	}
+
+	if(otc.en>0 && otc.token.length()>=32) {
+		otf = new OTF::OpenThingsFramework(httpport, otc.server, otc.port, otc.token, false);
+		DEBUG_PRINTLN(F("Started OTF with remote connection"));
+	} else {
+		otf = new OTF::OpenThingsFramework(httpport);
+		DEBUG_PRINTLN(F("Started OTF with just local connection"));
+	}
+
+	if(update_server) { delete update_server; update_server = NULL; }
+	update_server = new ESP8266WebServer(8080);
+	DEBUG_PRINT(F("Started update server"));
+	return 1;	
+
+#else
+
+	if (start_ether()) {
+		if(m_server)	{ delete m_server; m_server = NULL; }
 		m_server = new EthernetServer(httpport);
 		m_server->begin();
 		useEth = true;
-#endif
-
-		//udp = new EthernetUDP();
-		//udp->begin((httpport==8000) ? 8888 : 8000); // start udp on a different port than httpport
-
-//#if defined(ESP8266)
-		// turn off WiFi when ether is active
-		// todo: add option to keep both ether and wifi active
-		// lwip: WiFi.mode(WIFI_OFF);
-//#endif
-
 		return 1;
-
 	}	else {
-
-#if defined(ESP8266)
-		if(w_server) { delete w_server; w_server = NULL; }
-		if(get_wifi_mode()==WIFI_MODE_AP) {
-			w_server = new ESP8266WebServer(80);
-		} else {
-			w_server = new ESP8266WebServer(httpport);
-		}
-
-		//udp = new WiFiUDP();
-		//udp->begin((httpport==8000) ? 8888 : 8000); // start udp on a different port than httpport
-
-		return 1;
-#endif
-
+		useEth = false;
+		return 0;
 	}
 
-	return 0;
+#endif
 }
 
 byte OpenSprinkler::start_ether() {
@@ -528,14 +502,16 @@ byte OpenSprinkler::start_ether() {
 	
 	eth.setDefault();	
 	load_hardware_mac((uint8_t*)tmp_buffer, true);
+	DEBUG_PRINTLN(F("before eth.begin"));
 	if(!eth.begin((uint8_t*)tmp_buffer))	return 0;
-		
+	DEBUG_PRINTLN(F("after eth.begin"));
 	lcd_print_line_clear_pgm(PSTR("Start wired link"), 1);
 	
-	// todo: lwip add timeout
+	ulong timeout = millis()+30000; // 30 seconds time out
   while (!eth.connected()) {
     DEBUG_PRINT(".");
     delay(1000);
+		if(millis()>timeout) return 0;
   }	
 
   DEBUG_PRINTLN();
@@ -588,7 +564,7 @@ byte OpenSprinkler::start_ether() {
 
 bool OpenSprinkler::network_connected(void) {
 #if defined (ESP8266)
-	if(useEth) return true; // todo: fix this
+	if(useEth) return true; // todo: check if lwip has status indicator
 	else
 		return (get_wifi_mode()==WIFI_MODE_STA && WiFi.status()==WL_CONNECTED && state==OS_STATE_CONNECTED);
 #else
@@ -605,7 +581,6 @@ void OpenSprinkler::reboot_dev(uint8_t cause) {
 	}
 #if defined(ESP8266)
 	ESP.restart();
-	//ESP.reset();
 #else
 	resetFunc();
 #endif
@@ -926,8 +901,13 @@ void OpenSprinkler::begin() {
 
 	lcd_start();
 
-	lcd.createChar(ICON_ETHER_CONNECTED, _iconimage_ether_connected);
-	lcd.createChar(ICON_ETHER_DISCONNECTED, _iconimage_ether_disconnected);
+	#if defined(ESP8266)
+		lcd.createChar(ICON_ETHER_CONNECTED, _iconimage_ether_connected);
+		lcd.createChar(ICON_ETHER_DISCONNECTED, _iconimage_ether_disconnected);
+	#else
+		lcd.createChar(ICON_ETHER_CONNECTED, _iconimage_connected);
+		lcd.createChar(ICON_ETHER_DISCONNECTED, _iconimage_disconnected);
+	#endif
 	lcd.createChar(ICON_REMOTEXT, _iconimage_remotext);
 	lcd.createChar(ICON_RAINDELAY, _iconimage_raindelay);
 	lcd.createChar(ICON_RAIN, _iconimage_rain);
@@ -1545,7 +1525,7 @@ void OpenSprinkler::attribs_load() {
 }
 
 /** verify if a string matches password */
-byte OpenSprinkler::password_verify(char *pw) {
+byte OpenSprinkler::password_verify(const char *pw) {
 	return (file_cmp_block(SOPTS_FILENAME, pw, SOPT_PASSWORD*MAX_SOPTS_SIZE)==0) ? 1 : 0;
 }
 
@@ -1811,7 +1791,7 @@ int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char*
 		}
 	}
 #endif*/
-
+/*
 	while(client->available()==0) {
 		if(millis()>stoptime) {
 			client->stop();
@@ -1823,9 +1803,51 @@ int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char*
 		if(nbytes>ETHER_BUFFER_SIZE) nbytes=ETHER_BUFFER_SIZE;
 		client->read((uint8_t*)ether_buffer, nbytes);
 	}
+	DEBUG_PRINT(F("client->read:"));
+	DEBUG_PRINTLN(nbytes);
+	DEBUG_PRINTLN(ether_buffer);
 
 	client->stop();
 	if(strlen(ether_buffer)==0) return HTTP_RQT_EMPTY_RETURN;
+	if(callback) callback(ether_buffer);
+	return HTTP_RQT_SUCCESS;
+*/
+	int pos = 0;
+#if defined(ARDUINO)
+	while(true) {
+		int nbytes = client->available();
+		if(nbytes>0) {
+			DEBUG_PRINTLN(nbytes);
+			if(pos+nbytes>ETHER_BUFFER_SIZE) nbytes=ETHER_BUFFER_SIZE-pos; // cannot read more than buffer size
+			client->read((uint8_t*)ether_buffer+pos, nbytes);
+			pos+=nbytes;
+		}
+		if(millis()>stoptime) {
+			DEBUG_PRINTLN(F("host timeout occured"));
+			//return HTTP_RQT_TIMEOUT; // instead of returning with timeout, we'll work with data received so far
+			break;
+		}
+		if(!client->connected() && !client->available()) {
+			DEBUG_PRINTLN(F("host disconnected"));
+			break;
+		}
+	}
+#else
+	while(client->connected()) {
+		int len=client->read((uint8_t *)ether_buffer+pos, ETHER_BUFFER_SIZE);
+		if (len<=0) continue;
+		pos+=len;
+		if(millis()>stoptime) {
+			DEBUG_PRINTLN(F("host timeout occured"));
+			//return HTTP_RQT_TIMEOUT; // instead of returning with timeout, we'll work with data received so far
+			break;
+		}
+	}
+#endif
+	ether_buffer[pos]=0; // properly end buffer with 0
+	client->stop();
+	if(strlen(ether_buffer)==0) return HTTP_RQT_EMPTY_RETURN;
+	DEBUG_PRINTLN(ether_buffer);
 	if(callback) callback(ether_buffer);
 	return HTTP_RQT_SUCCESS;
 }
@@ -1979,6 +2001,33 @@ void OpenSprinkler::factory_reset() {
 	file_write_byte(DONE_FILENAME, 0, 1);
 }
 
+#define str(s) #s
+#define xstr(s) str(s)
+
+/** Parse OTC configuration */
+#if defined(ESP8266)
+void OpenSprinkler::parse_otc_config() {
+	char server[MAX_SOPTS_SIZE+1] = {0};
+	char token[MAX_SOPTS_SIZE+1] = {0};
+	int port = DEFAULT_OTC_PORT;
+	int en = 0;
+
+	char *config = tmp_buffer;
+	sopt_load(SOPT_OTC_OPTS, config);
+	//strcpy(config, "\"en\":1,\"token\":\"OTce113e85697a4d05cc5b785583379a\",\"server\":\"ws.cloud.openthings.io\",\"port\":80");
+	if (*config != 0) {
+		sscanf(config, "\"en\":%d,\"token\":\"%" xstr(MAX_SOPTS_SIZE) "[^\"]\",\"server\":\"%" xstr(MAX_SOPTS_SIZE) "[^\"]\",\"port\":%d",
+			&en, token, server, &port);
+		token[MAX_SOPTS_SIZE] = 0;
+		server[MAX_SOPTS_SIZE] = 0;
+	}
+	otc.en = en;
+	otc.token = String(token);
+	otc.server = String(server);
+	otc.port = 80;
+}
+#endif
+
 /** Setup function for options */
 void OpenSprinkler::options_setup() {
 
@@ -1998,6 +2047,7 @@ void OpenSprinkler::options_setup() {
 		#if defined(ESP8266)
 		wifi_ssid = sopt_load(SOPT_STA_SSID);
 		wifi_pass = sopt_load(SOPT_STA_PASS);
+		parse_otc_config();
 		#endif
 		attribs_load();
 	}

@@ -9,7 +9,7 @@
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * (at your option) any later version. 
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -36,15 +36,22 @@
 		#include <LittleFS.h>
 		#include "espconnect.h"
 	 
-		extern ESP8266WebServer *w_server;
+		extern ESP8266WebServer *update_server;
+		extern OTF::OpenThingsFramework *otf;
 		extern ENC28J60lwIP eth;
-		#define handle_return(x) {if(x==HTML_OK) server_send_content(); else server_send_result(x); w_server->client().stop(); return;}
+		#define OTF_PARAMS_DEF const OTF::Request &req,OTF::Response &res
+		#define OTF_PARAMS req,res
+		#define FKV_SOURCE req
+		#define handle_return(x) {if(x==HTML_OK) res.writeBodyChunk((char *)"%s",ether_buffer); else otf_send_result(req,res,x); return;}
 
 	#else
 
 		#include "SdFat.h"
 		extern SdFat sd;
 		extern EthernetClient *m_client;
+		#define OTF_PARAMS_DEF 
+		#define OTF_PARAMS
+		#define FKV_SOURCE p
 		#define handle_return(x) {return_code=x; return;}
 	#endif
 
@@ -55,6 +62,9 @@
 	#include "etherport.h"
 
 	extern EthernetClient *m_client;
+	#define OTF_PARAMS_DEF
+	#define OTF_PARAMS
+	#define FKV_SOURCE p
 	#define handle_return(x) {return_code=x; return;}
 
 #endif
@@ -101,6 +111,7 @@ int available_ether_buffer() {
 #define HTML_UPLOAD_FAILED		 0x40
 #define HTML_REDIRECT_HOME		 0xFF
 
+#if !defined(ESP8266)
 static const char html200OK[] PROGMEM =
 	"HTTP/1.1 200 OK\r\n"
 ;
@@ -125,6 +136,7 @@ static const char htmlContentJSON[] PROGMEM =
 	"Content-Type: application/json\r\n"
 	"Connection: close\r\n"
 ;
+#endif
 
 static const char htmlMobileHeader[] PROGMEM =
 	"<meta name=\"viewport\" content=\"width=device-width,initial-scale=1.0,minimum-scale=1.0,user-scalable=no\">\r\n"
@@ -134,54 +146,26 @@ static const char htmlReturnHome[] PROGMEM =
 	"<script>window.location=\"/\";</script>\n"
 ;
 
-void print_html_standard_header() {
-	bfill.emit_p(PSTR("$F$F$F$F\r\n"), html200OK, htmlContentHTML, htmlNoCache, htmlAccessControl);
-	// todo: streamline this part as well
-	/*m_client->write((const uint8_t *)html200OK, strlen(html200OK));
-	m_client->write((const uint8_t *)htmlContentHTML, strlen(htmlContentHTML));
-	m_client->write((const uint8_t *)htmlNoCache, strlen(htmlNoCache));
-	m_client->write((const uint8_t *)htmlAccessControl, strlen(htmlAccessControl));
-	m_client->write((const uint8_t *)"\r\n", 2);*/
+#if defined(ESP8266)
+byte findKeyVal (const OTF::Request &req,char *strbuf, uint16_t maxlen,const char *key,bool key_in_pgm=false,uint8_t *keyfound=NULL) {
+	char* result = key_in_pgm?req.getQueryParameter((const __FlashStringHelper *)key):req.getQueryParameter(key);
+	if(result!=NULL) {
+		strncpy(strbuf, result, maxlen);
+		strbuf[maxlen-1]=0;
+		if(keyfound) *keyfound=1;
+		return strlen(strbuf);
+	} else {
+		if(keyfound) *keyfound=0;
+	}
+	return 0;
 }
-
-void print_json_header(bool bracket=true) {
-	bfill.emit_p(PSTR("$F$F$F$F\r\n"), html200OK, htmlContentJSON, htmlAccessControl, htmlNoCache);
-	if(bracket) bfill.emit_p(PSTR("{"));
-	// todo: streamline
-	/*m_client->write((const uint8_t *)html200OK, strlen(html200OK));
-	m_client->write((const uint8_t *)htmlContentJSON, strlen(htmlContentJSON));
-	m_client->write((const uint8_t *)htmlNoCache, strlen(htmlNoCache));
-	m_client->write((const uint8_t *)htmlAccessControl, strlen(htmlAccessControl));
-	if(bracket) m_client->write((const uint8_t *)"\r\n{", 3);
-	else m_client->write((const uint8_t *)"\r\n", 2);*/
-}
-
+#endif
 byte findKeyVal (const char *str,char *strbuf, uint16_t maxlen,const char *key,bool key_in_pgm=false,uint8_t *keyfound=NULL) {
 	uint8_t found=0;
-#if defined(ESP8266)
-	// for ESP8266: there are two cases:
-	// case 1: if str is NULL, we assume the key-val to search is already parsed in w_server
-	if(str==NULL) {
-		char _key[10];
-		if(key_in_pgm) strcpy_P(_key, key);
-		else strcpy(_key, key);
-		if(w_server->hasArg(_key)) {
-			// copy value to buffer, and make sure it ends properly
-			strncpy(strbuf, w_server->arg(_key).c_str(), maxlen);
-			strbuf[maxlen-1]=0;
-			found=1;
-		} else {
-			strbuf[0]=0;
-		}
-		if (keyfound) *keyfound = found;
-		return strlen(strbuf);
-	}
-#endif
-	// case 2: otherwise, assume the key-val is stored in str
 	uint16_t i=0;
 	const char *kp;
+	if(str==NULL||strbuf==NULL||key==NULL) {return 0;}
 	kp=key;
-#if defined(ARDUINO)	
 	if (key_in_pgm) {
 		// key is in program memory space
 		while(*str &&  *str!=' ' && *str!='\n' && found==0){
@@ -199,11 +183,7 @@ byte findKeyVal (const char *str,char *strbuf, uint16_t maxlen,const char *key,b
 			}
 			str++;
 		}
-	}
-	else
-#endif
-	// for Linux, key_in_pgm is always false
-	{
+	}	else {
 		while(*str &&  *str!=' ' && *str!='\n' && found==0){
 			if (*str == *kp){
 				kp++;
@@ -245,23 +225,47 @@ void rewind_ether_buffer() {
 	ether_buffer[0] = 0;
 }
 
-void send_packet(bool final=false) {
+void send_packet(OTF_PARAMS_DEF) {
 #if defined(ESP8266)
-	w_server->sendContent(ether_buffer);
-	if(final) { w_server->client().stop(); }
-	rewind_ether_buffer();
-	return;
+	res.writeBodyChunk((char *)"%s",ether_buffer);
+	//if(final) { w_server->client().stop(); }
 #else
 	m_client->write((const uint8_t *)ether_buffer, strlen(ether_buffer));
 	if(final) { m_client->stop(); }
+#endif
 	rewind_ether_buffer();
 	return;
-#endif
 }
 
 char dec2hexchar(byte dec) {
 	if(dec<10) return '0'+dec;
 	else return 'A'+(dec-10);
+}
+
+void print_json_header(OTF_PARAMS_DEF) {
+#if defined(ESP8266)
+	res.writeStatus(200, F("OK"));
+	res.writeHeader(F("Content-Type"), F("application/json"));
+	res.writeHeader(F("Access-Control-Allow-Origin"), F("*"));
+	res.writeHeader(F("Cache-Control"), F("max-age=0, no-cache, no-store, must-revalidate"));
+	res.writeHeader(F("Connection"), F("close"));
+	//res.writeHeader(F("Content-Length"), strlen_P((char *) content));
+#else
+	bfill.emit_p(PSTR("$F$F$F$F\r\n"), html200OK, htmlContentJson, htmlAccessControl, htmlNoCache);
+#endif
+}
+
+void print_html_header(OTF_PARAMS_DEF) {
+#if defined(ESP8266)
+	res.writeStatus(200, F("OK"));
+	res.writeHeader(F("Content-Type"), F("text/html"));
+	res.writeHeader(F("Access-Control-Allow-Origin"), F("*"));
+	res.writeHeader(F("Cache-Control"), F("max-age=0, no-cache, no-store, must-revalidate"));
+	res.writeHeader(F("Connection"), F("close"));
+	//res.writeHeader(F("Content-Length"), strlen_P((char *) content));
+#else
+	bfill.emit_p(PSTR("$F$F$F$F\r\n"), html200OK, htmlContentHTML, htmlAccessControl, htmlNoCache);
+#endif
 }
 
 #if defined(ESP8266)
@@ -271,6 +275,51 @@ String two_digits(uint8_t x) {
 
 String toHMS(ulong t) {
 	return two_digits(t/3600)+":"+two_digits((t/60)%60)+":"+two_digits(t%60);
+}
+
+void otf_send_result(OTF_PARAMS_DEF, byte code, const char *item = NULL) {
+	String json = F("{\"result\":");
+	json += code;
+	if (!item) item = "";
+	json += F(",\"item\":\"");
+	json += item;
+	json += F("\"");
+	json += F("}");
+	print_json_header(OTF_PARAMS);
+	res.writeBodyChunk((char *)"%s",json.c_str());
+}
+
+void update_server_send_result(byte code, const char* item = NULL) {
+	String json = F("{\"result\":");
+	json += code;
+	if (!item) item = "";
+	json += F(",\"item\":\"");
+	json += item;
+	json += F("\"");
+	json += F("}");
+	update_server->sendHeader("Access-Control-Allow-Origin", "*"); // from esp8266 2.4 this has to be sent explicitly
+	update_server->send(200, "application/json", json);
+}
+
+/*
+void otf_send_html_P(OTF::Response &res, const __FlashStringHelper *content) {
+	res.writeStatus(200, F("OK"));
+	res.writeHeader(F("Content-Type"), F("text/html"));
+	res.writeHeader(F("Access-Control-Allow-Origin"), F("*")); // from esp8266 2.4 this has to be sent explicitly
+	//res.writeHeader(F("Content-Length"), strlen_P((char *) content));
+	res.writeHeader(F("Connection"), F("close"));
+	res.writeBodyChunk((char *) "%s", content);
+	DEBUG_PRINT(strlen_P((char *) content));
+	DEBUG_PRINTLN(F(" bytes sent."));
+}
+
+void otf_send_json(OTF::Response &res, String json) {
+	res.writeStatus(200, F("OK"));
+	res.writeHeader(F("Content-Type"), F("application/json"));
+	res.writeHeader(F("Access-Control-Allow-Origin"), F("*")); // from esp8266 2.4 this has to be sent explicitly
+	//res.writeHeader(F("Content-Length"), json.length());
+	res.writeHeader(F("Connection"), F("close"));
+	res.writeBodyChunk((char *) "%s",json.c_str());
 }
 
 void server_send_content() {
@@ -298,7 +347,7 @@ void server_send_result(byte code, const char* item) {
 	server_send_content();
 }
 
-/*bool get_value_by_key(const char* key, long& val) {
+bool get_value_by_key(const char* key, long& val) {
 	if(w_server->hasArg(key)) {
 		val = w_server->arg(key).toInt();	 
 		return true;
@@ -345,7 +394,7 @@ String get_ap_ssid() {
 	if(!ap_ssid.length()) {
 		byte mac[6];
 		WiFi.macAddress(mac);
-		ap_ssid += "OS_";
+		ap_ssid = "OS_";
 		for(byte i=3;i<6;i++) {
 			ap_ssid += dec2hexchar((mac[i]>>4)&0x0F);
 			ap_ssid += dec2hexchar(mac[i]&0x0F);
@@ -356,51 +405,54 @@ String get_ap_ssid() {
 
 static String scanned_ssids;
 
-void on_ap_home() {
+void on_ap_home(OTF_PARAMS_DEF) {
 	if(os.get_wifi_mode()!=WIFI_MODE_AP) return;
-	server_send_html(FPSTR(ap_home_html));
+	print_html_header(OTF_PARAMS);
+	res.writeBodyChunk((char *) "%s", ap_home_html);
 }
 
-void on_ap_scan() {
+void on_ap_scan(OTF_PARAMS_DEF) {
 	if(os.get_wifi_mode()!=WIFI_MODE_AP) return;
-	server_send_html(scanned_ssids);
+	print_json_header(OTF_PARAMS);
+	res.writeBodyChunk((char *)"%s",scanned_ssids.c_str());
 }
 
-void on_ap_change_config() {
+void on_ap_change_config(OTF_PARAMS_DEF) {
 	if(os.get_wifi_mode()!=WIFI_MODE_AP) return;
-	if(w_server->hasArg("ssid")&&w_server->arg("ssid").length()!=0) {
-		os.wifi_ssid = w_server->arg("ssid");
-		os.wifi_pass = w_server->arg("pass"); 
+	char *ssid = req.getQueryParameter("ssid");
+	if(ssid!=NULL&&strlen(ssid)!=0) {
+		os.wifi_ssid = ssid;
+		os.wifi_pass = req.getQueryParameter("pass"); 
 		os.sopt_save(SOPT_STA_SSID, os.wifi_ssid.c_str());
 		os.sopt_save(SOPT_STA_PASS, os.wifi_pass.c_str());
-		server_send_result(HTML_SUCCESS);
+		otf_send_result(OTF_PARAMS, HTML_SUCCESS, nullptr);
 		os.state = OS_STATE_TRY_CONNECT;
 		os.lcd.setCursor(0, 2);
 		os.lcd.print(F("Connecting..."));
 	} else {
-		server_send_result(HTML_DATA_MISSING, "ssid");
+		otf_send_result(OTF_PARAMS, HTML_DATA_MISSING, "ssid");
 	}
 }
 
-void on_ap_try_connect() {
+void on_ap_try_connect(OTF_PARAMS_DEF) {
 	if(os.get_wifi_mode()!=WIFI_MODE_AP) return;
-	ulong ip = (WiFi.status()==WL_CONNECTED)?(uint32_t)WiFi.localIP():0;
-	String html = "{\"ip\":";
-	html += ip;
-	html += "}";
-	server_send_html(html);
+	String json = "{";
+	json += F("\"ip\":");
+	json += (WiFi.status() == WL_CONNECTED) ? (uint32_t)WiFi.localIP() : 0;
+	json += F("}");
+	print_json_header(OTF_PARAMS);
+	res.writeBodyChunk((char *)"%s",json.c_str());
 	if(WiFi.status() == WL_CONNECTED && WiFi.localIP()) {
 		// IP received by client, restart
 		//os.reboot_dev(REBOOT_CAUSE_WIFIDONE);
-	}  
+	}
 }
-
 #endif
 
 
 /** Check and verify password */
 #if defined(ESP8266)
-boolean process_password(boolean fwv_on_fail=false, char *p = NULL)
+boolean process_password(OTF_PARAMS_DEF, boolean fwv_on_fail=false)
 #else
 boolean check_password(char *p)
 #endif
@@ -409,25 +461,30 @@ boolean check_password(char *p)
 	return true;
 #endif
 	if (os.iopts[IOPT_IGNORE_PASSWORD])  return true;
+
 #if !defined(ESP8266)
 	if (m_client && !p) {
 		p = get_buffer;
-	}  
-#endif
-	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("pw"), true)) {
-		urlDecode(tmp_buffer);
-		if (os.password_verify(tmp_buffer))
-			return true;
 	}
-#if defined(ESP8266)
-	/* some pages will output fwv if password check has failed */
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("pw"), true)) {
+		urlDecode(tmp_buffer);
+		if (os.password_verify(tmp_buffer)) return true;
+	} 
+#else
+	if(req.isCloudRequest()){ // password is not required if this is coming from cloud connection
+		return true;
+	}
+	const char *pw = req.getQueryParameter("pw");
+	if(pw != NULL && os.password_verify(pw)) return true;
+
+	/* if fwv_on_fail is true, output fwv if password check has failed */
 	if(fwv_on_fail) {
 		rewind_ether_buffer();
-		print_json_header();
-		bfill.emit_p(PSTR("\"$F\":$D}"), iopt_json_names+0, os.iopts[0]);
-		server_send_content();
+		bfill.emit_p(PSTR("{\"$F\":$D}"), iopt_json_names+0, os.iopts[0]);
+		print_json_header(OTF_PARAMS);
+		res.writeBodyChunk((char *)"%s",ether_buffer);
 	} else {
-		server_send_result(HTML_UNAUTHORIZED);
+		otf_send_result(OTF_PARAMS, HTML_UNAUTHORIZED);
 	}
 #endif
 	return false;
@@ -444,7 +501,7 @@ void server_json_stations_attrib(const char* name, byte *attrib)
 	bfill.emit_p(PSTR("],"));
 }
 
-void server_json_stations_main() {
+void server_json_stations_main(OTF_PARAMS_DEF) {
 	server_json_stations_attrib(PSTR("masop"), os.attrib_mas);
 	server_json_stations_attrib(PSTR("masop2"), os.attrib_mas2);
 	server_json_stations_attrib(PSTR("ignore_rain"), os.attrib_igrd);  
@@ -462,35 +519,36 @@ void server_json_stations_main() {
 		if(sid!=os.nstations-1)
 			bfill.emit_p(PSTR(","));
 		if (available_ether_buffer() <=0 ) {
-			send_packet();
+			send_packet(OTF_PARAMS);
 		}
 	}
 	bfill.emit_p(PSTR("],\"maxlen\":$D}"), STATION_NAME_SIZE);
 }
 
 /** Output stations data */
-void server_json_stations() {
+void server_json_stations(OTF_PARAMS_DEF) {
 #if defined(ESP8266)
-	if(!process_password()) return;
+	if(!process_password(OTF_PARAMS)) return;
 	rewind_ether_buffer();
 #endif
-	print_json_header();
-	server_json_stations_main();
+	print_json_header(OTF_PARAMS);
+	bfill.emit_p(PSTR("{"));
+	server_json_stations_main(OTF_PARAMS);
 	handle_return(HTML_OK);
 }
 
 /** Output station special attribute */
-void server_json_station_special() {
-
+void server_json_station_special(OTF_PARAMS_DEF) {
 #if defined(ESP8266)
-	if(!process_password()) return;
+	if(!process_password(OTF_PARAMS)) return;
 	rewind_ether_buffer();
 #endif
 
 	byte sid;
 	byte comma=0;
 	StationData *data = (StationData*)tmp_buffer;
-	print_json_header();
+	print_json_header(OTF_PARAMS);
+	bfill.emit_p(PSTR("{"));
 	for(sid=0;sid<os.nstations;sid++) {
 		if(os.get_station_type(sid)!=STN_TYPE_STANDARD) {  // check if this is a special station
 			os.get_station_data(sid, data);
@@ -499,22 +557,25 @@ void server_json_station_special() {
 			bfill.emit_p(PSTR("\"$D\":{\"st\":$D,\"sd\":\"$S\"}"), sid, data->type, data->sped);
 		}
 		if (available_ether_buffer() <=0 ) {
-			send_packet();
+			send_packet(OTF_PARAMS);
 		}		
 	}
 	bfill.emit_p(PSTR("}"));
 	handle_return(HTML_OK);
 }
 
-
+#if defined(ESP8266)
+void server_change_stations_attrib(const OTF::Request &req, char header, byte *attrib)
+#else
 void server_change_stations_attrib(char *p, char header, byte *attrib)
+#endif
 {
 	char tbuf2[5] = {0, 0, 0, 0, 0};
 	byte bid;
 	tbuf2[0]=header;
 	for(bid=0;bid<os.nboards;bid++) {
 		itoa(bid, tbuf2+1, 10);
-		if(findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, tbuf2)) {
+		if(findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, tbuf2)) {
 			attrib[bid] = atoi(tmp_buffer);
 		}
 	}
@@ -532,10 +593,9 @@ void server_change_stations_attrib(char *p, char header, byte *attrib)
  * q?: station sequeitnal bit field
  * p?: station special flag bit field
  */
-void server_change_stations() {
+void server_change_stations(OTF_PARAMS_DEF) {
 #if defined(ESP8266)
-	char* p = NULL;
-	if(!process_password()) return;
+	if(!process_password(OTF_PARAMS)) return;
 #else
 	char* p = get_buffer;
 #endif
@@ -545,27 +605,27 @@ void server_change_stations() {
 	// process station names
 	for(sid=0;sid<os.nstations;sid++) {
 		itoa(sid, tbuf2+1, 10);
-		if(findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, tbuf2)) {
+		if(findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, tbuf2)) {
 			urlDecode(tmp_buffer);
 			os.set_station_name(sid, tmp_buffer);
 		}
 	}
 
-	server_change_stations_attrib(p, 'm', os.attrib_mas); // master1
-	server_change_stations_attrib(p, 'i', os.attrib_igrd); // ignore rain delay
-	server_change_stations_attrib(p, 'j', os.attrib_igs); // ignore sensor1
-	server_change_stations_attrib(p, 'k', os.attrib_igs2); // ignore sensor2
-	server_change_stations_attrib(p, 'n', os.attrib_mas2); // master2
-	server_change_stations_attrib(p, 'd', os.attrib_dis); // disable
-	server_change_stations_attrib(p, 'q', os.attrib_seq); // sequential
-	server_change_stations_attrib(p, 'p', os.attrib_spe); // special
+	server_change_stations_attrib(FKV_SOURCE, 'm', os.attrib_mas); // master1
+	server_change_stations_attrib(FKV_SOURCE, 'i', os.attrib_igrd); // ignore rain delay
+	server_change_stations_attrib(FKV_SOURCE, 'j', os.attrib_igs); // ignore sensor1
+	server_change_stations_attrib(FKV_SOURCE, 'k', os.attrib_igs2); // ignore sensor2
+	server_change_stations_attrib(FKV_SOURCE, 'n', os.attrib_mas2); // master2
+	server_change_stations_attrib(FKV_SOURCE, 'd', os.attrib_dis); // disable
+	server_change_stations_attrib(FKV_SOURCE, 'q', os.attrib_seq); // sequential
+	server_change_stations_attrib(FKV_SOURCE, 'p', os.attrib_spe); // special
 
 	/* handle special data */
-	if(findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("sid"), true)) {
+	if(findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("sid"), true)) {
 		sid = atoi(tmp_buffer);
 		if(sid<0 || sid>os.nstations) handle_return(HTML_DATA_OUTOFBOUND);
-		if(findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("st"), true) &&
-			 findKeyVal(p, tmp_buffer+1, TMP_BUFFER_SIZE-1, PSTR("sd"), true)) {
+		if(findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("st"), true) &&
+			 findKeyVal(FKV_SOURCE, tmp_buffer+1, TMP_BUFFER_SIZE-1, PSTR("sd"), true)) {
 
 			tmp_buffer[0]-='0';
 			tmp_buffer[STATION_SPECIAL_DATA_SIZE] = 0;
@@ -630,15 +690,14 @@ void manual_start_program(byte, byte);
  * pid: program index (0 refers to the first program)
  * uwt: use weather (i.e. watering percentage)
  */
-void server_manual_program() {
+void server_manual_program(OTF_PARAMS_DEF) {
 #if defined(ESP8266)
-	char* p = NULL;
-	if(!process_password()) return;
+	if(!process_password(OTF_PARAMS)) return;
 #else
 	char *p = get_buffer;
 #endif
 
-	if (!findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("pid"), true))
+	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("pid"), true))
 		handle_return(HTML_DATA_MISSING);
 
 	int pid=atoi(tmp_buffer);
@@ -647,7 +706,7 @@ void server_manual_program() {
 	}
 
 	byte uwt = 0;
-	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("uwt"), true)) {
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("uwt"), true)) {
 		if(tmp_buffer[0]=='1') uwt = 1;
 	}
 
@@ -666,11 +725,10 @@ void server_manual_program() {
  * pw: password
  * t:  station water time
  */
-void server_change_runonce() {
+void server_change_runonce(OTF_PARAMS_DEF) {
 #if defined(ESP8266)
-	char* p = NULL;
-	if(!process_password()) return;
-	if(!findKeyVal(p,tmp_buffer,TMP_BUFFER_SIZE, "t", false)) handle_return(HTML_DATA_MISSING);
+	if(!process_password(OTF_PARAMS)) return;
+	if(!findKeyVal(FKV_SOURCE,tmp_buffer,TMP_BUFFER_SIZE, "t", false)) handle_return(HTML_DATA_MISSING);
 	char *pv = tmp_buffer+1;
 #else
 	char *p = get_buffer;
@@ -729,14 +787,13 @@ void server_change_runonce() {
  * pw: password
  * pid:program index (-1 will delete all programs)
  */
-void server_delete_program() {
+void server_delete_program(OTF_PARAMS_DEF) {
 #if defined(ESP8266)
-	char *p = NULL;
-	if(!process_password()) return;
+	if(!process_password(OTF_PARAMS)) return;
 #else
 	char *p = get_buffer;
 #endif
-	if (!findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("pid"), true))
+	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("pid"), true))
 		handle_return(HTML_DATA_MISSING);
 
 	int pid=atoi(tmp_buffer);
@@ -758,15 +815,14 @@ void server_delete_program() {
  * pw:	password
  * pid: program index (must be 1 or larger, because we can't move up program 0)
 */
-void server_moveup_program() {
+void server_moveup_program(OTF_PARAMS_DEF) {
 #if defined(ESP8266)
-	char *p = NULL;
-	if(!process_password()) return;
+	if(!process_password(OTF_PARAMS)) return;
 #else
 	char *p = get_buffer;
 #endif
 
-	if (!findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("pid"), true))
+	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("pid"), true))
 		handle_return(HTML_DATA_MISSING);
 		
 	int pid=atoi(tmp_buffer);
@@ -790,10 +846,9 @@ void server_moveup_program() {
  * name:	program name
 */
 const char _str_program[] PROGMEM = "Program ";
-void server_change_program() {
+void server_change_program(OTF_PARAMS_DEF) {
 #if defined(ESP8266)
-	char *p = NULL;
-	if(!process_password()) return;
+	if(!process_password(OTF_PARAMS)) return;
 #else
 	char *p = get_buffer;
 #endif
@@ -803,27 +858,27 @@ void server_change_program() {
 	ProgramStruct prog;
 
 	// parse program index
-	if (!findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("pid"), true)) handle_return(HTML_DATA_MISSING);
+	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("pid"), true)) handle_return(HTML_DATA_MISSING);
 	
 	int pid=atoi(tmp_buffer);
 	if (!(pid>=-1 && pid< pd.nprograms)) handle_return(HTML_DATA_OUTOFBOUND);
 
 	// check if "en" parameter is present
-	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("en"), true)) {
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("en"), true)) {
 		if(pid<0) handle_return(HTML_DATA_OUTOFBOUND);
 		pd.set_flagbit(pid, PROGRAMSTRUCT_EN_BIT, (tmp_buffer[0]=='0')?0:1);
 		handle_return(HTML_SUCCESS);
 	}
 
 	// check if "uwt" parameter is present
-	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("uwt"), true)) {
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("uwt"), true)) {
 		if(pid<0) handle_return(HTML_DATA_OUTOFBOUND);
 		pd.set_flagbit(pid, PROGRAMSTRUCT_UWT_BIT, (tmp_buffer[0]=='0')?0:1);
 		handle_return(HTML_SUCCESS);
 	}
 	
 	// parse program name
-	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("name"), true)) {
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("name"), true)) {
 		urlDecode(tmp_buffer);
 		strncpy(prog.name, tmp_buffer, PROGRAM_NAME_SIZE);
 	} else {
@@ -831,11 +886,13 @@ void server_change_program() {
 		itoa((pid==-1)? (pd.nprograms+1): (pid+1), prog.name+8, 10);
 	}
 
+#if !defined(ESP8266)
 	// do a full string decoding
 	if(p) urlDecode(p);
+#endif
 
 #if defined(ESP8266)
-	if(!findKeyVal(p,tmp_buffer,TMP_BUFFER_SIZE, "v",false)) handle_return(HTML_DATA_MISSING);
+	if(!findKeyVal(FKV_SOURCE,tmp_buffer,TMP_BUFFER_SIZE, "v",false)) handle_return(HTML_DATA_MISSING);
 	char *pv = tmp_buffer+1;	
 #else
 	// parse ad-hoc v=[...
@@ -959,17 +1016,18 @@ void server_json_options_main() {
 }
 
 /** Output Options */
-void server_json_options() {
+void server_json_options(OTF_PARAMS_DEF) {
 #if defined(ESP8266)
-	if(!process_password(true)) return;
+	if(!process_password(OTF_PARAMS,true)) return;
 	rewind_ether_buffer();
 #endif
-	print_json_header();
+	print_json_header(OTF_PARAMS);
+	bfill.emit_p(PSTR("{"));
 	server_json_options_main();
 	handle_return(HTML_OK);
 }
 
-void server_json_programs_main() {
+void server_json_programs_main(OTF_PARAMS_DEF) {
 
 	bfill.emit_p(PSTR("\"nprogs\":$D,\"nboards\":$D,\"mnp\":$D,\"mnst\":$D,\"pnsize\":$D,\"pd\":["),
 							 pd.nprograms, os.nboards, MAX_NUM_PROGRAMS, MAX_NUM_STARTTIMES, PROGRAM_NAME_SIZE);
@@ -1005,37 +1063,38 @@ void server_json_programs_main() {
 		// push out a packet if available
 		// buffer size is getting small
 		if (available_ether_buffer() <= 0) {
-			send_packet();
+			send_packet(OTF_PARAMS);
 		}
 	}
 	bfill.emit_p(PSTR("]}"));
 }
 
 /** Output program data */
-void server_json_programs() {
+void server_json_programs(OTF_PARAMS_DEF) {
 #if defined(ESP8266)
-	if(!process_password()) return;
+	if(!process_password(OTF_PARAMS)) return;
 	rewind_ether_buffer();
 #endif
 
-	print_json_header();
-	server_json_programs_main();
+	print_json_header(OTF_PARAMS);
+	bfill.emit_p(PSTR("{"));
+	server_json_programs_main(OTF_PARAMS);
 	handle_return(HTML_OK);
 }
 
 /** Output script url form */
-void server_view_scripturl() {
+void server_view_scripturl(OTF_PARAMS_DEF) {
 #if defined(ESP8266)
 	// no authenticaion needed
 	rewind_ether_buffer();
 #endif
 
-	print_html_standard_header();
+	print_html_header(OTF_PARAMS);
 	bfill.emit_p(PSTR("<form name=of action=cu method=get><table cellspacing=\"12\"><tr><td><b>JavaScript</b>:</td><td><input type=text size=40 maxlength=40 value=\"$O\" name=jsp></td></tr><tr><td>Default:</td><td>$S</td></tr><tr><td><b>Weather</b>:</td><td><input type=text size=40 maxlength=40 value=\"$O\" name=wsp></td></tr><tr><td>Default:</td><td>$S</td></tr><tr><td><b>Password</b>:</td><td><input type=password size=32 name=pw> <input type=submit></td></tr></table></form><script src=https://ui.opensprinkler.com/js/hasher.js></script>"), SOPT_JAVASCRIPTURL, DEFAULT_JAVASCRIPT_URL, SOPT_WEATHERURL, DEFAULT_WEATHER_URL);
 	handle_return(HTML_OK);
 }
 
-void server_json_controller_main() {
+void server_json_controller_main(OTF_PARAMS_DEF) {
 	byte bid, sid;
 	ulong curr_time = os.now_tz();
 	bfill.emit_p(PSTR("\"devt\":$L,\"nbrd\":$D,\"en\":$D,\"sn1\":$D,\"sn2\":$D,\"rd\":$D,\"rdst\":$L,"
@@ -1061,7 +1120,7 @@ void server_json_controller_main() {
 							pd.lastrun.endtime);
 
 #if defined(ESP8266)
-	bfill.emit_p(PSTR("\"RSSI\":$D,"), (int16_t)WiFi.RSSI());
+	bfill.emit_p(PSTR("\"RSSI\":$D,\"otcen\":$D,\"otcs\":$D,"), (int16_t)WiFi.RSSI(), os.otc.en, otf->getCloudStatus());
 #endif
 
 	byte mac[6] = {0};
@@ -1099,7 +1158,7 @@ void server_json_controller_main() {
 		// if available ether buffer is getting small
 		// send out a packet
 		if(available_ether_buffer() <= 0) {
-			send_packet();
+			send_packet(OTF_PARAMS);
 		}
 		unsigned long rem = 0;
 		byte qid = pd.station_qid[sid];
@@ -1119,24 +1178,25 @@ void server_json_controller_main() {
 }
 
 /** Output controller variables in json */
-void server_json_controller() {
+void server_json_controller(OTF_PARAMS_DEF) {
 #if defined(ESP8266)
-	if(!process_password()) return;
+	if(!process_password(OTF_PARAMS)) return;
 	rewind_ether_buffer();
 #endif
-	print_json_header();
-	server_json_controller_main();
+	print_json_header(OTF_PARAMS);
+	bfill.emit_p(PSTR("{"));
+	server_json_controller_main(OTF_PARAMS);
 	handle_return(HTML_OK);
 }
 
 /** Output homepage */
-void server_home()
+void server_home(OTF_PARAMS_DEF)
 {
 #if defined(ESP8266)
 	rewind_ether_buffer();
 #endif
 
-	print_html_standard_header();
+	print_html_header(OTF_PARAMS);
 	
 	bfill.emit_p(PSTR("<!DOCTYPE html>\n<html>\n<head>\n$F</head>\n<body>\n<script>"), htmlMobileHeader);
 	// send server variables and javascript packets
@@ -1161,44 +1221,44 @@ void server_home()
  * ap:	reset to ap (ESP8266 only)
  * update: launch update script (for OSPi/OSBo/Linux only)
  */
-void server_change_values()
+void server_change_values(OTF_PARAMS_DEF)
 {
 #if defined(ESP8266)
-	char *p = NULL;
 	extern uint32_t reboot_timer;
-	if(!process_password()) return;
+	if(!process_password(OTF_PARAMS)) return;
 #else
 	char *p = get_buffer;
 #endif	
-	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("rsn"), true)) {
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("rsn"), true)) {
 		reset_all_stations();
 	}
 
 #if !defined(ARDUINO)
-	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("update"), true) && atoi(tmp_buffer) > 0) {
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("update"), true) && atoi(tmp_buffer) > 0) {
 		os.update_dev();
 	}
 #endif
 
-	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("rbt"), true) && atoi(tmp_buffer) > 0) {
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("rbt"), true) && atoi(tmp_buffer) > 0) {
 		#if defined(ESP8266)
 			os.status.safe_reboot = 0;
 			reboot_timer = os.now_tz() + 2;
 			handle_return(HTML_SUCCESS);
 		#else
-			print_html_standard_header();
+			print_html_header(OTF_PARAMS);
 			//bfill.emit_p(PSTR("Rebooting..."));
-			send_packet(true);
+			send_packet();
+			m_client->stop();
 			os.reboot_dev(REBOOT_CAUSE_WEB);
 		#endif
 	}
 
-	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("en"), true)) {
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("en"), true)) {
 		if (tmp_buffer[0]=='1' && !os.status.enabled)  os.enable();
 		else if (tmp_buffer[0]=='0' &&	os.status.enabled)	os.disable();
 	}
 
-	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("rd"), true)) {
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("rd"), true)) {
 		int rd = atoi(tmp_buffer);
 		if (rd>0) {
 			os.nvdata.rd_stop_time = os.now_tz() + (unsigned long) rd * 3600;
@@ -1208,7 +1268,7 @@ void server_change_values()
 		} else	handle_return(HTML_DATA_OUTOFBOUND);
 	}
 
-	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("re"), true)) {
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("re"), true)) {
 		if (tmp_buffer[0]=='1' && !os.iopts[IOPT_REMOTE_EXT_MODE]) {
 			os.iopts[IOPT_REMOTE_EXT_MODE] = 1;
 			os.iopts_save();
@@ -1219,7 +1279,7 @@ void server_change_values()
 	}
 	
 	#if defined(ESP8266)
-	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("ap"), true)) {
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("ap"), true)) {
 		os.reset_to_ap();
 	}  
 	#endif
@@ -1245,10 +1305,9 @@ void string_remove_space(char *src) {
  * pw:	password
  * jsp: Javascript path
  */
-void server_change_scripturl() {
+void server_change_scripturl(OTF_PARAMS_DEF) {
 #if defined(ESP8266)
-	char *p = NULL;
-	if(!process_password()) return;
+	if(!process_password(OTF_PARAMS)) return;
 #else  
 	char *p = get_buffer;
 #endif
@@ -1256,14 +1315,14 @@ void server_change_scripturl() {
 #if defined(DEMO)
 	handle_return(HTML_REDIRECT_HOME);
 #endif
-	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("jsp"), true)) {
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("jsp"), true)) {
 		urlDecode(tmp_buffer);
 		tmp_buffer[TMP_BUFFER_SIZE]=0;	// make sure we don't exceed the maximum size
 		// trim unwanted space characters
 		string_remove_space(tmp_buffer);
 		os.sopt_save(SOPT_JAVASCRIPTURL, tmp_buffer);
 	}
-	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("wsp"), true)) {
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("wsp"), true)) {
 		urlDecode(tmp_buffer);
 		tmp_buffer[TMP_BUFFER_SIZE]=0;
 		string_remove_space(tmp_buffer);
@@ -1281,11 +1340,10 @@ void server_change_scripturl() {
  * loc: location
  * ttt: manual time (applicable only if ntp=0)
  */
-void server_change_options()
+void server_change_options(OTF_PARAMS_DEF)
 {
 #if defined(ESP8266)
-	char *p = NULL;
-	if(!process_password()) return;
+	if(!process_password(OTF_PARAMS)) return;
 #else  
 	char *p = get_buffer;
 #endif
@@ -1315,7 +1373,7 @@ void server_change_options()
 		// json name only
 		char tbuf2[6];
 		strncpy_P0(tbuf2, iopt_json_names+oid*5, 5);
-		if(findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, tbuf2)) {
+		if(findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, tbuf2)) {
 			int32_t v = atol(tmp_buffer);
 			if (oid==IOPT_MASTER_OFF_ADJ || oid==IOPT_MASTER_OFF_ADJ_2 ||
 					oid==IOPT_MASTER_ON_ADJ  || oid==IOPT_MASTER_ON_ADJ_2  ||
@@ -1340,14 +1398,14 @@ void server_change_options()
 		}
 	}
 
-	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("loc"), true)) {
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("loc"), true)) {
 		urlDecode(tmp_buffer);
 		if (os.sopt_save(SOPT_LOCATION, tmp_buffer)) { // if location string has changed
 			weather_change = true;
 		}
 	}
 	uint8_t keyfound = 0;
-	if(findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("wto"), true)) {
+	if(findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("wto"), true)) {
 		urlDecode(tmp_buffer);
 		if (os.sopt_save(SOPT_WEATHER_OPTS, tmp_buffer)) {
 			weather_change = true;	// if wto has changed
@@ -1356,49 +1414,36 @@ void server_change_options()
 	}
 	
 	keyfound = 0;
-	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("ifkey"), true, &keyfound)) {
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("ifkey"), true, &keyfound)) {
 		urlDecode(tmp_buffer);
 		os.sopt_save(SOPT_IFTTT_KEY, tmp_buffer);
 	} else if (keyfound) {
 		tmp_buffer[0]=0;
 		os.sopt_save(SOPT_IFTTT_KEY, tmp_buffer);
-	}
-	
-	keyfound = 0;
-	if(findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("mqtt"), true, &keyfound)) {
-		urlDecode(tmp_buffer);
-		os.sopt_save(SOPT_MQTT_OPTS, tmp_buffer);
-		os.status.req_mqtt_restart = true;
-	} else if (keyfound) {
-		tmp_buffer[0]=0;
-		os.sopt_save(SOPT_MQTT_OPTS, tmp_buffer);
-		os.status.req_mqtt_restart = true;
 	}
 
-	/*
-	// wtkey is retired
-	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("wtkey"), true, &keyfound)) {
+	keyfound = 0;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("otc"), true, &keyfound)) {
 		urlDecode(tmp_buffer);
-		if (os.sopt_save(SOPT_WEATHER_KEY, tmp_buffer)) {  // if weather key has changed
-			weather_change = true;
-		}
+		os.sopt_save(SOPT_OTC_OPTS, tmp_buffer);
 	} else if (keyfound) {
 		tmp_buffer[0]=0;
-		os.sopt_save(SOPT_WEATHER_KEY, tmp_buffer);
+		os.sopt_save(SOPT_OTC_OPTS, tmp_buffer);
 	}
 	
 	keyfound = 0;
-	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("blynk"), true, &keyfound)) {
+	if(findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("mqtt"), true, &keyfound)) {
 		urlDecode(tmp_buffer);
-		os.sopt_save(SOPT_BLYNK_TOKEN, tmp_buffer);
+		os.sopt_save(SOPT_MQTT_OPTS, tmp_buffer);
+		os.status.req_mqtt_restart = true;
 	} else if (keyfound) {
 		tmp_buffer[0]=0;
-		os.sopt_save(SOPT_BLYNK_TOKEN, tmp_buffer);
+		os.sopt_save(SOPT_MQTT_OPTS, tmp_buffer);
+		os.status.req_mqtt_restart = true;
 	}
-	*/
 
 	// if not using NTP and manually setting time
-	if (!os.iopts[IOPT_USE_NTP] && findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("ttt"), true)) {
+	if (!os.iopts[IOPT_USE_NTP] && findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("ttt"), true)) {
 		unsigned long t;
 		t = strtoul(tmp_buffer, NULL, 0);
 		// before chaging time, reset all stations to avoid messing up with timing
@@ -1438,21 +1483,20 @@ void server_change_options()
  * npw: new password
  * cpw: confirm new password
  */
-void server_change_password() {
+void server_change_password(OTF_PARAMS_DEF) {
 #if defined(DEMO)
 	handle_return(HTML_SUCCESS);	// do not allow chnaging password for demo
 	return;
 #endif
 
 #if defined(ESP8266)
-	char* p = NULL;
-	if(!process_password()) return;
+	if(!process_password(OTF_PARAMS)) return;
 #else
 	char* p = get_buffer;
 #endif
-	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("npw"), true)) {
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("npw"), true)) {
 		char tbuf2[TMP_BUFFER_SIZE];
-		if (findKeyVal(p, tbuf2, TMP_BUFFER_SIZE, PSTR("cpw"), true) && strncmp(tmp_buffer, tbuf2, TMP_BUFFER_SIZE) == 0) {
+		if (findKeyVal(FKV_SOURCE, tbuf2, TMP_BUFFER_SIZE, PSTR("cpw"), true) && strncmp(tmp_buffer, tbuf2, TMP_BUFFER_SIZE) == 0) {
 			urlDecode(tmp_buffer);
 			os.sopt_save(SOPT_PASSWORD, tmp_buffer);
 			handle_return(HTML_SUCCESS);
@@ -1475,13 +1519,14 @@ void server_json_status_main() {
 }
 
 /** Output station status */
-void server_json_status()
+void server_json_status(OTF_PARAMS_DEF)
 {
 #if defined(ESP8266)
-	if(!process_password()) return;
+	if(!process_password(OTF_PARAMS)) return;
 	rewind_ether_buffer();
 #endif
-	print_json_header();
+	print_json_header(OTF_PARAMS);
+	bfill.emit_p(PSTR("{"));
 	server_json_status_main();
 	handle_return(HTML_OK);
 }
@@ -1495,16 +1540,15 @@ void server_json_status()
  * en: enable (0 or 1)
  * t:  timer (required if en=1)
  */
-void server_change_manual() {
+void server_change_manual(OTF_PARAMS_DEF) {
 #if defined(ESP8266)
-	char *p = NULL;
-	if(!process_password()) return;
+	if(!process_password(OTF_PARAMS)) return;
 #else
 	char *p = get_buffer;
 #endif
 
 	int sid=-1;
-	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("sid"), true)) {
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("sid"), true)) {
 		sid=atoi(tmp_buffer);
 		if (sid<0 || sid>=os.nstations) handle_return(HTML_DATA_OUTOFBOUND);
 	} else {
@@ -1512,7 +1556,7 @@ void server_change_manual() {
 	}
 
 	byte en=0;
-	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("en"), true)) {
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("en"), true)) {
 		en=atoi(tmp_buffer);
 	} else {
 		handle_return(HTML_DATA_MISSING);
@@ -1521,7 +1565,7 @@ void server_change_manual() {
 	uint16_t timer=0;
 	unsigned long curr_time = os.now_tz();
 	if (en) { // if turning on a station, must provide timer
-		if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("t"), true)) {
+		if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("t"), true)) {
 			timer=(uint16_t)atol(tmp_buffer);
 			if (timer==0 || timer>64800) {
 				handle_return(HTML_DATA_OUTOFBOUND);
@@ -1587,11 +1631,10 @@ int file_fgets(File file, char* buf, int maxsize) {
  *				rs, rd, wl
  *				if unspecified, output all records
  */
-void server_json_log() {
+void server_json_log(OTF_PARAMS_DEF) {
 
 #if defined(ESP8266)
-	char *p = NULL;
-	if(!process_password()) return;
+	if(!process_password(OTF_PARAMS)) return;
 #else
 	char *p = get_buffer;
 #endif
@@ -1599,7 +1642,7 @@ void server_json_log() {
 	unsigned int start, end;
 
 	// past n day history
-	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("hist"), true)) {
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("hist"), true)) {
 		int hist = atoi(tmp_buffer);
 		if (hist< 0 || hist > 365) handle_return(HTML_DATA_OUTOFBOUND);
 		end = os.now_tz() / 86400L;
@@ -1607,11 +1650,11 @@ void server_json_log() {
 	}
 	else
 	{
-		if (!findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("start"), true)) handle_return(HTML_DATA_MISSING);
+		if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("start"), true)) handle_return(HTML_DATA_MISSING);
 
 		start = strtoul(tmp_buffer, NULL, 0) / 86400L;
 
-		if (!findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("end"), true)) handle_return(HTML_DATA_MISSING);
+		if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("end"), true)) handle_return(HTML_DATA_MISSING);
 		
 		end = strtoul(tmp_buffer, NULL, 0) / 86400L;
 
@@ -1622,18 +1665,18 @@ void server_json_log() {
 	// extract the type parameter
 	char type[4] = {0};
 	bool type_specified = false;
-	if (findKeyVal(p, type, 4, PSTR("type"), true))
+	if (findKeyVal(FKV_SOURCE, type, 4, PSTR("type"), true))
 		type_specified = true;
 
 #if defined(ESP8266)
 	// as the log data can be large, we will use ESP8266's sendContent function to
 	// send multiple packets of data, instead of the standard way of using send().
 	rewind_ether_buffer();
-	print_json_header(false);
+	print_json_header(OTF_PARAMS);
 	//bfill.emit_p(PSTR("$F$F$F$F\r\n"), html200OK, htmlContentJSON, htmlAccessControl, htmlNoCache);
 	//w_server->sendContent(ether_buffer);
 #else
-	print_json_header(false);
+	print_json_header(OTF_PARAMS);
 #endif
 
 	bfill.emit_p(PSTR("["));
@@ -1654,30 +1697,29 @@ void server_json_log() {
 		FILE *file = fopen(get_filename_fullpath(tmp_buffer), "rb");
 		if(!file) continue;
 #endif // prepare to open log file
-
-		int res;
+		int result;
 		while(true) {
 		#if defined(ESP8266)
 			// do not use file.readBytes or readBytesUntil because it's very slow
-			int res = file_fgets(file, tmp_buffer, TMP_BUFFER_SIZE);
-			if (res <= 0) {
+			result = file_fgets(file, tmp_buffer, TMP_BUFFER_SIZE);
+			if (result <= 0) {
 				file.close();
 				break;
 			}
-			tmp_buffer[res]=0;
+			tmp_buffer[result]=0;
 		#elif defined(ARDUINO)
-			res = file.fgets(tmp_buffer, TMP_BUFFER_SIZE);
-			if (res <= 0) {
+			result = file.fgets(tmp_buffer, TMP_BUFFER_SIZE);
+			if (result <= 0) {
 				file.close();
 				break;
 			}
 		#else
 			if(fgets(tmp_buffer, TMP_BUFFER_SIZE, file)) {
-				res = strlen(tmp_buffer);
+				result = strlen(tmp_buffer);
 			} else {
-				res = 0;
+				result = 0;
 			}
-			if (res <= 0) {
+			if (result <= 0) {
 				fclose(file);
 				break;
 			}
@@ -1706,7 +1748,7 @@ void server_json_log() {
 			// if the available ether buffer size is getting small
 			// push out a packet
 			if (available_ether_buffer() <= 0) {
-				send_packet();
+				send_packet(OTF_PARAMS);
 			}
 		}
 	}
@@ -1723,15 +1765,14 @@ void server_json_log() {
  * day:day (epoch time / 86400)
  * if day=all: delete all log files)
  */
-void server_delete_log() {
+void server_delete_log(OTF_PARAMS_DEF) {
 #if defined(ESP8266)
-	char *p = NULL;
-	if(!process_password()) return;
+	if(!process_password(OTF_PARAMS)) return;
 #else  
 	char *p = get_buffer;
 #endif
 
-	if (!findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("day"), true))
+	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("day"), true))
 		handle_return(HTML_DATA_MISSING);
 
 	delete_log(tmp_buffer);
@@ -1740,43 +1781,44 @@ void server_delete_log() {
 }
 
 /** Output all JSON data, including jc, jp, jo, js, jn */
-void server_json_all() {
+void server_json_all(OTF_PARAMS_DEF) {
 #if defined(ESP8266)
-	if(!process_password(true)) return;
+	if(!process_password(OTF_PARAMS,true)) return;
 	rewind_ether_buffer();
 #endif
-	print_json_header();
-	bfill.emit_p(PSTR("\"settings\":{"));
-	server_json_controller_main();
-	send_packet();
+	print_json_header(OTF_PARAMS);
+	bfill.emit_p(PSTR("{\"settings\":{"));
+	server_json_controller_main(OTF_PARAMS);
+	send_packet(OTF_PARAMS);
 	bfill.emit_p(PSTR(",\"programs\":{"));
-	server_json_programs_main();
-	send_packet();
+	server_json_programs_main(OTF_PARAMS);
+	send_packet(OTF_PARAMS);
 	bfill.emit_p(PSTR(",\"options\":{"));
 	server_json_options_main();
-	send_packet();
+	send_packet(OTF_PARAMS);
 	bfill.emit_p(PSTR(",\"status\":{"));
 	server_json_status_main();
-	send_packet();
+	send_packet(OTF_PARAMS);
 	bfill.emit_p(PSTR(",\"stations\":{"));
-	server_json_stations_main();
+	server_json_stations_main(OTF_PARAMS);
 	bfill.emit_p(PSTR("}"));
 	handle_return(HTML_OK);
 }
 
-#if defined(ARDUINO) && !defined(ESP8266)
+#if defined(ARDUINO)
+
+#if !defined(ESP8266)
 static int freeHeap () {
-  extern int __heap_start, *__brkval; 
-  int v; 
-  return (int) &v - (__brkval == 0 ? (int) &__heap_start : (int) __brkval); 
+	extern int __heap_start, *__brkval; 
+	int v; 
+	return (int) &v - (__brkval == 0 ? (int) &__heap_start : (int) __brkval); 
 }
 #endif
 
-#if defined(ARDUINO)
-void server_json_debug() {
+void server_json_debug(OTF_PARAMS_DEF) {
   rewind_ether_buffer();
-  print_json_header();
-  bfill.emit_p(PSTR("\"date\":\"$S\",\"time\":\"$S\",\"heap\":$D"), __DATE__, __TIME__,
+  print_json_header(OTF_PARAMS);
+  bfill.emit_p(PSTR("{\"date\":\"$S\",\"time\":\"$S\",\"heap\":$D"), __DATE__, __TIME__,
 #if defined(ESP8266)
   (uint16_t)ESP.getFreeHeap());
   FSInfo fs_info;
@@ -1790,7 +1832,7 @@ void server_json_debug() {
 }
 #endif
 
-typedef void (*URLHandler)(void);
+typedef void (*URLHandler)(OTF_PARAMS_DEF);
 
 /* Server function urls
  * To save RAM space, each GET command keyword is exactly
@@ -1855,36 +1897,43 @@ URLHandler urls[] = {
 
 // handle Ethernet request
 #if defined(ESP8266)
-void on_ap_update() {
-	String html = FPSTR(ap_update_html);
-	server_send_html(html);
+void on_ap_update(OTF_PARAMS_DEF) {
+	print_html_header(OTF_PARAMS);
+	res.writeBodyChunk((char *) "%s", ap_update_html);
 }
 
-void on_sta_update() {
-	String html = FPSTR(sta_update_html);
-	server_send_html(html);
+void on_sta_update(OTF_PARAMS_DEF) {
+	if(req.isCloudRequest()) otf_send_result(OTF_PARAMS, HTML_NOT_PERMITTED, "fw update");
+	else {
+		print_html_header(OTF_PARAMS);
+		res.writeBodyChunk((char *) "%s", sta_update_html);
+	}
 }
 
 void on_sta_upload_fin() {
-	if(!process_password()) {
+	if(!(update_server->hasArg("dkey") && os.password_verify(update_server->arg("pw").c_str()))) {
+		update_server_send_result(HTML_UNAUTHORIZED);
 		Update.end(false);
 		return;
 	}
 	// finish update and check error
 	if(!Update.end(true) || Update.hasError()) {
-		handle_return(HTML_UPLOAD_FAILED);
+		update_server_send_result(HTML_UPLOAD_FAILED);
+		//handle_return(HTML_UPLOAD_FAILED);
 	}
 	
-	server_send_result(HTML_SUCCESS);
+	update_server_send_result(HTML_SUCCESS);
 	os.reboot_dev(REBOOT_CAUSE_FWUPDATE);
 }
 
 void on_ap_upload_fin() { on_sta_upload_fin(); }
 
 void on_sta_upload() {
-	HTTPUpload& upload = w_server->upload();
+	HTTPUpload& upload = update_server->upload();
 	if(upload.status == UPLOAD_FILE_START){
-		WiFiUDP::stopAll();
+		// todo:
+		// WiFiUDP::stopAll();
+		//mqtt_client->disconnect(); 
 		DEBUG_PRINT(F("upload: "));
 		DEBUG_PRINTLN(upload.filename);
 		uint32_t maxSketchSpace = (ESP.getFreeSketchSpace()-0x1000)&0xFFFFF000;
@@ -1910,79 +1959,54 @@ void on_sta_upload() {
 	delay(0);
 }
 
-void on_ap_upload() { 
-	HTTPUpload& upload = w_server->upload();
-	if(upload.status == UPLOAD_FILE_START){
-		DEBUG_PRINT(F("upload: "));
-		DEBUG_PRINTLN(upload.filename);
-		uint32_t maxSketchSpace = (ESP.getFreeSketchSpace()-0x1000)&0xFFFFF000;
-		if(!Update.begin(maxSketchSpace)) {
-			DEBUG_PRINTLN(F("begin failed"));
-			DEBUG_PRINTLN(maxSketchSpace);			
-		}
-	} else if(upload.status == UPLOAD_FILE_WRITE) {
-		DEBUG_PRINT(".");
-		if(Update.write(upload.buf, upload.currentSize) != upload.currentSize) {
-			DEBUG_PRINTLN(F("size mismatch"));
-		}
-			
-	} else if(upload.status == UPLOAD_FILE_END) {
-		
-		DEBUG_PRINTLN(F("completed"));
-			 
-	} else if(upload.status == UPLOAD_FILE_ABORTED){
-		Update.end();
-		DEBUG_PRINTLN(F("aborted"));
-	}
-	delay(0);
-}
+void on_ap_upload() { on_sta_upload(); }
 
 void start_server_client() {
-	if(!w_server) return;
+	if(!otf) return;
 	
-	w_server->on("/", server_home);	// handle home page
-	w_server->on("/index.html", server_home);
-	w_server->on("/update", HTTP_GET, on_sta_update); // handle firmware update
-	w_server->on("/update", HTTP_POST, on_sta_upload_fin, on_sta_upload);	
+	otf->on("/", server_home);	// handle home page
+	otf->on("/index.html", server_home);
+	otf->on("/update", on_sta_update, OTF::HTTP_GET); // handle firmware update
+	update_server->on("/update", HTTP_POST, on_sta_upload_fin, on_sta_upload);	
 	
 	// set up all other handlers
 	char uri[4];
 	uri[0]='/';
 	uri[3]=0;
-	for(int i=0;i<sizeof(urls)/sizeof(URLHandler);i++) {
+	for(byte i=0;i<sizeof(urls)/sizeof(URLHandler);i++) {
 		uri[1]=pgm_read_byte(_url_keys+2*i);
 		uri[2]=pgm_read_byte(_url_keys+2*i+1);
-		w_server->on(uri, urls[i]);
+		otf->on(uri, urls[i]);
 	}
-	w_server->begin();
+	update_server->begin();
 }
 
 void start_server_ap() {
-	if(!w_server) return;
+	if(!otf) return;
 	
 	scanned_ssids = scan_network();
 	String ap_ssid = get_ap_ssid();
 	start_network_ap(ap_ssid.c_str(), NULL);
 	delay(500);
-	w_server->on("/", on_ap_home);
-	w_server->on("/jsap", on_ap_scan);
-	w_server->on("/ccap", on_ap_change_config);
-	w_server->on("/jtap", on_ap_try_connect);
-	w_server->on("/update", HTTP_GET, on_ap_update);
-	w_server->on("/update", HTTP_POST, on_ap_upload_fin, on_ap_upload);
-	w_server->onNotFound(on_ap_home);
+	otf->on("/", on_ap_home);
+	otf->on("/jsap", on_ap_scan);
+	otf->on("/ccap", on_ap_change_config);
+	otf->on("/jtap", on_ap_try_connect);
+	otf->on("/update", on_ap_update, OTF::HTTP_GET);
+	update_server->on("/update", HTTP_POST, on_ap_upload_fin, on_ap_upload);
+	otf->onMissingPage(on_ap_home);
 
 	// set up all other handlers
 	char uri[4];
 	uri[0]='/';
 	uri[3]=0;
-	for(int i=0;i<sizeof(urls)/sizeof(URLHandler);i++) {
+	for(byte i=0;i<sizeof(urls)/sizeof(URLHandler);i++) {
 		uri[1]=pgm_read_byte(_url_keys+2*i);
 		uri[2]=pgm_read_byte(_url_keys+2*i+1);
-		w_server->on(uri, urls[i]);
+		otf->on(uri, urls[i]);
 	}
 	
-	w_server->begin();
+	//w_server->begin();
 	os.lcd.setCursor(0, -1);
 	os.lcd.print(F("OSAP:"));
 	os.lcd.print(ap_ssid);
@@ -1992,6 +2016,8 @@ void start_server_ap() {
 
 #endif
 
+#if !defined(ESP8266)
+// This funtion is only used for non-ESP8266 platforms
 void handle_web_request(char *p) {
 	rewind_ether_buffer();
 
@@ -2002,7 +2028,8 @@ void handle_web_request(char *p) {
 
 	if(com[0]==' ') {
 		server_home();	// home page handler
-		send_packet(true);
+		send_packet();
+		m_client->stop();
 	} else {
 		// server funtion handlers
 		byte i;
@@ -2019,13 +2046,9 @@ void handle_web_request(char *p) {
 					ret = return_code;
 				} else if ((com[0]=='j' && com[1]=='o') ||
 									 (com[0]=='j' && com[1]=='a'))	{ // for /jo and /ja we output fwv if password fails
-#if defined(ESP8266)
-					if(process_password(false, dat)==false) {
-#else
 					if(check_password(dat)==false) {
-#endif
-						print_json_header();
-						bfill.emit_p(PSTR("\"$F\":$D}"),
+						print_json_header(OTF_PARAMS);
+						bfill.emit_p(PSTR("{\"$F\":$D}"),
 									 iopt_json_names+0, os.iopts[0]);
 						ret = HTML_OK;
 					} else {
@@ -2039,11 +2062,7 @@ void handle_web_request(char *p) {
 					ret = return_code;
 				} else {
 					// first check password
-#if defined(ESP8266)
-					if(process_password(false, dat)==false) {
-#else
 					if(check_password(dat)==false) {
-#endif
 						ret = HTML_UNAUTHORIZED;
 					} else {
 						get_buffer = dat;
@@ -2052,24 +2071,20 @@ void handle_web_request(char *p) {
 					}
 				}
 				if (ret == -1) {
-#if defined(ESP8266)
-						w_server->client().stop();
-#else
-						if (m_client)
-							m_client->stop();
-#endif
+					if (m_client)
+						m_client->stop();
 					return;
 				}				 
 				switch(ret) {
 				case HTML_OK:
 					break;
 				case HTML_REDIRECT_HOME:
-					print_html_standard_header();
+					print_html_header(OTF_PARAMS);
 					bfill.emit_p(PSTR("$F"), htmlReturnHome);
 					break;
 				default:
-					print_json_header();
-					bfill.emit_p(PSTR("\"result\":$D}"), ret);
+					print_json_header(OTF_PARAMS);
+					bfill.emit_p(PSTR("{\"result\":$D}"), ret);
 				}
 				break;
 			}
@@ -2077,12 +2092,14 @@ void handle_web_request(char *p) {
 
 		if(i==sizeof(urls)/sizeof(URLHandler)) {
 			// no server funtion found
-			print_json_header();
-			bfill.emit_p(PSTR("\"result\":$D}"), HTML_PAGE_NOT_FOUND);
+			print_json_header(OTF_PARAMS);
+			bfill.emit_p(PSTR("{\"result\":$D}"), HTML_PAGE_NOT_FOUND);
 		}
-		send_packet(true);
+		send_packet();
+		m_client->stop();
 	}
 }
+#endif
 
 #if defined(ARDUINO)
 #define NTP_NTRIES 10
@@ -2110,8 +2127,6 @@ ulong getNtpTime() {
 	ulong gt = 0;
 	while(tries<NTP_NTRIES) {
 		gt = time(NULL);
-		DEBUG_PRINT(gt);
-		DEBUG_PRINT("|");
 		if(gt>1577836800UL)	break;
 		else gt = 0;
 		delay(1000);

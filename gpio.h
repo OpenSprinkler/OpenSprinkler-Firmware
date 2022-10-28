@@ -109,9 +109,6 @@ private:
 	uint8_t inputmask = 0;	// mask bits for input pins
 };
 
-//void pcf_write(int addr, byte data);
-//byte pcf_read(int addr);
-//void pcf_write16(int addr, uint16_t data);
 void pinModeExt(byte pin, byte mode);
 void digitalWriteExt(byte pin, byte value);
 byte digitalReadExt(byte pin);

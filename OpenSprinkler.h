@@ -31,20 +31,21 @@
 #include "images.h"
 #include "mqtt.h"
 
-#if defined(ARDUINO) // headers for ESP8266
+#if defined(ARDUINO) // headers for Arduino
 	#include <Arduino.h>
 	#include <Wire.h>
 	#include <SPI.h>
 	#include "I2CRTC.h"
 
-	#if defined(ESP8266)
+	#if defined(ESP8266) // for ESP8266
 		#include <FS.h>
 		#include <LittleFS.h>
 		#include <ENC28J60lwIP.h>
 		#include <RCSwitch.h>
+		#include <OpenThingsFramework.h>
 		#include "SSD1306Display.h"
 		#include "espconnect.h"
-	#else
+	#else // for AVR
 		#include <SdFat.h>
 		#include "LiquidCrystal.h"
 		#include <Ethernet.h>
@@ -61,7 +62,8 @@
 
 #if defined(ARDUINO)
 	#if defined(ESP8266)
-	extern ESP8266WebServer *w_server;
+	extern ESP8266WebServer *update_server;
+	extern OTF::OpenThingsFramework *otf;
 	extern ENC28J60lwIP eth;
 	#else
 	extern EthernetServer *m_server;
@@ -143,7 +145,15 @@ struct ConStatus {
 	byte sensor2:1;						// sensor2 status bit (when set, sensor2 on is detected)
 	byte sensor1_active:1;		// sensor1 active bit (when set, sensor1 is activated)
 	byte sensor2_active:1;		// sensor2 active bit (when set, sensor2 is activated)
-	byte req_mqtt_restart:1;			// request mqtt restart
+	byte req_mqtt_restart:1;	// request mqtt restart
+};
+
+/** OTF configuration */
+struct OTCConfig {
+	byte en;
+	String token;
+	String server;
+	uint32_t port;
 };
 
 extern const char iopt_json_names[];
@@ -244,7 +254,7 @@ public:
 	static void sopt_load(byte oid, char *buf);
 	static String sopt_load(byte oid);
 
-	static byte password_verify(char *pw);	// verify password
+	static byte password_verify(const char *pw);	// verify password
 	
 	// -- controller operation
 	static void enable();						// enable controller operation
@@ -311,6 +321,7 @@ public:
 	static void lcd_set_contrast();
 
 	#if defined(ESP8266)
+	static OTCConfig otc;
 	static IOEXP *mainio, *drio;
 	static IOEXP *expanders[];
 	static RCSwitch rfswitch;
@@ -334,6 +345,7 @@ private:
 	static byte button_read_busy(byte pin_butt, byte waitmode, byte butt, byte is_holding);
 
 	#if defined(ESP8266)
+	static void parse_otc_config();
 	static void latch_boost();
 	static void latch_open(byte sid);
 	static void latch_close(byte sid);

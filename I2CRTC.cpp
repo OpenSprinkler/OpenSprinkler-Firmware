@@ -69,9 +69,6 @@ void I2CRTC::set(time_t t)
 {
 	tmElements_t tm;
 	breakTime(t, tm);
-	//tm.Second |= 0x80;	// stop the clock		ray: removed this step
-	//write(tm); 
-	//tm.Second &= 0x7f;	// start the clock	ray: moved to write function
 	write(tm); 
 }
 

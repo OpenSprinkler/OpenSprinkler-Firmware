@@ -31,9 +31,10 @@
 
 #if defined(ARDUINO)
 	#if defined(ESP8266)
-		ESP8266WebServer *w_server = NULL;	// due to lwIP, both WiFi and wired use the unified w_server variable
-		ENC28J60lwIP eth(PIN_ETHER_CS);
-		bool useEth = false;
+		ESP8266WebServer *update_server = NULL;
+		OTF::OpenThingsFramework *otf = NULL;
+		ENC28J60lwIP eth(PIN_ETHER_CS); // ENC28J60 lwip for wired Ether
+		bool useEth = false; // tracks whether we are using WiFi or wired Ether connection
 		static uint16_t led_blink_ms = LED_FAST_BLINK;
 	#else
 		EthernetServer *m_server = NULL;
@@ -293,7 +294,6 @@ void ui_state_machine() {
 void do_setup() {
 	/* Clear WDT reset flag. */
 #if defined(ESP8266)
-	if(w_server) { delete w_server; w_server = NULL; }
 	WiFi.persistent(false);
 	led_blink_ms = LED_FAST_BLINK;
 #else
@@ -395,9 +395,9 @@ void delete_log(char *name);
 #if defined(ESP8266)
 void start_server_ap();
 void start_server_client();
-#endif
-
+#else
 void handle_web_request(char *p);
+#endif
 
 /** Main Loop */
 void do_loop()
@@ -481,7 +481,8 @@ void do_loop()
 		
 	case OS_STATE_CONNECTED:
 		if(os.get_wifi_mode() == WIFI_MODE_AP) {
-			w_server->handleClient();
+			update_server->handleClient();
+			otf->loop();
 			connecting_timeout = 0;
 			if(os.get_wifi_mode()==WIFI_MODE_STA) {
 				// already in STA mode, waiting to reboot
@@ -494,7 +495,8 @@ void do_loop()
 			}
 		} else {
 			if(useEth || WiFi.status() == WL_CONNECTED) {
-				w_server->handleClient();
+				update_server->handleClient();
+				otf->loop();
 				connecting_timeout = 0;
 			} else {
 				DEBUG_PRINTLN(F("WiFi disconnected, going back to initial"));
@@ -1593,7 +1595,7 @@ void write_log(byte type, ulong curr_time) {
 
 #if defined(ARDUINO)
 	#if defined(ESP8266)
-	file.write((byte*)tmp_buffer, strlen(tmp_buffer));
+	file.write((const uint8_t*)tmp_buffer, strlen(tmp_buffer));
 	#else
 	file.write(tmp_buffer);
 	#endif
