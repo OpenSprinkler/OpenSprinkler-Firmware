@@ -422,7 +422,7 @@ void on_ap_change_config(OTF_PARAMS_DEF) {
 	char *ssid = req.getQueryParameter("ssid");
 	if(ssid!=NULL&&strlen(ssid)!=0) {
 		os.wifi_ssid = ssid;
-		os.wifi_pass = req.getQueryParameter("pass"); 
+		os.wifi_pass = req.getQueryParameter("pass");
 		os.sopt_save(SOPT_STA_SSID, os.wifi_ssid.c_str());
 		os.sopt_save(SOPT_STA_PASS, os.wifi_pass.c_str());
 		otf_send_result(OTF_PARAMS, HTML_SUCCESS, nullptr);

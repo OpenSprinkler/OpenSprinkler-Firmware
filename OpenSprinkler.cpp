@@ -2014,7 +2014,6 @@ void OpenSprinkler::parse_otc_config() {
 
 	char *config = tmp_buffer;
 	sopt_load(SOPT_OTC_OPTS, config);
-	//strcpy(config, "\"en\":1,\"token\":\"OTce113e85697a4d05cc5b785583379a\",\"server\":\"ws.cloud.openthings.io\",\"port\":80");
 	if (*config != 0) {
 		sscanf(config, "\"en\":%d,\"token\":\"%" xstr(MAX_SOPTS_SIZE) "[^\"]\",\"server\":\"%" xstr(MAX_SOPTS_SIZE) "[^\"]\",\"port\":%d",
 			&en, token, server, &port);

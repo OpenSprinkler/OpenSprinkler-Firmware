@@ -15,7 +15,6 @@ table#rd td {	border: 1px solid black; border-collapse: collapse;}</style>
 <table cellspacing=16>
 <tr><td><input type='text' name='ssid' id='ssid' style='font-size:14pt;height:28px;'></td><td>(Your WiFi SSID)</td></tr>
 <tr><td><input type='password' name='pass' id='pass' style='font-size:14pt;height:28px;'></td><td>(Your WiFi Password)</td></tr>
-<tr><td><input type='text' name='otc' id='otc' style='font-size:14pt;height:28px;'></td><td><label id='lbl_otc'>(OTC Token, Optional)</label></td></tr>
 <tr><td colspan=2><p id='msg'></p></td></tr>
 <tr><td><button type='button' id='butt' onclick='sf();' style='height:36px;width:180px'>Submit</button></td><td></td></tr>
 </table>
@@ -40,6 +39,7 @@ xhr.open('GET', 'jtap', true); xhr.send();
 }  
 function sf() {
 id('msg').innerHTML='';
+if(id('ssid').value.length==0) {alert("SSID is empty!"); return;}
 var xhr=new XMLHttpRequest();
 xhr.onreadystatechange=function() {
 if(xhr.readyState==4 && xhr.status==200) {
@@ -48,9 +48,9 @@ if(jd.result==1) { id('butt').innerHTML='Connecting...'; id('msg').innerHTML='<f
 id('msg').innerHTML='<b><font color=red>Error code: '+jd.result+', item: '+jd.item+'</font></b>'; id('butt').innerHTML='Submit'; id('butt').disabled=false;id('ssid').disabled=false;id('pass').disabled=false;id('otc').disabled=false;
 }
 };
-var comm='ccap?ssid='+encodeURIComponent(id('ssid').value)+'&pass='+encodeURIComponent(id('pass').value)+'&otc='+id('otc').value;
+var comm='ccap?ssid='+encodeURIComponent(id('ssid').value)+'&pass='+encodeURIComponent(id('pass').value);
 xhr.open('GET', comm, true); xhr.send();
-id('butt').disabled=true;id('ssid').disabled=true;id('pass').disabled=true;id('otc').disabled=true;
+id('butt').disabled=true;id('ssid').disabled=true;id('pass').disabled=true;
 }
 
 function loadSSIDs() {
@@ -123,7 +123,7 @@ show_msg('Update failed.',0,'red');
 }
 }
 };
-xhr.open('POST', 'update', true);
+xhr.open('POST', '//' + window.location.hostname + ':8080' + window.location.pathname, true);
 xhr.send(fd);
 });
 </script>
@@ -185,7 +185,7 @@ show_msg('Update failed.',0,'red');
 }
 }
 };
-xhr.open('POST', 'update', true);
+xhr.open('POST', '//'+window.location.hostname+':8080'+window.location.pathname, true);
 xhr.send(fd);
 });
 </script>
