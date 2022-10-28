@@ -1866,7 +1866,7 @@ int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char*
 			pos+=nbytes;
 		} else if (!client->connected())
 			break;
-		yield();
+		delay(5);
 
 		if(millis()>stoptime) {
 			DEBUG_PRINTLN(F("host timeout occured"));

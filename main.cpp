@@ -28,6 +28,7 @@
 #include "weather.h"
 #include "opensprinkler_server.h"
 #include "mqtt.h"
+#include "sensors.h"
 
 
 #if defined(ARDUINO)
@@ -349,7 +350,7 @@ void do_setup() {
 
 	os.button_timeout = LCD_BACKLIGHT_TIMEOUT;
 	DEBUG_PRINTLN("do_setup6...");
-
+	sensor_load();
 }
 
 // Arduino software reset function
@@ -389,6 +390,7 @@ void do_setup() {
 
 	os.mqtt.init();
 	os.status.req_mqtt_restart = true;
+	sensor_load();
 }
 #endif
 
@@ -912,6 +914,9 @@ void do_loop()
 		// activate/deactivate valves
 		os.apply_all_station_bits();
 
+		// read analog sensors
+		read_all_sensors();
+		
 #if defined(ARDUINO)
 		// process LCD display
 		if (!ui_state) {

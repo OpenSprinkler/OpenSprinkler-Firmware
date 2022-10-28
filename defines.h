@@ -58,6 +58,7 @@ typedef unsigned long ulong;
 #define PROG_FILENAME         "prog.dat"    // program data file
 #define DONE_FILENAME         "done.dat"    // used to indicate the completion of all files
 #define SENSOR_FILENAME       "sensor.dat"  // analog sensor filename
+#define PROG_SENSOR_FILENAME  "progsensor.dat"  // sensor to program assign filename
 #define SENSORLOG_FILENAME    "sensorlog.dat"  // analog sensor log filename
 
 /** Station macro defines */

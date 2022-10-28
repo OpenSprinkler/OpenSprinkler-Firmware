@@ -124,6 +124,7 @@ void initialiseEpoch()
 ulong millis (void)
 {
 	struct timeval tv ;
+	
 	uint64_t now ;
 
 	gettimeofday (&tv, NULL) ;
@@ -282,7 +283,7 @@ void read_from_file(const char *fn, char *data, ulong maxsize, ulong pos) {
 void remove_file(const char *fn) {
 #if defined(ESP8266)
 
-	if(!LittleFS.exists(fn)) return;
+	if(!file_exists(fn)) return;
 	LittleFS.remove(fn);
 
 #elif defined(ARDUINO)

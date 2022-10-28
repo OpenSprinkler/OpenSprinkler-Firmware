@@ -54,6 +54,9 @@ public:
 				//wtoa(va_arg(ap, uint16_t), (char*) ptr);
 				itoa(va_arg(ap, int), (char*) ptr, 10);  // ray
 				break;
+			case 'E': //Double
+				sprintf((char*) ptr, "%f", va_arg(ap, double));
+				break;
 			case 'L':
 				//ltoa(va_arg(ap, long), (char*) ptr, 10);
 				ultoa(va_arg(ap, long), (char*) ptr, 10); // ray
@@ -65,8 +68,8 @@ public:
 				char d = va_arg(ap, int);
 				*ptr++ = dec2hexchar((d >> 4) & 0x0F);
 				*ptr++ = dec2hexchar(d & 0x0F);
-			}
 				continue;
+			}
 			case 'F': {
 				PGM_P s = va_arg(ap, PGM_P);
 				char d;
@@ -77,8 +80,8 @@ public:
 			case 'O': {
 				uint16_t oid = va_arg(ap, int);
 				file_read_block(SOPTS_FILENAME, (char*) ptr, oid*MAX_SOPTS_SIZE, MAX_SOPTS_SIZE);
-			}
 				break;
+			}
 			default:
 				*ptr++ = c;
 				continue;

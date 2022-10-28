@@ -44,6 +44,7 @@
 #define SENSOR_GROUP_AVG               1002   //Sensor group with avg value
 #define SENSOR_GROUP_SUM               1003   //Sensor group with sum value
 
+#define SENSOR_READ_TIMEOUT            3000   //ms
 
 //Definition of a sensor
 typedef struct Sensor {
@@ -59,7 +60,8 @@ typedef struct Sensor {
 	double   last_data;        // last converted sensor data
 	byte     enable:1;
 	byte     log:1;
-	uint32_t undef; //for later
+	byte     data_ok:1;
+	byte     undef[32]; //for later
 	//unstored
 	ulong    last_read; //millis
 	Sensor   *next; 
@@ -75,19 +77,34 @@ typedef struct SensorLog {
 } SensorLog_t;
 #define SENSORLOG_STORE_SIZE (sizeof(SensorLog_t))
 
+//Sensor to program data
+typedef struct ProgSensor {
+	uint   sensor;
+	double offset;
+	double factor;
+	double divider;
+	byte   undef[32]; //for later
+} ProgSensor_t;
+
+
 //All sensors:
 static Sensor_t *sensors = NULL;
 
+//Program sensor data 
+static ProgSensor_t *progSensor = NULL;
+
 //Utils:
-uint16_t CRC16 (const uint8_t *nData, uint16_t wLength);
+uint16_t CRC16 (byte buf[], int len);
 
 //Sensor API functions:
-void sensor_delete(uint nr);
-void sensor_define(uint nr, char *name, uint type, uint group, uint32_t ip, uint port, uint id, uint ri, byte enabled, byte log);
+int sensor_delete(uint nr);
+int sensor_define(uint nr, char *name, uint type, uint group, uint32_t ip, uint port, uint id, uint ri, byte enabled, byte log);
 void sensor_load();
 void sensor_save();
 uint sensor_count();
 void sensor_update_groups();
+
+void read_all_sensors();
 
 Sensor_t *sensor_by_nr(uint nr);
 Sensor_t *sensor_by_idx(uint idx);
@@ -95,9 +112,14 @@ Sensor_t *sensor_by_idx(uint idx);
 int read_sensor(Sensor_t *sensor); //sensor value goes to last_native_data/last_data
 
 //Sensorlog API functions:
-void sensorlog_add(SensorLog *sensorlog);
+void sensorlog_add(SensorLog_t *sensorlog);
+void sensorlog_add(Sensor_t *sensor, ulong time);
 void sensorlog_clear_all();
 SensorLog_t *sensorlog_load(ulong pos);
+SensorLog_t *sensorlog_load(ulong idx, SensorLog_t* sensorlog);
+ulong sensorlog_size();
 
+//Set Sensor Address
+int set_sensor_address(Sensor_t *sensor, byte new_address);
 
 #endif // _SENSORS_H

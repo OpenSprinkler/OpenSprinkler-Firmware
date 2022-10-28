@@ -1745,8 +1745,9 @@ void server_delete_log() {
 }
 
 /**
+ * sc
  * Modus RS485 Sensor config
- * {"nr":1,"type":1,"name":"myname","ip":123456789,"port":3000,"id":1,"ri":1000,"enable":1,"log":1}
+ * {"nr":1,"type":1,"group":0,"name":"myname","ip":123456789,"port":3000,"id":1,"ri":1000,"enable":1,"log":1}
  */
 void server_sensor_config() {
 #if defined(ESP8266)
@@ -1755,6 +1756,9 @@ void server_sensor_config() {
 #else  
 	char *p = get_buffer;
 #endif
+
+	DEBUG_PRINTLN("server_sensor_config");
+
 	if (!findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("nr"), true))
 		handle_return(HTML_DATA_MISSING);
 	uint nr = strtoul(tmp_buffer, NULL, 0); // Sensor nr
@@ -1766,7 +1770,6 @@ void server_sensor_config() {
 	if (type == 0) {
 		sensor_delete(nr);
 		handle_return(HTML_SUCCESS);
-		return;
 	}
 
 	if (!findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("group"), true))
@@ -1802,12 +1805,41 @@ void server_sensor_config() {
 	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("log"), true))
 		log = strtoul(tmp_buffer, NULL, 0); // 1=logging enabled/0=logging disabled
 
-	sensor_define(nr, name, type, group, ip, port, id, ri, enable, log);
-
-	handle_return(HTML_SUCCESS);
+	int res = sensor_define(nr, name, type, group, ip, port, id, ri, enable, log);
+	res = res >= HTTP_RQT_SUCCESS?HTML_SUCCESS:(256+res);
+	handle_return(res);
 }
 
 /**
+ * sa
+ * Modus RS485 Sensor set address help function
+ * {"nr":1,"id":1}
+ */
+void server_set_sensor_address() {
+#if defined(ESP8266)
+	char *p = NULL;
+	if(!process_password()) return;
+#else  
+	char *p = get_buffer;
+#endif
+
+	DEBUG_PRINTLN("server_set_sensor_address");
+
+	if (!findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("nr"), true))
+		handle_return(HTML_DATA_MISSING);
+	uint nr = strtoul(tmp_buffer, NULL, 0); // Sensor nr
+
+	if (!findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("id"), true))
+		handle_return(HTML_DATA_MISSING);
+	uint id = strtoul(tmp_buffer, NULL, 0); // Sensor modbus id
+
+	int res = set_sensor_address(sensor_by_nr(nr), id);
+	res = res >= HTTP_RQT_SUCCESS?HTML_SUCCESS:(256+res);
+	handle_return(res);
+}
+
+/**
+ * sg
  * @brief return a 485 sensor
  * 
  */
@@ -1818,6 +1850,9 @@ void server_sensor_get() {
 #else  
 	char *p = get_buffer;
 #endif
+
+	DEBUG_PRINTLN("server_sensor_get");
+
 	if (!findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("nr"), true))
 		handle_return(HTML_DATA_MISSING);
 	uint nr = strtoul(tmp_buffer, NULL, 0); // Sensor nr
@@ -1829,8 +1864,14 @@ void server_sensor_get() {
 		return;
 	}
 
+#if defined(ESP8266)
+	rewind_ether_buffer();
 	print_json_header(false);
-	bfill.emit_p(PSTR("{\"nr\":$D,\"type\":$D,\"group\":$D,\"name\":\"$S\",\"ip\":$L,\"port\":$D,\"id\":$D,\"ri\":$D,\"lnd\":$L,\"ld\":$F,\"enable\":$D,\"log\":$D}"),
+#else
+	print_json_header(false);
+#endif
+
+	bfill.emit_p(PSTR("{\"nr\":$D,\"type\":$D,\"group\":$D,\"name\":\"$S\",\"ip\":$L,\"port\":$D,\"id\":$D,\"ri\":$D,\"lnd\":$L,\"ld\":$E,\"enable\":$D,\"log\":$D,\"last\":$L}"),
 		sensor->nr, 
 		sensor->type,
 		sensor->group,
@@ -1842,12 +1883,57 @@ void server_sensor_get() {
 		sensor->last_native_data,
 		sensor->last_data,
 		sensor->enable,
-		sensor->log);
+		sensor->log,
+		sensor->last_read);
 
 	handle_return(HTML_OK);
 }
 
 /**
+ * sr
+ * @brief read now and return status and last data
+ * 
+ */
+void server_sensor_readnow() {
+	#if defined(ESP8266)
+	char *p = NULL;
+	if(!process_password()) return;
+#else  
+	char *p = get_buffer;
+#endif
+
+	DEBUG_PRINTLN("server_sensor_readnow");
+
+	if (!findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("nr"), true))
+		handle_return(HTML_DATA_MISSING);
+	uint nr = strtoul(tmp_buffer, NULL, 0); // Sensor nr
+
+	Sensor_t *sensor = sensor_by_nr(nr);
+	if (!sensor)
+	{
+		server_send_result(255);
+		return;
+	}
+
+	int status = read_sensor(sensor);
+
+#if defined(ESP8266)
+	rewind_ether_buffer();
+	print_json_header(false);
+#else
+	print_json_header(false);
+#endif
+
+	bfill.emit_p(PSTR("{\"nr\":$D,\"status\":$D,\"lnd\":$L,\"ld\":$E}"),
+		sensor->nr, 
+		status,
+		sensor->last_native_data,
+		sensor->last_data);
+
+	handle_return(HTML_OK);
+}
+/**
+ * sl
  * @brief Lists all sensors
  * 
  */
@@ -1859,13 +1945,24 @@ void server_sensor_list() {
 	char *p = get_buffer;
 #endif
 
-	Sensor_t *sensor = sensors;
-	print_json_header(true);
-	bfill.emit_p(PSTR("{\"count\":$D},"), sensor_count());
+	DEBUG_PRINTLN("server_sensor_list");
+	DEBUG_PRINT("server_count: ");
+	DEBUG_PRINTLN(sensor_count());
 
-	bfill.emit_p(PSTR("["));
-	while (sensor) {
-		bfill.emit_p(PSTR("{\"nr\":$D,\"type\":$D,\"group\":$D,\"name\":\"$S\",\"ip\":$L,\"port\":$D,\"id\":$D,\"ri\":$D,\"lnd\":$L,\"ld\":$F,\"enable\":$D,\"log\":$D}"),
+#if defined(ESP8266)
+	rewind_ether_buffer();
+	print_json_header(false);
+#else
+	print_json_header(false);
+#endif
+
+	int count = sensor_count();
+	bfill.emit_p(PSTR("{\"count\":$D,"), count);
+
+	bfill.emit_p(PSTR("\"sensors\":["));
+	for (int i = 0; i < count; i++) {
+		Sensor_t *sensor = sensor_by_idx(i);
+		bfill.emit_p(PSTR("{\"nr\":$D,\"type\":$D,\"group\":$D,\"name\":\"$S\",\"ip\":$L,\"port\":$D,\"id\":$D,\"ri\":$D,\"lnd\":$L,\"ld\":$E,\"enable\":$D,\"log\":$D,\"last\":$L}"),
 			sensor->nr, 
 			sensor->type,
 			sensor->group,
@@ -1877,11 +1974,15 @@ void server_sensor_list() {
 			sensor->last_native_data,
 			sensor->last_data,
 			sensor->enable,
-			sensor->log);
-		sensor = sensor ->next;
-		if (sensor)
+			sensor->log,
+			sensor->last_read);
+		if (i < count-1)
 			bfill.emit_p(PSTR(","));
-		send_packet();
+		// if available ether buffer is getting small
+		// send out a packet
+		if(available_ether_buffer() <= 0) {
+			send_packet();
+		}
 	}
 	bfill.emit_p(PSTR("]"));
 	bfill.emit_p(PSTR("}"));
@@ -1889,25 +1990,126 @@ void server_sensor_list() {
 	handle_return(HTML_OK);
 }
 
-void serverlog_list() {
-	#if defined(ESP8266)
+/**
+ * so
+ * @brief output sensorlog
+ * 
+ */
+void server_sensorlog_list() {
+#if defined(ESP8266)
 	char *p = NULL;
 	if(!process_password()) return;
 #else  
 	char *p = get_buffer;
 #endif
+	ulong log_size = sensorlog_size();
 
+	DEBUG_PRINTLN("server_sensorlog_list");
 
-	print_json_header(true);
+	//start / max:
+	ulong startAt = 0;
+	ulong maxResults = log_size;
+	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("start"), true)) // Log start
+		startAt = strtoul(tmp_buffer, NULL, 0); 
+
+	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("max"), true)) // Log Lines count
+		maxResults = strtoul(tmp_buffer, NULL, 0);
+	
+	//Filters:
+	uint nr = 0;
+	uint type = 0;
+	ulong after = 0;
+	ulong before = 0;
+	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("nr"), true)) // Filter log for sensor-nr
+		nr = strtoul(tmp_buffer, NULL, 0); 
+
+	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("type"), true)) // Filter log for sensor-type
+		type = strtoul(tmp_buffer, NULL, 0); 
+
+	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("after"), true)) // Filter time after
+		after = strtoul(tmp_buffer, NULL, 0);
+
+	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("before"), true)) // Filter time before
+		before = strtoul(tmp_buffer, NULL, 0);
+
+#if defined(ESP8266)
+	rewind_ether_buffer();
+	print_json_header(false);
+#else
+	print_json_header(false);
+#endif
+	bfill.emit_p(PSTR("["));
+
+	ulong count = 0;
+ 	SensorLog_t sensorlog;
+	Sensor_t *sensor = NULL;
+	for (ulong idx = startAt; idx < log_size; idx++) {
+		sensorlog_load(idx, &sensorlog);
+
+		if (nr && sensorlog.nr != nr)
+			continue;
+
+		if (after && sensorlog.time <= after)
+			continue;
+
+		if (before && sensorlog.time >= before)
+			continue;
+
+		if (!sensor || sensor->nr != sensorlog.nr)
+			sensor = sensor_by_nr(sensorlog.nr);
+		uint sensor_type = sensor?sensor->type:0;
+		if (type && sensor_type != type)
+			continue;
+		
+		if (count > 0)
+			bfill.emit_p(PSTR(","));
+		bfill.emit_p(PSTR("{\"nr\":$D,\"type\":$D,\"time\":$L,\"native_data\":$L,\"data\":$E}"),
+			sensorlog.nr,          //sensor-nr
+			sensor_type,           //sensor-type
+			sensorlog.time,        //timestamp
+			sensorlog.native_data, //native data
+			sensorlog.data);
+			
+		// if available ether buffer is getting small
+		// send out a packet
+		if(available_ether_buffer() <= 0) {
+			send_packet();
+		}
+		if (++count >= maxResults)
+			break;
+	}
+	bfill.emit_p(PSTR("]"));
+
+	handle_return(HTML_OK);	
 }
 
-void serverlog_clear() {
-	 #if defined(ESP8266)
+/**
+ * sn 
+ * @brief Delete/Clear Sensor log
+ * 
+ */
+void server_sensorlog_clear() {
+#if defined(ESP8266)
 	char *p = NULL;
 	if(!process_password()) return;
 #else  
 	char *p = get_buffer;
 #endif
+
+	DEBUG_PRINTLN("server_sensorlog_clear");
+
+#if defined(ESP8266)
+	rewind_ether_buffer();
+	print_json_header(false);
+#else
+	print_json_header(false);
+#endif
+
+	ulong log_size = sensorlog_size();
+
+	sensorlog_clear_all();
+
+	bfill.emit_p(PSTR("{\"deleted\":$L}"), log_size);
 
 	handle_return(HTML_OK);
 }
@@ -1996,6 +2198,8 @@ const char _url_keys[] PROGMEM =
 	"sc"
 	"sl"
 	"sg"
+	"sr"
+	"sa"
 	"so"
 	"sn"
 #if defined(ARDUINO)  
@@ -2029,8 +2233,10 @@ URLHandler urls[] = {
 	server_sensor_config,    // sc
 	server_sensor_list,      // sl
 	server_sensor_get,       // sg
-	serverlog_list,          // so
-	serverlog_clear,         // sn
+	server_sensor_readnow,       // sr
+	server_set_sensor_address,  // sa
+	server_sensorlog_list,          // so
+	server_sensorlog_clear,         // sn
 #if defined(ARDUINO)  
   server_json_debug,			// db
 #endif	
