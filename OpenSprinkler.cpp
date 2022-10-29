@@ -31,10 +31,12 @@ OSMqtt OpenSprinkler::mqtt;
 NVConData OpenSprinkler::nvdata;
 ConStatus OpenSprinkler::status;
 ConStatus OpenSprinkler::old_status;
+#if defined(ESP8266)
 OTCConfig OpenSprinkler::otc;
+#endif
+
 byte OpenSprinkler::hw_type;
 byte OpenSprinkler::hw_rev;
-
 byte OpenSprinkler::nboards;
 byte OpenSprinkler::nstations;
 byte OpenSprinkler::station_bits[MAX_NUM_BOARDS];

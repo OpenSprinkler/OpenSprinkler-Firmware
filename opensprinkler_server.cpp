@@ -231,7 +231,7 @@ void send_packet(OTF_PARAMS_DEF) {
 	//if(final) { w_server->client().stop(); }
 #else
 	m_client->write((const uint8_t *)ether_buffer, strlen(ether_buffer));
-	if(final) { m_client->stop(); }
+	//if(final) { m_client->stop(); }
 #endif
 	rewind_ether_buffer();
 	return;
@@ -251,7 +251,7 @@ void print_json_header(OTF_PARAMS_DEF) {
 	res.writeHeader(F("Connection"), F("close"));
 	//res.writeHeader(F("Content-Length"), strlen_P((char *) content));
 #else
-	bfill.emit_p(PSTR("$F$F$F$F\r\n"), html200OK, htmlContentJson, htmlAccessControl, htmlNoCache);
+	bfill.emit_p(PSTR("$F$F$F$F\r\n"), html200OK, htmlContentJSON, htmlAccessControl, htmlNoCache);
 #endif
 }
 
@@ -1120,7 +1120,7 @@ void server_json_controller_main(OTF_PARAMS_DEF) {
 							pd.lastrun.endtime);
 
 #if defined(ESP8266)
-	bfill.emit_p(PSTR("\"RSSI\":$D,\"otcen\":$D,\"otcs\":$D,"), (int16_t)WiFi.RSSI(), os.otc.en, otf->getCloudStatus());
+	bfill.emit_p(PSTR("\"RSSI\":$D,\"otc\":{$O},\"otcen\":$D,\"otcs\":$D,"), (int16_t)WiFi.RSSI(), SOPT_OTC_OPTS, os.otc.en, otf->getCloudStatus());
 #endif
 
 	byte mac[6] = {0};
@@ -1911,7 +1911,7 @@ void on_sta_update(OTF_PARAMS_DEF) {
 }
 
 void on_sta_upload_fin() {
-	if(!(update_server->hasArg("dkey") && os.password_verify(update_server->arg("pw").c_str()))) {
+	if(!(update_server->hasArg("pw") && os.password_verify(update_server->arg("pw").c_str()))) {
 		update_server_send_result(HTML_UNAUTHORIZED);
 		Update.end(false);
 		return;
@@ -1995,6 +1995,7 @@ void start_server_ap() {
 	otf->on("/update", on_ap_update, OTF::HTTP_GET);
 	update_server->on("/update", HTTP_POST, on_ap_upload_fin, on_ap_upload);
 	otf->onMissingPage(on_ap_home);
+	update_server->begin();
 
 	// set up all other handlers
 	char uri[4];
