@@ -118,6 +118,7 @@ typedef unsigned long ulong;
 #define OS_STATE_CONNECTING     1
 #define OS_STATE_CONNECTED      2
 #define OS_STATE_TRY_CONNECT    3
+#define OS_STATE_WAIT_REBOOT		4
 
 #define LED_FAST_BLINK 100
 #define LED_SLOW_BLINK 500

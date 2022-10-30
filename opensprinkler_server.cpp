@@ -75,8 +75,10 @@ extern OpenSprinkler os;
 extern ProgramData pd;
 extern ulong flow_count;
 
+#if !defined(ESP8266)
 static byte return_code;
 static char* get_buffer = NULL;
+#endif
 
 BufferFiller bfill;
 
@@ -116,30 +118,27 @@ static const char html200OK[] PROGMEM =
 	"HTTP/1.1 200 OK\r\n"
 ;
 
-static const char htmlCacheCtrl[] PROGMEM =
-	"Cache-Control: max-age=604800, public\r\n"
-;
-
 static const char htmlNoCache[] PROGMEM =
 	"Cache-Control: max-age=0, no-cache, no-store, must-revalidate\r\n"
-;
-
-static const char htmlContentHTML[] PROGMEM =
-	"Content-Type: text/html\r\n"
-;
-
-static const char htmlAccessControl[] PROGMEM =
-	"Access-Control-Allow-Origin: *\r\n"
 ;
 
 static const char htmlContentJSON[] PROGMEM =
 	"Content-Type: application/json\r\n"
 	"Connection: close\r\n"
 ;
+
+static const char htmlContentHTML[] PROGMEM =
+	"Content-Type: text/html\r\n"
+	"Connection: close\r\n"
+;
+
+static const char htmlAccessControl[] PROGMEM =
+	"Access-Control-Allow-Origin: *\r\n"
+;
 #endif
 
 static const char htmlMobileHeader[] PROGMEM =
-	"<meta name=\"viewport\" content=\"width=device-width,initial-scale=1.0,minimum-scale=1.0,user-scalable=no\">\r\n"
+	"<meta name=\"viewport\" content=\"width=device-width,initial-scale=1.0,minimum-scale=1.0,user-scalable=no\">"
 ;
 
 static const char htmlReturnHome[] PROGMEM =
@@ -228,13 +227,10 @@ void rewind_ether_buffer() {
 void send_packet(OTF_PARAMS_DEF) {
 #if defined(ESP8266)
 	res.writeBodyChunk((char *)"%s",ether_buffer);
-	//if(final) { w_server->client().stop(); }
 #else
 	m_client->write((const uint8_t *)ether_buffer, strlen(ether_buffer));
-	//if(final) { m_client->stop(); }
 #endif
 	rewind_ether_buffer();
-	return;
 }
 
 char dec2hexchar(byte dec) {
@@ -242,31 +238,21 @@ char dec2hexchar(byte dec) {
 	else return 'A'+(dec-10);
 }
 
-void print_json_header(OTF_PARAMS_DEF) {
 #if defined(ESP8266)
+void print_header(OTF_PARAMS_DEF, bool isJson=true, int len=0) {
 	res.writeStatus(200, F("OK"));
-	res.writeHeader(F("Content-Type"), F("application/json"));
+	res.writeHeader(F("Content-Type"), isJson?F("application/json"):F("text/html"));
+	if(len>0)
+		res.writeHeader(F("Content-Length"), len);
 	res.writeHeader(F("Access-Control-Allow-Origin"), F("*"));
 	res.writeHeader(F("Cache-Control"), F("max-age=0, no-cache, no-store, must-revalidate"));
 	res.writeHeader(F("Connection"), F("close"));
-	//res.writeHeader(F("Content-Length"), strlen_P((char *) content));
-#else
-	bfill.emit_p(PSTR("$F$F$F$F\r\n"), html200OK, htmlContentJSON, htmlAccessControl, htmlNoCache);
-#endif
 }
-
-void print_html_header(OTF_PARAMS_DEF) {
-#if defined(ESP8266)
-	res.writeStatus(200, F("OK"));
-	res.writeHeader(F("Content-Type"), F("text/html"));
-	res.writeHeader(F("Access-Control-Allow-Origin"), F("*"));
-	res.writeHeader(F("Cache-Control"), F("max-age=0, no-cache, no-store, must-revalidate"));
-	res.writeHeader(F("Connection"), F("close"));
-	//res.writeHeader(F("Content-Length"), strlen_P((char *) content));
 #else
-	bfill.emit_p(PSTR("$F$F$F$F\r\n"), html200OK, htmlContentHTML, htmlAccessControl, htmlNoCache);
-#endif
+void print_header(bool isJson=true)  {
+	bfill.emit_p(PSTR("$F$F$F$F\r\n"), html200OK, isJson?htmlContentJSON:htmlContentHTML, htmlAccessControl, htmlNoCache);
 }
+#endif
 
 #if defined(ESP8266)
 String two_digits(uint8_t x) {
@@ -285,7 +271,7 @@ void otf_send_result(OTF_PARAMS_DEF, byte code, const char *item = NULL) {
 	json += item;
 	json += F("\"");
 	json += F("}");
-	print_json_header(OTF_PARAMS);
+	print_header(OTF_PARAMS, true, json.length());
 	res.writeBodyChunk((char *)"%s",json.c_str());
 }
 
@@ -407,13 +393,13 @@ static String scanned_ssids;
 
 void on_ap_home(OTF_PARAMS_DEF) {
 	if(os.get_wifi_mode()!=WIFI_MODE_AP) return;
-	print_html_header(OTF_PARAMS);
+	print_header(OTF_PARAMS, false, strlen_P((char*)ap_home_html));
 	res.writeBodyChunk((char *) "%s", ap_home_html);
 }
 
 void on_ap_scan(OTF_PARAMS_DEF) {
 	if(os.get_wifi_mode()!=WIFI_MODE_AP) return;
-	print_json_header(OTF_PARAMS);
+	print_header(OTF_PARAMS, true, scanned_ssids.length());
 	res.writeBodyChunk((char *)"%s",scanned_ssids.c_str());
 }
 
@@ -434,17 +420,21 @@ void on_ap_change_config(OTF_PARAMS_DEF) {
 	}
 }
 
+void reboot_in(uint32_t ms);
+
 void on_ap_try_connect(OTF_PARAMS_DEF) {
 	if(os.get_wifi_mode()!=WIFI_MODE_AP) return;
 	String json = "{";
 	json += F("\"ip\":");
 	json += (WiFi.status() == WL_CONNECTED) ? (uint32_t)WiFi.localIP() : 0;
 	json += F("}");
-	print_json_header(OTF_PARAMS);
+	print_header(OTF_PARAMS,true,json.length());
 	res.writeBodyChunk((char *)"%s",json.c_str());
 	if(WiFi.status() == WL_CONNECTED && WiFi.localIP()) {
-		// IP received by client, restart
-		//os.reboot_dev(REBOOT_CAUSE_WIFIDONE);
+		os.iopts[IOPT_WIFI_MODE] = WIFI_MODE_STA;
+		os.iopts_save();
+		DEBUG_PRINTLN(F("IP received by client, restart."));
+		reboot_in(1000);
 	}
 }
 #endif
@@ -481,7 +471,7 @@ boolean check_password(char *p)
 	if(fwv_on_fail) {
 		rewind_ether_buffer();
 		bfill.emit_p(PSTR("{\"$F\":$D}"), iopt_json_names+0, os.iopts[0]);
-		print_json_header(OTF_PARAMS);
+		print_header(OTF_PARAMS,true,strlen(ether_buffer));
 		res.writeBodyChunk((char *)"%s",ether_buffer);
 	} else {
 		otf_send_result(OTF_PARAMS, HTML_UNAUTHORIZED);
@@ -530,8 +520,11 @@ void server_json_stations(OTF_PARAMS_DEF) {
 #if defined(ESP8266)
 	if(!process_password(OTF_PARAMS)) return;
 	rewind_ether_buffer();
+	print_header(OTF_PARAMS);
+#else
+	print_header();
 #endif
-	print_json_header(OTF_PARAMS);
+	
 	bfill.emit_p(PSTR("{"));
 	server_json_stations_main(OTF_PARAMS);
 	handle_return(HTML_OK);
@@ -542,12 +535,15 @@ void server_json_station_special(OTF_PARAMS_DEF) {
 #if defined(ESP8266)
 	if(!process_password(OTF_PARAMS)) return;
 	rewind_ether_buffer();
+	print_header(OTF_PARAMS);
+#else
+	print_header();
 #endif
 
 	byte sid;
 	byte comma=0;
 	StationData *data = (StationData*)tmp_buffer;
-	print_json_header(OTF_PARAMS);
+	
 	bfill.emit_p(PSTR("{"));
 	for(sid=0;sid<os.nstations;sid++) {
 		if(os.get_station_type(sid)!=STN_TYPE_STANDARD) {  // check if this is a special station
@@ -1020,8 +1016,10 @@ void server_json_options(OTF_PARAMS_DEF) {
 #if defined(ESP8266)
 	if(!process_password(OTF_PARAMS,true)) return;
 	rewind_ether_buffer();
+	print_header(OTF_PARAMS);
+#else
+	print_header();
 #endif
-	print_json_header(OTF_PARAMS);
 	bfill.emit_p(PSTR("{"));
 	server_json_options_main();
 	handle_return(HTML_OK);
@@ -1074,9 +1072,10 @@ void server_json_programs(OTF_PARAMS_DEF) {
 #if defined(ESP8266)
 	if(!process_password(OTF_PARAMS)) return;
 	rewind_ether_buffer();
+	print_header(OTF_PARAMS);
+#else
+	print_header();
 #endif
-
-	print_json_header(OTF_PARAMS);
 	bfill.emit_p(PSTR("{"));
 	server_json_programs_main(OTF_PARAMS);
 	handle_return(HTML_OK);
@@ -1084,13 +1083,15 @@ void server_json_programs(OTF_PARAMS_DEF) {
 
 /** Output script url form */
 void server_view_scripturl(OTF_PARAMS_DEF) {
-#if defined(ESP8266)
-	// no authenticaion needed
 	rewind_ether_buffer();
+	bfill.emit_p(PSTR("<form name=of action=cu method=get><table cellspacing=\"12\"><tr><td><b>JavaScript</b>:</td><td><input type=text size=40 maxlength=40 value=\"$O\" name=jsp></td></tr><tr><td>Default:</td><td>$S</td></tr><tr><td><b>Weather</b>:</td><td><input type=text size=40 maxlength=40 value=\"$O\" name=wsp></td></tr><tr><td>Default:</td><td>$S</td></tr><tr><td><b>Password</b>:</td><td><input type=password size=32 name=pw> <input type=submit></td></tr></table></form><script src=https://ui.opensprinkler.com/js/hasher.js></script>"), SOPT_JAVASCRIPTURL, DEFAULT_JAVASCRIPT_URL, SOPT_WEATHERURL, DEFAULT_WEATHER_URL);
+
+#if defined(ESP8266)
+	print_header(OTF_PARAMS,false,strlen(ether_buffer));
+#else
+	print_header(false);
 #endif
 
-	print_html_header(OTF_PARAMS);
-	bfill.emit_p(PSTR("<form name=of action=cu method=get><table cellspacing=\"12\"><tr><td><b>JavaScript</b>:</td><td><input type=text size=40 maxlength=40 value=\"$O\" name=jsp></td></tr><tr><td>Default:</td><td>$S</td></tr><tr><td><b>Weather</b>:</td><td><input type=text size=40 maxlength=40 value=\"$O\" name=wsp></td></tr><tr><td>Default:</td><td>$S</td></tr><tr><td><b>Password</b>:</td><td><input type=password size=32 name=pw> <input type=submit></td></tr></table></form><script src=https://ui.opensprinkler.com/js/hasher.js></script>"), SOPT_JAVASCRIPTURL, DEFAULT_JAVASCRIPT_URL, SOPT_WEATHERURL, DEFAULT_WEATHER_URL);
 	handle_return(HTML_OK);
 }
 
@@ -1182,8 +1183,11 @@ void server_json_controller(OTF_PARAMS_DEF) {
 #if defined(ESP8266)
 	if(!process_password(OTF_PARAMS)) return;
 	rewind_ether_buffer();
+	print_header(OTF_PARAMS);
+#else
+	print_header();
 #endif
-	print_json_header(OTF_PARAMS);
+	
 	bfill.emit_p(PSTR("{"));
 	server_json_controller_main(OTF_PARAMS);
 	handle_return(HTML_OK);
@@ -1192,19 +1196,19 @@ void server_json_controller(OTF_PARAMS_DEF) {
 /** Output homepage */
 void server_home(OTF_PARAMS_DEF)
 {
-#if defined(ESP8266)
 	rewind_ether_buffer();
-#endif
-
-	print_html_header(OTF_PARAMS);
-	
-	bfill.emit_p(PSTR("<!DOCTYPE html>\n<html>\n<head>\n$F</head>\n<body>\n<script>"), htmlMobileHeader);
+	bfill.emit_p(PSTR("<!DOCTYPE html><html><head>$F</head><body><script>"), htmlMobileHeader);
 	// send server variables and javascript packets
-	bfill.emit_p(PSTR("var ver=$D,ipas=$D;</script>\n"),
+	bfill.emit_p(PSTR("var ver=$D,ipas=$D;</script>"),
 							 OS_FW_VERSION, os.iopts[IOPT_IGNORE_PASSWORD]);
 
-	bfill.emit_p(PSTR("<script src=\"$O/home.js\"></script>\n</body>\n</html>"), SOPT_JAVASCRIPTURL);
+	bfill.emit_p(PSTR("<script src=\"$O/home.js\"></script></body></html>"), SOPT_JAVASCRIPTURL);
 
+#if defined(ESP8266)
+	print_header(OTF_PARAMS,false,strlen(ether_buffer));
+#else
+	print_header(false);
+#endif
 	handle_return(HTML_OK);
 }
 
@@ -1242,10 +1246,10 @@ void server_change_values(OTF_PARAMS_DEF)
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("rbt"), true) && atoi(tmp_buffer) > 0) {
 		#if defined(ESP8266)
 			os.status.safe_reboot = 0;
-			reboot_timer = os.now_tz() + 2;
+			reboot_timer = os.now_tz() + 1;
 			handle_return(HTML_SUCCESS);
 		#else
-			print_html_header(OTF_PARAMS);
+			print_header(false);
 			//bfill.emit_p(PSTR("Rebooting..."));
 			send_packet();
 			m_client->stop();
@@ -1524,8 +1528,11 @@ void server_json_status(OTF_PARAMS_DEF)
 #if defined(ESP8266)
 	if(!process_password(OTF_PARAMS)) return;
 	rewind_ether_buffer();
+	print_header(OTF_PARAMS);
+#else
+	print_header();
 #endif
-	print_json_header(OTF_PARAMS);
+	
 	bfill.emit_p(PSTR("{"));
 	server_json_status_main();
 	handle_return(HTML_OK);
@@ -1672,11 +1679,9 @@ void server_json_log(OTF_PARAMS_DEF) {
 	// as the log data can be large, we will use ESP8266's sendContent function to
 	// send multiple packets of data, instead of the standard way of using send().
 	rewind_ether_buffer();
-	print_json_header(OTF_PARAMS);
-	//bfill.emit_p(PSTR("$F$F$F$F\r\n"), html200OK, htmlContentJSON, htmlAccessControl, htmlNoCache);
-	//w_server->sendContent(ether_buffer);
+	print_header(OTF_PARAMS);
 #else
-	print_json_header(OTF_PARAMS);
+	print_header();
 #endif
 
 	bfill.emit_p(PSTR("["));
@@ -1785,8 +1790,10 @@ void server_json_all(OTF_PARAMS_DEF) {
 #if defined(ESP8266)
 	if(!process_password(OTF_PARAMS,true)) return;
 	rewind_ether_buffer();
+	print_header(OTF_PARAMS);
+#else
+	print_header();
 #endif
-	print_json_header(OTF_PARAMS);
 	bfill.emit_p(PSTR("{\"settings\":{"));
 	server_json_controller_main(OTF_PARAMS);
 	send_packet(OTF_PARAMS);
@@ -1816,8 +1823,12 @@ static int freeHeap () {
 #endif
 
 void server_json_debug(OTF_PARAMS_DEF) {
+#if defined(ESP8266)
   rewind_ether_buffer();
-  print_json_header(OTF_PARAMS);
+	print_header(OTF_PARAMS);
+#else
+	print_header();
+#endif
   bfill.emit_p(PSTR("{\"date\":\"$S\",\"time\":\"$S\",\"heap\":$D"), __DATE__, __TIME__,
 #if defined(ESP8266)
   (uint16_t)ESP.getFreeHeap());
@@ -1898,14 +1909,14 @@ URLHandler urls[] = {
 // handle Ethernet request
 #if defined(ESP8266)
 void on_ap_update(OTF_PARAMS_DEF) {
-	print_html_header(OTF_PARAMS);
+	print_header(OTF_PARAMS, false, strlen_P((char*)ap_update_html));
 	res.writeBodyChunk((char *) "%s", ap_update_html);
 }
 
 void on_sta_update(OTF_PARAMS_DEF) {
 	if(req.isCloudRequest()) otf_send_result(OTF_PARAMS, HTML_NOT_PERMITTED, "fw update");
 	else {
-		print_html_header(OTF_PARAMS);
+		print_header(OTF_PARAMS, false, strlen_P((char*)sta_update_html));
 		res.writeBodyChunk((char *) "%s", sta_update_html);
 	}
 }
@@ -2048,7 +2059,7 @@ void handle_web_request(char *p) {
 				} else if ((com[0]=='j' && com[1]=='o') ||
 									 (com[0]=='j' && com[1]=='a'))	{ // for /jo and /ja we output fwv if password fails
 					if(check_password(dat)==false) {
-						print_json_header(OTF_PARAMS);
+						print_header();
 						bfill.emit_p(PSTR("{\"$F\":$D}"),
 									 iopt_json_names+0, os.iopts[0]);
 						ret = HTML_OK;
@@ -2080,11 +2091,11 @@ void handle_web_request(char *p) {
 				case HTML_OK:
 					break;
 				case HTML_REDIRECT_HOME:
-					print_html_header(OTF_PARAMS);
+					print_header(false);
 					bfill.emit_p(PSTR("$F"), htmlReturnHome);
 					break;
 				default:
-					print_json_header(OTF_PARAMS);
+					print_header();
 					bfill.emit_p(PSTR("{\"result\":$D}"), ret);
 				}
 				break;
@@ -2093,7 +2104,7 @@ void handle_web_request(char *p) {
 
 		if(i==sizeof(urls)/sizeof(URLHandler)) {
 			// no server funtion found
-			print_json_header(OTF_PARAMS);
+			print_header();
 			bfill.emit_p(PSTR("{\"result\":$D}"), HTML_PAGE_NOT_FOUND);
 		}
 		send_packet();

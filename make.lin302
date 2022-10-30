@@ -7,9 +7,12 @@ LIBS = . \
   $(ESP_LIBS)/ESP8266mDNS \
   $(ESP_LIBS)/LittleFS \
   $(ESP_LIBS)/lwIP_enc28j60 \
+  $(ESP_LIBS)/Ticker \
   $(HOME)/Arduino/libraries/SSD1306 \
   $(HOME)/Arduino/libraries/rc-switch \
   $(HOME)/Arduino/libraries/pubsubclient \
+  $(HOME)/Arduino/libraries/OTF-Controller-Library \
+  $(HOME)/Arduino/libraries/WebSockets \
 
 ESP_ROOT = $(HOME)/esp8266_3.0/
 ESPCORE_VERSION = 302

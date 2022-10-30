@@ -43,6 +43,7 @@
 		#include <ENC28J60lwIP.h>
 		#include <RCSwitch.h>
 		#include <OpenThingsFramework.h>
+		#include <Ticker.h>
 		#include "SSD1306Display.h"
 		#include "espconnect.h"
 	#else // for AVR

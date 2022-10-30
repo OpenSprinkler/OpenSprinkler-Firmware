@@ -395,6 +395,14 @@ void delete_log(char *name);
 #if defined(ESP8266)
 void start_server_ap();
 void start_server_client();
+static Ticker reboot_ticker;
+void reboot_in(uint32_t ms) {
+	if(os.state != OS_STATE_WAIT_REBOOT) {
+		os.state = OS_STATE_WAIT_REBOOT;
+		DEBUG_PRINTLN(F("Prepare to restart..."));
+		reboot_ticker.once_ms(ms, ESP.restart);
+	}
+}
 #else
 void handle_web_request(char *p);
 #endif
@@ -478,7 +486,12 @@ void do_loop()
 			}
 		}
 		break;
-		
+	
+	case OS_STATE_WAIT_REBOOT:
+		if(otf) otf->loop();
+		if(update_server) update_server->handleClient();
+		break;
+
 	case OS_STATE_CONNECTED:
 		if(os.get_wifi_mode() == WIFI_MODE_AP) {
 			update_server->handleClient();
@@ -488,10 +501,10 @@ void do_loop()
 				// already in STA mode, waiting to reboot
 				break;
 			}
-			if(WiFi.status()==WL_CONNECTED && WiFi.localIP()) {
-				os.iopts[IOPT_WIFI_MODE] = WIFI_MODE_STA;
-				os.iopts_save();
-				os.reboot_dev(REBOOT_CAUSE_WIFIDONE);
+			if(WiFi.status()==WL_CONNECTED && WiFi.localIP() && reboot_timer!=0) {
+				DEBUG_PRINTLN(F("STA connected, set up reboot timer"));
+				reboot_timer = os.now_tz() + 10;
+				//os.reboot_dev(REBOOT_CAUSE_WIFIDONE);
 			}
 		} else {
 			if(useEth || WiFi.status() == WL_CONNECTED) {

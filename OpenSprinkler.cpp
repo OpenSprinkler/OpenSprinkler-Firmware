@@ -464,7 +464,7 @@ byte OpenSprinkler::start_network() {
 		useEth = false;
 	}
 
-	if(otc.en>0 && otc.token.length()>=32) {
+	if((useEth || get_wifi_mode()==WIFI_MODE_STA) && otc.en>0 && otc.token.length()>=32) {
 		otf = new OTF::OpenThingsFramework(httpport, otc.server, otc.port, otc.token, false);
 		DEBUG_PRINTLN(F("Started OTF with remote connection"));
 	} else {
