@@ -8,6 +8,7 @@ LIBS = . \
   $(ESP_LIBS)/LittleFS \
   $(ESP_LIBS)/lwIP_enc28j60 \
   $(ESP_LIBS)/Ticker \
+  $(ESP_LIBS)/DNSServer \
   $(HOME)/Arduino/libraries/SSD1306 \
   $(HOME)/Arduino/libraries/rc-switch \
   $(HOME)/Arduino/libraries/pubsubclient \

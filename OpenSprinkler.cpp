@@ -471,7 +471,8 @@ byte OpenSprinkler::start_network() {
 		otf = new OTF::OpenThingsFramework(httpport);
 		DEBUG_PRINTLN(F("Started OTF with just local connection"));
 	}
-
+	extern DNSServer *dns;
+	if(get_wifi_mode() == WIFI_MODE_AP) dns = new DNSServer();
 	if(update_server) { delete update_server; update_server = NULL; }
 	update_server = new ESP8266WebServer(8080);
 	DEBUG_PRINT(F("Started update server"));

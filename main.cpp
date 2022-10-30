@@ -33,6 +33,7 @@
 	#if defined(ESP8266)
 		ESP8266WebServer *update_server = NULL;
 		OTF::OpenThingsFramework *otf = NULL;
+		DNSServer *dns = NULL;
 		ENC28J60lwIP eth(PIN_ETHER_CS); // ENC28J60 lwip for wired Ether
 		bool useEth = false; // tracks whether we are using WiFi or wired Ether connection
 		static uint16_t led_blink_ms = LED_FAST_BLINK;
@@ -444,9 +445,10 @@ void do_loop()
 			start_server_client();
 			os.state = OS_STATE_CONNECTED;
 			connecting_timeout = 0;			
-		}
-		else if(os.get_wifi_mode()==WIFI_MODE_AP) {
+		} else if(os.get_wifi_mode()==WIFI_MODE_AP) {
 			start_server_ap();
+			dns->setErrorReplyCode(DNSReplyCode::NoError);
+			dns->start(53, "*", WiFi.softAPIP());
 			os.state = OS_STATE_CONNECTED;
 			connecting_timeout = 0;
 		} else {
@@ -488,12 +490,14 @@ void do_loop()
 		break;
 	
 	case OS_STATE_WAIT_REBOOT:
+		if(dns) dns->processNextRequest();  
 		if(otf) otf->loop();
 		if(update_server) update_server->handleClient();
 		break;
 
 	case OS_STATE_CONNECTED:
 		if(os.get_wifi_mode() == WIFI_MODE_AP) {
+			dns->processNextRequest();
 			update_server->handleClient();
 			otf->loop();
 			connecting_timeout = 0;
