@@ -1771,50 +1771,6 @@ int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char*
 	memset(ether_buffer, 0, ETHER_BUFFER_SIZE);
 	uint32_t stoptime = millis()+timeout;
 
-/*#if defined(ARDUINO)
-	while(client->available()==0) {
-		if(millis()>stoptime) {
-			client->stop();
-			return HTTP_RQT_TIMEOUT;
-		}		
-	}
-	int nbytes = client->available();
-	if(nbytes>0) {
-		if(nbytes>ETHER_BUFFER_SIZE) nbytes=ETHER_BUFFER_SIZE;
-		client->read((uint8_t*)ether_buffer, nbytes);
-	}
-	
-#else
-	while(client->connected()) {
-		int len=client->read((uint8_t *)ether_buffer, ETHER_BUFFER_SIZE);
-		if (len<=0) continue;
-		if(millis()>stoptime) {
-			client->stop();
-			return HTTP_RQT_TIMEOUT;
-		}
-	}
-#endif*/
-/*
-	while(client->available()==0) {
-		if(millis()>stoptime) {
-			client->stop();
-			return HTTP_RQT_TIMEOUT;
-		}		
-	}
-	int nbytes = client->available();
-	if(nbytes>0) {
-		if(nbytes>ETHER_BUFFER_SIZE) nbytes=ETHER_BUFFER_SIZE;
-		client->read((uint8_t*)ether_buffer, nbytes);
-	}
-	DEBUG_PRINT(F("client->read:"));
-	DEBUG_PRINTLN(nbytes);
-	DEBUG_PRINTLN(ether_buffer);
-
-	client->stop();
-	if(strlen(ether_buffer)==0) return HTTP_RQT_EMPTY_RETURN;
-	if(callback) callback(ether_buffer);
-	return HTTP_RQT_SUCCESS;
-*/
 	int pos = 0;
 #if defined(ARDUINO)
 	while(true) {

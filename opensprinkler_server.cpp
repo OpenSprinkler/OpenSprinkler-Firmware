@@ -287,94 +287,6 @@ void update_server_send_result(byte code, const char* item = NULL) {
 	update_server->send(200, "application/json", json);
 }
 
-/*
-void otf_send_html_P(OTF::Response &res, const __FlashStringHelper *content) {
-	res.writeStatus(200, F("OK"));
-	res.writeHeader(F("Content-Type"), F("text/html"));
-	res.writeHeader(F("Access-Control-Allow-Origin"), F("*")); // from esp8266 2.4 this has to be sent explicitly
-	//res.writeHeader(F("Content-Length"), strlen_P((char *) content));
-	res.writeHeader(F("Connection"), F("close"));
-	res.writeBodyChunk((char *) "%s", content);
-	DEBUG_PRINT(strlen_P((char *) content));
-	DEBUG_PRINTLN(F(" bytes sent."));
-}
-
-void otf_send_json(OTF::Response &res, String json) {
-	res.writeStatus(200, F("OK"));
-	res.writeHeader(F("Content-Type"), F("application/json"));
-	res.writeHeader(F("Access-Control-Allow-Origin"), F("*")); // from esp8266 2.4 this has to be sent explicitly
-	//res.writeHeader(F("Content-Length"), json.length());
-	res.writeHeader(F("Connection"), F("close"));
-	res.writeBodyChunk((char *) "%s",json.c_str());
-}
-
-void server_send_content() {
-	w_server->sendContent(ether_buffer);
-	w_server->client().stop();
-	rewind_ether_buffer();	
-}
-
-void server_send_html(String html) {
-	w_server->send(200, "text/html", html);
-	w_server->client().stop();
-}
-
-void server_send_result(byte code) {
-	rewind_ether_buffer();
-	print_json_header(false);
-	bfill.emit_p(PSTR("{\"result\":$D}"), code);
-	server_send_content();
-}
-
-void server_send_result(byte code, const char* item) {
-	rewind_ether_buffer();
-	print_json_header(false);
-	bfill.emit_p(PSTR("{\"result\":$D,\"item\":\"$S\"}"), code, item);
-	server_send_content();
-}
-
-bool get_value_by_key(const char* key, long& val) {
-	if(w_server->hasArg(key)) {
-		val = w_server->arg(key).toInt();	 
-		return true;
-	} else {
-		return false;
-	}
-}
-
-bool get_value_by_key(const char* key, String& val) {
-	if(w_server->hasArg(key)) {
-		val = w_server->arg(key);	 
-		return true;
-	} else {
-		return false;
-	}
-}
-
-void append_key_value(String& html, const char* key, const ulong value) {
-	html += "\"";
-	html += key;
-	html += "\":";
-	html += value;
-	html += ",";
-}
-
-void append_key_value(String& html, const char* key, const int16_t value) {
-	html += "\"";
-	html += key;
-	html += "\":";
-	html += value;
-	html += ",";
-}
-
-void append_key_value(String& html, const char* key, const String& value) {
-	html += "\"";
-	html += key;
-	html += "\":\"";
-	html += value;
-	html += "\",";
-}*/
-
 String get_ap_ssid() {
 	static String ap_ssid;
 	if(!ap_ssid.length()) {
@@ -1124,8 +1036,13 @@ void server_json_controller_main(OTF_PARAMS_DEF) {
 	bfill.emit_p(PSTR("\"RSSI\":$D,\"otc\":{$O},\"otcen\":$D,\"otcs\":$D,"), (int16_t)WiFi.RSSI(), SOPT_OTC_OPTS, os.otc.en, otf->getCloudStatus());
 #endif
 
+#if defined(ARDUINO)
 	byte mac[6] = {0};
 	os.load_hardware_mac(mac, useEth);
+#else
+	os.load_hardware_mac(mac, true);
+#endif
+
 	bfill.emit_p(PSTR("\"mac\":\"$X:$X:$X:$X:$X:$X\","), mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 
 	bfill.emit_p(PSTR("\"loc\":\"$O\",\"jsp\":\"$O\",\"wsp\":\"$O\",\"wto\":{$O},\"ifkey\":\"$O\",\"mqtt\":{$O},\"wtdata\":$S,\"wterr\":$D,"),

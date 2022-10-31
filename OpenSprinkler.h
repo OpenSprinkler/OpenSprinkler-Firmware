@@ -71,6 +71,8 @@
 	extern EthernetServer *m_server;
 	#endif
 	extern bool useEth;
+#else
+	extern EthernetServer *m_server;
 #endif
 
 /** Non-volatile data structure */

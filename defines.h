@@ -24,25 +24,30 @@
 #ifndef _DEFINES_H
 #define _DEFINES_H
 
-#define ENABLE_DEBUG  // enable serial debug
+//#define ENABLE_DEBUG  // enable serial debug
 
+#if defined(ARDUINO)
 typedef unsigned char byte;
 typedef unsigned long ulong;
-  
+#else
+typedef uint8_t byte;
+typedef uint32_t ulong;
+#endif
+
 #define TMP_BUFFER_SIZE      255   // scratch buffer size
 
 /** Firmware version, hardware version, and maximal values */
 #define OS_FW_VERSION  220  // Firmware version: 220 means 2.2.0
-                            // if this number is different from the one stored in non-volatile memory
-                            // a device reset will be automatically triggered
+														// if this number is different from the one stored in non-volatile memory
+														// a device reset will be automatically triggered
 
 #define OS_FW_MINOR      0  // Firmware minor version
 
 /** Hardware version base numbers */
-#define OS_HW_VERSION_BASE   0x00
-#define OSPI_HW_VERSION_BASE 0x40
-#define OSBO_HW_VERSION_BASE 0x80
-#define SIM_HW_VERSION_BASE  0xC0
+#define OS_HW_VERSION_BASE   0x00	// OpenSprinkler
+#define OSPI_HW_VERSION_BASE 0x40 // OpenSprinkler Pi
+#define OSBO_HW_VERSION_BASE 0x80 // OpenSprinkler Beagle
+#define SIM_HW_VERSION_BASE  0xC0	// simulation hardware
 
 /** Hardware type macro defines */
 #define HW_TYPE_AC           0xAC   // standard 24VAC for 24VAC solenoids only, with triacs
@@ -59,7 +64,7 @@ typedef unsigned long ulong;
 #define DONE_FILENAME         "done.dat"    // used to indicate the completion of all files
 
 /** Station macro defines */
-#define STN_TYPE_STANDARD    0x00
+#define STN_TYPE_STANDARD    0x00 // standard solenoid station
 #define STN_TYPE_RF          0x01	// Radio Frequency (RF) station
 #define STN_TYPE_REMOTE      0x02	// Remote OpenSprinkler station
 #define STN_TYPE_GPIO        0x03	// direct GPIO station
@@ -382,14 +387,14 @@ enum {
 	#define PIN_SR_DATA_ALT   21    // shift register data pin (alternative, for RPi 1 rev. 1 boards)
 	#define PIN_SR_CLOCK       4    // shift register clock pin
 	#define PIN_SR_OE         17    // shift register output enable pin
-	#define PIN_SENSOR1				14
-	#define PIN_SENSOR2				23
+	#define PIN_SENSOR1       14
+	#define PIN_SENSOR2       23
 	#define PIN_RFTX          15    // RF transmitter pin
 	//#define PIN_BUTTON_1      23    // button 1
 	//#define PIN_BUTTON_2      24    // button 2
 	//#define PIN_BUTTON_3      25    // button 3
 
-	#define PIN_FREE_LIST		{5,6,7,8,9,10,11,12,13,16,18,19,20,21,23,24,25,26}  // free GPIO pins
+	#define PIN_FREE_LIST       {5,6,7,8,9,10,11,12,13,16,18,19,20,21,23,24,25,26}  // free GPIO pins
 	#define ETHER_BUFFER_SIZE   16384
 
 #elif defined(OSBO) // for OSBo
@@ -401,7 +406,7 @@ enum {
 	#define PIN_SR_DATA       30    // P9_11, shift register data pin
 	#define PIN_SR_CLOCK      31    // P9_13, shift register clock pin
 	#define PIN_SR_OE         50    // P9_14, shift register output enable pin
-	#define PIN_SENSOR1				48
+	#define PIN_SENSOR1       48
 	#define PIN_RFTX          51    // RF transmitter pin
 
 	#define PIN_FREE_LIST     {38,39,34,35,45,44,26,47,27,65,63,62,37,36,33,32,61,86,88,87,89,76,77,74,72,73,70,71}
@@ -418,10 +423,10 @@ enum {
 	#define PIN_SR_DATA     0
 	#define PIN_SR_CLOCK    0
 	#define PIN_SR_OE       0
-	#define PIN_SENSOR1			0
-	#define PIN_SENSOR2			0
-	#define PIN_RFTX     0
-	#define PIN_FREE_LIST	{}
+	#define PIN_SENSOR1     0
+	#define PIN_SENSOR2     0
+	#define PIN_RFTX        0
+	#define PIN_FREE_LIST  {}
 	#define ETHER_BUFFER_SIZE   16384
 #endif
 
@@ -458,7 +463,7 @@ enum {
 	#define now()       time(0)
 	#define pgm_read_byte(x) *(x)
 	#define PSTR(x)      x
-	#define F(x)				 x
+	#define F(x)         x
 	#define strcat_P     strcat
 	#define strcpy_P     strcpy
 	#define sprintf_P    sprintf
