@@ -78,20 +78,40 @@ typedef struct SensorLog {
 #define SENSORLOG_STORE_SIZE (sizeof(SensorLog_t))
 
 //Sensor to program data
-typedef struct ProgSensor {
-	uint   sensor;
-	double offset;
-	double factor;
-	double divider;
-	byte   undef[32]; //for later
-} ProgSensor_t;
+//Adjustment is formula 
+//   min max  factor1 factor2
+//   10..90 -> 5..1 factor1 > factor2
+//    a   b    c  d
+//   (b-sensorData) / (b-a) * (c-d) + d
+//
+//   10..90 -> 1..5 factor1 < factor2
+//    a   b    c  d
+//   (sensorData-a) / (b-a) * (d-c) + c
 
+#define PROG_NONE        0 //No adjustment (delete)
+#define PROG_LINEAR      1 //formula see above
+#define PROG_DIGITAL_MIN 2 //1=under or equal min, 0=above
+#define PROG_DIGITAL_MAX 3 //1=over or equal max, 0=below
+
+typedef struct ProgSensorAdjust {
+	uint   nr;
+	uint   type;     //PROG_XYZ type=0 -->delete
+	uint   sensor;   //sensor-nr
+	uint   prog;     //program-nr
+	double factor1;
+	double factor2;
+	double min;
+	double max;
+	byte   undef[32]; //for later
+	ProgSensorAdjust *next;
+} ProgSensorAdjust_t;
+#define PROGSENSOR_STORE_SIZE (sizeof(ProgSensorAdjust_t)-sizeof(ProgSensorAdjust_t*))
 
 //All sensors:
 static Sensor_t *sensors = NULL;
 
 //Program sensor data 
-static ProgSensor_t *progSensor = NULL;
+static ProgSensorAdjust_t *progSensorAdjusts = NULL;
 
 //Utils:
 uint16_t CRC16 (byte buf[], int len);
@@ -119,7 +139,14 @@ SensorLog_t *sensorlog_load(ulong pos);
 SensorLog_t *sensorlog_load(ulong idx, SensorLog_t* sensorlog);
 ulong sensorlog_size();
 
-//Set Sensor Address
+//Set Sensor Address for SMT100:
 int set_sensor_address(Sensor_t *sensor, byte new_address);
 
+//Calc watering adjustment:
+int prog_adjust_define(uint nr, uint type, uint sensor, uint prog, double factor1, double factor2, double min, double max);
+int prog_adjust_delete(uint nr);
+void prog_adjust_save();
+void prog_adjust_load();
+void prog_adjust_count();
+double calc_sensor_watering(uint prog);
 #endif // _SENSORS_H

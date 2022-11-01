@@ -120,12 +120,12 @@ int sensor_define(uint nr, char *name, uint type, uint group, uint32_t ip, uint 
 	new_sensor->read_interval = ri;
 	new_sensor->enable = enable;
 	new_sensor->log = log;
-	if (last == NULL) {
-		sensors = new_sensor;
-		new_sensor->next = sensor;
-	} else {
+	if (last) {
 		new_sensor->next = last->next;
 		last->next = new_sensor;
+	} else {
+		new_sensor->next = sensors;
+		sensors = new_sensor;
 	}
 	sensor_save();
 	return HTTP_RQT_SUCCESS;
@@ -542,4 +542,149 @@ int set_sensor_address(Sensor_t *sensor, byte new_address) {
 			return HTTP_RQT_SUCCESS;
 	}
 	return HTTP_RQT_NOT_RECEIVED;
+}
+
+double calc_linear(ProgSensorAdjust_t *p, Sensor_t *sensor) {
+	
+//   min max  factor1 factor2
+//   10..90 -> 5..1 factor1 > factor2
+//    a   b    c  d
+//   (b-sensorData) / (b-a) * (c-d) + d
+//
+//   10..90 -> 1..5 factor1 < factor2
+//    a   b    c  d
+//   (sensorData-a) / (b-a) * (d-c) + c
+				
+	double sensorData = sensor->last_data;
+	// Limit to min/max:
+	if (sensorData < p->min) sensorData = p->min;
+	if (sensorData > p->max) sensorData = p->max;
+
+	//Calculate:
+	if (p->factor1 > p->factor2) { // invers scaling factor:
+		return (p->max - sensorData) / (p->max - p->min) * (p->factor1 - p->factor2) + p->factor2;
+	} else { // upscaling factor:
+		return (sensorData - p->min) / (p->max - p->min) * (p->factor2 - p->factor1) + p->factor1;
+	}
+}
+
+double calc_digital_min(ProgSensorAdjust_t *p, Sensor_t *sensor) {
+	return sensor->last_data <= p->min? 1:0;
+}
+
+double calc_digital_max(ProgSensorAdjust_t *p, Sensor_t *sensor) {
+	return sensor->last_data >= p->max? 1:0;
+}
+
+/**
+ * @brief calculate adjustment
+ * 
+ * @param prog 
+ * @return double 
+ */
+double calc_sensor_watering(uint prog) {
+	double result = 1;
+	ProgSensorAdjust_t *p = progSensorAdjusts;
+
+	while (p) {
+		if (p->prog == prog) {
+			Sensor_t *sensor = sensor_by_nr(p->sensor);
+			if (sensor && sensor->enable && sensor->data_ok) {
+
+				double res = 0;
+				switch(p->type) {
+					case PROG_NONE:        res = 1; break;
+					case PROG_LINEAR:      res = calc_linear(p, sensor); break;
+					case PROG_DIGITAL_MIN: res = calc_digital_min(p, sensor); break;
+					case PROG_DIGITAL_MAX: res = calc_digital_max(p, sensor); break;
+					default:               res = 0; 
+				}
+
+				result = result * res;
+			}
+		}
+
+		p = p->next;
+	}
+
+	return result;
+}
+
+int prog_adjust_define(uint nr, uint type, uint sensor, uint prog, double factor1, double factor2, double min, double max) {
+	ProgSensorAdjust_t *p = progSensorAdjusts;
+
+	ProgSensorAdjust_t *last = NULL;
+
+	while (p) {
+		if (p->nr == nr) {
+			p->type = type;
+			p->sensor = sensor;
+			p->prog = prog;
+			p->factor1 = factor1;
+			p->factor2 = factor2;
+			p->min = min;
+			p->max = max;
+			prog_adjust_save();
+			return HTTP_RQT_SUCCESS;
+		}
+
+		if (p->nr > nr)
+			break;
+
+		last = p;
+		p = p->next;
+	}
+
+	p = new ProgSensorAdjust_t;
+	p->nr = nr;
+	p->type = type;
+	p->sensor = sensor;
+	p->prog = prog;
+	p->factor1 = factor1;
+	p->factor2 = factor2;
+	p->min = min;
+	p->max = max;
+	if (last) {
+		p->next = last->next;
+		last->next = p;
+	} else {
+		p->next = progSensorAdjusts;
+		progSensorAdjusts = p;
+	}
+
+	prog_adjust_save();
+	return HTTP_RQT_SUCCESS;
+}
+
+int prog_adjust_delete(uint nr) {
+	ProgSensorAdjust_t *p = progSensorAdjusts;
+
+	ProgSensorAdjust_t *last = NULL;
+
+	while (p) {
+		if (p->nr == nr) {
+			if (last)
+				last->next = p->next;
+			else
+				progSensorAdjusts = p->next;
+			delete p;
+			prog_adjust_save();
+			return HTTP_RQT_SUCCESS;
+		}
+		last = p;
+		p = p->next;
+	}
+	return HTTP_RQT_NOT_RECEIVED;
+}
+
+void prog_adjust_save() {
+
+}
+
+void prog_adjust_load() {
+
+}
+
+void prog_adjust_count() {
+	
 }
