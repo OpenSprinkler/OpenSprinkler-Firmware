@@ -49,8 +49,8 @@
 		#include "espconnect.h"
 	#else // for AVR
 		#include <SdFat.h>
-		#include "LiquidCrystal.h"
 		#include <Ethernet.h>
+		#include "LiquidCrystal.h"
 	#endif
 	
 #else // headers for RPI/BBB/LINUX

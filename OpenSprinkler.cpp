@@ -31,9 +31,6 @@ OSMqtt OpenSprinkler::mqtt;
 NVConData OpenSprinkler::nvdata;
 ConStatus OpenSprinkler::status;
 ConStatus OpenSprinkler::old_status;
-#if defined(ESP8266)
-OTCConfig OpenSprinkler::otc;
-#endif
 
 byte OpenSprinkler::hw_type;
 byte OpenSprinkler::hw_rev;
@@ -81,6 +78,7 @@ extern char ether_buffer[];
 	IOEXP* OpenSprinkler::mainio; // main controller IO expander object
 	IOEXP* OpenSprinkler::drio; // driver board IO expander object
 	RCSwitch OpenSprinkler::rfswitch;
+	OTCConfig OpenSprinkler::otc;
 
 	String OpenSprinkler::wifi_ssid="";
 	String OpenSprinkler::wifi_pass="";
@@ -412,7 +410,7 @@ time_t OpenSprinkler::now_tz() {
 	return now()+(int32_t)3600/4*(int32_t)(iopts[IOPT_TIMEZONE]-48);
 }
 
-#if defined(ARDUINO)	// AVR network init functions
+#if defined(ARDUINO)
 
 bool detect_i2c(int addr) {
 	Wire.beginTransmission(addr);
@@ -505,9 +503,7 @@ byte OpenSprinkler::start_ether() {
 	
 	eth.setDefault();	
 	load_hardware_mac((uint8_t*)tmp_buffer, true);
-	DEBUG_PRINTLN(F("before eth.begin"));
 	if(!eth.begin((uint8_t*)tmp_buffer))	return 0;
-	DEBUG_PRINTLN(F("after eth.begin"));
 	lcd_print_line_clear_pgm(PSTR("Start wired link"), 1);
 	
 	ulong timeout = millis()+30000; // 30 seconds time out
@@ -567,7 +563,7 @@ byte OpenSprinkler::start_ether() {
 
 bool OpenSprinkler::network_connected(void) {
 #if defined (ESP8266)
-	if(useEth) return true; // todo: check if lwip has status indicator
+	if(useEth) return true; // todo: lwip currently does not have a way to check link status
 	else
 		return (get_wifi_mode()==WIFI_MODE_STA && WiFi.status()==WL_CONNECTED && state==OS_STATE_CONNECTED);
 #else
@@ -707,7 +703,7 @@ void OpenSprinkler::begin() {
 	hw_type = HW_TYPE_UNKNOWN;
 	hw_rev = 0;
 		
-#if defined(ESP8266)
+#if defined(ESP8266) // ESP8266 specific initializations
 
 	/* check hardware type */
 	if(detect_i2c(ACDR_I2CADDR)) hw_type = HW_TYPE_AC;
@@ -798,6 +794,7 @@ void OpenSprinkler::begin() {
 	for(byte i=0;i<(MAX_NUM_BOARDS)/2;i++)
 		expanders[i] = NULL;
 	detect_expanders();
+
 #else
 
 	// shift register setup
@@ -1479,7 +1476,7 @@ void OpenSprinkler::attribs_save() {
 			at.dis = (attrib_dis[bid]>>s) & 1;
 			at.seq = (attrib_seq[bid]>>s) & 1;
 			at.gid = 0;
-			// only write if content has changed
+			// only write if content has changed: this is important for LittleFS as otherwise the overhead is too large
 			file_read_block(STATIONS_FILENAME, &at0, (uint32_t)sid*sizeof(StationData)+offsetof(StationData, attrib), 1);
 			if(*((byte*)&at) != *((byte*)&at0))
 				file_write_block(STATIONS_FILENAME, &at, (uint32_t)sid*sizeof(StationData)+offsetof(StationData, attrib), 1); // attribte bits are 1 byte long
@@ -1773,6 +1770,9 @@ int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char*
 
 	int pos = 0;
 #if defined(ARDUINO)
+	// with ESP8266 core 3.0.2, client->connected() is not always true even if there is more data
+	// so this loop is going to take longer than it should be
+	// todo: can consider using HTTPClient for ESP8266
 	while(true) {
 		int nbytes = client->available();
 		if(nbytes>0) {

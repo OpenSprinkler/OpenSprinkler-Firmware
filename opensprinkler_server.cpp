@@ -1033,7 +1033,7 @@ void server_json_controller_main(OTF_PARAMS_DEF) {
 							pd.lastrun.endtime);
 
 #if defined(ESP8266)
-	bfill.emit_p(PSTR("\"RSSI\":$D,\"otc\":{$O},\"otcen\":$D,\"otcs\":$D,"), (int16_t)WiFi.RSSI(), SOPT_OTC_OPTS, os.otc.en, otf->getCloudStatus());
+	bfill.emit_p(PSTR("\"RSSI\":$D,\"otc\":{$O},\"otcs\":$D,"), (int16_t)WiFi.RSSI(), SOPT_OTC_OPTS, otf->getCloudStatus());
 #endif
 
 #if defined(ARDUINO)
@@ -1089,8 +1089,6 @@ void server_json_controller_main(OTF_PARAMS_DEF) {
 		bfill.emit_p((sid<os.nstations-1)?PSTR(","):PSTR("]"));
 	}
 	
-	//bfill.emit_p(PSTR(",\"blynk\":\"$O\""), SOPT_BLYNK_TOKEN);
-	//bfill.emit_p(PSTR(",\"mqtt\":\"$O\""), SOPT_MQTT_IP);
 	
 	bfill.emit_p(PSTR("}"));
 }
@@ -1935,7 +1933,6 @@ void start_server_ap() {
 		otf->on(uri, urls[i]);
 	}
 	
-	//w_server->begin();
 	os.lcd.setCursor(0, -1);
 	os.lcd.print(F("OSAP:"));
 	os.lcd.print(ap_ssid);
@@ -2034,6 +2031,8 @@ void handle_web_request(char *p) {
 #define NTP_NTRIES 10
 /** NTP sync request */
 #if defined(ESP8266)
+// due to lwip not supporting UDP, we have to use configTime and time() functions
+// othewise, using UDP is much faster for NTP sync
 ulong getNtpTime() {
 	static bool configured = false;
 	if(!configured) {
