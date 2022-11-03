@@ -25,9 +25,9 @@
 	#include <Arduino.h>
 	#if defined(ESP8266)
 		#include <ESP8266WiFi.h>
-		#include <ENC28J60lwIP.h>		
+		#include <ENC28J60lwIP.h>
 	#else
-		#include <Ethernet.h>		
+		#include <Ethernet.h>
 	#endif
 	#include <PubSubClient.h>
 
@@ -49,21 +49,21 @@
 #if defined(ENABLE_DEBUG)
 	#if defined(ARDUINO)
 		#include "TimeLib.h"
-		#define DEBUG_PRINTF(msg, ...)		{Serial.printf(msg, ##__VA_ARGS__);}
-		#define DEBUG_TIMESTAMP(msg, ...)	{time_t t = os.now_tz(); Serial.printf("%02d-%02d-%02d %02d:%02d:%02d - ", year(t), month(t), day(t), hour(t), minute(t), second(t));}
+		#define DEBUG_PRINTF(msg, ...)    {Serial.printf(msg, ##__VA_ARGS__);}
+		#define DEBUG_TIMESTAMP(msg, ...) {time_t t = os.now_tz(); Serial.printf("%02d-%02d-%02d %02d:%02d:%02d - ", year(t), month(t), day(t), hour(t), minute(t), second(t));}
 	#else
 		#include <sys/time.h>
-		#define DEBUG_PRINTF(msg, ...)		{printf(msg, ##__VA_ARGS__);}
-		#define DEBUG_TIMESTAMP()			{char tstr[21]; time_t t = time(NULL); struct tm *tm = localtime(&t); strftime(tstr, 21, "%y-%m-%d %H:%M:%S - ", tm);printf("%s", tstr);}
+		#define DEBUG_PRINTF(msg, ...)    {printf(msg, ##__VA_ARGS__);}
+		#define DEBUG_TIMESTAMP()         {char tstr[21]; time_t t = time(NULL); struct tm *tm = localtime(&t); strftime(tstr, 21, "%y-%m-%d %H:%M:%S - ", tm);printf("%s", tstr);}
 	#endif
-	#define DEBUG_LOGF(msg, ...)			{DEBUG_TIMESTAMP(); DEBUG_PRINTF(msg, ##__VA_ARGS__);}
+	#define DEBUG_LOGF(msg, ...)        {DEBUG_TIMESTAMP(); DEBUG_PRINTF(msg, ##__VA_ARGS__);}
 
-	static unsigned long _lastMillis = 0;	// Holds the timestamp associated with the last call to DEBUG_DURATION() 
-	inline unsigned long DEBUG_DURATION()	{unsigned long dur = millis() - _lastMillis; _lastMillis = millis(); return dur;}
+	static unsigned long _lastMillis = 0; // Holds the timestamp associated with the last call to DEBUG_DURATION()
+	inline unsigned long DEBUG_DURATION() {unsigned long dur = millis() - _lastMillis; _lastMillis = millis(); return dur;}
 #else
-	#define DEBUG_PRINTF(msg, ...)			{}
-	#define DEBUG_LOGF(msg, ...)			{}
-	#define DEBUG_DURATION()				{}
+	#define DEBUG_PRINTF(msg, ...)  {}
+	#define DEBUG_LOGF(msg, ...)    {}
+	#define DEBUG_DURATION()        {}
 #endif
 
 #define str(s) #s
@@ -72,28 +72,28 @@
 extern OpenSprinkler os;
 extern char tmp_buffer[];
 
-#define MQTT_KEEPALIVE			60
-#define MQTT_DEFAULT_PORT		1883	// Default port for MQTT. Can be overwritten through App config
-#define MQTT_MAX_HOST_LEN		50		// Note: App is set to max 50 chars for broker name
-#define MQTT_MAX_USERNAME_LEN	32		// Note: App is set to max 32 chars for username
-#define MQTT_MAX_PASSWORD_LEN	32		// Note: App is set to max 32 chars for password
-#define MQTT_MAX_ID_LEN			16		// MQTT Client Id to uniquely reference this unit
-#define MQTT_RECONNECT_DELAY	120		// Minumum of 60 seconds between reconnect attempts
+#define MQTT_KEEPALIVE      60
+#define MQTT_DEFAULT_PORT   1883  // Default port for MQTT. Can be overwritten through App config
+#define MQTT_MAX_HOST_LEN   50    // Note: App is set to max 50 chars for broker name
+#define MQTT_MAX_USERNAME_LEN 32  // Note: App is set to max 32 chars for username
+#define MQTT_MAX_PASSWORD_LEN 32  // Note: App is set to max 32 chars for password
+#define MQTT_MAX_ID_LEN       16  // MQTT Client Id to uniquely reference this unit
+#define MQTT_RECONNECT_DELAY  120 // Minumum of 60 seconds between reconnect attempts
 
-#define MQTT_ROOT_TOPIC			"opensprinkler"
-#define MQTT_AVAILABILITY_TOPIC	MQTT_ROOT_TOPIC "/availability"
-#define MQTT_ONLINE_PAYLOAD		"online"
-#define MQTT_OFFLINE_PAYLOAD	"offline"
+#define MQTT_ROOT_TOPIC    "opensprinkler"
+#define MQTT_AVAILABILITY_TOPIC	MQTT_ROOT_TOPIC  "/availability"
+#define MQTT_ONLINE_PAYLOAD  "online"
+#define MQTT_OFFLINE_PAYLOAD "offline"
 
-#define MQTT_SUCCESS			0					// Returned when function operated successfully
-#define MQTT_ERROR				1					// Returned whan function failed
+#define MQTT_SUCCESS    0  // Returned when function operated successfully
+#define MQTT_ERROR      1  // Returned whan function failed
 
-char OSMqtt::_id[MQTT_MAX_ID_LEN + 1] = {0};		// Id to identify the client to the broker
-char OSMqtt::_host[MQTT_MAX_HOST_LEN + 1] = {0};	// IP or host name of the broker
-char OSMqtt::_username[MQTT_MAX_USERNAME_LEN + 1] = {0};	// username to connect to the broker
-char OSMqtt::_password[MQTT_MAX_PASSWORD_LEN + 1] = {0};	// password to connect to the broker
-int OSMqtt::_port = MQTT_DEFAULT_PORT;				// Port of the broker (default 1883)
-bool OSMqtt::_enabled = false;						// Flag indicating whether MQTT is enabled
+char OSMqtt::_id[MQTT_MAX_ID_LEN + 1] = {0};     // Id to identify the client to the broker
+char OSMqtt::_host[MQTT_MAX_HOST_LEN + 1] = {0}; // IP or host name of the broker
+char OSMqtt::_username[MQTT_MAX_USERNAME_LEN + 1] = {0};  // username to connect to the broker
+char OSMqtt::_password[MQTT_MAX_PASSWORD_LEN + 1] = {0};  // password to connect to the broker
+int OSMqtt::_port = MQTT_DEFAULT_PORT;  // Port of the broker (default 1883)
+bool OSMqtt::_enabled = false;          // Flag indicating whether MQTT is enabled
 
 // Initialise the client libraries and event handlers.
 void OSMqtt::init(void) {
@@ -106,7 +106,7 @@ void OSMqtt::init(void) {
 	os.load_hardware_mac(mac, useEth);
 	#else
 	os.load_hardware_mac(mac, true);
-	#endif	
+	#endif
 	snprintf(id, MQTT_MAX_ID_LEN, "OS-%02X%02X%02X%02X%02X%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 #endif
 
@@ -292,17 +292,17 @@ int OSMqtt::_loop(void) {
 
 const char * OSMqtt::_state_string(int rc) {
 	switch (rc) {
-		case MQTT_CONNECTION_TIMEOUT:		return "The server didn't respond within the keepalive time";
-		case MQTT_CONNECTION_LOST:			return "The network connection was lost";
-		case MQTT_CONNECT_FAILED:			return "The network connection failed";
-		case MQTT_DISCONNECTED:				return "The client has cleanly disconnected";
-		case MQTT_CONNECTED:				return "The client is connected";
-		case MQTT_CONNECT_BAD_PROTOCOL:		return "The server doesn't support the requested version of MQTT";
-		case MQTT_CONNECT_BAD_CLIENT_ID:	return "The server rejected the client identifier";
-		case MQTT_CONNECT_UNAVAILABLE:		return "The server was unavailable to accept the connection";
-		case MQTT_CONNECT_BAD_CREDENTIALS:	return "The username/password were rejected";
-		case MQTT_CONNECT_UNAUTHORIZED:		return "The client was not authorized to connect";
-		default:							return "Unrecognised state";
+		case MQTT_CONNECTION_TIMEOUT:  return "The server didn't respond within the keepalive time";
+		case MQTT_CONNECTION_LOST:     return "The network connection was lost";
+		case MQTT_CONNECT_FAILED:      return "The network connection failed";
+		case MQTT_DISCONNECTED:        return "The client has cleanly disconnected";
+		case MQTT_CONNECTED:           return "The client is connected";
+		case MQTT_CONNECT_BAD_PROTOCOL: return "The server doesn't support the requested version of MQTT";
+		case MQTT_CONNECT_BAD_CLIENT_ID: return "The server rejected the client identifier";
+		case MQTT_CONNECT_UNAVAILABLE:  return "The server was unavailable to accept the connection";
+		case MQTT_CONNECT_BAD_CREDENTIALS: return "The username/password were rejected";
+		case MQTT_CONNECT_UNAUTHORIZED: return "The client was not authorized to connect";
+		default:  return "Unrecognised state";
 	}
 }
 #else
@@ -374,7 +374,7 @@ int OSMqtt::_connect(void) {
 	}
 
 	// Allow 10ms for the Broker's ack to be received. We need this on start-up so that the
-	// connection is registered before we attempt to send our first NOTIFY_REBOOT notification. 
+	// connection is registered before we attempt to send our first NOTIFY_REBOOT notification.
 	usleep(10000);
 
 	return MQTT_SUCCESS;

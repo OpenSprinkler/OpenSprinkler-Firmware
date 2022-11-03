@@ -18,14 +18,14 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see
- * <http://www.gnu.org/licenses/>.
+ * <http://www.gnu.org/licenses/>
  */
 
 #include "utils.h"
 #include "OpenSprinkler.h"
 extern OpenSprinkler os;
 
-#if defined(ARDUINO)	// Arduino
+#if defined(ARDUINO)  // Arduino
 
 	#if defined(ESP8266)
 		#include <FS.h>
@@ -73,7 +73,7 @@ void delay(ulong howLong)
 {
 	struct timespec sleeper, dummy ;
 
-	sleeper.tv_sec	= (time_t)(howLong / 1000) ;
+	sleeper.tv_sec  = (time_t)(howLong / 1000) ;
 	sleeper.tv_nsec = (long)(howLong % 1000) * 1000000 ;
 
 	nanosleep (&sleeper, &dummy) ;
@@ -84,7 +84,7 @@ void delayMicrosecondsHard (ulong howLong)
 	struct timeval tNow, tLong, tEnd ;
 
 	gettimeofday (&tNow, NULL) ;
-	tLong.tv_sec	= howLong / 1000000 ;
+	tLong.tv_sec  = howLong / 1000000 ;
 	tLong.tv_usec = howLong % 1000000 ;
 	timeradd (&tNow, &tLong, &tEnd) ;
 
@@ -100,11 +100,11 @@ void delayMicroseconds (ulong howLong)
 
 	/**/ if (howLong ==		0)
 		return ;
-	else if (howLong	< 100)
+	else if (howLong < 100)
 		delayMicrosecondsHard (howLong) ;
 	else
 	{
-		sleeper.tv_sec	= wSecs ;
+		sleeper.tv_sec  = wSecs ;
 		sleeper.tv_nsec = (long)(uSecs * 1000L) ;
 		nanosleep (&sleeper, NULL) ;
 	}
@@ -117,7 +117,7 @@ void initialiseEpoch()
 	struct timeval tv ;
 
 	gettimeofday (&tv, NULL) ;
-	epochMilli = (uint64_t)tv.tv_sec * (uint64_t)1000		 + (uint64_t)(tv.tv_usec / 1000) ;
+	epochMilli = (uint64_t)tv.tv_sec * (uint64_t)1000    + (uint64_t)(tv.tv_usec / 1000) ;
 	epochMicro = (uint64_t)tv.tv_sec * (uint64_t)1000000 + (uint64_t)(tv.tv_usec) ;
 }
 
@@ -214,7 +214,7 @@ bool file_exists(const char *fn) {
 void file_read_block(const char *fn, void *dst, ulong pos, ulong len) {
 #if defined(ESP8266)
 
-	// do not use File.readBytes or readBytesUntil because it's very slow  
+	// do not use File.readBytes or readBytesUntil because it's very slow
 	File f = LittleFS.open(fn, "r");
 	if(f) {
 		f.seek(pos, SeekSet);
@@ -239,7 +239,7 @@ void file_read_block(const char *fn, void *dst, ulong pos, ulong len) {
 		fseek(fp, pos, SEEK_SET);
 		fread(dst, 1, len, fp);
 		fclose(fp);
-	}  
+	}
 
 #endif
 }
@@ -364,7 +364,7 @@ byte file_cmp_block(const char *fn, const char *buf, ulong pos) {
 		}
 		fclose(fp);
 		return (*buf==c)?0:1;
-	}  
+	}
 
 #endif
 	return 1;

@@ -18,9 +18,9 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see
- * <http://www.gnu.org/licenses/>. 
+ * <http://www.gnu.org/licenses/>.
  */
- 
+
 #ifndef _OPENSPRINKLER_SERVER_H
 #define _OPENSPRINKLER_SERVER_H
 
@@ -85,7 +85,7 @@ public:
 			}
 			ptr += strlen((char*) ptr);
 		}
-		*(ptr)=0;				 
+		*(ptr)=0;
 		va_end(ap);
 	}
 

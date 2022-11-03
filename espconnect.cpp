@@ -28,7 +28,7 @@ String scan_network() {
 	String wirelessinfo;
 	if (n>32) n = 32; // limit to 32 ssids max
 	 //Maintain old format of wireless network JSON for mobile app compat
-	 wirelessinfo = "{\"ssids\":["; 
+	 wirelessinfo = "{\"ssids\":[";
 	for(int i=0;i<n;i++) {
 		wirelessinfo += "\"";
 		wirelessinfo += WiFi.SSID(i);
@@ -36,7 +36,7 @@ String scan_network() {
 		if(i<n-1) wirelessinfo += ",\r\n";
 	}
 	wirelessinfo += "],";
-	wirelessinfo += "\"rssis\":["; 
+	wirelessinfo += "\"rssis\":[";
 	for(int i=0;i<n;i++) {
 		wirelessinfo += "\"";
 		wirelessinfo += WiFi.RSSI(i);

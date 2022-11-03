@@ -48,12 +48,12 @@
 #define LCD_BACKLIGHT 0x08
 #define LCD_NOBACKLIGHT 0x00
 
-#define En B00000100	// Enable bit
-#define Rw B00000010	// Read/Write bit
-#define Rs B00000001	// Register select bit
+#define En B00000100  // Enable bit
+#define Rw B00000010  // Read/Write bit
+#define Rs B00000001  // Register select bit
 
-#define LCD_STD 0			// Standard LCD
-#define LCD_I2C 1			// I2C LCD
+#define LCD_STD 0  // Standard LCD
+#define LCD_I2C 1  // I2C LCD
 #define LCD_I2C_ADDR1 0x27 // type using PCF8574,  at address 0x27
 #define LCD_I2C_ADDR2 0x3F // type using PCF8574A, at address 0x3F
 
@@ -85,15 +85,15 @@ public:
 
 	//void createChar(uint8_t, uint8_t[]);
 	void createChar(uint8_t, PGM_P ptr);
-	void setCursor(uint8_t, uint8_t); 
+	void setCursor(uint8_t, uint8_t);
 	virtual size_t write(uint8_t);
 	void command(uint8_t);
 
 	inline uint8_t type() { return _type; }
 	void noBacklight();
 	void backlight();
-	 
-	using Print::write;	 
+
+	using Print::write;
 private:
 	void send(uint8_t, uint8_t);
 	void write4bits(uint8_t);
@@ -107,7 +107,7 @@ private:
 	uint8_t _charsize;
 	uint8_t _backlightval;
 
-	uint8_t _type;		// LCD type. 0: standard; 1: I2C
+	uint8_t _type;   // LCD type. 0: standard; 1: I2C
 	uint8_t _rs_pin; // LOW: command.  HIGH: character.
 	uint8_t _rw_pin; // LOW: write to LCD.	HIGH: read from LCD.
 	uint8_t _enable_pin; // activated by a HIGH pulse.

@@ -18,9 +18,9 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see
- * <http://www.gnu.org/licenses/>. 
+ * <http://www.gnu.org/licenses/>.
  */
- 
+
 #include "gpio.h"
 
 #if defined(ARDUINO)
@@ -33,26 +33,26 @@
 byte IOEXP::detectType(uint8_t address) {
 	Wire.beginTransmission(address);
 	if(Wire.endTransmission()!=0) return IOEXP_TYPE_NONEXIST; // this I2C address does not exist
-	
+
 	Wire.beginTransmission(address);
 	Wire.write(NXP_INVERT_REG); // ask for polarity register
 	Wire.endTransmission();
-	
+
 	if(Wire.requestFrom(address, (uint8_t)2) != 2) return IOEXP_TYPE_UNKNOWN;
 	uint8_t low = Wire.read();
 	uint8_t high = Wire.read();
 	if(low==0x00 && high==0x00) {
 		return IOEXP_TYPE_9555; // PCA9555 has polarity register which inits to 0
 	}
-	return IOEXP_TYPE_8575;  
+	return IOEXP_TYPE_8575;
 }
 
 void PCA9555::pinMode(uint8_t pin, uint8_t IOMode) {
 	uint16_t config = i2c_read(NXP_CONFIG_REG);
 	if(IOMode == OUTPUT) {
-			config &= ~(1 << pin); // config bit set to 0 for output pin
+		config &= ~(1 << pin); // config bit set to 0 for output pin
 	} else {
-			config |= (1 << pin);  // config bit set to 1 for input pin
+		config |= (1 << pin);  // config bit set to 1 for input pin
 	}
 	i2c_write(NXP_CONFIG_REG, config);
 }
@@ -79,14 +79,14 @@ void PCA9555::i2c_write(uint8_t reg, uint16_t v){
 
 void PCA9555::shift_out(uint8_t plat, uint8_t pclk, uint8_t pdat, uint8_t v) {
 	if(plat<IOEXP_PIN || pclk<IOEXP_PIN || pdat<IOEXP_PIN)
-		return;	// the definition of each pin must be offset by IOEXP_PIN to begin with
-	
+		return; // the definition of each pin must be offset by IOEXP_PIN to begin with
+
 	plat-=IOEXP_PIN;
 	pclk-=IOEXP_PIN;
 	pdat-=IOEXP_PIN;
-	
+
 	uint16_t output = i2c_read(NXP_OUTPUT_REG); // keep a copy of the current output registers
-	
+
 	output &= ~(1<<plat); i2c_write(NXP_OUTPUT_REG, output); // set latch low
 
 	for(uint8_t s=0;s<8;s++) {
@@ -101,7 +101,7 @@ void PCA9555::shift_out(uint8_t plat, uint8_t pclk, uint8_t pdat, uint8_t v) {
 
 		output |= (1<<pclk); i2c_write(NXP_OUTPUT_REG, output); // set clock high
 	}
-	
+
 	output |= (1<<plat); i2c_write(NXP_OUTPUT_REG, output); // set latch high
 }
 
@@ -130,14 +130,14 @@ uint16_t PCF8574::i2c_read(uint8_t reg) {
 	if(Wire.requestFrom(address, (uint8_t)1) != 1) return 0xFFFF;
 	uint16_t data = Wire.read();
 	Wire.endTransmission();
-	return data; 
+	return data;
 }
 
 void PCF8574::i2c_write(uint8_t reg, uint16_t v) {
 	if(address==255)	return;
 	Wire.beginTransmission(address);
 	Wire.write((uint8_t)(v&0xFF) | inputmask);
-	Wire.endTransmission();  
+	Wire.endTransmission();
 }
 
 #include "OpenSprinkler.h"

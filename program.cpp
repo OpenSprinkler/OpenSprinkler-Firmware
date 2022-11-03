@@ -18,7 +18,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see
- * <http://www.gnu.org/licenses/>. 
+ * <http://www.gnu.org/licenses/>.
  */
 
 #include <limits.h>
@@ -45,7 +45,7 @@ void ProgramData::init() {
 }
 
 void ProgramData::reset_runtime() {
-	memset(station_qid, 0xFF, MAX_NUM_STATIONS);	// reset station qid to 0xFF
+	memset(station_qid, 0xFF, MAX_NUM_STATIONS);  // reset station qid to 0xFF
 	nqueue = 0;
 	last_seq_stop_time = 0;
 }
@@ -174,8 +174,8 @@ int16_t ProgramStruct::starttime_decode(int16_t t) {
 /** Check if a given time matches the program's start day */
 byte ProgramStruct::check_day_match(time_t t) {
 
-#if defined(ARDUINO) // get current time from Arduino
-	byte weekday_t = weekday(t);				// weekday ranges from [0,6] within Sunday being 1
+#if defined(ARDUINO)  // get current time from Arduino
+	byte weekday_t = weekday(t);  // weekday ranges from [0,6] within Sunday being 1
 	byte day_t = day(t);
 	byte month_t = month(t);
 #else // get current time from RPI/BBB
@@ -183,7 +183,7 @@ byte ProgramStruct::check_day_match(time_t t) {
 	struct tm *ti = gmtime(&ct);
 	byte weekday_t = (ti->tm_wday+1)%7;  // tm_wday ranges from [0,6] with Sunday being 0
 	byte day_t = ti->tm_mday;
-	byte month_t = ti->tm_mon+1;	 // tm_mon ranges from [0,11]
+	byte month_t = ti->tm_mon+1;  // tm_mon ranges from [0,11]
 #endif // get current time
 
 	byte wd = (weekday_t+5)%7;

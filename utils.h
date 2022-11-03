@@ -18,7 +18,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see
- * <http://www.gnu.org/licenses/>. 
+ * <http://www.gnu.org/licenses/>.
  */
 
 #ifndef _UTILS_H
@@ -44,7 +44,7 @@ void file_read_block (const char *fname, void *dst, ulong pos, ulong len);
 void file_write_block(const char *fname, const void *src, ulong pos, ulong len);
 void file_copy_block (const char *fname, ulong from, ulong to, ulong len, void *tmp=0);
 byte file_read_byte (const char *fname, ulong pos);
-void file_write_byte(const char *fname, ulong pos, byte v);  
+void file_write_byte(const char *fname, ulong pos, byte v);
 byte file_cmp_block(const char *fname, const char *buf, ulong pos);
 
 // misc. string and time converstion functions

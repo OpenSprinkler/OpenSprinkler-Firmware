@@ -44,10 +44,10 @@ typedef uint32_t ulong;
 #define OS_FW_MINOR      0  // Firmware minor version
 
 /** Hardware version base numbers */
-#define OS_HW_VERSION_BASE   0x00	// OpenSprinkler
+#define OS_HW_VERSION_BASE   0x00 // OpenSprinkler
 #define OSPI_HW_VERSION_BASE 0x40 // OpenSprinkler Pi
 #define OSBO_HW_VERSION_BASE 0x80 // OpenSprinkler Beagle
-#define SIM_HW_VERSION_BASE  0xC0	// simulation hardware
+#define SIM_HW_VERSION_BASE  0xC0 // simulation hardware
 
 /** Hardware type macro defines */
 #define HW_TYPE_AC           0xAC   // standard 24VAC for 24VAC solenoids only, with triacs
@@ -83,21 +83,21 @@ typedef uint32_t ulong;
 #define NOTIFY_STATION_ON      0x0100
 
 /** HTTP request macro defines */
-#define HTTP_RQT_SUCCESS			 0
-#define HTTP_RQT_NOT_RECEIVED -1
-#define HTTP_RQT_CONNECT_ERR	-2
-#define HTTP_RQT_TIMEOUT			-3
-#define HTTP_RQT_EMPTY_RETURN	-4
+#define HTTP_RQT_SUCCESS       0
+#define HTTP_RQT_NOT_RECEIVED  1
+#define HTTP_RQT_CONNECT_ERR   2
+#define HTTP_RQT_TIMEOUT       3
+#define HTTP_RQT_EMPTY_RETURN  4
 
 /** Sensor macro defines */
 #define SENSOR_TYPE_NONE    0x00
-#define SENSOR_TYPE_RAIN    0x01	// rain sensor
-#define SENSOR_TYPE_FLOW    0x02	// flow sensor
+#define SENSOR_TYPE_RAIN    0x01  // rain sensor
+#define SENSOR_TYPE_FLOW    0x02  // flow sensor
 #define SENSOR_TYPE_SOIL    0x03  // soil moisture sensor
-#define SENSOR_TYPE_PSWITCH 0xF0	// program switch sensor
+#define SENSOR_TYPE_PSWITCH 0xF0  // program switch sensor
 #define SENSOR_TYPE_OTHER   0xFF
 
-#define FLOWCOUNT_RT_WINDOW   30    // flow count window (for computing real-time flow rate), 30 seconds
+#define FLOWCOUNT_RT_WINDOW   30  // flow count window (for computing real-time flow rate), 30 seconds
 
 /** Reboot cause */
 #define REBOOT_CAUSE_NONE   0
@@ -111,7 +111,7 @@ typedef uint32_t ulong;
 #define REBOOT_CAUSE_WEATHER_FAIL 8
 #define REBOOT_CAUSE_NETWORK_FAIL 9
 #define REBOOT_CAUSE_NTP          10
-#define REBOOT_CAUSE_PROGRAM			11
+#define REBOOT_CAUSE_PROGRAM      11
 #define REBOOT_CAUSE_POWERON      99
 
 
@@ -123,7 +123,7 @@ typedef uint32_t ulong;
 #define OS_STATE_CONNECTING     1
 #define OS_STATE_CONNECTED      2
 #define OS_STATE_TRY_CONNECT    3
-#define OS_STATE_WAIT_REBOOT		4
+#define OS_STATE_WAIT_REBOOT    4
 
 #define LED_FAST_BLINK 100
 #define LED_SLOW_BLINK 500
@@ -132,7 +132,7 @@ typedef uint32_t ulong;
 #if defined(ARDUINO)
 	#define MAX_EXT_BOARDS    8  // maximum number of 8-zone expanders (each 16-zone expander counts as 2)
 #else
-	#define MAX_EXT_BOARDS		24 // allow more zones for linux-based firmwares
+	#define MAX_EXT_BOARDS    24 // allow more zones for linux-based firmwares
 #endif
 
 #define MAX_NUM_BOARDS    (1+MAX_EXT_BOARDS)  // maximum number of 8-zone boards including expanders
@@ -144,7 +144,7 @@ typedef uint32_t ulong;
 
 /** Default string option values */
 #define DEFAULT_PASSWORD          "a6d82bced638de3def1e9bbb4983225c"  // md5 of 'opendoor'
-#define DEFAULT_LOCATION          "42.36,-71.06"	// Boston,MA
+#define DEFAULT_LOCATION          "42.36,-71.06"  // Boston,MA
 #define DEFAULT_JAVASCRIPT_URL    "https://ui.opensprinkler.com/js"
 #define DEFAULT_WEATHER_URL       "weather.opensprinkler.com"
 #define DEFAULT_IFTTT_URL         "maker.ifttt.com"
@@ -207,7 +207,7 @@ enum {
 	IOPT_SPE_AUTO_REFRESH,
 	IOPT_IFTTT_ENABLE,
 	IOPT_SENSOR1_TYPE,
-	IOPT_SENSOR1_OPTION,	
+	IOPT_SENSOR1_OPTION,
 	IOPT_SENSOR2_TYPE,
 	IOPT_SENSOR2_OPTION,
 	IOPT_SENSOR1_ON_DELAY,
@@ -229,14 +229,14 @@ enum {
 	SOPT_JAVASCRIPTURL,
 	SOPT_WEATHERURL,
 	SOPT_WEATHER_OPTS,
-	SOPT_IFTTT_KEY,	// todo: make this IFTTT config just like MQTT
+	SOPT_IFTTT_KEY, // todo: make this IFTTT config just like MQTT
 	SOPT_STA_SSID,
 	SOPT_STA_PASS,
 	SOPT_MQTT_OPTS,
 	SOPT_OTC_OPTS,
 	//SOPT_WEATHER_KEY,
 	//SOPT_AP_PASS,
-	NUM_SOPTS	// total number of string options
+	NUM_SOPTS // total number of string options
 };
 
 /** Log Data Type */
@@ -254,7 +254,7 @@ enum {
 #if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__) // for OS 2.3
 
 	#define OS_HW_VERSION   (OS_HW_VERSION_BASE+23)
-	#define PIN_FREE_LIST		{2,10,12,13,14,15,18,19}  // Free GPIO pins
+	#define PIN_FREE_LIST   {2,10,12,13,14,15,18,19}  // Free GPIO pins
 
 	// hardware pins
 	#define PIN_BUTTON_1      31    // button 1
@@ -283,7 +283,7 @@ enum {
 	#define PIN_BOOST_EN      23    // boost voltage enable pin
 
 	#define PIN_ETHER_CS       4    // Ethernet controller chip select pin
-	#define PIN_SENSOR1				11		// 
+	#define PIN_SENSOR1       11    //
 	#define PIN_SD_CS          0    // SD card chip select pin
 	#define PIN_FLOWSENSOR_INT 1    // flow sensor interrupt pin (INT1)
 	#define PIN_EXP_SENSE      4    // expansion board sensing pin (A4)
@@ -296,7 +296,7 @@ enum {
 
 	#define pinModeExt        pinMode
 	#define digitalReadExt    digitalRead
-	#define digitalWriteExt   digitalWrite  
+	#define digitalWriteExt   digitalWrite
 
 #elif defined(ESP8266) // for ESP8266
 
@@ -315,7 +315,7 @@ enum {
 
 	#define PIN_ETHER_CS       16 // ENC28J60 CS (chip select pin) is 16 on OS 3.2.
 
-	/* To accommodate different OS30 versions, we use software defines pins */ 
+	/* To accommodate different OS30 versions, we use software defines pins */
 	extern byte PIN_BUTTON_1;
 	extern byte PIN_BUTTON_2;
 	extern byte PIN_BUTTON_3;
@@ -443,7 +443,7 @@ enum {
 		inline  void DEBUG_PRINT(const char*s) {printf("%s", s);}
 		#define DEBUG_PRINTLN(x)        {DEBUG_PRINT(x);printf("\n");}
 	#endif
-  
+
 #else
 
 	#define DEBUG_BEGIN(x)   {}
@@ -451,7 +451,7 @@ enum {
 	#define DEBUG_PRINTLN(x) {}
 
 #endif
-  
+
 /** Re-define avr-specific (e.g. PGM) types to use standard types */
 #if !defined(ARDUINO)
 	#include <stdio.h>
