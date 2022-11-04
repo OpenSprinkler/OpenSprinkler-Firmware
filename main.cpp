@@ -384,7 +384,7 @@ void do_setup() {
 
 void write_log(byte type, ulong curr_time);
 void schedule_all_stations(ulong curr_time);
-void turn_on_station(byte sid);
+void turn_on_station(byte sid, ulong duration);
 void turn_off_station(byte sid, ulong curr_time);
 void process_dynamic_events(ulong curr_time);
 void check_network();
@@ -788,7 +788,7 @@ void do_loop()
 					// if current station is not running, check if we should turn it on
 					if(!((bitvalue>>s)&1)) {
 						if (curr_time >= q->st && curr_time < q->st+q->dur) {
-							turn_on_station(sid);
+							turn_on_station(sid, q->st+q->dur-curr_time); // the last parameter is expected run time
 						} //if curr_time > scheduled_start_time
 					} // if current station is not running
 				}//end_s
@@ -1051,12 +1051,12 @@ void check_weather() {
 /** Turn on a station
  * This function turns on a scheduled station
  */
-void turn_on_station(byte sid) {
+void turn_on_station(byte sid, ulong duration) {
 	// RAH implementation of flow sensor
 	flow_start=0;
 
 	if (os.set_station_bit(sid, 1)) {
-		push_message(NOTIFY_STATION_ON, sid);
+		push_message(NOTIFY_STATION_ON, sid, duration);
 	}
 }
 
@@ -1306,11 +1306,13 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 	switch(type) {
 		case  NOTIFY_STATION_ON:
 
-			// todo: add IFTTT support for this event as well
 			if (os.mqtt.enabled()) {
 				sprintf_P(topic, PSTR("opensprinkler/station/%d"), lval);
-				strcpy_P(payload, PSTR("{\"state\":1}"));
+				sprintf_P(payload, PSTR("{\"state\":1,\"duration\":%d}"), (int)fval);
 			}
+
+			// todo: add IFTTT support for this event as well.
+			// currently no support due to the number of events exceeds 8 so need to use more than 1 byte
 			break;
 
 		case NOTIFY_STATION_OFF:

@@ -24,7 +24,7 @@
 #ifndef _DEFINES_H
 #define _DEFINES_H
 
-//#define ENABLE_DEBUG  // enable serial debug
+#define ENABLE_DEBUG  // enable serial debug
 
 #if defined(ARDUINO)
 typedef unsigned char byte;
@@ -313,7 +313,7 @@ enum {
 	#define PIN_FREE_LIST     {} // no free GPIO pin at the moment
 	#define ETHER_BUFFER_SIZE   2048
 
-	#define PIN_ETHER_CS       16 // ENC28J60 CS (chip select pin) is 16 on OS 3.2.
+	#define PIN_ETHER_CS       16 // Ethernet CS (chip select pin) is 16 on OS 3.2 and above
 
 	/* To accommodate different OS30 versions, we use software defines pins */
 	extern byte PIN_BUTTON_1;

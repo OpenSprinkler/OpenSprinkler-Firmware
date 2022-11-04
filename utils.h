@@ -55,6 +55,14 @@ int16_t water_time_decode_signed(byte i);
 void urlDecode(char *);
 void peel_http_header(char*);
 
+#define date_encode(m,d) ((m<<5)+d)
+#define MIN_ENCODED_DATE date_encode(1,1)
+#define MAX_ENCODED_DATE date_encode(12, 31)
+
+int16_t str2date(const char*);
+bool date2str(int16_t date, char* output);
+bool date_decode(int16_t date, int16_t& month, int16_t& day);
+
 #if defined(ARDUINO)
 
 #else // Arduino compatible functions for RPI/BBB

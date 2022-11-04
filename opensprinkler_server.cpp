@@ -744,7 +744,7 @@ void server_moveup_program(OTF_PARAMS_DEF) {
 
 /**
  * Change a program
- * Command: /cp?pw=xxx&pid=x&v=[flag,days0,days1,[start0,start1,start2,start3],[dur0,dur1,dur2..]]&name=x
+ * Command: /cp?pw=xxx&pid=x&v=[flag,days0,days1,[start0,start1,start2,start3],[dur0,dur1,dur2..]]&name=x&sdate=x&edate=x
  *
  * pw:		password
  * pid:		program index
@@ -752,6 +752,8 @@ void server_moveup_program(OTF_PARAMS_DEF) {
  * start?:up to 4 start times
  * dur?:	station water time
  * name:	program name
+ * sdate: start date of the program
+ * edate: end date of the program
 */
 const char _str_program[] PROGMEM = "Program ";
 void server_change_program(OTF_PARAMS_DEF) {
@@ -793,6 +795,25 @@ void server_change_program(OTF_PARAMS_DEF) {
 		strcpy_P(prog.name, _str_program);
 		itoa((pid==-1)? (pd.nprograms+1): (pid+1), prog.name+8, 10);
 	}
+
+	// parse program start date and end date
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("sdate"), true)) {
+		urlDecode(tmp_buffer);
+		int16_t date = str2date(tmp_buffer);
+		if(date<0) handle_return(HTML_DATA_FORMATERROR);
+		if(date==0) handle_return(HTML_DATA_OUTOFBOUND);
+		prog.daterange[0] = date;
+		if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("edate"), true)) {
+			urlDecode(tmp_buffer);
+			date = str2date(tmp_buffer);
+			if(date<0) handle_return(HTML_DATA_FORMATERROR);
+			if(date==0) handle_return(HTML_DATA_OUTOFBOUND);
+			if(date<prog.daterange[0]) handle_return(HTML_DATA_OUTOFBOUND);
+			prog.daterange[1] = date;
+		} else {
+			handle_return(HTML_DATA_MISSING);
+		}
+	} 
 
 #if !defined(ESP8266)
 	// do a full string decoding

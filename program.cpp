@@ -189,6 +189,16 @@ byte ProgramStruct::check_day_match(time_t t) {
 	byte wd = (weekday_t+5)%7;
 	byte dt = day_t;
 
+	if(en_daterange) { // check date range if enabled
+		// check validity of daterange[0] and [1] and ignore them if not valid
+		if(daterange[0]>=MIN_ENCODED_DATE && daterange[1]>=daterange[0] && daterange[1]<=MAX_ENCODED_DATE) {
+			int16_t currdate = date_encode(month_t, day_t); 
+			if (currdate < daterange[0] || currdate > daterange[1]) {
+				return 0;
+			}
+		}
+	}
+
 	// check day match
 	switch(type) {
 		case PROGRAM_TYPE_WEEKLY:

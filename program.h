@@ -74,8 +74,8 @@ public:
 	// 1: fixed start time (give arbitrary start times up to MAX_NUM_STARTTIMEs)
 	byte starttime_type:1;
 
-	// misc. data
-	byte dummy1: 1;
+	// enable date range
+	byte en_daterange: 1;
 
 	// weekly:   days[0][0..6] correspond to Monday till Sunday
 	// bi-weekly:days[0][0..6] and [1][0..6] store two weeks
@@ -102,6 +102,7 @@ public:
 
 	char name[PROGRAM_NAME_SIZE];
 
+	int16_t daterange[2]; // date range: start date, end date
 	byte check_match(time_t t);
 	int16_t starttime_decode(int16_t t);
 
