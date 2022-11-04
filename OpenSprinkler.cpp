@@ -1692,35 +1692,37 @@ int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char*
 	#define HTTP_CONNECT_NTRIES 3
 	byte tries = 0;
 	do {
-		DEBUG_PRINT(F("host: " ));
+		DEBUG_PRINT(F("connect to "));
 		DEBUG_PRINT(server);
 		DEBUG_PRINT(":");
-		DEBUG_PRINTLN(port);
+		DEBUG_PRINT(port);
 		if(client->connect(server, port)==1) break;
 		tries++;
 	} while(tries<HTTP_CONNECT_NTRIES);
 
 	if(tries==HTTP_CONNECT_NTRIES) {
-		DEBUG_PRINTLN(F("failed."));
+		DEBUG_PRINTLN(F(" ->FAILED!"));
 		client->stop();
 		return HTTP_RQT_CONNECT_ERR;
 	}
-
+	DEBUG_PRINTLN(F(" ->done"));
 #else
 
 	EthernetClient etherClient;
 	EthernetClient *client = &etherClient;
 	struct hostent *host;
+	DEBUG_PRINT(F("connect to "));
+	DEBUG_PRINT(server);
+	DEBUG_PRINT(":");
+	DEBUG_PRINT(port);
 	host = gethostbyname(server);
 	if (!host) { return HTTP_RQT_CONNECT_ERR; }	
 	if(!client->connect((uint8_t*)host->h_addr, port)) {
-		DEBUG_PRINT(F("Cannot connect to "));
-		DEBUG_PRINT(server);
-		DEBUG_PRINT(":");
-		DEBUG_PRINTLN(port);		
+		DEBUG_PRINT(F(" ->FAILED!"));
 		client->stop();
 		return HTTP_RQT_CONNECT_ERR;
-	}	
+	}
+	DEBUG_PRINTLN(F(" ->done"));
 
 #endif
 
@@ -1732,28 +1734,34 @@ int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char*
 	memset(ether_buffer, 0, ETHER_BUFFER_SIZE);
 	uint32_t stoptime = millis()+timeout;
 
+	int pos = 0;
 #if defined(ARDUINO)
 	while(client->connected()) {
 		int nbytes = client->available();
 		if(nbytes>0) {
-			if(nbytes>ETHER_BUFFER_SIZE) nbytes=ETHER_BUFFER_SIZE;
-			client->read((uint8_t*)ether_buffer, nbytes);
+			if(pos+nbytes>ETHER_BUFFER_SIZE) nbytes=ETHER_BUFFER_SIZE-pos; // cannot read more than buffer size
+			client->read((uint8_t*)ether_buffer+pos, nbytes);
+			pos+=nbytes;
 		}
 		if(millis()>stoptime) {
-			client->stop();
-			return HTTP_RQT_TIMEOUT;			
+			DEBUG_PRINTLN(F("host timeout occured"));
+			//return HTTP_RQT_TIMEOUT; // instead of returning with timeout, we'll work with data received so far
+			break;
 		}
 	}
 #else
 	while(client->connected()) {
-		int len=client->read((uint8_t *)ether_buffer, ETHER_BUFFER_SIZE);
+		int len=client->read((uint8_t *)ether_buffer+pos, ETHER_BUFFER_SIZE);
 		if (len<=0) continue;
+		pos+=len;
 		if(millis()>stoptime) {
-			client->stop();
-			return HTTP_RQT_TIMEOUT;
+			DEBUG_PRINTLN(F("host timeout occured"));
+			//return HTTP_RQT_TIMEOUT; // instead of returning with timeout, we'll work with data received so far
+			break;
 		}
 	}
 #endif
+	ether_buffer[pos]=0; // properly end buffer with 0
 	client->stop();
 	if(strlen(ether_buffer)==0) return HTTP_RQT_EMPTY_RETURN;
 	if(callback) callback(ether_buffer);

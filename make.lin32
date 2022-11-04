@@ -7,7 +7,7 @@ LIBS = . \
   $(ESP_LIBS)/ESP8266mDNS \
   ~/Arduino/libraries/SSD1306 \
   ~/Arduino/libraries/rc-switch \
-  ~/Arduino/libraries/EthernetENC \
+  ~/Arduino/libraries/UIPEthernet \
   ~/Arduino/libraries/pubsubclient \
 
 ESP_ROOT = $(HOME)/esp8266_2.7.4/

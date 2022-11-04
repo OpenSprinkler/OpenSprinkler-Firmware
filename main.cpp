@@ -427,49 +427,6 @@ void do_loop()
 	if (m_server) {	// if wired Ethernet
 		led_blink_ms = 0;
 
-		#if defined(ENABLE_DEBUG)
-			// this section prints out ENC28J60 register values onto LCD
-			#define PHY_TIMEOUT 10
-			static ulong phy_timeout = 0;
-			static ulong n_reinits = 0;
-			if(curr_time >= phy_timeout) {
-				#define ENC28J60_EIR  	0x1C
-				#define ENC28J60_ESTAT	0x1D
-				#define ENC28J60_ECON1	0x1F
-
-				#define ENC28J60_EIR_RXERIF			0x01
-				#define ENC28J60_ESTAT_BUFER		0x40
-				#define ENC28J60_ESTAT_LATCOL		0x10
-				#define ENC28J60_ESTAT_TXABRT		0x02
-				#define ENC28J60_ECON1_RXEN			0x04
-				uint16_t estat = Enc28J60Network::readReg((uint8_t) ENC28J60_ESTAT);
-				uint16_t eir = Enc28J60Network::readReg((uint8_t) ENC28J60_EIR);
-				uint16_t econ1 = Enc28J60Network::readReg((uint8_t) ENC28J60_ECON1);
-
-				os.lcd.setCursor(0,-1);
-				os.lcd.print(eir, HEX);
-				os.lcd.print("|");
-				os.lcd.print(estat, HEX);
-				os.lcd.print("|");
-				os.lcd.print(econ1, HEX);
-				os.lcd.print("|");
-				os.lcd.print(n_reinits);
-				os.lcd.print(F("         "));
-
-				/* Detect possible enc28j60 problems */
-				if( (eir & ENC28J60_EIR_RXERIF) || (estat & ENC28J60_ESTAT_BUFER) ||
-					  (estat & ENC28J60_ESTAT_LATCOL) || (estat & ENC28J60_ESTAT_TXABRT) || 
-					  ((econ1 & ENC28J60_ECON1_RXEN) == 0) ) {
-					os.load_hardware_mac((uint8_t*)tmp_buffer, true);
-					Enc28J60Network::init((uint8_t*)tmp_buffer);
-					n_reinits ++;
-				}
-
-				phy_timeout = curr_time + PHY_TIMEOUT;
-			}		
-
-		#endif
-
 		static unsigned long dhcp_timeout = 0;
 		if(curr_time > dhcp_timeout) {
 			Ethernet.maintain();
