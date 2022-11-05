@@ -145,6 +145,7 @@ typedef unsigned long ulong;
 #define DEFAULT_IFTTT_URL         "maker.ifttt.com"
 #define DEFAULT_OTC_SERVER        "ws.cloud.openthings.io"
 #define DEFAULT_OTC_PORT          80
+#define DEFAULT_DEVICE_NAME       "My OpenSprinkler"
 #define DEFAULT_EMPTY_STRING      ""
 
 /** Macro define of each option
@@ -229,7 +230,7 @@ enum {
 	SOPT_STA_PASS,
 	SOPT_MQTT_OPTS,
 	SOPT_OTC_OPTS,
-	//SOPT_WEATHER_KEY,
+	SOPT_DEVICE_NAME,
 	//SOPT_AP_PASS,
 	NUM_SOPTS // total number of string options
 };
