@@ -744,7 +744,8 @@ void server_moveup_program(OTF_PARAMS_DEF) {
 
 /**
  * Change a program
- * Command: /cp?pw=xxx&pid=x&v=[flag,days0,days1,[start0,start1,start2,start3],[dur0,dur1,dur2..]]&name=x&sdate=x&edate=x
+ * Command: /cp?pw=xxx&pid=x&v=[flag,days0,days1,[start0,start1,start2,start3],[dur0,dur1,dur2..]]
+ *              &name=x&sdate=x&edate=x
  *
  * pw:		password
  * pid:		program index
@@ -752,8 +753,8 @@ void server_moveup_program(OTF_PARAMS_DEF) {
  * start?:up to 4 start times
  * dur?:	station water time
  * name:	program name
- * sdate: start date of the program
- * edate: end date of the program
+ * sdate: start date of the program: an integer that's (month*32+day)
+ * edate: end date of the program, same format as sdate
 */
 const char _str_program[] PROGMEM = "Program ";
 void server_change_program(OTF_PARAMS_DEF) {
@@ -798,17 +799,12 @@ void server_change_program(OTF_PARAMS_DEF) {
 
 	// parse program start date and end date
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("sdate"), true)) {
-		urlDecode(tmp_buffer);
-		int16_t date = str2date(tmp_buffer);
-		if(date<0) handle_return(HTML_DATA_FORMATERROR);
-		if(date==0) handle_return(HTML_DATA_OUTOFBOUND);
+		int16_t date = atoi(tmp_buffer);
+		if(date<MIN_ENCODED_DATE || date>MAX_ENCODED_DATE) handle_return(HTML_DATA_OUTOFBOUND);
 		prog.daterange[0] = date;
 		if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("edate"), true)) {
-			urlDecode(tmp_buffer);
-			date = str2date(tmp_buffer);
-			if(date<0) handle_return(HTML_DATA_FORMATERROR);
-			if(date==0) handle_return(HTML_DATA_OUTOFBOUND);
-			if(date<prog.daterange[0]) handle_return(HTML_DATA_OUTOFBOUND);
+			date = atoi(tmp_buffer);
+			if(date<MIN_ENCODED_DATE || date>MAX_ENCODED_DATE) handle_return(HTML_DATA_OUTOFBOUND);
 			prog.daterange[1] = date;
 		} else {
 			handle_return(HTML_DATA_MISSING);

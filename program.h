@@ -75,7 +75,7 @@ public:
 	byte starttime_type:1;
 
 	// enable date range
-	byte en_daterange: 1;
+	byte en_daterange:1;
 
 	// weekly:   days[0][0..6] correspond to Monday till Sunday
 	// bi-weekly:days[0][0..6] and [1][0..6] store two weeks
@@ -102,7 +102,7 @@ public:
 
 	char name[PROGRAM_NAME_SIZE];
 
-	int16_t daterange[2]; // date range: start date, end date
+	int16_t daterange[2] = {MIN_ENCODED_DATE, MAX_ENCODED_DATE}; // date range: start date, end date
 	byte check_match(time_t t);
 	int16_t starttime_decode(int16_t t);
 

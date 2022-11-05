@@ -479,35 +479,3 @@ void peel_http_header(char* buffer) { // remove the HTTP header
 	}
 }
 
-static const char month_days[] = {31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
-
-int16_t str2date(const char* str) {
-	int m, d;
-	if(strchr(str, '/')) {
-		sscanf(str, "%d/%d", &m, &d);
-	} else if(strchr(str, '-')) {
-		sscanf(str, "%d-%d", &m, &d);
-	} else return -1;
-	if(m<1 || m>12) return 0;
-	if(d>month_days[m-1]) return 0;
-	return date_encode(m,d);
-}
-
-bool date2str(int16_t date, char* output) {
-	int16_t m, d;
-	if(!date_decode(date, m, d)) return false;
-	sprintf(output, "%d/%d", m, d);
-	return true;
-}
-
-bool date_decode(int16_t date, int16_t& month, int16_t& day) {
-	if(date<MIN_ENCODED_DATE) return false;
-	if(date>MAX_ENCODED_DATE) return false;
-	int16_t m = date>>5;
-	int16_t d = date&0x1f;
-	if(m<1 || m>12) return false;
-	if(d>month_days[m-1]) return false;
-	month = m;
-	day = d;
-	return true;
-}

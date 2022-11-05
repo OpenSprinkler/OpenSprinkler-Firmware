@@ -190,12 +190,13 @@ byte ProgramStruct::check_day_match(time_t t) {
 	byte dt = day_t;
 
 	if(en_daterange) { // check date range if enabled
-		// check validity of daterange[0] and [1] and ignore them if not valid
-		if(daterange[0]>=MIN_ENCODED_DATE && daterange[1]>=daterange[0] && daterange[1]<=MAX_ENCODED_DATE) {
-			int16_t currdate = date_encode(month_t, day_t); 
-			if (currdate < daterange[0] || currdate > daterange[1]) {
-				return 0;
-			}
+		int16_t currdate = date_encode(month_t, day_t);
+		// depending on whether daterange[0] or [1] is smaller:
+		if(daterange[0]<=daterange[1]) { 
+			if(currdate<daterange[0]||currdate>daterange[1]) return 0;
+		} else {
+			// this is the case where the defined range crosses the end of the year
+			if(currdate>daterange[1] && currdate<daterange[0]) return 0;
 		}
 	}
 
