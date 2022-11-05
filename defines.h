@@ -26,13 +26,8 @@
 
 #define ENABLE_DEBUG  // enable serial debug
 
-#if defined(ARDUINO)
 typedef unsigned char byte;
 typedef unsigned long ulong;
-#else
-typedef uint8_t byte;
-typedef uint32_t ulong;
-#endif
 
 #define TMP_BUFFER_SIZE      255   // scratch buffer size
 
