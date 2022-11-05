@@ -985,11 +985,9 @@ void server_json_programs_main(OTF_PARAMS_DEF) {
 		// program name
 		strncpy(tmp_buffer, prog.name, PROGRAM_NAME_SIZE);
 		tmp_buffer[PROGRAM_NAME_SIZE] = 0;	// make sure the string ends
-		bfill.emit_p(PSTR("$S"), tmp_buffer);
+		bfill.emit_p(PSTR("$S\",[$D,$D]]"), tmp_buffer,prog.daterange[0],prog.daterange[1]);
 		if(pid!=pd.nprograms-1) {
-			bfill.emit_p(PSTR("\"],"));
-		} else {
-			bfill.emit_p(PSTR("\"]"));
+			bfill.emit_p(PSTR("],"));
 		}
 		// push out a packet if available
 		// buffer size is getting small
@@ -1057,8 +1055,8 @@ void server_json_controller_main(OTF_PARAMS_DEF) {
 	bfill.emit_p(PSTR("\"RSSI\":$D,\"otc\":{$O},\"otcs\":$D,"), (int16_t)WiFi.RSSI(), SOPT_OTC_OPTS, otf->getCloudStatus());
 #endif
 
-#if defined(ARDUINO)
 	byte mac[6] = {0};
+#if defined(ARDUINO)
 	os.load_hardware_mac(mac, useEth);
 #else
 	os.load_hardware_mac(mac, true);
