@@ -745,7 +745,7 @@ void server_moveup_program(OTF_PARAMS_DEF) {
 /**
  * Change a program
  * Command: /cp?pw=xxx&pid=x&v=[flag,days0,days1,[start0,start1,start2,start3],[dur0,dur1,dur2..]]
- *              &name=x&sdate=x&edate=x
+ *              &name=x&from=x&to=x
  *
  * pw:		password
  * pid:		program index
@@ -753,8 +753,8 @@ void server_moveup_program(OTF_PARAMS_DEF) {
  * start?:up to 4 start times
  * dur?:	station water time
  * name:	program name
- * sdate: start date of the program: an integer that's (month*32+day)
- * edate: end date of the program, same format as sdate
+ * from:  start date of the program: an integer that's (month*32+day)
+ * to:    end date of the program, same format as from
 */
 const char _str_program[] PROGMEM = "Program ";
 void server_change_program(OTF_PARAMS_DEF) {
@@ -798,18 +798,18 @@ void server_change_program(OTF_PARAMS_DEF) {
 	}
 
 	// parse program start date and end date
-	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("sdate"), true)) {
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("from"), true)) {
 		int16_t date = atoi(tmp_buffer);
-		if(date<MIN_ENCODED_DATE || date>MAX_ENCODED_DATE) handle_return(HTML_DATA_OUTOFBOUND);
+		if(!isValidDate(date)) handle_return(HTML_DATA_OUTOFBOUND);
 		prog.daterange[0] = date;
-		if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("edate"), true)) {
+		if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("to"), true)) {
 			date = atoi(tmp_buffer);
-			if(date<MIN_ENCODED_DATE || date>MAX_ENCODED_DATE) handle_return(HTML_DATA_OUTOFBOUND);
+			if(!isValidDate(date)) handle_return(HTML_DATA_OUTOFBOUND);
 			prog.daterange[1] = date;
 		} else {
 			handle_return(HTML_DATA_MISSING);
 		}
-	} 
+	}
 
 #if !defined(ESP8266)
 	// do a full string decoding
@@ -981,7 +981,7 @@ void server_json_programs_main(OTF_PARAMS_DEF) {
 		// program name
 		strncpy(tmp_buffer, prog.name, PROGRAM_NAME_SIZE);
 		tmp_buffer[PROGRAM_NAME_SIZE] = 0;	// make sure the string ends
-		bfill.emit_p(PSTR("$S\",[$D,$D]]"), tmp_buffer,prog.daterange[0],prog.daterange[1]);
+		bfill.emit_p(PSTR("$S\",[$D,$D,$D]]"), tmp_buffer,prog.en_daterange,prog.daterange[0],prog.daterange[1]);
 		if(pid!=pd.nprograms-1) {
 			bfill.emit_p(PSTR("],"));
 		}
@@ -1115,7 +1115,7 @@ void server_json_controller_main(OTF_PARAMS_DEF) {
 		}
 	}
 	bfill.emit_p(PSTR("]"));
-	
+
 	bfill.emit_p(PSTR("}"));
 }
 

@@ -479,3 +479,19 @@ void peel_http_header(char* buffer) { // remove the HTTP header
 	}
 }
 
+static const byte month_days[] = {31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+
+bool isValidDate(byte m, byte d) {
+	if(m<1 || m>12) return false;
+	if(d<1 || d>month_days[m-1]) return false;
+	return true;
+}
+
+bool isValidDate(uint16_t date) {
+	if (date < MIN_ENCODED_DATE || date > MAX_ENCODED_DATE) {
+		return false;
+	}
+	byte month = date >> 5;
+	byte day = date & 31;
+	return isValidDate(month, day);
+}

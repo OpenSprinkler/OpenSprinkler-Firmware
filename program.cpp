@@ -192,7 +192,7 @@ byte ProgramStruct::check_day_match(time_t t) {
 	if(en_daterange) { // check date range if enabled
 		int16_t currdate = date_encode(month_t, day_t);
 		// depending on whether daterange[0] or [1] is smaller:
-		if(daterange[0]<=daterange[1]) { 
+		if(daterange[0]<=daterange[1]) {
 			if(currdate<daterange[0]||currdate>daterange[1]) return 0;
 		} else {
 			// this is the case where the defined range crosses the end of the year

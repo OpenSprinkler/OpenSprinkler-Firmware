@@ -58,6 +58,7 @@ void peel_http_header(char*);
 #define date_encode(m,d) ((m<<5)+d)
 #define MIN_ENCODED_DATE date_encode(1,1)
 #define MAX_ENCODED_DATE date_encode(12, 31)
+bool isValidDate(uint16_t date);
 
 #if defined(ARDUINO)
 
