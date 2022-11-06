@@ -392,7 +392,7 @@ boolean check_password(char *p)
 	return false;
 }
 
-void server_json_stations_attrib(const char* name, byte *attrib)
+void server_json_board_attrib(const char* name, byte *attrib)
 {
 	bfill.emit_p(PSTR("\"$F\":["), name);
 	for(byte i=0;i<os.nboards;i++) {
@@ -403,15 +403,30 @@ void server_json_stations_attrib(const char* name, byte *attrib)
 	bfill.emit_p(PSTR("],"));
 }
 
+void server_json_stations_attrib(const char* name, byte *attrib)
+{
+	bfill.emit_p(PSTR("\"$F\":["), name);
+	for(byte bid=0;bid<os.nboards;bid++) {
+		for (byte s = 0; s < 8; s++) {
+			bfill.emit_p(PSTR("$D"), attrib[bid * 8 + s]);
+			if(bid != os.nboards-1 || s < 7) {
+				bfill.emit_p(PSTR(","));
+			}
+		}
+	}
+	bfill.emit_p(PSTR("],"));
+}
+
 void server_json_stations_main(OTF_PARAMS_DEF) {
-	server_json_stations_attrib(PSTR("masop"), os.attrib_mas);
-	server_json_stations_attrib(PSTR("masop2"), os.attrib_mas2);
-	server_json_stations_attrib(PSTR("ignore_rain"), os.attrib_igrd);
-	server_json_stations_attrib(PSTR("ignore_sn1"), os.attrib_igs);
-	server_json_stations_attrib(PSTR("ignore_sn2"), os.attrib_igs2);
-	server_json_stations_attrib(PSTR("stn_dis"), os.attrib_dis);
-	server_json_stations_attrib(PSTR("stn_seq"), os.attrib_seq);
-	server_json_stations_attrib(PSTR("stn_spe"), os.attrib_spe);
+	server_json_board_attrib(PSTR("masop"), os.attrib_mas);
+	server_json_board_attrib(PSTR("masop2"), os.attrib_mas2);
+	server_json_board_attrib(PSTR("ignore_rain"), os.attrib_igrd);
+	server_json_board_attrib(PSTR("ignore_sn1"), os.attrib_igs);
+	server_json_board_attrib(PSTR("ignore_sn2"), os.attrib_igs2);
+	server_json_board_attrib(PSTR("stn_dis"), os.attrib_dis);
+	server_json_board_attrib(PSTR("stn_seq"), os.attrib_seq);
+	server_json_board_attrib(PSTR("stn_spe"), os.attrib_spe);
+	server_json_stations_attrib(PSTR("stn_grp"), os.attrib_grp);
 
 	bfill.emit_p(PSTR("\"snames\":["));
 	byte sid;
@@ -518,7 +533,7 @@ void server_change_stations_attrib(char *p, char header, byte *attrib)
  * i?: ignore rain bit field
  * n?: master2 operation bit field
  * d?: disable sation bit field
- * q?: station sequeitnal bit field
+ * q?: station sequential bit field
  * p?: station special flag bit field
  * g?: sequential group id
  */
