@@ -156,13 +156,13 @@ enum {
 };
 
 enum {
-	MASOPT_SID = 0, 
-	MASOPT_ON_ADJ, 
+	MASOPT_SID = 0,
+	MASOPT_ON_ADJ,
 	MASOPT_OFF_ADJ,
 	NUM_MASTER_OPTS,
 };
 
-// Sequential Groups 
+// Sequential Groups
 #define NUM_SEQ_GROUPS		4
 #define PARALLEL_GROUP_ID	255
 

@@ -548,7 +548,7 @@ void server_change_stations(OTF_PARAMS_DEF) {
 	server_change_board_attrib(FKV_SOURCE, 'd', os.attrib_dis); // disable
 	server_change_board_attrib(FKV_SOURCE, 'q', os.attrib_seq); // sequential
 	server_change_board_attrib(FKV_SOURCE, 'p', os.attrib_spe); // special
-	server_change_stations_attrib(FKV_SOURCE, 'g', os.attrib_grp); // sequential groups 
+	server_change_stations_attrib(FKV_SOURCE, 'g', os.attrib_grp); // sequential groups
 	/* handle special data */
 	if(findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("sid"), true)) {
 		sid = atoi(tmp_buffer);
@@ -1041,7 +1041,8 @@ void server_json_programs(OTF_PARAMS_DEF) {
 /** Output script url form */
 void server_view_scripturl(OTF_PARAMS_DEF) {
 	rewind_ether_buffer();
-	bfill.emit_p(PSTR("<form name=of action=cu method=get><table cellspacing=\"12\"><tr><td><b>JavaScript</b>:</td><td><input type=text size=40 maxlength=40 value=\"$O\" name=jsp></td></tr><tr><td>Default:</td><td>$S</td></tr><tr><td><b>Weather</b>:</td><td><input type=text size=40 maxlength=40 value=\"$O\" name=wsp></td></tr><tr><td>Default:</td><td>$S</td></tr><tr><td><b>Password</b>:</td><td><input type=password size=32 name=pw> <input type=submit></td></tr></table></form><script src=https://ui.opensprinkler.com/js/hasher.js></script>"), SOPT_JAVASCRIPTURL, DEFAULT_JAVASCRIPT_URL, SOPT_WEATHERURL, DEFAULT_WEATHER_URL);
+	bfill.emit_p(PSTR("<form name=of action=cu method=get><table cellspacing=\"12\"><tr><td><b>JavaScript</b>:</td><td><input type=text size=40 maxlength=$D value=\"$O\" name=jsp></td></tr><tr><td>Default:</td><td>$S</td></tr><tr><td><b>Weather</b>:</td><td><input type=text size=40 maxlength=$D value=\"$O\" name=wsp></td></tr><tr><td>Default:</td><td>$S</td></tr><tr><td><b>Password</b>:</td><td><input type=password size=32 name=pw> <input type=submit></td></tr></table></form><script src=https://ui.opensprinkler.com/js/hasher.js></script>"),
+	MAX_SOPTS_SIZE, SOPT_JAVASCRIPTURL, DEFAULT_JAVASCRIPT_URL, MAX_SOPTS_SIZE, SOPT_WEATHERURL, DEFAULT_WEATHER_URL);
 
 #if defined(ESP8266)
 	print_header(OTF_PARAMS,false,strlen(ether_buffer));
@@ -1057,7 +1058,7 @@ void server_json_controller_main(OTF_PARAMS_DEF) {
 	ulong curr_time = os.now_tz();
 	bfill.emit_p(PSTR("\"devt\":$L,\"nbrd\":$D,\"en\":$D,\"sn1\":$D,\"sn2\":$D,\"rd\":$D,\"rdst\":$L,"
 										"\"sunrise\":$D,\"sunset\":$D,\"eip\":$L,\"lwc\":$L,\"lswc\":$L,"
-										"\"lupt\":$L,\"lrbtc\":$D,\"lrun\":[$D,$D,$D,$L],\"pq\":$D,\"nq\":$D,"),
+										"\"lupt\":$L,\"lrbtc\":$D,\"lrun\":[$D,$D,$D,$L],\"pq\":$D,\"pt\":$L,\"nq\":$D,"),
 							curr_time,
 							os.nboards,
 							os.status.enabled,
@@ -1077,6 +1078,7 @@ void server_json_controller_main(OTF_PARAMS_DEF) {
 							pd.lastrun.duration,
 							pd.lastrun.endtime,
 							pd.pause_state,
+							pd.pause_timer,
 							pd.nqueue);
 
 #if defined(ESP8266)
@@ -1591,7 +1593,7 @@ void server_change_manual(OTF_PARAMS_DEF) {
 		if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("ssta"), true)) {
 			ssta = atoi(tmp_buffer);
 		}
-		// mark station for removal 
+		// mark station for removal
 		RuntimeQueueStruct *q = pd.queue + pd.station_qid[sid];
 		q->deque_time = curr_time;
 		turn_off_station(sid, curr_time, ssta);
@@ -1774,9 +1776,9 @@ void server_delete_log(OTF_PARAMS_DEF) {
 	handle_return(HTML_SUCCESS);
 }
 
-/** 
+/**
  * Command: "/pq?pw=x&dur=x"
- * dur: duration (in units of seconds) 
+ * dur: duration (in units of seconds)
  */
 void server_pause_queue(OTF_PARAMS_DEF) {
 #if defined(ESP8266)

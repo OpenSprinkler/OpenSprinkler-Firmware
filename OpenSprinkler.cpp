@@ -1458,7 +1458,7 @@ byte OpenSprinkler::get_station_type(byte sid) {
 }
 
 byte OpenSprinkler::is_sequential_station(byte sid) {
-	return get_station_gid(sid) != PARALLEL_GROUP_ID; 
+	return get_station_gid(sid) != PARALLEL_GROUP_ID;
 }
 
 byte OpenSprinkler::is_master_station(byte sid) {

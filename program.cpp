@@ -25,9 +25,9 @@
 #include "program.h"
 
 #if !defined(SECS_PER_DAY)
-#define SECS_PER_MIN	(60UL)
+#define SECS_PER_MIN  (60UL)
 #define SECS_PER_HOUR (3600UL)
-#define SECS_PER_DAY	(SECS_PER_HOUR * 24UL)
+#define SECS_PER_DAY  (SECS_PER_HOUR * 24UL)
 #endif
 
 // Declare static data members
@@ -128,43 +128,44 @@ void ProgramData::moveup(byte pid) {
 }
 
 void ProgramData::toggle_pause(ulong delay) {
-	os.clear_all_station_bits(); // TODO: this might cause a problem for special stations
 	if (pause_state) { // was paused
 		resume_stations();
-	} else { 
-		set_pause(delay); 
+	} else {
+		os.clear_all_station_bits(); // TODO: how does this affect special stations?
+		pause_timer = delay;
+		set_pause();
 	}
 	pause_state = !pause_state;
 }
 
-void ProgramData::set_pause(ulong delay) {
-	pause_timer = delay;
-	RuntimeQueueStruct *q = queue; 
-	ulong pause_t = os.now_tz();
+// TODO: handle situation where a pause is active and a station is scheduled later
+void ProgramData::set_pause() {
+	RuntimeQueueStruct *q = queue;
+	ulong curr_t = os.now_tz();
 
 	for (; q < queue + nqueue; q++) {
-		if (q->st + q->dur < pause_t) { // already run 
-			continue; 
-		} else if (q->st <= pause_t) { // currently running 
-			q->dur -= (pause_t - q->st);
-			q->st = pause_t + delay;
-		} else { // scheduled 
-			q->st += delay;
+		if (q->st + q->dur < curr_t) { // already finished running
+			continue;
+		} else if (q->st <= curr_t) { // currently running
+			q->dur -= (curr_t - q->st); // adjust remaining run time
+			q->st = curr_t + pause_timer;     // push back start time
+		} else { // scheduled but not running yet
+			q->st += pause_timer;
 		}
-		q->deque_time += delay;
+		q->deque_time += pause_timer;
 		byte gid = os.get_station_gid(q->sid);
 		if (q->st + q->dur > last_seq_stop_times[gid]) {
-			last_seq_stop_times[gid] = q->st + q->dur;
+			last_seq_stop_times[gid] = q->st + q->dur; // update last_seq_stop_times of the corresponding group
 		}
 	}
 }
 
 void ProgramData::resume_stations() {
-	RuntimeQueueStruct *q = queue; 
+	RuntimeQueueStruct *q = queue;
 	for (; q < queue + nqueue; q++) {
 		q->st -= pause_timer;
 		q->deque_time -= pause_timer;
-		q->st += 1;
+		q->st += 1; // adjust by 1 second to give time for scheduler
 		q->deque_time += 1;
 	}
 	clear_pause();

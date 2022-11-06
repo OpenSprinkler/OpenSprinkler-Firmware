@@ -357,7 +357,7 @@ private:
 	static void lcd_print_2digit(int v);  // print a integer in 2 digits
 	static void lcd_start();
 	static byte button_read_busy(byte pin_butt, byte waitmode, byte butt, byte is_holding);
-	
+
 	#if defined(ESP8266)
 	static void parse_otc_config();
 	static void latch_boost();

@@ -120,7 +120,7 @@ public:
 	uint16_t dur; // water time
 	byte  sid;
 	byte  pid;
-	ulong deque_time;
+	ulong deque_time; // deque time, which can be larger than st+dur to allow positive master off adjustment time
 };
 
 class ProgramData {
@@ -130,13 +130,13 @@ public:
 	static byte station_qid[];  // this array stores the queue element index for each scheduled station
 	static byte nprograms;  // number of programs
 	static LogStruct lastrun;
-	static ulong last_seq_stop_times[]; // the last stop time of a sequential station
+	static ulong last_seq_stop_times[]; // the last stop time of a sequential station (for each sequential group respectively)
 
-	static byte pause_state; 
+	static byte pause_state; // whether we are in paused state or not
 	static ulong pause_timer; // amount of time remaining in global pause
 	static void toggle_pause(ulong delay);
-	static void set_pause(ulong delay);
-	static void resume_stations(); 
+	static void set_pause();
+	static void resume_stations();
 	static void clear_pause();
 
 	static void reset_runtime();
