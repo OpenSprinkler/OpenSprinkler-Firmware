@@ -83,7 +83,7 @@ static char* get_buffer = NULL;
 BufferFiller bfill;
 
 void schedule_all_stations(ulong curr_time);
-void turn_off_station(byte sid, ulong curr_time);
+void turn_off_station(byte sid, ulong curr_time, byte shift=0);
 void process_dynamic_events(ulong curr_time);
 void check_network(time_t curr_time);
 void check_weather(time_t curr_time);
@@ -473,9 +473,9 @@ void server_json_station_special(OTF_PARAMS_DEF) {
 }
 
 #if defined(ESP8266)
-void server_change_stations_attrib(const OTF::Request &req, char header, byte *attrib)
+void server_change_board_attrib(const OTF::Request &req, char header, byte *attrib)
 #else
-void server_change_stations_attrib(char *p, char header, byte *attrib)
+void server_change_board_attrib(char *p, char header, byte *attrib)
 #endif
 {
 	char tbuf2[5] = {0, 0, 0, 0, 0};
@@ -485,6 +485,26 @@ void server_change_stations_attrib(char *p, char header, byte *attrib)
 		itoa(bid, tbuf2+1, 10);
 		if(findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, tbuf2)) {
 			attrib[bid] = atoi(tmp_buffer);
+		}
+	}
+}
+
+#if defined(ESP8266)
+void server_change_stations_attrib(const OTF::Request &req, char header, byte *attrib)
+#else
+void server_change_stations_attrib(char *p, char header, byte *attrib)
+#endif
+{
+	char tbuf2[6] = {0, 0, 0, 0, 0, 0};
+	byte bid, s, sid;
+	tbuf2[0]=header;
+	for(bid=0;bid<os.nboards;bid++) {
+		for(s=0;s<8;s++) {
+			sid=bid*8+s;
+			itoa(sid, tbuf2+1, 10);
+			if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, tbuf2)) {
+				attrib[sid] = atoi(tmp_buffer);
+			}
 		}
 	}
 }
@@ -500,6 +520,7 @@ void server_change_stations_attrib(char *p, char header, byte *attrib)
  * d?: disable sation bit field
  * q?: station sequeitnal bit field
  * p?: station special flag bit field
+ * g?: sequential group id
  */
 void server_change_stations(OTF_PARAMS_DEF) {
 #if defined(ESP8266)
@@ -519,15 +540,15 @@ void server_change_stations(OTF_PARAMS_DEF) {
 		}
 	}
 
-	server_change_stations_attrib(FKV_SOURCE, 'm', os.attrib_mas); // master1
-	server_change_stations_attrib(FKV_SOURCE, 'i', os.attrib_igrd); // ignore rain delay
-	server_change_stations_attrib(FKV_SOURCE, 'j', os.attrib_igs); // ignore sensor1
-	server_change_stations_attrib(FKV_SOURCE, 'k', os.attrib_igs2); // ignore sensor2
-	server_change_stations_attrib(FKV_SOURCE, 'n', os.attrib_mas2); // master2
-	server_change_stations_attrib(FKV_SOURCE, 'd', os.attrib_dis); // disable
-	server_change_stations_attrib(FKV_SOURCE, 'q', os.attrib_seq); // sequential
-	server_change_stations_attrib(FKV_SOURCE, 'p', os.attrib_spe); // special
-
+	server_change_board_attrib(FKV_SOURCE, 'm', os.attrib_mas); // master1
+	server_change_board_attrib(FKV_SOURCE, 'i', os.attrib_igrd); // ignore rain delay
+	server_change_board_attrib(FKV_SOURCE, 'j', os.attrib_igs); // ignore sensor1
+	server_change_board_attrib(FKV_SOURCE, 'k', os.attrib_igs2); // ignore sensor2
+	server_change_board_attrib(FKV_SOURCE, 'n', os.attrib_mas2); // master2
+	server_change_board_attrib(FKV_SOURCE, 'd', os.attrib_dis); // disable
+	server_change_board_attrib(FKV_SOURCE, 'q', os.attrib_seq); // sequential
+	server_change_board_attrib(FKV_SOURCE, 'p', os.attrib_spe); // special
+	server_change_stations_attrib(FKV_SOURCE, 'g', os.attrib_grp); // sequential groups 
 	/* handle special data */
 	if(findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("sid"), true)) {
 		sid = atoi(tmp_buffer);
@@ -937,7 +958,16 @@ void server_json_options_main() {
 			bfill.emit_p(PSTR(","));
 	}
 
-	bfill.emit_p(PSTR(",\"dexp\":$D,\"mexp\":$D,\"hwt\":$D}"), os.detect_exp(), MAX_EXT_BOARDS, os.hw_type);
+	bfill.emit_p(PSTR(",\"dexp\":$D,\"mexp\":$D,\"hwt\":$D,"), os.detect_exp(), MAX_EXT_BOARDS, os.hw_type);
+	// print master array
+	byte masid, optidx;
+	bfill.emit_p(PSTR("\"ms\":["));
+	for (masid = 0; masid < NUM_MASTER_ZONES; masid++) {
+		for (optidx = 0; optidx < NUM_MASTER_OPTS; optidx++) {
+			bfill.emit_p(PSTR("$D"), os.masters[masid][optidx]);
+			bfill.emit_p((masid == NUM_MASTER_ZONES - 1 && optidx == NUM_MASTER_OPTS - 1) ? PSTR("]}") : PSTR(","));
+		}
+	}
 }
 
 /** Output Options */
@@ -1027,7 +1057,7 @@ void server_json_controller_main(OTF_PARAMS_DEF) {
 	ulong curr_time = os.now_tz();
 	bfill.emit_p(PSTR("\"devt\":$L,\"nbrd\":$D,\"en\":$D,\"sn1\":$D,\"sn2\":$D,\"rd\":$D,\"rdst\":$L,"
 										"\"sunrise\":$D,\"sunset\":$D,\"eip\":$L,\"lwc\":$L,\"lswc\":$L,"
-										"\"lupt\":$L,\"lrbtc\":$D,\"lrun\":[$D,$D,$D,$L],"),
+										"\"lupt\":$L,\"lrbtc\":$D,\"lrun\":[$D,$D,$D,$L],\"pq\":$D,\"nq\":$D,"),
 							curr_time,
 							os.nboards,
 							os.status.enabled,
@@ -1045,7 +1075,9 @@ void server_json_controller_main(OTF_PARAMS_DEF) {
 							pd.lastrun.station,
 							pd.lastrun.program,
 							pd.lastrun.duration,
-							pd.lastrun.endtime);
+							pd.lastrun.endtime,
+							pd.pause_state,
+							pd.nqueue);
 
 #if defined(ESP8266)
 	bfill.emit_p(PSTR("\"RSSI\":$D,\"otc\":{$O},\"otcs\":$D,"), (int16_t)WiFi.RSSI(), SOPT_OTC_OPTS, otf->getCloudStatus());
@@ -1101,7 +1133,8 @@ void server_json_controller_main(OTF_PARAMS_DEF) {
 			rem = (curr_time >= q->st) ? (q->st+q->dur-curr_time) : q->dur;
 			if(rem>65535) rem = 0;
 		}
-		bfill.emit_p(PSTR("[$D,$L,$L]"), (qid<255)?q->pid:0, rem, (qid<255)?q->st:0);
+		bfill.emit_p(PSTR("[$D,$L,$L,$D]"),
+		(qid<255)?q->pid:0, rem, (qid<255)?q->st:0, os.attrib_grp[sid]);
 		bfill.emit_p((sid<os.nstations-1)?PSTR(","):PSTR("]"));
 	}
 
@@ -1407,6 +1440,7 @@ void server_change_options(OTF_PARAMS_DEF)
 	if (err)	handle_return(HTML_DATA_OUTOFBOUND);
 
 	os.iopts_save();
+	os.populate_master();
 
 	if(time_change) {
 		os.status.req_ntpsync = 1;
@@ -1487,12 +1521,13 @@ void server_json_status(OTF_PARAMS_DEF)
 
 /**
  * Test station (previously manual operation)
- * Command: /cm?pw=xxx&sid=x&en=x&t=x
+ * Command: /cm?pw=xxx&sid=x&en=x&t=x&ssta=x
  *
  * pw: password
  * sid:station index (starting from 0)
  * en: enable (0 or 1)
  * t:  timer (required if en=1)
+ * ssta: shift remaining stations
  */
 void server_change_manual(OTF_PARAMS_DEF) {
 #if defined(ESP8266)
@@ -1552,7 +1587,14 @@ void server_change_manual(OTF_PARAMS_DEF) {
 			handle_return(HTML_DATA_MISSING);
 		}
 	} else {	// turn off station
-		turn_off_station(sid, curr_time);
+		byte ssta = 0;
+		if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("ssta"), true)) {
+			ssta = atoi(tmp_buffer);
+		}
+		// mark station for removal 
+		RuntimeQueueStruct *q = pd.queue + pd.station_qid[sid];
+		q->deque_time = curr_time;
+		turn_off_station(sid, curr_time, ssta);
 	}
 	handle_return(HTML_SUCCESS);
 }
@@ -1732,6 +1774,27 @@ void server_delete_log(OTF_PARAMS_DEF) {
 	handle_return(HTML_SUCCESS);
 }
 
+/** 
+ * Command: "/pq?pw=x&dur=x"
+ * dur: duration (in units of seconds) 
+ */
+void server_pause_queue(OTF_PARAMS_DEF) {
+#if defined(ESP8266)
+	if(!process_password(OTF_PARAMS)) return;
+#else
+	char *p = get_buffer;
+#endif
+
+	ulong duration = 0;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("dur"), true)) {
+		duration = strtoul(tmp_buffer, NULL, 0);
+	}
+
+	pd.toggle_pause(duration);
+
+	handle_return(HTML_SUCCESS);
+}
+
 /** Output all JSON data, including jc, jp, jo, js, jn */
 void server_json_all(OTF_PARAMS_DEF) {
 #if defined(ESP8266)
@@ -1820,6 +1883,7 @@ const char _url_keys[] PROGMEM =
 	"su"
 	"cu"
 	"ja"
+	"pq"
 #if defined(ARDUINO)
   "db"
 #endif
@@ -1848,6 +1912,7 @@ URLHandler urls[] = {
 	server_view_scripturl,  // su
 	server_change_scripturl,// cu
 	server_json_all,        // ja
+	server_pause_queue,     // pq
 #if defined(ARDUINO)
 	server_json_debug,      // db
 #endif

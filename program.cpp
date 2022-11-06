@@ -36,7 +36,10 @@ byte ProgramData::nqueue = 0;
 RuntimeQueueStruct ProgramData::queue[RUNTIME_QUEUE_SIZE];
 byte ProgramData::station_qid[MAX_NUM_STATIONS];
 LogStruct ProgramData::lastrun;
-ulong ProgramData::last_seq_stop_time;
+ulong ProgramData::last_seq_stop_times[NUM_SEQ_GROUPS];
+byte ProgramData::pause_state = 0;
+ulong ProgramData::pause_timer = 0;
+
 extern char tmp_buffer[];
 
 void ProgramData::init() {
@@ -47,7 +50,7 @@ void ProgramData::init() {
 void ProgramData::reset_runtime() {
 	memset(station_qid, 0xFF, MAX_NUM_STATIONS);  // reset station qid to 0xFF
 	nqueue = 0;
-	last_seq_stop_time = 0;
+	memset(last_seq_stop_times, 0, sizeof(last_seq_stop_times));
 }
 
 /** Insert a new element to the queue
@@ -122,6 +125,55 @@ void ProgramData::moveup(byte pid) {
 	file_read_block(PROG_FILENAME, buf2, next, PROGRAMSTRUCT_SIZE);
 	file_write_block(PROG_FILENAME, tmp_buffer, next, PROGRAMSTRUCT_SIZE);
 	file_write_block(PROG_FILENAME, buf2, pos, PROGRAMSTRUCT_SIZE);
+}
+
+void ProgramData::toggle_pause(ulong delay) {
+	os.clear_all_station_bits(); // TODO: this might cause a problem for special stations
+	if (pause_state) { // was paused
+		resume_stations();
+	} else { 
+		set_pause(delay); 
+	}
+	pause_state = !pause_state;
+}
+
+void ProgramData::set_pause(ulong delay) {
+	pause_timer = delay;
+	RuntimeQueueStruct *q = queue; 
+	ulong pause_t = os.now_tz();
+
+	for (; q < queue + nqueue; q++) {
+		if (q->st + q->dur < pause_t) { // already run 
+			continue; 
+		} else if (q->st <= pause_t) { // currently running 
+			q->dur -= (pause_t - q->st);
+			q->st = pause_t + delay;
+		} else { // scheduled 
+			q->st += delay;
+		}
+		q->deque_time += delay;
+		byte gid = os.get_station_gid(q->sid);
+		if (q->st + q->dur > last_seq_stop_times[gid]) {
+			last_seq_stop_times[gid] = q->st + q->dur;
+		}
+	}
+}
+
+void ProgramData::resume_stations() {
+	RuntimeQueueStruct *q = queue; 
+	for (; q < queue + nqueue; q++) {
+		q->st -= pause_timer;
+		q->deque_time -= pause_timer;
+		q->st += 1;
+		q->deque_time += 1;
+	}
+	clear_pause();
+}
+
+void ProgramData::clear_pause() {
+	pause_state = 0;
+	pause_timer = 0;
+	memset(last_seq_stop_times, 0, sizeof(last_seq_stop_times));
 }
 
 /** Modify a program */
@@ -306,6 +358,3 @@ void ProgramData::drem_to_absolute(byte days[2]) {
 	// todo future: use now_tz()?
 	days[0] = (byte)(((os.now_tz()/SECS_PER_DAY) + rem_rel) % inv);
 }
-
-
-

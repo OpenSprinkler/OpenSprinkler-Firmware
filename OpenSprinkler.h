@@ -94,8 +94,7 @@ struct StationAttrib {  // station attributes
 	byte igrd:1; // ignore rain delay
 	byte unused:1;
 
-	byte gid:4; // group id: reserved for the future
-	byte dummy:4;
+	byte gid;    // sequential group id
 	byte reserved[2]; // reserved bytes for the future
 }; // total is 4 bytes so far
 
@@ -201,6 +200,8 @@ public:
 	static byte attrib_dis[];
 	static byte attrib_seq[];
 	static byte attrib_spe[];
+	static byte attrib_grp[];
+	static byte masters[NUM_MASTER_ZONES][NUM_MASTER_OPTS];
 
 	// variables for time keeping
 	static ulong sensor1_on_timer;  // time when sensor1 is detected on last time
@@ -235,6 +236,16 @@ public:
 	static void get_station_name(byte sid, char buf[]); // get station name
 	static void set_station_name(byte sid, char buf[]); // set station name
 	static byte get_station_type(byte sid); // get station type
+	static byte is_sequential_station(byte sid);
+	static byte is_master_station(byte sid);
+	static byte bound_to_master(byte sid, byte mas);
+	static byte get_master_id(byte mas);
+	static int16_t get_on_adj(byte mas);
+	static int16_t get_off_adj(byte mas);
+	static byte is_running(byte sid);
+	static byte get_station_gid(byte sid);
+	static void set_station_gid(byte sid, byte gid);
+
 	//static StationAttrib get_station_attrib(byte sid); // get station attribute
 	static void attribs_save(); // repackage attrib bits and save (backward compatibility)
 	static void attribs_load(); // load and repackage attrib bits (backward compatibility)
@@ -256,7 +267,7 @@ public:
 	static bool sopt_save(byte oid, const char *buf);
 	static void sopt_load(byte oid, char *buf);
 	static String sopt_load(byte oid);
-
+	static void populate_master();
 	static byte password_verify(const char *pw);  // verify password
 
 	// -- controller operation
@@ -346,7 +357,7 @@ private:
 	static void lcd_print_2digit(int v);  // print a integer in 2 digits
 	static void lcd_start();
 	static byte button_read_busy(byte pin_butt, byte waitmode, byte butt, byte is_holding);
-
+	
 	#if defined(ESP8266)
 	static void parse_otc_config();
 	static void latch_boost();

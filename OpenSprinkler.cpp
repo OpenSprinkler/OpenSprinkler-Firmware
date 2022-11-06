@@ -66,6 +66,8 @@ byte OpenSprinkler::attrib_igrd[MAX_NUM_BOARDS];
 byte OpenSprinkler::attrib_dis[MAX_NUM_BOARDS];
 byte OpenSprinkler::attrib_seq[MAX_NUM_BOARDS];
 byte OpenSprinkler::attrib_spe[MAX_NUM_BOARDS];
+byte OpenSprinkler::attrib_grp[MAX_NUM_STATIONS];
+byte OpenSprinkler::masters[NUM_MASTER_ZONES][NUM_MASTER_OPTS];
 
 extern char tmp_buffer[];
 extern char ether_buffer[];
@@ -1455,6 +1457,62 @@ byte OpenSprinkler::get_station_type(byte sid) {
 	return file_read_byte(STATIONS_FILENAME, (uint32_t)sid*sizeof(StationData)+offsetof(StationData, type));
 }
 
+byte OpenSprinkler::is_sequential_station(byte sid) {
+	return get_station_gid(sid) != PARALLEL_GROUP_ID; 
+}
+
+byte OpenSprinkler::is_master_station(byte sid) {
+	for (byte mas = 0; mas < NUM_MASTER_ZONES; mas++) {
+		if (get_master_id(mas) && (get_master_id(mas) - 1 == sid)) {
+			return 1;
+		}
+	}
+	return 0;
+}
+
+byte OpenSprinkler::is_running(byte sid) {
+	return station_bits[(sid >> 3)] >> (sid & 0x07) & 1;
+}
+
+byte OpenSprinkler::get_master_id(byte mas) {
+	return masters[mas][MASOPT_SID];
+}
+
+int16_t OpenSprinkler::get_on_adj(byte mas) {
+	return water_time_decode_signed(masters[mas][MASOPT_ON_ADJ]);
+}
+
+int16_t OpenSprinkler::get_off_adj(byte mas) {
+	return water_time_decode_signed(masters[mas][MASOPT_OFF_ADJ]);
+}
+
+byte OpenSprinkler::bound_to_master(byte sid, byte mas) {
+	byte bid = sid >> 3;
+	byte s = sid & 0x07;
+	byte attributes = 0;
+
+	switch (mas) {
+		case MASTER_1:
+			attributes= attrib_mas[bid];
+			break;
+		case MASTER_2:
+			attributes = attrib_mas2[bid];
+			break;
+		default:
+			break;
+	}
+
+	return attributes & (1 << s);
+}
+
+byte OpenSprinkler::get_station_gid(byte sid) {
+	return attrib_grp[sid];
+}
+
+void OpenSprinkler::set_station_gid(byte sid, byte gid) {
+	attrib_grp[sid] = gid;
+}
+
 /** Get station attribute */
 /*void OpenSprinkler::get_station_attrib(byte sid, StationAttrib *attrib); {
 	file_read_block(STATIONS_FILENAME, attrib, (uint32_t)sid*sizeof(StationData)+offsetof(StationData, attrib), sizeof(StationAttrib));
@@ -1463,7 +1521,7 @@ byte OpenSprinkler::get_station_type(byte sid) {
 /** Save all station attribs to file (backward compatibility) */
 void OpenSprinkler::attribs_save() {
 	// re-package attribute bits and save
-	byte bid, s, sid=0;
+	byte bid, s, sid=0, gid;
 	StationAttrib at, at0;
 	byte ty = STN_TYPE_STANDARD, ty0;
 	for(bid=0;bid<MAX_NUM_BOARDS;bid++) {
@@ -1475,11 +1533,13 @@ void OpenSprinkler::attribs_save() {
 			at.igrd= (attrib_igrd[bid]>>s) & 1;
 			at.dis = (attrib_dis[bid]>>s) & 1;
 			at.seq = (attrib_seq[bid]>>s) & 1;
-			at.gid = 0;
+			at.gid = get_station_gid(sid);
+			set_station_gid(sid, at.gid);
+
 			// only write if content has changed: this is important for LittleFS as otherwise the overhead is too large
-			file_read_block(STATIONS_FILENAME, &at0, (uint32_t)sid*sizeof(StationData)+offsetof(StationData, attrib), 1);
-			if(*((byte*)&at) != *((byte*)&at0))
-				file_write_block(STATIONS_FILENAME, &at, (uint32_t)sid*sizeof(StationData)+offsetof(StationData, attrib), 1); // attribte bits are 1 byte long
+			file_read_block(STATIONS_FILENAME, &at0, (uint32_t)sid*sizeof(StationData)+offsetof(StationData, attrib), sizeof(StationAttrib));
+			if(memcmp(&at,&at0,sizeof(StationAttrib))!=0)
+				file_write_block(STATIONS_FILENAME, &at, (uint32_t)sid*sizeof(StationData)+offsetof(StationData, attrib), sizeof(StationAttrib)); // attribte bits are 1 byte long
 			if(attrib_spe[bid]>>s==0) {
 				// if station special bit is 0, make sure to write type STANDARD
 				// only write if content has changed
@@ -1505,6 +1565,7 @@ void OpenSprinkler::attribs_load() {
 	memset(attrib_dis, 0, nboards);
 	memset(attrib_seq, 0, nboards);
 	memset(attrib_spe, 0, nboards);
+	memset(attrib_grp, 0, MAX_NUM_STATIONS);
 
 	for(bid=0;bid<MAX_NUM_BOARDS;bid++) {
 		for(s=0;s<8;s++,sid++) {
@@ -1516,6 +1577,7 @@ void OpenSprinkler::attribs_load() {
 			attrib_igrd[bid]|= (at.igrd<<s);
 			attrib_dis[bid] |= (at.dis<<s);
 			attrib_seq[bid] |= (at.seq<<s);
+			attrib_grp[sid] = at.gid;
 			file_read_block(STATIONS_FILENAME, &ty, (uint32_t)sid*sizeof(StationData)+offsetof(StationData, type), 1);
 			if(ty!=STN_TYPE_STANDARD) {
 				attrib_spe[bid] |= (1<<s);
@@ -1990,7 +2052,7 @@ void OpenSprinkler::parse_otc_config() {
 void OpenSprinkler::options_setup() {
 
 	// Check reset conditions:
-	if (file_read_byte(IOPTS_FILENAME, IOPT_FW_VERSION)<219 ||  // fw version is invalid (<219)
+	if (file_read_byte(IOPTS_FILENAME, IOPT_FW_VERSION)<220 ||  // fw version is invalid (<219)
 			!file_exists(DONE_FILENAME)) {  // done file doesn't exist
 
 		factory_reset();
@@ -2131,17 +2193,28 @@ void OpenSprinkler::iopts_load() {
 	status.enabled = iopts[IOPT_DEVICE_ENABLE];
 	iopts[IOPT_FW_VERSION] = OS_FW_VERSION;
 	iopts[IOPT_FW_MINOR] = OS_FW_MINOR;
-        /* Reject the former default 50.97.210.169 NTP IP address as
-         * it no longer works, yet is carried on by people's saved
-         * configs when they upgrade from older versions.
-         * IOPT_NTP_IP1 = 0 leads to the new good default behavior. */
-        if (iopts[IOPT_NTP_IP1] == 50 && iopts[IOPT_NTP_IP2] == 97 &&
-            iopts[IOPT_NTP_IP3] == 210 && iopts[IOPT_NTP_IP4] == 169) {
-            iopts[IOPT_NTP_IP1] = 0;
-            iopts[IOPT_NTP_IP2] = 0;
-            iopts[IOPT_NTP_IP3] = 0;
-            iopts[IOPT_NTP_IP4] = 0;
-        }
+	/* Reject the former default 50.97.210.169 NTP IP address as
+		* it no longer works, yet is carried on by people's saved
+		* configs when they upgrade from older versions.
+		* IOPT_NTP_IP1 = 0 leads to the new good default behavior. */
+	if (iopts[IOPT_NTP_IP1] == 50 && iopts[IOPT_NTP_IP2] == 97 &&
+			iopts[IOPT_NTP_IP3] == 210 && iopts[IOPT_NTP_IP4] == 169) {
+			iopts[IOPT_NTP_IP1] = 0;
+			iopts[IOPT_NTP_IP2] = 0;
+			iopts[IOPT_NTP_IP3] = 0;
+			iopts[IOPT_NTP_IP4] = 0;
+	}
+	populate_master();
+}
+
+void OpenSprinkler::populate_master() {
+	masters[MASTER_1][MASOPT_SID] = iopts[IOPT_MASTER_STATION];
+	masters[MASTER_1][MASOPT_ON_ADJ] = iopts[IOPT_MASTER_ON_ADJ];
+	masters[MASTER_1][MASOPT_OFF_ADJ] = iopts[IOPT_MASTER_OFF_ADJ];
+
+	masters[MASTER_2][MASOPT_SID] = iopts[IOPT_MASTER_STATION_2];
+	masters[MASTER_2][MASOPT_ON_ADJ] = iopts[IOPT_MASTER_ON_ADJ_2];
+	masters[MASTER_2][MASOPT_OFF_ADJ] = iopts[IOPT_MASTER_OFF_ADJ_2];
 }
 
 /** Save integer options to file */

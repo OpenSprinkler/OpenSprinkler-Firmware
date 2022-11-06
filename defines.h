@@ -148,6 +148,24 @@ typedef unsigned long ulong;
 #define DEFAULT_DEVICE_NAME       "My OpenSprinkler"
 #define DEFAULT_EMPTY_STRING      ""
 
+/* Master */
+enum {
+	MASTER_1 = 0,
+	MASTER_2,
+	NUM_MASTER_ZONES,
+};
+
+enum {
+	MASOPT_SID = 0, 
+	MASOPT_ON_ADJ, 
+	MASOPT_OFF_ADJ,
+	NUM_MASTER_OPTS,
+};
+
+// Sequential Groups 
+#define NUM_SEQ_GROUPS		4
+#define PARALLEL_GROUP_ID	255
+
 /** Macro define of each option
   * Refer to OpenSprinkler.cpp for details on each option
   */

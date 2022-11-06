@@ -385,7 +385,8 @@ void do_setup() {
 void write_log(byte type, ulong curr_time);
 void schedule_all_stations(ulong curr_time);
 void turn_on_station(byte sid, ulong duration);
-void turn_off_station(byte sid, ulong curr_time);
+void turn_off_station(byte sid, ulong curr_time, byte shift=0);
+void handle_expired_station(byte sid, ulong curr_time);
 void process_dynamic_events(ulong curr_time);
 void check_network();
 void check_weather();
@@ -424,7 +425,7 @@ void do_loop()
 	static ulong last_time = 0;
 	static ulong last_minute = 0;
 
-	byte bid, sid, s, pid, qid, bitvalue;
+	byte bid, sid, s, pid, qid, gid, bitvalue;
 	ProgramStruct prog;
 
 	os.status.mas = os.iopts[IOPT_MASTER_STATION];
@@ -778,6 +779,7 @@ void do_loop()
 					if (pd.station_qid[sid]==255) continue;
 
 					q = pd.queue + pd.station_qid[sid];
+					/*
 					// check if this station is scheduled, either running or waiting to run
 					if (q->st > 0) {
 						// if so, check if we should turn it off
@@ -791,6 +793,19 @@ void do_loop()
 							turn_on_station(sid, q->st+q->dur-curr_time); // the last parameter is expected run time
 						} //if curr_time > scheduled_start_time
 					} // if current station is not running
+					*/
+					// if current station is not running, check if we should turn it on
+					if(!((bitvalue >> s) & 1)) {
+						if (curr_time >= q->st && curr_time < q->st+q->dur) {
+							//os.set_station_bit(sid, 1);
+							turn_on_station(sid, q->st+q->dur-curr_time); // the last parameter is expected run time
+						} //if curr_time > scheduled_start_time
+					} // if current station is not running
+
+					// check if this station should be removed
+					if (q->st > 0) { // return a value depending on whether or not a value was dequeued
+						turn_off_station(sid, curr_time);
+					}
 				}//end_s
 			}//end_bid
 
@@ -798,7 +813,8 @@ void do_loop()
 			int qi;
 			for(qi=pd.nqueue-1;qi>=0;qi--) {
 				q=pd.queue+qi;
-				if(!q->dur || curr_time>=q->st+q->dur) {
+				//if(!q->dur || curr_time>=q->st+q->dur) {
+				if(!q->dur || curr_time >= q->deque_time) {
 					pd.dequeue(qi);
 				}
 			}
@@ -810,7 +826,7 @@ void do_loop()
 			os.apply_all_station_bits();
 
 			// check through runtime queue, calculate the last stop time of sequential stations
-			pd.last_seq_stop_time = 0;
+			//pd.last_seq_stop_time = 0;
 			ulong sst;
 			byte re=os.iopts[IOPT_REMOTE_EXT_MODE];
 			q = pd.queue;
@@ -818,13 +834,18 @@ void do_loop()
 				sid = q->sid;
 				bid = sid>>3;
 				s = sid&0x07;
+				gid = os.get_station_gid(sid);
+				pd.last_seq_stop_times[gid] = 0;
 				// check if any sequential station has a valid stop time
 				// and the stop time must be larger than curr_time
 				sst = q->st + q->dur;
 				if (sst>curr_time) {
 					// only need to update last_seq_stop_time for sequential stations
-					if (os.attrib_seq[bid]&(1<<s) && !re) {
+					/*if (os.attrib_seq[bid]&(1<<s) && !re) {
 						pd.last_seq_stop_time = (sst>pd.last_seq_stop_time ) ? sst : pd.last_seq_stop_time;
+					}*/
+					if (os.is_sequential_station(sid) && !re) {
+						pd.last_seq_stop_times[gid] = (sst > pd.last_seq_stop_times[gid]) ? sst : pd.last_seq_stop_times[gid];
 					}
 				}
 			}
@@ -839,6 +860,8 @@ void do_loop()
 				pd.reset_runtime();
 				// reset program busy bit
 				os.status.program_busy = 0;
+				pd.clear_pause(); // TODO: what if pause hasn't expired and a new program is scheduled to run?
+
 				// log flow sensor reading if flow sensor is used
 				if(os.iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_FLOW) {
 					write_log(LOGDATA_FLOWSENSE, curr_time);
@@ -852,6 +875,35 @@ void do_loop()
 		}//if_some_program_is_running
 
 		// handle master
+		for (byte mas = MASTER_1; mas < NUM_MASTER_ZONES; mas++) {
+
+			byte mas_id = os.masters[mas][MASOPT_SID];
+
+			if (mas_id) { // if this master station is set 
+				int16_t mas_on_adj = os.get_on_adj(mas);
+				int16_t mas_off_adj = os.get_off_adj(mas);
+
+				byte masbit = 0;
+
+				for(sid = 0; sid < os.nstations; sid++) {
+					// skip if this is the master station
+					if (mas_id == sid + 1) continue;
+
+					q = pd.queue + pd.station_qid[sid];
+
+					if (os.bound_to_master(q->sid, mas)) {
+						// check if timing is within the acceptable range
+						if (curr_time >= q->st + mas_on_adj &&
+							curr_time <= q->st + q->dur + mas_off_adj) {
+							masbit = 1;
+							break;
+						}	
+					}
+				}
+				os.set_station_bit(mas_id - 1, masbit);
+			}
+		}
+		#if 0
 		if (os.status.mas>0) {
 			int16_t mas_on_adj = water_time_decode_signed(os.iopts[IOPT_MASTER_ON_ADJ]);
 			int16_t mas_off_adj= water_time_decode_signed(os.iopts[IOPT_MASTER_OFF_ADJ]);
@@ -898,7 +950,15 @@ void do_loop()
 			}
 			os.set_station_bit(os.status.mas2-1, masbit2);
 		}
-
+		#endif
+		if (pd.pause_state) {
+			if (pd.pause_timer > 0) {
+				pd.pause_timer--;
+			} else {
+				os.clear_all_station_bits();
+				pd.clear_pause();
+			}
+		} 
 		// process dynamic events
 		process_dynamic_events(curr_time);
 
@@ -1060,11 +1120,109 @@ void turn_on_station(byte sid, ulong duration) {
 	}
 }
 
+// after removing element q, update remaining stations in its group 
+void handle_shift_remaining_stations(RuntimeQueueStruct* q, byte gid, ulong curr_time) {
+	RuntimeQueueStruct *s = pd.queue;
+	ulong q_end_time = q->st + q->dur;
+	ulong remainder = 0;
+
+	if (q_end_time > curr_time) { // remainder is non-zero
+		remainder = (q->st < curr_time) ? q_end_time - curr_time : q->dur;
+		for ( ; s < pd.queue + pd.nqueue; s++) {	
+
+			// ignore station to be removed and stations in other groups		
+			if (s == q || os.get_station_gid(s->sid) != gid || !os.is_sequential_station(s->sid)) { 
+				continue; 
+			}
+
+			// only shift stations following current station 
+			if (s->st >= q_end_time) {
+				s->st -= remainder; 
+				s->deque_time -= remainder;
+			}
+		}
+	}
+	pd.last_seq_stop_times[gid] -= remainder;
+	pd.last_seq_stop_times[gid] += 1;
+}
+
+/** Turn off a station
+ * This function turns off a scheduled station
+ * writes a log record and determines if 
+ * the station should be removed from the queue 
+ */
+void turn_off_station(byte sid, ulong curr_time, byte shift) {
+
+	byte qid = pd.station_qid[sid];
+	RuntimeQueueStruct *q = pd.queue + qid;
+	byte force_dequeue = 0;
+	byte station_bit = os.is_running(sid);
+	byte gid = os.get_station_gid(q->sid);
+
+	if (shift && os.is_sequential_station(sid) && !os.iopts[IOPT_REMOTE_EXT_MODE]) {
+		handle_shift_remaining_stations(q, gid, curr_time);
+	}
+
+	if (curr_time >= q->deque_time) {
+		if (station_bit) {
+			force_dequeue = 1;
+		} else { // if already off just remove from the queue
+			pd.dequeue(qid);
+			pd.station_qid[sid] = 0xFF;
+			return;
+		}
+	} else if (curr_time >= q->st + q->dur) { // end time and dequeue time are not equal
+		if (!station_bit) { return; }
+	} else { return; }
+
+	os.set_station_bit(sid, 0);
+
+	// ignore if we are turning off a station that's not running or scheduled to run
+	if (qid >= pd.nqueue)  {
+		return;
+	}
+
+	// RAH implementation of flow sensor
+	if (flow_gallons > 1) {
+		if(flow_stop <= flow_begin) flow_last_gpm = 0;
+		else flow_last_gpm = (float) 60000 / (float)((flow_stop-flow_begin) / (flow_gallons - 1));
+	}// RAH calculate GPM, 1 pulse per gallon
+	else {flow_last_gpm = 0;}  // RAH if not one gallon (two pulses) measured then record 0 gpm
+
+	// check if the current time is past the scheduled start time,
+	// because we may be turning off a station that hasn't started yet
+	if (curr_time > q->st) {
+		// record lastrun log (only for non-master stations)
+		if (os.status.mas != (sid + 1) && os.status.mas2 != (sid + 1)) {
+			pd.lastrun.station = sid;
+			pd.lastrun.program = q->pid;
+			pd.lastrun.duration = curr_time - q->st;
+			pd.lastrun.endtime = curr_time;
+
+			// log station run
+			write_log(LOGDATA_STATION, curr_time); // LOG_TODO
+			push_message(NOTIFY_STATION_OFF, sid, pd.lastrun.duration);
+		}
+	}
+	
+	// make necessary adjustments to sequential time stamps
+	int16_t station_delay = water_time_decode_signed(os.iopts[IOPT_STATION_DELAY_TIME]);
+	if (q->st + q->dur + station_delay == pd.last_seq_stop_times[gid]) { // if removing last station in group
+		pd.last_seq_stop_times[gid] = 0;
+	}
+
+	if (force_dequeue) {
+		pd.dequeue(qid);
+		pd.station_qid[sid] = 0xFF;
+	}
+}
+
+#if 0
 /** Turn off a station
  * This function turns off a scheduled station
  * and writes log record
  */
-void turn_off_station(byte sid, ulong curr_time) {
+void turn_off_station(byte sid, ulong curr_time, byte shift) {
 	os.set_station_bit(sid, 0);
 
 	byte qid = pd.station_qid[sid];
@@ -1100,6 +1258,7 @@ void turn_off_station(byte sid, ulong curr_time) {
 	pd.dequeue(qid);
 	pd.station_qid[sid] = 0xFF;
 }
+#endif
 
 /** Process dynamic events
  * such as rain delay, rain sensing
@@ -1150,6 +1309,37 @@ void process_dynamic_events(ulong curr_time) {
 	}
 }
 
+/* Scheduler 
+ * this function determines the appropriate start and dequeue times
+ * of stations bound to master stations with on and off adjustments
+ */
+void handle_master_adjustments(ulong curr_time, RuntimeQueueStruct *q) {
+
+	int16_t start_adj = 0;
+	int16_t dequeue_adj = 0;
+
+	for (byte mas = MASTER_1; mas < NUM_MASTER_ZONES; mas++) {
+
+		byte masid = os.masters[mas][MASOPT_SID];
+
+		if (masid && os.bound_to_master(q->sid, mas)) {
+
+			int16_t mas_on_adj = os.get_on_adj(mas);
+			int16_t mas_off_adj = os.get_off_adj(mas);
+
+			start_adj = min(start_adj, mas_on_adj);
+			dequeue_adj = max(dequeue_adj, mas_off_adj);
+		}
+	}
+
+	// negative on time adjustment
+	if (q->st - curr_time < abs(start_adj)) {
+		q->st += abs(start_adj);
+	}
+
+	q->deque_time = q->st + q->dur + dequeue_adj;
+}
+
 /** Scheduler
  * This function loops through the queue
  * and schedules the start time of each station
@@ -1160,28 +1350,32 @@ void schedule_all_stations(ulong curr_time) {
 	ulong seq_start_time = con_start_time;  // sequential start time
 
 	int16_t station_delay = water_time_decode_signed(os.iopts[IOPT_STATION_DELAY_TIME]);
-	// if the sequential queue has stations running
-	if (pd.last_seq_stop_time > curr_time) {
-		seq_start_time = pd.last_seq_stop_time + station_delay;
+	// if the queue is paused, make sure that parallel stations don't run immediately
+	if (pd.pause_state) {
+		con_start_time += pd.pause_timer; 
 	}
 
 	RuntimeQueueStruct *q = pd.queue;
 	byte re = os.iopts[IOPT_REMOTE_EXT_MODE];
+	byte gid;
+
 	// go through runtime queue and calculate start time of each station
 	for(;q<pd.queue+pd.nqueue;q++) {
 		if(q->st) continue; // if this queue element has already been scheduled, skip
 		if(!q->dur) continue; // if the element has been marked to reset, skip
-		byte sid=q->sid;
-		byte bid=sid>>3;
-		byte s=sid&0x07;
+		gid = os.get_station_gid(q->sid);
 
-		// if this is a sequential station and the controller is not in remote extension mode
-		// use sequential scheduling. station delay time apples
-		if (os.attrib_seq[bid]&(1<<s) && !re) {
-			// sequential scheduling
-			q->st = seq_start_time;
-			seq_start_time += q->dur;
-			seq_start_time += station_delay; // add station delay time
+		// use sequential scheduling per sequential group
+		// apply station delay time
+		if (os.is_sequential_station(q->sid) && !re) {
+			// if the sequential queue already has stations running
+			if (pd.last_seq_stop_times[gid] > curr_time) {
+				q->st = pd.last_seq_stop_times[gid] + station_delay;
+			} else {
+				q->st = seq_start_time;
+				pd.last_seq_stop_times[gid] = q->st; // initialize
+			}
+			pd.last_seq_stop_times[gid] += q->dur + station_delay;
 		} else {
 			// otherwise, concurrent scheduling
 			q->st = con_start_time;
@@ -1196,6 +1390,9 @@ void schedule_all_stations(ulong curr_time) {
 		DEBUG_PRINT(q->dur);
 		DEBUG_PRINT("]");
 		DEBUG_PRINTLN(pd.nqueue);*/
+
+		handle_master_adjustments(curr_time, q);
+
 		if (!os.status.program_busy) {
 			os.status.program_busy = 1;  // set program busy bit
 			// start flow count
@@ -1214,6 +1411,7 @@ void reset_all_stations_immediate() {
 	os.clear_all_station_bits();
 	os.apply_all_station_bits();
 	pd.reset_runtime();
+	pd.clear_pause();
 }
 
 /** Reset all stations
