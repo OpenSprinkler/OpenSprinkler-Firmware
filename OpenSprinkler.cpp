@@ -47,6 +47,7 @@ ulong OpenSprinkler::sensor2_on_timer;
 ulong OpenSprinkler::sensor2_off_timer;
 ulong OpenSprinkler::sensor2_active_lasttime;
 ulong OpenSprinkler::raindelay_on_lasttime;
+ulong OpenSprinkler::pause_timer;
 
 ulong OpenSprinkler::flowcount_log_start;
 ulong OpenSprinkler::flowcount_rt;
@@ -2366,19 +2367,17 @@ void OpenSprinkler::lcd_print_mac(const byte *mac) {
 }
 
 /** print station bits */
-void OpenSprinkler::lcd_print_station(byte line, char c) {
-	lcd.setCursor(0, line);
+void OpenSprinkler::lcd_print_screen(char c) {
+	lcd.setCursor(0, 1);
 	if (status.display_board == 0) {
-		lcd_print_pgm(PSTR("MC:"));  // Master controller is display as 'MC'
-	}
-	else {
-		lcd_print_pgm(PSTR("E"));
+		lcd.print(F("MC:"));  // Master controller is display as 'MC'
+	}	else {
+		lcd.print(F("E"));
 		lcd.print((int)status.display_board);
-		lcd_print_pgm(PSTR(":"));  // extension boards are displayed as E1, E2...
+		lcd.print(F(":"));  // extension boards are displayed as E1, E2...
 	}
-
 	if (!status.enabled) {
-		lcd_print_line_clear_pgm(PSTR("-Disabled!-"), 1);
+		lcd.print(F("-Disabled!-"));
 	} else {
 		byte bitvalue = station_bits[status.display_board];
 		for (byte s=0; s<8; s++) {
@@ -2394,17 +2393,13 @@ void OpenSprinkler::lcd_print_station(byte line, char c) {
 			bitvalue >>= 1;
 		}
 	}
-	lcd_print_pgm(PSTR("    "));
+	//lcd.print(F("    "));
 
-	if(iopts[IOPT_REMOTE_EXT_MODE]) {
-		lcd.setCursor(LCD_CURSOR_REMOTEXT, 1);
-		lcd.write(ICON_REMOTEXT);
-	}
+	lcd.setCursor(LCD_CURSOR_REMOTEXT, 1);
+	lcd.write(iopts[IOPT_REMOTE_EXT_MODE]?ICON_REMOTEXT:' ');
 
-	if(status.rain_delayed) {
-		lcd.setCursor(LCD_CURSOR_RAINDELAY, 1);
-		lcd.write(ICON_RAINDELAY);
-	}
+	lcd.setCursor(LCD_CURSOR_RAINDELAY, 1);
+	lcd.write((status.rain_delayed || status.pause_state)?ICON_RAINDELAY:' ');
 
 	// write sensor 1 icon
 	lcd.setCursor(LCD_CURSOR_SENSOR1, 1);
@@ -2420,6 +2415,9 @@ void OpenSprinkler::lcd_print_station(byte line, char c) {
 			break;
 		case SENSOR_TYPE_PSWITCH:
 			lcd.write(status.sensor1?'P':'p');
+			break;
+		default:
+			lcd.write(' ');
 			break;
 	}
 
@@ -2439,6 +2437,9 @@ void OpenSprinkler::lcd_print_station(byte line, char c) {
 		case SENSOR_TYPE_PSWITCH:
 			lcd.write(status.sensor2?'Q':'q');
 			break;
+		default:
+			lcd.write(' ');
+			break;
 	}
 
 	lcd.setCursor(LCD_CURSOR_NETWORK, 1);
@@ -2450,6 +2451,30 @@ void OpenSprinkler::lcd_print_station(byte line, char c) {
 		lcd.write(WiFi.status()==WL_CONNECTED?ICON_WIFI_CONNECTED:ICON_WIFI_DISCONNECTED);
 #else
 	lcd.write(status.network_fails>2?ICON_ETHER_DISCONNECTED:ICON_ETHER_CONNECTED);  // if network failure detection is more than 2, display disconnect icon
+#endif
+
+	lcd.setCursor(0, -1);
+	if(status.rain_delayed) {
+		lcd.print(F("<Rain Delay On> "));
+	} else if(status.pause_state) {
+		lcd.print(F("<Program Paused>"));
+	} else if(status.program_busy) {
+		lcd.print(F("<Running Zones> "));
+	} else {
+		lcd.print(F(" (System Idle)  "));
+	}
+
+#if defined(ESP8266)
+	if(useEth || (get_wifi_mode()==WIFI_MODE_STA && WiFi.status()==WL_CONNECTED && WiFi.localIP())) {
+		lcd.setCursor(0, 2);
+		if(status.program_busy && !status.pause_state) {
+			lcd.print(F("Curr: "));
+			lcd.print(read_current());
+			lcd.print(F(" mA      "));
+		} else {
+			lcd.clear(2, 2);
+		}
+	}
 #endif
 }
 

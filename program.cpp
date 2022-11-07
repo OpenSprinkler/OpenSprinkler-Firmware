@@ -37,8 +37,6 @@ RuntimeQueueStruct ProgramData::queue[RUNTIME_QUEUE_SIZE];
 byte ProgramData::station_qid[MAX_NUM_STATIONS];
 LogStruct ProgramData::lastrun;
 ulong ProgramData::last_seq_stop_times[NUM_SEQ_GROUPS];
-byte ProgramData::pause_state = 0;
-ulong ProgramData::pause_timer = 0;
 
 extern char tmp_buffer[];
 
@@ -128,14 +126,14 @@ void ProgramData::moveup(byte pid) {
 }
 
 void ProgramData::toggle_pause(ulong delay) {
-	if (pause_state) { // was paused
+	if (os.status.pause_state) { // was paused
 		resume_stations();
 	} else {
 		//os.clear_all_station_bits(); // TODO: this will affect logging
-		pause_timer = delay;
+		os.pause_timer = delay;
 		set_pause();
 	}
-	pause_state = !pause_state;
+	os.status.pause_state = !os.status.pause_state;
 }
 
 void turn_off_station(byte sid, ulong curr_time, byte shift=0);
@@ -145,17 +143,17 @@ void ProgramData::set_pause() {
 	ulong curr_t = os.now_tz();
 
 	for (; q < queue + nqueue; q++) {
-		byte station_bit = os.is_running(q->sid);
+
 		turn_off_station(q->sid, curr_t);
 		if (curr_t>=q->st+q->dur) { // already finished running
 			continue;
 		} else if (curr_t>=q->st) { // currently running
 			q->dur -= (curr_t - q->st); // adjust remaining run time
-			q->st = curr_t + pause_timer;     // push back start time
+			q->st = curr_t + os.pause_timer;     // push back start time
 		} else { // scheduled but not running yet
-			q->st += pause_timer;
+			q->st += os.pause_timer;
 		}
-		q->deque_time += pause_timer;
+		q->deque_time += os.pause_timer;
 		byte gid = os.get_station_gid(q->sid);
 		if (q->st + q->dur > last_seq_stop_times[gid]) {
 			last_seq_stop_times[gid] = q->st + q->dur; // update last_seq_stop_times of the corresponding group
@@ -166,8 +164,8 @@ void ProgramData::set_pause() {
 void ProgramData::resume_stations() {
 	RuntimeQueueStruct *q = queue;
 	for (; q < queue + nqueue; q++) {
-		q->st -= pause_timer;
-		q->deque_time -= pause_timer;
+		q->st -= os.pause_timer;
+		q->deque_time -= os.pause_timer;
 		q->st += 1; // adjust by 1 second to give time for scheduler
 		q->deque_time += 1;
 	}
@@ -175,8 +173,8 @@ void ProgramData::resume_stations() {
 }
 
 void ProgramData::clear_pause() {
-	pause_state = 0;
-	pause_timer = 0;
+	os.status.pause_state = 0;
+	os.pause_timer = 0;
 	memset(last_seq_stop_times, 0, sizeof(last_seq_stop_times));
 }
 

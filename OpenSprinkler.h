@@ -149,6 +149,7 @@ struct ConStatus {
 	byte sensor1_active:1;  // sensor1 active bit (when set, sensor1 is activated)
 	byte sensor2_active:1;  // sensor2 active bit (when set, sensor2 is activated)
 	byte req_mqtt_restart:1;// request mqtt restart
+	byte pause_state:1;     // pause station runs
 };
 
 /** OTF configuration */
@@ -211,6 +212,7 @@ public:
 	static ulong sensor2_off_timer; // time when sensor2 is detected off last time
 	static ulong sensor2_active_lasttime; // most recent time sensor1 is activated
 	static ulong raindelay_on_lasttime;  // time when the most recent rain delay started
+	static ulong pause_timer; // count down timer in paused state
 	static ulong flowcount_rt;     // flow count (for computing real-time flow rate)
 	static ulong flowcount_log_start; // starting flow count (for logging)
 
@@ -305,7 +307,7 @@ public:
 	static void lcd_print_time(time_t t);  // print current time
 	static void lcd_print_ip(const byte *ip, byte endian);  // print ip
 	static void lcd_print_mac(const byte *mac);  // print mac
-	static void lcd_print_station(byte line, char c);  // print station bits of the board selected by display_board
+	static void lcd_print_screen(char c);  // print station bits of the board selected by display_board
 	static void lcd_print_version(byte v);  // print version number
 
 	static String time2str(uint32_t t) {

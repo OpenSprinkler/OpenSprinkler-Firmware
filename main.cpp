@@ -889,9 +889,9 @@ void do_loop()
 			}
 		}
 
-		if (pd.pause_state) {
-			if (pd.pause_timer > 0) {
-				pd.pause_timer--;
+		if (os.status.pause_state) {
+			if (os.pause_timer > 0) {
+				os.pause_timer--;
 			} else {
 				os.clear_all_station_bits();
 				pd.clear_pause();
@@ -905,21 +905,7 @@ void do_loop()
 
 #if defined(ARDUINO)
 		// process LCD display
-		if (!ui_state) {
-			os.lcd_print_station(1, ui_anim_chars[(unsigned long)curr_time%3]);
-			#if defined(ESP8266)
-			if(os.get_wifi_mode()==WIFI_MODE_STA && WiFi.status()==WL_CONNECTED && WiFi.localIP()) {
-				os.lcd.setCursor(0, 2);
-				os.lcd.clear(2, 2);
-				if(os.status.program_busy) {
-					os.lcd.print(F("curr: "));
-					uint16_t curr = os.read_current();
-					os.lcd.print(curr);
-					os.lcd.print(F(" mA"));
-				}
-			}
-			#endif
-		}
+		if (!ui_state) { os.lcd_print_screen(ui_anim_chars[(unsigned long)curr_time%3]); }
 
 #endif
 
@@ -1285,8 +1271,8 @@ void handle_master_adjustments(ulong curr_time, RuntimeQueueStruct *q) {
 void schedule_all_stations(ulong curr_time) {
 	ulong con_start_time = curr_time + 1;   // concurrent start time
 	// if the queue is paused, make sure the start time is after the scheduled pause ends
-	if (pd.pause_state) {
-		con_start_time += pd.pause_timer;
+	if (os.status.pause_state) {
+		con_start_time += os.pause_timer;
 	}
 	ulong seq_start_time = con_start_time;  // sequential start time
 	int16_t station_delay = water_time_decode_signed(os.iopts[IOPT_STATION_DELAY_TIME]);

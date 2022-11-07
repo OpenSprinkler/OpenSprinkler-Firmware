@@ -1092,8 +1092,8 @@ void server_json_controller_main(OTF_PARAMS_DEF) {
 							pd.lastrun.program,
 							pd.lastrun.duration,
 							pd.lastrun.endtime,
-							pd.pause_state,
-							pd.pause_timer,
+							os.status.pause_state,
+							os.pause_timer,
 							pd.nqueue);
 
 #if defined(ESP8266)
