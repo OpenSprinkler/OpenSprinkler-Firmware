@@ -131,22 +131,25 @@ void ProgramData::toggle_pause(ulong delay) {
 	if (pause_state) { // was paused
 		resume_stations();
 	} else {
-		os.clear_all_station_bits(); // TODO: how does this affect special stations?
+		//os.clear_all_station_bits(); // TODO: this will affect logging
 		pause_timer = delay;
 		set_pause();
 	}
 	pause_state = !pause_state;
 }
 
-// TODO: handle situation where a pause is active and a station is scheduled later
+void turn_off_station(byte sid, ulong curr_time, byte shift=0);
+
 void ProgramData::set_pause() {
 	RuntimeQueueStruct *q = queue;
 	ulong curr_t = os.now_tz();
 
 	for (; q < queue + nqueue; q++) {
-		if (q->st + q->dur < curr_t) { // already finished running
+		byte station_bit = os.is_running(q->sid);
+		turn_off_station(q->sid, curr_t);
+		if (curr_t>=q->st+q->dur) { // already finished running
 			continue;
-		} else if (q->st <= curr_t) { // currently running
+		} else if (curr_t>=q->st) { // currently running
 			q->dur -= (curr_t - q->st); // adjust remaining run time
 			q->st = curr_t + pause_timer;     // push back start time
 		} else { // scheduled but not running yet

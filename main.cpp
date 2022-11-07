@@ -1092,6 +1092,10 @@ void handle_shift_remaining_stations(RuntimeQueueStruct* q, byte gid, ulong curr
 void turn_off_station(byte sid, ulong curr_time, byte shift) {
 
 	byte qid = pd.station_qid[sid];
+	// ignore request if trying to turn off a zone that's not even in the queue
+	if (qid >= pd.nqueue)  {
+		return;
+	}
 	RuntimeQueueStruct *q = pd.queue + qid;
 	byte force_dequeue = 0;
 	byte station_bit = os.is_running(sid);
@@ -1111,14 +1115,9 @@ void turn_off_station(byte sid, ulong curr_time, byte shift) {
 		}
 	} else if (curr_time >= q->st + q->dur) { // end time and dequeue time are not equal due to master handling
 		if (!station_bit) { return; }
-	} else { return; }
+	} //else { return; }
 
 	os.set_station_bit(sid, 0);
-
-	// ignore if we are turning off a station that's not running or scheduled to run
-	if (qid >= pd.nqueue)  {
-		return;
-	}
 
 	// RAH implementation of flow sensor
 	if (flow_gallons > 1) {
@@ -1129,7 +1128,7 @@ void turn_off_station(byte sid, ulong curr_time, byte shift) {
 
 	// check if the current time is past the scheduled start time,
 	// because we may be turning off a station that hasn't started yet
-	if (curr_time > q->st) {
+	if (curr_time >= q->st) {
 		// record lastrun log (only for non-master stations)
 		if (os.status.mas != (sid + 1) && os.status.mas2 != (sid + 1)) {
 			pd.lastrun.station = sid;
