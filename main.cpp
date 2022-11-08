@@ -605,7 +605,7 @@ void do_loop()
 
 #if defined(ARDUINO)
 		if (!ui_state)
-			os.lcd_print_time(os.now_tz());  // print time
+			os.lcd_print_time(curr_time);  // print time
 #endif
 
 		// ====== Check raindelay status ======

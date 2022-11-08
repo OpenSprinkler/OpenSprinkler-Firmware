@@ -2323,6 +2323,9 @@ void OpenSprinkler::lcd_print_2digit(int v)
 /** print time to a given line */
 void OpenSprinkler::lcd_print_time(time_t t)
 {
+#if defined(ESP8266)
+	lcd.setAutoDisplay(false);
+#endif
 	lcd.setCursor(0, 0);
 	lcd_print_2digit(hour(t));
 	lcd_print_pgm(PSTR(":"));
@@ -2334,6 +2337,10 @@ void OpenSprinkler::lcd_print_time(time_t t)
 	lcd_print_2digit(month(t));
 	lcd_print_pgm(PSTR("-"));
 	lcd_print_2digit(day(t));
+#if defined(ESP8266)
+	lcd.display();
+	lcd.setAutoDisplay(true);
+#endif
 }
 
 /** print ip address */
@@ -2368,6 +2375,9 @@ void OpenSprinkler::lcd_print_mac(const byte *mac) {
 
 /** print station bits */
 void OpenSprinkler::lcd_print_screen(char c) {
+#if defined(ESP8266)
+	lcd.setAutoDisplay(false); // reduce screen drawing time by turning off display() when drawing individual characters
+#endif
 	lcd.setCursor(0, 1);
 	if (status.display_board == 0) {
 		lcd.print(F("MC:"));  // Master controller is display as 'MC'
@@ -2453,22 +2463,23 @@ void OpenSprinkler::lcd_print_screen(char c) {
 	lcd.write(status.network_fails>2?ICON_ETHER_DISCONNECTED:ICON_ETHER_CONNECTED);  // if network failure detection is more than 2, display disconnect icon
 #endif
 
-	lcd.setCursor(0, -1);
-	if(status.rain_delayed) {
-		lcd.print(F("<Rain Delay On> "));
-	} else if(status.pause_state) {
-		lcd.print(F("<Program Paused>"));
-	} else if(status.program_busy) {
-		lcd.print(F("<Running Zones> "));
-	} else {
-		lcd.print(F(" (System Idle)  "));
-	}
-
 #if defined(ESP8266)
+
 	if(useEth || (get_wifi_mode()==WIFI_MODE_STA && WiFi.status()==WL_CONNECTED && WiFi.localIP())) {
-		lcd.setCursor(0, 2);
+		lcd.setCursor(0, -1);
+		if(status.rain_delayed) {
+			lcd.print(F("<Rain Delay On> "));
+		} else if(status.pause_state) {
+			lcd.print(F("<Program Paused>"));
+		} else if(status.program_busy) {
+			lcd.print(F("<Running Zones> "));
+		} else {
+			lcd.print(F(" (System Idle)  "));
+		}
+
+		lcd.setCursor(2, 2);
 		if(status.program_busy && !status.pause_state) {
-			lcd.print(F("Curr: "));
+			//lcd.print(F("Curr: "));
 			lcd.print(read_current());
 			lcd.print(F(" mA      "));
 		} else {
@@ -2476,6 +2487,10 @@ void OpenSprinkler::lcd_print_screen(char c) {
 		}
 	}
 #endif
+#if defined(ESP8266)
+	lcd.display();
+	lcd.setAutoDisplay(true);
+#endif	
 }
 
 /** print a version number */
