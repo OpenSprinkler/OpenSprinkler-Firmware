@@ -813,7 +813,6 @@ void do_loop()
 			os.apply_all_station_bits();
 
 			// check through runtime queue, calculate the last stop time of sequential stations
-			//pd.last_seq_stop_time = 0;
 			memset(pd.last_seq_stop_times, 0, sizeof(ulong)*NUM_SEQ_GROUPS);
 			ulong sst;
 			byte re=os.iopts[IOPT_REMOTE_EXT_MODE];
@@ -823,7 +822,6 @@ void do_loop()
 				bid = sid>>3;
 				s = sid&0x07;
 				gid = os.get_station_gid(sid);
-				//pd.last_seq_stop_times[gid] = 0;
 				// check if any sequential station has a valid stop time
 				// and the stop time must be larger than curr_time
 				sst = q->st + q->dur;
@@ -1279,6 +1277,7 @@ void schedule_all_stations(ulong curr_time) {
 	ulong seq_start_times[NUM_SEQ_GROUPS];  // sequential start times
 	for(byte i=0;i<NUM_SEQ_GROUPS;i++) {
 		seq_start_times[i] = con_start_time;
+		// if the sequential queue already has stations running
 		if (pd.last_seq_stop_times[i] > curr_time) {
 			seq_start_times[i] = pd.last_seq_stop_times[i] + station_delay;
 		}
@@ -1296,14 +1295,6 @@ void schedule_all_stations(ulong curr_time) {
 		// use sequential scheduling per sequential group
 		// apply station delay time
 		if (os.is_sequential_station(q->sid) && !re) {
-			// if the sequential queue already has stations running
-			/*if (pd.last_seq_stop_times[gid] > curr_time) {
-				q->st = pd.last_seq_stop_times[gid] + station_delay;
-			} else {
-				q->st = seq_start_time;
-			}
-			pd.last_seq_stop_times[gid] = q->st+q->dur;
-			*/
 			q->st = seq_start_times[gid];
 			seq_start_times[gid] += q->dur;
 			seq_start_times[gid] += station_delay; // add station delay time

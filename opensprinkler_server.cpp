@@ -1056,15 +1056,23 @@ void server_json_programs(OTF_PARAMS_DEF) {
 /** Output script url form */
 void server_view_scripturl(OTF_PARAMS_DEF) {
 	rewind_ether_buffer();
-	bfill.emit_p(PSTR("<form name=of action=cu method=get><table cellspacing=\"12\"><tr><td><b>JavaScript</b>:</td><td><input type=text size=40 maxlength=$D value=\"$O\" name=jsp></td></tr><tr><td>Default:</td><td>$S</td></tr><tr><td><b>Weather</b>:</td><td><input type=text size=40 maxlength=$D value=\"$O\" name=wsp></td></tr><tr><td>Default:</td><td>$S</td></tr><tr><td><b>Password</b>:</td><td><input type=password size=32 name=pw> <input type=submit></td></tr></table></form><script src=https://ui.opensprinkler.com/js/hasher.js></script>"),
-	MAX_SOPTS_SIZE, SOPT_JAVASCRIPTURL, DEFAULT_JAVASCRIPT_URL, MAX_SOPTS_SIZE, SOPT_WEATHERURL, DEFAULT_WEATHER_URL);
-
 #if defined(ESP8266)
 	print_header(OTF_PARAMS,false,strlen(ether_buffer));
 #else
 	print_header(false);
 #endif
-
+	//bfill.emit_p(PSTR("<form name=of action=cu method=get><table cellspacing=12><tr><td><b>JavaScript</b>:</td><td><input type=text size=40 maxlength=$D value='$O' name=jsp></td></tr><tr><td>Default:</td><td>$S</td></tr><tr><td><b>Weather</b>:</td><td><input type=text size=40 maxlength=$D value='$O' name=wsp></td></tr><tr><td>Default:</td><td>$S</td></tr><tr><td><b>Password</b>:</td><td><input type=password size=32 name=pw> <input type=submit value=Submit></td></tr></table></form><script src=https://ui.opensprinkler.com/js/hasher.js></script>"),
+	bfill.emit_p(PSTR(R"(<form name=of action=cu method=get><table cellspacing=12>
+<tr><td><b>UI Source</b>:</td><td><input type=text size=40 maxlength=$D value='$O' id=jsp name=jsp></td></tr>
+<tr><td></td><td><button type=button onclick='rst_jsp()'>Reset UI Source</button></td></tr>
+<tr><td><b>Weather</b>:</td><td><input type=text size=40 maxlength=$D value='$O' id=wsp name=wsp></td></tr>
+<tr><td></td><td><button type=button onclick='rst_wsp()'>Reset Weather Server</button></td></tr>
+<tr><td><b>Password</b>:</td><td><input type=password size=32 name=pw><input type=submit value=submit></tr>
+</table></form>
+<script src=https://ui.opensprinkler.com/js/hasher.js></script>
+<script>function rst_jsp() {document.getElementById('jsp').value='$S';}
+function rst_wsp() {document.getElementById('wsp').value='$S';}</script>)"),
+	MAX_SOPTS_SIZE, SOPT_JAVASCRIPTURL, MAX_SOPTS_SIZE, SOPT_WEATHERURL, DEFAULT_JAVASCRIPT_URL, DEFAULT_WEATHER_URL);
 	handle_return(HTML_OK);
 }
 
@@ -1324,7 +1332,14 @@ void server_change_scripturl(OTF_PARAMS_DEF) {
 		string_remove_space(tmp_buffer);
 		os.sopt_save(SOPT_WEATHERURL, tmp_buffer);
 	}
+#if defined(ESP8266)
+	rewind_ether_buffer();
+	print_header(OTF_PARAMS,false,strlen(ether_buffer));
+	bfill.emit_p(PSTR("$F"), htmlReturnHome);
+	handle_return(HTML_OK);
+#else
 	handle_return(HTML_REDIRECT_HOME);
+#endif
 }
 
 /**
