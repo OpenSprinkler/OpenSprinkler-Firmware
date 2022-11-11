@@ -351,6 +351,7 @@ void do_setup() {
 	os.button_timeout = LCD_BACKLIGHT_TIMEOUT;
 	DEBUG_PRINTLN("do_setup6...");
 	sensor_load();
+	prog_adjust_load();
 }
 
 // Arduino software reset function
@@ -717,6 +718,8 @@ void do_loop()
 																								// do not water
 									water_time = 0;
 							}
+							// Analog sensor water time adjustments:
+							water_time = (ulong)(water_time * calc_sensor_watering(pid));
 
 							if (water_time) {
 								// check if water time is still valid

@@ -33,11 +33,15 @@
 #include "defines.h"
 #include "utils.h"
 #include <sys/stat.h>
+#include <SparkFun_ADS1015_Arduino_Library.h>
 
 //Sensor types:
 #define SENSOR_NONE                       0   //None or deleted sensor
 #define SENSOR_SMT100_MODBUS_RTU_MOIS     1   //Truebner SMT100 RS485 Modbus RTU over TCP, moisture mode
 #define SENSOR_SMT100_MODBUS_RTU_TEMP     2   //Truebner SMT100 RS485 Modbus RTU over TCP, temperature mode
+#define SENSOR_ANALOG_EXTENSION_BOARD     10  //New OpenSprinkler analog extension board 2xADS1015 48/49
+#define SENSOR_OSPI_ANALOG_INPUTS         20  //Old OSPi analog input
+//#define SENSOR_REMOTE                     100 // Remote sensor of an remote opensprinkler
 
 #define SENSOR_GROUP_MIN               1000   //Sensor group with min value
 #define SENSOR_GROUP_MAX               1001   //Sensor group with max value
@@ -48,14 +52,14 @@
 
 //Definition of a sensor
 typedef struct Sensor {
-	uint     nr;   //1..n sensor-nr, 0=deleted
-	char     name[30];
-	uint     type; //1..n type definition, 0=deleted
+	uint     nr;               // 1..n sensor-nr, 0=deleted
+	char     name[30];         // name
+	uint     type;             // 1..n type definition, 0=deleted
 	uint     group;            // group assignment,0=no group
-	uint32_t ip;
-	uint     port;
-	uint     id; //modbus id
-	uint     read_interval; // seconds
+	uint32_t ip;               // tcp-ip
+	uint     port;             // tcp-port    / ADC: I2C Address 0x48/0x49
+	uint     id;               // modbus id   / ADC: channel
+	uint     read_interval;    // seconds
 	uint32_t last_native_data; // last native sensor data
 	double   last_data;        // last converted sensor data
 	byte     enable:1;
@@ -94,10 +98,10 @@ typedef struct SensorLog {
 #define PROG_DIGITAL_MAX 3 //1=over or equal max, 0=below
 
 typedef struct ProgSensorAdjust {
-	uint   nr;
+	uint   nr;       //adjust-nr 1..x
 	uint   type;     //PROG_XYZ type=0 -->delete
 	uint   sensor;   //sensor-nr
-	uint   prog;     //program-nr
+	uint   prog;     //program-nr=pid
 	double factor1;
 	double factor2;
 	double min;
@@ -107,8 +111,18 @@ typedef struct ProgSensorAdjust {
 } ProgSensorAdjust_t;
 #define PROGSENSOR_STORE_SIZE (sizeof(ProgSensorAdjust_t)-sizeof(ProgSensorAdjust_t*))
 
+typedef struct ADCSensor {
+	uint i2c;
+	byte active;
+	ADS1015 adc;
+	ADCSensor *next;
+} ADCSensor_t;
+
 //All sensors:
 static Sensor_t *sensors = NULL;
+
+//ADS1015 48+49:
+static ADCSensor_t *adcSensors = NULL;
 
 //Program sensor data 
 static ProgSensorAdjust_t *progSensorAdjusts = NULL;
@@ -147,6 +161,8 @@ int prog_adjust_define(uint nr, uint type, uint sensor, uint prog, double factor
 int prog_adjust_delete(uint nr);
 void prog_adjust_save();
 void prog_adjust_load();
-void prog_adjust_count();
+uint prog_adjust_count();
 double calc_sensor_watering(uint prog);
+double calc_sensor_watering_by_nr(uint nr);
+
 #endif // _SENSORS_H

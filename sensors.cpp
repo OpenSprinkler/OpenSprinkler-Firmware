@@ -271,16 +271,61 @@ void read_all_sensors() {
 	sensor_update_groups();
 }
 
-int read_sensor(Sensor_t *sensor) {
+/**
+ * Read ADS1015 sensors
+*/
+int read_sensor_adc(Sensor_t *sensor) {
+	if (!sensor || !sensor->enable) return HTTP_RQT_NOT_RECEIVED;
 
-	if (!sensor || !sensor->enable)
+	//Init + Detect:
+	ADCSensor_t *adc = adcSensors;
+	while (adc) {
+		if (adc->i2c == sensor->port) { //0x48 / 0x49
+			break;
+		}
+		adc = adc->next;
+	}
+
+	if (!adc) {
+		adc = new ADCSensor_t;
+		adc->i2c = sensor->port;
+		adc->active = adc->adc.begin(adc->i2c);
+		adc->next = adcSensors;
+		adcSensors = adc;
+	}
+
+	if (!adc->active)
 		return HTTP_RQT_NOT_RECEIVED;
 
-	sensor->last_read = os.now_tz();
 
-	DEBUG_PRINT(F("Reading sensor "));
-	DEBUG_PRINTLN(sensor->name);
+	//Read values:
+	sensor->last_native_data = adc->adc.getSingleEnded(sensor->id);
+	sensor->last_data = adc->adc.getSingleEndedMillivolts(sensor->id);
+	sensor->data_ok = true;
 
+	DEBUG_PRINT(F("Sensor "));
+	DEBUG_PRINT(sensor->nr);
+	DEBUG_PRINT(F(" returned "));
+	DEBUG_PRINT(F(" native: "));
+	DEBUG_PRINT(sensor->last_native_data);
+	DEBUG_PRINT(F(" effective: "));
+	DEBUG_PRINTLN(sensor->last_data);
+
+	return HTTP_RQT_SUCCESS;
+}
+
+int read_sensor_ospi(Sensor_t *sensor) {
+	if (!sensor || !sensor->enable) return HTTP_RQT_NOT_RECEIVED;
+
+	//currently not implemented 
+
+	return HTTP_RQT_SUCCESS;
+}
+
+/**
+ * Read ip connected sensors
+*/
+int read_sensor_ip(Sensor_t *sensor) {
 #if defined(ARDUINO)
 
 	Client *client;
@@ -415,6 +460,39 @@ int read_sensor(Sensor_t *sensor) {
 	return HTTP_RQT_NOT_RECEIVED;
 }
 
+/**
+ * read a sensor
+*/
+int read_sensor(Sensor_t *sensor) {
+
+	if (!sensor || !sensor->enable)
+		return HTTP_RQT_NOT_RECEIVED;
+
+	sensor->last_read = os.now_tz();
+
+	DEBUG_PRINT(F("Reading sensor "));
+	DEBUG_PRINTLN(sensor->name);
+
+	switch(sensor->type)
+	{
+		case SENSOR_SMT100_MODBUS_RTU_MOIS:
+		case SENSOR_SMT100_MODBUS_RTU_TEMP:
+			return read_sensor_ip(sensor);
+
+		case SENSOR_ANALOG_EXTENSION_BOARD:
+			return read_sensor_adc(sensor);
+
+		case SENSOR_OSPI_ANALOG_INPUTS:
+			return read_sensor_ospi(sensor);
+
+		default: return HTTP_RQT_NOT_RECEIVED;
+	}
+}
+
+/**
+ * @brief Update group values
+ * 
+ */
 void sensor_update_groups() {
 	Sensor_t *sensor = sensors;	
 
@@ -610,6 +688,41 @@ double calc_sensor_watering(uint prog) {
 	return result;
 }
 
+/**
+ * @brief calculate adjustment
+ * 
+ * @param nr 
+ * @return double 
+ */
+double calc_sensor_watering_by_nr(uint nr) {
+	double result = 1;
+	ProgSensorAdjust_t *p = progSensorAdjusts;
+
+	while (p) {
+		if (p->nr == nr) {
+			Sensor_t *sensor = sensor_by_nr(p->sensor);
+			if (sensor && sensor->enable && sensor->data_ok) {
+
+				double res = 0;
+				switch(p->type) {
+					case PROG_NONE:        res = 1; break;
+					case PROG_LINEAR:      res = calc_linear(p, sensor); break;
+					case PROG_DIGITAL_MIN: res = calc_digital_min(p, sensor); break;
+					case PROG_DIGITAL_MAX: res = calc_digital_max(p, sensor); break;
+					default:               res = 0; 
+				}
+
+				result = result * res;
+			}
+			break;
+		}
+
+		p = p->next;
+	}
+
+	return result;
+}
+
 int prog_adjust_define(uint nr, uint type, uint sensor, uint prog, double factor1, double factor2, double min, double max) {
 	ProgSensorAdjust_t *p = progSensorAdjusts;
 
@@ -678,13 +791,60 @@ int prog_adjust_delete(uint nr) {
 }
 
 void prog_adjust_save() {
+	DEBUG_PRINTLN("sensor_save1");
+	if (!progSensorAdjusts && file_exists(PROG_SENSOR_FILENAME))
+		remove_file(PROG_SENSOR_FILENAME);
+	
+	DEBUG_PRINTLN("sensor_save2");
 
+	ulong pos = 0;
+	ProgSensorAdjust_t *pa = progSensorAdjusts;
+	while (pa) {
+		DEBUG_PRINTLN("sensor_save3");
+		file_write_block(PROG_SENSOR_FILENAME, pa, pos, PROGSENSOR_STORE_SIZE);
+		pa = pa->next;
+		pos += PROGSENSOR_STORE_SIZE; 
+		DEBUG_PRINTLN("sensor_save4");
+	}
+	DEBUG_PRINTLN("sensor_save5");
 }
 
 void prog_adjust_load() {
+	DEBUG_PRINTLN("prog_adjust_load");
+	progSensorAdjusts = NULL;
+	if (!file_exists(PROG_SENSOR_FILENAME))
+		return;
 
+	DEBUG_PRINTLN("prog_adjust_load2");
+
+	ulong pos = 0;
+	ProgSensorAdjust_t *last = NULL;
+	while (true) {
+		ProgSensorAdjust_t *pa = new ProgSensorAdjust_t;
+		memset(pa, 0, sizeof(ProgSensorAdjust_t));
+		file_read_block (PROG_SENSOR_FILENAME, pa, pos, PROGSENSOR_STORE_SIZE);
+		if (!pa->nr || !pa->type) {
+			DEBUG_PRINTLN("prog_adjust_load3");
+
+			delete pa;
+			break;
+		}
+		if (!last) progSensorAdjusts = pa;
+		else last->next = pa;
+		last = pa;
+		pa->next = NULL;
+		pos += PROGSENSOR_STORE_SIZE;
+		DEBUG_PRINTLN("prog_adjust_load4");
+	}
+	DEBUG_PRINTLN("prog_adjust_load5");
 }
 
-void prog_adjust_count() {
-	
+uint prog_adjust_count() {
+	uint count = 0;
+	ProgSensorAdjust_t *pa = progSensorAdjusts;
+	while (pa) {
+		count++;
+		pa = pa->next;
+	}
+	return count;
 }

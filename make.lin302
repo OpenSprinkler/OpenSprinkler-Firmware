@@ -10,6 +10,7 @@ LIBS = . \
   /data/libs/SSD1306 \
   /data/libs/rc-switch \
   /data/libs/pubsubclient \
+  /data/libs/ADS1015 \
 
 ESP_ROOT = /data/esp8266_3.0.2/
 ESPCORE_VERSION = 302
