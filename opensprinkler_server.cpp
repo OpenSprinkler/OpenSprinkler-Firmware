@@ -1197,6 +1197,11 @@ void server_json_controller(OTF_PARAMS_DEF) {
 void server_home(OTF_PARAMS_DEF)
 {
 	rewind_ether_buffer();
+#if defined(ESP8266)
+	print_header(OTF_PARAMS,false,strlen(ether_buffer));
+#else
+	print_header(false);
+#endif
 	bfill.emit_p(PSTR("<!DOCTYPE html><html><head>$F</head><body><script>"), htmlMobileHeader);
 	// send server variables and javascript packets
 	bfill.emit_p(PSTR("var ver=$D,ipas=$D;</script>"),
@@ -1204,11 +1209,6 @@ void server_home(OTF_PARAMS_DEF)
 
 	bfill.emit_p(PSTR("<script src=\"$O/home.js\"></script></body></html>"), SOPT_JAVASCRIPTURL);
 
-#if defined(ESP8266)
-	print_header(OTF_PARAMS,false,strlen(ether_buffer));
-#else
-	print_header(false);
-#endif
 	handle_return(HTML_OK);
 }
 

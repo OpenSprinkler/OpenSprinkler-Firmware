@@ -34,9 +34,9 @@ id('butt').innerHTML='Go to '+ip;id('butt').disabled=false;
 id('butt').onclick=function rd(){window.open('http://'+ip);}
 clearInterval(tci);
 }
-}    
+}
 xhr.open('GET', 'jtap', true); xhr.send();
-}  
+}
 function sf() {
 id('msg').innerHTML='';
 if(id('ssid').value.length==0) {alert("SSID is empty!"); return;}
@@ -52,7 +52,6 @@ var comm='ccap?ssid='+encodeURIComponent(id('ssid').value)+'&pass='+encodeURICom
 xhr.open('GET', comm, true); xhr.send();
 id('butt').disabled=true;id('ssid').disabled=true;id('pass').disabled=true;
 }
-
 function loadSSIDs() {
 var xhr=new XMLHttpRequest();
 xhr.onreadystatechange=function() {
@@ -151,7 +150,7 @@ const char sta_update_html[] PROGMEM = R"(<head>
 </div>
 <div data-role='footer' data-theme='c'>
 <p style='font-weight:normal;'>&copy; OpenSprinkler (<a href='http://www.opensprinkler.com' target='_blank' style='text-decoration:none'>www.opensprinkler.com</a>)</p>
-</div>  
+</div>
 </div>
 <script>
 function id(s) {return document.getElementById(s);}
