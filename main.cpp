@@ -983,7 +983,7 @@ void do_loop()
 
 				if (dhcp_timeout > 0 && !check_enc28j60()) { //ENC28J60 REGISTER CHECK!!
 					DEBUG_PRINT(F("Reconnect"));
-					eth.resetEther();
+					//eth.resetEther();
 	
 					// todo: lwip add timeout
 					int n = os.iopts[IOPT_USE_DHCP]?30:2;

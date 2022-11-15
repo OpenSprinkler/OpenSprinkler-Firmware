@@ -1664,7 +1664,7 @@ void server_json_log() {
 		while(true) {
 		#if defined(ESP8266)
 			// do not use file.readBytes or readBytesUntil because it's very slow
-			int res = file_fgets(file, tmp_buffer, TMP_BUFFER_SIZE);
+			res = file_fgets(file, tmp_buffer, TMP_BUFFER_SIZE);
 			if (res <= 0) {
 				file.close();
 				break;
@@ -1871,7 +1871,7 @@ void server_sensor_get() {
 	print_json_header(false);
 #endif
 
-	bfill.emit_p(PSTR("{\"nr\":$D,\"type\":$D,\"group\":$D,\"name\":\"$S\",\"ip\":$L,\"port\":$D,\"id\":$D,\"ri\":$D,\"lnd\":$L,\"ld\":$E,\"enable\":$D,\"log\":$D,\"last\":$L}"),
+	bfill.emit_p(PSTR("{\"nr\":$D,\"type\":$D,\"group\":$D,\"name\":\"$S\",\"ip\":$L,\"port\":$D,\"id\":$D,\"ri\":$D,\"nativedata\":$L,\"data\":$E,\"enable\":$D,\"log\":$D,\"last\":$L}"),
 		sensor->nr, 
 		sensor->type,
 		sensor->group,
@@ -1924,7 +1924,7 @@ void server_sensor_readnow() {
 	print_json_header(false);
 #endif
 
-	bfill.emit_p(PSTR("{\"nr\":$D,\"status\":$D,\"lnd\":$L,\"ld\":$E}"),
+	bfill.emit_p(PSTR("{\"nr\":$D,\"status\":$D,\"nativedata\":$L,\"data\":$E}"),
 		sensor->nr, 
 		status,
 		sensor->last_native_data,
@@ -1939,10 +1939,10 @@ void server_sensor_readnow() {
  */
 void server_sensor_list() {
 #if defined(ESP8266)
-	char *p = NULL;
+	//char *p = NULL;
 	if(!process_password()) return;
 #else  
-	char *p = get_buffer;
+	//char *p = get_buffer;
 #endif
 
 	DEBUG_PRINTLN(F("server_sensor_list"));
@@ -1962,7 +1962,7 @@ void server_sensor_list() {
 	bfill.emit_p(PSTR("\"sensors\":["));
 	for (int i = 0; i < count; i++) {
 		Sensor_t *sensor = sensor_by_idx(i);
-		bfill.emit_p(PSTR("{\"nr\":$D,\"type\":$D,\"group\":$D,\"name\":\"$S\",\"ip\":$L,\"port\":$D,\"id\":$D,\"ri\":$D,\"lnd\":$L,\"ld\":$E,\"enable\":$D,\"log\":$D,\"last\":$L}"),
+		bfill.emit_p(PSTR("{\"nr\":$D,\"type\":$D,\"group\":$D,\"name\":\"$S\",\"ip\":$L,\"port\":$D,\"id\":$D,\"ri\":$D,\"nativedata\":$L,\"data\":$E,\"enable\":$D,\"log\":$D,\"last\":$L}"),
 			sensor->nr, 
 			sensor->type,
 			sensor->group,
@@ -2063,7 +2063,7 @@ void server_sensorlog_list() {
 		
 		if (count > 0)
 			bfill.emit_p(PSTR(","));
-		bfill.emit_p(PSTR("{\"nr\":$D,\"type\":$D,\"time\":$L,\"native_data\":$L,\"data\":$E}"),
+		bfill.emit_p(PSTR("{\"nr\":$D,\"type\":$D,\"time\":$L,\"nativedata\":$L,\"data\":$E}"),
 			sensorlog.nr,          //sensor-nr
 			sensor_type,           //sensor-type
 			sensorlog.time,        //timestamp
@@ -2090,10 +2090,10 @@ void server_sensorlog_list() {
  */
 void server_sensorlog_clear() {
 #if defined(ESP8266)
-	char *p = NULL;
+	//char *p = NULL;
 	if(!process_password()) return;
 #else  
-	char *p = get_buffer;
+	//char *p = get_buffer;
 #endif
 
 	DEBUG_PRINTLN(F("server_sensorlog_clear"));

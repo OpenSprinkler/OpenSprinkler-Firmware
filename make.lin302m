@@ -6,13 +6,12 @@ LIBS = . \
   $(ESP_LIBS)/ESP8266WebServer \
   $(ESP_LIBS)/ESP8266mDNS \
   $(ESP_LIBS)/LittleFS \
-  /data/libs/lwIP_enc28j60 \
+  $(ESP_LIBS)/lwIP_enc28j60 \
   /data/libs/SSD1306 \
   /data/libs/rc-switch \
   /data/libs/pubsubclient \
-  /data/libs/ADS1X15 \
 
-ESP_ROOT = /data/esp8266_3.0.2/
+ESP_ROOT = /data/esp8266_3.0.2-master
 ESPCORE_VERSION = 302
 BUILD_ROOT = /data/opensprinkler-firmware/$(MAIN_NAME)
 
@@ -23,14 +22,12 @@ UPLOAD_VERB = -v
 # Uncomment the line below for OS3.0 revision 0: reset mode is ck
 # UPLOAD_RESET = ck
 
-FLASH_DEF = 4M2M
+FLASH_DEF = 4M3M
 FLASH_MODE = dio
 FLASH_SPEED = 80
 F_CPU = 160000000L
 
 BOARD = generic
-board_build.filesystem = littlefs
-FS_TYPE = littlefs
 
 EXCLUDE_DIRS = ./build-1284
 

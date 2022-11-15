@@ -24,6 +24,7 @@
 
 #if defined(ARDUINO)
 	#include <Arduino.h>
+	#include <sys/stat.h>
 #else // headers for RPI/BBB
 	#include <stdio.h>
 	#include <limits.h>
@@ -32,15 +33,16 @@
 #endif
 #include "defines.h"
 #include "utils.h"
-#include <sys/stat.h>
-#include <SparkFun_ADS1015_Arduino_Library.h>
+#include <ADS1X15.h>
 
 //Sensor types:
 #define SENSOR_NONE                       0   //None or deleted sensor
 #define SENSOR_SMT100_MODBUS_RTU_MOIS     1   //Truebner SMT100 RS485 Modbus RTU over TCP, moisture mode
 #define SENSOR_SMT100_MODBUS_RTU_TEMP     2   //Truebner SMT100 RS485 Modbus RTU over TCP, temperature mode
-#define SENSOR_ANALOG_EXTENSION_BOARD     10  //New OpenSprinkler analog extension board 2xADS1015 48/49
-#define SENSOR_OSPI_ANALOG_INPUTS         20  //Old OSPi analog input
+#define SENSOR_ANALOG_EXTENSION_BOARD     10  //New OpenSprinkler analog extension board 2xADS1015 48/49 - voltage mode 0..4V
+#define SENSOR_SMT50_MOIS                 11  //New OpenSprinkler analog extension board 2xADS1015 48/49 - SMT50 VWC [%] = (U * 50) : 3
+#define SENSOR_SMT50_TEMP                 12  //New OpenSprinkler analog extension board 2xADS1015 48/49 - SMT50 T [°C] = (U – 0,5) * 100
+//#define SENSOR_OSPI_ANALOG_INPUTS         20  //Old OSPi analog input
 //#define SENSOR_REMOTE                     100 // Remote sensor of an remote opensprinkler
 
 #define SENSOR_GROUP_MIN               1000   //Sensor group with min value
@@ -110,12 +112,6 @@ typedef struct ProgSensorAdjust {
 	ProgSensorAdjust *next;
 } ProgSensorAdjust_t;
 #define PROGSENSOR_STORE_SIZE (sizeof(ProgSensorAdjust_t)-sizeof(ProgSensorAdjust_t*))
-
-//All sensors:
-static Sensor_t *sensors = NULL;
-
-//Program sensor data 
-static ProgSensorAdjust_t *progSensorAdjusts = NULL;
 
 //Utils:
 uint16_t CRC16 (byte buf[], int len);

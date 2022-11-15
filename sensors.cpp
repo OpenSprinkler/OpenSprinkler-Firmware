@@ -26,6 +26,12 @@
 #include "OpenSprinkler.h"
 #include "sensors.h"
 
+//All sensors:
+static Sensor_t *sensors = NULL;
+
+//Program sensor data 
+static ProgSensorAdjust_t *progSensorAdjusts = NULL;
+
  uint16_t CRC16 (byte buf[], int len) {
 	uint16_t crc = 0xFFFF;
   
@@ -278,10 +284,10 @@ int read_sensor_adc(Sensor_t *sensor) {
 	if (!sensor || !sensor->enable) return HTTP_RQT_NOT_RECEIVED;
 
 	//Init + Detect:
-	ADS1015 adc;
-	bool active = adc.begin(sensor->port);
+	ADS1015 adc(sensor->port);
+	bool active = adc.begin();
 	if (active)
-		adc.setGain(ADS1015_CONFIG_PGA_1);
+		adc.setGain(1);
 	DEBUG_PRINT(F("adc sensor found="));
 	DEBUG_PRINTLN(active);
 
@@ -289,8 +295,16 @@ int read_sensor_adc(Sensor_t *sensor) {
 		return HTTP_RQT_NOT_RECEIVED;
 
 	//Read values:
-	sensor->last_native_data = adc.getSingleEnded(sensor->id);
-	sensor->last_data = adc.getSingleEndedMillivolts(sensor->id);
+	sensor->last_native_data = adc.readADC(sensor->id);
+	sensor->last_data = adc.toVoltage(sensor->last_native_data);
+
+	if (sensor->type == SENSOR_SMT50_MOIS) { // SMT50 VWC [%] = (U * 50) : 3
+		sensor->last_data = (sensor->last_data * 50) / 3;
+	}
+	if (sensor->type == SENSOR_SMT50_TEMP) { // SMT50 T [°C] = (U – 0,5) * 100
+		sensor->last_data = (sensor->last_data - 0.5) * 100;
+	}
+
 	sensor->data_ok = true;
 
 	DEBUG_PRINT(F("adc sensor values: "));
@@ -469,10 +483,12 @@ int read_sensor(Sensor_t *sensor) {
 			return read_sensor_ip(sensor);
 
 		case SENSOR_ANALOG_EXTENSION_BOARD:
+		case SENSOR_SMT50_MOIS: //SMT50 VWC [%] = (U * 50) : 3
+		case SENSOR_SMT50_TEMP: //SMT50 T [°C] = (U – 0,5) * 100
 			return read_sensor_adc(sensor);
 
-		case SENSOR_OSPI_ANALOG_INPUTS:
-			return read_sensor_ospi(sensor);
+		//case SENSOR_OSPI_ANALOG_INPUTS:
+		//	return read_sensor_ospi(sensor);
 
 		default: return HTTP_RQT_NOT_RECEIVED;
 	}
@@ -491,7 +507,7 @@ void sensor_update_groups() {
 			case SENSOR_GROUP_MAX:
 			case SENSOR_GROUP_AVG:
 			case SENSOR_GROUP_SUM: {
-				int nr = sensor->nr;
+				uint nr = sensor->nr;
 				Sensor_t *group = sensors;
 				double value = 0;
 				int n = 0;

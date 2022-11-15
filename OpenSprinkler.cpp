@@ -25,6 +25,7 @@
 #include "opensprinkler_server.h"
 #include "gpio.h"
 #include "testmode.h"
+#include "images.h"
 
 /** Declare static data members */
 OSMqtt OpenSprinkler::mqtt;
