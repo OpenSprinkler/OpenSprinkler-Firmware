@@ -22,9 +22,9 @@
 #include <stdlib.h>
 #include "defines.h"
 #include "utils.h"
-#include "sensors.h"
 #include "program.h"
 #include "OpenSprinkler.h"
+#include "sensors.h"
 
  uint16_t CRC16 (byte buf[], int len) {
 	uint16_t crc = 0xFFFF;
@@ -136,12 +136,10 @@ int sensor_define(uint nr, char *name, uint type, uint group, uint32_t ip, uint 
  * 
  */
 void sensor_load() {
-	DEBUG_PRINTLN("sensor_load");
+	DEBUG_PRINTLN(F("sensor_load"));
 	sensors = NULL;
 	if (!file_exists(SENSOR_FILENAME))
 		return;
-
-	DEBUG_PRINTLN("sensor_load2");
 
 	ulong pos = 0;
 	Sensor_t *last = NULL;
@@ -150,8 +148,6 @@ void sensor_load() {
 		memset(sensor, 0, sizeof(Sensor_t));
 		file_read_block (SENSOR_FILENAME, sensor, pos, SENSOR_STORE_SIZE);
 		if (!sensor->nr || !sensor->type) {
-			DEBUG_PRINTLN("sensor_load3");
-
 			delete sensor;
 			break;
 		}
@@ -160,9 +156,7 @@ void sensor_load() {
 		last = sensor;
 		sensor->next = NULL;
 		pos += SENSOR_STORE_SIZE;
-		DEBUG_PRINTLN("sensor_load4");
 	}
-	DEBUG_PRINTLN("sensor_load5");
 }
 
 /**
@@ -170,25 +164,21 @@ void sensor_load() {
  * 
  */
 void sensor_save() {
-	DEBUG_PRINTLN("sensor_save1");
+	DEBUG_PRINTLN(F("sensor_save"));
 	if (!sensors && file_exists(SENSOR_FILENAME))
 		remove_file(SENSOR_FILENAME);
 	
-	DEBUG_PRINTLN("sensor_save2");
-
 	ulong pos = 0;
 	Sensor_t *sensor = sensors;
 	while (sensor) {
-		DEBUG_PRINTLN("sensor_save3");
 		file_write_block(SENSOR_FILENAME, sensor, pos, SENSOR_STORE_SIZE);
 		sensor = sensor->next;
 		pos += SENSOR_STORE_SIZE; 
-		DEBUG_PRINTLN("sensor_save4");
 	}
-	DEBUG_PRINTLN("sensor_save5");
 }
 
 uint sensor_count() {
+	DEBUG_PRINTLN(F("sensor_count"));
 	Sensor_t *sensor = sensors;
 	uint count = 0;
 	while (sensor) {
@@ -199,6 +189,7 @@ uint sensor_count() {
 }
 
 Sensor_t *sensor_by_nr(uint nr) {
+	DEBUG_PRINTLN(F("sensor_by_nr"));
 	Sensor_t *sensor = sensors;
 	while (sensor) {
 		if (sensor->nr == nr) 
@@ -209,6 +200,7 @@ Sensor_t *sensor_by_nr(uint nr) {
 }
 
 Sensor_t *sensor_by_idx(uint idx) {
+	DEBUG_PRINTLN(F("sensor_by_idx"));
 	Sensor_t *sensor = sensors;
 	uint count = 0;
 	while (sensor) {
@@ -221,6 +213,7 @@ Sensor_t *sensor_by_idx(uint idx) {
 }
 
 void sensorlog_add(SensorLog_t *sensorlog) {
+	DEBUG_PRINTLN(F("sensorlog_add"));
 	file_write_block(SENSORLOG_FILENAME, sensorlog, file_size(SENSORLOG_FILENAME), SENSORLOG_STORE_SIZE);
 }
 
@@ -237,10 +230,14 @@ void sensorlog_add(Sensor_t *sensor, ulong time) {
 
 
 ulong sensorlog_size() {
-	return file_size(SENSORLOG_FILENAME) / SENSORLOG_STORE_SIZE;
+	DEBUG_PRINT(F("sensorlog_size "));
+	ulong size = file_size(SENSORLOG_FILENAME) / SENSORLOG_STORE_SIZE;
+	DEBUG_PRINTLN(size);
+	return size;
 }
 
 void sensorlog_clear_all() {
+	DEBUG_PRINTLN(F("sensorlog_clear_all"));
 	remove_file(SENSORLOG_FILENAME);
 }
 
@@ -250,11 +247,13 @@ SensorLog_t *sensorlog_load(ulong idx) {
 }
 
 SensorLog_t *sensorlog_load(ulong idx, SensorLog_t* sensorlog) {
+	DEBUG_PRINTLN(F("sensorlog_load"));
 	file_read_block(SENSORLOG_FILENAME, sensorlog, idx * SENSORLOG_STORE_SIZE, SENSORLOG_STORE_SIZE);
 	return sensorlog;
 }
 
 void read_all_sensors() {
+	DEBUG_PRINTLN(F("read_all_sensors"));
 	if (!sensors || os.status.network_fails>0 || os.iopts[IOPT_REMOTE_EXT_MODE]) return;
 
 	ulong time = os.now_tz();
@@ -275,46 +274,36 @@ void read_all_sensors() {
  * Read ADS1015 sensors
 */
 int read_sensor_adc(Sensor_t *sensor) {
+	DEBUG_PRINTLN(F("read_sensor_adc"));
 	if (!sensor || !sensor->enable) return HTTP_RQT_NOT_RECEIVED;
 
 	//Init + Detect:
-	ADCSensor_t *adc = adcSensors;
-	while (adc) {
-		if (adc->i2c == sensor->port) { //0x48 / 0x49
-			break;
-		}
-		adc = adc->next;
-	}
+	ADS1015 adc;
+	bool active = adc.begin(sensor->port);
+	if (active)
+		adc.setGain(ADS1015_CONFIG_PGA_1);
+	DEBUG_PRINT(F("adc sensor found="));
+	DEBUG_PRINTLN(active);
 
-	if (!adc) {
-		adc = new ADCSensor_t;
-		adc->i2c = sensor->port;
-		adc->active = adc->adc.begin(adc->i2c);
-		adc->next = adcSensors;
-		adcSensors = adc;
-	}
-
-	if (!adc->active)
+	if (!active)
 		return HTTP_RQT_NOT_RECEIVED;
 
-
 	//Read values:
-	sensor->last_native_data = adc->adc.getSingleEnded(sensor->id);
-	sensor->last_data = adc->adc.getSingleEndedMillivolts(sensor->id);
+	sensor->last_native_data = adc.getSingleEnded(sensor->id);
+	sensor->last_data = adc.getSingleEndedMillivolts(sensor->id);
 	sensor->data_ok = true;
 
-	DEBUG_PRINT(F("Sensor "));
-	DEBUG_PRINT(sensor->nr);
-	DEBUG_PRINT(F(" returned "));
-	DEBUG_PRINT(F(" native: "));
+	DEBUG_PRINT(F("adc sensor values: "));
 	DEBUG_PRINT(sensor->last_native_data);
-	DEBUG_PRINT(F(" effective: "));
+	DEBUG_PRINT(",");
 	DEBUG_PRINTLN(sensor->last_data);
+
 
 	return HTTP_RQT_SUCCESS;
 }
 
 int read_sensor_ospi(Sensor_t *sensor) {
+	DEBUG_PRINTLN(F("read_sensor_ospi"));
 	if (!sensor || !sensor->enable) return HTTP_RQT_NOT_RECEIVED;
 
 	//currently not implemented 
@@ -791,31 +780,23 @@ int prog_adjust_delete(uint nr) {
 }
 
 void prog_adjust_save() {
-	DEBUG_PRINTLN("sensor_save1");
 	if (!progSensorAdjusts && file_exists(PROG_SENSOR_FILENAME))
 		remove_file(PROG_SENSOR_FILENAME);
-	
-	DEBUG_PRINTLN("sensor_save2");
 
 	ulong pos = 0;
 	ProgSensorAdjust_t *pa = progSensorAdjusts;
 	while (pa) {
-		DEBUG_PRINTLN("sensor_save3");
 		file_write_block(PROG_SENSOR_FILENAME, pa, pos, PROGSENSOR_STORE_SIZE);
 		pa = pa->next;
 		pos += PROGSENSOR_STORE_SIZE; 
-		DEBUG_PRINTLN("sensor_save4");
 	}
-	DEBUG_PRINTLN("sensor_save5");
 }
 
 void prog_adjust_load() {
-	DEBUG_PRINTLN("prog_adjust_load");
+	DEBUG_PRINTLN(F("prog_adjust_load"));
 	progSensorAdjusts = NULL;
 	if (!file_exists(PROG_SENSOR_FILENAME))
 		return;
-
-	DEBUG_PRINTLN("prog_adjust_load2");
 
 	ulong pos = 0;
 	ProgSensorAdjust_t *last = NULL;
@@ -824,8 +805,6 @@ void prog_adjust_load() {
 		memset(pa, 0, sizeof(ProgSensorAdjust_t));
 		file_read_block (PROG_SENSOR_FILENAME, pa, pos, PROGSENSOR_STORE_SIZE);
 		if (!pa->nr || !pa->type) {
-			DEBUG_PRINTLN("prog_adjust_load3");
-
 			delete pa;
 			break;
 		}
@@ -834,9 +813,7 @@ void prog_adjust_load() {
 		last = pa;
 		pa->next = NULL;
 		pos += PROGSENSOR_STORE_SIZE;
-		DEBUG_PRINTLN("prog_adjust_load4");
 	}
-	DEBUG_PRINTLN("prog_adjust_load5");
 }
 
 uint prog_adjust_count() {

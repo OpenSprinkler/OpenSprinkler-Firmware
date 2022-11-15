@@ -23,13 +23,14 @@ UPLOAD_VERB = -v
 # Uncomment the line below for OS3.0 revision 0: reset mode is ck
 # UPLOAD_RESET = ck
 
-FLASH_DEF = 4M3M
+FLASH_DEF = 4M2M
 FLASH_MODE = dio
 FLASH_SPEED = 80
 F_CPU = 160000000L
 
 BOARD = generic
 board_build.filesystem = littlefs
+FS_TYPE = littlefs
 
 EXCLUDE_DIRS = ./build-1284
 

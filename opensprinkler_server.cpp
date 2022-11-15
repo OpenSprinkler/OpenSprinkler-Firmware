@@ -1757,7 +1757,7 @@ void server_sensor_config() {
 	char *p = get_buffer;
 #endif
 
-	DEBUG_PRINTLN(PSTR("server_sensor_config"));
+	DEBUG_PRINTLN(F("server_sensor_config"));
 
 	if (!findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("nr"), true))
 		handle_return(HTML_DATA_MISSING);
@@ -1823,7 +1823,7 @@ void server_set_sensor_address() {
 	char *p = get_buffer;
 #endif
 
-	DEBUG_PRINTLN(PSTR("server_set_sensor_address"));
+	DEBUG_PRINTLN(F("server_set_sensor_address"));
 
 	if (!findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("nr"), true))
 		handle_return(HTML_DATA_MISSING);
@@ -1851,7 +1851,7 @@ void server_sensor_get() {
 	char *p = get_buffer;
 #endif
 
-	DEBUG_PRINTLN(PSTR("server_sensor_get"));
+	DEBUG_PRINTLN(F("server_sensor_get"));
 
 	if (!findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("nr"), true))
 		handle_return(HTML_DATA_MISSING);
@@ -1902,7 +1902,7 @@ void server_sensor_readnow() {
 	char *p = get_buffer;
 #endif
 
-	DEBUG_PRINTLN(PSTR("server_sensor_readnow"));
+	DEBUG_PRINTLN(F("server_sensor_readnow"));
 
 	if (!findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("nr"), true))
 		handle_return(HTML_DATA_MISSING);
@@ -1945,8 +1945,8 @@ void server_sensor_list() {
 	char *p = get_buffer;
 #endif
 
-	DEBUG_PRINTLN(PSTR("server_sensor_list"));
-	DEBUG_PRINT(PSTR("server_count: "));
+	DEBUG_PRINTLN(F("server_sensor_list"));
+	DEBUG_PRINT(F("server_count: "));
 	DEBUG_PRINTLN(sensor_count());
 
 #if defined(ESP8266)
@@ -2004,7 +2004,7 @@ void server_sensorlog_list() {
 #endif
 	ulong log_size = sensorlog_size();
 
-	DEBUG_PRINTLN(PSTR("server_sensorlog_list"));
+	DEBUG_PRINTLN(F("server_sensorlog_list"));
 
 	//start / max:
 	ulong startAt = 0;
@@ -2096,7 +2096,7 @@ void server_sensorlog_clear() {
 	char *p = get_buffer;
 #endif
 
-	DEBUG_PRINTLN(PSTR("server_sensorlog_clear"));
+	DEBUG_PRINTLN(F("server_sensorlog_clear"));
 
 #if defined(ESP8266)
 	rewind_ether_buffer();
@@ -2126,7 +2126,7 @@ void server_sensorprog_config() {
 	char *p = get_buffer;
 #endif
 
-	DEBUG_PRINTLN(PSTR("server_sensorprog_config"));
+	DEBUG_PRINTLN(F("server_sensorprog_config"));
 	//uint nr, uint type, uint sensor, uint prog, double factor1, double factor2, double min, double max
 
 	if (!findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("nr"), true))
@@ -2183,19 +2183,19 @@ void server_sensorprog_calc() {
         char *p = get_buffer;
 #endif
 
-        DEBUG_PRINTLN(PSTR("server_sensorprog_calc"));
-        //uint nr or uint prog
+	DEBUG_PRINTLN(F("server_sensorprog_calc"));
+	//uint nr or uint prog
         
-        if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("nr"), true)) {
-	        uint nr = strtoul(tmp_buffer, NULL, 0); // Adjustment nr
-	        double adj = calc_sensor_watering_by_nr(nr);
+	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("nr"), true)) {
+		uint nr = strtoul(tmp_buffer, NULL, 0); // Adjustment nr
+		double adj = calc_sensor_watering_by_nr(nr);
 		bfill.emit_p(PSTR("{\"adjustment\":$E}"), adj);
 		handle_return(HTML_OK);	        
 	}
 	
-        if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("prog"), true)) {
-	        uint prog = strtoul(tmp_buffer, NULL, 0); // Adjustment nr
-	        double adj = calc_sensor_watering(prog);
+	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("prog"), true)) {
+		uint prog = strtoul(tmp_buffer, NULL, 0); // Adjustment nr
+    	double adj = calc_sensor_watering(prog);
 		bfill.emit_p(PSTR("{\"adjustment\":$E}"), adj);
 		handle_return(HTML_OK);
 	}

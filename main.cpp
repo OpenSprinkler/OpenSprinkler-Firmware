@@ -308,20 +308,15 @@ void do_setup() {
 	DEBUG_PRINTLN(F("started"));
 
 	os.begin();					 // OpenSprinkler init
-	DEBUG_PRINTLN("do_setup1...");
 	os.options_setup();  // Setup options
-	DEBUG_PRINTLN("do_setup2...");
 
 	pd.init();						// ProgramData init
-	DEBUG_PRINTLN("do_setup3...");
 
 	// set time using RTC if it exists
 	if(RTC.exists())	setTime(RTC.get());
-	DEBUG_PRINTLN("do_setup4...");
 
 	os.lcd_print_time(os.now_tz());  // display time to LCD
 	os.powerup_lasttime = os.now_tz();
-	DEBUG_PRINTLN("do_setup5...");
 
 #if !defined(ESP8266)
 	// enable WDT
@@ -349,7 +344,7 @@ void do_setup() {
 	os.apply_all_station_bits(); // reset station bits
 
 	os.button_timeout = LCD_BACKLIGHT_TIMEOUT;
-	DEBUG_PRINTLN("do_setup6...");
+
 	sensor_load();
 	prog_adjust_load();
 }
@@ -381,10 +376,10 @@ void do_setup() {
 	pd.init();						// ProgramData init
 
 	if (os.start_network()) {  // initialize network
-		DEBUG_PRINTLN("network established.");
+		DEBUG_PRINTLN(F("network established."));
 		os.status.network_fails = 0;
 	} else {
-		DEBUG_PRINTLN("network failed.");
+		DEBUG_PRINTLN(F("network failed."));
 		os.status.network_fails = 1;
 	}
 	os.status.req_network = 0;
@@ -987,7 +982,7 @@ void do_loop()
 					dhcp_renew(intf);
 
 				if (dhcp_timeout > 0 && !check_enc28j60()) { //ENC28J60 REGISTER CHECK!!
-					DEBUG_PRINT("Reconnect");
+					DEBUG_PRINT(F("Reconnect"));
 					eth.resetEther();
 	
 					// todo: lwip add timeout

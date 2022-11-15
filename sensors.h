@@ -111,18 +111,8 @@ typedef struct ProgSensorAdjust {
 } ProgSensorAdjust_t;
 #define PROGSENSOR_STORE_SIZE (sizeof(ProgSensorAdjust_t)-sizeof(ProgSensorAdjust_t*))
 
-typedef struct ADCSensor {
-	uint i2c;
-	byte active;
-	ADS1015 adc;
-	ADCSensor *next;
-} ADCSensor_t;
-
 //All sensors:
 static Sensor_t *sensors = NULL;
-
-//ADS1015 48+49:
-static ADCSensor_t *adcSensors = NULL;
 
 //Program sensor data 
 static ProgSensorAdjust_t *progSensorAdjusts = NULL;
