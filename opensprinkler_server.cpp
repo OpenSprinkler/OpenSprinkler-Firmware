@@ -1762,6 +1762,7 @@ void server_sensor_config() {
 	if (!findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("nr"), true))
 		handle_return(HTML_DATA_MISSING);
 	uint nr = strtoul(tmp_buffer, NULL, 0); // Sensor nr
+	if (nr == 0) handle_return(HTML_DATA_MISSING);
 
 	if (!findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("type"), true))
 		handle_return(HTML_DATA_MISSING);
@@ -2132,6 +2133,8 @@ void server_sensorprog_config() {
 	if (!findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("nr"), true))
 		handle_return(HTML_DATA_MISSING);
 	uint nr = strtoul(tmp_buffer, NULL, 0); // Adjustment nr
+	if (nr == 0)
+		handle_return(HTML_DATA_MISSING);
 
 	if (!findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("type"), true))
 		handle_return(HTML_DATA_MISSING);
@@ -2169,6 +2172,151 @@ void server_sensorprog_config() {
 	int res = prog_adjust_define(nr, type, sensor, prog, factor1, factor2, min, max);
 	res = res >= HTTP_RQT_SUCCESS?HTML_SUCCESS:(256+res);
 	handle_return(res);
+}
+
+/**
+ * se
+ * define a program adjustment
+*/
+void server_sensorprog_list() {
+#if defined(ESP8266)
+	char *p = NULL;
+	if(!process_password()) return;
+#else  
+	char *p = get_buffer;
+#endif
+
+	DEBUG_PRINTLN(F("server_sensorprog_list"));
+
+	uint nr = 0;
+	int prog = -1;
+
+	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("nr"), true))
+		nr = strtoul(tmp_buffer, NULL, 0);
+
+	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("prog"), true))
+		prog = strtoul(tmp_buffer, NULL, 0);
+
+#if defined(ESP8266)
+	rewind_ether_buffer();
+	print_json_header(false);
+#else
+	print_json_header(false);
+#endif
+
+	uint n = prog_adjust_count();
+	uint idx = 0;
+	uint count = 0;
+	while (idx < n) {
+		ProgSensorAdjust_t *p = prog_adjust_by_idx(idx++);
+		if (nr > 0 && p->nr != nr)
+			continue;
+		if (prog >= 0 && p->prog != prog)
+			continue;
+		count++;
+	}
+
+	bfill.emit_p(PSTR("{\"count\": $D,"), count);
+
+	bfill.emit_p(PSTR("\"progAdjust\": ["));
+	idx = 0;
+	count = 0;
+
+	while (idx < n) {
+		ProgSensorAdjust_t *p = prog_adjust_by_idx(idx++);
+		if (nr > 0 && p->nr != nr)
+			continue;
+		if (prog >= 0 && p->prog != prog)
+			continue;
+
+		if (count++ > 0)
+			bfill.emit_p(PSTR(","));
+		bfill.emit_p(PSTR("{\"nr\":$D,\"type\":$D,\"sensor\":$D,\"prog\":$D,\"factor1\":$E,\"factor2\":$E,\"min\":$E,\"max\":$E}"),
+			p->nr,          
+			p->type,
+			p->sensor,
+			p->prog,
+			p->factor1, 
+			p->factor2,
+			p->min,
+			p->max);
+			
+		// if available ether buffer is getting small
+		// send out a packet
+		if(available_ether_buffer() <= 0) {
+			send_packet();
+		}
+	}
+	bfill.emit_p(PSTR("]}"));
+	handle_return(HTML_OK);
+}
+
+const int sensor_types[] = {
+	SENSOR_SMT100_MODBUS_RTU_MOIS,
+	SENSOR_SMT100_MODBUS_RTU_TEMP,
+	SENSOR_ANALOG_EXTENSION_BOARD,
+	SENSOR_SMT50_MOIS,
+	SENSOR_SMT50_TEMP,
+	//SENSOR_OSPI_ANALOG_INPUTS,  
+	//SENSOR_REMOTE,              
+	SENSOR_GROUP_MIN,
+	SENSOR_GROUP_MAX,
+	SENSOR_GROUP_AVG,
+	SENSOR_GROUP_SUM,
+};
+
+const char* sensor_names[] = {
+	"Truebner SMT100 RS485 Modbus RTU over TCP, moisture mode",
+	"Truebner SMT100 RS485 Modbus RTU over TCP, temperature mode",
+	"OpenSprinkler analog extension board 2xADS1015 0x48/0x49 - voltage mode 0..4V",
+	"OpenSprinkler analog extension board 2xADS1015 0x48/0x49 - SMT50 moisture mode",
+	"OpenSprinkler analog extension board 2xADS1015 0x48/0x49 - SMT50 temperature mode",
+	//"OSPi analog input",
+	//"Remote sensor of an remote opensprinkler,
+	"Sensor group with min value",
+	"Sensor group with max value",
+	"Sensor group with avg value",
+	"Sensor group with sum value",
+};
+
+/**
+ * sf
+ * List supported sensor types
+ **/
+void server_sensor_types() {
+#if defined(ESP8266)
+        //char *p = NULL;
+        if(!process_password()) return;
+#else
+        //char *p = get_buffer;
+#endif
+
+	DEBUG_PRINTLN(F("server_sensor_types"));
+
+#if defined(ESP8266)
+	rewind_ether_buffer();
+	print_json_header(false);
+#else
+	print_json_header(false);
+#endif
+
+	bfill.emit_p(PSTR("{\"sensorTypes\":["));
+
+	for (int i = 0; i < sizeof(sensor_types)/sizeof(int); i++)
+	{
+		if (i > 0)
+			bfill.emit_p(PSTR(","));
+		bfill.emit_p(PSTR("{\"type\":$D,\"name\":\"$S\"}"), sensor_types[i], sensor_names[i]);
+		
+		// if available ether buffer is getting small
+		// send out a packet
+		if(available_ether_buffer() <= 0) {
+			send_packet();
+		}
+	}
+	bfill.emit_p(PSTR("]}"));
+
+	handle_return(HTML_OK);
 }
 
 /**
@@ -2293,6 +2441,8 @@ const char _url_keys[] PROGMEM =
 	"sn"
 	"sb"
 	"sd"
+	"se"
+	"sf"
 #if defined(ARDUINO)  
   "db"
 #endif	
@@ -2330,6 +2480,8 @@ URLHandler urls[] = {
 	server_sensorlog_clear,         // sn
 	server_sensorprog_config,    // sb
 	server_sensorprog_calc,      // sd
+	server_sensorprog_list,    // se
+	server_sensor_types,    // sf
 #if defined(ARDUINO)  
   server_json_debug,			// db
 #endif	

@@ -841,3 +841,23 @@ uint prog_adjust_count() {
 	}
 	return count;
 }
+
+ProgSensorAdjust_t *prog_adjust_by_nr(uint nr) {
+	ProgSensorAdjust_t *pa = progSensorAdjusts;
+	while (pa) {
+		if (pa->nr == nr) return pa;
+		pa = pa->next;
+	}
+	return NULL;
+}
+
+ProgSensorAdjust_t *prog_adjust_by_idx(uint idx) {
+	ProgSensorAdjust_t *pa = progSensorAdjusts;
+	int idxCounter = 0;
+	while (pa) {
+		if (idxCounter++ == idx) return pa;
+		pa = pa->next;
+	}
+	return NULL;
+}
+

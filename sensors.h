@@ -148,6 +148,8 @@ int prog_adjust_delete(uint nr);
 void prog_adjust_save();
 void prog_adjust_load();
 uint prog_adjust_count();
+ProgSensorAdjust_t *prog_adjust_by_nr(uint nr);
+ProgSensorAdjust_t *prog_adjust_by_idx(uint idx);
 double calc_sensor_watering(uint prog);
 double calc_sensor_watering_by_nr(uint nr);
 
