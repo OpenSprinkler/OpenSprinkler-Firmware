@@ -2076,7 +2076,7 @@ void OpenSprinkler::options_setup() {
 			if(mac!=NULL && isValidMAC(tmp_buffer)) { // check if bssid is valid MAC
 				*mac=0; // terminate MAC string
 				int chl = atoi(mac+1);
-				if(chl>=0 && chl<255) {
+				if(chl>=0 && chl<=255) {
 					str2mac(tmp_buffer, wifi_bssid);
 					wifi_channel = chl;
 				}

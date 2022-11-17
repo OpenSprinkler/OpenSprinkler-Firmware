@@ -4,8 +4,8 @@
 .ipt {font-size:14pt; height:28px;}
 </style>
 <caption><b>OpenSprinkler WiFi Config</caption><br><br>
-<table border=1 cellspacing=4 id='rd'>
-  <tr><td align='center'><b>Detected SSID</b></td><td align='center'><b>BSSID</b></td><td align='center'><b>Strength</b></td>
+<table border=1 cellspacing=6 id='rd'>
+  <tr><td align='center'><b>Detected SSID</b></td><td align='center'><b>BSSID</b></td><td align='center'><b>Signal</b></td>
     <td><b>Ch.</b></td></tr><tr><td>(Scanning...)</td></tr>
 </table>
 <br>
@@ -53,8 +53,11 @@ function sf() {
     }
   };
   var comm='ccap?ssid='+encodeURIComponent(id('ssid').value)+'&pass='+encodeURIComponent(id('pass').value);
-  if(id('bssid').value.length>0 && id('channel').value.length>0)
-    comm+='&extra='+encodeURIComponent(id('bssid').value+'@'+id('channel').value);
+  if(id('bssid').value.length>0) {    
+    if(id('channel').value.length>0) comm+='&extra='+encodeURIComponent(id('bssid').value+'@'+id('channel').value);
+    else comm+='&extra='+encodeURIComponent(id('bssid').value+'@0');
+  }
+    
   xhr.open('POST', comm, true); xhr.send();
   id('butt').disabled=true;id('ssid').disabled=true;id('pass').disabled=true;
   id('bssid').disabled=true;id('channel').disabled=true;

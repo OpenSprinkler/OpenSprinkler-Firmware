@@ -455,8 +455,6 @@ void do_loop()
 		} else {
 			led_blink_ms = LED_SLOW_BLINK;
 			if(os.sopt_load(SOPT_STA_BSSID_CHL).length()>0 && os.wifi_channel<255) {
-				DEBUG_PRINTLN(os.sopt_load(SOPT_STA_BSSID_CHL));
-				DEBUG_PRINTLN(os.wifi_channel);
 				start_network_sta(os.wifi_ssid.c_str(), os.wifi_pass.c_str(), (int32_t)os.wifi_channel, os.wifi_bssid);
 			}
 			else
@@ -474,8 +472,6 @@ void do_loop()
 	case OS_STATE_TRY_CONNECT:
 		led_blink_ms = LED_SLOW_BLINK;
 		if(os.sopt_load(SOPT_STA_BSSID_CHL).length()>0 && os.wifi_channel<255) {
-			DEBUG_PRINTLN(os.sopt_load(SOPT_STA_BSSID_CHL));
-			DEBUG_PRINTLN(os.wifi_channel);
 			start_network_sta_with_ap(os.wifi_ssid.c_str(), os.wifi_pass.c_str(), (int32_t)os.wifi_channel, os.wifi_bssid);
 		}
 		else

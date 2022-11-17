@@ -323,20 +323,20 @@ void on_ap_change_config(OTF_PARAMS_DEF) {
 		os.wifi_ssid = ssid;
 		os.wifi_pass = req.getQueryParameter("pass");
 		char *extra = req.getQueryParameter("extra");
-		if(extra!=NULL) { // bssid and channel are passed in
-			char *mac = strchr(extra, '@');
-			if(mac==NULL || !isValidMAC(extra)) { // check if bssid is valid MAC
+		if(extra!=NULL) { // bssid and channel are in the format of xx:xx:xx:xx:xx:xx@ch
+			char *mac = strchr(extra, '@'); // search for symbol @
+			if(mac==NULL || !isValidMAC(extra)) { // if not found or if MAC is invalid
 				otf_send_result(OTF_PARAMS, HTML_DATA_FORMATERROR, "bssid");
 				return;
 			}
-			int chl = atoi(mac+1);
-			if(!(chl>=0 && chl<255)) {
+			int chl = atoi(mac+1); // convert ch to integer
+			if(!(chl>=0 && chl<=255)) { // chl must be less than 255
 				otf_send_result(OTF_PARAMS, HTML_DATA_OUTOFBOUND, "channel");
 				return;
 			}
-			os.sopt_save(SOPT_STA_BSSID_CHL, extra);
+			DEBUG_PRINTLN(extra);
 			*mac=0; // terminate bssid string
-			str2mac(extra, os.wifi_bssid);
+			str2mac(extra, os.wifi_bssid); // update controller variables
 			os.wifi_channel = chl;
 
 		} else {
