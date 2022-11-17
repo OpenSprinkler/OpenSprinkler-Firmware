@@ -348,6 +348,7 @@ public:
 	static byte get_wifi_mode() { if (useEth) return WIFI_MODE_STA; else return wifi_testmode ? WIFI_MODE_STA : iopts[IOPT_WIFI_MODE];}
 	static byte wifi_testmode;
 	static String wifi_ssid, wifi_pass;
+	static byte wifi_bssid[6], wifi_channel;
 	static void config_ip();
 	static void save_wifi_ip();
 	static void reset_to_ap();

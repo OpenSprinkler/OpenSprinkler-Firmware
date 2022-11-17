@@ -495,3 +495,51 @@ bool isValidDate(uint16_t date) {
 	byte day = date & 31;
 	return isValidDate(month, day);
 }
+
+byte hex2dec(const char *hex) {
+	return strtol(hex, NULL, 16);
+}
+
+bool isHex(char c) {
+	if(c>='0' && c<='9') return true;
+	if(c>='a' && c<='f') return true;
+	if(c>='A' && c<='F') return true;
+	return false;
+}
+
+bool isValidMAC(const char *_mac) {
+	char mac[18], *hex;
+	strncpy(mac, _mac, 18);
+	mac[17] = 0;
+	byte count = 0;
+	hex = strtok(mac, ":");
+	if(strlen(hex)!=2) return false;
+	if(!isHex(hex[0]) || !isHex(hex[1])) return false;
+	count++;
+	while(true) {
+		hex = strtok(NULL, ":");
+		if(hex==NULL) break;
+		if(strlen(hex)!=2) return false;
+		if(!isHex(hex[0]) || !isHex(hex[1])) return false;
+		count++;
+		yield();
+	}
+	if(count!=6) return false;
+	else return true;
+}
+
+void str2mac(const char *_str, byte mac[]) {
+	char str[18], *hex;
+	strncpy(str, _str, 18);
+	str[17] = 0;
+	byte count=0;
+	hex = strtok(str, ":");
+	mac[count] = hex2dec(hex);
+	count++;
+	while(true) {
+		hex = strtok(NULL, ":");
+		if(hex==NULL) break;
+		mac[count++] = hex2dec(hex);
+		yield();
+	}
+}

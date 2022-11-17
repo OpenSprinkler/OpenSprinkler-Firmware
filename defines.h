@@ -249,7 +249,7 @@ enum {
 	SOPT_MQTT_OPTS,
 	SOPT_OTC_OPTS,
 	SOPT_DEVICE_NAME,
-	//SOPT_AP_PASS,
+	SOPT_STA_BSSID_CHL, // wifi extra info: bssid and channel
 	NUM_SOPTS // total number of string options
 };
 

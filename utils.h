@@ -59,6 +59,10 @@ void peel_http_header(char*);
 #define MIN_ENCODED_DATE date_encode(1,1)
 #define MAX_ENCODED_DATE date_encode(12, 31)
 bool isValidDate(uint16_t date);
+byte hex2dec(const char *hex);
+bool isHex(char c);
+bool isValidMAC(const char *_mac);
+void str2mac(const char *_str, byte mac[]);
 
 #if defined(ARDUINO)
 

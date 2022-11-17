@@ -255,6 +255,7 @@ void print_header(bool isJson=true)  {
 #endif
 
 #if defined(ESP8266)
+
 String two_digits(uint8_t x) {
 	return String(x/10) + (x%10);
 }
@@ -321,6 +322,26 @@ void on_ap_change_config(OTF_PARAMS_DEF) {
 	if(ssid!=NULL&&strlen(ssid)!=0) {
 		os.wifi_ssid = ssid;
 		os.wifi_pass = req.getQueryParameter("pass");
+		char *extra = req.getQueryParameter("extra");
+		if(extra!=NULL) { // bssid and channel are passed in
+			char *mac = strchr(extra, '@');
+			if(mac==NULL || !isValidMAC(extra)) { // check if bssid is valid MAC
+				otf_send_result(OTF_PARAMS, HTML_DATA_FORMATERROR, "bssid");
+				return;
+			}
+			int chl = atoi(mac+1);
+			if(!(chl>=0 && chl<255)) {
+				otf_send_result(OTF_PARAMS, HTML_DATA_OUTOFBOUND, "channel");
+				return;
+			}
+			os.sopt_save(SOPT_STA_BSSID_CHL, extra);
+			*mac=0; // terminate bssid string
+			str2mac(extra, os.wifi_bssid);
+			os.wifi_channel = chl;
+
+		} else {
+			os.sopt_save(SOPT_STA_BSSID_CHL, DEFAULT_EMPTY_STRING); // if extra is not present, write empty string
+		}
 		os.sopt_save(SOPT_STA_SSID, os.wifi_ssid.c_str());
 		os.sopt_save(SOPT_STA_PASS, os.wifi_pass.c_str());
 		otf_send_result(OTF_PARAMS, HTML_SUCCESS, nullptr);

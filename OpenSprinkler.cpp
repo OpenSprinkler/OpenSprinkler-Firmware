@@ -85,6 +85,8 @@ extern char ether_buffer[];
 
 	String OpenSprinkler::wifi_ssid="";
 	String OpenSprinkler::wifi_pass="";
+	byte OpenSprinkler::wifi_bssid[6]={0};
+	byte OpenSprinkler::wifi_channel=255;
 	byte OpenSprinkler::wifi_testmode = 0;
 #elif defined(ARDUINO)
 	LiquidCrystal OpenSprinkler::lcd;
@@ -388,14 +390,14 @@ const char *OpenSprinkler::sopts[] = {
 	DEFAULT_LOCATION,
 	DEFAULT_JAVASCRIPT_URL,
 	DEFAULT_WEATHER_URL,
-	DEFAULT_EMPTY_STRING,
-	DEFAULT_EMPTY_STRING,
-	DEFAULT_EMPTY_STRING,
-	DEFAULT_EMPTY_STRING,
-	DEFAULT_EMPTY_STRING,
-	DEFAULT_EMPTY_STRING,
+	DEFAULT_EMPTY_STRING, // SOPT_WEATHER_OPTS
+	DEFAULT_EMPTY_STRING, // SOPT_IFTTT_KEY
+	DEFAULT_EMPTY_STRING, // SOPT_STA_SSID
+	DEFAULT_EMPTY_STRING, // SOPT_STA_PASS
+	DEFAULT_EMPTY_STRING, // SOPT_MQTT_OPTS
+	DEFAULT_EMPTY_STRING, // SOPT_OTC_OPTS
 	DEFAULT_DEVICE_NAME,
-	DEFAULT_EMPTY_STRING,
+	DEFAULT_EMPTY_STRING, // SOPT_STA_BSSID_CHL
 };
 
 /** Weekday strings (stored in PROGMEM to reduce RAM usage) */
@@ -2068,6 +2070,18 @@ void OpenSprinkler::options_setup() {
 		#if defined(ESP8266)
 		wifi_ssid = sopt_load(SOPT_STA_SSID);
 		wifi_pass = sopt_load(SOPT_STA_PASS);
+		sopt_load(SOPT_STA_BSSID_CHL, tmp_buffer);
+		if(tmp_buffer[0]!=0) {
+			char *mac = strchr(tmp_buffer, '@');
+			if(mac!=NULL && isValidMAC(tmp_buffer)) { // check if bssid is valid MAC
+				*mac=0; // terminate MAC string
+				int chl = atoi(mac+1);
+				if(chl>=0 && chl<255) {
+					str2mac(tmp_buffer, wifi_bssid);
+					wifi_channel = chl;
+				}
+			}
+		}
 		parse_otc_config();
 		#endif
 		attribs_load();
