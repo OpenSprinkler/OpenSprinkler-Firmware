@@ -1,19 +1,19 @@
 const char ap_home_html[] PROGMEM = R"(<head><title>OpenSprinkler WiFi Config</title><meta name='viewport' content='width=device-width, initial-scale=1'></head>
 <body>
-<style> table, th, td {	border-collapse: collapse;}
-.ipt {font-size:14pt; height:28px;}
+<style> table, th, td { padding:4px; border-collapse: collapse;}
+.ipt {font-size:12pt;height:28px;}
 </style>
 <caption><b>OpenSprinkler WiFi Config</caption><br><br>
-<table border=1 cellspacing=6 id='rd'>
+<table border=1 id='rd'>
 <tr><td align='center'><b>Detected SSID</b></td><td align='center'><b>BSSID</b></td><td align='center'><b>Signal</b></td>
 <td><b>Ch.</b></td></tr><tr><td>(Scanning...)</td></tr>
 </table>
 <br>
-<table cellspacing=16>
-<tr><td><b>SSID</b>:</td><td><input type='text' id='ssid' class='ipt'></td></tr>
-<tr><td><b>Password</b>:</td><td><input type='password' id='pass' class='ipt'></td></tr>
-<tr><td><b>BSSID</b>:</td><td><input type='text' id='bssid' class='ipt' placeholder='(optional)'></td></tr>
-<tr><td><b>Channel</b>:<td><input type='text' id='channel' class='ipt' placeholder='(optional)'></td></tr>
+<table>
+<tr><td><b>SSID</b>:</td><td><input type='text' id='ssid' class='ipt' size=18></td></tr>
+<tr><td><b>Password</b>:</td><td><input type='password' id='pass' class='ipt' size=18></td></tr>
+<tr><td><b>BSSID</b>:</td><td><input type='text' id='bssid' class='ipt' size=18 placeholder='(optional)'></td></tr>
+<tr><td><b>Channel</b>:<td><input type='text' id='channel' class='ipt' size=18 placeholder='(optional)'></td></tr>
 <tr><td colspan=2><p id='msg'></p></td></tr>
 <tr><td></td></td><td><button type='button' id='butt' onclick='sf();' style='height:48px;width:180px;font-size:16px'><b>Submit</b></button></td></tr>
 </table>
@@ -62,6 +62,7 @@ xhr.open('POST', comm, true); xhr.send();
 id('butt').disabled=true;id('ssid').disabled=true;id('pass').disabled=true;
 id('bssid').disabled=true;id('channel').disabled=true;
 }
+function truncateStr(s,n) {if(s.length<=n) return s; else return s.slice(0,n)+'...';}
 function loadSSIDs() {
 var xhr=new XMLHttpRequest();
 xhr.onreadystatechange=function() {
@@ -75,7 +76,7 @@ for(i=0;i<ssids.length;i++) {
 var strength= ssids[i][2]>-71?'Ok':(ssids[i][2]>-81?'Weak':'Poor');
 var row=id('rd').insertRow(-1);
 row.innerHTML ="<tr><td><input type='radio' name='ssids' onclick=sel("+i+")>"
-+ssids[i][0]+"</td><td>"+ssids[i][1]+"</td><td>"+ssids[i][2]+" dbm ("+strength+")</td><td align='center'>"+ssids[i][3]+"</td></tr>";
++truncateStr(ssids[i][0],15)+"</td><td>"+ssids[i][1]+"</td><td>"+ssids[i][2]+" dbm ("+strength+")</td><td align='center'>"+ssids[i][3]+"</td></tr>";
 }
 };
 }

@@ -334,7 +334,6 @@ void on_ap_change_config(OTF_PARAMS_DEF) {
 				otf_send_result(OTF_PARAMS, HTML_DATA_OUTOFBOUND, "channel");
 				return;
 			}
-			DEBUG_PRINTLN(extra);
 			*mac=0; // terminate bssid string
 			str2mac(extra, os.wifi_bssid); // update controller variables
 			os.wifi_channel = chl;
@@ -1897,7 +1896,8 @@ void server_json_debug(OTF_PARAMS_DEF) {
 	(uint16_t)ESP.getFreeHeap());
 	FSInfo fs_info;
 	LittleFS.info(fs_info);
-	bfill.emit_p(PSTR(",\"flash\":$D,\"used\":$D}"), fs_info.totalBytes, fs_info.usedBytes);
+	bfill.emit_p(PSTR(",\"flash\":$D,\"used\":$D,\"rssi\":$D,\"bssid\":\"$S\"}"),
+		fs_info.totalBytes, fs_info.usedBytes, WiFi.RSSI(), WiFi.BSSIDstr().c_str());
 #else
 	(uint16_t)freeHeap());
 	bfill.emit_p(PSTR("}"));
