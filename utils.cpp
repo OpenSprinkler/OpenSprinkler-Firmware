@@ -496,6 +496,7 @@ bool isValidDate(uint16_t date) {
 	return isValidDate(month, day);
 }
 
+#if defined(ESP8266)
 byte hex2dec(const char *hex) {
 	return strtol(hex, NULL, 16);
 }
@@ -543,3 +544,4 @@ void str2mac(const char *_str, byte mac[]) {
 		yield();
 	}
 }
+#endif

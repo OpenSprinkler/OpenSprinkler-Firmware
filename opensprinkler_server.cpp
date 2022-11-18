@@ -334,10 +334,10 @@ void on_ap_change_config(OTF_PARAMS_DEF) {
 				otf_send_result(OTF_PARAMS, HTML_DATA_OUTOFBOUND, "channel");
 				return;
 			}
+			os.sopt_save(SOPT_STA_BSSID_CHL, extra); // save string to flash first
 			*mac=0; // terminate bssid string
 			str2mac(extra, os.wifi_bssid); // update controller variables
 			os.wifi_channel = chl;
-
 		} else {
 			os.sopt_save(SOPT_STA_BSSID_CHL, DEFAULT_EMPTY_STRING); // if extra is not present, write empty string
 		}
@@ -393,9 +393,9 @@ boolean check_password(char *p)
 		if (os.password_verify(tmp_buffer)) return true;
 	}
 #else
-	if(req.isCloudRequest()){ // password is not required if this is coming from cloud connection
+	/*if(req.isCloudRequest()){ // password is not required if this is coming from cloud connection
 		return true;
-	}
+	}*/
 	const char *pw = req.getQueryParameter("pw");
 	if(pw != NULL && os.password_verify(pw)) return true;
 
@@ -1896,8 +1896,8 @@ void server_json_debug(OTF_PARAMS_DEF) {
 	(uint16_t)ESP.getFreeHeap());
 	FSInfo fs_info;
 	LittleFS.info(fs_info);
-	bfill.emit_p(PSTR(",\"flash\":$D,\"used\":$D,\"rssi\":$D,\"bssid\":\"$S\"}"),
-		fs_info.totalBytes, fs_info.usedBytes, WiFi.RSSI(), WiFi.BSSIDstr().c_str());
+	bfill.emit_p(PSTR(",\"flash\":$D,\"used\":$D,\"rssi\":$D,\"bssid\":\"$S\",\"bssidchl\":\"$O\"}"),
+		fs_info.totalBytes, fs_info.usedBytes, WiFi.RSSI(), WiFi.BSSIDstr().c_str(), SOPT_STA_BSSID_CHL);
 #else
 	(uint16_t)freeHeap());
 	bfill.emit_p(PSTR("}"));
