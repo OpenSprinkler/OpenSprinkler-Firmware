@@ -24,6 +24,7 @@
 #include "utils.h"
 #include "program.h"
 #include "OpenSprinkler.h"
+#include "OpenSprinkler_server.h"
 #include "sensors.h"
 
 //All sensors:
@@ -325,6 +326,34 @@ int read_sensor_ospi(Sensor_t *sensor) {
 	return HTTP_RQT_SUCCESS;
 }
 
+extern byte findKeyVal (const char *str,char *strbuf, uint16_t maxlen,const char *key,bool key_in_pgm=false,uint8_t *keyfound=NULL);
+
+int read_sensor_http(Sensor_t *sensor) {
+    IPAddress _ip(sensor->ip);
+	byte ip[4] = {_ip[0], _ip[1], _ip[2], _ip[3]};
+
+	char *p = tmp_buffer;
+	BufferFiller bf = p;
+
+	bf.emit_p(PSTR("GET /cm?pw=$O&sr=$D"),
+		SOPT_PASSWORD, sensor->id);
+	bf.emit_p(PSTR(" HTTP/1.0\r\nHOST: $D.$D.$D.$D\r\n\r\n"),
+		ip[0],ip[1],ip[2],ip[3]);
+
+	if (os.send_http_request(sensor->ip, sensor->port, p) == HTTP_RQT_SUCCESS) {
+					
+		if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("nativedata"), true)) {
+			sensor->last_native_data = strtoul(tmp_buffer, NULL, 0);
+		}
+		if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("data"), true)) {
+			sensor->last_data = atof(tmp_buffer);
+			sensor->data_ok = true;
+		}
+		return HTTP_RQT_SUCCESS;
+	}
+	return HTTP_RQT_EMPTY_RETURN;
+}
+
 /**
  * Read ip connected sensors
 */
@@ -361,7 +390,7 @@ int read_sensor_ip(Sensor_t *sensor) {
 
 	uint8_t buffer[10];
 	int len = 0;
-	boolean addCrc16 = true;
+	boolean addCrc16 = false;
 	switch(sensor->type)
 	{
 		case SENSOR_SMT100_MODBUS_RTU_MOIS:
@@ -372,6 +401,7 @@ int read_sensor_ip(Sensor_t *sensor) {
 			buffer[4] = 0x00; 
 			buffer[5] = 0x01; //Number of registers to read (soil moisture value is one 16-bit register)
 			len = 6;
+			addCrc16 = true;
 			break;
  
 		case SENSOR_SMT100_MODBUS_RTU_TEMP:
@@ -382,6 +412,7 @@ int read_sensor_ip(Sensor_t *sensor) {
 			buffer[4] = 0x00; 
 			buffer[5] = 0x01; //Number of registers to read (soil moisture value is one 16-bit register)
 			len = 6;
+			addCrc16 = true;
 			break;
 
 		default:
@@ -489,6 +520,8 @@ int read_sensor(Sensor_t *sensor) {
 
 		//case SENSOR_OSPI_ANALOG_INPUTS:
 		//	return read_sensor_ospi(sensor);
+		case SENSOR_REMOTE:
+			return read_sensor_http(sensor);
 
 		default: return HTTP_RQT_NOT_RECEIVED;
 	}

@@ -42,8 +42,8 @@
 #define SENSOR_ANALOG_EXTENSION_BOARD     10  //New OpenSprinkler analog extension board 2xADS1015 48/49 - voltage mode 0..4V
 #define SENSOR_SMT50_MOIS                 11  //New OpenSprinkler analog extension board 2xADS1015 48/49 - SMT50 VWC [%] = (U * 50) : 3
 #define SENSOR_SMT50_TEMP                 12  //New OpenSprinkler analog extension board 2xADS1015 48/49 - SMT50 T [°C] = (U – 0,5) * 100
-//#define SENSOR_OSPI_ANALOG_INPUTS         20  //Old OSPi analog input
-//#define SENSOR_REMOTE                     100 // Remote sensor of an remote opensprinkler
+#define SENSOR_OSPI_ANALOG_INPUTS         20  //Old OSPi analog input
+#define SENSOR_REMOTE                     100 //Remote sensor of an remote opensprinkler
 
 #define SENSOR_GROUP_MIN               1000   //Sensor group with min value
 #define SENSOR_GROUP_MAX               1001   //Sensor group with max value
@@ -112,6 +112,9 @@ typedef struct ProgSensorAdjust {
 	ProgSensorAdjust *next;
 } ProgSensorAdjust_t;
 #define PROGSENSOR_STORE_SIZE (sizeof(ProgSensorAdjust_t)-sizeof(ProgSensorAdjust_t*))
+
+extern char ether_buffer[];
+extern char tmp_buffer[];
 
 //Utils:
 uint16_t CRC16 (byte buf[], int len);
