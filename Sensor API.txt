@@ -1,7 +1,8 @@
 Sensor API
+This api documentation is part of the opensprinkler 
 
-<ip> the ip-address
-<pw> the MD5 encrypted password
+<ip> the ip-address, for example 192.168.0.55
+<pw> the MD5 encrypted password, opendoor=a6d82bced638de3def1e9bbb4983225c
 
 
 Create Sensors (sc):
@@ -12,20 +13,50 @@ creates, modifies or deletes a sensor.
 "name" a name
 "ip" for the ip-address, only for network connected sensors. All others use ip=0
 "port" for the ip-port-address, only for network connected sensors. All others use port=0 execpt ADC Sensors for the I2C address (currently only 72/73)
+"id" sub-id, e.a. modbus address or subid
+"ri" read interval in seconds
+"enable" 0=sensor disabled, 1=sensor enabled
+"log" 0=logging disabled, 1=logging enabled
+
 examples:
 http://<ip>/sc?pw=<pw>&nr=1&type=1&group=0&name=SMT100-Mois&ip=4261456064&port=8899&id=253&ri=60&enable=1&log=1
 http://<ip>/sc?pw=<pw>&nr=2&type=2&group=0&name=SMT100-Temp&ip=4261456064&port=8899&id=253&ri=60&enable=1&log=1
 http://<ip>/sc?pw=<pw>&nr=3&type=11&group=0&name=SMT50-Mois&ip=0&port=72&id=0&ri=60&enable=1&log=1
 http://<ip>/sc?pw=<pw>&nr=4&type=12&group=0&name=SMT50-Temp&ip=0&port=72&id=1&ri=60&enable=1&log=1
 
+ip: dec=4261456064 = hex=FE00A8C0 = 
+FE = 254
+00 = 000
+A8 = 168
+C0 = 192
+   = 192.168.000.254
+
+For the Truebner SMT100 RS485 Modbus you need a RS485 Modbus RTU over TCP converter.
+Set ip/port for the converter, e.a PUSR USR-W610 in transparent modus.
+
+For the analog ports of the extension board (including SMT50) id is 0x48=72 for the first 4 ports (with id 0-3) 
+and 0x49=73 for the second 4 ports (also with id 0-3)
+
+type:
+SENSOR_NONE                       0   //None or deleted sensor
+SENSOR_SMT100_MODBUS_RTU_MOIS     1   //Truebner SMT100 RS485 Modbus RTU over TCP, moisture mode
+SENSOR_SMT100_MODBUS_RTU_TEMP     2   //Truebner SMT100 RS485 Modbus RTU over TCP, temperature mode
+SENSOR_ANALOG_EXTENSION_BOARD     10  //New OpenSprinkler analog extension board 2xADS1015 48/49 - voltage mode 0..4V
+SENSOR_SMT50_MOIS                 11  //New OpenSprinkler analog extension board 2xADS1015 48/49 - SMT50 VWC [%] = (U * 50) : 3
+SENSOR_SMT50_TEMP                 12  //New OpenSprinkler analog extension board 2xADS1015 48/49 - SMT50 T [°C] = (U – 0,5) * 100
+SENSOR_OSPI_ANALOG_INPUTS         20  //Old OSPi analog input (currenty not implemented!)
+SENSOR_REMOTE                     100 //Remote sensor of an remote opensprinkler (ip+port remote OS, id=sensor-nr)
+SENSOR_GROUP_MIN               1000   //Sensor group with min value
+SENSOR_GROUP_MAX               1001   //Sensor group with max value
+SENSOR_GROUP_AVG               1002   //Sensor group with avg value
+SENSOR_GROUP_SUM               1003   //Sensor group with sum value
 
 List Sensors (sl):
 lists the current sensors
 examples:
 http://<ip>/sl?pw=<pw>
 
-
-Get last Sensor values (sg)
+Get last Sensor values (sg):
 returns last read sensor values
 examples:
 http://<ip>/sg?pw=<pw>&nr=1
@@ -62,13 +93,43 @@ defines program adjustments
 examples:
 http://<ip>/sb?pw=<pw>&nr=1&type=1&sensor=4&prog=1&factor1=0&factor2=2&min=0&max=50
 
-List Program adjustments (se)
+type:
+PROG_NONE        0 //No adjustment (delete)
+PROG_LINEAR      1 //formula
+PROG_DIGITAL_MIN 2 //1=under or equal min, 0=above
+PROG_DIGITAL_MAX 3 //1=over or equal max, 0=below
+
+formula:
+   min max  factor1 factor2
+   10..90 -> 5..1 factor1 > factor2
+    a   b    c  d
+   (b-sensorData) / (b-a) * (c-d) + d
+
+   10..90 -> 1..5 factor1 < factor2
+    a   b    c  d
+   (sensorData-a) / (b-a) * (d-c) + c
+
+min/max is the used range of the sensor (for example min=10 max=80)
+factor1/factor2 is the calculated adjustment (for example factor1=2 factor2=0)
+So a sensordata of 10 will be a adjustment of factor 2 (200%) or
+a sensordata of 80 will be a adjustment of factor 0 (0%)
+everything beetween will be linear scaled in the range of 0..2
+
+List Program adjustments (se):
 lists the current program adjustments
 examples:
 http://<ip>/se?pw=<pw>
 &nr=1&prog=1
 
-List supported sensor types (sf)
+List supported sensor types (sf):
 lists supported sensor types
 examples:
 http://<ip>/sf?pw=<pw>
+
+List supported program adjustments (sh):
+http://<ip>/sh?pw=<pw>
+
+System used and free space (du):
+http://<ip>/du?pw=<pw>
+
+

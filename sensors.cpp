@@ -220,8 +220,9 @@ Sensor_t *sensor_by_idx(uint idx) {
 }
 
 void sensorlog_add(SensorLog_t *sensorlog) {
-	DEBUG_PRINTLN(F("sensorlog_add"));
-	file_write_block(SENSORLOG_FILENAME, sensorlog, file_size(SENSORLOG_FILENAME), SENSORLOG_STORE_SIZE);
+	DEBUG_PRINT(F("sensorlog_add "));
+	file_append_block(SENSORLOG_FILENAME, sensorlog, SENSORLOG_STORE_SIZE);
+	DEBUG_PRINT(sensorlog_filesize());
 }
 
 void sensorlog_add(Sensor_t *sensor, ulong time) {
@@ -235,6 +236,12 @@ void sensorlog_add(Sensor_t *sensor, ulong time) {
 	}
 }
 
+ulong sensorlog_filesize() {
+	DEBUG_PRINT(F("sensorlog_filesize "));
+	ulong size = file_size(SENSORLOG_FILENAME);
+	DEBUG_PRINTLN(size);
+	return size;
+}
 
 ulong sensorlog_size() {
 	DEBUG_PRINT(F("sensorlog_size "));
@@ -886,7 +893,7 @@ ProgSensorAdjust_t *prog_adjust_by_nr(uint nr) {
 
 ProgSensorAdjust_t *prog_adjust_by_idx(uint idx) {
 	ProgSensorAdjust_t *pa = progSensorAdjusts;
-	int idxCounter = 0;
+	uint idxCounter = 0;
 	while (pa) {
 		if (idxCounter++ == idx) return pa;
 		pa = pa->next;

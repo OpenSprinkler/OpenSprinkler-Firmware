@@ -430,6 +430,43 @@ void file_write_block(const char *fn, const void *src, ulong pos, ulong len) {
 
 }
 
+void file_append_block(const char *fn, const void *src, ulong len) {
+#if defined(ESP8266)
+
+	File f = LittleFS.open(fn, "r+");
+	if(!f) f = LittleFS.open(fn, "w");
+	if(f) {
+		f.seek(0, SeekEnd);
+		f.write((byte*)src, len);
+		f.close();
+	}
+
+#elif defined(ARDUINO)
+
+	sd.chdir("/");
+	SdFile file;
+	int ret = file.open(fn, O_CREAT | O_RDWR);
+	if(!ret) return;
+	file.seekEnd(0);
+	file.write(src, len);
+	file.close();
+
+#else
+
+	FILE *fp = fopen(get_filename_fullpath(fn), "rb+");
+	if(!fp) {
+		fp = fopen(get_filename_fullpath(fn), "wb+");
+	}
+	if(fp) {
+		fseek(fp, 0, SEEK_END); //this fails silently without the above change
+		fwrite(src, 1, len, fp);
+		fclose(fp);
+	}
+
+#endif
+
+}
+
 void file_copy_block(const char *fn, ulong from, ulong to, ulong len, void *tmp) {
 	// assume tmp buffer is provided and is larger than len
 	// todo future: if tmp buffer is not provided, do byte-to-byte copy

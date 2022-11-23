@@ -2039,7 +2039,8 @@ void server_sensorlog_list() {
 #else
 	print_json_header(false);
 #endif
-	bfill.emit_p(PSTR("["));
+	bfill.emit_p(PSTR("{\"logsize\":$D,\"filesize\":$D,\"log\":["), 
+		log_size, sensorlog_filesize());
 
 	ulong count = 0;
  	SensorLog_t sensorlog;
@@ -2079,7 +2080,7 @@ void server_sensorlog_list() {
 		if (++count >= maxResults)
 			break;
 	}
-	bfill.emit_p(PSTR("]"));
+	bfill.emit_p(PSTR("]}"));
 
 	handle_return(HTML_OK);	
 }
@@ -2211,7 +2212,7 @@ void server_sensorprog_list() {
 		ProgSensorAdjust_t *p = prog_adjust_by_idx(idx++);
 		if (nr > 0 && p->nr != nr)
 			continue;
-		if (prog >= 0 && p->prog != prog)
+		if (prog >= 0 && p->prog != (uint)prog)
 			continue;
 		count++;
 	}
@@ -2226,7 +2227,7 @@ void server_sensorprog_list() {
 		ProgSensorAdjust_t *p = prog_adjust_by_idx(idx++);
 		if (nr > 0 && p->nr != nr)
 			continue;
-		if (prog >= 0 && p->prog != prog)
+		if (prog >= 0 && p->prog != (uint)prog)
 			continue;
 
 		if (count++ > 0)
@@ -2300,9 +2301,9 @@ void server_sensor_types() {
 	print_json_header(false);
 #endif
 
-	bfill.emit_p(PSTR("{\"sensorTypes\":["));
+	bfill.emit_p(PSTR("{\"count\":$D,\"sensorTypes\":["), sizeof(sensor_types)/sizeof(int));
 
-	for (int i = 0; i < sizeof(sensor_types)/sizeof(int); i++)
+	for (uint i = 0; i < sizeof(sensor_types)/sizeof(int); i++)
 	{
 		if (i > 0)
 			bfill.emit_p(PSTR(","));
@@ -2315,6 +2316,44 @@ void server_sensor_types() {
 		}
 	}
 	bfill.emit_p(PSTR("]}"));
+
+	handle_return(HTML_OK);
+}
+
+/**
+ * du
+ * List supported sensor types
+ **/
+void server_usage() {
+#if defined(ESP8266)
+        //char *p = NULL;
+        if(!process_password()) return;
+#else
+        //char *p = get_buffer;
+#endif
+
+	DEBUG_PRINTLN(F("server_usage"));
+
+#if defined(ESP8266)
+	rewind_ether_buffer();
+	print_json_header(false);
+#else
+	print_json_header(false);
+#endif
+
+	struct FSInfo fsinfo;
+
+	boolean ok = LittleFS.info(fsinfo);
+
+	bfill.emit_p(PSTR("{\"status\":$D,\"totalBytes\":$D,\"usedBytes\":$D,\"freeBytes\":$D,\"blockSize\":$D,\"pageSize\":$D,\"maxOpenFiles\":$D,\"maxPathLength\":$D}"),
+		ok, 
+		fsinfo.totalBytes, 
+		fsinfo.usedBytes, 
+		fsinfo.totalBytes-fsinfo.usedBytes,
+		fsinfo.blockSize, 
+		fsinfo.pageSize, 
+		fsinfo.maxOpenFiles, 
+		fsinfo.maxPathLength);
 
 	handle_return(HTML_OK);
 }
@@ -2349,6 +2388,62 @@ void server_sensorprog_calc() {
 	}
 	
 	handle_return(HTML_DATA_MISSING);
+}
+
+const int prog_types[] = {
+	PROG_NONE,
+	PROG_LINEAR,
+	PROG_DIGITAL_MIN,
+	PROG_DIGITAL_MAX,
+};
+
+const char* prog_names[] = {
+	"No Adjustment",
+	"Linear scaling",
+	"Digital under min",
+	"Digital over max",
+};
+
+/**
+ * sh
+ * List supported adjustment types 
+ */
+void server_sensorprog_types()
+{
+#if defined(ESP8266)
+        //char *p = NULL;
+        if(!process_password()) return;
+#else
+        //char *p = get_buffer;
+#endif
+
+	DEBUG_PRINTLN(F("server_sensorprog_types"));
+
+#if defined(ESP8266)
+	rewind_ether_buffer();
+	print_json_header(false);
+#else
+	print_json_header(false);
+#endif
+
+	bfill.emit_p(PSTR("{\"count\":$D,\"progTypes\":["), sizeof(prog_types)/sizeof(int));
+
+	for (uint i = 0; i < sizeof(prog_types)/sizeof(int); i++)
+	{
+
+		if (i > 0)
+			bfill.emit_p(PSTR(","));
+		bfill.emit_p(PSTR("{\"type\":$D,\"name\":\"$S\"}"), prog_types[i], prog_names[i]);
+
+		// if available ether buffer is getting small
+		// send out a packet
+		if(available_ether_buffer() <= 0) {
+			send_packet();
+		}
+	}
+	bfill.emit_p(PSTR("]}"));
+
+	handle_return(HTML_OK);
 }
 
 /** Output all JSON data, including jc, jp, jo, js, jn */
@@ -2443,6 +2538,8 @@ const char _url_keys[] PROGMEM =
 	"sd"
 	"se"
 	"sf"
+	"du"
+	"sh"
 #if defined(ARDUINO)  
   "db"
 #endif	
@@ -2482,6 +2579,8 @@ URLHandler urls[] = {
 	server_sensorprog_calc,      // sd
 	server_sensorprog_list,    // se
 	server_sensor_types,    // sf
+	server_usage,           // du
+	server_sensorprog_types, // sh
 #if defined(ARDUINO)  
   server_json_debug,			// db
 #endif	
@@ -2583,7 +2682,7 @@ void start_server_client() {
 	char uri[4];
 	uri[0]='/';
 	uri[3]=0;
-	for(int i=0;i<sizeof(urls)/sizeof(URLHandler);i++) {
+	for(uint i=0;i<sizeof(urls)/sizeof(URLHandler);i++) {
 		uri[1]=pgm_read_byte(_url_keys+2*i);
 		uri[2]=pgm_read_byte(_url_keys+2*i+1);
 		w_server->on(uri, urls[i]);
@@ -2610,7 +2709,7 @@ void start_server_ap() {
 	char uri[4];
 	uri[0]='/';
 	uri[3]=0;
-	for(int i=0;i<sizeof(urls)/sizeof(URLHandler);i++) {
+	for(uint i=0;i<sizeof(urls)/sizeof(URLHandler);i++) {
 		uri[1]=pgm_read_byte(_url_keys+2*i);
 		uri[2]=pgm_read_byte(_url_keys+2*i+1);
 		w_server->on(uri, urls[i]);

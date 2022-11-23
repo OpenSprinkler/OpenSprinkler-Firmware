@@ -140,6 +140,7 @@ void sensorlog_add(Sensor_t *sensor, ulong time);
 void sensorlog_clear_all();
 SensorLog_t *sensorlog_load(ulong pos);
 SensorLog_t *sensorlog_load(ulong idx, SensorLog_t* sensorlog);
+ulong sensorlog_filesize();
 ulong sensorlog_size();
 
 //Set Sensor Address for SMT100:
