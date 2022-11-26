@@ -1048,7 +1048,7 @@ void server_json_programs_main(OTF_PARAMS_DEF) {
 		tmp_buffer[PROGRAM_NAME_SIZE] = 0;	// make sure the string ends
 		bfill.emit_p(PSTR("$S\",[$D,$D,$D]]"), tmp_buffer,prog.en_daterange,prog.daterange[0],prog.daterange[1]);
 		if(pid!=pd.nprograms-1) {
-			bfill.emit_p(PSTR("],"));
+			bfill.emit_p(PSTR(","));
 		}
 		// push out a packet if available
 		// buffer size is getting small
