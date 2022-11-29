@@ -36,4 +36,6 @@ void GetWeather();
 
 extern char wt_rawData[];
 extern int wt_errCode;
+extern byte wt_monthly[];
+void load_wt_monthly(char* wto);
 #endif  // _WEATHER_H

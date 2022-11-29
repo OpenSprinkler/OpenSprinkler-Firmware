@@ -1841,7 +1841,6 @@ int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char*
 	while(true) {
 		int nbytes = client->available();
 		if(nbytes>0) {
-			DEBUG_PRINTLN(nbytes);
 			if(pos+nbytes>ETHER_BUFFER_SIZE) nbytes=ETHER_BUFFER_SIZE-pos; // cannot read more than buffer size
 			client->read((uint8_t*)ether_buffer+pos, nbytes);
 			pos+=nbytes;
@@ -2200,6 +2199,8 @@ void OpenSprinkler::nvdata_save() {
 	file_write_block(NVCON_FILENAME, &nvdata, 0, sizeof(NVConData));
 }
 
+void load_wt_monthly(char* wto);
+
 /** Load integer options from file */
 void OpenSprinkler::iopts_load() {
 	file_read_block(IOPTS_FILENAME, iopts, 0, NUM_IOPTS);
@@ -2220,6 +2221,10 @@ void OpenSprinkler::iopts_load() {
 			iopts[IOPT_NTP_IP4] = 0;
 	}
 	populate_master();
+	sopt_load(SOPT_WEATHER_OPTS, tmp_buffer);
+	if(iopts[IOPT_USE_WEATHER]==WEATHER_METHOD_MONTHLY) {
+		load_wt_monthly(tmp_buffer);
+	}
 }
 
 void OpenSprinkler::populate_master() {

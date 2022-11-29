@@ -32,6 +32,7 @@ extern char tmp_buffer[];
 extern char ether_buffer[];
 char wt_rawData[TMP_BUFFER_SIZE];
 int wt_errCode = HTTP_RQT_NOT_RECEIVED;
+byte wt_monthly[12] = {100,100,100,100,100,100,100,100,100,100,100,100};
 
 byte findKeyVal (const char *str,char *strbuf, uint16_t maxlen,const char *key,bool key_in_pgm=false,uint8_t *keyfound=NULL);
 void write_log(byte type, ulong curr_time);
@@ -136,8 +137,11 @@ void GetWeather() {
 #endif
 	// use temp buffer to construct get command
 	BufferFiller bf = tmp_buffer;
+	int method = os.iopts[IOPT_USE_WEATHER];
+	// use manual adjustment call for monthly adjustment -- a bit ugly, but does not involve weather server changes
+	if(method==WEATHER_METHOD_MONTHLY) method=WEATHER_METHOD_MANUAL;
 	bf.emit_p(PSTR("$D?loc=$O&wto=$O&fwv=$D"),
-								(int) os.iopts[IOPT_USE_WEATHER],
+								method,
 								SOPT_LOCATION,
 								SOPT_WEATHER_OPTS,
 								(int)os.iopts[IOPT_FW_VERSION]);
@@ -179,5 +183,17 @@ void GetWeather() {
 	if(ret!=HTTP_RQT_SUCCESS) {
 		if(wt_errCode < 0) wt_errCode = ret;
 		// if wt_errCode > 0, the call is successful but weather script may return error
+	}
+}
+
+void load_wt_monthly(char* wto) {
+	byte i;
+	int p[12];
+	for(i=0;i<12;i++) p[i]=100; // init all to 100
+	sscanf(wto, "\"scales\":[%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d]", p,p+1,p+2,p+3,p+4,p+5,p+6,p+7,p+8,p+9,p+10,p+11);
+	for(i=0;i<12;i++) {
+		if(p[i]<0) p[i]=0;
+		if(p[i]>250) p[i]=250;
+		wt_monthly[i]=p[i];
 	}
 }

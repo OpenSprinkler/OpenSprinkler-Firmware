@@ -642,6 +642,15 @@ void do_loop()
 			os.old_status.rain_delayed = os.status.rain_delayed;
 		}
 
+		// ====== Check monthly water percentage ======
+		if(os.iopts[IOPT_USE_WEATHER]==WEATHER_METHOD_MONTHLY) {
+			byte m = month(curr_time)-1;
+			if(os.iopts[IOPT_WATER_PERCENTAGE]!=wt_monthly[m]) {
+				os.iopts[IOPT_WATER_PERCENTAGE]=wt_monthly[m];
+				os.iopts_save();
+			}
+		}
+
 		// ====== Check binary (i.e. rain or soil) sensor status ======
 		os.detect_binarysensor_status(curr_time);
 
@@ -1018,12 +1027,12 @@ void check_weather() {
 	ulong ntz = os.now_tz();
 	if (os.checkwt_success_lasttime && (ntz > os.checkwt_success_lasttime + CHECK_WEATHER_SUCCESS_TIMEOUT)) {
 		// if last successful weather call timestamp is more than allowed threshold
-		// and if the selected adjustment method is not manual
+		// and if the selected adjustment method is not one of the manual methods
 		// reset watering percentage to 100
-		// todo: the firmware currently needs to be explicitly aware of which adjustment methods
-		// use manual watering percentage (namely methods 0 and 2), this is not ideal
+		// todo: the firmware currently needs to be explicitly aware of which adjustment methods, this is not ideal
 		os.checkwt_success_lasttime = 0;
-		if(!(os.iopts[IOPT_USE_WEATHER]==0 || os.iopts[IOPT_USE_WEATHER]==2)) {
+		byte method = os.iopts[IOPT_USE_WEATHER];
+		if(!(method==WEATHER_METHOD_MANUAL || method==WEATHER_METHOD_AUTORAINDELY || method==WEATHER_METHOD_MONTHLY)) {
 			os.iopts[IOPT_WATER_PERCENTAGE] = 100; // reset watering percentage to 100%
 			wt_rawData[0] = 0; 		// reset wt_rawData and errCode
 			wt_errCode = HTTP_RQT_NOT_RECEIVED;

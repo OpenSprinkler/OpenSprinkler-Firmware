@@ -148,6 +148,16 @@ typedef unsigned long ulong;
 #define DEFAULT_DEVICE_NAME       "My OpenSprinkler"
 #define DEFAULT_EMPTY_STRING      ""
 
+/* Weather Adjustment Methods */
+enum {
+	WEATHER_METHOD_MANUAL = 0,
+	WEATHER_METHOD_ZIMMERMAN,
+	WEATHER_METHOD_AUTORAINDELY,
+	WEATHER_METHOD_ETO,
+	WEATHER_METHOD_MONTHLY,
+	NUM_WEATHER_METHODS
+};
+
 /* Master */
 enum {
 	MASTER_1 = 0,
