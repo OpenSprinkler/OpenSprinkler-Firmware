@@ -1773,7 +1773,7 @@ void delete_log(char *name) {
 		// delete all log files
 		Dir dir = LittleFS.openDir(LOG_PREFIX);
 		while (dir.next()) {
-			LittleFS.remove(dir.fileName());
+			LittleFS.remove(LOG_PREFIX+dir.fileName());
 		}
 	} else {
 		// delete a single log file
