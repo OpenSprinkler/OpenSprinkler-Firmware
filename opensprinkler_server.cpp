@@ -1441,6 +1441,7 @@ void server_change_options(OTF_PARAMS_DEF)
 		if (os.sopt_save(SOPT_WEATHER_OPTS, tmp_buffer)) {
 			if(os.iopts[IOPT_USE_WEATHER]==WEATHER_METHOD_MONTHLY) {
 				load_wt_monthly(tmp_buffer);
+				apply_monthly_adjustment(os.now_tz());
 			} else {
 				weather_change = true;	// if wto has changed
 			}

@@ -642,21 +642,6 @@ void do_loop()
 			os.old_status.rain_delayed = os.status.rain_delayed;
 		}
 
-		// ====== Check monthly water percentage ======
-		if(os.iopts[IOPT_USE_WEATHER]==WEATHER_METHOD_MONTHLY) {
-#if defined(ARDUINO)
-			byte m = month(curr_time)-1;
-#else
-			time_t ct = curr_time;
-			struct tm *ti = gmtime(&ct);
-			byte m = ti->tm_mon+1;  // tm_mon ranges from [0,11]
-#endif
-			if(os.iopts[IOPT_WATER_PERCENTAGE]!=wt_monthly[m]) {
-				os.iopts[IOPT_WATER_PERCENTAGE]=wt_monthly[m];
-				os.iopts_save();
-			}
-		}
-
 		// ====== Check binary (i.e. rain or soil) sensor status ======
 		os.detect_binarysensor_status(curr_time);
 
@@ -704,6 +689,9 @@ void do_loop()
 		// we only need to check once every minute
 		if (curr_minute != last_minute) {
 			last_minute = curr_minute;
+
+			apply_monthly_adjustment(curr_time); // check and apply monthly adjustment here, if it's selected
+
 			// check through all programs
 			for(pid=0; pid<pd.nprograms; pid++) {
 				pd.read(pid, &prog);	// todo future: reduce load time
