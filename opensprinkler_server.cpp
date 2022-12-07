@@ -1841,7 +1841,7 @@ void server_set_sensor_address() {
 
 /**
  * sg
- * @brief return a 485 sensor
+ * @brief return one or all last sensor values
  * 
  */
 void server_sensor_get() {
@@ -1854,16 +1854,9 @@ void server_sensor_get() {
 
 	DEBUG_PRINTLN(F("server_sensor_get"));
 
-	if (!findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("nr"), true))
-		handle_return(HTML_DATA_MISSING);
-	uint nr = strtoul(tmp_buffer, NULL, 0); // Sensor nr
-
-	Sensor_t *sensor = sensor_by_nr(nr);
-	if (!sensor)
-	{
-		server_send_result(255);
-		return;
-	}
+	uint nr = 0;
+	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("nr"), true))
+		nr = strtoul(tmp_buffer, NULL, 0); // Sensor nr
 
 #if defined(ESP8266)
 	rewind_ether_buffer();
@@ -1872,21 +1865,34 @@ void server_sensor_get() {
 	print_json_header(false);
 #endif
 
-	bfill.emit_p(PSTR("{\"nr\":$D,\"type\":$D,\"group\":$D,\"name\":\"$S\",\"ip\":$L,\"port\":$D,\"id\":$D,\"ri\":$D,\"nativedata\":$L,\"data\":$E,\"enable\":$D,\"log\":$D,\"last\":$L}"),
-		sensor->nr, 
-		sensor->type,
-		sensor->group,
-		sensor->name,
-		sensor->ip,
-		sensor->port,
-		sensor->id,
-		sensor->read_interval,
-		sensor->last_native_data,
-		sensor->last_data,
-		sensor->enable,
-		sensor->log,
-		sensor->last_read);
+	bfill.emit_p(PSTR("{\"datas\":["));
+	uint count = sensor_count();
+	for (uint i = 0; i < count; i++) {
 
+		Sensor_t *sensor = sensor_by_idx(i);
+		if (!sensor)
+		{
+			server_send_result(255);
+			return;
+		}
+
+		if (nr != 0 && nr != sensor->nr)
+			continue;
+
+		bfill.emit_p(PSTR("{\"nr\":$D,\"nativedata\":$L,\"data\":$E,\"last\":$L}"),
+			sensor->nr, 
+			sensor->last_native_data,
+			sensor->last_data,
+			sensor->last_read);
+		if (i < count-1)
+			bfill.emit_p(PSTR(","));
+		// if available ether buffer is getting small
+		// send out a packet
+		if(available_ether_buffer() <= 0) {
+			send_packet();
+		}
+	}
+	bfill.emit_p(PSTR("]}"));
 	handle_return(HTML_OK);
 }
 
@@ -1905,18 +1911,9 @@ void server_sensor_readnow() {
 
 	DEBUG_PRINTLN(F("server_sensor_readnow"));
 
-	if (!findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("nr"), true))
-		handle_return(HTML_DATA_MISSING);
-	uint nr = strtoul(tmp_buffer, NULL, 0); // Sensor nr
-
-	Sensor_t *sensor = sensor_by_nr(nr);
-	if (!sensor)
-	{
-		server_send_result(255);
-		return;
-	}
-
-	int status = read_sensor(sensor);
+	uint nr = 0;
+	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("nr"), true))
+		nr = strtoul(tmp_buffer, NULL, 0); // Sensor nr
 
 #if defined(ESP8266)
 	rewind_ether_buffer();
@@ -1925,14 +1922,40 @@ void server_sensor_readnow() {
 	print_json_header(false);
 #endif
 
-	bfill.emit_p(PSTR("{\"nr\":$D,\"status\":$D,\"nativedata\":$L,\"data\":$E}"),
-		sensor->nr, 
-		status,
-		sensor->last_native_data,
-		sensor->last_data);
+	bfill.emit_p(PSTR("{\"datas\":["));
+	uint count = sensor_count();
+	for (uint i = 0; i < count; i++) {
 
+		Sensor_t *sensor = sensor_by_idx(i);
+		if (!sensor)
+		{
+			server_send_result(255);
+			return;
+		}
+
+		if (nr != 0 && nr != sensor->nr)
+			continue;
+
+		int status = read_sensor(sensor);
+
+		bfill.emit_p(PSTR("{\"nr\":$D,\"status\":$D,\"nativedata\":$L,\"data\":$E}"),
+			sensor->nr, 
+			status,
+			sensor->last_native_data,
+			sensor->last_data);
+
+		if (i < count-1)
+			bfill.emit_p(PSTR(","));
+		// if available ether buffer is getting small
+		// send out a packet
+		if(available_ether_buffer() <= 0) {
+			send_packet();
+		}
+	}
+	bfill.emit_p(PSTR("]}"));
 	handle_return(HTML_OK);
 }
+
 /**
  * sl
  * @brief Lists all sensors

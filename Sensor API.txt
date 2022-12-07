@@ -12,7 +12,7 @@ creates, modifies or deletes a sensor.
 "group" for group assignment, a nr of another sensor with type=SENSOR_GROUP_YXZ
 "name" a name
 "ip" for the ip-address, only for network connected sensors. All others use ip=0
-"port" for the ip-port-address, only for network connected sensors. All others use port=0 execpt ADC Sensors for the I2C address (currently only 72/73)
+"port" for the ip-port-address, only for network connected sensors. All others use port=0 except ADC Sensors for the I2C address (currently only 72/73)
 "id" sub-id, e.a. modbus address or subid
 "ri" read interval in seconds
 "enable" 0=sensor disabled, 1=sensor enabled
@@ -44,7 +44,7 @@ SENSOR_SMT100_MODBUS_RTU_TEMP     2   //Truebner SMT100 RS485 Modbus RTU over TC
 SENSOR_ANALOG_EXTENSION_BOARD     10  //New OpenSprinkler analog extension board 2xADS1015 48/49 - voltage mode 0..4V
 SENSOR_SMT50_MOIS                 11  //New OpenSprinkler analog extension board 2xADS1015 48/49 - SMT50 VWC [%] = (U * 50) : 3
 SENSOR_SMT50_TEMP                 12  //New OpenSprinkler analog extension board 2xADS1015 48/49 - SMT50 T [°C] = (U – 0,5) * 100
-SENSOR_OSPI_ANALOG_INPUTS         20  //Old OSPi analog input (currenty not implemented!)
+SENSOR_OSPI_ANALOG_INPUTS         20  //Old OSPi analog input (currently not implemented!)
 SENSOR_REMOTE                     100 //Remote sensor of an remote opensprinkler (ip+port remote OS, id=sensor-nr)
 SENSOR_GROUP_MIN               1000   //Sensor group with min value
 SENSOR_GROUP_MAX               1001   //Sensor group with max value
@@ -59,11 +59,13 @@ http://<ip>/sl?pw=<pw>
 Get last Sensor values (sg):
 returns last read sensor values
 examples:
+http://<ip>/sg?pw=<pw>
 http://<ip>/sg?pw=<pw>&nr=1
 
 Read sensor now (sr):
 executes sensor read and returns the values
 examples:
+http://<ip>/sr?pw=<pw>
 http://<ip>/sr?pw=<pw>&nr=1
 
 Set sensor address for SMT100 (sa): 
@@ -88,8 +90,8 @@ defines program adjustments
 "nr" adjustment-nr
 "type" adjustment-type (0=delete, 1=linear, 2=digital min, 3=digital max)
 "sensor" sensor-nr
-"prog" programm-nr
-"factor1", "factor2", "min", "max" formular-values
+"prog" program-nr
+"factor1", "factor2", "min", "max" formula-values
 examples:
 http://<ip>/sb?pw=<pw>&nr=1&type=1&sensor=4&prog=1&factor1=0&factor2=2&min=0&max=50
 
@@ -113,7 +115,7 @@ min/max is the used range of the sensor (for example min=10 max=80)
 factor1/factor2 is the calculated adjustment (for example factor1=2 factor2=0)
 So a sensordata of 10 will be a adjustment of factor 2 (200%) or
 a sensordata of 80 will be a adjustment of factor 0 (0%)
-everything beetween will be linear scaled in the range of 0..2
+everything between will be linear scaled in the range of 0..2
 
 List Program adjustments (se):
 lists the current program adjustments
