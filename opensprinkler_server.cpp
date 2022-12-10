@@ -444,7 +444,7 @@ void server_json_stations_main(OTF_PARAMS_DEF) {
 	server_json_board_attrib(PSTR("ignore_sn1"), os.attrib_igs);
 	server_json_board_attrib(PSTR("ignore_sn2"), os.attrib_igs2);
 	server_json_board_attrib(PSTR("stn_dis"), os.attrib_dis);
-	server_json_board_attrib(PSTR("stn_seq"), os.attrib_seq);
+	//server_json_board_attrib(PSTR("stn_seq"), os.attrib_seq);
 	server_json_board_attrib(PSTR("stn_spe"), os.attrib_spe);
 	server_json_stations_attrib(PSTR("stn_grp"), os.attrib_grp);
 
@@ -581,8 +581,7 @@ void server_change_stations(OTF_PARAMS_DEF) {
 	server_change_board_attrib(FKV_SOURCE, 'k', os.attrib_igs2); // ignore sensor2
 	server_change_board_attrib(FKV_SOURCE, 'n', os.attrib_mas2); // master2
 	server_change_board_attrib(FKV_SOURCE, 'd', os.attrib_dis); // disable
-	server_change_board_attrib(FKV_SOURCE, 'q', os.attrib_seq); // sequential
-	server_change_board_attrib(FKV_SOURCE, 'p', os.attrib_spe); // special
+	//server_change_board_attrib(FKV_SOURCE, 'q', os.attrib_seq); // sequential: this is no longer used by this firmware
 	server_change_stations_attrib(FKV_SOURCE, 'g', os.attrib_grp); // sequential groups
 	/* handle special data */
 	if(findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("sid"), true)) {
@@ -605,7 +604,9 @@ void server_change_stations(OTF_PARAMS_DEF) {
 				for (byte i = 0; i < sizeof(gpioList) && found == false; i++) {
 					if (gpioList[i] == gpio) found = true;
 				}
-				if (!found || activeState > 1) handle_return(HTML_DATA_OUTOFBOUND);
+				if (!found || activeState > 1) {
+					handle_return(HTML_DATA_OUTOFBOUND);
+				}
 			} else if (tmp_buffer[0] == STN_TYPE_HTTP) {
 				#if !defined(ESP8266)
 					urlDecode(tmp_buffer + 1);
@@ -624,6 +625,8 @@ void server_change_stations(OTF_PARAMS_DEF) {
 
 		}
 	}
+	// handle special attribute after parameters have been processed
+	server_change_board_attrib(FKV_SOURCE, 'p', os.attrib_spe);
 
 	os.attribs_save();
 	handle_return(HTML_SUCCESS);

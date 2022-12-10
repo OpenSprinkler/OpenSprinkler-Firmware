@@ -347,7 +347,7 @@ byte OpenSprinkler::iopts[] = {
 	0,  // device id
 	150,// lcd contrast
 	100,// lcd backlight
-	50, // lcd dimming
+	30, // lcd dimming
 	80, // boost time (only valid to DC and LATCH type)
 	0,  // weather algorithm (0 means not using weather algorithm)
 	0,  // this and the next three bytes define the ntp server ip
@@ -1438,9 +1438,11 @@ void OpenSprinkler::get_station_data(byte sid, StationData* data) {
 }
 
 /** Set station data */
+/*
 void OpenSprinkler::set_station_data(byte sid, StationData* data) {
 	file_write_block(STATIONS_FILENAME, data, (uint32_t)sid*sizeof(StationData), sizeof(StationData));
 }
+*/
 
 /** Get station name */
 void OpenSprinkler::get_station_name(byte sid, char tmp[]) {
@@ -1452,7 +1454,12 @@ void OpenSprinkler::get_station_name(byte sid, char tmp[]) {
 void OpenSprinkler::set_station_name(byte sid, char tmp[]) {
 	// todo: store the right size
 	tmp[STATION_NAME_SIZE]=0;
-	file_write_block(STATIONS_FILENAME, tmp, (uint32_t)sid*sizeof(StationData)+offsetof(StationData, name), STATION_NAME_SIZE);
+	char n0[STATION_NAME_SIZE+1];
+	get_station_name(sid, n0);
+	size_t len = strlen(n0);
+	if(len!=strlen(tmp) || memcmp(n0, tmp, len)!=0) { // only write if the name has changed
+		file_write_block(STATIONS_FILENAME, tmp, (uint32_t)sid*sizeof(StationData)+offsetof(StationData, name), STATION_NAME_SIZE);
+	}
 }
 
 /** Get station type */
@@ -1516,19 +1523,15 @@ void OpenSprinkler::set_station_gid(byte sid, byte gid) {
 	attrib_grp[sid] = gid;
 }
 
-/** Get station attribute */
-/*void OpenSprinkler::get_station_attrib(byte sid, StationAttrib *attrib); {
-	file_read_block(STATIONS_FILENAME, attrib, (uint32_t)sid*sizeof(StationData)+offsetof(StationData, attrib), sizeof(StationAttrib));
-}*/
-
 /** Save all station attribs to file (backward compatibility) */
 void OpenSprinkler::attribs_save() {
 	// re-package attribute bits and save
-	byte bid, s, sid=0, gid;
+	byte bid, s, sid=0;
 	StationAttrib at, at0;
+	memset(&at, 0, sizeof(StationAttrib));
 	byte ty = STN_TYPE_STANDARD, ty0;
-	for(bid=0;bid<MAX_NUM_BOARDS;bid++) {
-		for(s=0;s<8;s++,sid++) {
+	for(bid=0;bid<MAX_NUM_BOARDS && sid<nstations;bid++) {
+		for(s=0;s<8 && sid<nstations;s++,sid++) {
 			at.mas = (attrib_mas[bid]>>s) & 1;
 			at.igs = (attrib_igs[bid]>>s) & 1;
 			at.mas2= (attrib_mas2[bid]>>s)& 1;
@@ -1541,14 +1544,16 @@ void OpenSprinkler::attribs_save() {
 
 			// only write if content has changed: this is important for LittleFS as otherwise the overhead is too large
 			file_read_block(STATIONS_FILENAME, &at0, (uint32_t)sid*sizeof(StationData)+offsetof(StationData, attrib), sizeof(StationAttrib));
-			if(memcmp(&at,&at0,sizeof(StationAttrib))!=0)
+			if(memcmp(&at,&at0,sizeof(StationAttrib))!=0) {
 				file_write_block(STATIONS_FILENAME, &at, (uint32_t)sid*sizeof(StationData)+offsetof(StationData, attrib), sizeof(StationAttrib)); // attribte bits are 1 byte long
+			}
 			if(attrib_spe[bid]>>s==0) {
 				// if station special bit is 0, make sure to write type STANDARD
 				// only write if content has changed
 				file_read_block(STATIONS_FILENAME, &ty0, (uint32_t)sid*sizeof(StationData)+offsetof(StationData, type), 1);
-				if(ty!=ty0)
+				if(ty!=ty0) {
 					file_write_block(STATIONS_FILENAME, &ty, (uint32_t)sid*sizeof(StationData)+offsetof(StationData, type), 1); // attribte bits are 1 byte long
+				}
 			}
 		}
 	}
