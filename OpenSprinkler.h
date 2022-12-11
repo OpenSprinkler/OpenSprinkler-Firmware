@@ -89,10 +89,10 @@ struct StationAttrib {  // station attributes
 	byte igs:1;  // ignore sensor 1
 	byte mas2:1;
 	byte dis:1;
-	byte seq:1;
+	byte seq:1; // this bit is retired and replaced by sequential group id
 	byte igs2:1; // ignore sensor 2
 	byte igrd:1; // ignore rain delay
-	byte unused:1;
+	byte igpu:1; // todo: ignore pause
 
 	byte gid;    // sequential group id
 	byte reserved[2]; // reserved bytes for the future
@@ -199,7 +199,6 @@ public:
 	static byte attrib_igs2[];
 	static byte attrib_igrd[];
 	static byte attrib_dis[];
-	static byte attrib_seq[];
 	static byte attrib_spe[];
 	static byte attrib_grp[];
 	static byte masters[NUM_MASTER_ZONES][NUM_MASTER_OPTS];

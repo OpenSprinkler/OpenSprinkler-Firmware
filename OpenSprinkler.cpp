@@ -66,7 +66,6 @@ byte OpenSprinkler::attrib_mas2[MAX_NUM_BOARDS];
 byte OpenSprinkler::attrib_igs2[MAX_NUM_BOARDS];
 byte OpenSprinkler::attrib_igrd[MAX_NUM_BOARDS];
 byte OpenSprinkler::attrib_dis[MAX_NUM_BOARDS];
-byte OpenSprinkler::attrib_seq[MAX_NUM_BOARDS];
 byte OpenSprinkler::attrib_spe[MAX_NUM_BOARDS];
 byte OpenSprinkler::attrib_grp[MAX_NUM_STATIONS];
 byte OpenSprinkler::masters[NUM_MASTER_ZONES][NUM_MASTER_OPTS];
@@ -1482,7 +1481,7 @@ byte OpenSprinkler::get_station_type(byte sid) {
 }
 
 byte OpenSprinkler::is_sequential_station(byte sid) {
-	return get_station_gid(sid) != PARALLEL_GROUP_ID;
+	return attrib_grp[sid] != PARALLEL_GROUP_ID;
 }
 
 byte OpenSprinkler::is_master_station(byte sid) {
@@ -1552,7 +1551,6 @@ void OpenSprinkler::attribs_save() {
 			at.igs2= (attrib_igs2[bid]>>s) & 1;
 			at.igrd= (attrib_igrd[bid]>>s) & 1;
 			at.dis = (attrib_dis[bid]>>s) & 1;
-			at.seq = (attrib_seq[bid]>>s) & 1;
 			at.gid = get_station_gid(sid);
 			set_station_gid(sid, at.gid);
 
@@ -1585,7 +1583,6 @@ void OpenSprinkler::attribs_load() {
 	memset(attrib_igs2, 0, nboards);
 	memset(attrib_igrd, 0, nboards);
 	memset(attrib_dis, 0, nboards);
-	memset(attrib_seq, 0, nboards);
 	memset(attrib_spe, 0, nboards);
 	memset(attrib_grp, 0, MAX_NUM_STATIONS);
 
@@ -1598,7 +1595,6 @@ void OpenSprinkler::attribs_load() {
 			attrib_igs2[bid]|= (at.igs2<<s);
 			attrib_igrd[bid]|= (at.igrd<<s);
 			attrib_dis[bid] |= (at.dis<<s);
-			attrib_seq[bid] |= (at.seq<<s);
 			attrib_grp[sid] = at.gid;
 			file_read_block(STATIONS_FILENAME, &ty, (uint32_t)sid*sizeof(StationData)+offsetof(StationData, type), 1);
 			if(ty!=STN_TYPE_STANDARD) {
@@ -2028,8 +2024,7 @@ void OpenSprinkler::factory_reset() {
 	StationAttrib at;
 	memset(&at, 0, sizeof(StationAttrib));
 	at.mas=1;
-	at.seq=1;
-	pdata->attrib=at; // mas:1 seq:1
+	pdata->attrib=at; // mas:1
 	pdata->type=STN_TYPE_STANDARD;
 	pdata->sped[0]='0';
 	pdata->sped[1]=0;

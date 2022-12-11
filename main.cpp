@@ -837,9 +837,6 @@ void do_loop()
 				sst = q->st + q->dur;
 				if (sst>curr_time) {
 					// only need to update last_seq_stop_time for sequential stations
-					/*if (os.attrib_seq[bid]&(1<<s) && !re) {
-						pd.last_seq_stop_time = (sst>pd.last_seq_stop_time ) ? sst : pd.last_seq_stop_time;
-					}*/
 					if (os.is_sequential_station(sid) && !re) {
 						pd.last_seq_stop_times[gid] = (sst > pd.last_seq_stop_times[gid]) ? sst : pd.last_seq_stop_times[gid];
 					}
@@ -1148,49 +1145,6 @@ void turn_off_station(byte sid, ulong curr_time, byte shift) {
 		pd.station_qid[sid] = 0xFF;
 	}
 }
-
-#if 0
-/** Turn off a station
- * This function turns off a scheduled station
- * and writes log record
- */
-void turn_off_station(byte sid, ulong curr_time, byte shift) {
-	os.set_station_bit(sid, 0);
-
-	byte qid = pd.station_qid[sid];
-	// ignore if we are turning off a station that's not running or scheduled to run
-	if (qid>=pd.nqueue)  return;
-
-	// RAH implementation of flow sensor
-	if (flow_gallons>1) {
-		if(flow_stop<=flow_begin) flow_last_gpm = 0;
-		else flow_last_gpm = (float) 60000/(float)((flow_stop-flow_begin)/(flow_gallons-1));
-	}// RAH calculate GPM, 1 pulse per gallon
-	else {flow_last_gpm = 0;}  // RAH if not one gallon (two pulses) measured then record 0 gpm
-
-	RuntimeQueueStruct *q = pd.queue+qid;
-
-	// check if the current time is past the scheduled start time,
-	// because we may be turning off a station that hasn't started yet
-	if (curr_time > q->st) {
-		// record lastrun log (only for non-master stations)
-		if(os.status.mas!=(sid+1) && os.status.mas2!=(sid+1)) {
-			pd.lastrun.station = sid;
-			pd.lastrun.program = q->pid;
-			pd.lastrun.duration = curr_time - q->st;
-			pd.lastrun.endtime = curr_time;
-
-			// log station run
-			write_log(LOGDATA_STATION, curr_time);
-			push_message(NOTIFY_STATION_OFF, sid, pd.lastrun.duration);
-		}
-	}
-
-	// dequeue the element
-	pd.dequeue(qid);
-	pd.station_qid[sid] = 0xFF;
-}
-#endif
 
 /** Process dynamic events
  * such as rain delay, rain sensing
