@@ -25,6 +25,7 @@
 #include "opensprinkler_server.h"
 #include "gpio.h"
 #include "testmode.h"
+#include "program.h"
 
 /** Declare static data members */
 OSMqtt OpenSprinkler::mqtt;
@@ -72,6 +73,7 @@ byte OpenSprinkler::masters[NUM_MASTER_ZONES][NUM_MASTER_OPTS];
 
 extern char tmp_buffer[];
 extern char ether_buffer[];
+extern ProgramData pd;
 
 #if defined(ESP8266)
 	SSD1306Display OpenSprinkler::lcd(0x3c, SDA, SCL);
@@ -1209,19 +1211,33 @@ void OpenSprinkler::apply_all_station_bits() {
 	#endif
 #endif
 
-
+	ulong start = millis();
 	if(iopts[IOPT_SPE_AUTO_REFRESH]) {
 		// handle refresh of RF and remote stations
 		// we refresh the station that's next in line
 		static byte next_sid_to_refresh = MAX_NUM_STATIONS>>1;
 		static byte lastnow = 0;
-		byte _now = (now() & 0xFF);
+		ulong curr_time = now_tz();
+		byte _now = (curr_time & 0xFF);
 		if (lastnow != _now) {  // perform this no more than once per second
 			lastnow = _now;
 			next_sid_to_refresh = (next_sid_to_refresh+1) % MAX_NUM_STATIONS;
-			bid=next_sid_to_refresh>>3;
-			s=next_sid_to_refresh&0x07;
-			switch_special_station(next_sid_to_refresh, (station_bits[bid]>>s)&0x01);
+			byte bid=next_sid_to_refresh>>3,s=next_sid_to_refresh&0x07;
+			if(os.attrib_spe[bid]&(1<<s)) { // check if this is a special station
+			//if(get_station_type(next_sid_to_refresh) != STN_TYPE_STANDARD) {\}
+				bid=next_sid_to_refresh>>3;
+				s=next_sid_to_refresh&0x07;
+				bool on = (station_bits[bid]>>s)&0x01;
+				uint16_t dur = 0;
+				if(on) {
+					byte sqi=pd.station_qid[next_sid_to_refresh];
+					RuntimeQueueStruct *q=pd.queue+sqi;
+					if(sqi<255 && q->st>0 && q->st+q->dur>curr_time) {
+						dur = q->st+q->dur-curr_time;
+					}
+				}
+				switch_special_station(next_sid_to_refresh, on, dur);
+			}
 		}
 	}
 }
@@ -1616,8 +1632,10 @@ byte OpenSprinkler::weekday_today() {
 }
 
 /** Switch special station */
-void OpenSprinkler::switch_special_station(byte sid, byte value) {
+void OpenSprinkler::switch_special_station(byte sid, byte value, uint16_t dur) {
 	// check if this is a special station
+	byte bid=sid>>3,s=sid&0x07;
+	if(!os.attrib_spe[bid]&(1<<s)) return;
 	byte stype = get_station_type(sid);
 	if(stype!=STN_TYPE_STANDARD) {
 		// read station data
@@ -1630,7 +1648,7 @@ void OpenSprinkler::switch_special_station(byte sid, byte value) {
 			break;
 
 		case STN_TYPE_REMOTE:
-			switch_remotestation((RemoteStationData *)pdata->sped, value);
+			switch_remotestation((RemoteStationData *)pdata->sped, value, dur);
 			break;
 
 		case STN_TYPE_GPIO:
@@ -1649,7 +1667,7 @@ void OpenSprinkler::switch_special_station(byte sid, byte value) {
  * You have to call apply_all_station_bits next to apply the bits
  * (which results in physical actions of opening/closing valves).
  */
-byte OpenSprinkler::set_station_bit(byte sid, byte value) {
+byte OpenSprinkler::set_station_bit(byte sid, byte value, uint16_t dur) {
 	byte *data = station_bits+(sid>>3);  // pointer to the station byte
 	byte mask = (byte)1<<(sid&0x07); // mask
 	if (value) {
@@ -1657,7 +1675,7 @@ byte OpenSprinkler::set_station_bit(byte sid, byte value) {
 		else {
 			(*data) = (*data) | mask;
 			engage_booster = true; // if bit is changing from 0 to 1, set engage_booster
-			switch_special_station(sid, 1); // handle special stations
+			switch_special_station(sid, 1, dur); // handle special stations
 			return 1;
 		}
 	} else {
@@ -1899,7 +1917,7 @@ int8_t OpenSprinkler::send_http_request(char* server_with_port, char* p, void(*c
  * The remote controller is assumed to have the same
  * password as the main controller
  */
-void OpenSprinkler::switch_remotestation(RemoteStationData *data, bool turnon) {
+void OpenSprinkler::switch_remotestation(RemoteStationData *data, bool turnon, uint16_t dur) {
 	RemoteStationData copy;
 	memcpy((char*)&copy, (char*)data, sizeof(RemoteStationData));
 
@@ -1916,9 +1934,18 @@ void OpenSprinkler::switch_remotestation(RemoteStationData *data, bool turnon) {
 	// because remote station data is loaded at the beginning
 	char *p = tmp_buffer;
 	BufferFiller bf = p;
-	// if auto refresh is enabled, we give a fixed duration each time, and auto refresh will renew it periodically
-	// if no auto refresh, we will give the maximum allowed duration, and station will be turned off when off command is sent
-	uint16_t timer = iopts[IOPT_SPE_AUTO_REFRESH]?4*MAX_NUM_STATIONS:64800;
+	// if turning on the zone and duration is defined, give duration as the timer value
+	// otherwise:
+	//   if autorefresh is defined, we give a fixed duration each time, and auto refresh will renew it periodically
+	//   if no auto refresh, we will give the maximum allowed duration, and station will be turned off when off command is sent
+	uint16_t timer = 0;
+	if(turnon) {
+		if(dur>0) {
+			timer = dur;
+		} else {
+			timer = iopts[IOPT_SPE_AUTO_REFRESH]?4*MAX_NUM_STATIONS:64800;
+		}
+	}
 	bf.emit_p(PSTR("GET /cm?pw=$O&sid=$D&en=$D&t=$D"),
 						SOPT_PASSWORD,
 						(int)hex2ulong(copy.sid, sizeof(copy.sid)),

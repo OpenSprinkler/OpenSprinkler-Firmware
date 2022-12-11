@@ -253,7 +253,7 @@ public:
 	static void attribs_load(); // load and repackage attrib bits (backward compatibility)
 	static uint16_t parse_rfstation_code(RFStationData *data, ulong *on, ulong *off); // parse rf code into on/off/time sections
 	static void switch_rfstation(RFStationData *data, bool turnon);  // switch rf station
-	static void switch_remotestation(RemoteStationData *data, bool turnon); // switch remote station
+	static void switch_remotestation(RemoteStationData *data, bool turnon, uint16_t dur=0); // switch remote station
 	static void switch_gpiostation(GPIOStationData *data, bool turnon); // switch gpio station
 	static void switch_httpstation(HTTPStationData *data, bool turnon); // switch http station
 
@@ -287,8 +287,8 @@ public:
 	static int detect_exp();      // detect the number of expansion boards
 	static byte weekday_today();  // returns index of today's weekday (Monday is 0)
 
-	static byte set_station_bit(byte sid, byte value); // set station bit of one station (sid->station index, value->0/1)
-	static void switch_special_station(byte sid, byte value); // swtich special station
+	static byte set_station_bit(byte sid, byte value, uint16_t dur=0); // set station bit of one station (sid->station index, value->0/1)
+	static void switch_special_station(byte sid, byte value, uint16_t dur=0); // swtich special station
 	static void clear_all_station_bits(); // clear all station bits
 	static void apply_all_station_bits(); // apply all station bits (activate/deactive values)
 

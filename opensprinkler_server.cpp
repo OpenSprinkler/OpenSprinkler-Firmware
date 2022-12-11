@@ -493,7 +493,9 @@ void server_json_station_special(OTF_PARAMS_DEF) {
 
 	bfill.emit_p(PSTR("{"));
 	for(sid=0;sid<os.nstations;sid++) {
-		if(os.get_station_type(sid)!=STN_TYPE_STANDARD) {  // check if this is a special station
+		byte bid=sid>>3,s=sid&0x07;
+		if(os.attrib_spe[bid]&(1<<s)) { // check if this is a special station
+		//if(os.get_station_type(sid)!=STN_TYPE_STANDARD) {  
 			os.get_station_data(sid, data);
 			if (comma) bfill.emit_p(PSTR(","));
 			else {comma=1;}

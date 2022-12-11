@@ -794,7 +794,6 @@ void do_loop()
 					// if current station is not running, check if we should turn it on
 					if(!((bitvalue >> s) & 1)) {
 						if (curr_time >= q->st && curr_time < q->st+q->dur) {
-							//os.set_station_bit(sid, 1);
 							turn_on_station(sid, q->st+q->dur-curr_time); // the last parameter is expected run time
 						} //if curr_time > scheduled_start_time
 					} // if current station is not running
@@ -1049,7 +1048,7 @@ void turn_on_station(byte sid, ulong duration) {
 	// RAH implementation of flow sensor
 	flow_start=0;
 
-	if (os.set_station_bit(sid, 1)) {
+	if (os.set_station_bit(sid, 1, duration)) {
 		push_message(NOTIFY_STATION_ON, sid, duration);
 	}
 }
