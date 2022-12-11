@@ -1211,7 +1211,6 @@ void OpenSprinkler::apply_all_station_bits() {
 	#endif
 #endif
 
-	ulong start = millis();
 	if(iopts[IOPT_SPE_AUTO_REFRESH]) {
 		// handle refresh of RF and remote stations
 		// we refresh the station that's next in line
@@ -1224,7 +1223,6 @@ void OpenSprinkler::apply_all_station_bits() {
 			next_sid_to_refresh = (next_sid_to_refresh+1) % MAX_NUM_STATIONS;
 			byte bid=next_sid_to_refresh>>3,s=next_sid_to_refresh&0x07;
 			if(os.attrib_spe[bid]&(1<<s)) { // check if this is a special station
-			//if(get_station_type(next_sid_to_refresh) != STN_TYPE_STANDARD) {\}
 				bid=next_sid_to_refresh>>3;
 				s=next_sid_to_refresh&0x07;
 				bool on = (station_bits[bid]>>s)&0x01;
@@ -1635,7 +1633,7 @@ byte OpenSprinkler::weekday_today() {
 void OpenSprinkler::switch_special_station(byte sid, byte value, uint16_t dur) {
 	// check if this is a special station
 	byte bid=sid>>3,s=sid&0x07;
-	if(!os.attrib_spe[bid]&(1<<s)) return;
+	if(!(os.attrib_spe[bid]&(1<<s))) return; // if this is not a special stations
 	byte stype = get_station_type(sid);
 	if(stype!=STN_TYPE_STANDARD) {
 		// read station data
@@ -1900,7 +1898,12 @@ int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char*
 
 int8_t OpenSprinkler::send_http_request(uint32_t ip4, uint16_t port, char* p, void(*callback)(char*), uint16_t timeout) {
 	char server[20];
-	sprintf(server, "%d.%d.%d.%d", ip4>>24, (ip4>>16)&0xff, (ip4>>8)&0xff, ip4&0xff);
+	byte ip[4];
+	ip[0] = ip4>>24;
+	ip[1] = (ip4>>16)&0xff;
+	ip[2] = (ip4>>8)&0xff;
+	ip[3] = ip4&0xff;
+	sprintf(server, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
 	return send_http_request(server, port, p, callback, timeout);
 }
 
@@ -1953,8 +1956,9 @@ void OpenSprinkler::switch_remotestation(RemoteStationData *data, bool turnon, u
 	bf.emit_p(PSTR(" HTTP/1.0\r\nHOST: $D.$D.$D.$D\r\n\r\n"),
 						ip[0],ip[1],ip[2],ip[3]);
 
-	send_http_request(ip4, port, p, remote_http_callback);
-
+	char server[20];
+	sprintf(server, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
+	send_http_request(server, port, p, remote_http_callback);
 }
 
 /** Switch http station
@@ -2541,7 +2545,7 @@ void OpenSprinkler::lcd_print_screen(char c) {
 #if defined(ESP8266)
 	lcd.display();
 	lcd.setAutoDisplay(true);
-#endif	
+#endif
 }
 
 /** print a version number */
