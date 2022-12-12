@@ -1868,7 +1868,7 @@ int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char*
 			break;
 		}
 		if(!client->connected() && !client->available()) {
-			DEBUG_PRINTLN(F("host disconnected"));
+			//DEBUG_PRINTLN(F("host disconnected"));
 			break;
 		}
 	}
@@ -1887,7 +1887,6 @@ int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char*
 	ether_buffer[pos]=0; // properly end buffer with 0
 	client->stop();
 	if(strlen(ether_buffer)==0) return HTTP_RQT_EMPTY_RETURN;
-	DEBUG_PRINTLN(ether_buffer);
 	if(callback) callback(ether_buffer);
 	return HTTP_RQT_SUCCESS;
 }

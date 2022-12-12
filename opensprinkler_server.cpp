@@ -1903,6 +1903,20 @@ void server_json_debug(OTF_PARAMS_DEF) {
 	(uint16_t)ESP.getFreeHeap());
 	FSInfo fs_info;
 	LittleFS.info(fs_info);
+
+#if 0 // print out all log files and all files in the main folder with file sizes
+	Dir dir = LittleFS.openDir("/logs/");
+	while (dir.next()) {
+		DEBUG_PRINTLN(dir.fileName());
+	}
+	dir = LittleFS.openDir("/");
+	while (dir.next()) {
+		DEBUG_PRINT(dir.fileName());
+		DEBUG_PRINT("/");
+		DEBUG_PRINTLN(dir.fileSize());
+	}
+#endif
+
 	bfill.emit_p(PSTR(",\"flash\":$D,\"used\":$D,\"rssi\":$D,\"bssid\":\"$S\",\"bssidchl\":\"$O\"}"),
 		fs_info.totalBytes, fs_info.usedBytes, WiFi.RSSI(), WiFi.BSSIDstr().c_str(), SOPT_STA_BSSID_CHL);
 #else
@@ -1910,6 +1924,25 @@ void server_json_debug(OTF_PARAMS_DEF) {
 	bfill.emit_p(PSTR("}"));
 #endif
 	handle_return(HTML_OK);
+}
+#endif
+
+#if 0 // fill ESP8266 flash with some dummy files
+void server_fill_files(OTF_PARAMS_DEF) {
+	memset(ether_buffer, 65, ETHER_BUFFER_SIZE);
+	ether_buffer[ETHER_BUFFER_SIZE] = 0;
+
+	for(int index=1;index<5;index++) {
+		itoa(index, tmp_buffer, 10);
+		make_logfile_name(tmp_buffer);
+		DEBUG_PRINT(F("creating "));
+		DEBUG_PRINT(tmp_buffer);
+		File file = LittleFS.open(tmp_buffer, "w");
+		file.write(ether_buffer, ETHER_BUFFER_SIZE);
+		file.close();
+		DEBUG_PRINT(F(" done. "));
+	}
+	handle_return(HTML_SUCCESS);
 }
 #endif
 

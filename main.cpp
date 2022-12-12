@@ -395,6 +395,7 @@ void perform_ntp_sync();
 void delete_log(char *name);
 
 #if defined(ESP8266)
+bool delete_log_oldest();
 void start_server_ap();
 void start_server_client();
 static Ticker reboot_ticker;
@@ -1564,7 +1565,7 @@ void make_logfile_name(char *name) {
 	sd.chdir("/");
 	#endif
 #endif
-	strcpy(tmp_buffer+TMP_BUFFER_SIZE-10, name);
+	strcpy(tmp_buffer+TMP_BUFFER_SIZE-10, name); // hack: we do this because name is from tmp_buffer too
 	strcpy(tmp_buffer, LOG_PREFIX);
 	strcat(tmp_buffer, tmp_buffer+TMP_BUFFER_SIZE-10);
 	strcat_P(tmp_buffer, PSTR(".txt"));
@@ -1600,6 +1601,13 @@ void write_log(byte type, ulong curr_time) {
 	#if defined(ESP8266)
 	File file = LittleFS.open(tmp_buffer, "r+");
 	if(!file) {
+		FSInfo fs_info;
+		LittleFS.info(fs_info);
+		// check if we are getting close to run out of space, and delete some oldest files
+		if(fs_info.totalBytes < fs_info.usedBytes + fs_info.blockSize * 4) {
+			// delete the oldest 7 files (1 week of log)
+			for(byte i=0;i<7;i++)	delete_log_oldest();
+		}
 		file = LittleFS.open(tmp_buffer, "w");
 		if(!file) return;
 	}
@@ -1701,6 +1709,28 @@ void write_log(byte type, ulong curr_time) {
 #endif
 }
 
+#if defined(ESP8266)
+bool delete_log_oldest() {
+	Dir dir = LittleFS.openDir(LOG_PREFIX);
+	time_t oldest_t = ULONG_MAX;
+	String oldest_fn;
+	while (dir.next()) {
+		time_t t = dir.fileCreationTime();
+		if(t<oldest_t) {
+			oldest_t = t;
+			oldest_fn = dir.fileName();
+		}
+	}
+	if(oldest_fn.length()>0) {
+		DEBUG_PRINT(F("deleting "))
+		DEBUG_PRINTLN(LOG_PREFIX+oldest_fn);
+		LittleFS.remove(LOG_PREFIX+oldest_fn);
+		return true;
+	} else {
+		return false;
+	}
+}
+#endif
 
 /** Delete log file
  * If name is 'all', delete all logs
