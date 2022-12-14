@@ -1372,7 +1372,9 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 		return;
 
 	if (ifttt_enabled) {
-		strcpy_P(postval, PSTR("{\"value1\":\""));
+		strcpy_P(postval, PSTR("{\"value1\":\"On site ["));
+		os.sopt_load(SOPT_DEVICE_NAME, postval+strlen(postval));
+		strcat_P(postval, PSTR("], "));
 	}
 
 	if (os.mqtt.enabled()) {
@@ -1403,9 +1405,10 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 				}
 			}
 			if (ifttt_enabled) {
-				char name[STATION_NAME_SIZE];
-				os.get_station_name(lval, name);
-				sprintf_P(postval+strlen(postval), PSTR("Station %s closed. It ran for %d minutes %d seconds."), name, (int)fval/60, (int)fval%60);
+				strcat_P(postval, PSTR("station ["));
+				os.get_station_name(lval, postval+strlen(postval));
+				strcat_P(postval, PSTR("] closed. It ran for "));
+				sprintf_P(postval+strlen(postval), PSTR(" %d minutes %d seconds."), (int)fval/60, (int)fval%60);
 
 				if(os.iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_FLOW) {
 					sprintf_P(postval+strlen(postval), PSTR(" Flow rate: %d.%02d"), (int)flow_last_gpm, (int)(flow_last_gpm*100)%100);
@@ -1416,8 +1419,8 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 		case NOTIFY_PROGRAM_SCHED:
 
 			if (ifttt_enabled) {
-				if (sval) strcat_P(postval, PSTR("Manually scheduled "));
-				else strcat_P(postval, PSTR("Automatically scheduled "));
+				if (sval) strcat_P(postval, PSTR("manually scheduled "));
+				else strcat_P(postval, PSTR("automatically scheduled "));
 				strcat_P(postval, PSTR("Program "));
 				{
 					ProgramStruct prog;
@@ -1435,7 +1438,7 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 				sprintf_P(payload, PSTR("{\"state\":%d}"), (int)fval);
 			}
 			if (ifttt_enabled) {
-				strcat_P(postval, PSTR("Sensor 1 "));
+				strcat_P(postval, PSTR("sensor 1 "));
 				strcat_P(postval, ((int)fval)?PSTR("activated."):PSTR("de-activated."));
 			}
 			break;
@@ -1447,7 +1450,7 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 				sprintf_P(payload, PSTR("{\"state\":%d}"), (int)fval);
 			}
 			if (ifttt_enabled) {
-				strcat_P(postval, PSTR("Sensor 2 "));
+				strcat_P(postval, PSTR("sensor 2 "));
 				strcat_P(postval, ((int)fval)?PSTR("activated."):PSTR("de-activated."));
 			}
 			break;
@@ -1459,7 +1462,7 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 				sprintf_P(payload, PSTR("{\"state\":%d}"), (int)fval);
 			}
 			if (ifttt_enabled) {
-				strcat_P(postval, PSTR("Rain delay "));
+				strcat_P(postval, PSTR("rain delay "));
 				strcat_P(postval, ((int)fval)?PSTR("activated."):PSTR("de-activated."));
 			}
 			break;
@@ -1474,7 +1477,7 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 				sprintf_P(payload, PSTR("{\"count\":%lu,\"volume\":%d.%02d}"), lval, (int)volume/100, (int)volume%100);
 			}
 			if (ifttt_enabled) {
-				sprintf_P(postval+strlen(postval), PSTR("Flow count: %lu, volume: %d.%02d"), lval, (int)volume/100, (int)volume%100);
+				sprintf_P(postval+strlen(postval), PSTR("flow count: %lu, volume: %d.%02d"), lval, (int)volume/100, (int)volume%100);
 			}
 			break;
 
@@ -1482,7 +1485,7 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 
 			if (ifttt_enabled) {
 				if(lval>0) {
-					strcat_P(postval, PSTR("External IP updated: "));
+					strcat_P(postval, PSTR("external IP updated: "));
 					byte ip[4] = {(byte)((lval>>24)&0xFF),
 									(byte)((lval>>16)&0xFF),
 									(byte)((lval>>8)&0xFF),
@@ -1490,7 +1493,7 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 					ip2string(postval, ip);
 				}
 				if(fval>=0) {
-					sprintf_P(postval+strlen(postval), PSTR("Water level updated: %d%%."), (int)fval);
+					sprintf_P(postval+strlen(postval), PSTR("water level updated: %d%%."), (int)fval);
 				}
 			}
 			break;
@@ -1503,7 +1506,7 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 			}
 			if (ifttt_enabled) {
 				#if defined(ARDUINO)
-					strcat_P(postval, PSTR("Rebooted. Device IP: "));
+					strcat_P(postval, PSTR("rebooted. Device IP: "));
 					#if defined(ESP8266)
 					{
 						IPAddress _ip;
@@ -1522,7 +1525,7 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 					//strcat(postval, ":");
 					//itoa(_port, postval+strlen(postval), 10);
 				#else
-					strcat_P(postval, PSTR("Process restarted."));
+					strcat_P(postval, PSTR("process restarted."));
 				#endif
 			}
 			break;
