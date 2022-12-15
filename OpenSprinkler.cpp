@@ -576,7 +576,11 @@ void OpenSprinkler::reboot_dev(uint8_t cause) {
 byte OpenSprinkler::start_network() {
 	unsigned int port = (unsigned int)(iopts[IOPT_HTTPPORT_1]<<8) + (unsigned int)iopts[IOPT_HTTPPORT_0];
 #if defined(DEMO)
+#if defined(HTTP_PORT)
+	port = HTTP_PORT;
+#else
 	port = 80;
+#endif
 #endif
 	if(m_server) { delete m_server; m_server = 0; }
 
