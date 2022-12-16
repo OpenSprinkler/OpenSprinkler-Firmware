@@ -339,6 +339,12 @@ void do_setup() {
 
 	os.apply_all_station_bits(); // reset station bits
 
+	// because at reboot we don't know if special stations
+	// are in OFF state, here we explicitly turn them off
+	for(byte sid=0;sid<os.nstations;sid++) {
+		os.switch_special_station(sid, 0);
+	}
+
 	os.button_timeout = LCD_BACKLIGHT_TIMEOUT;
 }
 
@@ -376,6 +382,12 @@ void do_setup() {
 		os.status.network_fails = 1;
 	}
 	os.status.req_network = 0;
+
+	// because at reboot we don't know if special stations
+	// are in OFF state, here we explicitly turn them off
+	for(byte sid=0;sid<os.nstations;sid++) {
+		os.switch_special_station(sid, 0);
+	}
 
 	os.mqtt.init();
 	os.status.req_mqtt_restart = true;
