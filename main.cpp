@@ -971,14 +971,12 @@ void do_loop()
 		// check weather
 		check_weather();
 
-		byte wuf = os.weather_update_flag;
-		if(wuf) {
-			if((wuf&WEATHER_UPDATE_EIP) | (wuf&WEATHER_UPDATE_WL)) {
-				// at the moment, we only send notification if water level or external IP changed
-				// the other changes, such as sunrise, sunset changes are ignored for notification
-				push_message(NOTIFY_WEATHER_UPDATE, (wuf&WEATHER_UPDATE_EIP)?os.nvdata.external_ip:0,
-																				 (wuf&WEATHER_UPDATE_WL)?os.iopts[IOPT_WATER_PERCENTAGE]:-1);
-			}
+		if( os.weather_update_flag & WEATHER_UPDATE_WL)
+		{
+			// at the moment, we only send notification if water level IP changed
+			// the other changes, such as sunrise, sunset changes are ignored for notification
+			push_message(NOTIFY_WEATHER_UPDATE, 0, os.iopts[IOPT_WATER_PERCENTAGE]);
+			
 			os.weather_update_flag = 0;
 		}
 		static byte reboot_notification = 1;
