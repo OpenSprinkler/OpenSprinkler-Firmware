@@ -1631,7 +1631,6 @@ void OpenSprinkler::switch_special_station(byte sid, byte value, uint16_t dur) {
 	byte bid=sid>>3,s=sid&0x07;
 	if(!(os.attrib_spe[bid]&(1<<s))) return; // if this is not a special stations
 	byte stype = get_station_type(sid);
-	DEBUG_PRINTLN(stype);
 	if(stype!=STN_TYPE_STANDARD) {
 		// read station data
 		StationData *pdata=(StationData*) tmp_buffer;
