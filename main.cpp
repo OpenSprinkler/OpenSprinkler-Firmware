@@ -973,14 +973,10 @@ void do_loop()
 		// check weather
 		check_weather();
 
-		byte wuf = os.weather_update_flag;
-		if(wuf) {
-			if((wuf&WEATHER_UPDATE_EIP) | (wuf&WEATHER_UPDATE_WL)) {
-				// at the moment, we only send notification if water level or external IP changed
-				// the other changes, such as sunrise, sunset changes are ignored for notification
-				push_message(NOTIFY_WEATHER_UPDATE, (wuf&WEATHER_UPDATE_EIP)?os.nvdata.external_ip:0,
-																				 (wuf&WEATHER_UPDATE_WL)?os.iopts[IOPT_WATER_PERCENTAGE]:-1);
-			}
+		if(os.weather_update_flag & WEATHER_UPDATE_WL) {
+			// at the moment, we only send notification if water level changed
+			// the other changes, such as sunrise, sunset changes are ignored for notification
+			push_message(NOTIFY_WEATHER_UPDATE, 0, os.iopts[IOPT_WATER_PERCENTAGE]);
 			os.weather_update_flag = 0;
 		}
 		static byte reboot_notification = 1;
@@ -1486,10 +1482,10 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 			volume = lval*volume;
 			if (os.mqtt.enabled()) {
 				strcpy_P(topic, PSTR("opensprinkler/sensor/flow"));
-				sprintf_P(payload, PSTR("{\"count\":%lu,\"volume\":%d.%02d}"), lval, (int)volume/100, (int)volume%100);
+				sprintf_P(payload, PSTR("{\"count\":%u,\"volume\":%d.%02d}"), lval, (int)volume/100, (int)volume%100);
 			}
 			if (ifttt_enabled) {
-				sprintf_P(postval+strlen(postval), PSTR("flow count: %lu, volume: %d.%02d"), lval, (int)volume/100, (int)volume%100);
+				sprintf_P(postval+strlen(postval), PSTR("Flow count: %u, volume: %d.%02d"), lval, (int)volume/100, (int)volume%100);
 			}
 			break;
 

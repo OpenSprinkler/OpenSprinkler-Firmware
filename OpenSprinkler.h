@@ -291,9 +291,9 @@ public:
 	static void clear_all_station_bits(); // clear all station bits
 	static void apply_all_station_bits(); // apply all station bits (activate/deactive values)
 
-	static int8_t send_http_request(uint32_t ip4, uint16_t port, char* p, void(*callback)(char*)=NULL, uint16_t timeout=3000);
-	static int8_t send_http_request(const char* server, uint16_t port, char* p, void(*callback)(char*)=NULL, uint16_t timeout=3000);
-	static int8_t send_http_request(char* server_with_port, char* p, void(*callback)(char*)=NULL, uint16_t timeout=3000);
+	static int8_t send_http_request(uint32_t ip4, uint16_t port, char* p, void(*callback)(char*)=NULL, uint16_t timeout=5000);
+	static int8_t send_http_request(const char* server, uint16_t port, char* p, void(*callback)(char*)=NULL, uint16_t timeout=5000);
+	static int8_t send_http_request(char* server_with_port, char* p, void(*callback)(char*)=NULL, uint16_t timeout=5000);
 	// -- LCD functions
 #if defined(ARDUINO) // LCD functions for Arduino
 	#if defined(ESP8266)

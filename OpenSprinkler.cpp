@@ -605,7 +605,11 @@ void OpenSprinkler::reboot_dev(uint8_t cause) {
 byte OpenSprinkler::start_network() {
 	unsigned int port = (unsigned int)(iopts[IOPT_HTTPPORT_1]<<8) + (unsigned int)iopts[IOPT_HTTPPORT_0];
 #if defined(DEMO)
+#if defined(HTTP_PORT)
+	port = HTTP_PORT;
+#else
 	port = 80;
+#endif
 #endif
 	if(m_server) { delete m_server; m_server = 0; }
 
@@ -1818,7 +1822,7 @@ int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char*
 	} while(tries<HTTP_CONNECT_NTRIES);
 
 	if(tries==HTTP_CONNECT_NTRIES) {
-		DEBUG_PRINTLN(F("failed."));
+		DEBUG_PRINTLN(F(" ->FAILED!"));
 		client->stop();
 		return HTTP_RQT_CONNECT_ERR;
 	}
@@ -1827,6 +1831,10 @@ int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char*
 	EthernetClient etherClient;
 	EthernetClient *client = &etherClient;
 	struct hostent *host;
+	DEBUG_PRINT(F("connect to "));
+	DEBUG_PRINT(server);
+	DEBUG_PRINT(":");
+	DEBUG_PRINT(port);
 	host = gethostbyname(server);
 	if (!host) { return HTTP_RQT_CONNECT_ERR; }
 	if(!client->connect((uint8_t*)host->h_addr, port)) {

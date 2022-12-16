@@ -2290,6 +2290,7 @@ ulong getNtpTime() {
 		os.iopts[IOPT_NTP_IP4]};
 	byte tries=0;
 	ulong gt = 0;
+	ulong startt = millis();
 	while(tries<NTP_NTRIES) {
 		// sendNtpPacket
 		udp->begin(port);
@@ -2345,6 +2346,9 @@ ulong getNtpTime() {
 				if(gt>1577836800UL) {
 					udp->stop();
 					delete udp;
+					DEBUG_PRINT(F("took "));
+					DEBUG_PRINT(millis()-startt);
+					DEBUG_PRINTLN(F("ms"));
 					return gt;
 				}
 			}
