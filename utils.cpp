@@ -479,6 +479,12 @@ void peel_http_header(char* buffer) { // remove the HTTP header
 	}
 }
 
+void strReplace(char *str, char c, char r) {
+	for(byte i=0;i<strlen(str);i++) {
+		if(str[i]==c) str[i]=r;
+	}
+}
+
 static const byte month_days[] = {31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
 
 bool isValidDate(byte m, byte d) {

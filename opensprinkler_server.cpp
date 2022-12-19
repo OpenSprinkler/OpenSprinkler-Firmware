@@ -571,6 +571,8 @@ void server_change_stations(OTF_PARAMS_DEF) {
 		itoa(sid, tbuf2+1, 10);
 		if(findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, tbuf2)) {
 			urlDecode(tmp_buffer);
+			strReplace(tmp_buffer, '\"', '\'');
+			strReplace(tmp_buffer, '\\', '/');
 			os.set_station_name(sid, tmp_buffer);
 		}
 	}
@@ -849,6 +851,8 @@ void server_change_program(OTF_PARAMS_DEF) {
 	// parse program name
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("name"), true)) {
 		urlDecode(tmp_buffer);
+		strReplace(tmp_buffer, '\"', '\'');
+		strReplace(tmp_buffer, '\\', '/');
 		strncpy(prog.name, tmp_buffer, PROGRAM_NAME_SIZE);
 	} else {
 		strcpy_P(prog.name, _str_program);
@@ -1482,6 +1486,8 @@ void server_change_options(OTF_PARAMS_DEF)
 
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("dname"), true)) {
 		urlDecode(tmp_buffer);
+		strReplace(tmp_buffer, '\"', '\'');
+		strReplace(tmp_buffer, '\\', '/');
 		os.sopt_save(SOPT_DEVICE_NAME, tmp_buffer);
 	}
 

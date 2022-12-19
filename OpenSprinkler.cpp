@@ -348,7 +348,7 @@ byte OpenSprinkler::iopts[] = {
 	0,  // device id
 	150,// lcd contrast
 	100,// lcd backlight
-	30, // lcd dimming
+	15, // lcd dimming
 	80, // boost time (only valid to DC and LATCH type)
 	0,  // weather algorithm (0 means not using weather algorithm)
 	0,  // this and the next three bytes define the ntp server ip
@@ -1822,7 +1822,7 @@ int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char*
 	} while(tries<HTTP_CONNECT_NTRIES);
 
 	if(tries==HTTP_CONNECT_NTRIES) {
-		DEBUG_PRINTLN(F(" ->FAILED!"));
+		DEBUG_PRINTLN(F("failed."));
 		client->stop();
 		return HTTP_RQT_CONNECT_ERR;
 	}
@@ -1831,17 +1831,13 @@ int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char*
 	EthernetClient etherClient;
 	EthernetClient *client = &etherClient;
 	struct hostent *host;
-	DEBUG_PRINT(F("connect to "));
 	DEBUG_PRINT(server);
 	DEBUG_PRINT(":");
-	DEBUG_PRINT(port);
+	DEBUG_PRINTLN(port);
 	host = gethostbyname(server);
 	if (!host) { return HTTP_RQT_CONNECT_ERR; }
 	if(!client->connect((uint8_t*)host->h_addr, port)) {
-		DEBUG_PRINT(F("Cannot connect to "));
-		DEBUG_PRINT(server);
-		DEBUG_PRINT(":");
-		DEBUG_PRINTLN(port);
+		DEBUG_PRINT(F("failed."));
 		client->stop();
 		return HTTP_RQT_CONNECT_ERR;
 	}
