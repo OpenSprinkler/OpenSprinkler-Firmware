@@ -86,7 +86,7 @@ int sensor_delete(uint nr) {
  * @param port 
  * @param id 
  */
-int sensor_define(uint nr, char *name, uint type, uint group, uint32_t ip, uint port, uint id, uint ri, byte enable, byte log) {
+int sensor_define(uint nr, char *name, uint type, uint group, uint32_t ip, uint port, uint id, uint ri, SensorFlags_t flags) {
 
 	if (nr == 0 || type == 0)
 		return HTTP_RQT_NOT_RECEIVED;
@@ -102,8 +102,7 @@ int sensor_define(uint nr, char *name, uint type, uint group, uint32_t ip, uint 
 			sensor->port = port;
 			sensor->id = id;
 			sensor->read_interval = ri;
-			sensor->enable = enable;
-			sensor->log = log;
+			sensor->flags = flags;
 			sensor_save();
 			return HTTP_RQT_SUCCESS;
 		}
@@ -125,8 +124,7 @@ int sensor_define(uint nr, char *name, uint type, uint group, uint32_t ip, uint 
 	new_sensor->port = port;
 	new_sensor->id = id;
 	new_sensor->read_interval = ri;
-	new_sensor->enable = enable;
-	new_sensor->log = log;
+	new_sensor->flags = flags;
 	if (last) {
 		new_sensor->next = last->next;
 		last->next = new_sensor;
@@ -219,21 +217,30 @@ Sensor_t *sensor_by_idx(uint idx) {
 	return NULL;
 }
 
-void sensorlog_add(SensorLog_t *sensorlog) {
-	DEBUG_PRINT(F("sensorlog_add "));
-	file_append_block(SENSORLOG_FILENAME, sensorlog, SENSORLOG_STORE_SIZE);
-	DEBUG_PRINT(sensorlog_filesize());
+bool sensorlog_add(SensorLog_t *sensorlog) {
+	if (checkDiskFree()) {
+		DEBUG_PRINT(F("sensorlog_add "));
+		file_append_block(SENSORLOG_FILENAME, sensorlog, SENSORLOG_STORE_SIZE);
+		DEBUG_PRINT(sensorlog_filesize());
+		return true;
+	}
+	return false;
 }
 
-void sensorlog_add(Sensor_t *sensor, ulong time) {
-	if (sensor->data_ok) {
+bool sensorlog_add(Sensor_t *sensor, ulong time) {
+	if (sensor->flags.data_ok && sensor->flags.log) {
 		SensorLog_t sensorlog;
 		sensorlog.nr = sensor->nr;
 		sensorlog.time = time;
 		sensorlog.native_data = sensor->last_native_data;
 		sensorlog.data = sensor->last_data;
-		sensorlog_add(&sensorlog);
+		if (!sensorlog_add(&sensorlog)) {
+			sensor->flags.log = 0;
+			return false;
+		}
+		return true;
 	}
+	return false;
 }
 
 ulong sensorlog_filesize() {
@@ -289,7 +296,7 @@ void read_all_sensors() {
 */
 int read_sensor_adc(Sensor_t *sensor) {
 	DEBUG_PRINTLN(F("read_sensor_adc"));
-	if (!sensor || !sensor->enable) return HTTP_RQT_NOT_RECEIVED;
+	if (!sensor || !sensor->flags.enable) return HTTP_RQT_NOT_RECEIVED;
 
 	//Init + Detect:
 	ADS1015 adc(sensor->port);
@@ -313,7 +320,7 @@ int read_sensor_adc(Sensor_t *sensor) {
 		sensor->last_data = (sensor->last_data - 0.5) * 100;
 	}
 
-	sensor->data_ok = true;
+	sensor->flags.data_ok = true;
 
 	DEBUG_PRINT(F("adc sensor values: "));
 	DEBUG_PRINT(sensor->last_native_data);
@@ -326,7 +333,7 @@ int read_sensor_adc(Sensor_t *sensor) {
 
 int read_sensor_ospi(Sensor_t *sensor) {
 	DEBUG_PRINTLN(F("read_sensor_ospi"));
-	if (!sensor || !sensor->enable) return HTTP_RQT_NOT_RECEIVED;
+	if (!sensor || !sensor->flags.enable) return HTTP_RQT_NOT_RECEIVED;
 
 	//currently not implemented 
 
@@ -342,7 +349,7 @@ int read_sensor_http(Sensor_t *sensor) {
 	char *p = tmp_buffer;
 	BufferFiller bf = p;
 
-	bf.emit_p(PSTR("GET /cm?pw=$O&sr=$D"),
+	bf.emit_p(PSTR("GET /sg?pw=$O&nr=$D"),
 		SOPT_PASSWORD, sensor->id);
 	bf.emit_p(PSTR(" HTTP/1.0\r\nHOST: $D.$D.$D.$D\r\n\r\n"),
 		ip[0],ip[1],ip[2],ip[3]);
@@ -354,8 +361,11 @@ int read_sensor_http(Sensor_t *sensor) {
 		}
 		if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("data"), true)) {
 			sensor->last_data = atof(tmp_buffer);
-			sensor->data_ok = true;
+			sensor->flags.data_ok = true;
 		}
+		if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("unitid"), true)) {
+			sensor->unitid = strtoul(tmp_buffer, NULL, 0);
+		}		
 		return HTTP_RQT_SUCCESS;
 	}
 	return HTTP_RQT_EMPTY_RETURN;
@@ -485,12 +495,12 @@ int read_sensor_ip(Sensor_t *sensor) {
 			{
 				case SENSOR_SMT100_MODBUS_RTU_MOIS: //Equation: soil moisture [vol.%]= (16Bit_soil_moisture_value / 100)
 					sensor->last_data = ((double)sensor->last_native_data / 100);
-					sensor->data_ok = true;
+					sensor->flags.data_ok = true;
 					DEBUG_PRINT(F(" soil moisture %: "));
 					break;
 				case SENSOR_SMT100_MODBUS_RTU_TEMP:	//Equation: temperature [°C]= (16Bit_temperature_value / 100)-100
 					sensor->last_data = ((double)sensor->last_native_data / 100) - 100;
-					sensor->data_ok = true;
+					sensor->flags.data_ok = true;
 					DEBUG_PRINT(F(" temperature °C: "));
 					break;
 			}
@@ -506,7 +516,7 @@ int read_sensor_ip(Sensor_t *sensor) {
 */
 int read_sensor(Sensor_t *sensor) {
 
-	if (!sensor || !sensor->enable)
+	if (!sensor || !sensor->flags.enable)
 		return HTTP_RQT_NOT_RECEIVED;
 
 	sensor->last_read = os.now_tz();
@@ -552,7 +562,7 @@ void sensor_update_groups() {
 				double value = 0;
 				int n = 0;
 				while (group) {
-					if (group->nr != nr && group->group == nr && group->enable && group->data_ok) {
+					if (group->nr != nr && group->group == nr && group->flags.enable && group->flags.data_ok) {
 						switch(sensor->type) {
 							case SENSOR_GROUP_MIN:
 								if (n++ == 0) value = group->last_data;
@@ -577,7 +587,7 @@ void sensor_update_groups() {
 				sensor->last_data = value;
 				sensor->last_native_data = 0;
 				sensor->last_read = os.now_tz();
-				sensor->data_ok = n>0;
+				sensor->flags.data_ok = n>0;
 				break;
 			}
 		}
@@ -712,7 +722,7 @@ double calc_sensor_watering(uint prog) {
 	while (p) {
 		if (p->prog == prog) {
 			Sensor_t *sensor = sensor_by_nr(p->sensor);
-			if (sensor && sensor->enable && sensor->data_ok) {
+			if (sensor && sensor->flags.enable && sensor->flags.data_ok) {
 
 				double res = 0;
 				switch(p->type) {
@@ -746,7 +756,7 @@ double calc_sensor_watering_by_nr(uint nr) {
 	while (p) {
 		if (p->nr == nr) {
 			Sensor_t *sensor = sensor_by_nr(p->sensor);
-			if (sensor && sensor->enable && sensor->data_ok) {
+			if (sensor && sensor->flags.enable && sensor->flags.data_ok) {
 
 				double res = 0;
 				switch(p->type) {
@@ -901,3 +911,85 @@ ProgSensorAdjust_t *prog_adjust_by_idx(uint idx) {
 	return NULL;
 }
 
+ulong diskFree() {
+	struct FSInfo fsinfo;
+	LittleFS.info(fsinfo);
+	return fsinfo.totalBytes-fsinfo.usedBytes;
+}
+
+bool checkDiskFree() {
+	if (diskFree() < MIN_DISK_FREE) {
+		DEBUG_PRINT(F("fs has low space!"));
+		return false;
+	}
+	return true;
+}
+
+const char* getSensorUnit(Sensor_t *sensor) {
+	if (!sensor)
+		return sensor_unitNames[0];
+
+	return sensor_unitNames[getSensorUnitId(sensor)];
+}
+
+boolean sensor_isgroup(Sensor_t *sensor) {
+	if (!sensor)
+		return false;
+
+	switch(sensor->type) {
+		case SENSOR_GROUP_MIN:
+		case SENSOR_GROUP_MAX:             
+		case SENSOR_GROUP_AVG:             
+		case SENSOR_GROUP_SUM: return true;
+
+		default: return false;
+	}
+}
+
+byte getSensorUnitId(int type) {
+	switch(type) {
+		case SENSOR_SMT100_MODBUS_RTU_MOIS: return UNIT_PERCENT; 
+		case SENSOR_SMT100_MODBUS_RTU_TEMP: return UNIT_DEGREE;
+	    case SENSOR_ANALOG_EXTENSION_BOARD: return UNIT_VOLT;
+		case SENSOR_SMT50_MOIS: 			return UNIT_PERCENT;
+		case SENSOR_SMT50_TEMP: 			return UNIT_DEGREE;
+		case SENSOR_OSPI_ANALOG_INPUTS: 	return UNIT_VOLT;
+
+		default: return UNIT_NONE;
+	}
+}
+
+byte getSensorUnitId(Sensor_t *sensor) {
+	if (!sensor)
+		return 0;
+
+	switch(sensor->type) {
+		case SENSOR_SMT100_MODBUS_RTU_MOIS: return UNIT_PERCENT; 
+		case SENSOR_SMT100_MODBUS_RTU_TEMP: return UNIT_DEGREE;
+	    case SENSOR_ANALOG_EXTENSION_BOARD: return UNIT_VOLT;
+		case SENSOR_SMT50_MOIS: 			return UNIT_PERCENT;
+		case SENSOR_SMT50_TEMP: 			return UNIT_DEGREE;
+		case SENSOR_OSPI_ANALOG_INPUTS: 	return UNIT_VOLT;
+		case SENSOR_REMOTE:                	return sensor->unitid;
+
+		case SENSOR_GROUP_MIN:
+		case SENSOR_GROUP_MAX:             
+		case SENSOR_GROUP_AVG:             
+		case SENSOR_GROUP_SUM: 
+
+			for (int i = 0; i < 100; i++) {
+				Sensor_t *sen = sensors;
+				while (sen) {
+					if (sen != sensor && sen->group > 0 && sen->group == sensor->nr) {
+						if (!sensor_isgroup(sen)) 
+							return getSensorUnitId(sen);
+						sensor = sen;
+						break;
+					}
+					sen = sen->next;
+				}
+			}
+
+		default: return UNIT_NONE;
+	}
+}

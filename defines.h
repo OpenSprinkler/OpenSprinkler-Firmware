@@ -32,11 +32,11 @@ typedef unsigned long ulong;
 #define TMP_BUFFER_SIZE      255   // scratch buffer size
 
 /** Firmware version, hardware version, and maximal values */
-#define OS_FW_VERSION  220  // Firmware version: 220 means 2.2.0
+#define OS_FW_VERSION  230  // Firmware version: 220 means 2.2.0
                             // if this number is different from the one stored in non-volatile memory
                             // a device reset will be automatically triggered
 
-#define OS_FW_MINOR      113  // Firmware minor version
+#define OS_FW_MINOR      1  // Firmware minor version
 
 /** Hardware version base numbers */
 #define OS_HW_VERSION_BASE   0x00

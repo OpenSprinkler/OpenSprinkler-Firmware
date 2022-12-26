@@ -52,6 +52,15 @@
 
 #define SENSOR_READ_TIMEOUT            3000   //ms
 
+#define MIN_DISK_FREE                  8192   //8Kb min 
+
+typedef struct SensorFlags {
+	uint     enable:1;
+	uint     log:1;
+	uint     data_ok:1;
+	uint     show:1;
+} SensorFlags_t;
+
 //Definition of a sensor
 typedef struct Sensor {
 	uint     nr;               // 1..n sensor-nr, 0=deleted
@@ -64,15 +73,14 @@ typedef struct Sensor {
 	uint     read_interval;    // seconds
 	uint32_t last_native_data; // last native sensor data
 	double   last_data;        // last converted sensor data
-	byte     enable:1;
-	byte     log:1;
-	byte     data_ok:1;
-	byte     undef[32]; //for later
+	SensorFlags_t flags;       // Flags see obove
+	byte     undef[32];        //for later
 	//unstored
+	byte     unitid;
 	ulong    last_read; //millis
 	Sensor   *next; 
 } Sensor_t;
-#define SENSOR_STORE_SIZE (sizeof(Sensor_t)-sizeof(Sensor_t*)-sizeof(ulong))
+#define SENSOR_STORE_SIZE (sizeof(Sensor_t)-sizeof(Sensor_t*)-sizeof(ulong)-sizeof(byte))
 
 //Definition of a log data
 typedef struct SensorLog {
@@ -113,6 +121,22 @@ typedef struct ProgSensorAdjust {
 } ProgSensorAdjust_t;
 #define PROGSENSOR_STORE_SIZE (sizeof(ProgSensorAdjust_t)-sizeof(ProgSensorAdjust_t*))
 
+#define UNIT_NONE       0
+#define UNIT_PERCENT    1
+#define UNIT_DEGREE     2
+#define UNIT_FAHRENHEIT 3
+#define UNIT_VOLT       4
+
+//Unitnames
+static const char* sensor_unitNames[] {
+	"", "%", "°C", "°F", "V",
+//   0   1     2     3    4
+};
+
+const char* getSensorUnit(Sensor_t *sensor);
+byte getSensorUnitId(int type);
+byte getSensorUnitId(Sensor_t *sensor);
+
 extern char ether_buffer[];
 extern char tmp_buffer[];
 
@@ -121,10 +145,11 @@ uint16_t CRC16 (byte buf[], int len);
 
 //Sensor API functions:
 int sensor_delete(uint nr);
-int sensor_define(uint nr, char *name, uint type, uint group, uint32_t ip, uint port, uint id, uint ri, byte enabled, byte log);
+int sensor_define(uint nr, char *name, uint type, uint group, uint32_t ip, uint port, uint id, uint ri, SensorFlags_t flags);
 void sensor_load();
 void sensor_save();
 uint sensor_count();
+boolean sensor_isgroup(Sensor_t *sensor);
 void sensor_update_groups();
 
 void read_all_sensors();
@@ -135,8 +160,8 @@ Sensor_t *sensor_by_idx(uint idx);
 int read_sensor(Sensor_t *sensor); //sensor value goes to last_native_data/last_data
 
 //Sensorlog API functions:
-void sensorlog_add(SensorLog_t *sensorlog);
-void sensorlog_add(Sensor_t *sensor, ulong time);
+bool sensorlog_add(SensorLog_t *sensorlog);
+bool sensorlog_add(Sensor_t *sensor, ulong time);
 void sensorlog_clear_all();
 SensorLog_t *sensorlog_load(ulong pos);
 SensorLog_t *sensorlog_load(ulong idx, SensorLog_t* sensorlog);
@@ -156,5 +181,8 @@ ProgSensorAdjust_t *prog_adjust_by_nr(uint nr);
 ProgSensorAdjust_t *prog_adjust_by_idx(uint idx);
 double calc_sensor_watering(uint prog);
 double calc_sensor_watering_by_nr(uint nr);
+
+ulong diskFree();
+bool checkDiskFree(); //true: disk space Ok, false: Out of disk space
 
 #endif // _SENSORS_H

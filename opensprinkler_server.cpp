@@ -1806,7 +1806,12 @@ void server_sensor_config() {
 	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("log"), true))
 		log = strtoul(tmp_buffer, NULL, 0); // 1=logging enabled/0=logging disabled
 
-	int res = sensor_define(nr, name, type, group, ip, port, id, ri, enable, log);
+	uint show = 1;
+	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("show"), true))
+		show = strtoul(tmp_buffer, NULL, 0); // 1=show enabled/0=show disabled
+
+	SensorFlags_t flags = {.enable=enable, .log=log, .show=show};
+	int res = sensor_define(nr, name, type, group, ip, port, id, ri, flags);
 	res = res >= HTTP_RQT_SUCCESS?HTML_SUCCESS:(256+res);
 	handle_return(res);
 }
@@ -1879,10 +1884,12 @@ void server_sensor_get() {
 		if (nr != 0 && nr != sensor->nr)
 			continue;
 
-		bfill.emit_p(PSTR("{\"nr\":$D,\"nativedata\":$L,\"data\":$E,\"last\":$L}"),
+		bfill.emit_p(PSTR("{\"nr\":$D,\"nativedata\":$L,\"data\":$E,\"unit\":\"$S\",\"unitid\":$D,\"last\":$L}"),
 			sensor->nr, 
 			sensor->last_native_data,
 			sensor->last_data,
+			getSensorUnit(sensor),
+			getSensorUnitId(sensor),
 			sensor->last_read);
 		if (i < count-1)
 			bfill.emit_p(PSTR(","));
@@ -1938,11 +1945,13 @@ void server_sensor_readnow() {
 
 		int status = read_sensor(sensor);
 
-		bfill.emit_p(PSTR("{\"nr\":$D,\"status\":$D,\"nativedata\":$L,\"data\":$E}"),
+		bfill.emit_p(PSTR("{\"nr\":$D,\"status\":$D,\"nativedata\":$L,\"data\":$E,\"unit\":\"$S\",\"unitid\":$D}"),
 			sensor->nr, 
 			status,
 			sensor->last_native_data,
-			sensor->last_data);
+			sensor->last_data,
+			getSensorUnit(sensor),
+			getSensorUnitId(sensor));
 
 		if (i < count-1)
 			bfill.emit_p(PSTR(","));
@@ -1954,6 +1963,37 @@ void server_sensor_readnow() {
 	}
 	bfill.emit_p(PSTR("]}"));
 	handle_return(HTML_OK);
+}
+
+void sensorconfig_json() {
+	int count = sensor_count();
+	for (int i = 0; i < count; i++) {
+		Sensor_t *sensor = sensor_by_idx(i);
+		bfill.emit_p(PSTR("{\"nr\":$D,\"type\":$D,\"group\":$D,\"name\":\"$S\",\"ip\":$L,\"port\":$D,\"id\":$D,\"ri\":$D,\"nativedata\":$L,\"data\":$E,\"unit\":\"$S\",\"unitid\":$D,\"enable\":$D,\"log\":$D,\"show\":$D,\"last\":$L}"),
+			sensor->nr, 
+			sensor->type,
+			sensor->group,
+			sensor->name,
+			sensor->ip,
+			sensor->port,
+			sensor->id,
+			sensor->read_interval,
+			sensor->last_native_data,
+			sensor->last_data,
+			getSensorUnit(sensor),
+			getSensorUnitId(sensor),
+			sensor->flags.enable,
+			sensor->flags.log,
+			sensor->flags.show,
+			sensor->last_read);
+		if (i < count-1)
+			bfill.emit_p(PSTR(","));
+		// if available ether buffer is getting small
+		// send out a packet
+		if(available_ether_buffer() <= 0) {
+			send_packet();
+		}
+	}
 }
 
 /**
@@ -1982,32 +2022,8 @@ void server_sensor_list() {
 
 	int count = sensor_count();
 	bfill.emit_p(PSTR("{\"count\":$D,"), count);
-
 	bfill.emit_p(PSTR("\"sensors\":["));
-	for (int i = 0; i < count; i++) {
-		Sensor_t *sensor = sensor_by_idx(i);
-		bfill.emit_p(PSTR("{\"nr\":$D,\"type\":$D,\"group\":$D,\"name\":\"$S\",\"ip\":$L,\"port\":$D,\"id\":$D,\"ri\":$D,\"nativedata\":$L,\"data\":$E,\"enable\":$D,\"log\":$D,\"last\":$L}"),
-			sensor->nr, 
-			sensor->type,
-			sensor->group,
-			sensor->name,
-			sensor->ip,
-			sensor->port,
-			sensor->id,
-			sensor->read_interval,
-			sensor->last_native_data,
-			sensor->last_data,
-			sensor->enable,
-			sensor->log,
-			sensor->last_read);
-		if (i < count-1)
-			bfill.emit_p(PSTR(","));
-		// if available ether buffer is getting small
-		// send out a packet
-		if(available_ether_buffer() <= 0) {
-			send_packet();
-		}
-	}
+	sensorconfig_json();
 	bfill.emit_p(PSTR("]"));
 	bfill.emit_p(PSTR("}"));
 
@@ -2088,12 +2104,14 @@ void server_sensorlog_list() {
 		
 		if (count > 0)
 			bfill.emit_p(PSTR(","));
-		bfill.emit_p(PSTR("{\"nr\":$D,\"type\":$D,\"time\":$L,\"nativedata\":$L,\"data\":$E}"),
+		bfill.emit_p(PSTR("{\"nr\":$D,\"type\":$D,\"time\":$L,\"nativedata\":$L,\"data\":$E,\"unit\":\"$S\",\"unitid\":$D}"),
 			sensorlog.nr,          //sensor-nr
 			sensor_type,           //sensor-type
 			sensorlog.time,        //timestamp
 			sensorlog.native_data, //native data
-			sensorlog.data);
+			sensorlog.data,
+			getSensorUnit(sensor),
+			getSensorUnitId(sensor));
 			
 		// if available ether buffer is getting small
 		// send out a packet
@@ -2198,6 +2216,28 @@ void server_sensorprog_config() {
 	handle_return(res);
 }
 
+void progconfig_json(ProgSensorAdjust_t *p) {
+	bfill.emit_p(PSTR("{\"nr\":$D,\"type\":$D,\"sensor\":$D,\"prog\":$D,\"factor1\":$E,\"factor2\":$E,\"min\":$E,\"max\":$E}"),
+		p->nr,          
+		p->type,
+		p->sensor,
+		p->prog,
+		p->factor1, 
+		p->factor2,
+		p->min,
+		p->max);
+}
+
+void progconfig_json() {
+	uint count = prog_adjust_count();
+	for (uint i = 0; i < count; i++) {
+		ProgSensorAdjust_t *p = prog_adjust_by_idx(i);
+		progconfig_json(p);
+		if (i < count-1)
+			bfill.emit_p(PSTR(","));
+	}
+}
+
 /**
  * se
  * define a program adjustment
@@ -2255,16 +2295,7 @@ void server_sensorprog_list() {
 
 		if (count++ > 0)
 			bfill.emit_p(PSTR(","));
-		bfill.emit_p(PSTR("{\"nr\":$D,\"type\":$D,\"sensor\":$D,\"prog\":$D,\"factor1\":$E,\"factor2\":$E,\"min\":$E,\"max\":$E}"),
-			p->nr,          
-			p->type,
-			p->sensor,
-			p->prog,
-			p->factor1, 
-			p->factor2,
-			p->min,
-			p->max);
-			
+		progconfig_json(p);
 		// if available ether buffer is getting small
 		// send out a packet
 		if(available_ether_buffer() <= 0) {
@@ -2330,7 +2361,9 @@ void server_sensor_types() {
 	{
 		if (i > 0)
 			bfill.emit_p(PSTR(","));
-		bfill.emit_p(PSTR("{\"type\":$D,\"name\":\"$S\"}"), sensor_types[i], sensor_names[i]);
+		byte unitid = getSensorUnitId(sensor_types[i]);
+		bfill.emit_p(PSTR("{\"type\":$D,\"name\":\"$S\",\"unit\":\"$S\",\"unitid\":$D}"), 
+			sensor_types[i], sensor_names[i], sensor_unitNames[unitid], unitid);
 		
 		// if available ether buffer is getting small
 		// send out a packet
@@ -2469,6 +2502,40 @@ void server_sensorprog_types()
 	handle_return(HTML_OK);
 }
 
+/**
+ * sx
+ * @brief backup sensor configuration
+ * 
+ */
+void server_sensorconfig_backup()
+{
+#if defined(ESP8266)
+	if(!process_password(true)) return;
+	rewind_ether_buffer();
+#endif
+	print_json_header();
+	bfill.emit_p(PSTR("\"sensors\":["));
+	sensorconfig_json();
+	bfill.emit_p(PSTR("],"));
+	send_packet();
+	bfill.emit_p(PSTR("\"progadjust\":["));
+	progconfig_json();
+	bfill.emit_p(PSTR("]"));
+	send_packet();
+	bfill.emit_p(PSTR("}"));
+	handle_return(HTML_OK);
+}
+
+/**
+ * sy
+ * @brief restore sensor configuration
+ * 
+ */
+void server_sensorconfig_restore()
+{
+
+}
+
 /** Output all JSON data, including jc, jp, jo, js, jn */
 void server_json_all() {
 #if defined(ESP8266)
@@ -2563,6 +2630,8 @@ const char _url_keys[] PROGMEM =
 	"sf"
 	"du"
 	"sh"
+	"sx"
+	"sy"
 #if defined(ARDUINO)  
   "db"
 #endif	
@@ -2604,6 +2673,8 @@ URLHandler urls[] = {
 	server_sensor_types,    // sf
 	server_usage,           // du
 	server_sensorprog_types, // sh
+	server_sensorconfig_backup, // sx
+	server_sensorconfig_restore, // sy
 #if defined(ARDUINO)  
   server_json_debug,			// db
 #endif	
