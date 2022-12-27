@@ -2216,8 +2216,8 @@ void server_sensorprog_config() {
 	handle_return(res);
 }
 
-void progconfig_json(ProgSensorAdjust_t *p) {
-	bfill.emit_p(PSTR("{\"nr\":$D,\"type\":$D,\"sensor\":$D,\"prog\":$D,\"factor1\":$E,\"factor2\":$E,\"min\":$E,\"max\":$E}"),
+void progconfig_json(ProgSensorAdjust_t *p, double current) {
+	bfill.emit_p(PSTR("{\"nr\":$D,\"type\":$D,\"sensor\":$D,\"prog\":$D,\"factor1\":$E,\"factor2\":$E,\"min\":$E,\"max\":$E, \"current\":$E}"),
 		p->nr,          
 		p->type,
 		p->sensor,
@@ -2225,14 +2225,16 @@ void progconfig_json(ProgSensorAdjust_t *p) {
 		p->factor1, 
 		p->factor2,
 		p->min,
-		p->max);
+		p->max,
+		current);
 }
 
 void progconfig_json() {
 	uint count = prog_adjust_count();
 	for (uint i = 0; i < count; i++) {
 		ProgSensorAdjust_t *p = prog_adjust_by_idx(i);
-		progconfig_json(p);
+		double current = calc_sensor_watering_by_nr(p->nr);
+		progconfig_json(p, current);
 		if (i < count-1)
 			bfill.emit_p(PSTR(","));
 	}
@@ -2293,9 +2295,11 @@ void server_sensorprog_list() {
 		if (prog >= 0 && p->prog != (uint)prog)
 			continue;
 
+		double current = calc_sensor_watering_by_nr(p->nr);
+
 		if (count++ > 0)
 			bfill.emit_p(PSTR(","));
-		progconfig_json(p);
+		progconfig_json(p, current);
 		// if available ether buffer is getting small
 		// send out a packet
 		if(available_ether_buffer() <= 0) {
@@ -2310,6 +2314,7 @@ const int sensor_types[] = {
 	SENSOR_SMT100_MODBUS_RTU_MOIS,
 	SENSOR_SMT100_MODBUS_RTU_TEMP,
 	SENSOR_ANALOG_EXTENSION_BOARD,
+	SENSOR_ANALOG_EXTENSION_BOARD_P,
 	SENSOR_SMT50_MOIS,
 	SENSOR_SMT50_TEMP,
 	//SENSOR_OSPI_ANALOG_INPUTS,  
@@ -2324,6 +2329,7 @@ const char* sensor_names[] = {
 	"Truebner SMT100 RS485 Modbus RTU over TCP, moisture mode",
 	"Truebner SMT100 RS485 Modbus RTU over TCP, temperature mode",
 	"OpenSprinkler analog extension board 2xADS1015 0x48/0x49 - voltage mode 0..4V",
+	"OpenSprinkler analog extension board 2xADS1015 0x48/0x49 - 0..3.3V to 0..100%",
 	"OpenSprinkler analog extension board 2xADS1015 0x48/0x49 - SMT50 moisture mode",
 	"OpenSprinkler analog extension board 2xADS1015 0x48/0x49 - SMT50 temperature mode",
 	//"OSPi analog input",

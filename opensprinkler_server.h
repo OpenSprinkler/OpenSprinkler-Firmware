@@ -55,7 +55,7 @@ public:
 				itoa(va_arg(ap, int), (char*) ptr, 10);  // ray
 				break;
 			case 'E': //Double
-				sprintf((char*) ptr, "%f", va_arg(ap, double));
+				sprintf((char*) ptr, "%10.6lf", va_arg(ap, double));
 				break;
 			case 'L':
 				//ltoa(va_arg(ap, long), (char*) ptr, 10);

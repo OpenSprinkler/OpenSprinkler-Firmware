@@ -90,6 +90,8 @@ int sensor_define(uint nr, char *name, uint type, uint group, uint32_t ip, uint 
 
 	if (nr == 0 || type == 0)
 		return HTTP_RQT_NOT_RECEIVED;
+	if (ri < 10)
+		ri = 10;
 
 	Sensor_t *sensor = sensors;
 	Sensor_t *last = NULL;
@@ -313,11 +315,16 @@ int read_sensor_adc(Sensor_t *sensor) {
 	sensor->last_native_data = adc.readADC(sensor->id);
 	sensor->last_data = adc.toVoltage(sensor->last_native_data);
 
-	if (sensor->type == SENSOR_SMT50_MOIS) { // SMT50 VWC [%] = (U * 50) : 3
-		sensor->last_data = (sensor->last_data * 50) / 3;
-	}
-	if (sensor->type == SENSOR_SMT50_TEMP) { // SMT50 T [°C] = (U – 0,5) * 100
-		sensor->last_data = (sensor->last_data - 0.5) * 100;
+	switch(sensor->type) {
+		case SENSOR_SMT50_MOIS:  // SMT50 VWC [%] = (U * 50) : 3
+			sensor->last_data = (sensor->last_data * 50.0) / 3.0;
+			break;
+		case SENSOR_SMT50_TEMP:  // SMT50 T [°C] = (U – 0,5) * 100
+			sensor->last_data = (sensor->last_data - 0.5) * 100.0;
+			break;
+		case SENSOR_ANALOG_EXTENSION_BOARD_P: // 0..3,3V -> 0..100%
+			sensor->last_data = sensor->last_data * 100.0 / 3.3;
+			break;
 	}
 
 	sensor->flags.data_ok = true;
@@ -531,6 +538,7 @@ int read_sensor(Sensor_t *sensor) {
 			return read_sensor_ip(sensor);
 
 		case SENSOR_ANALOG_EXTENSION_BOARD:
+		case SENSOR_ANALOG_EXTENSION_BOARD_P:
 		case SENSOR_SMT50_MOIS: //SMT50 VWC [%] = (U * 50) : 3
 		case SENSOR_SMT50_TEMP: //SMT50 T [°C] = (U – 0,5) * 100
 			return read_sensor_adc(sensor);
@@ -948,12 +956,13 @@ boolean sensor_isgroup(Sensor_t *sensor) {
 
 byte getSensorUnitId(int type) {
 	switch(type) {
-		case SENSOR_SMT100_MODBUS_RTU_MOIS: return UNIT_PERCENT; 
-		case SENSOR_SMT100_MODBUS_RTU_TEMP: return UNIT_DEGREE;
-	    case SENSOR_ANALOG_EXTENSION_BOARD: return UNIT_VOLT;
-		case SENSOR_SMT50_MOIS: 			return UNIT_PERCENT;
-		case SENSOR_SMT50_TEMP: 			return UNIT_DEGREE;
-		case SENSOR_OSPI_ANALOG_INPUTS: 	return UNIT_VOLT;
+		case SENSOR_SMT100_MODBUS_RTU_MOIS:   return UNIT_PERCENT; 
+		case SENSOR_SMT100_MODBUS_RTU_TEMP:   return UNIT_DEGREE;
+	    case SENSOR_ANALOG_EXTENSION_BOARD:   return UNIT_VOLT;
+	    case SENSOR_ANALOG_EXTENSION_BOARD_P: return UNIT_PERCENT;
+		case SENSOR_SMT50_MOIS: 			  return UNIT_PERCENT;
+		case SENSOR_SMT50_TEMP: 			  return UNIT_DEGREE;
+		case SENSOR_OSPI_ANALOG_INPUTS: 	  return UNIT_VOLT;
 
 		default: return UNIT_NONE;
 	}
@@ -964,13 +973,14 @@ byte getSensorUnitId(Sensor_t *sensor) {
 		return 0;
 
 	switch(sensor->type) {
-		case SENSOR_SMT100_MODBUS_RTU_MOIS: return UNIT_PERCENT; 
-		case SENSOR_SMT100_MODBUS_RTU_TEMP: return UNIT_DEGREE;
-	    case SENSOR_ANALOG_EXTENSION_BOARD: return UNIT_VOLT;
-		case SENSOR_SMT50_MOIS: 			return UNIT_PERCENT;
-		case SENSOR_SMT50_TEMP: 			return UNIT_DEGREE;
-		case SENSOR_OSPI_ANALOG_INPUTS: 	return UNIT_VOLT;
-		case SENSOR_REMOTE:                	return sensor->unitid;
+		case SENSOR_SMT100_MODBUS_RTU_MOIS:   return UNIT_PERCENT; 
+		case SENSOR_SMT100_MODBUS_RTU_TEMP:   return UNIT_DEGREE;
+	    case SENSOR_ANALOG_EXTENSION_BOARD:   return UNIT_VOLT;
+		case SENSOR_ANALOG_EXTENSION_BOARD_P: return UNIT_PERCENT;
+		case SENSOR_SMT50_MOIS: 			  return UNIT_PERCENT;
+		case SENSOR_SMT50_TEMP: 			  return UNIT_DEGREE;
+		case SENSOR_OSPI_ANALOG_INPUTS: 	  return UNIT_VOLT;
+		case SENSOR_REMOTE:                	  return sensor->unitid;
 
 		case SENSOR_GROUP_MIN:
 		case SENSOR_GROUP_MAX:             
