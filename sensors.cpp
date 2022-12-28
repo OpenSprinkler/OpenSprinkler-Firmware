@@ -398,6 +398,12 @@ int read_sensor_ip(Sensor_t *sensor) {
 	EthernetClient *client = &etherClient;
 #endif
 
+	sensor->flags.data_ok = false;
+	if (!sensor->ip || !sensor->port) {
+		sensor->flags.enable = false;				
+		return HTTP_RQT_CONNECT_ERR;
+	}
+
     IPAddress _ip(sensor->ip);
 	byte ip[4] = {_ip[0], _ip[1], _ip[2], _ip[3]};
 
@@ -453,10 +459,11 @@ int read_sensor_ip(Sensor_t *sensor) {
 	client->write(buffer, len);
 	client->flush();
 	
+	uint32_t stoptime = millis()+SENSOR_READ_TIMEOUT;
 	while (true) {
 		if (client->available())
 			break;
-		if (os.now_tz() > sensor->last_read+SENSOR_READ_TIMEOUT) {
+		if (millis() >=  stoptime) {
 			client->stop();
 			DEBUG_PRINT(F("Sensor "));
 			DEBUG_PRINT(sensor->nr);
@@ -638,10 +645,15 @@ int set_sensor_address(Sensor_t *sensor, byte new_address) {
 			EthernetClient etherClient;
 			EthernetClient *client = &etherClient;
 #endif
+			sensor->flags.data_ok = false;
+			if (!sensor->ip || !sensor->port) {
+				sensor->flags.enable = false;				
+				return HTTP_RQT_CONNECT_ERR;
+			}
 
  			IPAddress _ip(sensor->ip);
 			byte ip[4] = {_ip[0], _ip[1], _ip[2], _ip[3]};
-
+		
 			if(!client->connect(ip, sensor->port)) {
 				DEBUG_PRINT(F("Cannot connect to "));
 				DEBUG_PRINT(_ip[0]); DEBUG_PRINT(".");
