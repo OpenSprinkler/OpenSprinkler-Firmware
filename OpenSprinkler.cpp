@@ -469,10 +469,10 @@ byte OpenSprinkler::start_network() {
 	}
 
 	if((useEth || get_wifi_mode()==WIFI_MODE_STA) && otc.en>0 && otc.token.length()>=32) {
-		otf = new OTF::OpenThingsFramework(httpport, otc.server, otc.port, otc.token, false);
+		otf = new OTF::OpenThingsFramework(httpport, otc.server, otc.port, otc.token, false, ether_buffer, ETHER_BUFFER_SIZE);
 		DEBUG_PRINTLN(F("Started OTF with remote connection"));
 	} else {
-		otf = new OTF::OpenThingsFramework(httpport);
+		otf = new OTF::OpenThingsFramework(httpport, ether_buffer, ETHER_BUFFER_SIZE);
 		DEBUG_PRINTLN(F("Started OTF with just local connection"));
 	}
 	extern DNSServer *dns;
