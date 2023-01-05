@@ -125,7 +125,7 @@ byte digitalReadExt(byte pin);
 #define OUTPUT 0
 #define INPUT  1
 
-#if defined(OSPI)
+#if defined(OSPI) || defined(OSOPI)
 #define INPUT_PULLUP 2
 #else
 #define INPUT_PULLUP INPUT

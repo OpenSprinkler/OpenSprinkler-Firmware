@@ -205,7 +205,7 @@ public:
 	// todo: LCD define for RPI/BBB
 #endif
 
-#if defined(OSPI)
+#if defined(OSPI) || defined(OSOPI)
 	static byte pin_sr_data;  // RPi shift register data pin to handle RPi rev. 1
 #endif
 
