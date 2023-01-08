@@ -507,8 +507,15 @@ byte OpenSprinkler::start_ether() {
 	SPI.setDataMode(SPI_MODE0);
 	SPI.setFrequency(4000000);
 
-	eth.setDefault();
 	load_hardware_mac((uint8_t*)tmp_buffer, true);
+	if (iopts[IOPT_USE_DHCP]==0) { // config static IP before calling eth.begin
+		IPAddress staticip(iopts+IOPT_STATIC_IP1);
+		IPAddress gateway(iopts+IOPT_GATEWAY_IP1);
+		IPAddress dns(iopts+IOPT_DNS_IP1);
+		IPAddress subn(iopts+IOPT_SUBNET_MASK1);
+		eth.config(staticip, gateway, subn, dns);
+	}
+	eth.setDefault();
 	if(!eth.begin((uint8_t*)tmp_buffer))	return 0;
 	lcd_print_line_clear_pgm(PSTR("Start wired link"), 1);
 
@@ -531,12 +538,6 @@ byte OpenSprinkler::start_ether() {
 		memcpy(iopts+IOPT_DNS_IP1, &(WiFi.dnsIP()[0]), 4); // todo: lwip need dns ip
 		memcpy(iopts+IOPT_SUBNET_MASK1, &(eth.subnetMask()[0]), 4);
 		iopts_save();
-	} else {
-		IPAddress staticip(iopts+IOPT_STATIC_IP1);
-		IPAddress gateway(iopts+IOPT_GATEWAY_IP1);
-		IPAddress dns(iopts+IOPT_DNS_IP1);
-		IPAddress subn(iopts+IOPT_SUBNET_MASK1);
-		eth.config(staticip, gateway, subn, dns);
 	}
 
 	return 1;
