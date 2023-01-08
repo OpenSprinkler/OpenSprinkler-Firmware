@@ -48,7 +48,6 @@
 		#include <Ticker.h>
 		#include "SSD1306Display.h"
 		#include "espconnect.h"
-		#include <Ethernet.h>
 	#else // for AVR
 		#include <SdFat.h>
 		#include <Ethernet.h>

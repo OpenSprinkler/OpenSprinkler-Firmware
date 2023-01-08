@@ -509,13 +509,18 @@ byte OpenSprinkler::start_ether() {
 	SPI.setFrequency(4000000);
 
 	if(eth.isW5500) {
-		DEBUG_PRINTLN(F("check W5500"));
-		/* this is copied from w5500.cpp */
-		/* perform a software reset and see if we get a response */
+		DEBUG_PRINTLN(F("detect existence of W5500"));
+		/* this is copied from w5500.cpp wizchip_sw_reset
+		 * perform a software reset and see if we get a correct response
+		 * without this, eth.begin will crash if W5500 is not connected
+		 * ideally wizchip_sw_reset should return a value but since it doesn't
+		 * we have to extract it code here
+		 * */
 		static const uint8_t AccessModeRead = (0x00 << 2);
 		static const uint8_t AccessModeWrite = (0x01 << 2);
 		static const uint8_t BlockSelectCReg = (0x00 << 3);
 		pinMode(PIN_ETHER_CS, OUTPUT);
+		// ==> setMR(MR_RST)
 		digitalWrite(PIN_ETHER_CS, LOW);
 		SPI.transfer((0x00 & 0xFF00) >> 8);
 		SPI.transfer((0x00 & 0x00FF) >> 0);
@@ -523,6 +528,7 @@ byte OpenSprinkler::start_ether() {
 		SPI.transfer(0x80);
 		digitalWrite(PIN_ETHER_CS, HIGH);
 
+		// ==> ret = getMR()
 		uint8_t ret;
 		digitalWrite(PIN_ETHER_CS, LOW);
 		SPI.transfer((0x00 & 0xFF00) >> 8);
@@ -532,9 +538,33 @@ byte OpenSprinkler::start_ether() {
 		digitalWrite(PIN_ETHER_CS, HIGH);
 		if(ret!=0) return 0; // ret is expected to be 0
 	} else {
-		/* this is from */
-		/* get erevid and see if we get a response */
-		DEBUG_PRINTLN(F("check ENC28J60"));
+		/* this is copied from enc28j60.cpp geterevid
+		 * check to see if the hardware revision number if expected
+		 * */
+		DEBUG_PRINTLN(F("detect existence of ENC28J60"));
+		#define MAADRX_BANK 0x03
+		#define EREVID 0x12
+		#define ECON1 0x1f
+
+		// ==> setregbank(MAADRX_BANK);
+		pinMode(PIN_ETHER_CS, OUTPUT);
+		uint8_t r;
+		digitalWrite(PIN_ETHER_CS, LOW);
+		SPI.transfer(0x00 | (ECON1 & 0x1f));
+		r = SPI.transfer(0);
+		digitalWrite(PIN_ETHER_CS, HIGH);
+
+		digitalWrite(PIN_ETHER_CS, LOW);
+		SPI.transfer(0x40 | (ECON1 & 0x1f));
+		SPI.transfer((r & 0xfc) | (MAADRX_BANK & 0x03));
+		digitalWrite(PIN_ETHER_CS, HIGH);
+
+		// ==> r = readreg(EREVID);
+		digitalWrite(PIN_ETHER_CS, LOW);
+		SPI.transfer(0x00 | (EREVID & 0x1f));
+		r = SPI.transfer(0);
+		digitalWrite(PIN_ETHER_CS, HIGH);
+		if(r==0 || r==255) return 0; // r is expected to be a non-255 revision number
 	}
 
 	load_hardware_mac((uint8_t*)tmp_buffer, true);
