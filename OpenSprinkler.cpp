@@ -668,7 +668,7 @@ void OpenSprinkler::reboot_dev(uint8_t cause) {
 /** Launch update script */
 void OpenSprinkler::update_dev() {
 	char cmd[1000];
-	sprintf(cmd, "cd %s & ./updater.sh", get_runtime_path());
+	sprintf(cmd, "cd %s && ./updater.sh", get_runtime_path());
 	system(cmd);
 }
 #endif // end network init functions
