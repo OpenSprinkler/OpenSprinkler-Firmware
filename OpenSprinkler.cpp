@@ -500,12 +500,42 @@ byte OpenSprinkler::start_network() {
 
 byte OpenSprinkler::start_ether() {
 #if defined(ESP8266)
-	if(hw_rev<2) return 0;  // ethernet capability is only available after hw_rev 2
+	if(hw_rev<2) return 0;  // ethernet capability is only available when hw_rev>=2
+	eth.isW5500 = (hw_rev==2)?false:true; // os 3.2 uses enc28j60 and 3.3 uses w5500
 
 	SPI.begin();
 	SPI.setBitOrder(MSBFIRST);
 	SPI.setDataMode(SPI_MODE0);
 	SPI.setFrequency(4000000);
+
+	if(eth.isW5500) {
+		DEBUG_PRINTLN(F("check W5500"));
+		/* this is copied from w5500.cpp */
+		/* perform a software reset and see if we get a response */
+		static const uint8_t AccessModeRead = (0x00 << 2);
+		static const uint8_t AccessModeWrite = (0x01 << 2);
+		static const uint8_t BlockSelectCReg = (0x00 << 3);
+		pinMode(PIN_ETHER_CS, OUTPUT);
+		digitalWrite(PIN_ETHER_CS, LOW);
+		SPI.transfer((0x00 & 0xFF00) >> 8);
+		SPI.transfer((0x00 & 0x00FF) >> 0);
+		SPI.transfer(BlockSelectCReg | AccessModeWrite);
+		SPI.transfer(0x80);
+		digitalWrite(PIN_ETHER_CS, HIGH);
+
+		uint8_t ret;
+		digitalWrite(PIN_ETHER_CS, LOW);
+		SPI.transfer((0x00 & 0xFF00) >> 8);
+		SPI.transfer((0x00 & 0x00FF) >> 0);
+		SPI.transfer(BlockSelectCReg | AccessModeRead);
+		ret = SPI.transfer(0);
+		digitalWrite(PIN_ETHER_CS, HIGH);
+		if(ret!=0) return 0; // ret is expected to be 0
+	} else {
+		/* this is from */
+		/* get erevid and see if we get a response */
+		DEBUG_PRINTLN(F("check ENC28J60"));
+	}
 
 	load_hardware_mac((uint8_t*)tmp_buffer, true);
 	if (iopts[IOPT_USE_DHCP]==0) { // config static IP before calling eth.begin
