@@ -783,8 +783,12 @@ void OpenSprinkler::begin() {
 			PIN_SENSOR1 = V1_PIN_SENSOR1;
 			PIN_SENSOR2 = V1_PIN_SENSOR2;
 		} else {
-			// revision 2
-			hw_rev = 2;
+			// revision 2 and 3
+			if(detect_i2c(EEPROM_I2CADDR)) { // revision 3 has a I2C EEPROM
+				hw_rev = 3;
+			} else {
+				hw_rev = 2;
+			}
 			mainio->i2c_write(NXP_CONFIG_REG, V2_IO_CONFIG);
 			mainio->i2c_write(NXP_OUTPUT_REG, V2_IO_OUTPUT);
 
@@ -1058,7 +1062,7 @@ void OpenSprinkler::latch_setzoneoutput_v2(byte sid, byte A, byte K) {
  *
  */
 void OpenSprinkler::latch_open(byte sid) {
-	if(hw_rev==2) {
+	if(hw_rev>=2) {
 		DEBUG_PRINTLN(F("latch_open_v2"));
 		latch_disable_alloutputs_v2(); // disable all output pins
 		latch_boost(); // generate boost voltage
@@ -1081,7 +1085,7 @@ void OpenSprinkler::latch_open(byte sid) {
 }
 
 void OpenSprinkler::latch_close(byte sid) {
-	if(hw_rev==2) {
+	if(hw_rev>=2) {
 		DEBUG_PRINTLN(F("latch_close_v2"));
 		latch_disable_alloutputs_v2(); // disable all output pins
 		latch_boost(); // generate boost voltage
@@ -1248,7 +1252,7 @@ void OpenSprinkler::apply_all_station_bits() {
 void OpenSprinkler::detect_binarysensor_status(ulong curr_time) {
 	// sensor_type: 0 if normally closed, 1 if normally open
 	if(iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_RAIN || iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_SOIL) {
-		if(hw_rev==2)	pinModeExt(PIN_SENSOR1, INPUT_PULLUP); // this seems necessary for OS 3.2
+		if(hw_rev>=2)	pinModeExt(PIN_SENSOR1, INPUT_PULLUP); // this seems necessary for OS 3.2
 		byte val = digitalReadExt(PIN_SENSOR1);
 		status.sensor1 = (val == iopts[IOPT_SENSOR1_OPTION]) ? 0 : 1;
 		if(status.sensor1) {
@@ -1278,7 +1282,7 @@ void OpenSprinkler::detect_binarysensor_status(ulong curr_time) {
 // ESP8266 is guaranteed to have sensor 2
 #if defined(ESP8266) || defined(PIN_SENSOR2)
 	if(iopts[IOPT_SENSOR2_TYPE]==SENSOR_TYPE_RAIN || iopts[IOPT_SENSOR2_TYPE]==SENSOR_TYPE_SOIL) {
-		if(hw_rev==2)	pinModeExt(PIN_SENSOR2, INPUT_PULLUP); // this seems necessary for OS 3.2
+		if(hw_rev>=2)	pinModeExt(PIN_SENSOR2, INPUT_PULLUP); // this seems necessary for OS 3.2
 		byte val = digitalReadExt(PIN_SENSOR2);
 		status.sensor2 = (val == iopts[IOPT_SENSOR2_OPTION]) ? 0 : 1;
 		if(status.sensor2) {
@@ -1313,7 +1317,7 @@ byte OpenSprinkler::detect_programswitch_status(ulong curr_time) {
 	byte ret = 0;
 	if(iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_PSWITCH) {
 		static byte sensor1_hist = 0;
-		if(hw_rev==2) pinModeExt(PIN_SENSOR1, INPUT_PULLUP); // this seems necessary for OS 3.2
+		if(hw_rev>=2) pinModeExt(PIN_SENSOR1, INPUT_PULLUP); // this seems necessary for OS 3.2
 		status.sensor1 = (digitalReadExt(PIN_SENSOR1) != iopts[IOPT_SENSOR1_OPTION]); // is switch activated?
 		sensor1_hist = (sensor1_hist<<1) | status.sensor1;
 		// basic noise filtering: only trigger if sensor matches pattern:
@@ -1325,7 +1329,7 @@ byte OpenSprinkler::detect_programswitch_status(ulong curr_time) {
 #if defined(ESP8266) || defined(PIN_SENSOR2)
 	if(iopts[IOPT_SENSOR2_TYPE]==SENSOR_TYPE_PSWITCH) {
 		static byte sensor2_hist = 0;
-		if(hw_rev==2) pinModeExt(PIN_SENSOR2, INPUT_PULLUP); // this seems necessary for OS 3.2
+		if(hw_rev>=2) pinModeExt(PIN_SENSOR2, INPUT_PULLUP); // this seems necessary for OS 3.2
 		status.sensor2 = (digitalReadExt(PIN_SENSOR2) != iopts[IOPT_SENSOR2_OPTION]); // is sensor activated?
 		sensor2_hist = (sensor2_hist<<1) | status.sensor2;
 		if((sensor2_hist&0b1111) == 0b0011) {

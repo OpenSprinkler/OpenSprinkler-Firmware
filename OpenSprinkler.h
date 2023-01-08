@@ -41,6 +41,7 @@
 		#include <FS.h>
 		#include <LittleFS.h>
 		#include <ENC28J60lwIP.h>
+		#include <W5500lwIP.h>
 		#include <RCSwitch.h>
 		#include <OpenThingsFramework.h>
 		#include <DNSServer.h>
