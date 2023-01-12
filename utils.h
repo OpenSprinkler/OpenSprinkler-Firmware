@@ -18,7 +18,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see
- * <http://www.gnu.org/licenses/>. 
+ * <http://www.gnu.org/licenses/>.
  */
 
 #ifndef _UTILS_H
@@ -47,7 +47,7 @@ void file_write_block(const char *fname, const void *src, ulong pos, ulong len);
 void file_append_block(const char *fname, const void *src, ulong len);
 void file_copy_block (const char *fname, ulong from, ulong to, ulong len, void *tmp=0);
 byte file_read_byte (const char *fname, ulong pos);
-void file_write_byte(const char *fname, ulong pos, byte v);  
+void file_write_byte(const char *fname, ulong pos, byte v);
 byte file_cmp_block(const char *fname, const char *buf, ulong pos);
 
 // misc. string and time converstion functions
@@ -57,6 +57,18 @@ byte water_time_encode_signed(int16_t i);
 int16_t water_time_decode_signed(byte i);
 void urlDecode(char *);
 void peel_http_header(char*);
+void strReplace(char *, char c, char r);
+
+#define date_encode(m,d) ((m<<5)+d)
+#define MIN_ENCODED_DATE date_encode(1,1)
+#define MAX_ENCODED_DATE date_encode(12, 31)
+bool isValidDate(uint16_t date);
+#if defined(ESP8266)
+byte hex2dec(const char *hex);
+bool isHex(char c);
+bool isValidMAC(const char *_mac);
+void str2mac(const char *_str, byte mac[]);
+#endif
 
 #if defined(ARDUINO)
 

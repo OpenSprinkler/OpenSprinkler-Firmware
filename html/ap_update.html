@@ -49,9 +49,8 @@ id('btn_submit').addEventListener('click', function(e){
       }
     }
   };
-  xhr.open('POST', 'update', true);
+  xhr.open('POST', '//' + window.location.hostname + ':8080' + window.location.pathname, true);
   xhr.send(fd);
 });
 </script>
 </body>
-

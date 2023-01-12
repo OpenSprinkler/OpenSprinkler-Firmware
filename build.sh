@@ -14,7 +14,7 @@ if [ "$1" == "demo" ]; then
 	echo "Installing required libraries..."
 	apt-get install -y libmosquitto-dev
 	echo "Compiling firmware..."
-	g++ -o OpenSprinkler -DDEMO -m32 main.cpp OpenSprinkler.cpp program.cpp opensprinkler_server.cpp utils.cpp weather.cpp gpio.cpp etherport.cpp mqtt.cpp -lpthread -lmosquitto
+	g++ -o OpenSprinkler -DDEMO -std=c++14 -m32 main.cpp OpenSprinkler.cpp program.cpp opensprinkler_server.cpp utils.cpp weather.cpp gpio.cpp etherport.cpp mqtt.cpp -lpthread -lmosquitto
 elif [ "$1" == "osbo" ]; then
 	echo "Installing required libraries..."
 	apt-get install -y libmosquitto-dev
@@ -22,7 +22,14 @@ elif [ "$1" == "osbo" ]; then
 	g++ -o OpenSprinkler -DOSBO main.cpp OpenSprinkler.cpp program.cpp opensprinkler_server.cpp utils.cpp weather.cpp gpio.cpp etherport.cpp mqtt.cpp -lpthread -lmosquitto
 else
 	echo "Installing required libraries..."
+	apt-get update
 	apt-get install -y libmosquitto-dev
+	apt-get install -y raspi-gpio
+	if ! command -v raspi-gpio &> /dev/null
+	then
+		echo "Command raspi-gpio is required and is not installed"
+		exit 0
+	fi
 	echo "Compiling firmware..."
 	g++ -o OpenSprinkler -DOSPI main.cpp OpenSprinkler.cpp program.cpp opensprinkler_server.cpp utils.cpp weather.cpp gpio.cpp etherport.cpp mqtt.cpp -lpthread -lmosquitto
 fi

@@ -18,7 +18,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see
- * <http://www.gnu.org/licenses/>. 
+ * <http://www.gnu.org/licenses/>.
  */
 
 #ifndef GPIO_H
@@ -45,13 +45,13 @@
 class IOEXP {
 public:
 	IOEXP(uint8_t addr=255) { address = addr; type = IOEXP_TYPE_NONEXIST; }
-	
+
 	virtual void pinMode(uint8_t pin, uint8_t IOMode) { }
 	virtual uint16_t i2c_read(uint8_t reg) { return 0xFFFF; }
 	virtual void i2c_write(uint8_t reg, uint16_t v) { }
 	// software implementation of shift register out
 	virtual void shift_out(uint8_t plat, uint8_t pclk, uint8_t pdat, uint8_t v) { }
-	
+
 	void digitalWrite(uint16_t v) {
 		i2c_write(NXP_OUTPUT_REG, v);
 	}
@@ -100,7 +100,7 @@ private:
 class PCF8574 : public IOEXP {
 public:
 	PCF8574(uint8_t addr) { address = addr; type = IOEXP_TYPE_8574; }
-	void pinMode(uint8_t pin, uint8_t IOMode) { 
+	void pinMode(uint8_t pin, uint8_t IOMode) {
 		if(IOMode!=OUTPUT) inputmask |= (1<<pin);
 	}
 	uint16_t i2c_read(uint8_t reg);
@@ -109,9 +109,6 @@ private:
 	uint8_t inputmask = 0;	// mask bits for input pins
 };
 
-//void pcf_write(int addr, byte data);
-//byte pcf_read(int addr);
-//void pcf_write16(int addr, uint16_t data);
 void pinModeExt(byte pin, byte mode);
 void digitalWriteExt(byte pin, byte value);
 byte digitalReadExt(byte pin);
@@ -134,8 +131,8 @@ byte digitalReadExt(byte pin);
 #define INPUT_PULLUP INPUT
 #endif
 
-#define HIGH	 1
-#define LOW		 0
+#define HIGH   1
+#define LOW    0
 
 void pinMode(int pin, byte mode);
 void digitalWrite(int pin, byte value);

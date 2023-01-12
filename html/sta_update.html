@@ -20,7 +20,7 @@
   </div>
   <div data-role='footer' data-theme='c'>
     <p style='font-weight:normal;'>&copy; OpenSprinkler (<a href='http://www.opensprinkler.com' target='_blank' style='text-decoration:none'>www.opensprinkler.com</a>)</p>
-  </div>  
+  </div>
 </div>
 <script>
 function id(s) {return document.getElementById(s);}
@@ -54,10 +54,9 @@ $('#btn_submit').click(function(e){
       }
     }
   };
-  xhr.open('POST', 'update', true);
+  xhr.open('POST', '//'+window.location.hostname+':8080'+window.location.pathname, true);
   xhr.send(fd);
 });
 </script>
 <script src=https://ui.opensprinkler.com/js/hasher.js></script>
 </body>
-

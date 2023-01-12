@@ -58,7 +58,7 @@ bool I2CRTC::detect()
 }
 
 // PUBLIC FUNCTIONS
-time_t I2CRTC::get()	 // Aquire data from buffer and convert to time_t
+time_t I2CRTC::get() // Aquire data from buffer and convert to time_t
 {
 	tmElements_t tm;
 	read(tm);
@@ -69,9 +69,6 @@ void I2CRTC::set(time_t t)
 {
 	tmElements_t tm;
 	breakTime(t, tm);
-	//tm.Second |= 0x80;	// stop the clock		ray: removed this step
-	//write(tm); 
-	//tm.Second &= 0x7f;	// start the clock	ray: moved to write function
 	write(tm); 
 }
 
@@ -83,25 +80,25 @@ void I2CRTC::read( tmElements_t &tm)
 
 	if(addr == PCF8563_ADDR) { 
 			Wire.write((uint8_t)0x02);
-			Wire.endTransmission();				 
+			Wire.endTransmission();
 			Wire.requestFrom(addr, (uint8_t)7);
 			tm.Second = bcd2dec(Wire.read() & 0x7f);
 			tm.Minute = bcd2dec(Wire.read() & 0x7f);
-			tm.Hour =		bcd2dec(Wire.read() & 0x3f);	// mask assumes 24hr clock
+			tm.Hour =		bcd2dec(Wire.read() & 0x3f);  // mask assumes 24hr clock
 			tm.Day = bcd2dec(Wire.read() & 0x3f);
 			tm.Wday = bcd2dec(Wire.read() & 0x07);
-			tm.Month = bcd2dec(Wire.read() & 0x1f);		// fix bug for MCP7940
+			tm.Month = bcd2dec(Wire.read() & 0x1f);   // fix bug for MCP7940
 			tm.Year = (bcd2dec(Wire.read()));
 	} else {
 			Wire.write((uint8_t)0x00); 
-			Wire.endTransmission();				 
+			Wire.endTransmission();
 			Wire.requestFrom(addr, (uint8_t)7);
 			tm.Second = bcd2dec(Wire.read() & 0x7f);
 			tm.Minute = bcd2dec(Wire.read() & 0x7f);
-			tm.Hour =		bcd2dec(Wire.read() & 0x3f);	// mask assumes 24hr clock
+			tm.Hour =		bcd2dec(Wire.read() & 0x3f);  // mask assumes 24hr clock
 			tm.Wday = bcd2dec(Wire.read() & 0x07);
 			tm.Day = bcd2dec(Wire.read() & 0x3f);
-			tm.Month = bcd2dec(Wire.read() & 0x1f);		// fix bug for MCP7940
+			tm.Month = bcd2dec(Wire.read() & 0x1f);   // fix bug for MCP7940
 			tm.Year = y2kYearToTm((bcd2dec(Wire.read())));
 	}
 }
@@ -112,11 +109,11 @@ void I2CRTC::write(tmElements_t &tm)
 	switch(addr) {
 		case DS1307_ADDR:
 			Wire.beginTransmission(addr);  
-			Wire.write((uint8_t)0x00); // reset register pointer	
+			Wire.write((uint8_t)0x00); // reset register pointer
 			Wire.write(dec2bcd(tm.Second) & 0x7f);	// ray: start clock by setting CH bit low
 			Wire.write(dec2bcd(tm.Minute));
-			Wire.write(dec2bcd(tm.Hour));			 // sets 24 hour format
-			Wire.write(dec2bcd(tm.Wday));		
+			Wire.write(dec2bcd(tm.Hour));  // sets 24 hour format
+			Wire.write(dec2bcd(tm.Wday));
 			Wire.write(dec2bcd(tm.Day));
 			Wire.write(dec2bcd(tm.Month));
 			Wire.write(dec2bcd(tmYearToY2k(tm.Year))); 
@@ -124,11 +121,11 @@ void I2CRTC::write(tmElements_t &tm)
 			break;
 		case MCP7940_ADDR:
 			Wire.beginTransmission(addr);  
-			Wire.write((uint8_t)0x00); // reset register pointer	
-			Wire.write(dec2bcd(tm.Second) | 0x80);	// ray: start clock by setting ST bit high
+			Wire.write((uint8_t)0x00); // reset register pointer
+			Wire.write(dec2bcd(tm.Second) | 0x80); // ray: start clock by setting ST bit high
 			Wire.write(dec2bcd(tm.Minute));
-			Wire.write(dec2bcd(tm.Hour));			 // sets 24 hour format
-			Wire.write(dec2bcd(tm.Wday) | 0x08);	// ray: turn on battery backup by setting VBATEN bit high
+			Wire.write(dec2bcd(tm.Hour));  // sets 24 hour format
+			Wire.write(dec2bcd(tm.Wday) | 0x08);  // ray: turn on battery backup by setting VBATEN bit high
 			Wire.write(dec2bcd(tm.Day));
 			Wire.write(dec2bcd(tm.Month));
 			Wire.write(dec2bcd(tmYearToY2k(tm.Year))); 
@@ -136,17 +133,17 @@ void I2CRTC::write(tmElements_t &tm)
 			break;
 		case PCF8563_ADDR:
 			Wire.beginTransmission(addr);  
-			Wire.write((uint8_t)0x02); // reset register pointer	
+			Wire.write((uint8_t)0x02); // reset register pointer
 			Wire.write(dec2bcd(tm.Second) & 0x7f);
 			Wire.write(dec2bcd(tm.Minute));
-			Wire.write(dec2bcd(tm.Hour));			 // sets 24 hour format
+			Wire.write(dec2bcd(tm.Hour));  // sets 24 hour format
 			Wire.write(dec2bcd(tm.Day));
-			Wire.write(dec2bcd(tm.Wday));		
+			Wire.write(dec2bcd(tm.Wday));
 			Wire.write(dec2bcd(tm.Month));
 			Wire.write(dec2bcd(tm.Year)); 
 			Wire.endTransmission();
 			break;
-	}		 
+	}
 }
 
 // Convert Decimal to Binary Coded Decimal (BCD)

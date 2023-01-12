@@ -18,9 +18,9 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see
- * <http://www.gnu.org/licenses/>. 
+ * <http://www.gnu.org/licenses/>.
  */
- 
+
 #include "gpio.h"
 
 #if defined(ARDUINO)
@@ -33,26 +33,26 @@
 byte IOEXP::detectType(uint8_t address) {
 	Wire.beginTransmission(address);
 	if(Wire.endTransmission()!=0) return IOEXP_TYPE_NONEXIST; // this I2C address does not exist
-	
+
 	Wire.beginTransmission(address);
 	Wire.write(NXP_INVERT_REG); // ask for polarity register
 	Wire.endTransmission();
-	
+
 	if(Wire.requestFrom(address, (uint8_t)2) != 2) return IOEXP_TYPE_UNKNOWN;
 	uint8_t low = Wire.read();
 	uint8_t high = Wire.read();
 	if(low==0x00 && high==0x00) {
 		return IOEXP_TYPE_9555; // PCA9555 has polarity register which inits to 0
 	}
-	return IOEXP_TYPE_8575;  
+	return IOEXP_TYPE_8575;
 }
 
 void PCA9555::pinMode(uint8_t pin, uint8_t IOMode) {
 	uint16_t config = i2c_read(NXP_CONFIG_REG);
 	if(IOMode == OUTPUT) {
-			config &= ~(1 << pin); // config bit set to 0 for output pin
+		config &= ~(1 << pin); // config bit set to 0 for output pin
 	} else {
-			config |= (1 << pin);  // config bit set to 1 for input pin
+		config |= (1 << pin);  // config bit set to 1 for input pin
 	}
 	i2c_write(NXP_CONFIG_REG, config);
 }
@@ -62,7 +62,7 @@ uint16_t PCA9555::i2c_read(uint8_t reg) {
 	Wire.beginTransmission(address);
 	Wire.write(reg);
 	Wire.endTransmission();
-	if(Wire.requestFrom(address, (uint8_t)2) != 2) {return 0xFFFF; Serial.println("GPIO error");}
+	if(Wire.requestFrom(address, (uint8_t)2) != 2) {return 0xFFFF; DEBUG_PRINTLN("GPIO error");}
 	uint16_t data0 = Wire.read();
 	uint16_t data1 = Wire.read();
 	return data0+(data1<<8);
@@ -79,14 +79,14 @@ void PCA9555::i2c_write(uint8_t reg, uint16_t v){
 
 void PCA9555::shift_out(uint8_t plat, uint8_t pclk, uint8_t pdat, uint8_t v) {
 	if(plat<IOEXP_PIN || pclk<IOEXP_PIN || pdat<IOEXP_PIN)
-		return;	// the definition of each pin must be offset by IOEXP_PIN to begin with
-	
+		return; // the definition of each pin must be offset by IOEXP_PIN to begin with
+
 	plat-=IOEXP_PIN;
 	pclk-=IOEXP_PIN;
 	pdat-=IOEXP_PIN;
-	
+
 	uint16_t output = i2c_read(NXP_OUTPUT_REG); // keep a copy of the current output registers
-	
+
 	output &= ~(1<<plat); i2c_write(NXP_OUTPUT_REG, output); // set latch low
 
 	for(uint8_t s=0;s<8;s++) {
@@ -101,7 +101,7 @@ void PCA9555::shift_out(uint8_t plat, uint8_t pclk, uint8_t pdat, uint8_t v) {
 
 		output |= (1<<pclk); i2c_write(NXP_OUTPUT_REG, output); // set clock high
 	}
-	
+
 	output |= (1<<plat); i2c_write(NXP_OUTPUT_REG, output); // set latch high
 }
 
@@ -130,14 +130,14 @@ uint16_t PCF8574::i2c_read(uint8_t reg) {
 	if(Wire.requestFrom(address, (uint8_t)1) != 1) return 0xFFFF;
 	uint16_t data = Wire.read();
 	Wire.endTransmission();
-	return data; 
+	return data;
 }
 
 void PCF8574::i2c_write(uint8_t reg, uint16_t v) {
 	if(address==255)	return;
 	Wire.beginTransmission(address);
 	Wire.write((uint8_t)(v&0xFF) | inputmask);
-	Wire.endTransmission();  
+	Wire.endTransmission();
 }
 
 #include "OpenSprinkler.h"
@@ -158,13 +158,6 @@ void digitalWriteExt(byte pin, byte value) {
 	if(pin>=IOEXP_PIN) {
 
 		os.mainio->digitalWrite(pin-IOEXP_PIN, value);
-	/*
-		// a pin on IO expander
-		byte data=pcf_read(MAIN_I2CADDR);
-		if(value) data|=(1<<(pin-IOEXP_PIN));
-		else		 data&=~(1<<(pin-IOEXP_PIN));
-		data |= MAIN_INPUTMASK; // make sure to enforce 1 for input pins
-		pcf_write(MAIN_I2CADDR, data);*/
 	} else {
 		digitalWrite(pin, value);
 	}
@@ -291,7 +284,8 @@ void pinMode(int pin, byte mode) {
 #if defined(OSPI)
 	if(mode==INPUT_PULLUP) {
 		char cmd[BUFFER_MAX];
-		snprintf(cmd, BUFFER_MAX, "gpio -g mode %d up", pin);
+		//snprintf(cmd, BUFFER_MAX, "gpio -g mode %d up", pin);
+		snprintf(cmd, BUFFER_MAX, "raspi-gpio set %d pu", pin);
 		system(cmd);
 	}
 #endif

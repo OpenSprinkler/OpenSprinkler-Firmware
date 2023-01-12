@@ -39,10 +39,10 @@
 #define SENSOR_NONE                       0   //None or deleted sensor
 #define SENSOR_SMT100_MODBUS_RTU_MOIS     1   //Truebner SMT100 RS485 Modbus RTU over TCP, moisture mode
 #define SENSOR_SMT100_MODBUS_RTU_TEMP     2   //Truebner SMT100 RS485 Modbus RTU over TCP, temperature mode
-#define SENSOR_ANALOG_EXTENSION_BOARD     10  //New OpenSprinkler analog extension board 2xADS1015 48/49 - voltage mode 0..4V
-#define SENSOR_ANALOG_EXTENSION_BOARD_P   11  //New OpenSprinkler analog extension board 2xADS1015 48/49 - percent 0..3.3V to 0..100%
-#define SENSOR_SMT50_MOIS                 15  //New OpenSprinkler analog extension board 2xADS1015 48/49 - SMT50 VWC [%] = (U * 50) : 3
-#define SENSOR_SMT50_TEMP                 16  //New OpenSprinkler analog extension board 2xADS1015 48/49 - SMT50 T [°C] = (U – 0,5) * 100
+#define SENSOR_ANALOG_EXTENSION_BOARD     10  //New OpenSprinkler analog extension board x8 - voltage mode 0..4V
+#define SENSOR_ANALOG_EXTENSION_BOARD_P   11  //New OpenSprinkler analog extension board x8 - percent 0..3.3V to 0..100%
+#define SENSOR_SMT50_MOIS                 15  //New OpenSprinkler analog extension board x8 - SMT50 VWC [%] = (U * 50) : 3
+#define SENSOR_SMT50_TEMP                 16  //New OpenSprinkler analog extension board x8 - SMT50 T [°C] = (U – 0,5) * 100
 #define SENSOR_OSPI_ANALOG_INPUTS         20  //Old OSPi analog input
 #define SENSOR_REMOTE                     100 //Remote sensor of an remote opensprinkler
 
@@ -69,7 +69,7 @@ typedef struct Sensor {
 	uint     type;             // 1..n type definition, 0=deleted
 	uint     group;            // group assignment,0=no group
 	uint32_t ip;               // tcp-ip
-	uint     port;             // tcp-port    / ADC: I2C Address 0x48/0x49
+	uint     port;             // tcp-port    / ADC: I2C Address 0x48/0x49 or 0/1
 	uint     id;               // modbus id   / ADC: channel
 	uint     read_interval;    // seconds
 	uint32_t last_native_data; // last native sensor data

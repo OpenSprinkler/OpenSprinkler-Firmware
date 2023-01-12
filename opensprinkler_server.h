@@ -18,9 +18,9 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see
- * <http://www.gnu.org/licenses/>. 
+ * <http://www.gnu.org/licenses/>.
  */
- 
+
 #ifndef _OPENSPRINKLER_SERVER_H
 #define _OPENSPRINKLER_SERVER_H
 
@@ -56,7 +56,7 @@ public:
 				break;
 			case 'E': //Double
 				sprintf((char*) ptr, "%10.6lf", va_arg(ap, double));
-				break;
+				break;				
 			case 'L':
 				//ltoa(va_arg(ap, long), (char*) ptr, 10);
 				ultoa(va_arg(ap, long), (char*) ptr, 10); // ray
@@ -68,8 +68,8 @@ public:
 				char d = va_arg(ap, int);
 				*ptr++ = dec2hexchar((d >> 4) & 0x0F);
 				*ptr++ = dec2hexchar(d & 0x0F);
-				continue;
 			}
+				continue;
 			case 'F': {
 				PGM_P s = va_arg(ap, PGM_P);
 				char d;
@@ -80,15 +80,15 @@ public:
 			case 'O': {
 				uint16_t oid = va_arg(ap, int);
 				file_read_block(SOPTS_FILENAME, (char*) ptr, oid*MAX_SOPTS_SIZE, MAX_SOPTS_SIZE);
-				break;
 			}
+				break;
 			default:
 				*ptr++ = c;
 				continue;
 			}
 			ptr += strlen((char*) ptr);
 		}
-		*(ptr)=0;				 
+		*(ptr)=0;
 		va_end(ap);
 	}
 

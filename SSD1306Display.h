@@ -7,7 +7,7 @@
 #include "font.h"
 #include "images.h"
 
-#define LCD_STD 0			// Standard LCD
+#define LCD_STD 0  // Standard LCD
 #define LCD_I2C 1
 
 class SSD1306Display : public SSD1306{
@@ -32,7 +32,7 @@ public:
 		fillRect(0, (start+1)*fontHeight, 128, (end-start+1)*fontHeight);
 		setColor(WHITE);
 	}
-	
+
 	uint8_t type() { return LCD_I2C; }
 	void noBlink() {/*no support*/}
 	void blink() {/*no support*/}
@@ -55,23 +55,25 @@ public:
 			drawString(cx, cy, String((char)c));
 		}
 		cx += fontWidth;
-		display();	// todo: not very efficient
+		if(auto_display) display();  // todo: not very efficient
 		return 1;
 	}
 	size_t write(const char* s) {
 		uint8_t nc = strlen(s);
 		setColor(BLACK);
-		fillRect(cx, cy, fontWidth*nc, fontHeight);  
+		fillRect(cx, cy, fontWidth*nc, fontHeight);
 		setColor(WHITE);
 		drawString(cx, cy, String(s));
 		cx += fontWidth*nc;
-		display();	// todo: not very efficient
+		if(auto_display) display();	// todo: not very efficient
 		return nc;
 	}
 	void createChar(byte idx, PGM_P ptr) {
 		if(idx>=0&&idx<NUM_CUSTOM_ICONS) custom_chars[idx]=ptr;
 	}
+	void setAutoDisplay(bool v) {auto_display=v;}
 private:
+	bool auto_display = true;
 	uint8_t cx, cy;
 	uint8_t fontWidth, fontHeight;
 	PGM_P custom_chars[NUM_CUSTOM_ICONS];

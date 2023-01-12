@@ -299,9 +299,13 @@ void read_all_sensors() {
 int read_sensor_adc(Sensor_t *sensor) {
 	DEBUG_PRINTLN(F("read_sensor_adc"));
 	if (!sensor || !sensor->flags.enable) return HTTP_RQT_NOT_RECEIVED;
-
+	if (sensor->id >= 8) return HTTP_RQT_NOT_RECEIVED;
 	//Init + Detect:
-	ADS1015 adc(sensor->port);
+
+	int port = sensor->id < 4? 72 : 73;
+	int id = id % 4;
+
+	ADS1015 adc(port);
 	bool active = adc.begin();
 	if (active)
 		adc.setGain(1);
@@ -312,7 +316,7 @@ int read_sensor_adc(Sensor_t *sensor) {
 		return HTTP_RQT_NOT_RECEIVED;
 
 	//Read values:
-	sensor->last_native_data = adc.readADC(sensor->id);
+	sensor->last_native_data = adc.readADC(id);
 	sensor->last_data = adc.toVoltage(sensor->last_native_data);
 
 	switch(sensor->type) {
@@ -333,7 +337,6 @@ int read_sensor_adc(Sensor_t *sensor) {
 	DEBUG_PRINT(sensor->last_native_data);
 	DEBUG_PRINT(",");
 	DEBUG_PRINTLN(sensor->last_data);
-
 
 	return HTTP_RQT_SUCCESS;
 }

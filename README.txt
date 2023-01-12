@@ -14,15 +14,3 @@ https://openthings.freshdesk.com/support/solutions/articles/5000631599-installin
 Questions and comments:
 http://www.opensprinkler.com
 ============================================
-
-
-************************************************************** UPDATE 01.04.2022 *************************************
-This is the lwip version from OpenSprinkler branch dev/os220 
-
-we found out that the lwip_enc28j60 had some bugs, so use better the lwip_enc28j60 from here: 
-https://github.com/esp8266/Arduino/pull/8376
-
-Also it is better to use the updated version of LitteFS from here:
-https://github.com/littlefs-project/littlefs
-
-**********************************************************************************************************************

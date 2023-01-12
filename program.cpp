@@ -18,16 +18,16 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see
- * <http://www.gnu.org/licenses/>. 
+ * <http://www.gnu.org/licenses/>.
  */
 
 #include <limits.h>
 #include "program.h"
 
 #if !defined(SECS_PER_DAY)
-#define SECS_PER_MIN	(60UL)
+#define SECS_PER_MIN  (60UL)
 #define SECS_PER_HOUR (3600UL)
-#define SECS_PER_DAY	(SECS_PER_HOUR * 24UL)
+#define SECS_PER_DAY  (SECS_PER_HOUR * 24UL)
 #endif
 
 // Declare static data members
@@ -36,7 +36,8 @@ byte ProgramData::nqueue = 0;
 RuntimeQueueStruct ProgramData::queue[RUNTIME_QUEUE_SIZE];
 byte ProgramData::station_qid[MAX_NUM_STATIONS];
 LogStruct ProgramData::lastrun;
-ulong ProgramData::last_seq_stop_time;
+ulong ProgramData::last_seq_stop_times[NUM_SEQ_GROUPS];
+
 extern char tmp_buffer[];
 
 void ProgramData::init() {
@@ -45,9 +46,9 @@ void ProgramData::init() {
 }
 
 void ProgramData::reset_runtime() {
-	memset(station_qid, 0xFF, MAX_NUM_STATIONS);	// reset station qid to 0xFF
+	memset(station_qid, 0xFF, MAX_NUM_STATIONS);  // reset station qid to 0xFF
 	nqueue = 0;
-	last_seq_stop_time = 0;
+	memset(last_seq_stop_times, 0, sizeof(last_seq_stop_times));
 }
 
 /** Insert a new element to the queue
@@ -124,6 +125,59 @@ void ProgramData::moveup(byte pid) {
 	file_write_block(PROG_FILENAME, buf2, pos, PROGRAMSTRUCT_SIZE);
 }
 
+void ProgramData::toggle_pause(ulong delay) {
+	if (os.status.pause_state) { // was paused
+		resume_stations();
+	} else {
+		//os.clear_all_station_bits(); // TODO: this will affect logging
+		os.pause_timer = delay;
+		set_pause();
+	}
+	os.status.pause_state = !os.status.pause_state;
+}
+
+void turn_off_station(byte sid, ulong curr_time, byte shift=0);
+
+void ProgramData::set_pause() {
+	RuntimeQueueStruct *q = queue;
+	ulong curr_t = os.now_tz();
+
+	for (; q < queue + nqueue; q++) {
+
+		turn_off_station(q->sid, curr_t);
+		if (curr_t>=q->st+q->dur) { // already finished running
+			continue;
+		} else if (curr_t>=q->st) { // currently running
+			q->dur -= (curr_t - q->st); // adjust remaining run time
+			q->st = curr_t + os.pause_timer;     // push back start time
+		} else { // scheduled but not running yet
+			q->st += os.pause_timer;
+		}
+		q->deque_time += os.pause_timer;
+		byte gid = os.get_station_gid(q->sid);
+		if (q->st + q->dur > last_seq_stop_times[gid]) {
+			last_seq_stop_times[gid] = q->st + q->dur; // update last_seq_stop_times of the corresponding group
+		}
+	}
+}
+
+void ProgramData::resume_stations() {
+	RuntimeQueueStruct *q = queue;
+	for (; q < queue + nqueue; q++) {
+		q->st -= os.pause_timer;
+		q->deque_time -= os.pause_timer;
+		q->st += 1; // adjust by 1 second to give time for scheduler
+		q->deque_time += 1;
+	}
+	clear_pause();
+}
+
+void ProgramData::clear_pause() {
+	os.status.pause_state = 0;
+	os.pause_timer = 0;
+	memset(last_seq_stop_times, 0, sizeof(last_seq_stop_times));
+}
+
 /** Modify a program */
 byte ProgramData::modify(byte pid, ProgramStruct *buf) {
 	if (pid >= nprograms)  return 0;
@@ -174,8 +228,8 @@ int16_t ProgramStruct::starttime_decode(int16_t t) {
 /** Check if a given time matches the program's start day */
 byte ProgramStruct::check_day_match(time_t t) {
 
-#if defined(ARDUINO) // get current time from Arduino
-	byte weekday_t = weekday(t);				// weekday ranges from [0,6] within Sunday being 1
+#if defined(ARDUINO)  // get current time from Arduino
+	byte weekday_t = weekday(t);  // weekday ranges from [0,6] within Sunday being 1
 	byte day_t = day(t);
 	byte month_t = month(t);
 #else // get current time from RPI/BBB
@@ -183,11 +237,22 @@ byte ProgramStruct::check_day_match(time_t t) {
 	struct tm *ti = gmtime(&ct);
 	byte weekday_t = (ti->tm_wday+1)%7;  // tm_wday ranges from [0,6] with Sunday being 0
 	byte day_t = ti->tm_mday;
-	byte month_t = ti->tm_mon+1;	 // tm_mon ranges from [0,11]
+	byte month_t = ti->tm_mon+1;  // tm_mon ranges from [0,11]
 #endif // get current time
 
 	byte wd = (weekday_t+5)%7;
 	byte dt = day_t;
+
+	if(en_daterange) { // check date range if enabled
+		int16_t currdate = date_encode(month_t, day_t);
+		// depending on whether daterange[0] or [1] is smaller:
+		if(daterange[0]<=daterange[1]) {
+			if(currdate<daterange[0]||currdate>daterange[1]) return 0;
+		} else {
+			// this is the case where the defined range crosses the end of the year
+			if(currdate>daterange[1] && currdate<daterange[0]) return 0;
+		}
+	}
 
 	// check day match
 	switch(type) {
@@ -295,6 +360,3 @@ void ProgramData::drem_to_absolute(byte days[2]) {
 	// todo future: use now_tz()?
 	days[0] = (byte)(((os.now_tz()/SECS_PER_DAY) + rem_rel) % inv);
 }
-
-
-
