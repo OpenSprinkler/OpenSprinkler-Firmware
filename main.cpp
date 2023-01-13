@@ -32,6 +32,7 @@
 
 #if defined(ARDUINO)
 	#if defined(ESP8266)
+		extern "C" struct netif* eagle_lwip_getif (int netif_index);
 		ESP8266WebServer *update_server = NULL;
 		OTF::OpenThingsFramework *otf = NULL;
 		DNSServer *dns = NULL;
@@ -422,6 +423,7 @@ void reboot_in(uint32_t ms) {
 		reboot_ticker.once_ms(ms, ESP.restart);
 	}
 }
+bool check_enc28j60();
 #else
 void handle_web_request(char *p);
 #endif
@@ -978,6 +980,40 @@ void do_loop()
 				flowcount_rt_start = flow_count;
 			}
 		}
+
+#if defined(ESP8266)
+		// dhcp and hw check:
+		static unsigned long dhcp_timeout = 0;
+		if(curr_time > dhcp_timeout) {
+			if (useEth) {
+				netif* intf = (netif*) eth.getNetIf();
+				if (os.iopts[IOPT_USE_DHCP])
+					dhcp_renew(intf);
+
+				if (dhcp_timeout > 0 && !check_enc28j60()) { //ENC28J60 REGISTER CHECK!!
+					DEBUG_PRINT(F("Reconnect"));
+					//eth.resetEther();
+	
+					// todo: lwip add timeout
+					int n = os.iopts[IOPT_USE_DHCP]?30:2;
+  					while (!eth.connected() && n-- >0) {
+    					DEBUG_PRINT(".");
+    					delay(1000);
+  					}					
+
+					if (!eth.connected()) {
+						os.nvdata.reboot_cause = REBOOT_CAUSE_NETWORK_FAIL;
+						os.status.safe_reboot = 1;
+					}
+				}
+			}
+			else if (os.iopts[IOPT_USE_DHCP] && WiFi.status() == WL_CONNECTED && os.get_wifi_mode()==WIFI_MODE_STA) {
+				netif* intf = eagle_lwip_getif(STATION_IF);
+				dhcp_renew(intf);
+			}
+			dhcp_timeout = curr_time + DHCP_CHECKLEASE_INTERVAL;
+		}
+#endif
 
 		// perform ntp sync
 		// instead of using curr_time, which may change due to NTP sync itself
@@ -1865,6 +1901,29 @@ void check_network() {
 	// nothing to do for other platforms
 #endif
 }
+
+#if defined(ESP8266)
+#define NET_ENC28J60_EIR                                 0x1C
+#define NET_ENC28J60_ESTAT                               0x1D
+#define NET_ENC28J60_ECON1                               0x1F
+#define NET_ENC28J60_EIR_RXERIF                          0x01
+#define NET_ENC28J60_ESTAT_BUFFER                        0x40
+#define NET_ENC28J60_ECON1_RXEN                          0x04
+bool check_enc28j60()
+{
+	uint8_t stateEconRxen = eth.readreg((uint8_t) NET_ENC28J60_ECON1) & NET_ENC28J60_ECON1_RXEN;
+    // ESTAT.BUFFER rised on TX or RX error
+    // I think the test of this register is not necessary - EIR.RXERIF state checking may be enough
+    uint8_t stateEstatBuffer = eth.readreg((uint8_t) NET_ENC28J60_ESTAT) & NET_ENC28J60_ESTAT_BUFFER;
+    // EIR.RXERIF set on RX error
+    uint8_t stateEirRxerif = eth.readreg((uint8_t) NET_ENC28J60_EIR) & NET_ENC28J60_EIR_RXERIF;
+    if (!stateEconRxen || (stateEstatBuffer && stateEirRxerif)) {
+		DEBUG_PRINTLN(F("ENC28J60 FAILED - REBOOT!"))
+		return false;
+	}
+	return true;
+}
+#endif
 
 /** Perform NTP sync */
 void perform_ntp_sync() {
