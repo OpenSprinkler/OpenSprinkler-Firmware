@@ -367,7 +367,7 @@ private:
 	static void latch_close(byte sid);
 	static void latch_setzonepin(byte sid, byte value);
 	static void latch_setallzonepins(byte value);
-	static void latch_disable_alloutputs_v2();
+	static void latch_disable_alloutputs_v2(byte expvalue);
 	static void latch_setzoneoutput_v2(byte sid, byte A, byte K);
 	static void latch_apply_all_station_bits();
 	static byte prev_station_bits[];

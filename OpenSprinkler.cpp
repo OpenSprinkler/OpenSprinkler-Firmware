@@ -1001,7 +1001,7 @@ void OpenSprinkler::latch_setallzonepins(byte value) {
 	}
 }
 
-void OpenSprinkler::latch_disable_alloutputs_v2() {
+void OpenSprinkler::latch_disable_alloutputs_v2(byte expvalue) {
 	digitalWriteExt(PIN_LATCH_COMA, LOW);
 	digitalWriteExt(PIN_LATCH_COMK, LOW);
 
@@ -1010,7 +1010,12 @@ void OpenSprinkler::latch_disable_alloutputs_v2() {
 	// latch v2 has a 74hc595 which controls all h-bridge cathode pins
 	drio->shift_out(V2_PIN_SRLAT, V2_PIN_SRCLK, V2_PIN_SRDAT, 0x00);
 
-	// todo: handle expander
+	// Handle all expansion boards
+	for(byte i=0;i<MAX_EXT_BOARDS/2;i++) {
+		if(expanders[i]->type==IOEXP_TYPE_9555) {
+			expanders[i]->i2c_write(NXP_OUTPUT_REG, expvalue?0xFFFF:0x0000);
+		}
+	}
 }
 
 /** Set one zone (for LATCH controller)
@@ -1049,8 +1054,15 @@ void OpenSprinkler::latch_setzoneoutput_v2(byte sid, byte A, byte K) {
 
 		drio->shift_out(V2_PIN_SRLAT, V2_PIN_SRCLK, V2_PIN_SRDAT, K ? (1<<sid) : 0);
 
-	} else { // on expander
-		// todo: handle expander
+	} else { // for expander
+		byte bid=(sid-8)>>4;
+		uint16_t s=(sid-8)&0x0F;
+		if(expanders[bid]->type==IOEXP_TYPE_9555) {
+			uint16_t reg = expanders[bid]->i2c_read(NXP_OUTPUT_REG);  // read current output reg value
+			if(A==HIGH && K==LOW) reg |= (1<<s);
+			else if(K==HIGH && A==LOW) reg &= (~(1<<s));
+			expanders[bid]->i2c_write(NXP_OUTPUT_REG, reg);
+		}
 	}
 }
 
@@ -1060,14 +1072,14 @@ void OpenSprinkler::latch_setzoneoutput_v2(byte sid, byte A, byte K) {
 void OpenSprinkler::latch_open(byte sid) {
 	if(hw_rev==2) {
 		DEBUG_PRINTLN(F("latch_open_v2"));
-		latch_disable_alloutputs_v2(); // disable all output pins
+		latch_disable_alloutputs_v2(HIGH); // disable all output pins; set expanders all to HIGH
 		latch_boost(); // generate boost voltage
 		digitalWriteExt(PIN_LATCH_COMA, HIGH); // enable COM+
 		latch_setzoneoutput_v2(sid, LOW, HIGH); // enable sid-
 		digitalWriteExt(PIN_BOOST_EN, HIGH); // enable output path
 		delay(150);
 		digitalWriteExt(PIN_BOOST_EN, LOW); // disabled output boosted voltage path
-		latch_disable_alloutputs_v2(); // disable all output pins
+		latch_disable_alloutputs_v2(HIGH); // disable all output pins; set expanders all to HIGH
 	} else {
 		latch_boost();  // boost voltage
 		latch_setallzonepins(HIGH);  // set all switches to HIGH, including COM
@@ -1083,14 +1095,14 @@ void OpenSprinkler::latch_open(byte sid) {
 void OpenSprinkler::latch_close(byte sid) {
 	if(hw_rev==2) {
 		DEBUG_PRINTLN(F("latch_close_v2"));
-		latch_disable_alloutputs_v2(); // disable all output pins
+		latch_disable_alloutputs_v2(LOW); // disable all output pins; set expanders all to LOW
 		latch_boost(); // generate boost voltage
 		latch_setzoneoutput_v2(sid, HIGH, LOW); // enable sid+
 		digitalWriteExt(PIN_LATCH_COMK, HIGH); // enable COM-
 		digitalWriteExt(PIN_BOOST_EN, HIGH); // enable output path
 		delay(150);
 		digitalWriteExt(PIN_BOOST_EN, LOW); // disable output boosted voltage path
-		latch_disable_alloutputs_v2(); // disable all output pins
+		latch_disable_alloutputs_v2(HIGH); // disable all output pins; set expanders all to HIGH
 	} else {
 		latch_boost();  // boost voltage
 		latch_setallzonepins(LOW);  // set all switches to LOW, including COM
