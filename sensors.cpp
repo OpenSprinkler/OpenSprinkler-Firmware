@@ -303,7 +303,7 @@ int read_sensor_adc(Sensor_t *sensor) {
 	//Init + Detect:
 
 	int port = sensor->id < 4? 72 : 73;
-	int id = id % 4;
+	int id = sensor->id % 4;
 
 	ADS1015 adc(port);
 	bool active = adc.begin();
