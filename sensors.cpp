@@ -484,7 +484,6 @@ int read_sensor_ip(Sensor_t *sensor) {
 	client->write(buffer, len);
 #if defined(ESP8266)
 	client->flush();
-#endif
 	uint32_t stoptime = millis()+SENSOR_READ_TIMEOUT;
 	while (true) {
 		if (client->available())
@@ -498,6 +497,21 @@ int read_sensor_ip(Sensor_t *sensor) {
 		}
 		delay(5);
 	}
+#else
+	uint32_t stoptime = millis()+SENSOR_READ_TIMEOUT;
+	while (true) {
+		if (client->peek() != -1))
+			break;
+		if (millis() >=  stoptime) {
+			client->stop();
+			DEBUG_PRINT(F("Sensor "));
+			DEBUG_PRINT(sensor->nr);
+			DEBUG_PRINT(F(" timeout read!"));
+			return HTTP_RQT_TIMEOUT;
+		}
+		delay(5);
+	}
+#endif
 
 	//Read result:
 	switch(sensor->type)
