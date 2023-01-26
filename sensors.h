@@ -33,16 +33,20 @@
 #endif
 #include "defines.h"
 #include "utils.h"
+#if defined(ESP8266)
 #include <ADS1X15.h>
+#endif
 
 //Sensor types:
 #define SENSOR_NONE                       0   //None or deleted sensor
 #define SENSOR_SMT100_MODBUS_RTU_MOIS     1   //Truebner SMT100 RS485 Modbus RTU over TCP, moisture mode
 #define SENSOR_SMT100_MODBUS_RTU_TEMP     2   //Truebner SMT100 RS485 Modbus RTU over TCP, temperature mode
+#if defined(ESP8266)
 #define SENSOR_ANALOG_EXTENSION_BOARD     10  //New OpenSprinkler analog extension board x8 - voltage mode 0..4V
 #define SENSOR_ANALOG_EXTENSION_BOARD_P   11  //New OpenSprinkler analog extension board x8 - percent 0..3.3V to 0..100%
 #define SENSOR_SMT50_MOIS                 15  //New OpenSprinkler analog extension board x8 - SMT50 VWC [%] = (U * 50) : 3
 #define SENSOR_SMT50_TEMP                 16  //New OpenSprinkler analog extension board x8 - SMT50 T [°C] = (U – 0,5) * 100
+#endif
 #define SENSOR_OSPI_ANALOG_INPUTS         20  //Old OSPi analog input
 #define SENSOR_REMOTE                     100 //Remote sensor of an remote opensprinkler
 

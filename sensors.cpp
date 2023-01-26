@@ -293,6 +293,7 @@ void read_all_sensors() {
 	sensor_update_groups();
 }
 
+#if defined(ESP8266)
 /**
  * Read ADS1015 sensors
 */
@@ -340,6 +341,7 @@ int read_sensor_adc(Sensor_t *sensor) {
 
 	return HTTP_RQT_SUCCESS;
 }
+#endif
 
 int read_sensor_ospi(Sensor_t *sensor) {
 	DEBUG_PRINTLN(F("read_sensor_ospi"));
@@ -547,11 +549,13 @@ int read_sensor(Sensor_t *sensor) {
 		case SENSOR_SMT100_MODBUS_RTU_TEMP:
 			return read_sensor_ip(sensor);
 
+#if defined(ESP8266)
 		case SENSOR_ANALOG_EXTENSION_BOARD:
 		case SENSOR_ANALOG_EXTENSION_BOARD_P:
 		case SENSOR_SMT50_MOIS: //SMT50 VWC [%] = (U * 50) : 3
 		case SENSOR_SMT50_TEMP: //SMT50 T [°C] = (U – 0,5) * 100
 			return read_sensor_adc(sensor);
+#endif
 
 		//case SENSOR_OSPI_ANALOG_INPUTS:
 		//	return read_sensor_ospi(sensor);
@@ -973,10 +977,12 @@ byte getSensorUnitId(int type) {
 	switch(type) {
 		case SENSOR_SMT100_MODBUS_RTU_MOIS:   return UNIT_PERCENT; 
 		case SENSOR_SMT100_MODBUS_RTU_TEMP:   return UNIT_DEGREE;
+#if defined(ESP8266)
 	    case SENSOR_ANALOG_EXTENSION_BOARD:   return UNIT_VOLT;
 	    case SENSOR_ANALOG_EXTENSION_BOARD_P: return UNIT_PERCENT;
 		case SENSOR_SMT50_MOIS: 			  return UNIT_PERCENT;
 		case SENSOR_SMT50_TEMP: 			  return UNIT_DEGREE;
+#endif
 		case SENSOR_OSPI_ANALOG_INPUTS: 	  return UNIT_VOLT;
 
 		default: return UNIT_NONE;
@@ -990,10 +996,12 @@ byte getSensorUnitId(Sensor_t *sensor) {
 	switch(sensor->type) {
 		case SENSOR_SMT100_MODBUS_RTU_MOIS:   return UNIT_PERCENT; 
 		case SENSOR_SMT100_MODBUS_RTU_TEMP:   return UNIT_DEGREE;
+#if defined(ESP8266)		
 	    case SENSOR_ANALOG_EXTENSION_BOARD:   return UNIT_VOLT;
 		case SENSOR_ANALOG_EXTENSION_BOARD_P: return UNIT_PERCENT;
 		case SENSOR_SMT50_MOIS: 			  return UNIT_PERCENT;
 		case SENSOR_SMT50_TEMP: 			  return UNIT_DEGREE;
+#endif
 		case SENSOR_OSPI_ANALOG_INPUTS: 	  return UNIT_VOLT;
 		case SENSOR_REMOTE:                	  return sensor->unitid;
 

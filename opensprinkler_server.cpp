@@ -2529,10 +2529,12 @@ void server_sensorprog_list(OTF_PARAMS_DEF) {
 const int sensor_types[] = {
 	SENSOR_SMT100_MODBUS_RTU_MOIS,
 	SENSOR_SMT100_MODBUS_RTU_TEMP,
+#if defined(ESP8266)
 	SENSOR_ANALOG_EXTENSION_BOARD,
 	SENSOR_ANALOG_EXTENSION_BOARD_P,
 	SENSOR_SMT50_MOIS,
 	SENSOR_SMT50_TEMP,
+#endif	
 	//SENSOR_OSPI_ANALOG_INPUTS,  
 	SENSOR_REMOTE,              
 	SENSOR_GROUP_MIN,
@@ -2544,10 +2546,12 @@ const int sensor_types[] = {
 const char* sensor_names[] = {
 	"Truebner SMT100 RS485 Modbus RTU over TCP, moisture mode",
 	"Truebner SMT100 RS485 Modbus RTU over TCP, temperature mode",
+#if defined(ESP8266)
 	"OpenSprinkler analog extension board 2xADS1015 x8 - voltage mode 0..4V",
 	"OpenSprinkler analog extension board 2xADS1015 x8 - 0..3.3V to 0..100%",
 	"OpenSprinkler analog extension board 2xADS1015 x8 - SMT50 moisture mode",
 	"OpenSprinkler analog extension board 2xADS1015 x8 - SMT50 temperature mode",
+#endif
 	//"OSPi analog input",
 	"Remote sensor of an remote opensprinkler",
 	"Sensor group with min value",
