@@ -434,10 +434,10 @@ int read_sensor_ip(Sensor_t *sensor) {
 
 	if(!client->connect(ip, sensor->port)) {
 		DEBUG_PRINT(F("Cannot connect to "));
-		DEBUG_PRINT(_ip[0]); DEBUG_PRINT(".");
-		DEBUG_PRINT(_ip[1]); DEBUG_PRINT(".");
-		DEBUG_PRINT(_ip[2]); DEBUG_PRINT(".");
-		DEBUG_PRINT(_ip[3]); DEBUG_PRINT(":");
+		DEBUG_PRINT(ip[0]); DEBUG_PRINT(".");
+		DEBUG_PRINT(ip[1]); DEBUG_PRINT(".");
+		DEBUG_PRINT(ip[2]); DEBUG_PRINT(".");
+		DEBUG_PRINT(ip[3]); DEBUG_PRINT(":");
 		DEBUG_PRINTLN(sensor->port);
 		client->stop();
 		return HTTP_RQT_CONNECT_ERR;
@@ -700,10 +700,10 @@ int set_sensor_address(Sensor_t *sensor, byte new_address) {
 				return HTTP_RQT_CONNECT_ERR;
 			}
 
-#if defined(ESP8266)
 			client->write(buffer, len);
-#endif
+#if defined(ESP8266)
 			client->flush();
+#endif
 
 			//Read result:
 			int n = client->read(buffer, 8);
