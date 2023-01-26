@@ -491,8 +491,8 @@ int read_sensor_ip(Sensor_t *sensor) {
 	{
 		case SENSOR_SMT100_MODBUS_RTU_MOIS:
 		case SENSOR_SMT100_MODBUS_RTU_TEMP:	
-#if defined(ESP8266)
 			uint32_t stoptime = millis()+SENSOR_READ_TIMEOUT;
+#if defined(ESP8266)
 			while (true) {
 				if (client->available())
 					break;
