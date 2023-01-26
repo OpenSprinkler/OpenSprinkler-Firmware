@@ -484,33 +484,6 @@ int read_sensor_ip(Sensor_t *sensor) {
 	client->write(buffer, len);
 #if defined(ESP8266)
 	client->flush();
-	uint32_t stoptime = millis()+SENSOR_READ_TIMEOUT;
-	while (true) {
-		if (client->available())
-			break;
-		if (millis() >=  stoptime) {
-			client->stop();
-			DEBUG_PRINT(F("Sensor "));
-			DEBUG_PRINT(sensor->nr);
-			DEBUG_PRINT(F(" timeout read!"));
-			return HTTP_RQT_TIMEOUT;
-		}
-		delay(5);
-	}
-#else
-	uint32_t stoptime = millis()+SENSOR_READ_TIMEOUT;
-	while (true) {
-		if (client->peek() != -1))
-			break;
-		if (millis() >=  stoptime) {
-			client->stop();
-			DEBUG_PRINT(F("Sensor "));
-			DEBUG_PRINT(sensor->nr);
-			DEBUG_PRINT(F(" timeout read!"));
-			return HTTP_RQT_TIMEOUT;
-		}
-		delay(5);
-	}
 #endif
 
 	//Read result:
@@ -518,7 +491,37 @@ int read_sensor_ip(Sensor_t *sensor) {
 	{
 		case SENSOR_SMT100_MODBUS_RTU_MOIS:
 		case SENSOR_SMT100_MODBUS_RTU_TEMP:	
+#if defined(ESP8266)
+			uint32_t stoptime = millis()+SENSOR_READ_TIMEOUT;
+			while (true) {
+				if (client->available())
+					break;
+				if (millis() >=  stoptime) {
+					client->stop();
+					DEBUG_PRINT(F("Sensor "));
+					DEBUG_PRINT(sensor->nr);
+					DEBUG_PRINT(F(" timeout read!"));
+					return HTTP_RQT_TIMEOUT;
+				}
+				delay(5);
+			}
 			int n = client->read(buffer, 7);
+#else
+			int n = 0;
+			while (true) {
+				n = client->read(buffer, 7);
+				if (n > 0)
+					break;
+				if (millis() >=  stoptime) {
+					client->stop();
+					DEBUG_PRINT(F("Sensor "));
+					DEBUG_PRINT(sensor->nr);
+					DEBUG_PRINT(F(" timeout read!"));
+					return HTTP_RQT_TIMEOUT;
+				}
+				delay(5);
+			}
+#endif
 			client->stop();
 			DEBUG_PRINT(F("Sensor "));
 			DEBUG_PRINT(sensor->nr);
