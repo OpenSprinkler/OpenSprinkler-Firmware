@@ -99,7 +99,7 @@ int sensor_define(uint nr, char *name, uint type, uint group, uint32_t ip, uint 
 		if (sensor->nr == nr) { //Modify existing
 			sensor->type = type;
 			sensor->group = group;
-			strlcpy(sensor->name, name, sizeof(sensor->name)-1);
+			strncpy(sensor->name, name, sizeof(sensor->name)-1);
 			sensor->ip = ip;
 			sensor->port = port;
 			sensor->id = id;
@@ -121,7 +121,7 @@ int sensor_define(uint nr, char *name, uint type, uint group, uint32_t ip, uint 
 	new_sensor->nr = nr;
 	new_sensor->type = type;
 	new_sensor->group = group;
-	strlcpy(new_sensor->name, name, sizeof(new_sensor->name)-1);
+	strncpy(new_sensor->name, name, sizeof(new_sensor->name)-1);
 	new_sensor->ip = ip;
 	new_sensor->port = port;
 	new_sensor->id = id;

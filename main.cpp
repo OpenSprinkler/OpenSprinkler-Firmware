@@ -1900,7 +1900,8 @@ void check_network() {
 				os.status.network_fails=0;
 		}
 	}
-#else
+#endif
+#if defined(ESP8266)
 	if (os.status.program_busy) {return;}
 
 	if (os.status.req_network) {

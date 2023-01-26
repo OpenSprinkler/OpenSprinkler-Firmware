@@ -1995,8 +1995,12 @@ void server_sensor_config(OTF_PARAMS_DEF)
 
 	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("name"), true))
 		handle_return(HTML_DATA_MISSING);
+	urlDecode(tmp_buffer);
+	strReplace(tmp_buffer, '\"', '\'');
+	strReplace(tmp_buffer, '\\', '/');	
 	char name[30];
-	strlcpy(name, tmp_buffer, sizeof(name)-1); // Sensor nr
+
+	strncpy(name, tmp_buffer, sizeof(name)-1); // Sensor nr
 
 	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("ip"), true))
 		handle_return(HTML_DATA_MISSING);
@@ -2625,6 +2629,8 @@ void server_usage(OTF_PARAMS_DEF) {
 	print_header();
 #endif
 
+#if defined(ESP8266)
+
 	struct FSInfo fsinfo;
 
 	boolean ok = LittleFS.info(fsinfo);
@@ -2638,7 +2644,7 @@ void server_usage(OTF_PARAMS_DEF) {
 		fsinfo.pageSize, 
 		fsinfo.maxOpenFiles, 
 		fsinfo.maxPathLength);
-
+#endif
 	handle_return(HTML_OK);
 }
 
