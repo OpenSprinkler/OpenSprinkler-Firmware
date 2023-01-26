@@ -220,13 +220,17 @@ Sensor_t *sensor_by_idx(uint idx) {
 }
 
 bool sensorlog_add(SensorLog_t *sensorlog) {
+#if defined(ESP8266)
 	if (checkDiskFree()) {
+#endif
 		DEBUG_PRINT(F("sensorlog_add "));
 		file_append_block(SENSORLOG_FILENAME, sensorlog, SENSORLOG_STORE_SIZE);
 		DEBUG_PRINT(sensorlog_filesize());
 		return true;
+#if defined(ESP8266)		
 	}
 	return false;
+#endif
 }
 
 bool sensorlog_add(Sensor_t *sensor, ulong time) {
@@ -362,8 +366,8 @@ int read_sensor_http(Sensor_t *sensor) {
     byte ip[4];
 	ip[0] = (byte)((sensor->ip >> 24) &0xFF);
 	ip[1] = (byte)((sensor->ip >> 16) &0xFF);
-	ip[2] = (byte)((sensor->ip >> 08) &0xFF);
-	ip[3] = (byte)((sensor->ip & &0xFF));
+	ip[2] = (byte)((sensor->ip >> 8) &0xFF);
+	ip[3] = (byte)((sensor->ip &0xFF));
 #endif
 
 	char *p = tmp_buffer;
@@ -424,8 +428,8 @@ int read_sensor_ip(Sensor_t *sensor) {
     byte ip[4];
 	ip[0] = (byte)((sensor->ip >> 24) &0xFF);
 	ip[1] = (byte)((sensor->ip >> 16) &0xFF);
-	ip[2] = (byte)((sensor->ip >> 08) &0xFF);
-	ip[3] = (byte)((sensor->ip & &0xFF));
+	ip[2] = (byte)((sensor->ip >> 8) &0xFF);
+	ip[3] = (byte)((sensor->ip &0xFF));
 #endif
 
 	if(!client->connect(ip, sensor->port)) {
@@ -682,21 +686,23 @@ int set_sensor_address(Sensor_t *sensor, byte new_address) {
     		byte ip[4];
 			ip[0] = (byte)((sensor->ip >> 24) &0xFF);
 			ip[1] = (byte)((sensor->ip >> 16) &0xFF);
-			ip[2] = (byte)((sensor->ip >> 08) &0xFF);
-			ip[3] = (byte)((sensor->ip & &0xFF));
+			ip[2] = (byte)((sensor->ip >> 8) &0xFF);
+			ip[3] = (byte)((sensor->ip &0xFF));
 #endif		
 			if(!client->connect(ip, sensor->port)) {
 				DEBUG_PRINT(F("Cannot connect to "));
-				DEBUG_PRINT(_ip[0]); DEBUG_PRINT(".");
-				DEBUG_PRINT(_ip[1]); DEBUG_PRINT(".");
-				DEBUG_PRINT(_ip[2]); DEBUG_PRINT(".");
-				DEBUG_PRINT(_ip[3]); DEBUG_PRINT(":");
+				DEBUG_PRINT(ip[0]); DEBUG_PRINT(".");
+				DEBUG_PRINT(ip[1]); DEBUG_PRINT(".");
+				DEBUG_PRINT(ip[2]); DEBUG_PRINT(".");
+				DEBUG_PRINT(ip[3]); DEBUG_PRINT(":");
 				DEBUG_PRINTLN(sensor->port);
 				client->stop();
 				return HTTP_RQT_CONNECT_ERR;
 			}
 
+#if defined(ESP8266)
 			client->write(buffer, len);
+#endif
 			client->flush();
 
 			//Read result:
