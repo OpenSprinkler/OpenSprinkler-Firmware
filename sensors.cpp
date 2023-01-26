@@ -24,7 +24,7 @@
 #include "utils.h"
 #include "program.h"
 #include "OpenSprinkler.h"
-#include "OpenSprinkler_server.h"
+#include "opensprinkler_server.h"
 #include "sensors.h"
 
 //All sensors:
