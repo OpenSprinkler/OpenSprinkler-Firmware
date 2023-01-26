@@ -187,7 +187,9 @@ ProgSensorAdjust_t *prog_adjust_by_idx(uint idx);
 double calc_sensor_watering(uint prog);
 double calc_sensor_watering_by_nr(uint nr);
 
+#if defined(ESP8266)
 ulong diskFree();
 bool checkDiskFree(); //true: disk space Ok, false: Out of disk space
+#endif
 
 #endif // _SENSORS_H

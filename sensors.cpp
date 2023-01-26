@@ -355,8 +355,16 @@ int read_sensor_ospi(Sensor_t *sensor) {
 extern byte findKeyVal (const char *str,char *strbuf, uint16_t maxlen,const char *key,bool key_in_pgm=false,uint8_t *keyfound=NULL);
 
 int read_sensor_http(Sensor_t *sensor) {
+#if defined(ESP8266)
     IPAddress _ip(sensor->ip);
 	byte ip[4] = {_ip[0], _ip[1], _ip[2], _ip[3]};
+#else
+    byte ip[4];
+	ip[0] = (byte)((sensor->ip >> 24) &0xFF);
+	ip[1] = (byte)((sensor->ip >> 16) &0xFF);
+	ip[2] = (byte)((sensor->ip >> 08) &0xFF);
+	ip[3] = (byte)((sensor->ip & &0xFF));
+#endif
 
 	char *p = tmp_buffer;
 	BufferFiller bf = p;
@@ -409,8 +417,16 @@ int read_sensor_ip(Sensor_t *sensor) {
 		return HTTP_RQT_CONNECT_ERR;
 	}
 
+#if defined(ESP8266)
     IPAddress _ip(sensor->ip);
 	byte ip[4] = {_ip[0], _ip[1], _ip[2], _ip[3]};
+#else
+    byte ip[4];
+	ip[0] = (byte)((sensor->ip >> 24) &0xFF);
+	ip[1] = (byte)((sensor->ip >> 16) &0xFF);
+	ip[2] = (byte)((sensor->ip >> 08) &0xFF);
+	ip[3] = (byte)((sensor->ip & &0xFF));
+#endif
 
 	if(!client->connect(ip, sensor->port)) {
 		DEBUG_PRINT(F("Cannot connect to "));
@@ -462,8 +478,9 @@ int read_sensor_ip(Sensor_t *sensor) {
 	}
 
 	client->write(buffer, len);
+#if defined(ESP8266)
 	client->flush();
-	
+#endif
 	uint32_t stoptime = millis()+SENSOR_READ_TIMEOUT;
 	while (true) {
 		if (client->available())
@@ -658,9 +675,16 @@ int set_sensor_address(Sensor_t *sensor, byte new_address) {
 				return HTTP_RQT_CONNECT_ERR;
 			}
 
- 			IPAddress _ip(sensor->ip);
+#if defined(ESP8266)
+		    IPAddress _ip(sensor->ip);
 			byte ip[4] = {_ip[0], _ip[1], _ip[2], _ip[3]};
-		
+#else
+    		byte ip[4];
+			ip[0] = (byte)((sensor->ip >> 24) &0xFF);
+			ip[1] = (byte)((sensor->ip >> 16) &0xFF);
+			ip[2] = (byte)((sensor->ip >> 08) &0xFF);
+			ip[3] = (byte)((sensor->ip & &0xFF));
+#endif		
 			if(!client->connect(ip, sensor->port)) {
 				DEBUG_PRINT(F("Cannot connect to "));
 				DEBUG_PRINT(_ip[0]); DEBUG_PRINT(".");
@@ -938,6 +962,7 @@ ProgSensorAdjust_t *prog_adjust_by_idx(uint idx) {
 	return NULL;
 }
 
+#if defined(ESP8266)
 ulong diskFree() {
 	struct FSInfo fsinfo;
 	LittleFS.info(fsinfo);
@@ -951,6 +976,7 @@ bool checkDiskFree() {
 	}
 	return true;
 }
+#endif
 
 const char* getSensorUnit(Sensor_t *sensor) {
 	if (!sensor)
