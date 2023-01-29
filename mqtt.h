@@ -26,6 +26,8 @@
 
 class OSMqtt {
 private:
+    friend struct _mqtt_callbacks;
+
     static char _id[];
     static char _host[];
     static int _port;
@@ -40,7 +42,11 @@ private:
     static bool _connected(void);
     static int _publish(const char *topic, const char *payload);
     static int _loop(void);
-    static const char * _state_string(int state);
+
+    // Helper functions
+    static const char * _state_to_string(int state);
+    static int _make_full_topic(char * full_topic, const char * topic);
+
 public:
     static void init(void);
     static void init(const char * id);
