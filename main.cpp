@@ -944,9 +944,6 @@ void do_loop()
 		// activate/deactivate valves
 		os.apply_all_station_bits();
 
-		// read analog sensors
-		read_all_sensors();
-
 #if defined(ARDUINO)
 		// process LCD display
 		if (!ui_state) { os.lcd_print_screen(ui_anim_chars[(unsigned long)curr_time%3]); }
@@ -1038,6 +1035,11 @@ void do_loop()
 			push_message(NOTIFY_WEATHER_UPDATE, 0, os.iopts[IOPT_WATER_PERCENTAGE]);
 			os.weather_update_flag = 0;
 		}
+
+		// read analog sensors
+		if (curr_time && os.network_connected() && os.checkwt_success_lasttime) 
+			read_all_sensors();
+
 		static byte reboot_notification = 1;
 		if(reboot_notification) {
 			reboot_notification = 0;

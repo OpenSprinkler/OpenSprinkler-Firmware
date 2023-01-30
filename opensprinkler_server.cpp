@@ -227,10 +227,13 @@ void rewind_ether_buffer() {
 
 void send_packet(OTF_PARAMS_DEF) {
 #if defined(ESP8266)
+	if (!res.willFit(bfill.position()))
+		res.flush(); 
 	res.writeBodyChunk((char *)"%s",ether_buffer);
 #else
 	m_client->write((const uint8_t *)ether_buffer, strlen(ether_buffer));
 #endif
+    
 	rewind_ether_buffer();
 }
 
@@ -2329,7 +2332,16 @@ void server_sensorlog_list(OTF_PARAMS_DEF) {
 			sensorlog.data,
 			getSensorUnit(sensor),
 			getSensorUnitId(sensor));
-			
+
+		DEBUG_PRINT(F("Sensorlog2: "));
+		DEBUG_PRINT(res.isValid()?1:0);
+		DEBUG_PRINT(" ");
+		DEBUG_PRINT(count);
+		DEBUG_PRINT(" ");
+		DEBUG_PRINT(available_ether_buffer());
+		DEBUG_PRINT(" ");
+		DEBUG_PRINTLN(res.getLength());
+ 
 		// if available ether buffer is getting small
 		// send out a packet
 		if(available_ether_buffer() <= 0) {
