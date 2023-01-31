@@ -2550,6 +2550,9 @@ const int sensor_types[] = {
 	SENSOR_ANALOG_EXTENSION_BOARD_P,
 	SENSOR_SMT50_MOIS,
 	SENSOR_SMT50_TEMP,
+	SENSOR_VH400,
+	SENSOR_THERM200,
+	SENSOR_AQUAPLUMB,  
 #endif	
 	//SENSOR_OSPI_ANALOG_INPUTS,  
 	SENSOR_REMOTE,              
@@ -2567,6 +2570,9 @@ const char* sensor_names[] = {
 	"OpenSprinkler analog extension board 2xADS1015 x8 - 0..3.3V to 0..100%",
 	"OpenSprinkler analog extension board 2xADS1015 x8 - SMT50 moisture mode",
 	"OpenSprinkler analog extension board 2xADS1015 x8 - SMT50 temperature mode",
+	"OpenSprinkler analog extension board 2xADS1015 x8 - Vegetronix VH400",
+	"OpenSprinkler analog extension board 2xADS1015 x8 - Vegetronix THERM200",
+	"OpenSprinkler analog extension board 2xADS1015 x8 - Vegetronix AquaPlumb",
 #endif
 	//"OSPi analog input",
 	"Remote sensor of an remote opensprinkler",

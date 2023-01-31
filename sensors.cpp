@@ -323,16 +323,43 @@ int read_sensor_adc(Sensor_t *sensor) {
 	//Read values:
 	sensor->last_native_data = adc.readADC(id);
 	sensor->last_data = adc.toVoltage(sensor->last_native_data);
+	double v = sensor->last_data;
 
 	switch(sensor->type) {
 		case SENSOR_SMT50_MOIS:  // SMT50 VWC [%] = (U * 50) : 3
-			sensor->last_data = (sensor->last_data * 50.0) / 3.0;
+			sensor->last_data = (v * 50.0) / 3.0;
 			break;
 		case SENSOR_SMT50_TEMP:  // SMT50 T [°C] = (U – 0,5) * 100
-			sensor->last_data = (sensor->last_data - 0.5) * 100.0;
+			sensor->last_data = (v - 0.5) * 100.0;
 			break;
 		case SENSOR_ANALOG_EXTENSION_BOARD_P: // 0..3,3V -> 0..100%
-			sensor->last_data = sensor->last_data * 100.0 / 3.3;
+			sensor->last_data = v * 100.0 / 3.3;
+			if (sensor->last_data < 0)
+				sensor->last_data = 0;
+			else if (sensor->last_data > 100)
+				sensor->last_data = 100;
+			break;
+		case SENSOR_VH400: //http://vegetronix.com/Products/VH400/VH400-Piecewise-Curve
+			if (v <= 1.1)      // 0 to 1.1V         VWC= 10*V-1
+				sensor->last_data = 10 * v - 1;
+			else if (v < 1.3)  // 1.1V to 1.3V      VWC= 25*V- 17.5
+				sensor->last_data = 25 * v - 17.5;
+			else if (v < 1.82) // 1.3V to 1.82V     VWC= 48.08*V- 47.5
+				sensor->last_data = 48.08 * v - 47.5;
+			else if (v < 2.2)  // 1.82V to 2.2V     VWC= 26.32*V- 7.89
+				sensor->last_data = 26.32 * v - 7.89;
+			else               // 2.2V - 3.0V       VWC= 62.5*V - 87.5 
+				sensor->last_data = 62.5 * v - 87.5;
+			break;
+		case SENSOR_THERM200: //http://vegetronix.com/Products/THERM200/
+			sensor->last_data = v * 41.67 - 40;
+			break;
+		case SENSOR_AQUAPLUMB: //http://vegetronix.com/Products/AquaPlumb/
+			sensor->last_data = v * 100.0 / 3.0; // 0..3V -> 0..100%
+			if (sensor->last_data < 0)
+				sensor->last_data = 0;
+			else if (sensor->last_data > 100)
+				sensor->last_data = 100;
 			break;
 	}
 
@@ -592,6 +619,9 @@ int read_sensor(Sensor_t *sensor) {
 		case SENSOR_ANALOG_EXTENSION_BOARD_P:
 		case SENSOR_SMT50_MOIS: //SMT50 VWC [%] = (U * 50) : 3
 		case SENSOR_SMT50_TEMP: //SMT50 T [°C] = (U – 0,5) * 100
+		case SENSOR_VH400:
+		case SENSOR_THERM200:
+		case SENSOR_AQUAPLUMB:
 			return read_sensor_adc(sensor);
 #endif
 
@@ -1031,6 +1061,9 @@ byte getSensorUnitId(int type) {
 	    case SENSOR_ANALOG_EXTENSION_BOARD_P: return UNIT_PERCENT;
 		case SENSOR_SMT50_MOIS: 			  return UNIT_PERCENT;
 		case SENSOR_SMT50_TEMP: 			  return UNIT_DEGREE;
+		case SENSOR_VH400:                    return UNIT_PERCENT;
+		case SENSOR_THERM200:                 return UNIT_DEGREE;
+		case SENSOR_AQUAPLUMB:                return UNIT_PERCENT;
 #endif
 		case SENSOR_OSPI_ANALOG_INPUTS: 	  return UNIT_VOLT;
 
@@ -1050,6 +1083,9 @@ byte getSensorUnitId(Sensor_t *sensor) {
 		case SENSOR_ANALOG_EXTENSION_BOARD_P: return UNIT_PERCENT;
 		case SENSOR_SMT50_MOIS: 			  return UNIT_PERCENT;
 		case SENSOR_SMT50_TEMP: 			  return UNIT_DEGREE;
+		case SENSOR_VH400:                    return UNIT_PERCENT;
+		case SENSOR_THERM200:                 return UNIT_DEGREE;
+		case SENSOR_AQUAPLUMB:                return UNIT_PERCENT;
 #endif
 		case SENSOR_OSPI_ANALOG_INPUTS: 	  return UNIT_VOLT;
 		case SENSOR_REMOTE:                	  return sensor->unitid;
