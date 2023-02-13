@@ -339,6 +339,13 @@ int read_sensor_adc(Sensor_t *sensor) {
 			else if (sensor->last_data > 100)
 				sensor->last_data = 100;
 			break;
+		case SENSOR_SMT100_ANALOG_MOIS: // 0..3V -> 0..100%
+			sensor->last_data = v * 100.0 / 3;
+			break;
+		case SENSOR_SMT100_ANALOG_TEMP: // 0..3V -> -40°C..60°C
+			sensor->last_data = v * 100.0 / 3 - 40;
+			break;
+
 		case SENSOR_VH400: //http://vegetronix.com/Products/VH400/VH400-Piecewise-Curve
 			if (v <= 1.1)      // 0 to 1.1V         VWC= 10*V-1
 				sensor->last_data = 10 * v - 1;
@@ -619,6 +626,8 @@ int read_sensor(Sensor_t *sensor) {
 		case SENSOR_ANALOG_EXTENSION_BOARD_P:
 		case SENSOR_SMT50_MOIS: //SMT50 VWC [%] = (U * 50) : 3
 		case SENSOR_SMT50_TEMP: //SMT50 T [°C] = (U – 0,5) * 100
+		case SENSOR_SMT100_ANALOG_MOIS: //SMT100 Analog Moisture
+		case SENSOR_SMT100_ANALOG_TEMP: //SMT100 Analog Temperature
 		case SENSOR_VH400:
 		case SENSOR_THERM200:
 		case SENSOR_AQUAPLUMB:
@@ -1061,6 +1070,9 @@ byte getSensorUnitId(int type) {
 	    case SENSOR_ANALOG_EXTENSION_BOARD_P: return UNIT_PERCENT;
 		case SENSOR_SMT50_MOIS: 			  return UNIT_PERCENT;
 		case SENSOR_SMT50_TEMP: 			  return UNIT_DEGREE;
+		case SENSOR_SMT100_ANALOG_MOIS:       return UNIT_PERCENT; 
+		case SENSOR_SMT100_ANALOG_TEMP:       return UNIT_DEGREE;
+
 		case SENSOR_VH400:                    return UNIT_PERCENT;
 		case SENSOR_THERM200:                 return UNIT_DEGREE;
 		case SENSOR_AQUAPLUMB:                return UNIT_PERCENT;
@@ -1083,6 +1095,9 @@ byte getSensorUnitId(Sensor_t *sensor) {
 		case SENSOR_ANALOG_EXTENSION_BOARD_P: return UNIT_PERCENT;
 		case SENSOR_SMT50_MOIS: 			  return UNIT_PERCENT;
 		case SENSOR_SMT50_TEMP: 			  return UNIT_DEGREE;
+		case SENSOR_SMT100_ANALOG_MOIS:       return UNIT_PERCENT;
+		case SENSOR_SMT100_ANALOG_TEMP:       return UNIT_DEGREE;
+
 		case SENSOR_VH400:                    return UNIT_PERCENT;
 		case SENSOR_THERM200:                 return UNIT_DEGREE;
 		case SENSOR_AQUAPLUMB:                return UNIT_PERCENT;

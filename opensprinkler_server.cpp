@@ -2277,6 +2277,8 @@ void server_sensorlog_list(OTF_PARAMS_DEF) {
 	uint type = 0;
 	ulong after = 0;
 	ulong before = 0;
+	ulong lastHours = 0;
+
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("nr"), true)) // Filter log for sensor-nr
 		nr = strtoul(tmp_buffer, NULL, 0); 
 
@@ -2288,6 +2290,12 @@ void server_sensorlog_list(OTF_PARAMS_DEF) {
 
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("before"), true)) // Filter time before
 		before = strtoul(tmp_buffer, NULL, 0);
+
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("lasthours"), true)) // Filter time before
+		lastHours = strtoul(tmp_buffer, NULL, 0);
+
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("lastdays"), true)) // Filter time before
+		lastHours = strtoul(tmp_buffer, NULL, 0) * 24 + lastHours;
 
 #if defined(ESP8266)
 	// as the log data can be large, we will use ESP8266's sendContent function to
@@ -2304,6 +2312,19 @@ void server_sensorlog_list(OTF_PARAMS_DEF) {
 	ulong count = 0;
  	SensorLog_t sensorlog;
 	Sensor_t *sensor = NULL;
+
+	//lastHours: find limit for this
+	if (lastHours > 0 && log_size > 0) {
+		ulong timeLimit = os.now_tz() - lastHours * 60 * 60; //seconds
+		for (ulong idx = log_size-1; idx >= 0; idx--) {
+			sensorlog_load(idx, &sensorlog);
+			if (sensorlog.time < timeLimit) {
+				startAt = idx+1;
+				break;
+			}
+		}
+	}
+
 	for (ulong idx = startAt; idx < log_size; idx++) {
 		sensorlog_load(idx, &sensorlog);
 
@@ -2550,6 +2571,8 @@ const int sensor_types[] = {
 	SENSOR_ANALOG_EXTENSION_BOARD_P,
 	SENSOR_SMT50_MOIS,
 	SENSOR_SMT50_TEMP,
+	SENSOR_SMT100_ANALOG_MOIS,
+	SENSOR_SMT100_ANALOG_TEMP,
 	SENSOR_VH400,
 	SENSOR_THERM200,
 	SENSOR_AQUAPLUMB,  
@@ -2566,13 +2589,16 @@ const char* sensor_names[] = {
 	"Truebner SMT100 RS485 Modbus RTU over TCP, moisture mode",
 	"Truebner SMT100 RS485 Modbus RTU over TCP, temperature mode",
 #if defined(ESP8266)
-	"OpenSprinkler analog extension board 2xADS1015 x8 - voltage mode 0..4V",
-	"OpenSprinkler analog extension board 2xADS1015 x8 - 0..3.3V to 0..100%",
-	"OpenSprinkler analog extension board 2xADS1015 x8 - SMT50 moisture mode",
-	"OpenSprinkler analog extension board 2xADS1015 x8 - SMT50 temperature mode",
-	"OpenSprinkler analog extension board 2xADS1015 x8 - Vegetronix VH400",
-	"OpenSprinkler analog extension board 2xADS1015 x8 - Vegetronix THERM200",
-	"OpenSprinkler analog extension board 2xADS1015 x8 - Vegetronix AquaPlumb",
+	"OpenSprinkler analog extension board 2xADS1x15 x8 - voltage mode 0..4V",
+	"OpenSprinkler analog extension board 2xADS1x15 x8 - 0..3.3V to 0..100%",
+	"OpenSprinkler analog extension board 2xADS1x15 x8 - SMT50 moisture mode",
+	"OpenSprinkler analog extension board 2xADS1x15 x8 - SMT50 temperature mode",
+	"OpenSprinkler analog extension board 2xADS1x15 x8 - SMT100-analog moisture mode",
+	"OpenSprinkler analog extension board 2xADS1x15 x8 - SMT100-analog temperature mode",
+
+	"OpenSprinkler analog extension board 2xADS1x15 x8 - Vegetronix VH400",
+	"OpenSprinkler analog extension board 2xADS1x15 x8 - Vegetronix THERM200",
+	"OpenSprinkler analog extension board 2xADS1x15 x8 - Vegetronix AquaPlumb",
 #endif
 	//"OSPi analog input",
 	"Remote sensor of an remote opensprinkler",

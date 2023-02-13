@@ -46,11 +46,15 @@
 #define SENSOR_ANALOG_EXTENSION_BOARD_P   11  //New OpenSprinkler analog extension board x8 - percent 0..3.3V to 0..100%
 #define SENSOR_SMT50_MOIS                 15  //New OpenSprinkler analog extension board x8 - SMT50 VWC [%] = (U * 50) : 3
 #define SENSOR_SMT50_TEMP                 16  //New OpenSprinkler analog extension board x8 - SMT50 T [°C] = (U – 0,5) * 100
-#define SENSOR_VH400                      17  //New OpenSprinkler analog extension board x8 - Vegetronix VH400
-#define SENSOR_THERM200                   18  //New OpenSprinkler analog extension board x8 - Vegetronix THERM200
-#define SENSOR_AQUAPLUMB                  19  //New OpenSprinkler analog extension board x8 - Vegetronix Aquaplumb
+#define SENSOR_SMT100_ANALOG_MOIS         17  //New OpenSprinkler analog extension board x8 - SMT100 VWC [%] = (U * 100) : 3
+#define SENSOR_SMT100_ANALOG_TEMP         18  //New OpenSprinkler analog extension board x8 - SMT50 T [°C] = (U * 100) : 3 - 40
+
+#define SENSOR_VH400                      30  //New OpenSprinkler analog extension board x8 - Vegetronix VH400
+#define SENSOR_THERM200                   31  //New OpenSprinkler analog extension board x8 - Vegetronix THERM200
+#define SENSOR_AQUAPLUMB                  32  //New OpenSprinkler analog extension board x8 - Vegetronix Aquaplumb
+
 #endif
-#define SENSOR_OSPI_ANALOG_INPUTS         20  //Old OSPi analog input
+#define SENSOR_OSPI_ANALOG_INPUTS         50  //Old OSPi analog input
 #define SENSOR_REMOTE                     100 //Remote sensor of an remote opensprinkler
 
 #define SENSOR_GROUP_MIN               1000   //Sensor group with min value
