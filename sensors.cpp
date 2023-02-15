@@ -234,7 +234,7 @@ bool sensorlog_add(SensorLog_t *sensorlog) {
 }
 
 bool sensorlog_add(Sensor_t *sensor, ulong time) {
-	if (sensor->flags.data_ok && sensor->flags.log) {
+	if (sensor->flags.data_ok && sensor->flags.log && time > 1000) {
 		SensorLog_t sensorlog;
 		sensorlog.nr = sensor->nr;
 		sensorlog.time = time;

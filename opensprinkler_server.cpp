@@ -2291,10 +2291,10 @@ void server_sensorlog_list(OTF_PARAMS_DEF) {
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("before"), true)) // Filter time before
 		before = strtoul(tmp_buffer, NULL, 0);
 
-	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("lasthours"), true)) // Filter time before
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("lasthours"), true)) // Filter last hours
 		lastHours = strtoul(tmp_buffer, NULL, 0);
 
-	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("lastdays"), true)) // Filter time before
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("lastdays"), true)) // Filter last days
 		lastHours = strtoul(tmp_buffer, NULL, 0) * 24 + lastHours;
 
 #if defined(ESP8266)
@@ -2315,8 +2315,9 @@ void server_sensorlog_list(OTF_PARAMS_DEF) {
 
 	//lastHours: find limit for this
 	if (lastHours > 0 && log_size > 0) {
-		ulong timeLimit = os.now_tz() - lastHours * 60 * 60; //seconds
-		for (ulong idx = log_size-1; idx >= 0; idx--) {
+		time_t timeLimit = os.now_tz() - lastHours * 60 * 60; //seconds
+		DEBUG_PRINTLN(F("lastHours"));
+		for (ulong idx = log_size-1; idx > 0; idx--) {
 			sensorlog_load(idx, &sensorlog);
 			if (sensorlog.time < timeLimit) {
 				startAt = idx+1;
@@ -2353,15 +2354,6 @@ void server_sensorlog_list(OTF_PARAMS_DEF) {
 			sensorlog.data,
 			getSensorUnit(sensor),
 			getSensorUnitId(sensor));
-
-		DEBUG_PRINT(F("Sensorlog2: "));
-		DEBUG_PRINT(res.isValid()?1:0);
-		DEBUG_PRINT(" ");
-		DEBUG_PRINT(count);
-		DEBUG_PRINT(" ");
-		DEBUG_PRINT(available_ether_buffer());
-		DEBUG_PRINT(" ");
-		DEBUG_PRINTLN(res.getLength());
  
 		// if available ether buffer is getting small
 		// send out a packet
