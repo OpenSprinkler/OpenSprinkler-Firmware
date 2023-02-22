@@ -33,6 +33,12 @@ static Sensor_t *sensors = NULL;
 //Program sensor data 
 static ProgSensorAdjust_t *progSensorAdjusts = NULL;
 
+const char* sensor_unitNames[] {
+	"", "%", "°C", "°F", "V",
+//   0   1     2     3    4
+};
+byte logFileSwitch = 0; //0=use smaler File, 1=LOG1, 2=LOG2
+
  uint16_t CRC16 (byte buf[], int len) {
 	uint16_t crc = 0xFFFF;
   
@@ -219,12 +225,36 @@ Sensor_t *sensor_by_idx(uint idx) {
 	return NULL;
 }
 
+void checkLogSwitch() {
+	if (logFileSwitch == 0) { // Check file size, use smallest
+			ulong size1 = file_size(SENSORLOG_FILENAME1);
+			ulong size2 = file_size(SENSORLOG_FILENAME2);
+			if (size1 < size2)
+				logFileSwitch = 1; 
+			else
+				logFileSwitch = 2;
+		}
+}
+
+void checkLogSwitchAfterWrite() {
+	ulong size = file_size(logFileSwitch==1?SENSORLOG_FILENAME1:SENSORLOG_FILENAME2);
+	if ((size / SENSORLOG_STORE_SIZE) >= MAX_LOG_SIZE) { // switch logs if max reached
+		if (logFileSwitch == 1)
+			logFileSwitch = 2;
+		else
+			logFileSwitch = 1;
+		remove_file(logFileSwitch==1?SENSORLOG_FILENAME1:SENSORLOG_FILENAME2);
+	}
+}
+
 bool sensorlog_add(SensorLog_t *sensorlog) {
 #if defined(ESP8266)
 	if (checkDiskFree()) {
 #endif
 		DEBUG_PRINT(F("sensorlog_add "));
-		file_append_block(SENSORLOG_FILENAME, sensorlog, SENSORLOG_STORE_SIZE);
+		checkLogSwitch();
+		file_append_block(logFileSwitch==1?SENSORLOG_FILENAME1:SENSORLOG_FILENAME2, sensorlog, SENSORLOG_STORE_SIZE);
+		checkLogSwitchAfterWrite();
 		DEBUG_PRINT(sensorlog_filesize());
 		return true;
 #if defined(ESP8266)		
@@ -251,21 +281,23 @@ bool sensorlog_add(Sensor_t *sensor, ulong time) {
 
 ulong sensorlog_filesize() {
 	DEBUG_PRINT(F("sensorlog_filesize "));
-	ulong size = file_size(SENSORLOG_FILENAME);
+	ulong size = file_size(SENSORLOG_FILENAME1) + file_size(SENSORLOG_FILENAME2);
 	DEBUG_PRINTLN(size);
 	return size;
 }
 
 ulong sensorlog_size() {
 	DEBUG_PRINT(F("sensorlog_size "));
-	ulong size = file_size(SENSORLOG_FILENAME) / SENSORLOG_STORE_SIZE;
+	ulong size = (file_size(SENSORLOG_FILENAME1) + file_size(SENSORLOG_FILENAME2)) / SENSORLOG_STORE_SIZE;
 	DEBUG_PRINTLN(size);
 	return size;
 }
 
 void sensorlog_clear_all() {
 	DEBUG_PRINTLN(F("sensorlog_clear_all"));
-	remove_file(SENSORLOG_FILENAME);
+	remove_file(SENSORLOG_FILENAME1);
+	remove_file(SENSORLOG_FILENAME2);
+	logFileSwitch = 1;
 }
 
 SensorLog_t *sensorlog_load(ulong idx) {
@@ -275,7 +307,21 @@ SensorLog_t *sensorlog_load(ulong idx) {
 
 SensorLog_t *sensorlog_load(ulong idx, SensorLog_t* sensorlog) {
 	DEBUG_PRINTLN(F("sensorlog_load"));
-	file_read_block(SENSORLOG_FILENAME, sensorlog, idx * SENSORLOG_STORE_SIZE, SENSORLOG_STORE_SIZE);
+
+	//Map lower idx to the other log file
+	checkLogSwitch();
+	const char *flast = logFileSwitch==1?SENSORLOG_FILENAME2:SENSORLOG_FILENAME1;
+	const char *fcur = logFileSwitch==1?SENSORLOG_FILENAME1:SENSORLOG_FILENAME2;
+	ulong size = file_size(flast) / SENSORLOG_STORE_SIZE;
+	const char *f;
+	if (idx >= size) {
+		idx -= size;
+		f = fcur;
+	} else {
+		f = flast;
+	}
+
+	file_read_block(f, sensorlog, idx * SENSORLOG_STORE_SIZE, SENSORLOG_STORE_SIZE);
 	return sensorlog;
 }
 

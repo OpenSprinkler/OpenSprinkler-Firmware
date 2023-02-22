@@ -2315,15 +2315,24 @@ void server_sensorlog_list(OTF_PARAMS_DEF) {
 
 	//lastHours: find limit for this
 	if (lastHours > 0 && log_size > 0) {
-		time_t timeLimit = os.now_tz() - lastHours * 60 * 60; //seconds
+		after = os.now_tz() - lastHours * 60 * 60; //seconds
 		DEBUG_PRINTLN(F("lastHours"));
-		for (ulong idx = log_size-1; idx > 0; idx--) {
+
+		ulong a = 0;
+		ulong b = (log_size-1) / 2;
+		ulong lastIdx = 0;
+		while (true) {
+			ulong idx = (b-a)/2+a;
 			sensorlog_load(idx, &sensorlog);
-			if (sensorlog.time < timeLimit) {
-				startAt = idx+1;
-				break;
+			if (sensorlog.time < after) {
+				a = idx;
+			} else if (sensorlog.time > after) {
+				b = idx;
 			}
+			if (a >= b || idx == lastIdx) break;
+			lastIdx = idx;
 		}
+		startAt = lastIdx;
 	}
 
 	for (ulong idx = startAt; idx < log_size; idx++) {

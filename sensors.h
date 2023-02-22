@@ -37,6 +37,15 @@
 #include <ADS1X15.h>
 #endif
 
+//Files
+#define SENSOR_FILENAME       "sensor.dat"  // analog sensor filename
+#define PROG_SENSOR_FILENAME  "progsensor.dat"  // sensor to program assign filename
+#define SENSORLOG_FILENAME1   "sensorlog.dat"   // analog sensor log filename
+#define SENSORLOG_FILENAME2   "sensorlog2.dat"  // analog sensor log filename2
+
+//MaxLogSize
+#define MAX_LOG_SIZE 8000
+
 //Sensor types:
 #define SENSOR_NONE                       0   //None or deleted sensor
 #define SENSOR_SMT100_MODBUS_RTU_MOIS     1   //Truebner SMT100 RS485 Modbus RTU over TCP, moisture mode
@@ -140,10 +149,8 @@ typedef struct ProgSensorAdjust {
 #define UNIT_VOLT       4
 
 //Unitnames
-static const char* sensor_unitNames[] {
-	"", "%", "°C", "°F", "V",
-//   0   1     2     3    4
-};
+extern const char* sensor_unitNames[];
+extern byte logFileSwitch; //0=use smaler File, 1=LOG1, 2=LOG2
 
 const char* getSensorUnit(Sensor_t *sensor);
 byte getSensorUnitId(int type);
