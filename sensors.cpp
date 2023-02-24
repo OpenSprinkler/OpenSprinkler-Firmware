@@ -38,6 +38,8 @@ const char* sensor_unitNames[] {
 //   0   1     2     3    4
 };
 byte logFileSwitch = 0; //0=use smaler File, 1=LOG1, 2=LOG2
+ulong logFileSize1 = 0;
+ulong logFileSize2 = 0;
 
  uint16_t CRC16 (byte buf[], int len) {
 	uint16_t crc = 0xFFFF;
@@ -227,9 +229,9 @@ Sensor_t *sensor_by_idx(uint idx) {
 
 void checkLogSwitch() {
 	if (logFileSwitch == 0) { // Check file size, use smallest
-			ulong size1 = file_size(SENSORLOG_FILENAME1);
-			ulong size2 = file_size(SENSORLOG_FILENAME2);
-			if (size1 < size2)
+			logFileSize1 = file_size(SENSORLOG_FILENAME1);
+			logFileSize2 = file_size(SENSORLOG_FILENAME2);
+			if (logFileSize1 < logFileSize2)
 				logFileSwitch = 1; 
 			else
 				logFileSwitch = 2;
@@ -245,6 +247,8 @@ void checkLogSwitchAfterWrite() {
 			logFileSwitch = 1;
 		remove_file(logFileSwitch==1?SENSORLOG_FILENAME1:SENSORLOG_FILENAME2);
 	}
+	logFileSize1 = file_size(logFileSwitch==1?SENSORLOG_FILENAME1:SENSORLOG_FILENAME2);
+	logFileSize2 = file_size(logFileSwitch==2?SENSORLOG_FILENAME2:SENSORLOG_FILENAME1);
 }
 
 bool sensorlog_add(SensorLog_t *sensorlog) {
@@ -281,14 +285,15 @@ bool sensorlog_add(Sensor_t *sensor, ulong time) {
 
 ulong sensorlog_filesize() {
 	DEBUG_PRINT(F("sensorlog_filesize "));
-	ulong size = file_size(SENSORLOG_FILENAME1) + file_size(SENSORLOG_FILENAME2);
+	checkLogSwitch();
+	ulong size = logFileSize1+logFileSize2;
 	DEBUG_PRINTLN(size);
 	return size;
 }
 
 ulong sensorlog_size() {
 	DEBUG_PRINT(F("sensorlog_size "));
-	ulong size = (file_size(SENSORLOG_FILENAME1) + file_size(SENSORLOG_FILENAME2)) / SENSORLOG_STORE_SIZE;
+	ulong size = sensorlog_filesize() / SENSORLOG_STORE_SIZE;
 	DEBUG_PRINTLN(size);
 	return size;
 }
@@ -298,6 +303,8 @@ void sensorlog_clear_all() {
 	remove_file(SENSORLOG_FILENAME1);
 	remove_file(SENSORLOG_FILENAME2);
 	logFileSwitch = 1;
+	logFileSize1 = 0;
+	logFileSize2 = 0;
 }
 
 SensorLog_t *sensorlog_load(ulong idx) {
@@ -312,7 +319,7 @@ SensorLog_t *sensorlog_load(ulong idx, SensorLog_t* sensorlog) {
 	checkLogSwitch();
 	const char *flast = logFileSwitch==1?SENSORLOG_FILENAME2:SENSORLOG_FILENAME1;
 	const char *fcur = logFileSwitch==1?SENSORLOG_FILENAME1:SENSORLOG_FILENAME2;
-	ulong size = file_size(flast) / SENSORLOG_STORE_SIZE;
+	ulong size = (logFileSwitch==1?logFileSize2:logFileSize1) / SENSORLOG_STORE_SIZE;
 	const char *f;
 	if (idx >= size) {
 		idx -= size;
@@ -345,7 +352,7 @@ void read_all_sensors() {
 
 #if defined(ESP8266)
 /**
- * Read ADS1015 sensors
+ * Read ADS1115 sensors
 */
 int read_sensor_adc(Sensor_t *sensor) {
 	DEBUG_PRINTLN(F("read_sensor_adc"));
@@ -356,7 +363,7 @@ int read_sensor_adc(Sensor_t *sensor) {
 	int port = sensor->id < 4? 72 : 73;
 	int id = sensor->id % 4;
 
-	ADS1015 adc(port);
+	ADS1115 adc(port);
 	bool active = adc.begin();
 	if (active)
 		adc.setGain(1);
@@ -436,7 +443,23 @@ int read_sensor_ospi(Sensor_t *sensor) {
 	return HTTP_RQT_SUCCESS;
 }
 
-extern byte findKeyVal (const char *str,char *strbuf, uint16_t maxlen,const char *key,bool key_in_pgm=false,uint8_t *keyfound=NULL);
+bool extract(char *s, char *buf, int maxlen) {
+	s = strstr(s, ":");
+	if (!s) return false;
+	s++;
+	while (*s == ' ') s++; //skip spaces
+	char *e = strstr(s, ",");
+	char *f = strstr(s, "}");
+	if (!e && !f) return false;
+	if (f && f < e) e = f;
+	int l = e-s;
+	if (l < 1 || l > maxlen)
+	 	return false;
+	strncpy(buf, s, l);
+	buf[l] = 0;
+	DEBUG_PRINTLN(buf);
+	return true;
+}
 
 int read_sensor_http(Sensor_t *sensor) {
 #if defined(ESP8266)
@@ -450,6 +473,8 @@ int read_sensor_http(Sensor_t *sensor) {
 	ip[3] = (byte)((sensor->ip &0xFF));
 #endif
 
+	DEBUG_PRINTLN(F("read_sensor_http"));
+
 	char *p = tmp_buffer;
 	BufferFiller bf = p;
 
@@ -458,18 +483,31 @@ int read_sensor_http(Sensor_t *sensor) {
 	bf.emit_p(PSTR(" HTTP/1.0\r\nHOST: $D.$D.$D.$D\r\n\r\n"),
 		ip[0],ip[1],ip[2],ip[3]);
 
-	if (os.send_http_request(sensor->ip, sensor->port, p) == HTTP_RQT_SUCCESS) {
-					
-		if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("nativedata"), true)) {
-			sensor->last_native_data = strtoul(tmp_buffer, NULL, 0);
+	DEBUG_PRINTLN(p);
+
+	char server[20];
+	sprintf(server, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
+
+	if (os.send_http_request(server, sensor->port, p) == HTTP_RQT_SUCCESS) {
+		DEBUG_PRINTLN("Send Ok");
+		p = ether_buffer;
+		DEBUG_PRINTLN(p);
+
+		char buf[20];
+		char *s = strstr(p, "\"nativedata\":");
+		if (s && extract(s, buf, sizeof(buf))) {
+			sensor->last_native_data = strtoul(buf, NULL, 0);
 		}
-		if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("data"), true)) {
-			sensor->last_data = atof(tmp_buffer);
-			sensor->flags.data_ok = true;
+		s = strstr(p, "\"data\":");
+		if (s && extract(s, buf, sizeof(buf))) {
+			sensor->last_data = strtod(buf, NULL);
+			sensor->flags.data_ok = tr
 		}
-		if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("unitid"), true)) {
-			sensor->unitid = strtoul(tmp_buffer, NULL, 0);
-		}		
+		s = strstr(p, "\"unitid\":");
+		if (s && extract(s, buf, sizeof(buf))) {
+			sensor->unitid = atoi(buf);
+		}
+	
 		return HTTP_RQT_SUCCESS;
 	}
 	return HTTP_RQT_EMPTY_RETURN;
