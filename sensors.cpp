@@ -501,7 +501,7 @@ int read_sensor_http(Sensor_t *sensor) {
 		s = strstr(p, "\"data\":");
 		if (s && extract(s, buf, sizeof(buf))) {
 			sensor->last_data = strtod(buf, NULL);
-			sensor->flags.data_ok = tr
+			sensor->flags.data_ok = true;
 		}
 		s = strstr(p, "\"unitid\":");
 		if (s && extract(s, buf, sizeof(buf))) {
