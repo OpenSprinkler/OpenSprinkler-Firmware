@@ -259,6 +259,24 @@ void print_header(bool isJson=true)  {
 #endif
 
 #if defined(ESP8266)
+void print_header_download(OTF_PARAMS_DEF, int len=0) {
+	res.writeStatus(200, F("OK"));
+	res.writeHeader(F("Content-Type"), F("text/plain"));
+	res.writeHeader(F("Content-Disposition"), F("attachment; filename=\"log.csv\";"));
+	if(len>0)
+		res.writeHeader(F("Content-Length"), len);
+	res.writeHeader(F("Access-Control-Allow-Origin"), F("*"));
+	res.writeHeader(F("Cache-Control"), F("max-age=0, no-cache, no-store, must-revalidate"));
+	res.writeHeader(F("Connection"), F("close"));
+}
+#else
+
+void print_header_download()  {
+	bfill.emit_p(PSTR("$F$F$F$F$F\r\n"), html200OK, "Content-Type: text/plain", "Content-Disposition: attachment; filename=\"log.txt\";", htmlAccessControl, htmlNoCache);
+}
+#endif
+
+#if defined(ESP8266)
 
 String two_digits(uint8_t x) {
 	return String(x/10) + (x%10);
@@ -2278,6 +2296,7 @@ void server_sensorlog_list(OTF_PARAMS_DEF) {
 	ulong after = 0;
 	ulong before = 0;
 	ulong lastHours = 0;
+	bool isjson = true;
 
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("nr"), true)) // Filter log for sensor-nr
 		nr = strtoul(tmp_buffer, NULL, 0); 
@@ -2297,17 +2316,24 @@ void server_sensorlog_list(OTF_PARAMS_DEF) {
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("lastdays"), true)) // Filter last days
 		lastHours = strtoul(tmp_buffer, NULL, 0) * 24 + lastHours;
 
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("csv"), true)) // Filter last days
+		isjson = atoi(tmp_buffer) == 0;
+
 #if defined(ESP8266)
 	// as the log data can be large, we will use ESP8266's sendContent function to
 	// send multiple packets of data, instead of the standard way of using send().
 	rewind_ether_buffer();
-	print_header(OTF_PARAMS);
+	if (isjson)	print_header(OTF_PARAMS); else print_header_download(OTF_PARAMS);
 #else
-	print_header();
+	if (isjson)	print_header(); else print_header_download();
 #endif
 
-	bfill.emit_p(PSTR("{\"logsize\":$D,\"filesize\":$D,\"log\":["), 
-		log_size, sensorlog_filesize());
+	if (isjson) {
+		bfill.emit_p(PSTR("{\"logsize\":$D,\"filesize\":$D,\"log\":["), 
+			log_size, sensorlog_filesize());
+	} else {
+		bfill.emit_p(PSTR("nr;type;time;nativedata;data;unit;unitid\r\n"));
+	}
 
 	ulong count = 0;
  	SensorLog_t sensorlog;
@@ -2353,16 +2379,30 @@ void server_sensorlog_list(OTF_PARAMS_DEF) {
 		if (type && sensor_type != type)
 			continue;
 		
-		if (count > 0)
+		if (count > 0 && isjson) {
 			bfill.emit_p(PSTR(","));
-		bfill.emit_p(PSTR("{\"nr\":$D,\"type\":$D,\"time\":$L,\"nativedata\":$L,\"data\":$E,\"unit\":\"$S\",\"unitid\":$D}"),
-			sensorlog.nr,          //sensor-nr
-			sensor_type,           //sensor-type
-			sensorlog.time,        //timestamp
-			sensorlog.native_data, //native data
-			sensorlog.data,
-			getSensorUnit(sensor),
-			getSensorUnitId(sensor));
+		}
+
+		if (isjson) {
+			bfill.emit_p(PSTR("{\"nr\":$D,\"type\":$D,\"time\":$L,\"nativedata\":$L,\"data\":$E,\"unit\":\"$S\",\"unitid\":$D}"),
+				sensorlog.nr,          //sensor-nr
+				sensor_type,           //sensor-type
+				sensorlog.time,        //timestamp
+				sensorlog.native_data, //native data
+				sensorlog.data,
+				getSensorUnit(sensor),
+				getSensorUnitId(sensor));
+		} else {
+			bfill.emit_p(PSTR("$D;$D;$L;$L;$E;$S;$D\r\n"),
+				sensorlog.nr,          //sensor-nr
+				sensor_type,           //sensor-type
+				sensorlog.time,        //timestamp
+				sensorlog.native_data, //native data
+				sensorlog.data,
+				getSensorUnit(sensor),
+				getSensorUnitId(sensor));
+		}
+
  
 		// if available ether buffer is getting small
 		// send out a packet
@@ -2372,7 +2412,9 @@ void server_sensorlog_list(OTF_PARAMS_DEF) {
 		if (++count >= maxResults)
 			break;
 	}
-	bfill.emit_p(PSTR("]}"));
+
+	if (isjson)
+		bfill.emit_p(PSTR("]}"));
 
 	handle_return(HTML_OK);	
 }
