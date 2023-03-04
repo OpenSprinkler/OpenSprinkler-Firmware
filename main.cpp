@@ -754,7 +754,7 @@ void do_loop()
 							}
 
 							// Analog sensor water time adjustments:
-							water_time = (ulong)(water_time * calc_sensor_watering(pid));
+							water_time = (ulong)((double)water_time * calc_sensor_watering(pid));
 
 							if (water_time) {
 								// check if water time is still valid

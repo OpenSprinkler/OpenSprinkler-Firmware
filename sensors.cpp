@@ -917,7 +917,7 @@ double calc_sensor_watering(uint prog) {
 	ProgSensorAdjust_t *p = progSensorAdjusts;
 
 	while (p) {
-		if (p->prog == prog) {
+		if (p->prog-1 == prog) {
 			Sensor_t *sensor = sensor_by_nr(p->sensor);
 			if (sensor && sensor->flags.enable && sensor->flags.data_ok) {
 
