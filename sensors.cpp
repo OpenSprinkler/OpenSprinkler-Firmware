@@ -247,8 +247,8 @@ void checkLogSwitchAfterWrite() {
 			logFileSwitch = 1;
 		remove_file(logFileSwitch==1?SENSORLOG_FILENAME1:SENSORLOG_FILENAME2);
 	}
-	logFileSize1 = file_size(logFileSwitch==1?SENSORLOG_FILENAME1:SENSORLOG_FILENAME2);
-	logFileSize2 = file_size(logFileSwitch==2?SENSORLOG_FILENAME2:SENSORLOG_FILENAME1);
+	logFileSize1 = file_size(SENSORLOG_FILENAME1);
+	logFileSize2 = file_size(SENSORLOG_FILENAME2);
 }
 
 bool sensorlog_add(SensorLog_t *sensorlog) {
