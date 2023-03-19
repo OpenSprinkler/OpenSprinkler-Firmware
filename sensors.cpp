@@ -723,6 +723,13 @@ int read_sensor(Sensor_t *sensor) {
 		case SENSOR_REMOTE:
 			return read_sensor_http(sensor);
 
+		//Return true for logging:
+		case SENSOR_GROUP_MIN:
+		case SENSOR_GROUP_MAX:
+		case SENSOR_GROUP_AVG:
+		case SENSOR_GROUP_SUM:
+			return HTTP_RQT_SUCCESS;
+
 		default: return HTTP_RQT_NOT_RECEIVED;
 	}
 }
