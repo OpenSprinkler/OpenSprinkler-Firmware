@@ -33,7 +33,7 @@ static Sensor_t *sensors = NULL;
 //Program sensor data 
 static ProgSensorAdjust_t *progSensorAdjusts = NULL;
 
-const char* sensor_unitNames[] {
+const char*   sensor_unitNames[] {
 	"", "%", "°C", "°F", "V",
 //   0   1     2     3    4
 };
@@ -43,7 +43,7 @@ ulong logFileSize2 = 0;
 
  uint16_t CRC16 (byte buf[], int len) {
 	uint16_t crc = 0xFFFF;
-  
+
 	for (int pos = 0; pos < len; pos++) {
 	    crc ^= (uint16_t)buf[pos];          // XOR byte into least sig. byte of crc
 		for (int i = 8; i != 0; i--) {    // Loop over each bit
@@ -180,7 +180,7 @@ void sensor_load() {
  */
 void sensor_save() {
 	DEBUG_PRINTLN(F("sensor_save"));
-	if (!sensors && file_exists(SENSOR_FILENAME))
+	if (file_exists(SENSOR_FILENAME))
 		remove_file(SENSOR_FILENAME);
 	
 	ulong pos = 0;
@@ -1043,7 +1043,7 @@ int prog_adjust_delete(uint nr) {
 }
 
 void prog_adjust_save() {
-	if (!progSensorAdjusts && file_exists(PROG_SENSOR_FILENAME))
+	if (file_exists(PROG_SENSOR_FILENAME))
 		remove_file(PROG_SENSOR_FILENAME);
 
 	ulong pos = 0;
