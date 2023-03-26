@@ -642,7 +642,7 @@ bool OpenSprinkler::load_hardware_mac(byte* mac, bool wired) {
 	if ((fd = socket(AF_INET, SOCK_DGRAM, 0)) == 0) return true;
 
 	// Returns the mac address of the first interface if multiple active
-	for (int i = 0; i < sizeof(if_names)/sizeof(const char *); i++) {
+	for (unsigned int i = 0; i < sizeof(if_names)/sizeof(const char *); i++) {
 		strncpy(ifr.ifr_name, if_names[i], sizeof(ifr.ifr_name));
 		if (ioctl(fd, SIOCGIFHWADDR, &ifr) != -1) {
 			memcpy(mac, ifr.ifr_hwaddr.sa_data, 6);
