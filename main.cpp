@@ -400,8 +400,8 @@ void turn_on_station(byte sid, ulong duration);
 void handle_expired_station(byte sid, ulong curr_time);
 void check_network();
 void check_weather();
-bool process_special_program_command(const char*, uint32_t curr_time);
-void perform_ntp_sync();
+static bool process_special_program_command(const char*, uint32_t curr_time);
+static void perform_ntp_sync();
 void delete_log(char *name);
 
 #if defined(ESP8266)
@@ -990,7 +990,7 @@ void do_loop()
 }
 
 /** Check and process special program command */
-bool process_special_program_command(const char* pname, uint32_t curr_time) {
+static bool process_special_program_command(const char* pname, uint32_t curr_time) {
 	if(pname[0]==':') {	// special command start with :
 		if(strncmp(pname, ":>reboot_now", 12) == 0) {
 			os.status.safe_reboot = 0; // reboot regardless of program status
@@ -1845,7 +1845,7 @@ void check_network() {
 }
 
 /** Perform NTP sync */
-void perform_ntp_sync() {
+static void perform_ntp_sync() {
 #if defined(ARDUINO)
 	// do not perform ntp if this option is disabled, or if a program is currently running
 	if (!os.iopts[IOPT_USE_NTP] || os.status.program_busy) return;
