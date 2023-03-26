@@ -1171,8 +1171,6 @@ void OpenSprinkler::apply_all_station_bits() {
 			}
 		}
 	}
-
-	byte bid, s, sbits;
 #else
 	digitalWrite(PIN_SR_LATCH, LOW);
 	byte bid, s, sbits;
