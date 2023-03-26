@@ -1882,7 +1882,20 @@ void perform_ntp_sync() {
 
 #if !defined(ARDUINO) // main function for RPI/BBB
 int main(int argc, char *argv[]) {
-	do_setup();
+
+  int opt;
+  while(-1 != (opt = getopt(argc, argv, "d:"))) {
+    switch(opt) {
+    case 'd':
+      set_data_dir(optarg);
+      break;
+    default:
+      // ignore options we don't understand
+      break;
+    }
+  }
+
+  do_setup();
 
 	while(true) {
 		do_loop();
