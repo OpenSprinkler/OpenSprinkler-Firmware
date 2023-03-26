@@ -34,5 +34,6 @@ void reset_all_stations();
 void reset_all_stations_immediate();
 void delete_log(char *name);
 void write_log(byte type, ulong curr_time);
+void make_logfile_name(char *name);
 
 #endif // _MAIN_H

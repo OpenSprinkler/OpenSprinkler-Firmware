@@ -83,8 +83,6 @@ static char* get_buffer = NULL;
 
 BufferFiller bfill;
 
-void make_logfile_name(char *name);
-
 /* Check available space (number of bytes) in the Ethernet buffer */
 int available_ether_buffer() {
 	return ETHER_BUFFER_SIZE - (int)bfill.position();
