@@ -83,7 +83,6 @@ static char* get_buffer = NULL;
 
 BufferFiller bfill;
 
-void check_network(time_t curr_time);
 void check_weather(time_t curr_time);
 void perform_ntp_sync(time_t curr_time);
 void log_statistics(time_t curr_time);
