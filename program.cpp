@@ -36,7 +36,7 @@ byte ProgramData::nqueue = 0;
 RuntimeQueueStruct ProgramData::queue[RUNTIME_QUEUE_SIZE];
 byte ProgramData::station_qid[MAX_NUM_STATIONS];
 LogStruct ProgramData::lastrun;
-ulong ProgramData::last_seq_stop_times[NUM_SEQ_GROUPS];
+time_t ProgramData::last_seq_stop_times[NUM_SEQ_GROUPS];
 
 extern char tmp_buffer[];
 
