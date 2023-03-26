@@ -241,7 +241,7 @@ static byte GPIOUnexport(int pin) {
 /** Set interrupt edge mode */
 static byte GPIOSetEdge(int pin, const char *edge) {
 	char path[BUFFER_MAX];
-	int fd, len;
+	int fd;
 
 	snprintf(path, BUFFER_MAX, "/sys/class/gpio/gpio%d/edge", pin);
 
