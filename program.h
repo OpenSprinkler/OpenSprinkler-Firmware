@@ -120,7 +120,7 @@ public:
 	uint16_t dur; // water time
 	byte  sid;
 	byte  pid;
-	ulong deque_time; // deque time, which can be larger than st+dur to allow positive master off adjustment time
+	time_t   deque_time; // deque time, which can be larger than st+dur to allow positive master off adjustment time
 };
 
 class ProgramData {
