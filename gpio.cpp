@@ -221,6 +221,7 @@ static byte GPIOExport(int pin) {
 	return 1;
 }
 
+#if 0
 /** Unexport gpio pin */
 static byte GPIOUnexport(int pin) {
 	char buffer[BUFFER_MAX];
@@ -237,6 +238,7 @@ static byte GPIOUnexport(int pin) {
 	close(fd);
 	return 1;
 }
+#endif
 
 /** Set interrupt edge mode */
 static byte GPIOSetEdge(int pin, const char *edge) {
