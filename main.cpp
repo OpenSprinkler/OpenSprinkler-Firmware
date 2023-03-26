@@ -394,7 +394,6 @@ void do_setup() {
 #endif
 
 void turn_on_station(byte sid, ulong duration);
-void handle_expired_station(byte sid, ulong curr_time);
 void check_network();
 void check_weather();
 static bool process_special_program_command(const char*, uint32_t curr_time);
