@@ -837,7 +837,7 @@ void do_loop()
 
 			// check through runtime queue, calculate the last stop time of sequential stations
 			memset(pd.last_seq_stop_times, 0, sizeof(ulong)*NUM_SEQ_GROUPS);
-			ulong sst;
+			time_t sst;
 			byte re=os.iopts[IOPT_REMOTE_EXT_MODE];
 			q = pd.queue;
 			for(;q<pd.queue+pd.nqueue;q++) {
