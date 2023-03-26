@@ -413,7 +413,6 @@ void attachInterrupt(int pin, const char* mode, void (*isr)(void)) {
 
 	char path[BUFFER_MAX];
 	snprintf(path, BUFFER_MAX, "/sys/class/gpio/gpio%d/value", pin);
-	int fd;
 
 	// open gpio file
 	if(sysFds[pin]==-1) {
