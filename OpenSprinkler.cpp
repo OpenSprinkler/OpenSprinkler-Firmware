@@ -1220,7 +1220,7 @@ void OpenSprinkler::apply_all_station_bits() {
 		// we refresh the station that's next in line
 		static byte next_sid_to_refresh = MAX_NUM_STATIONS>>1;
 		static byte lastnow = 0;
-		ulong curr_time = now_tz();
+		time_t curr_time = now_tz();
 		byte _now = (curr_time & 0xFF);
 		if (lastnow != _now) {  // perform this no more than once per second
 			lastnow = _now;
