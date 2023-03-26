@@ -397,7 +397,7 @@ void do_setup() {
 void write_log(byte type, ulong curr_time);
 void schedule_all_stations(ulong curr_time);
 void turn_on_station(byte sid, ulong duration);
-void turn_off_station(byte sid, ulong curr_time, byte shift=0);
+void turn_off_station(byte sid, time_t curr_time, byte shift=0);
 void handle_expired_station(byte sid, ulong curr_time);
 void process_dynamic_events(ulong curr_time);
 void check_network();
@@ -1090,7 +1090,7 @@ void handle_shift_remaining_stations(RuntimeQueueStruct* q, byte gid, time_t cur
  * writes a log record and determines if
  * the station should be removed from the queue
  */
-void turn_off_station(byte sid, ulong curr_time, byte shift) {
+void turn_off_station(byte sid, time_t curr_time, byte shift) {
 
 	byte qid = pd.station_qid[sid];
 	// ignore request if trying to turn off a zone that's not even in the queue
