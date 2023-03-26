@@ -1,6 +1,6 @@
 CXX=g++
 # -std=gnu++17
-CXXFLAGS=-DOSPI -Wall
+CXXFLAGS=-std=gnu++14 -DOSPI -Wall
 LD=$(CXX)
 LIBS=pthread mosquitto
 LDFLAGS=$(addprefix -l,$(LIBS))
