@@ -1060,9 +1060,9 @@ void turn_on_station(byte sid, ulong duration) {
 }
 
 // after removing element q, update remaining stations in its group
-void handle_shift_remaining_stations(RuntimeQueueStruct* q, byte gid, ulong curr_time) {
+void handle_shift_remaining_stations(RuntimeQueueStruct* q, byte gid, time_t curr_time) {
 	RuntimeQueueStruct *s = pd.queue;
-	ulong q_end_time = q->st + q->dur;
+	time_t q_end_time = q->st + q->dur;
 	ulong remainder = 0;
 
 	if (q_end_time > curr_time) { // remainder is non-zero
