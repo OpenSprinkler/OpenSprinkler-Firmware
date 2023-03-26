@@ -38,7 +38,7 @@ extern OpenSprinkler os;
 
 #else // RPI/BBB
 
-char* get_runtime_path() {
+static char* get_runtime_path() {
 	static char path[PATH_MAX];
 	static byte query = 1;
 
@@ -62,9 +62,23 @@ char* get_runtime_path() {
 	return path;
 }
 
+static const char *data_dir = NULL;
+
+const char* get_data_dir(void) {
+	if (data_dir) {
+		return data_dir;
+	} else {
+		return get_runtime_path();
+	}
+}
+
+void set_data_dir(const char *new_data_dir) {
+	data_dir = new_data_dir;
+}
+
 char* get_filename_fullpath(const char *filename) {
 	static char fullpath[PATH_MAX];
-	strcpy(fullpath, get_runtime_path());
+	strcpy(fullpath, get_data_dir());
 	strcat(fullpath, filename);
 	return fullpath;
 }
