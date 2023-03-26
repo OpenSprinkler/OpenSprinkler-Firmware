@@ -116,7 +116,7 @@ extern OpenSprinkler os;
 
 class RuntimeQueueStruct {
 public:
-	ulong    st;  // start time
+	time_t   st;  // start time
 	uint16_t dur; // water time
 	byte  sid;
 	byte  pid;
