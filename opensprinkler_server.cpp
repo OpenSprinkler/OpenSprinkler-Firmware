@@ -26,6 +26,7 @@
 #include "opensprinkler_server.h"
 #include "weather.h"
 #include "mqtt.h"
+#include "main.h"
 
 // External variables defined in main ion file
 #if defined(ARDUINO)
@@ -82,9 +83,6 @@ static char* get_buffer = NULL;
 
 BufferFiller bfill;
 
-void schedule_all_stations(ulong curr_time);
-void turn_off_station(byte sid, ulong curr_time, byte shift=0);
-void process_dynamic_events(ulong curr_time);
 void check_network(time_t curr_time);
 void check_weather(time_t curr_time);
 void perform_ntp_sync(time_t curr_time);

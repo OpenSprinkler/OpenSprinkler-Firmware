@@ -28,6 +28,7 @@
 #include "weather.h"
 #include "opensprinkler_server.h"
 #include "mqtt.h"
+#include "main.h"
 
 #if defined(ARDUINO)
 	#if defined(ESP8266)
@@ -395,11 +396,8 @@ void do_setup() {
 #endif
 
 void write_log(byte type, ulong curr_time);
-void schedule_all_stations(time_t curr_time);
 void turn_on_station(byte sid, ulong duration);
-void turn_off_station(byte sid, time_t curr_time, byte shift=0);
 void handle_expired_station(byte sid, ulong curr_time);
-void process_dynamic_events(ulong curr_time);
 void check_network();
 void check_weather();
 bool process_special_program_command(const char*, uint32_t curr_time);

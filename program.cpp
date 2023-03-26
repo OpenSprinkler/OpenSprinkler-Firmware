@@ -23,6 +23,7 @@
 
 #include <limits.h>
 #include "program.h"
+#include "main.h"
 
 #if !defined(SECS_PER_DAY)
 #define SECS_PER_MIN  (60UL)
@@ -135,8 +136,6 @@ void ProgramData::toggle_pause(ulong delay) {
 	}
 	os.status.pause_state = !os.status.pause_state;
 }
-
-void turn_off_station(byte sid, ulong curr_time, byte shift=0);
 
 void ProgramData::set_pause() {
 	RuntimeQueueStruct *q = queue;
