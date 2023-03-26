@@ -1493,8 +1493,10 @@ void server_change_options(OTF_PARAMS_DEF)
 
 	// if not using NTP and manually setting time
 	if (!os.iopts[IOPT_USE_NTP] && findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("ttt"), true)) {
+#if defined(ARDUINO)
 		unsigned long t;
 		t = strtoul(tmp_buffer, NULL, 0);
+#endif
 		// before chaging time, reset all stations to avoid messing up with timing
 		reset_all_stations_immediate();
 #if defined(ARDUINO)
