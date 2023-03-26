@@ -394,7 +394,7 @@ void do_setup() {
 #endif
 
 void turn_on_station(byte sid, ulong duration);
-void check_network();
+static void check_network();
 void check_weather();
 static bool process_special_program_command(const char*, uint32_t curr_time);
 static void perform_ntp_sync();
@@ -1790,7 +1790,7 @@ void delete_log(char *name) {
  * to check if it's still online.
  * If not, it re-initializes Ethernet controller.
  */
-void check_network() {
+static void check_network() {
 #if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
 	// do not perform network checking if the controller has just started, or if a program is running
 	if (os.status.program_busy) {return;}
