@@ -198,7 +198,7 @@ void load_wt_monthly(char* wto) {
 	}
 }
 
-void apply_monthly_adjustment(ulong curr_time) {
+void apply_monthly_adjustment(time_t curr_time) {
 		// ====== Check monthly water percentage ======
 		if(os.iopts[IOPT_USE_WEATHER]==WEATHER_METHOD_MONTHLY) {
 #if defined(ARDUINO)
