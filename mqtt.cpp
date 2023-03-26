@@ -195,7 +195,11 @@ void OSMqtt::loop(void) {
 		last_reconnect_attempt = millis();
 	}
 
+#if defined(ENABLE_DEBUG)
 	int state = _loop();
+#else
+	(void) _loop();
+#endif
 
 #if defined(ENABLE_DEBUG)
 	// Print a diagnostic message whenever the MQTT state changes
