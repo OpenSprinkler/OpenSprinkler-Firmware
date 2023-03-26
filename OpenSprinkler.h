@@ -204,21 +204,21 @@ public:
 	static byte masters[NUM_MASTER_ZONES][NUM_MASTER_OPTS];
 
 	// variables for time keeping
-	static ulong sensor1_on_timer;  // time when sensor1 is detected on last time
-	static ulong sensor1_off_timer; // time when sensor1 is detected off last time
-	static ulong sensor1_active_lasttime; // most recent time sensor1 is activated
-	static ulong sensor2_on_timer;  // time when sensor2 is detected on last time
-	static ulong sensor2_off_timer; // time when sensor2 is detected off last time
-	static ulong sensor2_active_lasttime; // most recent time sensor1 is activated
-	static ulong raindelay_on_lasttime;  // time when the most recent rain delay started
+	static time_t sensor1_on_timer;  // time when sensor1 is detected on last time
+	static time_t sensor1_off_timer; // time when sensor1 is detected off last time
+	static time_t sensor1_active_lasttime; // most recent time sensor1 is activated
+	static time_t sensor2_on_timer;  // time when sensor2 is detected on last time
+	static time_t sensor2_off_timer; // time when sensor2 is detected off last time
+	static time_t sensor2_active_lasttime; // most recent time sensor1 is activated
+	static time_t raindelay_on_lasttime;  // time when the most recent rain delay started
 	static ulong pause_timer; // count down timer in paused state
 	static ulong flowcount_rt;     // flow count (for computing real-time flow rate)
 	static ulong flowcount_log_start; // starting flow count (for logging)
 
 	static byte  button_timeout;    // button timeout
-	static ulong checkwt_lasttime;  // time when weather was checked
-	static ulong checkwt_success_lasttime; // time when weather check was successful
-	static ulong powerup_lasttime;  // time when controller is powered up most recently
+	static time_t checkwt_lasttime;  // time when weather was checked
+	static time_t checkwt_success_lasttime; // time when weather check was successful
+	static time_t powerup_lasttime;  // time when controller is powered up most recently
 	static uint8_t last_reboot_cause;  // last reboot cause
 	static byte  weather_update_flag;
 	// member functions
@@ -276,8 +276,8 @@ public:
 	static void disable();  // disable controller operation, all stations will be closed immediately
 	static void raindelay_start();  // start raindelay
 	static void raindelay_stop();   // stop rain delay
-	static void detect_binarysensor_status(ulong);// update binary (rain, soil) sensor status
-	static byte detect_programswitch_status(ulong); // get program switch status
+	static void detect_binarysensor_status(time_t curr_time);// update binary (rain, soil) sensor status
+	static byte detect_programswitch_status(time_t curr_time); // get program switch status
 	static void sensor_resetall();
 
 	static uint16_t read_current(); // read current sensing value
