@@ -395,7 +395,7 @@ void do_setup() {
 #endif
 
 void write_log(byte type, ulong curr_time);
-void schedule_all_stations(ulong curr_time);
+void schedule_all_stations(time_t curr_time);
 void turn_on_station(byte sid, ulong duration);
 void turn_off_station(byte sid, time_t curr_time, byte shift=0);
 void handle_expired_station(byte sid, ulong curr_time);
@@ -1240,7 +1240,7 @@ void handle_master_adjustments(ulong curr_time, RuntimeQueueStruct *q) {
  * This function loops through the queue
  * and schedules the start time of each station
  */
-void schedule_all_stations(ulong curr_time) {
+void schedule_all_stations(time_t curr_time) {
 	ulong con_start_time = curr_time + 1;   // concurrent start time
 	// if the queue is paused, make sure the start time is after the scheduled pause ends
 	if (os.status.pause_state) {
