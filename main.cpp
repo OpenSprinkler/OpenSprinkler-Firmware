@@ -393,7 +393,6 @@ void do_setup() {
 }
 #endif
 
-void write_log(byte type, ulong curr_time);
 void turn_on_station(byte sid, ulong duration);
 void handle_expired_station(byte sid, ulong curr_time);
 void check_network();

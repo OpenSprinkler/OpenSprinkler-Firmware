@@ -33,5 +33,6 @@ void process_dynamic_events(ulong curr_time);
 void reset_all_stations();
 void reset_all_stations_immediate();
 void delete_log(char *name);
+void write_log(byte type, ulong curr_time);
 
 #endif // _MAIN_H
