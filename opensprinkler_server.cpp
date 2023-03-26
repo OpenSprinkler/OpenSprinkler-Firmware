@@ -87,9 +87,6 @@ void check_network(time_t curr_time);
 void check_weather(time_t curr_time);
 void perform_ntp_sync(time_t curr_time);
 void log_statistics(time_t curr_time);
-void delete_log(char *name);
-void reset_all_stations_immediate();
-void reset_all_stations();
 void make_logfile_name(char *name);
 
 /* Check available space (number of bytes) in the Ethernet buffer */

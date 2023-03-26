@@ -50,8 +50,6 @@
 	EthernetClient *m_client = 0;
 #endif
 
-void reset_all_stations();
-void reset_all_stations_immediate();
 void push_message(int type, uint32_t lval=0, float fval=0.f, const char* sval=NULL);
 void manual_start_program(byte, byte);
 void remote_http_callback(char*);
@@ -402,7 +400,6 @@ void check_network();
 void check_weather();
 static bool process_special_program_command(const char*, uint32_t curr_time);
 static void perform_ntp_sync();
-void delete_log(char *name);
 
 #if defined(ESP8266)
 bool delete_log_oldest();

@@ -30,5 +30,8 @@
 void turn_off_station(byte sid, time_t curr_time, byte shift=0);
 void schedule_all_stations(time_t curr_time);
 void process_dynamic_events(ulong curr_time);
+void reset_all_stations();
+void reset_all_stations_immediate();
+void delete_log(char *name);
 
 #endif // _MAIN_H
