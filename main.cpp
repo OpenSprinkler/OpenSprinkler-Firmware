@@ -435,7 +435,7 @@ void do_loop()
 		}
 	}
 
-	static ulong last_time = 0;
+	static time_t last_time = 0;
 	static ulong last_minute = 0;
 
 	byte bid, sid, s, pid, qid, gid, bitvalue;
