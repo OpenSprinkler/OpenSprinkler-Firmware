@@ -16,3 +16,7 @@ all: $(BINARY)
 
 $(BINARY): $(OBJECTS)
 	$(CXX) -o $(BINARY) $(OBJECTS) $(LDFLAGS)
+
+.PHONY: clean
+clean:
+	rm -f $(OBJECTS) $(BINARY)
