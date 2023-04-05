@@ -43,8 +43,15 @@
 #define SENSORLOG_FILENAME1   "sensorlog.dat"   // analog sensor log filename
 #define SENSORLOG_FILENAME2   "sensorlog2.dat"  // analog sensor log filename2
 
+#define SENSORLOG_FILENAME_WEEK1 "sensorlogW1.dat"    // analog sensor log filename for  week average
+#define SENSORLOG_FILENAME_WEEK2 "sensorlogW2.dat"    // analog sensor log filename2 for week average
+#define SENSORLOG_FILENAME_MONTH1 "sensorlogM1.dat"   // analog sensor log filename for month average
+#define SENSORLOG_FILENAME_MONTH2 "sensorlogM2.dat"   // analog sensor log filename2 for month average
+
 //MaxLogSize
 #define MAX_LOG_SIZE 8000
+#define MAX_LOG_SIZE_WEEK 2000
+#define MAX_LOG_SIZE_MONTH 1000
 
 //Sensor types:
 #define SENSOR_NONE                       0   //None or deleted sensor
@@ -150,7 +157,6 @@ typedef struct ProgSensorAdjust {
 
 //Unitnames
 extern const char* sensor_unitNames[];
-extern byte logFileSwitch; //0=use smaler File, 1=LOG1, 2=LOG2
 
 const char* getSensorUnit(Sensor_t *sensor);
 byte getSensorUnitId(int type);
@@ -179,13 +185,19 @@ Sensor_t *sensor_by_idx(uint idx);
 int read_sensor(Sensor_t *sensor); //sensor value goes to last_native_data/last_data
 
 //Sensorlog API functions:
-bool sensorlog_add(SensorLog_t *sensorlog);
-bool sensorlog_add(Sensor_t *sensor, ulong time);
+#define LOG_STD   0
+#define LOG_WEEK  1
+#define LOG_MONTH 2
+bool sensorlog_add(uint8_t log, SensorLog_t *sensorlog);
+bool sensorlog_add(uint8_t log, Sensor_t *sensor, ulong time);
 void sensorlog_clear_all();
-SensorLog_t *sensorlog_load(ulong pos);
-SensorLog_t *sensorlog_load(ulong idx, SensorLog_t* sensorlog);
-ulong sensorlog_filesize();
-ulong sensorlog_size();
+void sensorlog_clear(bool std, bool week, bool month);
+SensorLog_t *sensorlog_load(uint8_t log, ulong pos);
+SensorLog_t *sensorlog_load(uint8_t log, ulong idx, SensorLog_t* sensorlog);
+int sensorlog_load2(uint8_t log, ulong idx, int count, SensorLog_t* sensorlog);
+ulong sensorlog_filesize(uint8_t log);
+ulong sensorlog_size(uint8_t log);
+ulong findLogPosition(uint8_t log, ulong after);
 
 //Set Sensor Address for SMT100:
 int set_sensor_address(Sensor_t *sensor, byte new_address);

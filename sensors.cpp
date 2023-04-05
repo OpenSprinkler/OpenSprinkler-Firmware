@@ -37,11 +37,9 @@ const char*   sensor_unitNames[] {
 	"", "%", "°C", "°F", "V",
 //   0   1     2     3    4
 };
-byte logFileSwitch = 0; //0=use smaler File, 1=LOG1, 2=LOG2
-ulong logFileSize1 = 0;
-ulong logFileSize2 = 0;
+byte logFileSwitch[3] = {0,0,0}; //0=use smaller File, 1=LOG1, 2=LOG2
 
- uint16_t CRC16 (byte buf[], int len) {
+uint16_t CRC16 (byte buf[], int len) {
 	uint16_t crc = 0xFFFF;
 
 	for (int pos = 0; pos < len; pos++) {
@@ -151,7 +149,7 @@ int sensor_define(uint nr, char *name, uint type, uint group, uint32_t ip, uint 
  * 
  */
 void sensor_load() {
-	DEBUG_PRINTLN(F("sensor_load"));
+	//DEBUG_PRINTLN(F("sensor_load"));
 	sensors = NULL;
 	if (!file_exists(SENSOR_FILENAME))
 		return;
@@ -179,7 +177,7 @@ void sensor_load() {
  * 
  */
 void sensor_save() {
-	DEBUG_PRINTLN(F("sensor_save"));
+	//DEBUG_PRINTLN(F("sensor_save"));
 	if (file_exists(SENSOR_FILENAME))
 		remove_file(SENSOR_FILENAME);
 	
@@ -193,7 +191,7 @@ void sensor_save() {
 }
 
 uint sensor_count() {
-	DEBUG_PRINTLN(F("sensor_count"));
+	//DEBUG_PRINTLN(F("sensor_count"));
 	Sensor_t *sensor = sensors;
 	uint count = 0;
 	while (sensor) {
@@ -204,7 +202,7 @@ uint sensor_count() {
 }
 
 Sensor_t *sensor_by_nr(uint nr) {
-	DEBUG_PRINTLN(F("sensor_by_nr"));
+	//DEBUG_PRINTLN(F("sensor_by_nr"));
 	Sensor_t *sensor = sensors;
 	while (sensor) {
 		if (sensor->nr == nr) 
@@ -215,7 +213,7 @@ Sensor_t *sensor_by_nr(uint nr) {
 }
 
 Sensor_t *sensor_by_idx(uint idx) {
-	DEBUG_PRINTLN(F("sensor_by_idx"));
+	//DEBUG_PRINTLN(F("sensor_by_idx"));
 	Sensor_t *sensor = sensors;
 	uint count = 0;
 	while (sensor) {
@@ -227,39 +225,74 @@ Sensor_t *sensor_by_idx(uint idx) {
 	return NULL;
 }
 
-void checkLogSwitch() {
-	if (logFileSwitch == 0) { // Check file size, use smallest
-			logFileSize1 = file_size(SENSORLOG_FILENAME1);
-			logFileSize2 = file_size(SENSORLOG_FILENAME2);
-			if (logFileSize1 < logFileSize2)
-				logFileSwitch = 1; 
-			else
-				logFileSwitch = 2;
-		}
-}
+// LOGGING METHODS:
 
-void checkLogSwitchAfterWrite() {
-	ulong size = file_size(logFileSwitch==1?SENSORLOG_FILENAME1:SENSORLOG_FILENAME2);
-	if ((size / SENSORLOG_STORE_SIZE) >= MAX_LOG_SIZE) { // switch logs if max reached
-		if (logFileSwitch == 1)
-			logFileSwitch = 2;
-		else
-			logFileSwitch = 1;
-		remove_file(logFileSwitch==1?SENSORLOG_FILENAME1:SENSORLOG_FILENAME2);
+/**
+ * @brief getlogfile name
+ * 
+ * @param log 
+ * @return const char* 
+ */
+const char *getlogfile(uint8_t log) {
+	bool sw = logFileSwitch[log];
+	switch (log) {
+		case 0: return sw?SENSORLOG_FILENAME1:SENSORLOG_FILENAME2;
+		case 1: return sw?SENSORLOG_FILENAME_WEEK1:SENSORLOG_FILENAME_WEEK2;
+		case 2: return sw?SENSORLOG_FILENAME_MONTH1:SENSORLOG_FILENAME_MONTH2;
 	}
-	logFileSize1 = file_size(SENSORLOG_FILENAME1);
-	logFileSize2 = file_size(SENSORLOG_FILENAME2);
+	return "";
 }
 
-bool sensorlog_add(SensorLog_t *sensorlog) {
+/**
+ * @brief getlogfile name2 (opposite file)
+ * 
+ * @param log 
+ * @return const char* 
+ */
+const char *getlogfile2(uint8_t log) {
+	bool sw = logFileSwitch[log];
+	switch (log) {
+		case 0: return sw?SENSORLOG_FILENAME2:SENSORLOG_FILENAME1;
+		case 1: return sw?SENSORLOG_FILENAME_WEEK2:SENSORLOG_FILENAME_WEEK1;
+		case 2: return sw?SENSORLOG_FILENAME_MONTH2:SENSORLOG_FILENAME_MONTH1;
+	}
+	return "";
+}
+
+
+void checkLogSwitch(uint8_t log) {
+	if (logFileSwitch[log] == 0) { // Check file size, use smallest
+		ulong logFileSize1 = file_size(getlogfile(log));
+		ulong logFileSize2 = file_size(getlogfile2(log));
+		if (logFileSize1 < logFileSize2)
+			logFileSwitch[log] = 1; 
+		else
+			logFileSwitch[log] = 2;
+	}
+}
+
+void checkLogSwitchAfterWrite(uint8_t log) {
+	ulong size = file_size(getlogfile(log));
+	if ((size / SENSORLOG_STORE_SIZE) >= MAX_LOG_SIZE) { // switch logs if max reached
+		if (logFileSwitch[log] == 1)
+			logFileSwitch[log] = 2;
+		else
+			logFileSwitch[log] = 1;
+		remove_file(getlogfile(log));
+	}
+}
+
+bool sensorlog_add(uint8_t log, SensorLog_t *sensorlog) {
 #if defined(ESP8266)
 	if (checkDiskFree()) {
 #endif
 		DEBUG_PRINT(F("sensorlog_add "));
-		checkLogSwitch();
-		file_append_block(logFileSwitch==1?SENSORLOG_FILENAME1:SENSORLOG_FILENAME2, sensorlog, SENSORLOG_STORE_SIZE);
-		checkLogSwitchAfterWrite();
-		DEBUG_PRINT(sensorlog_filesize());
+		DEBUG_PRINT(log);
+		checkLogSwitch(log);
+		file_append_block(getlogfile(log), sensorlog, SENSORLOG_STORE_SIZE);
+		checkLogSwitchAfterWrite(log);
+		DEBUG_PRINT(F("="));
+		DEBUG_PRINT(sensorlog_filesize(log));
 		return true;
 #if defined(ESP8266)		
 	}
@@ -267,14 +300,14 @@ bool sensorlog_add(SensorLog_t *sensorlog) {
 #endif
 }
 
-bool sensorlog_add(Sensor_t *sensor, ulong time) {
+bool sensorlog_add(uint8_t log, Sensor_t *sensor, ulong time) {
 	if (sensor->flags.data_ok && sensor->flags.log && time > 1000) {
 		SensorLog_t sensorlog;
 		sensorlog.nr = sensor->nr;
 		sensorlog.time = time;
 		sensorlog.native_data = sensor->last_native_data;
 		sensorlog.data = sensor->last_data;
-		if (!sensorlog_add(&sensorlog)) {
+		if (!sensorlog_add(log, &sensorlog)) {
 			sensor->flags.log = 0;
 			return false;
 		}
@@ -283,43 +316,60 @@ bool sensorlog_add(Sensor_t *sensor, ulong time) {
 	return false;
 }
 
-ulong sensorlog_filesize() {
-	DEBUG_PRINT(F("sensorlog_filesize "));
-	checkLogSwitch();
-	ulong size = logFileSize1+logFileSize2;
-	DEBUG_PRINTLN(size);
+ulong sensorlog_filesize(uint8_t log) {
+	//DEBUG_PRINT(F("sensorlog_filesize "));
+	checkLogSwitch(log);
+	ulong size = file_size(getlogfile(log))+file_size(getlogfile2(log));
+	//DEBUG_PRINTLN(size);
 	return size;
 }
 
-ulong sensorlog_size() {
-	DEBUG_PRINT(F("sensorlog_size "));
-	ulong size = sensorlog_filesize() / SENSORLOG_STORE_SIZE;
-	DEBUG_PRINTLN(size);
+ulong sensorlog_size(uint8_t log) {
+	//DEBUG_PRINT(F("sensorlog_size "));
+	ulong size = sensorlog_filesize(log) / SENSORLOG_STORE_SIZE;
+	//DEBUG_PRINTLN(size);
 	return size;
 }
 
 void sensorlog_clear_all() {
-	DEBUG_PRINTLN(F("sensorlog_clear_all"));
-	remove_file(SENSORLOG_FILENAME1);
-	remove_file(SENSORLOG_FILENAME2);
-	logFileSwitch = 1;
-	logFileSize1 = 0;
-	logFileSize2 = 0;
+	sensorlog_clear(true, true, true);
 }
 
-SensorLog_t *sensorlog_load(ulong idx) {
+void sensorlog_clear(bool std, bool week, bool month) {
+	DEBUG_PRINTLN(F("sensorlog_clear "));
+	DEBUG_PRINT(std);
+	DEBUG_PRINT(week);
+	DEBUG_PRINT(month);
+	if (std) {
+		remove_file(SENSORLOG_FILENAME1);
+		remove_file(SENSORLOG_FILENAME2);
+		logFileSwitch[LOG_STD] = 1;
+	}
+	if (week) {
+		remove_file(SENSORLOG_FILENAME_WEEK1);
+		remove_file(SENSORLOG_FILENAME_WEEK2);
+		logFileSwitch[LOG_WEEK] = 1;
+	}
+	if (month) {
+		remove_file(SENSORLOG_FILENAME_MONTH1);
+		remove_file(SENSORLOG_FILENAME_MONTH2);
+		logFileSwitch[LOG_MONTH] = 1;
+	}
+}
+
+SensorLog_t *sensorlog_load(uint8_t log, ulong idx) {
 	SensorLog_t *sensorlog = new SensorLog_t;
-	return sensorlog_load(idx, sensorlog);
+	return sensorlog_load(log, idx, sensorlog);
 }
 
-SensorLog_t *sensorlog_load(ulong idx, SensorLog_t* sensorlog) {
-	DEBUG_PRINTLN(F("sensorlog_load"));
+SensorLog_t *sensorlog_load(uint8_t log, ulong idx, SensorLog_t* sensorlog) {
+	//DEBUG_PRINTLN(F("sensorlog_load"));
 
 	//Map lower idx to the other log file
-	checkLogSwitch();
-	const char *flast = logFileSwitch==1?SENSORLOG_FILENAME2:SENSORLOG_FILENAME1;
-	const char *fcur = logFileSwitch==1?SENSORLOG_FILENAME1:SENSORLOG_FILENAME2;
-	ulong size = (logFileSwitch==1?logFileSize2:logFileSize1) / SENSORLOG_STORE_SIZE;
+	checkLogSwitch(log);
+	const char *flast = getlogfile2(log);
+	const char *fcur = getlogfile(log);
+	ulong size = (logFileSwitch[log]==1?file_size(getlogfile2(log)):file_size(getlogfile(log))) / SENSORLOG_STORE_SIZE;
 	const char *f;
 	if (idx >= size) {
 		idx -= size;
@@ -332,6 +382,196 @@ SensorLog_t *sensorlog_load(ulong idx, SensorLog_t* sensorlog) {
 	return sensorlog;
 }
 
+int sensorlog_load2(uint8_t log, ulong idx, int count, SensorLog_t* sensorlog) {
+	//DEBUG_PRINTLN(F("sensorlog_load"));
+
+	//Map lower idx to the other log file
+	checkLogSwitch(log);
+	const char *flast = getlogfile2(log);
+	const char *fcur = getlogfile(log);
+	bool sw = logFileSwitch[log]==1;
+	ulong size = file_size(sw?getlogfile2(log):getlogfile(log)) / SENSORLOG_STORE_SIZE;
+	const char *f;
+	if (idx >= size) {
+		idx -= size;
+		f = fcur;
+		size = file_size(sw?getlogfile(log):getlogfile2(log)) / SENSORLOG_STORE_SIZE;
+	} else {
+		f = flast;
+	}
+
+	file_read_block(f, sensorlog, idx * SENSORLOG_STORE_SIZE, count * SENSORLOG_STORE_SIZE);
+	if (idx+count > size)
+		count = size-idx;
+	return count;
+}
+
+ulong findLogPosition(uint8_t log, ulong after) {
+	ulong log_size = sensorlog_size(log);
+	ulong a = 0;
+	ulong b = (log_size-1) / 2;
+	ulong lastIdx = 0;
+	SensorLog_t sensorlog;
+	while (true) {
+		ulong idx = (b-a)/2+a;
+		sensorlog_load(log, idx, &sensorlog);
+		if (sensorlog.time < after) {
+			a = idx;
+		} else if (sensorlog.time > after) {
+			b = idx;
+		}
+		if (a >= b || idx == lastIdx) break;
+		lastIdx = idx;
+	}
+	return lastIdx;
+}
+
+// 1/4 of a day: 6*60*60
+#define BLOCKSIZE 64
+#define CALCRANGE_WEEK 21600
+#define CALCRANGE_MONTH 172800
+static ulong next_week_calc = 0;
+static ulong next_month_calc = 0;
+
+/**
+Calculate week+month Data
+We store only the average value of 6 hours utc
+**/
+void calc_sensorlogs()
+{
+	if (!sensors || timeStatus() != timeSet)
+		return;
+
+	time_t time = os.now_tz();
+	time_t last_day = time;
+	ulong log_size = sensorlog_size(LOG_STD);
+	if (log_size == 0)
+		return;
+
+	if (time >= next_week_calc) {
+		DEBUG_PRINTLN(F("calc_sensorlogs WEEK start"));
+		SensorLog_t *sensorlog = (SensorLog_t*)malloc(sizeof(SensorLog_t)*BLOCKSIZE);
+		ulong size = sensorlog_size(LOG_WEEK);
+		if (size == 0) {
+			sensorlog_load(LOG_STD, 0, sensorlog);
+			last_day = sensorlog->time;
+		}
+		else
+		{
+			sensorlog_load(LOG_WEEK, size - 1, sensorlog); // last record
+			last_day = sensorlog->time + CALCRANGE_WEEK;			// Skip last Range
+		}
+		time_t fromdate = (last_day / CALCRANGE_WEEK) * CALCRANGE_WEEK;
+		time_t todate = fromdate + CALCRANGE_WEEK;
+
+		// 4 blocks per day
+
+		while (todate < time) {
+			ulong startidx = findLogPosition(LOG_STD, fromdate);
+			Sensor_t *sensor = sensors;
+			while (sensor) {
+				if (sensor->flags.enable && sensor->flags.log) {
+					ulong idx = startidx;
+					double data = 0;
+					ulong n = 0;
+					bool done = false;
+					while (!done) {
+						int n = sensorlog_load2(LOG_STD, idx, BLOCKSIZE, sensorlog);
+						if (n <= 0) break;
+						for (int i = 0; i < n; i++) {
+							idx++;
+							if (sensorlog[i].time >= todate) {
+								done = true;
+								break;
+							}
+							if (sensorlog[i].nr == sensor->nr) {
+								data += sensorlog[i].data;
+								n++;
+							}
+						}
+					}
+					if (n > 0)
+					{
+						sensorlog.nr = sensor->nr;
+						sensorlog.time = fromdate;
+						sensorlog.data = data / (double)n;
+						sensorlog.native_data = 0;
+						sensorlog_add(LOG_WEEK, &sensorlog);
+					}
+				}
+				sensor = sensor->next;
+			}
+			fromdate += CALCRANGE_WEEK;
+			todate += CALCRANGE_WEEK;
+		}
+		next_week_calc = todate;
+		DEBUG_PRINTLN(F("calc_sensorlogs WEEK end"));
+	}
+
+	if (time >= next_month_calc) {
+		SensorLog_t sensorlog;
+		log_size = sensorlog_size(LOG_WEEK);
+		if (log_size <= 0)
+			return;
+
+		DEBUG_PRINTLN(F("calc_sensorlogs MONTH start"));
+		ulong size = sensorlog_size(LOG_MONTH);
+		if (size == 0)
+		{
+			sensorlog_load(LOG_WEEK, 0, &sensorlog);
+			last_day = sensorlog.time;
+		}
+		else
+		{
+			sensorlog_load(LOG_MONTH, size - 1, &sensorlog); // last record
+			last_day = sensorlog.time + CALCRANGE_MONTH;			// Skip last Range
+		}
+		time_t fromdate = (last_day / CALCRANGE_MONTH) * CALCRANGE_MONTH;
+		time_t todate = fromdate + CALCRANGE_MONTH;
+		// 4 blocks per day
+
+		while (todate < time)
+		{
+			ulong startidx = findLogPosition(LOG_WEEK, fromdate);
+			Sensor_t *sensor = sensors;
+			while (sensor)
+			{
+				if (sensor->flags.enable && sensor->flags.log)
+				{
+					ulong idx = startidx;
+					double data = 0;
+					ulong n = 0;
+					while (idx < log_size)
+					{
+						sensorlog_load(LOG_WEEK, idx, &sensorlog);
+						if (sensorlog.time >= todate)
+							break;
+						if (sensorlog.nr == sensor->nr)
+						{
+							data += sensorlog.data;
+							n++;
+						}
+						idx++;
+					}
+					if (n > 0)
+					{
+						sensorlog.nr = sensor->nr;
+						sensorlog.time = fromdate;
+						sensorlog.data = data / (double)n;
+						sensorlog.native_data = 0;
+						sensorlog_add(LOG_MONTH, &sensorlog);
+					}
+				}
+				sensor = sensor->next;
+			}
+			fromdate += CALCRANGE_MONTH;
+			todate += CALCRANGE_MONTH;
+		}
+		next_month_calc = todate;
+		DEBUG_PRINTLN(F("calc_sensorlogs MONTH end"));
+	}
+}
+
 void read_all_sensors() {
 	DEBUG_PRINTLN(F("read_all_sensors"));
 	if (!sensors || os.status.network_fails>0 || os.iopts[IOPT_REMOTE_EXT_MODE]) return;
@@ -342,12 +582,14 @@ void read_all_sensors() {
 	while (sensor) {
 		if (time >= sensor->last_read + sensor->read_interval) {
 			if (read_sensor(sensor) == HTTP_RQT_SUCCESS) {
-				sensorlog_add(sensor, time);
+				sensorlog_add(LOG_STD, sensor, time);
 			}
 		}
 		sensor = sensor->next;
 	}
 	sensor_update_groups();
+
+	calc_sensorlogs();
 }
 
 #if defined(ESP8266)
@@ -457,7 +699,7 @@ bool extract(char *s, char *buf, int maxlen) {
 	 	return false;
 	strncpy(buf, s, l);
 	buf[l] = 0;
-	DEBUG_PRINTLN(buf);
+	//DEBUG_PRINTLN(buf);
 	return true;
 }
 
@@ -694,15 +936,16 @@ int read_sensor(Sensor_t *sensor) {
 	if (!sensor || !sensor->flags.enable)
 		return HTTP_RQT_NOT_RECEIVED;
 
-	sensor->last_read = os.now_tz();
-
 	DEBUG_PRINT(F("Reading sensor "));
 	DEBUG_PRINTLN(sensor->name);
+
+	ulong time = os.now_tz();
 
 	switch(sensor->type)
 	{
 		case SENSOR_SMT100_MODBUS_RTU_MOIS:
 		case SENSOR_SMT100_MODBUS_RTU_TEMP:
+			sensor->last_read = time;
 			return read_sensor_ip(sensor);
 
 #if defined(ESP8266)
@@ -715,20 +958,15 @@ int read_sensor(Sensor_t *sensor) {
 		case SENSOR_VH400:
 		case SENSOR_THERM200:
 		case SENSOR_AQUAPLUMB:
+			sensor->last_read = time;
 			return read_sensor_adc(sensor);
 #endif
 
 		//case SENSOR_OSPI_ANALOG_INPUTS:
 		//	return read_sensor_ospi(sensor);
 		case SENSOR_REMOTE:
+			sensor->last_read = time;
 			return read_sensor_http(sensor);
-
-		//Return true for logging:
-		case SENSOR_GROUP_MIN:
-		case SENSOR_GROUP_MAX:
-		case SENSOR_GROUP_AVG:
-		case SENSOR_GROUP_SUM:
-			return HTTP_RQT_SUCCESS;
 
 		default: return HTTP_RQT_NOT_RECEIVED;
 	}
@@ -738,50 +976,60 @@ int read_sensor(Sensor_t *sensor) {
  * @brief Update group values
  * 
  */
-void sensor_update_groups() {
-	Sensor_t *sensor = sensors;	
+void sensor_update_groups()
+{
+	Sensor_t *sensor = sensors;
 
-	while (sensor) {
-		switch(sensor->type) {
-			case SENSOR_GROUP_MIN:
-			case SENSOR_GROUP_MAX:
-			case SENSOR_GROUP_AVG:
-			case SENSOR_GROUP_SUM: {
-				uint nr = sensor->nr;
-				Sensor_t *group = sensors;
-				double value = 0;
-				int n = 0;
-				while (group) {
-					if (group->nr != nr && group->group == nr && group->flags.enable && group->flags.data_ok) {
-						switch(sensor->type) {
-							case SENSOR_GROUP_MIN:
-								if (n++ == 0) value = group->last_data;
-								else if (group->last_data < value) value = group->last_data;
-								break;
-							case SENSOR_GROUP_MAX:
-								if (n++ == 0) value = group->last_data;
-								else if (group->last_data > value) value = group->last_data;
-								break;
-							case SENSOR_GROUP_AVG:
-							case SENSOR_GROUP_SUM:
-								n++;
-								value += group->last_data;
-								break;
+	ulong time = os.now_tz();
+
+	while (sensor)
+	{
+		if (time >= sensor->last_read + sensor->read_interval) {
+			switch (sensor->type) {
+				case SENSOR_GROUP_MIN:
+				case SENSOR_GROUP_MAX:
+				case SENSOR_GROUP_AVG:
+				case SENSOR_GROUP_SUM: {
+					uint nr = sensor->nr;
+					Sensor_t *group = sensors;
+					double value = 0;
+					int n = 0;
+					while (group) {
+						if (group->nr != nr && group->group == nr && group->flags.enable && group->flags.data_ok) {
+							switch (sensor->type) {
+								case SENSOR_GROUP_MIN:
+									if (n++ == 0)
+										value = group->last_data;
+									else if (group->last_data < value)
+										value = group->last_data;
+									break;
+								case SENSOR_GROUP_MAX:
+									if (n++ == 0)
+										value = group->last_data;
+									else if (group->last_data > value)
+										value = group->last_data;
+									break;
+								case SENSOR_GROUP_AVG:
+								case SENSOR_GROUP_SUM:
+									n++;
+									value += group->last_data;
+									break;
+							}
 						}
+						group = group->next;
 					}
-					group = group->next;
+					if (sensor->type == SENSOR_GROUP_AVG && n > 0) {
+						value = value / (double)n;
+					}
+					sensor->last_data = value;
+					sensor->last_native_data = 0;
+					sensor->last_read = time;
+					sensor->flags.data_ok = n > 0;
+					sensorlog_add(LOG_STD, sensor, time);
+					break;
 				}
-				if (sensor->type == SENSOR_GROUP_AVG && n>0) {
-					value = value / n;
-				}
-				sensor->last_data = value;
-				sensor->last_native_data = 0;
-				sensor->last_read = os.now_tz();
-				sensor->flags.data_ok = n>0;
-				break;
 			}
 		}
-
 		sensor = sensor->next;
 	}
 }

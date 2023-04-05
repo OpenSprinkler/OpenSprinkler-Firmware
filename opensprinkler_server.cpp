@@ -227,7 +227,7 @@ void rewind_ether_buffer() {
 
 void send_packet(OTF_PARAMS_DEF) {
 #if defined(ESP8266)
-	if (!res.willFit(bfill.position()))
+	if (bfill.position() > 8192 || !res.willFit(bfill.position()))
 		res.flush(); 
 	res.writeBodyChunk((char *)"%s",ether_buffer);
 #else
@@ -2277,9 +2277,15 @@ void server_sensorlog_list(OTF_PARAMS_DEF) {
 	char *p = get_buffer;
 #endif
 
-	ulong log_size = sensorlog_size();
-
 	DEBUG_PRINTLN(F("server_sensorlog_list"));
+
+	uint8_t log = LOG_STD;
+
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("log"), true)) // Log type 0=DAY 1=WEEK 2=MONTH
+		log = strtoul(tmp_buffer, NULL, 0); 
+	if (log > LOG_MONTH)
+		log = LOG_STD;
+	ulong log_size = sensorlog_size(log);
 
 	//start / max:
 	ulong startAt = 0;
@@ -2297,6 +2303,7 @@ void server_sensorlog_list(OTF_PARAMS_DEF) {
 	ulong before = 0;
 	ulong lastHours = 0;
 	bool isjson = true;
+	bool shortcsv = false;
 
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("nr"), true)) // Filter log for sensor-nr
 		nr = strtoul(tmp_buffer, NULL, 0); 
@@ -2316,8 +2323,11 @@ void server_sensorlog_list(OTF_PARAMS_DEF) {
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("lastdays"), true)) // Filter last days
 		lastHours = strtoul(tmp_buffer, NULL, 0) * 24 + lastHours;
 
-	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("csv"), true)) // Filter last days
-		isjson = atoi(tmp_buffer) == 0;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("csv"), true)) { // Filter last days
+		int csv = atoi(tmp_buffer);
+		isjson = csv == 0;
+		shortcsv = csv == 2;
+	}
 
 #if defined(ESP8266)
 	// as the log data can be large, we will use ESP8266's sendContent function to
@@ -2329,14 +2339,18 @@ void server_sensorlog_list(OTF_PARAMS_DEF) {
 #endif
 
 	if (isjson) {
-		bfill.emit_p(PSTR("{\"logsize\":$D,\"filesize\":$D,\"log\":["), 
-			log_size, sensorlog_filesize());
+		bfill.emit_p(PSTR("{\"logtype\":$D,\"logsize\":$D,\"filesize\":$D,\"log\":["), 
+			log, log_size, sensorlog_filesize(log));
 	} else {
-		bfill.emit_p(PSTR("nr;type;time;nativedata;data;unit;unitid\r\n"));
+		if (shortcsv)
+			bfill.emit_p(PSTR("nr;time;data\r\n"));
+		else
+			bfill.emit_p(PSTR("nr;type;time;nativedata;data;unit;unitid\r\n"));
 	}
 
+	#define BLOCKSIZE 64
 	ulong count = 0;
- 	SensorLog_t sensorlog;
+ 	SensorLog_t *sensorlog = (SensorLog_t*)malloc(sizeof(SensorLog_t)*BLOCKSIZE);
 	Sensor_t *sensor = NULL;
 
 	//lastHours: find limit for this
@@ -2349,10 +2363,10 @@ void server_sensorlog_list(OTF_PARAMS_DEF) {
 		ulong lastIdx = 0;
 		while (true) {
 			ulong idx = (b-a)/2+a;
-			sensorlog_load(idx, &sensorlog);
-			if (sensorlog.time < after) {
+			sensorlog_load(log, idx, sensorlog);
+			if (sensorlog->time < after) {
 				a = idx;
-			} else if (sensorlog.time > after) {
+			} else if (sensorlog->time > after) {
 				b = idx;
 			}
 			if (a >= b || idx == lastIdx) break;
@@ -2361,60 +2375,74 @@ void server_sensorlog_list(OTF_PARAMS_DEF) {
 		startAt = lastIdx;
 	}
 
-	for (ulong idx = startAt; idx < log_size; idx++) {
-		sensorlog_load(idx, &sensorlog);
+	uint sensor_type = 0;
 
-		if (nr && sensorlog.nr != nr)
-			continue;
+	ulong idx = startAt; 
+	while (idx < log_size) {
+		int n = sensorlog_load2(log, idx, BLOCKSIZE, sensorlog);
+		if (n <= 0) break;
 
-		if (after && sensorlog.time <= after)
-			continue;
+		for (int i = 0; i < n; i++) {
+			idx++;
+			if (nr && sensorlog[i].nr != nr)
+				continue;
 
-		if (before && sensorlog.time >= before)
-			continue;
+			if (after && sensorlog[i].time <= after)
+				continue;
 
-		if (!sensor || sensor->nr != sensorlog.nr)
-			sensor = sensor_by_nr(sensorlog.nr);
-		uint sensor_type = sensor?sensor->type:0;
-		if (type && sensor_type != type)
-			continue;
+			if (before && sensorlog[i].time >= before)
+				continue;
+
+			if (!shortcsv || type) {
+				if (!sensor || sensor->nr != sensorlog[i].nr)
+					sensor = sensor_by_nr(sensorlog[i].nr);
+				sensor_type = sensor?sensor->type:0;
+				if (type && sensor_type != type)
+					continue;
+			}
 		
-		if (count > 0 && isjson) {
-			bfill.emit_p(PSTR(","));
-		}
+			if (count > 0 && isjson) {
+				bfill.emit_p(PSTR(","));
+			}
 
-		if (isjson) {
-			bfill.emit_p(PSTR("{\"nr\":$D,\"type\":$D,\"time\":$L,\"nativedata\":$L,\"data\":$E,\"unit\":\"$S\",\"unitid\":$D}"),
-				sensorlog.nr,          //sensor-nr
+			if (isjson) {
+				bfill.emit_p(PSTR("{\"nr\":$D,\"type\":$D,\"time\":$L,\"nativedata\":$L,\"data\":$E,\"unit\":\"$S\",\"unitid\":$D}"),
+				sensorlog[i].nr,          //sensor-nr
 				sensor_type,           //sensor-type
-				sensorlog.time,        //timestamp
-				sensorlog.native_data, //native data
-				sensorlog.data,
+				sensorlog[i].time,        //timestamp
+				sensorlog[i].native_data, //native data
+				sensorlog[i].data,
 				getSensorUnit(sensor),
 				getSensorUnitId(sensor));
-		} else {
-			bfill.emit_p(PSTR("$D;$D;$L;$L;$E;$S;$D\r\n"),
-				sensorlog.nr,          //sensor-nr
-				sensor_type,           //sensor-type
-				sensorlog.time,        //timestamp
-				sensorlog.native_data, //native data
-				sensorlog.data,
-				getSensorUnit(sensor),
-				getSensorUnitId(sensor));
+			} else {
+				if (shortcsv)
+					bfill.emit_p(PSTR("$D;$L;$E\r\n"),
+						sensorlog[i].nr,          //sensor-nr
+						sensorlog[i].time,        //timestamp
+						sensorlog[i].data);
+				else
+					bfill.emit_p(PSTR("$D;$D;$L;$L;$E;$S;$D\r\n"),
+						sensorlog[i].nr,          //sensor-nr
+						sensor_type,           //sensor-type
+						sensorlog[i].time,        //timestamp
+						sensorlog[i].native_data, //native data
+						sensorlog[i].data,
+						getSensorUnit(sensor),
+						getSensorUnitId(sensor));
+			}
+			// if available ether buffer is getting small
+			// send out a packet
+			if(available_ether_buffer() <= 0) {
+				send_packet(OTF_PARAMS);
+			}
+			if (++count >= maxResults)
+				break;
 		}
-
- 
-		// if available ether buffer is getting small
-		// send out a packet
-		if(available_ether_buffer() <= 0) {
-			send_packet(OTF_PARAMS);
-		}
-		if (++count >= maxResults)
-			break;
 	}
 
 	if (isjson)
 		bfill.emit_p(PSTR("]}"));
+	free(sensorlog);
 
 	handle_return(HTML_OK);	
 }
@@ -2430,6 +2458,9 @@ void server_sensorlog_clear(OTF_PARAMS_DEF) {
 #else
 	char *p = get_buffer;
 #endif
+	int log = -1;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("log"), true)) // Filter log for sensor-nr
+		log = atoi(tmp_buffer); 
 
 	DEBUG_PRINTLN(F("server_sensorlog_clear"));
 
@@ -2442,11 +2473,19 @@ void server_sensorlog_clear(OTF_PARAMS_DEF) {
 	print_header();
 #endif
 
-	ulong log_size = sensorlog_size();
+	ulong log_size = sensorlog_size(LOG_STD);
+	ulong log_sizeW = sensorlog_size(LOG_WEEK);
+	ulong log_sizeM = sensorlog_size(LOG_MONTH);
 
-	sensorlog_clear_all();
+	if (log == -1) {
+		sensorlog_clear_all();
+		bfill.emit_p(PSTR("{\"deleted\":$L,\"deleted_week\":$L,\"deleted_month\":$L}"), log_size, log_sizeW, log_sizeM);
+	}
+	else {
+		sensorlog_clear(log==LOG_STD, log==LOG_WEEK, log==LOG_MONTH);
+		bfill.emit_p(PSTR("{\"deleted\":$L}"), log==LOG_STD?log_size:log=LOG_WEEK?log_sizeW:log_sizeM);
+	}
 
-	bfill.emit_p(PSTR("{\"deleted\":$L}"), log_size);
 
 	handle_return(HTML_OK);
 }
