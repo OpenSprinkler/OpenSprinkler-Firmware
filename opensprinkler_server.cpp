@@ -2205,7 +2205,7 @@ void sensorconfig_json(OTF_PARAMS_DEF) {
 
 		if (first) first = false; else bfill.emit_p(PSTR(","));
 
-		bfill.emit_p(PSTR("{\"nr\":$D,\"type\":$D,\"group\":$D,\"name\":\"$S\",\"ip\":$L,\"port\":$D,\"id\":$D,\"ri\":$D,\"nativedata\":$L,\"data\":$E,\"unit\":\"$S\",\"unitid\":$D,\"enable\":$D,\"log\":$D,\"show\":$D,\"last\":$L}"),
+		bfill.emit_p(PSTR("{\"nr\":$D,\"type\":$D,\"group\":$D,\"name\":\"$S\",\"ip\":$L,\"port\":$D,\"id\":$D,\"ri\":$D,\"nativedata\":$L,\"data\":$E,\"unit\":\"$S\",\"unitid\":$D,\"enable\":$D,\"log\":$D,\"show\":$D,\"data_ok\":$D,\"last\":$L}"),
 			sensor->nr, 
 			sensor->type,
 			sensor->group,
@@ -2221,6 +2221,7 @@ void sensorconfig_json(OTF_PARAMS_DEF) {
 			sensor->flags.enable,
 			sensor->flags.log,
 			sensor->flags.show,
+			sensor->flags.data_ok,
 			sensor->last_read);
 		// if available ether buffer is getting small
 		// send out a packet

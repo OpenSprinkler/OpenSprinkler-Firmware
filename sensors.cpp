@@ -448,9 +448,11 @@ void calc_sensorlogs()
 	if (log_size == 0)
 		return;
 
+	SensorLog_t *sensorlog = NULL;
+
 	if (time >= next_week_calc) {
 		DEBUG_PRINTLN(F("calc_sensorlogs WEEK start"));
-		SensorLog_t *sensorlog = (SensorLog_t*)malloc(sizeof(SensorLog_t)*BLOCKSIZE);
+		sensorlog = (SensorLog_t*)malloc(sizeof(SensorLog_t)*BLOCKSIZE);
 		ulong size = sensorlog_size(LOG_WEEK);
 		if (size == 0) {
 			sensorlog_load(LOG_STD, 0, sensorlog);
@@ -492,11 +494,11 @@ void calc_sensorlogs()
 					}
 					if (n > 0)
 					{
-						sensorlog.nr = sensor->nr;
-						sensorlog.time = fromdate;
-						sensorlog.data = data / (double)n;
-						sensorlog.native_data = 0;
-						sensorlog_add(LOG_WEEK, &sensorlog);
+						sensorlog->nr = sensor->nr;
+						sensorlog->time = fromdate;
+						sensorlog->data = data / (double)n;
+						sensorlog->native_data = 0;
+						sensorlog_add(LOG_WEEK, sensorlog);
 					}
 				}
 				sensor = sensor->next;
@@ -509,7 +511,10 @@ void calc_sensorlogs()
 	}
 
 	if (time >= next_month_calc) {
-		SensorLog_t sensorlog;
+
+		if (!sensorlog)
+			sensorlog = (SensorLog_t*)malloc(sizeof(SensorLog_t)*BLOCKSIZE);
+		
 		log_size = sensorlog_size(LOG_WEEK);
 		if (log_size <= 0)
 			return;
@@ -518,13 +523,13 @@ void calc_sensorlogs()
 		ulong size = sensorlog_size(LOG_MONTH);
 		if (size == 0)
 		{
-			sensorlog_load(LOG_WEEK, 0, &sensorlog);
-			last_day = sensorlog.time;
+			sensorlog_load(LOG_WEEK, 0, sensorlog);
+			last_day = sensorlog->time;
 		}
 		else
 		{
-			sensorlog_load(LOG_MONTH, size - 1, &sensorlog); // last record
-			last_day = sensorlog.time + CALCRANGE_MONTH;			// Skip last Range
+			sensorlog_load(LOG_MONTH, size - 1, sensorlog); // last record
+			last_day = sensorlog->time + CALCRANGE_MONTH;			// Skip last Range
 		}
 		time_t fromdate = (last_day / CALCRANGE_MONTH) * CALCRANGE_MONTH;
 		time_t todate = fromdate + CALCRANGE_MONTH;
@@ -541,25 +546,29 @@ void calc_sensorlogs()
 					ulong idx = startidx;
 					double data = 0;
 					ulong n = 0;
-					while (idx < log_size)
-					{
-						sensorlog_load(LOG_WEEK, idx, &sensorlog);
-						if (sensorlog.time >= todate)
-							break;
-						if (sensorlog.nr == sensor->nr)
-						{
-							data += sensorlog.data;
-							n++;
+					bool done = false;
+					while (!done) {
+						int n = sensorlog_load2(LOG_WEEK, idx, BLOCKSIZE, sensorlog);
+						if (n <= 0) break;
+						for (int i = 0; i < n; i++) {
+							idx++;
+							if (sensorlog[i].time >= todate) {
+								done = true;
+								break;
+							}
+							if (sensorlog[i].nr == sensor->nr) {
+								data += sensorlog[i].data;
+								n++;
+							}
 						}
-						idx++;
 					}
 					if (n > 0)
 					{
-						sensorlog.nr = sensor->nr;
-						sensorlog.time = fromdate;
-						sensorlog.data = data / (double)n;
-						sensorlog.native_data = 0;
-						sensorlog_add(LOG_MONTH, &sensorlog);
+						sensorlog->nr = sensor->nr;
+						sensorlog->time = fromdate;
+						sensorlog->data = data / (double)n;
+						sensorlog->native_data = 0;
+						sensorlog_add(LOG_MONTH, sensorlog);
 					}
 				}
 				sensor = sensor->next;
@@ -570,6 +579,8 @@ void calc_sensorlogs()
 		next_month_calc = todate;
 		DEBUG_PRINTLN(F("calc_sensorlogs MONTH end"));
 	}
+	if (sensorlog)
+		free(sensorlog);
 }
 
 void read_all_sensors() {
