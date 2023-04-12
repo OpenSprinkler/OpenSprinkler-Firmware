@@ -2360,7 +2360,7 @@ void server_sensorlog_list(OTF_PARAMS_DEF) {
 		DEBUG_PRINTLN(F("lastHours"));
 
 		ulong a = 0;
-		ulong b = (log_size-1) / 2;
+		ulong b = log_size-1;
 		ulong lastIdx = 0;
 		while (true) {
 			ulong idx = (b-a)/2+a;

@@ -251,14 +251,15 @@ ulong file_size(const char *fn) {
 }
 
 // file functions
-void file_read_block(const char *fn, void *dst, ulong pos, ulong len) {
+ulong file_read_block(const char *fn, void *dst, ulong pos, ulong len) {
+	ulong result = 0;
 #if defined(ESP8266)
 
 	// do not use File.readBytes or readBytesUntil because it's very slow
 	File f = LittleFS.open(fn, "r");
 	if(f) {
 		f.seek(pos, SeekSet);
-		f.read((byte*)dst, len);
+		result = f.read((byte*)dst, len);
 		f.close();
 	}
 
@@ -268,7 +269,7 @@ void file_read_block(const char *fn, void *dst, ulong pos, ulong len) {
 	SdFile file;
 	if(file.open(fn, O_READ)) {
 		file.seekSet(pos);
-		file.read(dst, len);
+		result = file.read(dst, len);
 		file.close();
 	}
 
@@ -277,11 +278,12 @@ void file_read_block(const char *fn, void *dst, ulong pos, ulong len) {
 	FILE *fp = fopen(get_filename_fullpath(fn), "rb");
 	if(fp) {
 		fseek(fp, pos, SEEK_SET);
-		fread(dst, 1, len, fp);
+		result = fread(dst, 1, len, fp);
 		fclose(fp);
 	}
 
 #endif
+	return result;
 }
 
 void file_write_block(const char *fn, const void *src, ulong pos, ulong len) {

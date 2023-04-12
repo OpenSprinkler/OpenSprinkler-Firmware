@@ -400,16 +400,14 @@ int sensorlog_load2(uint8_t log, ulong idx, int count, SensorLog_t* sensorlog) {
 		f = flast;
 	}
 
-	file_read_block(f, sensorlog, idx * SENSORLOG_STORE_SIZE, count * SENSORLOG_STORE_SIZE);
-	if (idx+count > size)
-		count = size-idx;
-	return count;
+	ulong result = file_read_block(f, sensorlog, idx * SENSORLOG_STORE_SIZE, count * SENSORLOG_STORE_SIZE);
+	return result / SENSORLOG_STORE_SIZE; 
 }
 
 ulong findLogPosition(uint8_t log, ulong after) {
 	ulong log_size = sensorlog_size(log);
 	ulong a = 0;
-	ulong b = (log_size-1) / 2;
+	ulong b = log_size-1;
 	ulong lastIdx = 0;
 	SensorLog_t sensorlog;
 	while (true) {
@@ -442,13 +440,14 @@ void calc_sensorlogs()
 	if (!sensors || timeStatus() != timeSet)
 		return;
 
-	time_t time = os.now_tz();
-	time_t last_day = time;
 	ulong log_size = sensorlog_size(LOG_STD);
 	if (log_size == 0)
 		return;
 
 	SensorLog_t *sensorlog = NULL;
+
+	time_t time = os.now_tz();
+	time_t last_day = time;
 
 	if (time >= next_week_calc) {
 		DEBUG_PRINTLN(F("calc_sensorlogs WEEK start"));
@@ -923,17 +922,17 @@ int read_sensor_ip(Sensor_t *sensor) {
 			{
 				case SENSOR_SMT100_MODBUS_RTU_MOIS: //Equation: soil moisture [vol.%]= (16Bit_soil_moisture_value / 100)
 					sensor->last_data = ((double)sensor->last_native_data / 100);
-					sensor->flags.data_ok = true;
+					sensor->flags.data_ok = sensor->last_native_data < 10000;
 					DEBUG_PRINT(F(" soil moisture %: "));
 					break;
 				case SENSOR_SMT100_MODBUS_RTU_TEMP:	//Equation: temperature [°C]= (16Bit_temperature_value / 100)-100
 					sensor->last_data = ((double)sensor->last_native_data / 100) - 100;
-					sensor->flags.data_ok = true;
+					sensor->flags.data_ok = sensor->last_native_data > 7000;
 					DEBUG_PRINT(F(" temperature °C: "));
 					break;
 			}
 			DEBUG_PRINTLN(sensor->last_data);
-			return HTTP_RQT_SUCCESS;
+			return sensor->flags.data_ok?HTTP_RQT_SUCCESS:HTTP_RQT_NOT_RECEIVED;
 	}
 
 	return HTTP_RQT_NOT_RECEIVED;
