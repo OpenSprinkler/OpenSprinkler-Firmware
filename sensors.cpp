@@ -292,7 +292,7 @@ bool sensorlog_add(uint8_t log, SensorLog_t *sensorlog) {
 		file_append_block(getlogfile(log), sensorlog, SENSORLOG_STORE_SIZE);
 		checkLogSwitchAfterWrite(log);
 		DEBUG_PRINT(F("="));
-		DEBUG_PRINT(sensorlog_filesize(log));
+		DEBUG_PRINTLN(sensorlog_filesize(log));
 		return true;
 #if defined(ESP8266)		
 	}
@@ -418,10 +418,10 @@ ulong findLogPosition(uint8_t log, ulong after) {
 		} else if (sensorlog.time > after) {
 			b = idx;
 		}
-		if (a >= b || idx == lastIdx) break;
+		if (a >= b || idx == lastIdx) return idx;
 		lastIdx = idx;
 	}
-	return lastIdx;
+	return 0;
 }
 
 // 1/4 of a day: 6*60*60
@@ -477,9 +477,9 @@ void calc_sensorlogs()
 					ulong n = 0;
 					bool done = false;
 					while (!done) {
-						int n = sensorlog_load2(LOG_STD, idx, BLOCKSIZE, sensorlog);
-						if (n <= 0) break;
-						for (int i = 0; i < n; i++) {
+						int sn = sensorlog_load2(LOG_STD, idx, BLOCKSIZE, sensorlog);
+						if (sn <= 0) break;
+						for (int i = 0; i < sn; i++) {
 							idx++;
 							if (sensorlog[i].time >= todate) {
 								done = true;
@@ -547,9 +547,9 @@ void calc_sensorlogs()
 					ulong n = 0;
 					bool done = false;
 					while (!done) {
-						int n = sensorlog_load2(LOG_WEEK, idx, BLOCKSIZE, sensorlog);
-						if (n <= 0) break;
-						for (int i = 0; i < n; i++) {
+						int sn = sensorlog_load2(LOG_WEEK, idx, BLOCKSIZE, sensorlog);
+						if (sn <= 0) break;
+						for (int i = 0; i < sn; i++) {
 							idx++;
 							if (sensorlog[i].time >= todate) {
 								done = true;
