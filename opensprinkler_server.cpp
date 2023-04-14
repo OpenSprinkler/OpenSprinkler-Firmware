@@ -2129,11 +2129,7 @@ void server_sensor_get(OTF_PARAMS_DEF) {
 			getSensorUnit(sensor),
 			getSensorUnitId(sensor),
 			sensor->last_read);
-		// if available ether buffer is getting small
-		// send out a packet
-		if(available_ether_buffer() <= 0) {
-			send_packet(OTF_PARAMS);
-		}
+		send_packet(OTF_PARAMS);
 	}
 	bfill.emit_p(PSTR("]}"));
 	handle_return(HTML_OK);
@@ -2187,11 +2183,7 @@ void server_sensor_readnow(OTF_PARAMS_DEF) {
 			getSensorUnit(sensor),
 			getSensorUnitId(sensor));
 
-		// if available ether buffer is getting small
-		// send out a packet
-		if(available_ether_buffer() <= 0) {
-			send_packet(OTF_PARAMS);
-		}
+		send_packet(OTF_PARAMS);
 	}
 	bfill.emit_p(PSTR("]}"));
 	handle_return(HTML_OK);
@@ -2223,11 +2215,7 @@ void sensorconfig_json(OTF_PARAMS_DEF) {
 			sensor->flags.show,
 			sensor->flags.data_ok,
 			sensor->last_read);
-		// if available ether buffer is getting small
-		// send out a packet
-		if(available_ether_buffer() <= 0) {
-			send_packet(OTF_PARAMS);
-		}
+		send_packet(OTF_PARAMS);
 	}
 }
 
@@ -2433,12 +2421,12 @@ void server_sensorlog_list(OTF_PARAMS_DEF) {
 			}
 			// if available ether buffer is getting small
 			// send out a packet
-			if(available_ether_buffer() <= 0) {
-				send_packet(OTF_PARAMS);
-			}
-			if (++count >= maxResults)
+			if (count++ >= maxResults)
 				break;
+			send_packet(OTF_PARAMS);
 		}
+		if (count >= maxResults)
+			break;
 	}
 
 	if (isjson)
@@ -2636,11 +2624,7 @@ void server_sensorprog_list(OTF_PARAMS_DEF) {
 		if (count++ > 0)
 			bfill.emit_p(PSTR(","));
 		progconfig_json(p, current);
-		// if available ether buffer is getting small
-		// send out a packet
-		if(available_ether_buffer() <= 0) {
-			send_packet(OTF_PARAMS);
-		}
+		send_packet(OTF_PARAMS);
 	}
 	bfill.emit_p(PSTR("]}"));
 	handle_return(HTML_OK);
@@ -2722,12 +2706,7 @@ void server_sensor_types(OTF_PARAMS_DEF) {
 		byte unitid = getSensorUnitId(sensor_types[i]);
 		bfill.emit_p(PSTR("{\"type\":$D,\"name\":\"$S\",\"unit\":\"$S\",\"unitid\":$D}"), 
 			sensor_types[i], sensor_names[i], sensor_unitNames[unitid], unitid);
-		
-		// if available ether buffer is getting small
-		// send out a packet
-		if(available_ether_buffer() <= 0) {
-			send_packet(OTF_PARAMS);
-		}
+		send_packet(OTF_PARAMS);
 	}
 	bfill.emit_p(PSTR("]}"));
 
@@ -2851,11 +2830,7 @@ void server_sensorprog_types(OTF_PARAMS_DEF) {
 			bfill.emit_p(PSTR(","));
 		bfill.emit_p(PSTR("{\"type\":$D,\"name\":\"$S\"}"), prog_types[i], prog_names[i]);
 
-		// if available ether buffer is getting small
-		// send out a packet
-		if(available_ether_buffer() <= 0) {
-			send_packet(OTF_PARAMS);
-		}
+		send_packet(OTF_PARAMS);
 	}
 	bfill.emit_p(PSTR("]}"));
 
