@@ -369,7 +369,7 @@ SensorLog_t *sensorlog_load(uint8_t log, ulong idx, SensorLog_t* sensorlog) {
 	checkLogSwitch(log);
 	const char *flast = getlogfile2(log);
 	const char *fcur = getlogfile(log);
-	ulong size = (logFileSwitch[log]==1?file_size(getlogfile2(log)):file_size(getlogfile(log))) / SENSORLOG_STORE_SIZE;
+	ulong size = file_size(flast) / SENSORLOG_STORE_SIZE;
 	const char *f;
 	if (idx >= size) {
 		idx -= size;
@@ -389,19 +389,22 @@ int sensorlog_load2(uint8_t log, ulong idx, int count, SensorLog_t* sensorlog) {
 	checkLogSwitch(log);
 	const char *flast = getlogfile2(log);
 	const char *fcur = getlogfile(log);
-	bool sw = logFileSwitch[log]==1;
-	ulong size = file_size(sw?getlogfile2(log):getlogfile(log)) / SENSORLOG_STORE_SIZE;
+	ulong size = file_size(flast) / SENSORLOG_STORE_SIZE;
 	const char *f;
 	if (idx >= size) {
 		idx -= size;
 		f = fcur;
-		size = file_size(sw?getlogfile(log):getlogfile2(log)) / SENSORLOG_STORE_SIZE;
+		size = file_size(f) / SENSORLOG_STORE_SIZE;
 	} else {
 		f = flast;
 	}
 
-	ulong result = file_read_block(f, sensorlog, idx * SENSORLOG_STORE_SIZE, count * SENSORLOG_STORE_SIZE);
-	return result / SENSORLOG_STORE_SIZE; 
+	if (idx+count > size)
+		count = size-idx;
+	if (count <= 0)
+		return 0;
+	file_read_block(f, sensorlog, idx * SENSORLOG_STORE_SIZE, count * SENSORLOG_STORE_SIZE);
+	return count; 
 }
 
 ulong findLogPosition(uint8_t log, ulong after) {
