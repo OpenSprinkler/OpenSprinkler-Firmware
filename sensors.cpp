@@ -26,6 +26,9 @@
 #include "OpenSprinkler.h"
 #include "opensprinkler_server.h"
 #include "sensors.h"
+#include "weather.h"
+
+byte findKeyVal (const char *str,char *strbuf, uint16_t maxlen,const char *key,bool key_in_pgm=false,uint8_t *keyfound=NULL);
 
 //All sensors:
 static Sensor_t *sensors = NULL;
@@ -34,10 +37,18 @@ static Sensor_t *sensors = NULL;
 static ProgSensorAdjust_t *progSensorAdjusts = NULL;
 
 const char*   sensor_unitNames[] {
-	"", "%", "°C", "°F", "V",
-//   0   1     2     3    4
+	"", "%", "°C", "°F", "V", "%", "in", "mm", "mph", "kmh"
+//   0   1     2     3    4    5     6      7      8      9
 };
 byte logFileSwitch[3] = {0,0,0}; //0=use smaller File, 1=LOG1, 2=LOG2
+
+//Weather
+time_t last_weather_time = 0;
+bool current_weather_ok = false;
+double current_temp = 0.0;
+double current_humidity = 0.0;
+double current_precip = 0.0;
+double current_wind = 0.0;
 
 uint16_t CRC16 (byte buf[], int len) {
 	uint16_t crc = 0xFFFF;
@@ -981,6 +992,56 @@ int read_sensor(Sensor_t *sensor) {
 			sensor->last_read = time;
 			return read_sensor_http(sensor);
 
+		case SENSOR_WEATHER_TEMP_F:
+		case SENSOR_WEATHER_TEMP_C: 
+		case SENSOR_WEATHER_HUM:
+		case SENSOR_WEATHER_PRECIP_IN:
+		case SENSOR_WEATHER_PRECIP_MM:
+		case SENSOR_WEATHER_WIND_MPH:
+		case SENSOR_WEATHER_WIND_KMH:
+		{
+			GetSensorWeather();
+			if (current_weather_ok) {
+				sensor->last_read = time;
+				sensor->last_native_data = 0;
+				sensor->flags.data_ok = 1;
+
+				switch(sensor->type)
+				{
+					case SENSOR_WEATHER_TEMP_F: {
+						sensor->last_data = current_temp;
+						break;
+					}
+					case SENSOR_WEATHER_TEMP_C: {
+						sensor->last_data = (current_temp - 32.0) / 1.8;
+						break;
+					}
+					case SENSOR_WEATHER_HUM: {
+						sensor->last_data = current_humidity;
+						break;
+					}
+					case SENSOR_WEATHER_PRECIP_IN: {
+						sensor->last_data = current_precip;
+						break;
+					}
+					case SENSOR_WEATHER_PRECIP_MM: {
+						sensor->last_data = current_precip * 25.4;
+						break;
+					}
+					case SENSOR_WEATHER_WIND_MPH: {
+						sensor->last_data = current_wind;
+						break;
+					}
+					case SENSOR_WEATHER_WIND_KMH: {
+						sensor->last_data = current_wind * 1.609344;
+						break;
+					}
+				}				
+				return HTTP_RQT_SUCCESS;
+			}
+			return HTTP_RQT_NOT_RECEIVED;
+		}
+
 		default: return HTTP_RQT_NOT_RECEIVED;
 	}
 }
@@ -1431,6 +1492,14 @@ byte getSensorUnitId(int type) {
 #endif
 		case SENSOR_OSPI_ANALOG_INPUTS: 	  return UNIT_VOLT;
 
+		case SENSOR_WEATHER_TEMP_F:           return UNIT_FAHRENHEIT;
+		case SENSOR_WEATHER_TEMP_C:           return UNIT_DEGREE;
+		case SENSOR_WEATHER_HUM:              return UNIT_HUM_PERCENT;
+		case SENSOR_WEATHER_PRECIP_IN:        return UNIT_INCH;
+		case SENSOR_WEATHER_PRECIP_MM:        return UNIT_MM;
+		case SENSOR_WEATHER_WIND_MPH:         return UNIT_MPH;
+		case SENSOR_WEATHER_WIND_KMH:         return UNIT_KMH;
+
 		default: return UNIT_NONE;
 	}
 }
@@ -1457,6 +1526,14 @@ byte getSensorUnitId(Sensor_t *sensor) {
 		case SENSOR_OSPI_ANALOG_INPUTS: 	  return UNIT_VOLT;
 		case SENSOR_REMOTE:                	  return sensor->unitid;
 
+		case SENSOR_WEATHER_TEMP_F:           return UNIT_FAHRENHEIT;
+		case SENSOR_WEATHER_TEMP_C:           return UNIT_DEGREE;
+		case SENSOR_WEATHER_HUM:              return UNIT_HUM_PERCENT;
+		case SENSOR_WEATHER_PRECIP_IN:        return UNIT_INCH;
+		case SENSOR_WEATHER_PRECIP_MM:        return UNIT_MM;
+		case SENSOR_WEATHER_WIND_MPH:         return UNIT_MPH;
+		case SENSOR_WEATHER_WIND_KMH:         return UNIT_KMH;
+
 		case SENSOR_GROUP_MIN:
 		case SENSOR_GROUP_MAX:             
 		case SENSOR_GROUP_AVG:             
@@ -1476,5 +1553,98 @@ byte getSensorUnitId(Sensor_t *sensor) {
 			}
 
 		default: return UNIT_NONE;
+	}
+}
+
+void GetSensorWeather() {
+#if defined(ESP8266)
+	if (!useEth)
+		if (os.state!=OS_STATE_CONNECTED || WiFi.status()!=WL_CONNECTED) return;
+#endif
+	time_t time = os.now_tz();
+	if (last_weather_time == 0)
+		last_weather_time = time - 59*60;
+
+	if (time < last_weather_time + 60*60)
+		return;
+
+	// use temp buffer to construct get command
+	BufferFiller bf = tmp_buffer;
+	bf.emit_p(PSTR("weatherData?loc=$O"), SOPT_LOCATION);
+
+	char *src=tmp_buffer+strlen(tmp_buffer);
+	char *dst=tmp_buffer+TMP_BUFFER_SIZE-12;
+
+	char c;
+	// url encode. convert SPACE to %20
+	// copy reversely from the end because we are potentially expanding
+	// the string size
+	while(src!=tmp_buffer) {
+		c = *src--;
+		if(c==' ') {
+			*dst-- = '0';
+			*dst-- = '2';
+			*dst-- = '%';
+		} else {
+			*dst-- = c;
+		}
+	};
+	*dst = *src;
+
+	strcpy(ether_buffer, "GET /");
+	strcat(ether_buffer, dst);
+	// because dst is part of tmp_buffer,
+	// must load weather url AFTER dst is copied to ether_buffer
+
+	// load weather url to tmp_buffer
+	char *host = tmp_buffer;
+	os.sopt_load(SOPT_WEATHERURL, host);
+
+	strcat(ether_buffer, " HTTP/1.0\r\nHOST: ");
+	strcat(ether_buffer, host);
+	strcat(ether_buffer, "\r\n\r\n");
+
+	DEBUG_PRINTLN(F("GetSensorWeather"));
+	DEBUG_PRINTLN(ether_buffer);
+
+	int ret = os.send_http_request(host, ether_buffer, NULL);
+	if(ret == HTTP_RQT_SUCCESS) {
+		last_weather_time = time;
+		DEBUG_PRINTLN(ether_buffer);
+
+		char buf[20];
+		char *s = strstr(ether_buffer, "\"temp\":");
+		if (s && extract(s, buf, sizeof(buf))) {
+			current_temp = atof(buf);
+		}
+		s = strstr(ether_buffer, "\"humidity\":");
+		if (s && extract(s, buf, sizeof(buf))) {
+			current_humidity = atof(buf);
+		}
+		s = strstr(ether_buffer, "\"precip\":");
+		if (s && extract(s, buf, sizeof(buf))) {
+			current_precip = atof(buf);
+		}
+		s = strstr(ether_buffer, "\"wind\":");
+		if (s && extract(s, buf, sizeof(buf))) {
+			current_wind = atof(buf);
+		}
+		char tmp[10];
+		DEBUG_PRINT("temp: ");
+		dtostrf(current_temp, 2, 2, tmp);
+		DEBUG_PRINTLN(tmp)
+		DEBUG_PRINT("humidity: ");
+		dtostrf(current_humidity, 2, 2, tmp);
+		DEBUG_PRINTLN(tmp)
+		DEBUG_PRINT("precip: ");
+		dtostrf(current_precip, 2, 2, tmp);
+		DEBUG_PRINTLN(tmp)
+		DEBUG_PRINT("wind: ");
+		dtostrf(current_wind, 2, 2, tmp);
+		DEBUG_PRINTLN(tmp)
+
+		current_weather_ok = true;
+	} else {
+		current_weather_ok = false;
 	}
 }

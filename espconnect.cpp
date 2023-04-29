@@ -22,6 +22,7 @@
 #include "espconnect.h"
 
 String scan_network() {
+	WiFi.setOutputPower(20.5);
 	WiFi.mode(WIFI_STA);
 	WiFi.disconnect();
 	byte n = WiFi.scanNetworks();
@@ -51,6 +52,7 @@ String scan_network() {
 
 void start_network_ap(const char *ssid, const char *pass) {
 	if(!ssid) return;
+	WiFi.setOutputPower(20.5);
 	if(pass) WiFi.softAP(ssid, pass);
 	else WiFi.softAP(ssid);
 	WiFi.mode(WIFI_AP_STA); // start in AP_STA mode
@@ -59,12 +61,14 @@ void start_network_ap(const char *ssid, const char *pass) {
 
 void start_network_sta_with_ap(const char *ssid, const char *pass, int32_t channel, const byte *bssid) {
 	if(!ssid || !pass) return;
+	WiFi.setOutputPower(20.5);
 	if(WiFi.getMode()!=WIFI_AP_STA) WiFi.mode(WIFI_AP_STA);
 	WiFi.begin(ssid, pass, channel, bssid);
 }
 
 void start_network_sta(const char *ssid, const char *pass, int32_t channel, const byte *bssid) {
 	if(!ssid || !pass) return;
+	WiFi.setOutputPower(20.5);
 	if(WiFi.getMode()!=WIFI_STA) WiFi.mode(WIFI_STA);
 	WiFi.begin(ssid, pass, channel, bssid);
 }

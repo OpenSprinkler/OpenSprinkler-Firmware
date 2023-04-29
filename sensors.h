@@ -72,6 +72,13 @@
 #endif
 #define SENSOR_OSPI_ANALOG_INPUTS         50  //Old OSPi analog input
 #define SENSOR_REMOTE                     100 //Remote sensor of an remote opensprinkler
+#define SENSOR_WEATHER_TEMP_F             101 //Weather service - temperature (Fahrenheit)
+#define SENSOR_WEATHER_TEMP_C             102 //Weather service - temperature (Celcius)
+#define SENSOR_WEATHER_HUM                103 //Weather service - humidity (%)
+#define SENSOR_WEATHER_PRECIP_IN          105 //Weather service - precip (inch)
+#define SENSOR_WEATHER_PRECIP_MM          106 //Weather service - precip (mm)
+#define SENSOR_WEATHER_WIND_MPH           107 //Weather service - wind (mph)
+#define SENSOR_WEATHER_WIND_KMH           108 //Weather service - wind (kmh)
 
 #define SENSOR_GROUP_MIN               1000   //Sensor group with min value
 #define SENSOR_GROUP_MAX               1001   //Sensor group with max value
@@ -149,11 +156,16 @@ typedef struct ProgSensorAdjust {
 } ProgSensorAdjust_t;
 #define PROGSENSOR_STORE_SIZE (sizeof(ProgSensorAdjust_t)-sizeof(ProgSensorAdjust_t*))
 
-#define UNIT_NONE       0
-#define UNIT_PERCENT    1
-#define UNIT_DEGREE     2
-#define UNIT_FAHRENHEIT 3
-#define UNIT_VOLT       4
+#define UNIT_NONE        0
+#define UNIT_PERCENT     1
+#define UNIT_DEGREE      2
+#define UNIT_FAHRENHEIT  3
+#define UNIT_VOLT        4
+#define UNIT_HUM_PERCENT 5
+#define UNIT_INCH        6
+#define UNIT_MM          7
+#define UNIT_MPH         8
+#define UNIT_KMH         9
 
 //Unitnames
 extern const char* sensor_unitNames[];
@@ -212,6 +224,8 @@ ProgSensorAdjust_t *prog_adjust_by_nr(uint nr);
 ProgSensorAdjust_t *prog_adjust_by_idx(uint idx);
 double calc_sensor_watering(uint prog);
 double calc_sensor_watering_by_nr(uint nr);
+
+void GetSensorWeather();
 
 #if defined(ESP8266)
 ulong diskFree();
