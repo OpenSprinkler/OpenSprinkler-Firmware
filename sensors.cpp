@@ -27,6 +27,7 @@
 #include "opensprinkler_server.h"
 #include "sensors.h"
 #include "weather.h"
+#include "mqtt.h"
 
 byte findKeyVal (const char *str,char *strbuf, uint16_t maxlen,const char *key,bool key_in_pgm=false,uint8_t *keyfound=NULL);
 
@@ -596,18 +597,63 @@ void calc_sensorlogs()
 		free(sensorlog);
 }
 
+void sensor_remote_http_callback(char*) {
+//unused
+}
+
+void push_message(bool ok, Sensor_t *sensor) {
+	static char topic[TMP_BUFFER_SIZE];
+	static char payload[TMP_BUFFER_SIZE];
+	char* postval = tmp_buffer;
+
+	if (os.mqtt.enabled()) {
+		strcpy_P(topic, PSTR("opensprinkler/analogsensor/"));
+		strncat(topic, sensor->name, sizeof(topic)-1);
+		sprintf_P(payload, PSTR("{\"nr\":%u,\"type\":%u,\"data_ok\":%u,\"time\":%u,\"value\":%d.%02d,\"unit\":\"%s\"}"), 
+			sensor->nr, sensor->type, sensor->flags.data_ok, sensor->last_read, (int)sensor->last_data, (int)(sensor->last_data*100)%100, getSensorUnit(sensor));
+
+		os.mqtt.publish(topic, payload);
+	}
+	if (os.iopts[IOPT_IFTTT_ENABLE]) {
+		strcpy_P(postval, PSTR("{\"value1\":\"On site ["));
+		os.sopt_load(SOPT_DEVICE_NAME, postval+strlen(postval));
+		strcat_P(postval, PSTR("], "));
+	
+		strcat_P(postval, PSTR("analogsensor "));
+		sprintf_P(postval+strlen(postval), PSTR("nr: %u, type: %u, data_ok: %u, time: %u, value: %d.%02d, unit: %s"), 
+			sensor->nr, sensor->type, sensor->flags.data_ok, sensor->last_read, (int)sensor->last_data, (int)(sensor->last_data*100)%100, getSensorUnit(sensor));
+		strcat_P(postval, PSTR("\"}"));
+
+		//char postBuffer[1500];
+		BufferFiller bf = ether_buffer;
+		bf.emit_p(PSTR("POST /trigger/sprinkler/with/key/$O HTTP/1.0\r\n"
+						"Host: $S\r\n"
+						"Accept: */*\r\n"
+						"Content-Length: $D\r\n"
+						"Content-Type: application/json\r\n\r\n$S"),
+						SOPT_IFTTT_KEY, DEFAULT_IFTTT_URL, strlen(postval), postval);
+
+		os.send_http_request(DEFAULT_IFTTT_URL, 80, ether_buffer, sensor_remote_http_callback);
+	}			
+}
+
 void read_all_sensors() {
-	DEBUG_PRINTLN(F("read_all_sensors"));
+	//DEBUG_PRINTLN(F("read_all_sensors"));
 	if (!sensors || os.status.network_fails>0 || os.iopts[IOPT_REMOTE_EXT_MODE]) return;
 
 	ulong time = os.now_tz();
+
+	if (time < os.powerup_lasttime+30) return; //wait 30s before first sensor read
+
 	Sensor_t *sensor = sensors;
 
 	while (sensor) {
 		if (time >= sensor->last_read + sensor->read_interval) {
-			if (read_sensor(sensor) == HTTP_RQT_SUCCESS) {
+			bool ok = read_sensor(sensor) == HTTP_RQT_SUCCESS;
+			if (ok) {
 				sensorlog_add(LOG_STD, sensor, time);
 			}
+			push_message(ok, sensor);
 		}
 		sensor = sensor->next;
 	}
@@ -628,6 +674,7 @@ int read_sensor_adc(Sensor_t *sensor) {
 
 	int port = sensor->id < 4? 72 : 73;
 	int id = sensor->id % 4;
+	sensor->flags.data_ok = false;
 
 	ADS1115 adc(port);
 	bool active = adc.begin();
@@ -1004,7 +1051,7 @@ int read_sensor(Sensor_t *sensor) {
 			if (current_weather_ok) {
 				sensor->last_read = time;
 				sensor->last_native_data = 0;
-				sensor->flags.data_ok = 1;
+				sensor->flags.data_ok = true;
 
 				switch(sensor->type)
 				{
