@@ -601,7 +601,10 @@ void sensor_remote_http_callback(char*) {
 //unused
 }
 
-void push_message(bool ok, Sensor_t *sensor) {
+void push_message(Sensor_t *sensor) {
+	if (!sensor || !sensor->last_read)
+		return;
+		
 	static char topic[TMP_BUFFER_SIZE];
 	static char payload[TMP_BUFFER_SIZE];
 	char* postval = tmp_buffer;
@@ -649,11 +652,10 @@ void read_all_sensors() {
 
 	while (sensor) {
 		if (time >= sensor->last_read + sensor->read_interval) {
-			bool ok = read_sensor(sensor) == HTTP_RQT_SUCCESS;
-			if (ok) {
+			if (read_sensor(sensor) == HTTP_RQT_SUCCESS) {
 				sensorlog_add(LOG_STD, sensor, time);
 			}
-			push_message(ok, sensor);
+			push_message(sensor);
 		}
 		sensor = sensor->next;
 	}
