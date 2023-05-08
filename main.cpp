@@ -91,6 +91,7 @@ byte prev_flow_state = HIGH;
 float flow_last_gpm=0;
 
 uint32_t reboot_timer = 0;
+uint32_t ping_ok = 0;
 
 void flow_poll() {
 	#if defined(ESP8266)
@@ -1976,6 +1977,12 @@ void check_network() {
     			}
 #endif	
 				boolean failed = response.TotalSentRequests > response.TotalReceivedResponses;
+
+				//Idee: If we never received a ping response, then the gateway is blocked.
+				//      So only reboot if we failed 3 times and we never received any ping response.
+				ping_ok += response.TotalReceivedResponses;
+				if (!ping_ok)
+					return true;
 
 				if (failed)  {
 					if(os.status.network_fails<3)  os.status.network_fails++;
