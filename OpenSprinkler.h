@@ -37,16 +37,27 @@
 	#include <SPI.h>
 	#include "I2CRTC.h"
 
-	#if defined(ESP8266) // for ESP8266
+	#if defined(ESP8266) || defined(ESP32) // for ESP8266 and ESP32
 		#include <FS.h>
 		#include <LittleFS.h>
+		#if defined(ESP8266)
 		#include <ENC28J60lwIP.h>
+		#elif defined(ESP32)
+		#include <ESP32-ENC28J60.h> //this will load a different library by Tobozo
+		#endif
 		#include <RCSwitch.h>
 		#include <OpenThingsFramework.h>
 		#include <DNSServer.h>
 		#include <Ticker.h>
+		#if defined(LCD_SH1106)
+		#include "SH1106Display.h"
+		#else
 		#include "SSD1306Display.h"
+		#endif 
 		#include "espconnect.h"
+		#if defined(ESP32)
+			#include <SPIFFS.h>
+		#endif 
 	#else // for AVR
 		#include <SdFat.h>
 		#include <Ethernet.h>
@@ -67,6 +78,10 @@
 	extern ESP8266WebServer *update_server;
 	extern OTF::OpenThingsFramework *otf;
 	extern ENC28J60lwIP eth;
+	#elif defined(ESP32)
+	extern WebServer *update_server;
+	extern OTF::OpenThingsFramework *otf;
+	extern ENC28J60Class eth;
 	#else
 	extern EthernetServer *m_server;
 	#endif
@@ -167,8 +182,12 @@ class OpenSprinkler {
 public:
 
 	// data members
-#if defined(ESP8266)
-	static SSD1306Display lcd;  // 128x64 OLED display
+#if defined(ESP8266) || defined(ESP32)
+	#if defined(LCD_SH1106)
+	static SH1106Display lcd;	// 128x64 OLED display
+	#else
+	static SSD1306Display lcd;	// 128x64 OLED display
+	#endif
 #elif defined(ARDUINO)
 	static LiquidCrystal lcd;   // 16x2 character LCD
 #else
@@ -296,7 +315,7 @@ public:
 	static int8_t send_http_request(char* server_with_port, char* p, void(*callback)(char*)=NULL, uint16_t timeout=5000);
 	// -- LCD functions
 #if defined(ARDUINO) // LCD functions for Arduino
-	#if defined(ESP8266)
+	#if defined(ESP8266) || defined(ESP32)
 	static void lcd_print_pgm(PGM_P str); // ESP8266 does not allow PGM_P followed by PROGMEM
 	static void lcd_print_line_clear_pgm(PGM_P str, byte line);
 	#else
@@ -335,7 +354,7 @@ public:
 	static void lcd_set_brightness(byte value=1);
 	static void lcd_set_contrast();
 
-	#if defined(ESP8266)
+	#if defined(ESP8266) || defined(ESP32)
 	static OTCConfig otc;
 	static IOEXP *mainio, *drio;
 	static IOEXP *expanders[];
@@ -360,7 +379,7 @@ private:
 	static void lcd_start();
 	static byte button_read_busy(byte pin_butt, byte waitmode, byte butt, byte is_holding);
 
-	#if defined(ESP8266)
+	#if defined(ESP8266) || defined(ESP32)
 	static void parse_otc_config();
 	static void latch_boost();
 	static void latch_open(byte sid);

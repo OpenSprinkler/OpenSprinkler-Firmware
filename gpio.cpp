@@ -25,7 +25,7 @@
 
 #if defined(ARDUINO)
 
-#if defined(ESP8266)
+#if defined(ESP8266) || defined(ESP32)
 
 #include <Wire.h>
 #include "defines.h"
@@ -139,6 +139,68 @@ void PCF8574::i2c_write(uint8_t reg, uint16_t v) {
 	Wire.write((uint8_t)(v&0xFF) | inputmask);
 	Wire.endTransmission();
 }
+
+#if defined(ESP32)
+void BUILD_IN_GPIO::set_pins_output_mode() {
+  int i;
+  for (i=0; i<8; i++)
+    if ( on_board_gpin_list[i] != 255){
+      pinModeExt( on_board_gpin_list[i], OUTPUT);
+    }
+}
+
+void BUILD_IN_GPIO::i2c_write(uint8_t reg, uint16_t v) {
+  v = (uint8_t)(v&0xFF) | inputmask;
+  int i;
+  for (i=0; i<8; i++)
+    if ( on_board_gpin_list[i] != 255){
+      digitalWriteExt( on_board_gpin_list[i], ((v)>>(i)) & 1);
+    }
+}
+
+void IOEXP_SR::set_pins_output_mode(){
+	// shift register setup
+	// pinMode(PIN_SR_OE, OUTPUT);
+	// pull shift register OE high to disable output
+	// digitalWrite(PIN_SR_OE, HIGH);
+	pinMode(IOEXP_SR_LATCH_PIN, OUTPUT);
+	digitalWrite(IOEXP_SR_LATCH_PIN, HIGH);
+
+	pinMode(IOEXP_SR_CLK_PIN, OUTPUT);
+	digitalWrite(IOEXP_SR_CLK_PIN, HIGH);
+	pinMode(IOEXP_SR_DATA_PIN,	OUTPUT);
+	digitalWrite(IOEXP_SR_DATA_PIN, LOW);
+	
+	#if defined(SEPARATE_MASTER_VALVE)
+	// DEBUG_PRINTLN("Enabling separate master valve");
+	pinMode(SEPARATE_MASTER_VALVE,OUTPUT);
+	if ( STATION_LOGIC ) {
+		digitalWrite(SEPARATE_MASTER_VALVE,LOW);
+	} else {
+		digitalWrite(SEPARATE_MASTER_VALVE,HIGH);
+	}
+	#endif
+}
+
+
+void IOEXP_SR::i2c_write(uint8_t reg, uint16_t v){
+	v = (uint8_t)(v&0xFF) | inputmask;
+  	digitalWrite(IOEXP_SR_LATCH_PIN, LOW);
+	//byte s, sbits;
+		
+		// DEBUG_PRINT("Setting IOEXP pins: ");
+		// DEBUG_PRINTLN(v);
+		/*
+	for(s=0;s<8;s++) {
+		digitalWrite(IOEXP_SR_CLK_PIN, LOW);
+		digitalWrite(IOEXP_SR_DATA_PIN, (v & ((byte)1<<(7-s))) ? HIGH : LOW );
+	}*/
+	
+	shiftOut(IOEXP_SR_DATA_PIN, IOEXP_SR_CLK_PIN, MSBFIRST, v);
+	
+	digitalWrite(IOEXP_SR_LATCH_PIN, HIGH);
+}
+#endif
 
 #include "OpenSprinkler.h"
 

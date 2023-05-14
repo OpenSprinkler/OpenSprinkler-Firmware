@@ -50,6 +50,7 @@ typedef unsigned long ulong;
 #define HW_TYPE_LATCH        0x1A   // DC powered, for DC latching solenoids only, with boost converter and H-bridges
 #define HW_TYPE_UNKNOWN      0xFF
 
+#ifndef ESP32
 /** Data file names */
 #define IOPTS_FILENAME        "iopts.dat"   // integer options data file
 #define SOPTS_FILENAME        "sopts.dat"   // string options data file
@@ -57,6 +58,7 @@ typedef unsigned long ulong;
 #define NVCON_FILENAME        "nvcon.dat"   // non-volatile controller data file, see OpenSprinkler.h --> struct NVConData
 #define PROG_FILENAME         "prog.dat"    // program data file
 #define DONE_FILENAME         "done.dat"    // used to indicate the completion of all files
+#endif
 
 /** Station macro defines */
 #define STN_TYPE_STANDARD    0x00 // standard solenoid station
@@ -111,8 +113,10 @@ typedef unsigned long ulong;
 
 
 /** WiFi defines */
+#if ! defined(ESP32)
 #define WIFI_MODE_AP       0xA9
 #define WIFI_MODE_STA      0x2A
+#endif
 
 #define OS_STATE_INITIAL        0
 #define OS_STATE_CONNECTING     1
@@ -402,6 +406,9 @@ enum {
 	#define V2_PIN_LATCH_COMK    IOEXP_PIN+15 // latch COM- (cathode)
 	#define V2_PIN_SENSOR1       3  // sensor 1
 	#define V2_PIN_SENSOR2       10 // sensor 2
+#elif defined(ESP32)
+
+  #include "esp32.h"
 
 #elif defined(OSPI) // for OSPi
 

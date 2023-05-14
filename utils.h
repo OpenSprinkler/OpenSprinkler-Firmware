@@ -60,7 +60,7 @@ void strReplace(char *, char c, char r);
 #define MIN_ENCODED_DATE date_encode(1,1)
 #define MAX_ENCODED_DATE date_encode(12, 31)
 bool isValidDate(uint16_t date);
-#if defined(ESP8266)
+#if defined(ESP8266) || defined(ESP32)
 byte hex2dec(const char *hex);
 bool isHex(char c);
 bool isValidMAC(const char *_mac);

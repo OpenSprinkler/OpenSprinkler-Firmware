@@ -1,4 +1,4 @@
-#if defined(ESP8266)
+#if defined(ESP8266) || defined(ESP32)
 // Created by http://oleddisplay.squix.ch/ Consider a donation
 // In case of problems make sure that you are using the font file with the correct version!
 const byte Monospaced_plain_13[] PROGMEM = {

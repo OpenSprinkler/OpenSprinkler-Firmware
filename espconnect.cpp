@@ -17,9 +17,13 @@
  * along with this program.  If not, see
  * <http://www.gnu.org/licenses/>.
  */
-#if defined(ESP8266)
+#if defined(ESP8266) || defined(ESP32)
 
 #include "espconnect.h"
+
+#if  defined(ESP32)
+#include "esp32.h"
+#endif
 
 String scan_network() {
 	WiFi.mode(WIFI_STA);
@@ -66,6 +70,11 @@ void start_network_sta_with_ap(const char *ssid, const char *pass, int32_t chann
 void start_network_sta(const char *ssid, const char *pass, int32_t channel, const byte *bssid) {
 	if(!ssid || !pass) return;
 	if(WiFi.getMode()!=WIFI_STA) WiFi.mode(WIFI_STA);
+#if defined(ESP32)
+	WiFi.config(INADDR_NONE, INADDR_NONE, INADDR_NONE);
+	WiFi.setSleep(false);
+	WiFi.setHostname(MDNS_NAME);   
+#endif
 	WiFi.begin(ssid, pass, channel, bssid);
 }
 #endif

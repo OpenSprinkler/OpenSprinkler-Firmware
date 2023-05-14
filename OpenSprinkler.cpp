@@ -1,4 +1,4 @@
-/* OpenSprinkler Unified (AVR/RPI/BBB/LINUX/ESP8266) Firmware
+/* OpenSprinkler Unified (AVR/RPI/BBB/LINUX/ESP8266/ESP32) Firmware
  * Copyright (C) 2015 by Ray Wang (ray@opensprinkler.com)
  *
  * OpenSprinkler library
@@ -74,8 +74,12 @@ extern char tmp_buffer[];
 extern char ether_buffer[];
 extern ProgramData pd;
 
-#if defined(ESP8266)
-	SSD1306Display OpenSprinkler::lcd(0x3c, SDA, SCL);
+#if defined(ESP8266) || defined(ESP32) 
+	#if defined(LCD_SH1106)
+	SH1106Display OpenSprinkler::lcd(LCD_I2CADDR, SDA, SCL);
+	#else
+	SSD1306Display OpenSprinkler::lcd(LCD_I2CADDR, SDA, SCL);
+	#endif 
 	byte OpenSprinkler::state = OS_STATE_INITIAL;
 	byte OpenSprinkler::prev_station_bits[MAX_NUM_BOARDS];
 	IOEXP* OpenSprinkler::expanders[MAX_NUM_BOARDS/2];
@@ -426,7 +430,7 @@ bool detect_i2c(int addr) {
 /** read hardware MAC into tmp_buffer */
 #define MAC_CTRL_ID 0x50
 bool OpenSprinkler::load_hardware_mac(byte* buffer, bool wired) {
-#if defined(ESP8266)
+#if defined(ESP8266) || defined(ESP32)
 	WiFi.macAddress((byte*)buffer);
 	// if requesting wired Ethernet MAC, flip the last byte to create a modified MAC
 	if(wired) buffer[5] = ~buffer[5];
@@ -460,7 +464,15 @@ byte OpenSprinkler::start_network() {
 	lcd_print_line_clear_pgm(PSTR("Starting..."), 1);
 	uint16_t httpport = (uint16_t)(iopts[IOPT_HTTPPORT_1]<<8) + (uint16_t)iopts[IOPT_HTTPPORT_0];
 
-#if defined(ESP8266)
+#ifdef ENABLE_DEBUG
+#if defined(ESP32)
+  DEBUG_PRINTLN("SPIFFS dir:");
+  SPIFFS_list_dir();
+  DEBUG_PRINTLN("Starting network");
+#endif //ESP32
+#endif 
+
+#if defined(ESP8266) || defined(ESP32)
 
 	if (start_ether()) {
 		useEth = true;
@@ -478,7 +490,14 @@ byte OpenSprinkler::start_network() {
 	extern DNSServer *dns;
 	if(get_wifi_mode() == WIFI_MODE_AP) dns = new DNSServer();
 	if(update_server) { delete update_server; update_server = NULL; }
+	#if defined(ESP8266)
 	update_server = new ESP8266WebServer(8080);
+	#elif defined(ESP32)
+	MDNS.addService("_http", "_tcp", 8080 );
+	MDNS.addServiceTxt("_http", "_tcp", "path", "/");
+	//      MDNS.addService("_http", "_udp", 80 );
+	update_server = new WebServer(8080);
+	#endif
 	DEBUG_PRINT(F("Started update server"));
 	return 1;
 
@@ -499,7 +518,7 @@ byte OpenSprinkler::start_network() {
 }
 
 byte OpenSprinkler::start_ether() {
-#if defined(ESP8266)
+#if defined(ESP8266) // esp32 has no ethernet support now - todo
 	if(hw_rev<2) return 0;  // ethernet capability is only available after hw_rev 2
 
 	SPI.begin();
@@ -541,7 +560,9 @@ byte OpenSprinkler::start_ether() {
 	}
 
 	return 1;
-
+#elif defined(ESP32)
+	// no wired network support now
+	return 0;
 #else
 	Ethernet.init(PIN_ETHER_CS);  // make sure to call this before any Ethernet calls
 	if(Ethernet.hardwareStatus()==EthernetNoHardware) return 0;
@@ -569,7 +590,7 @@ byte OpenSprinkler::start_ether() {
 }
 
 bool OpenSprinkler::network_connected(void) {
-#if defined (ESP8266)
+#if defined (ESP8266) || defined(ESP32)
 	if(useEth) return true; // todo: lwip currently does not have a way to check link status
 	else
 		return (get_wifi_mode()==WIFI_MODE_STA && WiFi.status()==WL_CONNECTED && state==OS_STATE_CONNECTED);
@@ -585,7 +606,7 @@ void OpenSprinkler::reboot_dev(uint8_t cause) {
 		nvdata.reboot_cause = cause;
 		nvdata_save();
 	}
-#if defined(ESP8266)
+#if defined(ESP8266) || defined(ESP32)
 	ESP.restart();
 #else
 	resetFunc();
@@ -677,7 +698,7 @@ void OpenSprinkler::update_dev() {
 /** Initialize LCD */
 void OpenSprinkler::lcd_start() {
 
-#if defined(ESP8266)
+#if defined(ESP8266) || defined(ESP32)
 	// initialize SSD1306
 	lcd.init();
 	lcd.begin();
@@ -708,7 +729,14 @@ void OpenSprinkler::lcd_start() {
 void OpenSprinkler::begin() {
 
 #if defined(ARDUINO)
+	#if defined(ESP32)
+	if(!Wire.begin(SDA,SCL)) { DEBUG_PRINT("Error initiating I2C"); }
+	#ifdef ENABLE_DEBUG
+	scan_i2c();
+	#endif
+  	#else 
 	Wire.begin(); // init I2C
+	#endif
 #endif
 
 	hw_type = HW_TYPE_UNKNOWN;
@@ -805,7 +833,61 @@ void OpenSprinkler::begin() {
 	for(byte i=0;i<(MAX_NUM_BOARDS)/2;i++)
 		expanders[i] = NULL;
 	detect_expanders();
+#elif defined(ESP32)
 
+    hw_type = HW_TYPE_AC;
+    
+	PIN_RFRX = E0_PIN_RFRX;
+	PIN_RFTX = E0_PIN_RFTX;
+	PIN_BOOST = E0_PIN_BOOST;
+	PIN_BOOST_EN = E0_PIN_BOOST_EN;
+	PIN_SENSOR1 = E0_PIN_SENSOR1;
+	PIN_SENSOR2 = E0_PIN_SENSOR2;
+  
+	/*
+	#if defined(ETHPORT)
+		hw_rev = 2;
+	#else
+		hw_rev = 0;
+	#endif
+ 	*/
+ 	hw_rev = 0;
+	  // mainio = new IOEXP(ACDR_I2CADDR); // dont need this as all is handled by ESP32 gpio's
+  #ifndef USE_IOEXP_SR
+  	DEBUG_PRINTLN("Using GPIO IOEXP");
+	drio = new BUILD_IN_GPIO(); // to handle gpio's on ESP32 board
+	drio->set_pins_output_mode();
+  #else
+  	DEBUG_PRINTLN("Using Shift-register IOEXP");
+	drio = new IOEXP_SR();
+	drio->set_pins_output_mode();
+  #endif	
+	// ROTARY ENCODER not supported now
+	#if ! defined(USE_ROTARY_ENCODER)
+		PIN_BUTTON_1 = E0_PIN_BUTTON_1;
+		PIN_BUTTON_2 = E0_PIN_BUTTON_2;
+		PIN_BUTTON_3 = E0_PIN_BUTTON_3;
+		
+		pinModeExt(PIN_BUTTON_1, INPUT_PULLUP);
+		pinModeExt(PIN_BUTTON_2, INPUT_PULLUP);
+		pinModeExt(PIN_BUTTON_3, INPUT_PULLUP);
+	#else
+		PIN_BUTTON_1 = ROTARY_ENCODER_A_PIN;
+		PIN_BUTTON_2 = ROTARY_ENCODER_BUTTON_PIN;
+		PIN_BUTTON_3 = ROTARY_ENCODER_B_PIN;
+	
+		pinModeExt(PIN_BUTTON_1, INPUT);
+		pinModeExt(PIN_BUTTON_2, INPUT);
+		pinModeExt(PIN_BUTTON_3, INPUT);
+	#endif
+
+	/* detect expanders */
+	for(byte i=0;i<(MAX_NUM_BOARDS)/2;i++)
+		expanders[i] = NULL;
+	DEBUG_PRINTLN("Starting to detect expanders");
+	detect_expanders();
+
+	DEBUG_PRINT("hw_type = "); DEBUG_PRINT(hw_type); DEBUG_PRINT(" hw_rev = "); DEBUG_PRINTLN(hw_rev);
 #else
 
 	// shift register setup
@@ -835,7 +917,7 @@ void OpenSprinkler::begin() {
 	clear_all_station_bits();
 	apply_all_station_bits();
 
-#if defined(ESP8266)
+#if defined(ESP8266) || defined(ESP32)
 	// OS 3.0 has two independent sensors
 	pinModeExt(PIN_SENSOR1, INPUT_PULLUP);
 	pinModeExt(PIN_SENSOR2, INPUT_PULLUP);
@@ -871,7 +953,7 @@ void OpenSprinkler::begin() {
 
 #if defined(ARDUINO)  // AVR SD and LCD functions
 
-	#if defined(ESP8266)  // OS3.0 specific detections
+	#if defined(ESP8266) || defined(ESP32)  // OS3.0 specific detections
 
 		status.has_curr_sense = 1;  // OS3.0 has current sensing capacility
 		// measure baseline current
@@ -912,7 +994,7 @@ void OpenSprinkler::begin() {
 
 	lcd_start();
 
-	#if defined(ESP8266)
+	#if defined(ESP8266) || defined(ESP32)
 		lcd.createChar(ICON_ETHER_CONNECTED, _iconimage_ether_connected);
 		lcd.createChar(ICON_ETHER_DISCONNECTED, _iconimage_ether_disconnected);
 	#else
@@ -924,7 +1006,7 @@ void OpenSprinkler::begin() {
 	lcd.createChar(ICON_RAIN, _iconimage_rain);
 	lcd.createChar(ICON_SOIL, _iconimage_soil);
 
-	#if defined(ESP8266)
+	#if defined(ESP8266) || defined(ESP32)
 
 		/* create custom characters */
 		lcd.createChar(ICON_WIFI_CONNECTED, _iconimage_wifi_connected);
@@ -971,7 +1053,7 @@ void OpenSprinkler::begin() {
 #endif
 }
 
-#if defined(ESP8266)
+#if defined(ESP8266) || defined(ESP32)
 /** LATCH boost voltage
  *
  */
@@ -1132,7 +1214,7 @@ void OpenSprinkler::latch_apply_all_station_bits() {
  */
 void OpenSprinkler::apply_all_station_bits() {
 
-#if defined(ESP8266)
+#if defined(ESP8266) || defined(ESP32)
 	if(hw_type==HW_TYPE_LATCH) {
 		// if controller type is latching, the control mechanism is different
 		// hence will be handled separately
@@ -1149,6 +1231,10 @@ void OpenSprinkler::apply_all_station_bits() {
 			engage_booster = 0;
 		}
 
+		// DEBUG_PRINT("IOEXP type: ");
+		// DEBUG_PRINTLN(drio->type);
+		// DEBUG_PRINTLN(station_bits[0]);
+		
 		// Handle driver board (on main controller)
 		if(drio->type==IOEXP_TYPE_8574) {
 			/* revision 0 uses PCF8574 with active low logic, so all bits must be flipped */
@@ -1159,6 +1245,35 @@ void OpenSprinkler::apply_all_station_bits() {
 			reg = (reg&0xFF00) | station_bits[0]; // output channels are the low 8-bit
 			drio->i2c_write(NXP_OUTPUT_REG, reg); // write value to register
 		}
+		#if defined(ESP32)
+		 else if(drio->type == IOEXP_TYPE_BUILD_IN_GPIO  || drio->type == IOEXP_TYPE_SR){
+			// stations_bits[0] holds the master station zones as a byte
+			if (STATION_LOGIC) {
+				#if defined(SEPARATE_MASTER_VALVE)
+				// DEBUG_PRINT("Separate master on GPIO ");
+				// DEBUG_PRINTLN(SEPARATE_MASTER_VALVE);
+				// DEBUG_PRINTLN(station_bits[0]);
+				if ( station_bits[0] > 0 ) {
+					// DEBUG_PRINTLN("Turning MASTER VALVE On");
+					digitalWrite(SEPARATE_MASTER_VALVE,HIGH);
+				} else {
+					// DEBUG_PRINTLN("Turning MASTER VALVE Off");
+					digitalWrite(SEPARATE_MASTER_VALVE,LOW);
+				}
+				#endif
+				drio->i2c_write(255, station_bits[0]);
+			} else {
+				#if defined(SEPARATE_MASTER_VALVE)
+				if ( station_bits[0] > 0 ) {
+					digitalWrite(SEPARATE_MASTER_VALVE,LOW);
+				} else {
+					digitalWrite(SEPARATE_MASTER_VALVE,HIGH);
+				}
+				#endif
+				drio->i2c_write(255,~station_bits[0]);
+			}
+		} 
+		#endif
 
 		// Handle expansion boards
 		for(int i=0;i<MAX_EXT_BOARDS/2;i++) {
@@ -1172,7 +1287,6 @@ void OpenSprinkler::apply_all_station_bits() {
 		}
 	}
 
-	byte bid, s, sbits;
 #else
 	digitalWrite(PIN_SR_LATCH, LOW);
 	byte bid, s, sbits;
@@ -1276,6 +1390,7 @@ void OpenSprinkler::detect_binarysensor_status(ulong curr_time) {
 	}
 
 // ESP8266 is guaranteed to have sensor 2
+// if your ESP32 board has 2 sensors, then set PIN_SENOR2
 #if defined(ESP8266) || defined(PIN_SENSOR2)
 	if(iopts[IOPT_SENSOR2_TYPE]==SENSOR_TYPE_RAIN || iopts[IOPT_SENSOR2_TYPE]==SENSOR_TYPE_SOIL) {
 		if(hw_rev==2)	pinModeExt(PIN_SENSOR2, INPUT_PULLUP); // this seems necessary for OS 3.2
@@ -1361,13 +1476,13 @@ uint16_t OpenSprinkler::read_current() {
 	float scale = 1.0f;
 	if(status.has_curr_sense) {
 		if (hw_type == HW_TYPE_DC) {
-			#if defined(ESP8266)
+			#if defined(ESP8266) || defined(ESP32)
 			scale = 4.88;
 			#else
 			scale = 16.11;
 			#endif
 		} else if (hw_type == HW_TYPE_AC) {
-			#if defined(ESP8266)
+			#if defined(ESP8266) || defined(ESP32)
 			scale = 3.45;
 			#else
 			scale = 11.39;
@@ -1393,7 +1508,7 @@ uint16_t OpenSprinkler::read_current() {
 // AVR has capability to detect number of expansion boards
 int OpenSprinkler::detect_exp() {
 #if defined(ARDUINO)
-	#if defined(ESP8266)
+	#if defined(ESP8266) || defined(ESP32)
 	// detect the highest expansion board index
 	int n;
 	for(n=4;n>=0;n--) {
@@ -1706,7 +1821,7 @@ int rf_gpio_fd = -1;
 /** Transmit one RF signal bit */
 void transmit_rfbit(ulong lenH, ulong lenL) {
 #if defined(ARDUINO)
-	#if defined(ESP8266)
+	#if defined(ESP8266) || defined(ESP32)
 		digitalWrite(PIN_RFTX, 1);
 		delayMicroseconds(lenH);
 		digitalWrite(PIN_RFTX, 0);
@@ -1754,7 +1869,7 @@ void OpenSprinkler::switch_rfstation(RFStationData *data, bool turnon) {
 	ulong on, off;
 	uint16_t length = parse_rfstation_code(data, &on, &off);
 #if defined(ARDUINO)
-	#if defined(ESP8266)
+	#if defined(ESP8266) || defined(ESP32)
 	rfswitch.enableTransmit(PIN_RFTX);
 	rfswitch.setProtocol(1);
 	rfswitch.setPulseLength(length);
@@ -1800,7 +1915,7 @@ int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char*
 #if defined(ARDUINO)
 
 	Client *client;
-	#if defined(ESP8266)
+	#if defined(ESP8266) || defined(ESP32)
 		WiFiClient wifiClient;
 		client = &wifiClient;
 	#else
@@ -1989,7 +2104,7 @@ void OpenSprinkler::switch_httpstation(HTTPStationData *data, bool turnon) {
 /** Prepare factory reset */
 void OpenSprinkler::pre_factory_reset() {
 	// for ESP8266: wipe out flash
-	#if defined(ESP8266)
+	#if defined(ESP8266) || defined(ESP32)
 	lcd_print_line_clear_pgm(PSTR("Wiping flash.."), 0);
 	lcd_print_line_clear_pgm(PSTR("Please Wait..."), 1);
 	LittleFS.format();
@@ -2063,7 +2178,7 @@ void OpenSprinkler::factory_reset() {
 #define xstr(s) str(s)
 
 /** Parse OTC configuration */
-#if defined(ESP8266)
+#if defined(ESP8266) || defined(ESP32)
 void OpenSprinkler::parse_otc_config() {
 	char server[MAX_SOPTS_SIZE+1] = {0};
 	char token[MAX_SOPTS_SIZE+1] = {0};
@@ -2101,7 +2216,7 @@ void OpenSprinkler::options_setup() {
 		last_reboot_cause = nvdata.reboot_cause;
 		nvdata.reboot_cause = REBOOT_CAUSE_POWERON;
 		nvdata_save();
-		#if defined(ESP8266)
+		#if defined(ESP8266) || defined(ESP32)
 		wifi_ssid = sopt_load(SOPT_STA_SSID);
 		wifi_pass = sopt_load(SOPT_STA_PASS);
 		sopt_load(SOPT_STA_BSSID_CHL, tmp_buffer);
@@ -2136,7 +2251,7 @@ void OpenSprinkler::options_setup() {
 		break;
 
 	case BUTTON_2:
-	#if defined(ESP8266)
+	#if defined(ESP8266) || defined(ESP32)
 		// if BUTTON_2 is pressed during startup, go to Test OS mode
 		// only available for OS 3.0
 		lcd_print_line_clear_pgm(PSTR("===Test Mode==="), 0);
@@ -2190,7 +2305,7 @@ void OpenSprinkler::options_setup() {
 		byte hwv = iopts[IOPT_HW_VERSION];
 		lcd.print((char)('0'+(hwv/10)));
 		lcd.print('.');
-		#if defined(ESP8266)
+		#if defined(ESP8266) || defined(ESP32)
 		lcd.print(hw_rev);
 		#else
 		lcd.print((char)('0'+(hwv%10)));
@@ -2341,7 +2456,7 @@ void OpenSprinkler::raindelay_stop() {
 /** LCD and button functions */
 #if defined(ARDUINO)		// AVR LCD and button functions
 /** print a program memory string */
-#if defined(ESP8266)
+#if defined(ESP8266) || defined(ESP32)
 void OpenSprinkler::lcd_print_pgm(PGM_P str) {
 #else
 void OpenSprinkler::lcd_print_pgm(PGM_P PROGMEM str) {
@@ -2353,7 +2468,7 @@ void OpenSprinkler::lcd_print_pgm(PGM_P PROGMEM str) {
 }
 
 /** print a program memory string to a given line with clearing */
-#if defined(ESP8266)
+#if defined(ESP8266) || defined(ESP32)
 void OpenSprinkler::lcd_print_line_clear_pgm(PGM_P str, byte line) {
 #else
 void OpenSprinkler::lcd_print_line_clear_pgm(PGM_P PROGMEM str, byte line) {
@@ -2377,7 +2492,7 @@ void OpenSprinkler::lcd_print_2digit(int v)
 /** print time to a given line */
 void OpenSprinkler::lcd_print_time(time_t t)
 {
-#if defined(ESP8266)
+#if defined(ESP8266) || defined(ESP32)
 	lcd.setAutoDisplay(false);
 #endif
 	lcd.setCursor(0, 0);
@@ -2391,7 +2506,7 @@ void OpenSprinkler::lcd_print_time(time_t t)
 	lcd_print_2digit(month(t));
 	lcd_print_pgm(PSTR("-"));
 	lcd_print_2digit(day(t));
-#if defined(ESP8266)
+#if defined(ESP8266) || defined(ESP32)
 	lcd.display();
 	lcd.setAutoDisplay(true);
 #endif
@@ -2399,7 +2514,7 @@ void OpenSprinkler::lcd_print_time(time_t t)
 
 /** print ip address */
 void OpenSprinkler::lcd_print_ip(const byte *ip, byte endian) {
-#if defined(ESP8266)
+#if defined(ESP8266) || defined(ESP32)
 	lcd.clear(0, 1);
 #else
 	lcd.clear();
@@ -2429,7 +2544,7 @@ void OpenSprinkler::lcd_print_mac(const byte *mac) {
 
 /** print station bits */
 void OpenSprinkler::lcd_print_screen(char c) {
-#if defined(ESP8266)
+#if defined(ESP8266) || defined(ESP32)
 	lcd.setAutoDisplay(false); // reduce screen drawing time by turning off display() when drawing individual characters
 #endif
 	lcd.setCursor(0, 1);
@@ -2513,11 +2628,14 @@ void OpenSprinkler::lcd_print_screen(char c) {
 	}
 	else
 		lcd.write(WiFi.status()==WL_CONNECTED?ICON_WIFI_CONNECTED:ICON_WIFI_DISCONNECTED);
+#elif defined(ESP32)
+	// only wifi for ESP32
+	lcd.write(WiFi.status()==WL_CONNECTED?ICON_WIFI_CONNECTED:ICON_WIFI_DISCONNECTED);
 #else
 	lcd.write(status.network_fails>2?ICON_ETHER_DISCONNECTED:ICON_ETHER_CONNECTED);  // if network failure detection is more than 2, display disconnect icon
 #endif
 
-#if defined(ESP8266)
+#if defined(ESP8266) || defined(ESP32)
 
 	if(useEth || (get_wifi_mode()==WIFI_MODE_STA && WiFi.status()==WL_CONNECTED && WiFi.localIP())) {
 		lcd.setCursor(0, -1);
@@ -2541,7 +2659,7 @@ void OpenSprinkler::lcd_print_screen(char c) {
 		}
 	}
 #endif
-#if defined(ESP8266)
+#if defined(ESP8266) || defined(ESP32)
 	lcd.display();
 	lcd.setAutoDisplay(true);
 #endif
@@ -2743,7 +2861,7 @@ void OpenSprinkler::ui_set_options(int oid)
 				if(i==IOPT_URS_RETIRED) i++;
 				if(i==IOPT_RSO_RETIRED) i++;
 				if (hw_type==HW_TYPE_AC && i==IOPT_BOOST_TIME) i++;	// skip boost time for non-DC controller
-				#if defined(ESP8266)
+				#if defined(ESP8266) || defined(ESP32)
 				else if (lcd.type()==LCD_I2C && i==IOPT_LCD_CONTRAST) i+=3;
 				#else
 				else if (lcd.type()==LCD_I2C && i==IOPT_LCD_CONTRAST) i+=2;
@@ -2794,7 +2912,7 @@ void OpenSprinkler::lcd_set_brightness(byte value) {
 		}
 	}
 
-#elif defined(ESP8266)
+#elif defined(ESP8266) || defined(ESP32)
 	if (value) {lcd.displayOn();lcd.setBrightness(255); }
 	else {
 		if(iopts[IOPT_LCD_DIMMING]==0) lcd.displayOff();
@@ -2804,7 +2922,7 @@ void OpenSprinkler::lcd_set_brightness(byte value) {
 }
 #endif  // end of LCD and button functions
 
-#if defined(ESP8266)
+#if defined(ESP8266) || defined(ESP32)
 #include "images.h"
 void OpenSprinkler::flash_screen() {
 	lcd.setCursor(0, -1);
