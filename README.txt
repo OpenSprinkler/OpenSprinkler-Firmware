@@ -4,6 +4,8 @@ Work is based on JaCharer's work (https://github.com/JaCharer/OpenSprinkler-Firm
 
 **As of now - 2023.05.14 - NOTHING IS TESTED, but code compiles under PlatformIO(VSCode).**
 
+** Don't forget to change esp32.h according to your settings! It's set for my setup with ShiftRegister output and SH1106 LCD (instead of the default SSD1306) **
+
 Hopefully I can test it in the coming days/weeks on my HW and remove this comment :)
 
 HW is AC only, so no support, for DC/LATCH. Wired ethernet is also not supported now, maybe in the future.

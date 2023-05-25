@@ -1015,7 +1015,11 @@ void OpenSprinkler::begin() {
 		lcd.setCursor(0,0);
 		lcd.print(F("Init file system"));
 		lcd.setCursor(0,1);
+		#if defined(ESP8266)
 		if(!LittleFS.begin()) {
+		#elif defined(ESP32)
+		if(!SPIFFS.begin()) {
+		#endif
 			// !!! flash init failed, stall as we cannot proceed
 			lcd.setCursor(0, 0);
 			lcd_print_pgm(PSTR("Error Code: 0x2D"));
@@ -2107,7 +2111,11 @@ void OpenSprinkler::pre_factory_reset() {
 	#if defined(ESP8266) || defined(ESP32)
 	lcd_print_line_clear_pgm(PSTR("Wiping flash.."), 0);
 	lcd_print_line_clear_pgm(PSTR("Please Wait..."), 1);
+	#if defined(ESP8266)
 	LittleFS.format();
+	#elif defined(ESP32)
+	SPIFFS.format();
+	#endif
 	#else
 	// remove 'done' file as an indicator for reset
 	// todo os2.3 and ospi: delete log files and/or wipe SD card
