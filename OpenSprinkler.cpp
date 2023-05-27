@@ -467,7 +467,7 @@ byte OpenSprinkler::start_network() {
 #ifdef ENABLE_DEBUG
 #if defined(ESP32)
   DEBUG_PRINTLN("SPIFFS dir:");
-  SPIFFS_list_dir();
+  //SPIFFS_list_dir();
   DEBUG_PRINTLN("Starting network");
 #endif //ESP32
 #endif 
@@ -921,7 +921,10 @@ void OpenSprinkler::begin() {
 	// OS 3.0 has two independent sensors
 	pinModeExt(PIN_SENSOR1, INPUT_PULLUP);
 	pinModeExt(PIN_SENSOR2, INPUT_PULLUP);
-
+	
+	DEBUG_PRINTLN("Starting sensors - INPUT_PULLUP");
+ 	DEBUG_PRINT("Sensor1 PIN: "); DEBUG_PRINTLN(PIN_SENSOR1);
+  	DEBUG_PRINT("Sensor2 PIN: "); DEBUG_PRINTLN(PIN_SENSOR2);
 #else
 	// pull shift register OE low to enable output
 	digitalWrite(PIN_SR_OE, LOW);
@@ -950,6 +953,9 @@ void OpenSprinkler::begin() {
 	// set rf data pin
 	pinModeExt(PIN_RFTX, OUTPUT);
 	digitalWriteExt(PIN_RFTX, LOW);
+
+	DEBUG_PRINTLN("Starting RFTX pins ");
+  	DEBUG_PRINT("RFTX PIN: "); DEBUG_PRINTLN(PIN_RFTX);
 
 #if defined(ARDUINO)  // AVR SD and LCD functions
 
@@ -1014,6 +1020,7 @@ void OpenSprinkler::begin() {
 
 		lcd.setCursor(0,0);
 		lcd.print(F("Init file system"));
+		DEBUG_PRINTLN("Init file system");
 		lcd.setCursor(0,1);
 		#if defined(ESP8266)
 		if(!LittleFS.begin()) {
@@ -2111,11 +2118,11 @@ void OpenSprinkler::pre_factory_reset() {
 	#if defined(ESP8266) || defined(ESP32)
 	lcd_print_line_clear_pgm(PSTR("Wiping flash.."), 0);
 	lcd_print_line_clear_pgm(PSTR("Please Wait..."), 1);
-	#if defined(ESP8266)
+		#if defined(ESP8266)
 	LittleFS.format();
-	#elif defined(ESP32)
+		#elif defined(ESP32)
 	SPIFFS.format();
-	#endif
+		#endif
 	#else
 	// remove 'done' file as an indicator for reset
 	// todo os2.3 and ospi: delete log files and/or wipe SD card

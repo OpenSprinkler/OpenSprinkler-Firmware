@@ -1752,6 +1752,8 @@ void server_json_log(OTF_PARAMS_DEF) {
 
 #if defined(ESP8266) || defined(ESP32)
 		File file = LittleFS.open(tmp_buffer, "r");
+#elif defined(ESP32)
+		File file = SPIFFS.open(tmp_buffer, "r");
 		if(!file) continue;
 #elif defined(ARDUINO)
 		if (!sd.exists(tmp_buffer)) continue;
