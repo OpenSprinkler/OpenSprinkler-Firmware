@@ -33,18 +33,52 @@
 #endif
 #include "defines.h"
 #include "utils.h"
+#if defined(ESP8266)
 #include <ADS1X15.h>
+#endif
+
+//Files
+#define SENSOR_FILENAME       "sensor.dat"  // analog sensor filename
+#define PROG_SENSOR_FILENAME  "progsensor.dat"  // sensor to program assign filename
+#define SENSORLOG_FILENAME1   "sensorlog.dat"   // analog sensor log filename
+#define SENSORLOG_FILENAME2   "sensorlog2.dat"  // analog sensor log filename2
+
+#define SENSORLOG_FILENAME_WEEK1 "sensorlogW1.dat"    // analog sensor log filename for  week average
+#define SENSORLOG_FILENAME_WEEK2 "sensorlogW2.dat"    // analog sensor log filename2 for week average
+#define SENSORLOG_FILENAME_MONTH1 "sensorlogM1.dat"   // analog sensor log filename for month average
+#define SENSORLOG_FILENAME_MONTH2 "sensorlogM2.dat"   // analog sensor log filename2 for month average
+
+//MaxLogSize
+#define MAX_LOG_SIZE 8000
+#define MAX_LOG_SIZE_WEEK 2000
+#define MAX_LOG_SIZE_MONTH 1000
 
 //Sensor types:
 #define SENSOR_NONE                       0   //None or deleted sensor
 #define SENSOR_SMT100_MODBUS_RTU_MOIS     1   //Truebner SMT100 RS485 Modbus RTU over TCP, moisture mode
 #define SENSOR_SMT100_MODBUS_RTU_TEMP     2   //Truebner SMT100 RS485 Modbus RTU over TCP, temperature mode
+#if defined(ESP8266)
 #define SENSOR_ANALOG_EXTENSION_BOARD     10  //New OpenSprinkler analog extension board x8 - voltage mode 0..4V
 #define SENSOR_ANALOG_EXTENSION_BOARD_P   11  //New OpenSprinkler analog extension board x8 - percent 0..3.3V to 0..100%
 #define SENSOR_SMT50_MOIS                 15  //New OpenSprinkler analog extension board x8 - SMT50 VWC [%] = (U * 50) : 3
 #define SENSOR_SMT50_TEMP                 16  //New OpenSprinkler analog extension board x8 - SMT50 T [°C] = (U – 0,5) * 100
-#define SENSOR_OSPI_ANALOG_INPUTS         20  //Old OSPi analog input
+#define SENSOR_SMT100_ANALOG_MOIS         17  //New OpenSprinkler analog extension board x8 - SMT100 VWC [%] = (U * 100) : 3
+#define SENSOR_SMT100_ANALOG_TEMP         18  //New OpenSprinkler analog extension board x8 - SMT50 T [°C] = (U * 100) : 3 - 40
+
+#define SENSOR_VH400                      30  //New OpenSprinkler analog extension board x8 - Vegetronix VH400
+#define SENSOR_THERM200                   31  //New OpenSprinkler analog extension board x8 - Vegetronix THERM200
+#define SENSOR_AQUAPLUMB                  32  //New OpenSprinkler analog extension board x8 - Vegetronix Aquaplumb
+
+#endif
+#define SENSOR_OSPI_ANALOG_INPUTS         50  //Old OSPi analog input
 #define SENSOR_REMOTE                     100 //Remote sensor of an remote opensprinkler
+#define SENSOR_WEATHER_TEMP_F             101 //Weather service - temperature (Fahrenheit)
+#define SENSOR_WEATHER_TEMP_C             102 //Weather service - temperature (Celcius)
+#define SENSOR_WEATHER_HUM                103 //Weather service - humidity (%)
+#define SENSOR_WEATHER_PRECIP_IN          105 //Weather service - precip (inch)
+#define SENSOR_WEATHER_PRECIP_MM          106 //Weather service - precip (mm)
+#define SENSOR_WEATHER_WIND_MPH           107 //Weather service - wind (mph)
+#define SENSOR_WEATHER_WIND_KMH           108 //Weather service - wind (kmh)
 
 #define SENSOR_GROUP_MIN               1000   //Sensor group with min value
 #define SENSOR_GROUP_MAX               1001   //Sensor group with max value
@@ -122,17 +156,20 @@ typedef struct ProgSensorAdjust {
 } ProgSensorAdjust_t;
 #define PROGSENSOR_STORE_SIZE (sizeof(ProgSensorAdjust_t)-sizeof(ProgSensorAdjust_t*))
 
-#define UNIT_NONE       0
-#define UNIT_PERCENT    1
-#define UNIT_DEGREE     2
-#define UNIT_FAHRENHEIT 3
-#define UNIT_VOLT       4
+#define UNIT_NONE        0
+#define UNIT_PERCENT     1
+#define UNIT_DEGREE      2
+#define UNIT_FAHRENHEIT  3
+#define UNIT_VOLT        4
+#define UNIT_HUM_PERCENT 5
+#define UNIT_INCH        6
+#define UNIT_MM          7
+#define UNIT_MPH         8
+#define UNIT_KMH         9
+#define UNIT_LEVEL      10
 
 //Unitnames
-static const char* sensor_unitNames[] {
-	"", "%", "°C", "°F", "V",
-//   0   1     2     3    4
-};
+extern const char* sensor_unitNames[];
 
 const char* getSensorUnit(Sensor_t *sensor);
 byte getSensorUnitId(int type);
@@ -161,13 +198,19 @@ Sensor_t *sensor_by_idx(uint idx);
 int read_sensor(Sensor_t *sensor); //sensor value goes to last_native_data/last_data
 
 //Sensorlog API functions:
-bool sensorlog_add(SensorLog_t *sensorlog);
-bool sensorlog_add(Sensor_t *sensor, ulong time);
+#define LOG_STD   0
+#define LOG_WEEK  1
+#define LOG_MONTH 2
+bool sensorlog_add(uint8_t log, SensorLog_t *sensorlog);
+bool sensorlog_add(uint8_t log, Sensor_t *sensor, ulong time);
 void sensorlog_clear_all();
-SensorLog_t *sensorlog_load(ulong pos);
-SensorLog_t *sensorlog_load(ulong idx, SensorLog_t* sensorlog);
-ulong sensorlog_filesize();
-ulong sensorlog_size();
+void sensorlog_clear(bool std, bool week, bool month);
+SensorLog_t *sensorlog_load(uint8_t log, ulong pos);
+SensorLog_t *sensorlog_load(uint8_t log, ulong idx, SensorLog_t* sensorlog);
+int sensorlog_load2(uint8_t log, ulong idx, int count, SensorLog_t* sensorlog);
+ulong sensorlog_filesize(uint8_t log);
+ulong sensorlog_size(uint8_t log);
+ulong findLogPosition(uint8_t log, ulong after);
 
 //Set Sensor Address for SMT100:
 int set_sensor_address(Sensor_t *sensor, byte new_address);
@@ -183,7 +226,11 @@ ProgSensorAdjust_t *prog_adjust_by_idx(uint idx);
 double calc_sensor_watering(uint prog);
 double calc_sensor_watering_by_nr(uint nr);
 
+void GetSensorWeather();
+
+#if defined(ESP8266)
 ulong diskFree();
 bool checkDiskFree(); //true: disk space Ok, false: Out of disk space
+#endif
 
 #endif // _SENSORS_H

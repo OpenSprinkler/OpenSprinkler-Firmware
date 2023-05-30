@@ -227,10 +227,13 @@ void rewind_ether_buffer() {
 
 void send_packet(OTF_PARAMS_DEF) {
 #if defined(ESP8266)
+	if (bfill.position() > 8192 || !res.willFit(bfill.position()))
+		res.flush(); 
 	res.writeBodyChunk((char *)"%s",ether_buffer);
 #else
 	m_client->write((const uint8_t *)ether_buffer, strlen(ether_buffer));
 #endif
+    
 	rewind_ether_buffer();
 }
 
@@ -252,6 +255,24 @@ void print_header(OTF_PARAMS_DEF, bool isJson=true, int len=0) {
 #else
 void print_header(bool isJson=true)  {
 	bfill.emit_p(PSTR("$F$F$F$F\r\n"), html200OK, isJson?htmlContentJSON:htmlContentHTML, htmlAccessControl, htmlNoCache);
+}
+#endif
+
+#if defined(ESP8266)
+void print_header_download(OTF_PARAMS_DEF, int len=0) {
+	res.writeStatus(200, F("OK"));
+	res.writeHeader(F("Content-Type"), F("text/plain"));
+	res.writeHeader(F("Content-Disposition"), F("attachment; filename=\"log.csv\";"));
+	if(len>0)
+		res.writeHeader(F("Content-Length"), len);
+	res.writeHeader(F("Access-Control-Allow-Origin"), F("*"));
+	res.writeHeader(F("Cache-Control"), F("max-age=0, no-cache, no-store, must-revalidate"));
+	res.writeHeader(F("Connection"), F("close"));
+}
+#else
+
+void print_header_download()  {
+	bfill.emit_p(PSTR("$F$F$F$F$F\r\n"), html200OK, "Content-Type: text/plain", "Content-Disposition: attachment; filename=\"log.txt\";", htmlAccessControl, htmlNoCache);
 }
 #endif
 
@@ -1995,8 +2016,12 @@ void server_sensor_config(OTF_PARAMS_DEF)
 
 	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("name"), true))
 		handle_return(HTML_DATA_MISSING);
+	urlDecode(tmp_buffer);
+	strReplace(tmp_buffer, '\"', '\'');
+	strReplace(tmp_buffer, '\\', '/');	
 	char name[30];
-	strlcpy(name, tmp_buffer, sizeof(name)-1); // Sensor nr
+
+	strncpy(name, tmp_buffer, sizeof(name)-1); // Sensor nr
 
 	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("ip"), true))
 		handle_return(HTML_DATA_MISSING);
@@ -2104,11 +2129,7 @@ void server_sensor_get(OTF_PARAMS_DEF) {
 			getSensorUnit(sensor),
 			getSensorUnitId(sensor),
 			sensor->last_read);
-		// if available ether buffer is getting small
-		// send out a packet
-		if(available_ether_buffer() <= 0) {
-			send_packet(OTF_PARAMS);
-		}
+		send_packet(OTF_PARAMS);
 	}
 	bfill.emit_p(PSTR("]}"));
 	handle_return(HTML_OK);
@@ -2162,11 +2183,7 @@ void server_sensor_readnow(OTF_PARAMS_DEF) {
 			getSensorUnit(sensor),
 			getSensorUnitId(sensor));
 
-		// if available ether buffer is getting small
-		// send out a packet
-		if(available_ether_buffer() <= 0) {
-			send_packet(OTF_PARAMS);
-		}
+		send_packet(OTF_PARAMS);
 	}
 	bfill.emit_p(PSTR("]}"));
 	handle_return(HTML_OK);
@@ -2180,7 +2197,7 @@ void sensorconfig_json(OTF_PARAMS_DEF) {
 
 		if (first) first = false; else bfill.emit_p(PSTR(","));
 
-		bfill.emit_p(PSTR("{\"nr\":$D,\"type\":$D,\"group\":$D,\"name\":\"$S\",\"ip\":$L,\"port\":$D,\"id\":$D,\"ri\":$D,\"nativedata\":$L,\"data\":$E,\"unit\":\"$S\",\"unitid\":$D,\"enable\":$D,\"log\":$D,\"show\":$D,\"last\":$L}"),
+		bfill.emit_p(PSTR("{\"nr\":$D,\"type\":$D,\"group\":$D,\"name\":\"$S\",\"ip\":$L,\"port\":$D,\"id\":$D,\"ri\":$D,\"nativedata\":$L,\"data\":$E,\"unit\":\"$S\",\"unitid\":$D,\"enable\":$D,\"log\":$D,\"show\":$D,\"data_ok\":$D,\"last\":$L}"),
 			sensor->nr, 
 			sensor->type,
 			sensor->group,
@@ -2196,12 +2213,9 @@ void sensorconfig_json(OTF_PARAMS_DEF) {
 			sensor->flags.enable,
 			sensor->flags.log,
 			sensor->flags.show,
+			sensor->flags.data_ok,
 			sensor->last_read);
-		// if available ether buffer is getting small
-		// send out a packet
-		if(available_ether_buffer() <= 0) {
-			send_packet(OTF_PARAMS);
-		}
+		send_packet(OTF_PARAMS);
 	}
 }
 
@@ -2252,9 +2266,15 @@ void server_sensorlog_list(OTF_PARAMS_DEF) {
 	char *p = get_buffer;
 #endif
 
-	ulong log_size = sensorlog_size();
-
 	DEBUG_PRINTLN(F("server_sensorlog_list"));
+
+	uint8_t log = LOG_STD;
+
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("log"), true)) // Log type 0=DAY 1=WEEK 2=MONTH
+		log = strtoul(tmp_buffer, NULL, 0); 
+	if (log > LOG_MONTH)
+		log = LOG_STD;
+	ulong log_size = sensorlog_size(log);
 
 	//start / max:
 	ulong startAt = 0;
@@ -2270,6 +2290,10 @@ void server_sensorlog_list(OTF_PARAMS_DEF) {
 	uint type = 0;
 	ulong after = 0;
 	ulong before = 0;
+	ulong lastHours = 0;
+	bool isjson = true;
+	bool shortcsv = false;
+
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("nr"), true)) // Filter log for sensor-nr
 		nr = strtoul(tmp_buffer, NULL, 0); 
 
@@ -2282,59 +2306,132 @@ void server_sensorlog_list(OTF_PARAMS_DEF) {
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("before"), true)) // Filter time before
 		before = strtoul(tmp_buffer, NULL, 0);
 
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("lasthours"), true)) // Filter last hours
+		lastHours = strtoul(tmp_buffer, NULL, 0);
+
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("lastdays"), true)) // Filter last days
+		lastHours = strtoul(tmp_buffer, NULL, 0) * 24 + lastHours;
+
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("csv"), true)) { // Filter last days
+		int csv = atoi(tmp_buffer);
+		isjson = csv == 0;
+		shortcsv = csv == 2;
+	}
+
 #if defined(ESP8266)
 	// as the log data can be large, we will use ESP8266's sendContent function to
 	// send multiple packets of data, instead of the standard way of using send().
 	rewind_ether_buffer();
-	print_header(OTF_PARAMS);
+	if (isjson)	print_header(OTF_PARAMS); else print_header_download(OTF_PARAMS);
 #else
-	print_header();
+	if (isjson)	print_header(); else print_header_download();
 #endif
 
-	bfill.emit_p(PSTR("{\"logsize\":$D,\"filesize\":$D,\"log\":["), 
-		log_size, sensorlog_filesize());
+	if (isjson) {
+		bfill.emit_p(PSTR("{\"logtype\":$D,\"logsize\":$D,\"filesize\":$D,\"log\":["), 
+			log, log_size, sensorlog_filesize(log));
+	} else {
+		if (shortcsv)
+			bfill.emit_p(PSTR("nr;time;data\r\n"));
+		else
+			bfill.emit_p(PSTR("nr;type;time;nativedata;data;unit;unitid\r\n"));
+	}
 
+	#define BLOCKSIZE 64
 	ulong count = 0;
- 	SensorLog_t sensorlog;
+ 	SensorLog_t *sensorlog = (SensorLog_t*)malloc(sizeof(SensorLog_t)*BLOCKSIZE);
 	Sensor_t *sensor = NULL;
-	for (ulong idx = startAt; idx < log_size; idx++) {
-		sensorlog_load(idx, &sensorlog);
 
-		if (nr && sensorlog.nr != nr)
-			continue;
+	//lastHours: find limit for this
+	if (lastHours > 0 && log_size > 0) {
+		after = os.now_tz() - lastHours * 60 * 60; //seconds
+		DEBUG_PRINTLN(F("lastHours"));
 
-		if (after && sensorlog.time <= after)
-			continue;
+		ulong a = 0;
+		ulong b = log_size-1;
+		ulong lastIdx = 0;
+		while (true) {
+			ulong idx = (b-a)/2+a;
+			sensorlog_load(log, idx, sensorlog);
+			if (sensorlog->time < after) {
+				a = idx;
+			} else if (sensorlog->time > after) {
+				b = idx;
+			}
+			if (a >= b || idx == lastIdx) break;
+			lastIdx = idx;
+		}
+		startAt = lastIdx;
+	}
 
-		if (before && sensorlog.time >= before)
-			continue;
+	uint sensor_type = 0;
 
-		if (!sensor || sensor->nr != sensorlog.nr)
-			sensor = sensor_by_nr(sensorlog.nr);
-		uint sensor_type = sensor?sensor->type:0;
-		if (type && sensor_type != type)
-			continue;
+	ulong idx = startAt; 
+	while (idx < log_size) {
+		int n = sensorlog_load2(log, idx, BLOCKSIZE, sensorlog);
+		if (n <= 0) break;
+
+		for (int i = 0; i < n; i++) {
+			idx++;
+			if (nr && sensorlog[i].nr != nr)
+				continue;
+
+			if (after && sensorlog[i].time <= after)
+				continue;
+
+			if (before && sensorlog[i].time >= before)
+				continue;
+
+			if (!shortcsv || type) {
+				if (!sensor || sensor->nr != sensorlog[i].nr)
+					sensor = sensor_by_nr(sensorlog[i].nr);
+				sensor_type = sensor?sensor->type:0;
+				if (type && sensor_type != type)
+					continue;
+			}
 		
-		if (count > 0)
-			bfill.emit_p(PSTR(","));
-		bfill.emit_p(PSTR("{\"nr\":$D,\"type\":$D,\"time\":$L,\"nativedata\":$L,\"data\":$E,\"unit\":\"$S\",\"unitid\":$D}"),
-			sensorlog.nr,          //sensor-nr
-			sensor_type,           //sensor-type
-			sensorlog.time,        //timestamp
-			sensorlog.native_data, //native data
-			sensorlog.data,
-			getSensorUnit(sensor),
-			getSensorUnitId(sensor));
-			
-		// if available ether buffer is getting small
-		// send out a packet
-		if(available_ether_buffer() <= 0) {
+			if (count > 0 && isjson) {
+				bfill.emit_p(PSTR(","));
+			}
+
+			if (isjson) {
+				bfill.emit_p(PSTR("{\"nr\":$D,\"type\":$D,\"time\":$L,\"nativedata\":$L,\"data\":$E,\"unit\":\"$S\",\"unitid\":$D}"),
+				sensorlog[i].nr,          //sensor-nr
+				sensor_type,           //sensor-type
+				sensorlog[i].time,        //timestamp
+				sensorlog[i].native_data, //native data
+				sensorlog[i].data,
+				getSensorUnit(sensor),
+				getSensorUnitId(sensor));
+			} else {
+				if (shortcsv)
+					bfill.emit_p(PSTR("$D;$L;$E\r\n"),
+						sensorlog[i].nr,          //sensor-nr
+						sensorlog[i].time,        //timestamp
+						sensorlog[i].data);
+				else
+					bfill.emit_p(PSTR("$D;$D;$L;$L;$E;$S;$D\r\n"),
+						sensorlog[i].nr,          //sensor-nr
+						sensor_type,           //sensor-type
+						sensorlog[i].time,        //timestamp
+						sensorlog[i].native_data, //native data
+						sensorlog[i].data,
+						getSensorUnit(sensor),
+						getSensorUnitId(sensor));
+			}
+			// if available ether buffer is getting small
+			// send out a packet
+			if (count++ >= maxResults)
+				break;
 			send_packet(OTF_PARAMS);
 		}
-		if (++count >= maxResults)
+		if (count >= maxResults)
 			break;
 	}
-	bfill.emit_p(PSTR("]}"));
+
+	if (isjson)
+		bfill.emit_p(PSTR("]}"));
+	free(sensorlog);
 
 	handle_return(HTML_OK);	
 }
@@ -2350,6 +2447,9 @@ void server_sensorlog_clear(OTF_PARAMS_DEF) {
 #else
 	char *p = get_buffer;
 #endif
+	int log = -1;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("log"), true)) // Filter log for sensor-nr
+		log = atoi(tmp_buffer); 
 
 	DEBUG_PRINTLN(F("server_sensorlog_clear"));
 
@@ -2362,11 +2462,19 @@ void server_sensorlog_clear(OTF_PARAMS_DEF) {
 	print_header();
 #endif
 
-	ulong log_size = sensorlog_size();
+	ulong log_size = sensorlog_size(LOG_STD);
+	ulong log_sizeW = sensorlog_size(LOG_WEEK);
+	ulong log_sizeM = sensorlog_size(LOG_MONTH);
 
-	sensorlog_clear_all();
+	if (log == -1) {
+		sensorlog_clear_all();
+		bfill.emit_p(PSTR("{\"deleted\":$L,\"deleted_week\":$L,\"deleted_month\":$L}"), log_size, log_sizeW, log_sizeM);
+	}
+	else {
+		sensorlog_clear(log==LOG_STD, log==LOG_WEEK, log==LOG_MONTH);
+		bfill.emit_p(PSTR("{\"deleted\":$L}"), log==LOG_STD?log_size:log=LOG_WEEK?log_sizeW:log_sizeM);
+	}
 
-	bfill.emit_p(PSTR("{\"deleted\":$L}"), log_size);
 
 	handle_return(HTML_OK);
 }
@@ -2516,11 +2624,7 @@ void server_sensorprog_list(OTF_PARAMS_DEF) {
 		if (count++ > 0)
 			bfill.emit_p(PSTR(","));
 		progconfig_json(p, current);
-		// if available ether buffer is getting small
-		// send out a packet
-		if(available_ether_buffer() <= 0) {
-			send_packet(OTF_PARAMS);
-		}
+		send_packet(OTF_PARAMS);
 	}
 	bfill.emit_p(PSTR("]}"));
 	handle_return(HTML_OK);
@@ -2529,12 +2633,26 @@ void server_sensorprog_list(OTF_PARAMS_DEF) {
 const int sensor_types[] = {
 	SENSOR_SMT100_MODBUS_RTU_MOIS,
 	SENSOR_SMT100_MODBUS_RTU_TEMP,
+#if defined(ESP8266)
 	SENSOR_ANALOG_EXTENSION_BOARD,
 	SENSOR_ANALOG_EXTENSION_BOARD_P,
 	SENSOR_SMT50_MOIS,
 	SENSOR_SMT50_TEMP,
+	SENSOR_SMT100_ANALOG_MOIS,
+	SENSOR_SMT100_ANALOG_TEMP,
+	SENSOR_VH400,
+	SENSOR_THERM200,
+	SENSOR_AQUAPLUMB,  
+#endif	
 	//SENSOR_OSPI_ANALOG_INPUTS,  
-	SENSOR_REMOTE,              
+	SENSOR_REMOTE,
+	SENSOR_WEATHER_TEMP_F,
+	SENSOR_WEATHER_TEMP_C,
+	SENSOR_WEATHER_HUM,
+	SENSOR_WEATHER_PRECIP_IN,
+	SENSOR_WEATHER_PRECIP_MM,
+	SENSOR_WEATHER_WIND_MPH,
+	SENSOR_WEATHER_WIND_KMH,
 	SENSOR_GROUP_MIN,
 	SENSOR_GROUP_MAX,
 	SENSOR_GROUP_AVG,
@@ -2544,12 +2662,27 @@ const int sensor_types[] = {
 const char* sensor_names[] = {
 	"Truebner SMT100 RS485 Modbus RTU over TCP, moisture mode",
 	"Truebner SMT100 RS485 Modbus RTU over TCP, temperature mode",
-	"OpenSprinkler analog extension board 2xADS1015 x8 - voltage mode 0..4V",
-	"OpenSprinkler analog extension board 2xADS1015 x8 - 0..3.3V to 0..100%",
-	"OpenSprinkler analog extension board 2xADS1015 x8 - SMT50 moisture mode",
-	"OpenSprinkler analog extension board 2xADS1015 x8 - SMT50 temperature mode",
+#if defined(ESP8266)
+	"OpenSprinkler analog extension board 2xADS1x15 x8 - voltage mode 0..4V",
+	"OpenSprinkler analog extension board 2xADS1x15 x8 - 0..3.3V to 0..100%",
+	"OpenSprinkler analog extension board 2xADS1x15 x8 - SMT50 moisture mode",
+	"OpenSprinkler analog extension board 2xADS1x15 x8 - SMT50 temperature mode",
+	"OpenSprinkler analog extension board 2xADS1x15 x8 - SMT100-analog moisture mode",
+	"OpenSprinkler analog extension board 2xADS1x15 x8 - SMT100-analog temperature mode",
+
+	"OpenSprinkler analog extension board 2xADS1x15 x8 - Vegetronix VH400",
+	"OpenSprinkler analog extension board 2xADS1x15 x8 - Vegetronix THERM200",
+	"OpenSprinkler analog extension board 2xADS1x15 x8 - Vegetronix AquaPlumb",
+#endif
 	//"OSPi analog input",
 	"Remote sensor of an remote opensprinkler",
+	"Weather data - temperature (°F)",
+	"Weather data - temperature (°C)",
+	"Weather data - humidity (%)",
+	"Weather data - precip (inch)",
+	"Weather data - precip (mm)",
+	"Weather data - wind (mph)",
+	"Weather data - wind (kmh)",
 	"Sensor group with min value",
 	"Sensor group with max value",
 	"Sensor group with avg value",
@@ -2587,12 +2720,7 @@ void server_sensor_types(OTF_PARAMS_DEF) {
 		byte unitid = getSensorUnitId(sensor_types[i]);
 		bfill.emit_p(PSTR("{\"type\":$D,\"name\":\"$S\",\"unit\":\"$S\",\"unitid\":$D}"), 
 			sensor_types[i], sensor_names[i], sensor_unitNames[unitid], unitid);
-		
-		// if available ether buffer is getting small
-		// send out a packet
-		if(available_ether_buffer() <= 0) {
-			send_packet(OTF_PARAMS);
-		}
+		send_packet(OTF_PARAMS);
 	}
 	bfill.emit_p(PSTR("]}"));
 
@@ -2621,6 +2749,8 @@ void server_usage(OTF_PARAMS_DEF) {
 	print_header();
 #endif
 
+#if defined(ESP8266)
+
 	struct FSInfo fsinfo;
 
 	boolean ok = LittleFS.info(fsinfo);
@@ -2634,7 +2764,7 @@ void server_usage(OTF_PARAMS_DEF) {
 		fsinfo.pageSize, 
 		fsinfo.maxOpenFiles, 
 		fsinfo.maxPathLength);
-
+#endif
 	handle_return(HTML_OK);
 }
 
@@ -2714,11 +2844,7 @@ void server_sensorprog_types(OTF_PARAMS_DEF) {
 			bfill.emit_p(PSTR(","));
 		bfill.emit_p(PSTR("{\"type\":$D,\"name\":\"$S\"}"), prog_types[i], prog_names[i]);
 
-		// if available ether buffer is getting small
-		// send out a packet
-		if(available_ether_buffer() <= 0) {
-			send_packet(OTF_PARAMS);
-		}
+		send_packet(OTF_PARAMS);
 	}
 	bfill.emit_p(PSTR("]}"));
 
