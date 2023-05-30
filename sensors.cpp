@@ -38,8 +38,19 @@ static Sensor_t *sensors = NULL;
 static ProgSensorAdjust_t *progSensorAdjusts = NULL;
 
 const char*   sensor_unitNames[] {
-	"", "%", "°C", "°F", "V", "%", "in", "mm", "mph", "kmh"
-//   0   1     2     3    4    5     6      7      8      9
+	"", "%", "°C", "°F", "V", "%", "in", "mm", "mph", "kmh", "%"
+//   0   1     2     3    4    5     6      7      8      9   10
+//   0=Nothing
+//   1=Soil moisture
+//   2=degree celsius temperature
+//   3=degree fahrenheit temperature
+//   4=Volt V
+//   5=Humidity %
+//   6=Rain inch
+//   7=Rain mm
+//   8=Wind mph
+//   9=Wind kmh
+//  10=Level %
 };
 byte logFileSwitch[3] = {0,0,0}; //0=use smaller File, 1=LOG1, 2=LOG2
 
@@ -1562,7 +1573,7 @@ byte getSensorUnitId(Sensor_t *sensor) {
 		case SENSOR_SMT100_MODBUS_RTU_TEMP:   return UNIT_DEGREE;
 #if defined(ESP8266)		
 	    case SENSOR_ANALOG_EXTENSION_BOARD:   return UNIT_VOLT;
-		case SENSOR_ANALOG_EXTENSION_BOARD_P: return UNIT_PERCENT;
+		case SENSOR_ANALOG_EXTENSION_BOARD_P: return UNIT_LEVEL;
 		case SENSOR_SMT50_MOIS: 			  return UNIT_PERCENT;
 		case SENSOR_SMT50_TEMP: 			  return UNIT_DEGREE;
 		case SENSOR_SMT100_ANALOG_MOIS:       return UNIT_PERCENT;

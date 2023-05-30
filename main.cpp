@@ -1008,10 +1008,10 @@ void do_loop()
 					}
 				}
 			}
-			else if (os.iopts[IOPT_USE_DHCP] && WiFi.status() == WL_CONNECTED && os.get_wifi_mode()==WIFI_MODE_STA) {
-				netif* intf = eagle_lwip_getif(STATION_IF);
-				dhcp_renew(intf);
-			}
+			//else if (os.iopts[IOPT_USE_DHCP] && WiFi.status() == WL_CONNECTED && os.get_wifi_mode()==WIFI_MODE_STA) {
+			//	netif* intf = eagle_lwip_getif(STATION_IF);
+			//	dhcp_renew(intf);
+			//}
 			dhcp_timeout = curr_time + DHCP_CHECKLEASE_INTERVAL;
 		}
 #endif

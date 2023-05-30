@@ -166,6 +166,7 @@ typedef struct ProgSensorAdjust {
 #define UNIT_MM          7
 #define UNIT_MPH         8
 #define UNIT_KMH         9
+#define UNIT_LEVEL      10
 
 //Unitnames
 extern const char* sensor_unitNames[];
