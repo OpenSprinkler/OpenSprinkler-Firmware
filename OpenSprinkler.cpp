@@ -75,6 +75,14 @@ extern char ether_buffer[];
 extern ProgramData pd;
 
 #if defined(ESP8266) || defined(ESP32) 
+	
+	//DEBUG_PRINTLN(F("I2C Init with pins "));
+	//DEBUG_PRINT(DEBUG_TOSTRING(SDA));
+	//DEBUG_PRINT(" ");
+	//DEBUG_PRINT(SCL);
+	//DEBUG_PRINTLN(F(" with LCD @ "));
+	//DEBUG_PRINTLN(LCD_I2CADDR);
+	
 	#if defined(LCD_SH1106)
 	SH1106Display OpenSprinkler::lcd(LCD_I2CADDR, SDA, SCL);
 	#else
@@ -466,19 +474,23 @@ byte OpenSprinkler::start_network() {
 
 #ifdef ENABLE_DEBUG
 #if defined(ESP32)
-  DEBUG_PRINTLN("SPIFFS dir:");
-  //SPIFFS_list_dir();
-  DEBUG_PRINTLN("Starting network");
+  DEBUG_PRINTLN(F("SPIFFS dir:"));
+  SPIFFS_list_dir();
+  DEBUG_PRINTLN(F("Starting network"));
 #endif //ESP32
 #endif 
 
 #if defined(ESP8266) || defined(ESP32)
 
+	#if defined(ESP32)
+		useEth = false;
+	#else
 	if (start_ether()) {
 		useEth = true;
 	} else {
 		useEth = false;
 	}
+	#endif
 
 	if((useEth || get_wifi_mode()==WIFI_MODE_STA) && otc.en>0 && otc.token.length()>=32) {
 		otf = new OTF::OpenThingsFramework(httpport, otc.server, otc.port, otc.token, false, ether_buffer, ETHER_BUFFER_SIZE);
@@ -493,12 +505,13 @@ byte OpenSprinkler::start_network() {
 	#if defined(ESP8266)
 	update_server = new ESP8266WebServer(8080);
 	#elif defined(ESP32)
+	DEBUG_PRINTLN(F("Starting MDNS service"));
 	MDNS.addService("_http", "_tcp", 8080 );
 	MDNS.addServiceTxt("_http", "_tcp", "path", "/");
 	//      MDNS.addService("_http", "_udp", 80 );
 	update_server = new WebServer(8080);
 	#endif
-	DEBUG_PRINT(F("Started update server"));
+	DEBUG_PRINTLN(F("Started update server"));
 	return 1;
 
 #else
@@ -699,6 +712,11 @@ void OpenSprinkler::update_dev() {
 void OpenSprinkler::lcd_start() {
 
 #if defined(ESP8266) || defined(ESP32)
+	#if defined(LCD_SH1106)
+	DEBUG_PRINTLN("LCD SH1106 init");
+	#else
+	DEBUG_PRINTLN("LCD SSD1306 init");
+	#endif
 	// initialize SSD1306
 	lcd.init();
 	lcd.begin();
@@ -730,7 +748,7 @@ void OpenSprinkler::begin() {
 
 #if defined(ARDUINO)
 	#if defined(ESP32)
-	if(!Wire.begin(SDA,SCL)) { DEBUG_PRINT("Error initiating I2C"); }
+	if(!Wire.begin(SDA,SCL)) { DEBUG_PRINTLN(F("Error initiating I2C")); }
 	#ifdef ENABLE_DEBUG
 	scan_i2c();
 	#endif
@@ -853,14 +871,17 @@ void OpenSprinkler::begin() {
  	*/
  	hw_rev = 0;
 	  // mainio = new IOEXP(ACDR_I2CADDR); // dont need this as all is handled by ESP32 gpio's
-  #ifndef USE_IOEXP_SR
+
+  #if ! defined(USE_IOEXP_SR) || ( defined(USE_IOEXP_SR) && USE_IOEXP_SR != 1 )
   	DEBUG_PRINTLN("Using GPIO IOEXP");
 	drio = new BUILD_IN_GPIO(); // to handle gpio's on ESP32 board
 	drio->set_pins_output_mode();
   #else
-  	DEBUG_PRINTLN("Using Shift-register IOEXP");
+  	DEBUG_PRINTLN(F("Using Shift-register IOEXP"));
 	drio = new IOEXP_SR();
+	DEBUG_PRINTLN(F("Driver class initiated"));
 	drio->set_pins_output_mode();
+	DEBUG_PRINTLN("PIN SETUP COMPLETE");
   #endif	
 	// ROTARY ENCODER not supported now
 	#if ! defined(USE_ROTARY_ENCODER)
@@ -868,17 +889,17 @@ void OpenSprinkler::begin() {
 		PIN_BUTTON_2 = E0_PIN_BUTTON_2;
 		PIN_BUTTON_3 = E0_PIN_BUTTON_3;
 		
-		pinModeExt(PIN_BUTTON_1, INPUT_PULLUP);
-		pinModeExt(PIN_BUTTON_2, INPUT_PULLUP);
-		pinModeExt(PIN_BUTTON_3, INPUT_PULLUP);
+		pinMode(PIN_BUTTON_1, INPUT_PULLUP);
+		pinMode(PIN_BUTTON_2, INPUT_PULLUP);
+		pinMode(PIN_BUTTON_3, INPUT_PULLUP);
 	#else
 		PIN_BUTTON_1 = ROTARY_ENCODER_A_PIN;
 		PIN_BUTTON_2 = ROTARY_ENCODER_BUTTON_PIN;
 		PIN_BUTTON_3 = ROTARY_ENCODER_B_PIN;
 	
-		pinModeExt(PIN_BUTTON_1, INPUT);
-		pinModeExt(PIN_BUTTON_2, INPUT);
-		pinModeExt(PIN_BUTTON_3, INPUT);
+		pinMode(PIN_BUTTON_1, INPUT);
+		pinMode(PIN_BUTTON_2, INPUT);
+		pinMode(PIN_BUTTON_3, INPUT);
 	#endif
 
 	/* detect expanders */
@@ -1020,7 +1041,7 @@ void OpenSprinkler::begin() {
 
 		lcd.setCursor(0,0);
 		lcd.print(F("Init file system"));
-		DEBUG_PRINTLN("Init file system");
+		DEBUG_PRINT("Init file system... ");
 		lcd.setCursor(0,1);
 		#if defined(ESP8266)
 		if(!LittleFS.begin()) {
@@ -1030,8 +1051,11 @@ void OpenSprinkler::begin() {
 			// !!! flash init failed, stall as we cannot proceed
 			lcd.setCursor(0, 0);
 			lcd_print_pgm(PSTR("Error Code: 0x2D"));
+			DEBUG_PRINTLN(F("FAILED."));
 			delay(5000);
+			reboot_dev(REBOOT_CAUSE_PROGRAM);
 		}
+		DEBUG_PRINTLN(F("Done."));
 
 		state = OS_STATE_INITIAL;
 
@@ -1057,6 +1081,7 @@ void OpenSprinkler::begin() {
 	pinMode(PIN_BUTTON_3, INPUT_PULLUP);
 
 	// detect and check RTC type
+	DEBUG_PRINTLN(F("Detecting RTC"))
 	RTC.detect();
 
 #else

@@ -12,10 +12,11 @@
 #define DONE_FILENAME         "/done.dat"    // used to indicate the completion of all files
 
 #define SPIFFS_BLOCK_SIZE	4096
+#define FORMAT_SPIFFS_IF_FAILED true
 
 // chose LCD type: 0.96 probably SSD1306, 1.3" is probably SH1106
-#define LCD_SH1106
-// #define LCD_SSD1306
+//#define LCD_SH1106
+#define LCD_SSD1306
 
 #define MDNS_NAME "opensprinkler" // mDNS name for OS controler
 #define OS_HW_VERSION    (OS_HW_VERSION_BASE+40)
@@ -51,8 +52,8 @@
   extern byte PIN_BOOST;
   extern byte PIN_BOOST_EN;
   extern byte PIN_LATCH_COM;
-	extern byte PIN_LATCH_COMA;
-	extern byte PIN_LATCH_COMK;
+  extern byte PIN_LATCH_COMA;
+  extern byte PIN_LATCH_COMK;
   extern byte PIN_SENSOR1;
   extern byte PIN_SENSOR2;
   extern byte PIN_IOEXP_INT;
@@ -72,9 +73,9 @@
  
   #define PIN_ETHER_CS         255 // ENC28J60 CS (chip select pin) is 16 on OS 3.2.
 
-  #define USE_IOEXP_SR 1 // use Shift-register as station setting - uncomment this to use built-in gpio style
+  #define USE_IOEXP_SR 0 // use Shift-register as station setting - uncomment this to use built-in gpio style
   
-  #define ON_BOARD_GPIN_LIST     {255,255,255,255,255,255,255,255} //  ESP32 on board gpins to be usead as sections, 255 - pin not defined
+  #define ON_BOARD_GPIN_LIST     {2,4,255,255,255,255,255,255} //  ESP32 on board gpins to be usead as sections, 255 - pin not defined
   #define PIN_FREE_LIST     {} // no free GPIO pin at the moment
 
   #define PIN_CURR_SENSE      255
@@ -90,6 +91,7 @@
   #define SEPARATE_MASTER_VALVE 19
 
   // 74HC595 shift reg
+  // #define IOEXP_SR_OE_PIN // output enable pin, not used now
   #define IOEXP_SR_DATA_PIN 25
   #define IOEXP_SR_CLK_PIN 27
   #define IOEXP_SR_LATCH_PIN 32

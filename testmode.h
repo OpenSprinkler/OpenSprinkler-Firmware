@@ -48,7 +48,7 @@ void scan_i2c() {
 
         if (error == 0)
             {
-            DEBUG_PRINT("I2C device found at address 0x");
+            DEBUG_PRINT("I2C device found at address ");
             if (address<16) 
             DEBUG_PRINT("0");
             DEBUG_PRINTX(address);

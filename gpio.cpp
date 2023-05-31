@@ -159,21 +159,33 @@ void BUILD_IN_GPIO::i2c_write(uint8_t reg, uint16_t v) {
 }
 
 void IOEXP_SR::set_pins_output_mode(){
+	
+	DEBUG_PRINTLN("Setting up SR pins");
+	//DEBUG_PRINTLN(IOEXP_SR_LATCH_PIN);
+	//DEBUG_PRINTLN(IOEXP_SR_CLK_PIN);
 	// shift register setup
 	// pinMode(PIN_SR_OE, OUTPUT);
 	// pull shift register OE high to disable output
 	// digitalWrite(PIN_SR_OE, HIGH);
 	pinMode(IOEXP_SR_LATCH_PIN, OUTPUT);
+	DEBUG_PRINTLN("Latch 1");
 	digitalWrite(IOEXP_SR_LATCH_PIN, HIGH);
+	DEBUG_PRINTLN("Latch OK");
 
 	pinMode(IOEXP_SR_CLK_PIN, OUTPUT);
 	digitalWrite(IOEXP_SR_CLK_PIN, HIGH);
+	DEBUG_PRINTLN("CLK OK");
+	
 	pinMode(IOEXP_SR_DATA_PIN,	OUTPUT);
 	digitalWrite(IOEXP_SR_DATA_PIN, LOW);
-	
+	DEBUG_PRINTLN("DATA OK");
+
+
 	#if defined(SEPARATE_MASTER_VALVE)
-	// DEBUG_PRINTLN("Enabling separate master valve");
+	DEBUG_PRINTLN("Enabling separate master valve");
 	pinMode(SEPARATE_MASTER_VALVE,OUTPUT);
+	DEBUG_PRINT("Setting station logic to ");
+	DEBUG_PRINTLN(STATION_LOGIC);
 	if ( STATION_LOGIC ) {
 		digitalWrite(SEPARATE_MASTER_VALVE,LOW);
 	} else {

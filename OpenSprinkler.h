@@ -39,10 +39,11 @@
 
 	#if defined(ESP8266) || defined(ESP32) // for ESP8266 and ESP32
 		#include <FS.h>
-		#include <LittleFS.h>
 		#if defined(ESP8266)
+		#include <LittleFS.h>
 		#include <ENC28J60lwIP.h>
 		#elif defined(ESP32)
+		#include <SPIFFS.h>
 		#include <ESP32-ENC28J60.h> //this will load a different library by Tobozo
 		#endif
 		#include <RCSwitch.h>
@@ -55,9 +56,6 @@
 		#include "SSD1306Display.h"
 		#endif 
 		#include "espconnect.h"
-		#if defined(ESP32)
-			#include <SPIFFS.h>
-		#endif 
 	#else // for AVR
 		#include <SdFat.h>
 		#include <Ethernet.h>

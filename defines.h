@@ -24,7 +24,7 @@
 #ifndef _DEFINES_H
 #define _DEFINES_H
 
-//#define ENABLE_DEBUG  // enable serial debug
+#define ENABLE_DEBUG  // enable serial debug
 
 typedef unsigned char byte;
 typedef unsigned long ulong;
@@ -464,9 +464,11 @@ enum {
 #if defined(ENABLE_DEBUG) /** Serial debug functions */
 
 	#if defined(ARDUINO)
-		#define DEBUG_BEGIN(x)   {Serial.begin(x);}
-		#define DEBUG_PRINT(x)   {Serial.print(x);}
+		#define DEBUG_BEGIN(x) {Serial.begin(x);}
+		#define DEBUG_PRINT(x) {Serial.print(x);}
 		#define DEBUG_PRINTLN(x) {Serial.println(x);}
+		//#define DEBUG_STRINGIFY(x) {#x;}
+		//#define DEBUG_TOSTRING(x) { DEBUG_STRINGIFY(x); }
 	#else
 		#include <stdio.h>
 		#define DEBUG_BEGIN(x)          {}  /** Serial debug functions */
@@ -480,6 +482,7 @@ enum {
 	#define DEBUG_BEGIN(x)   {}
 	#define DEBUG_PRINT(x)   {}
 	#define DEBUG_PRINTLN(x) {}
+	#define DEBUG_STRINGIFY(x) {}
 
 #endif
 
