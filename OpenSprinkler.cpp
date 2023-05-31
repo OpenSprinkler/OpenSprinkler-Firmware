@@ -1052,7 +1052,7 @@ void OpenSprinkler::begin() {
 			lcd.setCursor(0, 0);
 			lcd_print_pgm(PSTR("Error Code: 0x2D"));
 			DEBUG_PRINTLN(F("FAILED."));
-			delay(5000);
+			delay(10000);
 			reboot_dev(REBOOT_CAUSE_PROGRAM);
 		}
 		DEBUG_PRINTLN(F("Done."));
