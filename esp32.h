@@ -13,7 +13,7 @@
 
 #define SPIFFS_BLOCK_SIZE	4096
 // for testing only
-//#define FORMAT_SPIFFS_IF_FAILED true
+#define ESP32_FORMAT_SPIFFS_IF_FAILED true
 
 // chose LCD type: 0.96 probably SSD1306, 1.3" is probably SH1106
 //#define LCD_SH1106

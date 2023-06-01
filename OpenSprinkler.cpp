@@ -502,6 +502,7 @@ byte OpenSprinkler::start_network() {
 	extern DNSServer *dns;
 	if(get_wifi_mode() == WIFI_MODE_AP) dns = new DNSServer();
 	if(update_server) { delete update_server; update_server = NULL; }
+	DEBUG_PRINTLN(F("Setting update server"));
 	#if defined(ESP8266)
 	update_server = new ESP8266WebServer(8080);
 	#elif defined(ESP32)
@@ -1046,7 +1047,30 @@ void OpenSprinkler::begin() {
 		#if defined(ESP8266)
 		if(!LittleFS.begin()) {
 		#elif defined(ESP32)
-		if(!SPIFFS.begin()) {
+			// Get the size of the flash memory
+			uint32_t flash_size = ESP.getFlashChipSize();
+			
+			DEBUG_PRINTLN();
+			DEBUG_PRINT(F("Flash size: "));
+			DEBUG_PRINT(flash_size);
+			DEBUG_PRINTLN(F(" bytes"));
+
+			#if defined(ESP32_LIST_PARTITIONS)
+			DEBUG_PRINTLN(F("ESP32 Partition table:"));
+
+			DEBUG_PRINTLN(F("| Type | Sub |  Offset  |   Size   |       Label      |"));
+			DEBUG_PRINTLN(F("| ---- | --- | -------- | -------- | ---------------- |"));
+			
+			esp_partition_iterator_t pi = esp_partition_find(ESP_PARTITION_TYPE_ANY, ESP_PARTITION_SUBTYPE_ANY, NULL);
+			if (pi != NULL) {
+				do {
+				const esp_partition_t* p = esp_partition_get(pi);
+				printf("|  %02x  | %02x  | 0x%06X | 0x%06X | %-16s |\r\n", 
+					p->type, p->subtype, p->address, p->size, p->label);
+				} while (pi = (esp_partition_next(pi)));
+			}
+			#endif
+		if(!SPIFFS.begin(ESP32_FORMAT_SPIFFS_IF_FAILED)) {
 		#endif
 			// !!! flash init failed, stall as we cannot proceed
 			lcd.setCursor(0, 0);
