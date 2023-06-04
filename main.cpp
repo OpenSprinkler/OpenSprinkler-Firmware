@@ -916,6 +916,8 @@ void do_loop()
 					// skip if this is the master station
 					if (mas_id == sid + 1) continue;
 
+					if(pd.station_qid[sid]==255) continue; // skip if station is not in the queue
+
 					q = pd.queue + pd.station_qid[sid];
 
 					if (os.bound_to_master(q->sid, mas)) {
@@ -2026,8 +2028,9 @@ void check_network() {
 #define NET_ENC28J60_EIR_RXERIF                          0x01
 #define NET_ENC28J60_ESTAT_BUFFER                        0x40
 #define NET_ENC28J60_ECON1_RXEN                          0x04
-bool check_enc28j60()
-{
+
+bool check_enc28j60() {
+	
 	uint8_t stateEconRxen = eth.readreg((uint8_t) NET_ENC28J60_ECON1) & NET_ENC28J60_ECON1_RXEN;
     // ESTAT.BUFFER rised on TX or RX error
     // I think the test of this register is not necessary - EIR.RXERIF state checking may be enough
