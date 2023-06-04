@@ -12,7 +12,7 @@
 #define DONE_FILENAME         "/done.dat"    // used to indicate the completion of all files
 
 #define SPIFFS_BLOCK_SIZE	4096
-// for testing only
+// for testing only - factory reset should do it anyway
 #define ESP32_FORMAT_SPIFFS_IF_FAILED true
 
 // chose LCD type: 0.96 probably SSD1306, 1.3" is probably SH1106
@@ -42,7 +42,7 @@
 #define EXP_I2CADDR_BASE 0x24 // base of expander I2C address
 
  
-  #define ETHER_BUFFER_SIZE   8192
+  #define ETHER_BUFFER_SIZE   4092 // was 8192 
 
   /* To accommodate different OS30 versions, we use software defines pins */ 
   extern byte PIN_BUTTON_1;

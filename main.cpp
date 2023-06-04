@@ -37,7 +37,7 @@
 		ESP8266WebServer *update_server = NULL;
 		ENC28J60lwIP eth(PIN_ETHER_CS); // ENC28J60 lwip for wired Ether
 		#elif defined(ESP32)
-		#include <ESP32-ENC28J60.h> // not used/implemented now
+		//#include <ESP32-ENC28J60.h> // not used/implemented now
 		WebServer *update_server = NULL;
 		#endif
 		OTF::OpenThingsFramework *otf = NULL;
@@ -307,6 +307,7 @@ void ui_state_machine() {
 void do_setup() {
 	
 	#if defined(ESP32)
+
 	/* Setting internal station pins to prevent unstable behavior on startup */
 	  int i;
 	  unsigned int pin_list[] = ON_BOARD_GPIN_LIST;
@@ -317,6 +318,7 @@ void do_setup() {
 		}
 	  }
 
+	#if defined(USE_IOEXP_SR) && USE_IOEXP_SR == 1
 	  pinMode(IOEXP_SR_LATCH_PIN, OUTPUT);
 	  digitalWrite(IOEXP_SR_LATCH_PIN, HIGH);
 
@@ -324,6 +326,7 @@ void do_setup() {
 	  digitalWrite(IOEXP_SR_CLK_PIN, HIGH);
 	  pinMode(IOEXP_SR_DATA_PIN,  OUTPUT);
 	  digitalWrite(IOEXP_SR_DATA_PIN, LOW);
+	#endif
 
 	  #if defined(SEPARATE_MASTER_VALVE)
 	  //DEBUG_PRINTLN("Enabling separate MASTER valve");
@@ -345,13 +348,20 @@ void do_setup() {
 #endif
 
 	DEBUG_BEGIN(115200);
-	DEBUG_PRINTLN(F("started"));
+
+	DEBUG_PRINT(F("Build timestamp: "));
+	DEBUG_PRINT(__DATE__);
+	DEBUG_PRINT(" ");
+	DEBUG_PRINTLN(__TIME__);
+
+	DEBUG_PRINTLN(F("--- Starting setup"));
 
 	os.begin();          // OpenSprinkler init
+	DEBUG_PRINTLN(F("--- Setting up options"));
 	os.options_setup();  // Setup options
-
+	DEBUG_PRINTLN(F("--- PD init"));
 	pd.init();           // ProgramData init
-
+	DEBUG_PRINTLN(F("--- Time setup"));
 	// set time using RTC if it exists
 	if(RTC.exists())	setTime(RTC.get());
 	os.lcd_print_time(os.now_tz());  // display time to LCD
@@ -368,6 +378,7 @@ void do_setup() {
 	/* Enable the WD interrupt (note no reset). */
 	WDTCSR |= _BV(WDIE);
 #endif
+	
 	if (os.start_network()) {  // initialize network
 		os.status.network_fails = 0;
 	} else {
@@ -376,7 +387,7 @@ void do_setup() {
 
 	os.status.req_network = 0;
 	os.status.req_ntpsync = 1;
-
+	DEBUG_PRINTLN(F("--- MQTT Init"));
 	os.mqtt.init();
 	os.status.req_mqtt_restart = true;
 
@@ -409,7 +420,7 @@ ISR(WDT_vect)
 #endif
 
 #else
-
+// not arduino
 void do_setup() {
 	initialiseEpoch();   // initialize time reference for millis() and micros()
 	os.begin();          // OpenSprinkler init
@@ -507,6 +518,7 @@ void do_loop()
 			os.state = OS_STATE_CONNECTED;
 			connecting_timeout = 0;
 		} else if(os.get_wifi_mode()==WIFI_MODE_AP) {
+			DEBUG_PRINTLN(F("Starting AP"));
 			start_server_ap();
 			dns->setErrorReplyCode(DNSReplyCode::NoError);
 			dns->start(53, "*", WiFi.softAPIP());
@@ -514,6 +526,7 @@ void do_loop()
 			connecting_timeout = 0;
 		} else {
 			led_blink_ms = LED_SLOW_BLINK;
+			DEBUG_PRINTLN(F("Setting up WiFi client"));
 			if(os.sopt_load(SOPT_STA_BSSID_CHL).length()>0 && os.wifi_channel<255) {
 				start_network_sta(os.wifi_ssid.c_str(), os.wifi_pass.c_str(), (int32_t)os.wifi_channel, os.wifi_bssid);
 			}

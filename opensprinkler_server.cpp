@@ -2125,7 +2125,7 @@ void start_server_client() {
 void start_server_ap() {
 	if(!otf) return;
 
-	scanned_ssids = scan_network();
+	scanned_ssids = scan_network(); // this is not used here, I don't know why it's needed
 	String ap_ssid = get_ap_ssid();
 	start_network_ap(ap_ssid.c_str(), NULL);
 	delay(500);

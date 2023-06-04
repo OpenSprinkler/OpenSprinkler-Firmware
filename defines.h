@@ -25,6 +25,7 @@
 #define _DEFINES_H
 
 #define ENABLE_DEBUG  // enable serial debug
+#define SERIAL_DEBUG // enable debug for OTF
 
 typedef unsigned char byte;
 typedef unsigned long ulong;
