@@ -39,12 +39,15 @@
 
 	#if defined(ESP8266) || defined(ESP32) // for ESP8266 and ESP32
 		#include <FS.h>
-		#if defined(ESP8266)
 		#include <LittleFS.h>
+		#if defined(ESP8266)
+		
 		#include <ENC28J60lwIP.h>
 		#elif defined(ESP32)
-		#include <SPIFFS.h>
-		#include <ESP32-ENC28J60.h> //this will load a different library by Tobozo
+		//#include <SPIFFS.h>
+		//#include <ArduinoWiFiServer.h>
+		//#include <ArduinoTcpHardware.h>
+		// #include <ESP32-ENC28J60.h> //this will load a different library by Tobozo
 		#endif
 		#include <RCSwitch.h>
 		#include <OpenThingsFramework.h>
@@ -79,7 +82,7 @@
 	#elif defined(ESP32)
 	extern WebServer *update_server;
 	extern OTF::OpenThingsFramework *otf;
-	extern ENC28J60Class eth;
+	//extern ENC28J60Class eth; - no ethernet now
 	#else
 	extern EthernetServer *m_server;
 	#endif

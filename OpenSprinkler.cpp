@@ -74,6 +74,8 @@ extern char tmp_buffer[];
 extern char ether_buffer[];
 extern ProgramData pd;
 
+extern void start_server_ap();
+
 #if defined(ESP8266) || defined(ESP32) 
 	
 	//DEBUG_PRINTLN(F("I2C Init with pins "));
@@ -474,8 +476,8 @@ byte OpenSprinkler::start_network() {
 
 #ifdef ENABLE_DEBUG
 #if defined(ESP32)
-  DEBUG_PRINTLN(F("SPIFFS dir:"));
-  SPIFFS_list_dir();
+  //DEBUG_PRINTLN(F("ESP32 FS dir:"));
+  //ESP32_FS_list_dir();
   DEBUG_PRINTLN(F("Starting network"));
 #endif //ESP32
 #endif 
@@ -492,13 +494,24 @@ byte OpenSprinkler::start_network() {
 	}
 	#endif
 
+	DEBUG_PRINT("ETH enabled: ");
+	DEBUG_PRINTLN(useEth);
+	DEBUG_PRINT("Wifi mode: ");
+	DEBUG_PRINTLN(( get_wifi_mode() == WIFI_MODE_STA ) ?  F("STA") : F("AP"));
+	
+	// FIXME, just for testing
+	::start_server_ap();
+
 	if((useEth || get_wifi_mode()==WIFI_MODE_STA) && otc.en>0 && otc.token.length()>=32) {
 		otf = new OTF::OpenThingsFramework(httpport, otc.server, otc.port, otc.token, false, ether_buffer, ETHER_BUFFER_SIZE);
 		DEBUG_PRINTLN(F("Started OTF with remote connection"));
 	} else {
+		DEBUG_PRINT(F("OTF start with http_port "));
+		DEBUG_PRINTLN(httpport);
 		otf = new OTF::OpenThingsFramework(httpport, ether_buffer, ETHER_BUFFER_SIZE);
 		DEBUG_PRINTLN(F("Started OTF with just local connection"));
 	}
+	DEBUG_PRINTLN("DNSServer start");
 	extern DNSServer *dns;
 	if(get_wifi_mode() == WIFI_MODE_AP) dns = new DNSServer();
 	if(update_server) { delete update_server; update_server = NULL; }
@@ -604,10 +617,12 @@ byte OpenSprinkler::start_ether() {
 }
 
 bool OpenSprinkler::network_connected(void) {
-#if defined (ESP8266) || defined(ESP32)
+#if defined (ESP8266)
 	if(useEth) return true; // todo: lwip currently does not have a way to check link status
 	else
 		return (get_wifi_mode()==WIFI_MODE_STA && WiFi.status()==WL_CONNECTED && state==OS_STATE_CONNECTED);
+#elif defined(ESP32)
+	return (get_wifi_mode()==WIFI_MODE_STA && WiFi.status()==WL_CONNECTED && state==OS_STATE_CONNECTED);
 #else
 	return (Ethernet.linkStatus()==LinkON);
 #endif
@@ -1070,7 +1085,7 @@ void OpenSprinkler::begin() {
 				} while (pi = (esp_partition_next(pi)));
 			}
 			#endif
-		if(!SPIFFS.begin(ESP32_FORMAT_SPIFFS_IF_FAILED)) {
+		if(!LittleFS.begin(ESP32_FORMAT_FS_IF_FAILED)) {
 		#endif
 			// !!! flash init failed, stall as we cannot proceed
 			lcd.setCursor(0, 0);
@@ -1105,8 +1120,9 @@ void OpenSprinkler::begin() {
 	pinMode(PIN_BUTTON_3, INPUT_PULLUP);
 
 	// detect and check RTC type
-	DEBUG_PRINTLN(F("Detecting RTC"))
+	DEBUG_PRINT(F("Detecting RTC..."));
 	RTC.detect();
+	DEBUG_PRINTLN(F("done."));
 
 #else
 	DEBUG_PRINTLN(get_runtime_path());
@@ -2170,7 +2186,7 @@ void OpenSprinkler::pre_factory_reset() {
 		#if defined(ESP8266)
 	LittleFS.format();
 		#elif defined(ESP32)
-	SPIFFS.format();
+	LittleFS.format();
 		#endif
 	#else
 	// remove 'done' file as an indicator for reset
@@ -2184,9 +2200,16 @@ void OpenSprinkler::factory_reset() {
 #if defined(ARDUINO)
 	lcd_print_line_clear_pgm(PSTR("Factory reset"), 0);
 	lcd_print_line_clear_pgm(PSTR("Please Wait..."), 1);
+	DEBUG_PRINTLN(F("Factory reset"));
 #else
 	DEBUG_PRINT("factory reset...");
 #endif
+
+	#if defined(ESP32)
+	// 0. create the directory
+	//LittleFS.mkdir(LOG_PREFIX);
+	LittleFS.mkdir(IOPTS_FILENAME);
+	#endif
 
 	// 1. reset integer options (by saving default values)
 	iopts_save();
@@ -2236,6 +2259,10 @@ void OpenSprinkler::factory_reset() {
 
 	// 5. write 'done' file
 	file_write_byte(DONE_FILENAME, 0, 1);
+
+	#if defined(ESP32)
+		start_network_ap(wifi_ssid.c_str(),wifi_pass.c_str());
+	#endif
 }
 
 #define str(s) #s
@@ -2267,9 +2294,11 @@ void OpenSprinkler::parse_otc_config() {
 /** Setup function for options */
 void OpenSprinkler::options_setup() {
 
+	LittleFS.mkdir(IOPTS_FILENAME);
+
 	// Check reset conditions:
-	if (file_read_byte(IOPTS_FILENAME, IOPT_FW_VERSION)<220 ||  // fw version is invalid (<219)
-			!file_exists(DONE_FILENAME)) {  // done file doesn't exist
+	if ( ( !file_exists(IOPTS_FILENAME) || file_read_byte(IOPTS_FILENAME, IOPT_FW_VERSION)<220 ) ||  // fw version is invalid (<219)
+			!file_exists(DONE_FILENAME) ) {  // done file doesn't exist
 
 		factory_reset();
 

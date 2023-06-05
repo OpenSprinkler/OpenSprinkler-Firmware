@@ -8,18 +8,18 @@
 #define DEBUG_PRINTX(x)  {Serial.print(F("0x")); Serial.print(x, HEX); }
 #endif
 
-void SPIFFS_list_dir();
+void ESP32_FS_list_dir();
 void scan_i2C();
 
-void SPIFFS_list_dir() {
+void ESP32_FS_list_dir() {
  
  
-  if (!SPIFFS.begin(true)) {
-    DEBUG_PRINTLN("An Error has occurred while mounting SPIFFS");
+  if (!LittleFS.begin()) {
+    DEBUG_PRINTLN("An Error has occurred while mounting FS");
     return;
   }
  
-  File root = SPIFFS.open("/");
+  File root = LittleFS.open("/");
  
   File file = root.openNextFile();
  

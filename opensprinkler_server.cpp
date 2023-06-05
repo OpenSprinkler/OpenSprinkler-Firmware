@@ -1750,10 +1750,10 @@ void server_json_log(OTF_PARAMS_DEF) {
 		itoa(i, tmp_buffer, 10);
 		make_logfile_name(tmp_buffer);
 
-#if defined(ESP8266) || defined(ESP32)
+#if defined(ESP8266)
 		File file = LittleFS.open(tmp_buffer, "r");
 #elif defined(ESP32)
-		File file = SPIFFS.open(tmp_buffer, "r");
+		File file = LittleFS.open(tmp_buffer, "r");
 		if(!file) continue;
 #elif defined(ARDUINO)
 		if (!sd.exists(tmp_buffer)) continue;
@@ -1938,7 +1938,7 @@ void server_json_debug(OTF_PARAMS_DEF) {
 #elif defined(ESP32)
 	(uint16_t)ESP.getFreeHeap());
 	bfill.emit_p(PSTR(",\"flash\":$D,\"used\":$D,\"rssi\":$D,\"bssid\":\"$S\",\"bssidchl\":\"$O\"}"),
-		SPIFFS.totalBytes(), SPIFFS.usedBytes(), WiFi.RSSI(), WiFi.BSSIDstr().c_str(), SOPT_STA_BSSID_CHL);
+		LittleFS.totalBytes(), LittleFS.usedBytes(), WiFi.RSSI(), WiFi.BSSIDstr().c_str(), SOPT_STA_BSSID_CHL);
 #else
 	(uint16_t)freeHeap());
 	bfill.emit_p(PSTR("}"));
@@ -2125,7 +2125,7 @@ void start_server_client() {
 void start_server_ap() {
 	if(!otf) return;
 
-	scanned_ssids = scan_network();
+	scanned_ssids = scan_network(); // this is not used here, I don't know why it's needed
 	String ap_ssid = get_ap_ssid();
 	start_network_ap(ap_ssid.c_str(), NULL);
 	delay(500);

@@ -1,8 +1,11 @@
 # OpenSprinkler firmware with support added for ESP32.
 
+Use at least 6.3.0 from framework-espressi32, since 6.2.0 contains F() macro bug! Use 'pio pkg update' from PIO Core Cli to upgrade!
+
 Work is based on JaCharer's work (https://github.com/JaCharer/OpenSprinkler-Firmware-ESP32port) but was done from existing OpenSprinkler firmware.
 
 **As of now - 2023.05.14 - NOTHING IS TESTED, but code compiles under PlatformIO(VSCode).**
+**As of now - 2023.06.05 - Code is tested by some, runs on Wokwi simulator, but had to apply workaround after factory reset.**
 
 ** Don't forget to change esp32.h according to your settings! It's set for my setup with ShiftRegister output and SH1106 LCD (instead of the default SSD1306) **
 
@@ -14,17 +17,7 @@ LCD can be set also to SH1106 (1.3"), instead of SSD1306 (0.96").
 
 Multiple outputs are supported: GPIO, ShiftRegister and the standard PCF8574/PCA9555A
 
-OpenThings lib is not 100%, the following 2 functions must be added to Esp32LocalServer.cpp (don't forget to modify the .h as well):
-
-void Esp32LocalClient::flush() {
-	client.flush();
-}
-
-void Esp32LocalClient::stop() {
-	client.stop();
-}
-
-<sub>Will open a PR, once have some time to debug/verify everything</sub>
+OpenThingsLibrary is my fork, since there are some ESP32 related bugs. Will change when PR accepted.
 
 Final comment. This is an experimental software in alpha stage, please be very careful connecting any external devices as errors may damage your device. You can use it, but it's at your own risk !
 

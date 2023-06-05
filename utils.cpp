@@ -32,7 +32,7 @@ extern OpenSprinkler os;
 		#include <LittleFS.h>
 	#elif defined(ESP32)
 		#include <FS.h>
-		#include <SPIFFS.h>
+		#include <LittleFS.h>
 	#else
 		#include <avr/eeprom.h>
 		#include "SdFat.h"
@@ -180,8 +180,8 @@ void remove_file(const char *fn) {
 	if(!LittleFS.exists(fn)) return;
 	LittleFS.remove(fn);
 #elif defined(ESP32)
-	if(!SPIFFS.exists(fn)) return;
-	SPIFFS.remove(fn);
+	if(!LittleFS.exists(fn)) return;
+	LittleFS.remove(fn);
 #elif defined(ARDUINO)
 
 	sd.chdir("/");
@@ -201,7 +201,7 @@ bool file_exists(const char *fn) {
 	return LittleFS.exists(fn);
 #elif defined(ESP32)
 
-	return SPIFFS.exists(fn);
+	return LittleFS.exists(fn);
 #elif defined(ARDUINO)
 
 	sd.chdir("/");
@@ -230,7 +230,7 @@ void file_read_block(const char *fn, void *dst, ulong pos, ulong len) {
 	}
 #elif defined(ESP32)
 	// do not use File.readBytes or readBytesUntil because it's very slow
-	File f = SPIFFS.open(fn, "r");
+	File f = LittleFS.open(fn, "r");
 	if(f) {
 		f.seek(0, SeekSet);
 		f.seek(pos, SeekSet);
@@ -270,12 +270,9 @@ void file_write_block(const char *fn, const void *src, ulong pos, ulong len) {
 		f.close();
 	}
 #elif defined(ESP32)
-	File f;
-	if ( SPIFFS.exists(fn) ) {
-		f = SPIFFS.open(fn, "r+");
-	} else {
-		f = SPIFFS.open(fn, "w");
-	}
+
+	File f = LittleFS.open(fn, "r+");
+	if(!f) f = LittleFS.open(fn, "w");
 	
 	if(f) {
 		f.seek(pos, SeekSet);
@@ -322,7 +319,7 @@ void file_copy_block(const char *fn, ulong from, ulong to, ulong len, void *tmp)
 	f.write((byte*)tmp, len);
 	f.close();
 #elif defined(ESP32)
-	File f = SPIFFS.open(fn, "r+");
+	File f = LittleFS.open(fn, "r+");
 	if(!f) return;
 	f.seek(0,SeekSet);
 	f.seek(from, SeekSet);
@@ -373,7 +370,7 @@ byte file_cmp_block(const char *fn, const char *buf, ulong pos) {
 	}
 
 #elif defined(ESP32)
-	File f = SPIFFS.open(fn, "r");
+	File f = LittleFS.open(fn, "r");
 	if(f) {
 		f.seek(0, SeekSet);
 		f.seek(pos, SeekSet);

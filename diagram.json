@@ -3,7 +3,7 @@
   "author": "Tamas DAJKA",
   "editor": "wokwi",
   "parts": [
-    { "type": "wokwi-esp32-devkit-v1", "id": "esp", "top": 0, "left": 0, "attrs": {} },
+    { "type": "wokwi-esp32-devkit-v1", "id": "esp", "top": 0, "left": 0, "attrs": { "firmwareOffset": "0" } },
     { "type": "board-ssd1306", "id": "oled1", "top": -73.51, "left": 160.5, "attrs": {} },
     {
       "type": "wokwi-pushbutton",

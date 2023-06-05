@@ -1,4 +1,4 @@
 [wokwi]
 version = 1
-firmware = '.pio\build\esp32_sprinkler\firmware.bin'
+firmware = '.pio\build\esp32_sprinkler\firmware_merged.bin'
 elf = '.pio\build\esp32_sprinkler\firmware.elf'
