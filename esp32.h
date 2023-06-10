@@ -3,6 +3,8 @@
 
 #if defined(ESP32)
 
+ #define CONFIG_LITTLEFS_SPIFFS_COMPAT 1
+ 
 /** Data file names for esp32 / in filename is needed to work correctly */
 #define IOPTS_FILENAME        "/iopts.dat"   // integer options data file
 #define SOPTS_FILENAME        "/sopts.dat"   // string options data file
@@ -16,8 +18,8 @@
 #define ESP32_FORMAT_FS_IF_FAILED true
 
 // chose LCD type: 0.96 probably SSD1306, 1.3" is probably SH1106
-//#define LCD_SH1106
-#define LCD_SSD1306
+#define LCD_SH1106
+//#define LCD_SSD1306
 
 #define MDNS_NAME "opensprinkler" // mDNS name for OS controler
 #define OS_HW_VERSION    (OS_HW_VERSION_BASE+40)

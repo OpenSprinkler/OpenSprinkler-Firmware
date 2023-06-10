@@ -507,6 +507,8 @@ void do_loop()
 #if defined(ARDUINO)	// Process Ethernet packets for Arduino
 	#if defined(ESP8266) || defined(ESP32)
 	static ulong connecting_timeout;
+	//DEBUG_PRINT("OS State: ");
+	//DEBUG_PRINTLN(os.state); OS STate2
 	switch(os.state) {
 	case OS_STATE_INITIAL:
 		if(useEth) {
@@ -520,6 +522,7 @@ void do_loop()
 		} else if(os.get_wifi_mode()==WIFI_MODE_AP) {
 			DEBUG_PRINTLN(F("Starting AP"));
 			start_server_ap();
+			DEBUG_PRINTLN(F("AP started."));
 			dns->setErrorReplyCode(DNSReplyCode::NoError);
 			dns->start(53, "*", WiFi.softAPIP());
 			os.state = OS_STATE_CONNECTED;

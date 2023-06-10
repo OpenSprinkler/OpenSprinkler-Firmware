@@ -477,7 +477,7 @@ byte OpenSprinkler::start_network() {
 #ifdef ENABLE_DEBUG
 #if defined(ESP32)
   //DEBUG_PRINTLN(F("ESP32 FS dir:"));
-  //ESP32_FS_list_dir();
+  ESP32_FS_list_dir();
   DEBUG_PRINTLN(F("Starting network"));
 #endif //ESP32
 #endif 
@@ -519,9 +519,9 @@ byte OpenSprinkler::start_network() {
 	#if defined(ESP8266)
 	update_server = new ESP8266WebServer(8080);
 	#elif defined(ESP32)
-	DEBUG_PRINTLN(F("Starting MDNS service"));
-	MDNS.addService("_http", "_tcp", 8080 );
-	MDNS.addServiceTxt("_http", "_tcp", "path", "/");
+	//DEBUG_PRINTLN(F("Starting MDNS service"));
+	//MDNS.addService("_http", "_tcp", 8080 );
+	//MDNS.addServiceTxt("_http", "_tcp", "path", "/");
 	//      MDNS.addService("_http", "_udp", 80 );
 	update_server = new WebServer(8080);
 	#endif
@@ -1068,7 +1068,7 @@ void OpenSprinkler::begin() {
 			DEBUG_PRINTLN();
 			DEBUG_PRINT(F("Flash size: "));
 			DEBUG_PRINT(flash_size);
-			DEBUG_PRINTLN(F(" bytes"));
+			DEBUG_PRINTLN(F(" bytes"));			
 
 			#if defined(ESP32_LIST_PARTITIONS)
 			DEBUG_PRINTLN(F("ESP32 Partition table:"));
@@ -1087,12 +1087,17 @@ void OpenSprinkler::begin() {
 			#endif
 		if(!LittleFS.begin(ESP32_FORMAT_FS_IF_FAILED)) {
 		#endif
+
 			// !!! flash init failed, stall as we cannot proceed
 			lcd.setCursor(0, 0);
 			lcd_print_pgm(PSTR("Error Code: 0x2D"));
 			DEBUG_PRINTLN(F("FAILED."));
 			delay(10000);
-			reboot_dev(REBOOT_CAUSE_PROGRAM);
+			//reboot_dev(REBOOT_CAUSE_PROGRAM);
+		} else {
+			ESP32_listDir("/",2);
+			
+			//ESP32_readFile(IOPTS_FILENAME);
 		}
 		DEBUG_PRINTLN(F("Done."));
 
@@ -1123,6 +1128,11 @@ void OpenSprinkler::begin() {
 	DEBUG_PRINT(F("Detecting RTC..."));
 	RTC.detect();
 	DEBUG_PRINTLN(F("done."));
+
+	#if defined(ESP32)
+		// workaround for OTF 
+		start_network_ap(wifi_ssid.c_str(),wifi_pass.c_str());
+	#endif
 
 #else
 	DEBUG_PRINTLN(get_runtime_path());
@@ -2207,8 +2217,7 @@ void OpenSprinkler::factory_reset() {
 
 	#if defined(ESP32)
 	// 0. create the directory
-	//LittleFS.mkdir(LOG_PREFIX);
-	LittleFS.mkdir(IOPTS_FILENAME);
+	//LittleFS.mkdir(IOPTS_FILENAME);
 	#endif
 
 	// 1. reset integer options (by saving default values)
@@ -2261,6 +2270,7 @@ void OpenSprinkler::factory_reset() {
 	file_write_byte(DONE_FILENAME, 0, 1);
 
 	#if defined(ESP32)
+		// workaround for OTF 
 		start_network_ap(wifi_ssid.c_str(),wifi_pass.c_str());
 	#endif
 }
@@ -2294,8 +2304,20 @@ void OpenSprinkler::parse_otc_config() {
 /** Setup function for options */
 void OpenSprinkler::options_setup() {
 
+	#if defined(ESP8266)
 	LittleFS.mkdir(IOPTS_FILENAME);
-
+	#endif
+	//LittleFS.mkdir(DONE_FILENAME);
+	if ( !file_exists(IOPTS_FILENAME) ) {
+		DEBUG_PRINTLN("IOPTS missing");
+	}
+	if ( file_read_byte(IOPTS_FILENAME, IOPT_FW_VERSION)<220 ) {
+		DEBUG_PRINTLN("Wrong version");
+		DEBUG_PRINTLN(file_read_byte(IOPTS_FILENAME, IOPT_FW_VERSION));
+	}
+	if ( !file_exists(DONE_FILENAME) ) {
+		DEBUG_PRINTLN("DONE missing");
+	}
 	// Check reset conditions:
 	if ( ( !file_exists(IOPTS_FILENAME) || file_read_byte(IOPTS_FILENAME, IOPT_FW_VERSION)<220 ) ||  // fw version is invalid (<219)
 			!file_exists(DONE_FILENAME) ) {  // done file doesn't exist

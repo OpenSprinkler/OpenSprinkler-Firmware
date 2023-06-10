@@ -270,7 +270,9 @@ void file_write_block(const char *fn, const void *src, ulong pos, ulong len) {
 		f.close();
 	}
 #elif defined(ESP32)
-
+	//DEBUG_PRINT("Writing to ");
+	//DEBUG_PRINTLN(fn);
+	//DEBUG_PRINTLN(src);
 	File f = LittleFS.open(fn, "r+");
 	if(!f) f = LittleFS.open(fn, "w");
 	
