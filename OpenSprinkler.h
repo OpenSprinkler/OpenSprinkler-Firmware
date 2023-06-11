@@ -236,6 +236,9 @@ public:
 	static ulong flowcount_log_start; // starting flow count (for logging)
 
 	static byte  button_timeout;    // button timeout
+	#if defined(ESP32)
+	static bool  lcd_dimmed;
+	#endif
 	static ulong checkwt_lasttime;  // time when weather was checked
 	static ulong checkwt_success_lasttime; // time when weather check was successful
 	static ulong powerup_lasttime;  // time when controller is powered up most recently

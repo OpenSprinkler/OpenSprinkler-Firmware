@@ -162,8 +162,16 @@ void ui_state_machine() {
 	}
 #endif
 
-	if (!os.button_timeout) {
+	// LCD timeout reached
+	if (!os.button_timeout && !os.lcd_dimmed) {
+		#if defined(ESP32)
+		if ( os.get_wifi_mode()==WIFI_MODE_STA ) {
+			os.lcd_set_brightness(0);
+			os.lcd_dimmed = true;
+		}
+		#else
 		os.lcd_set_brightness(0);
+		#endif
 		ui_state = UI_STATE_DEFAULT;  // also recover to default state
 	}
 
@@ -171,6 +179,7 @@ void ui_state_machine() {
 	byte button = os.button_read(BUTTON_WAIT_HOLD);
 
 	if (button & BUTTON_FLAG_DOWN) {  // repond only to button down events
+		os.lcd_dimmed = false;
 		os.button_timeout = LCD_BACKLIGHT_TIMEOUT;
 		os.lcd_set_brightness(1);
 	} else {
@@ -1647,6 +1656,8 @@ void make_logfile_name(char *name) {
 #if defined(ARDUINO)
 	#if !defined(ESP8266) && !defined(ESP32)
 	sd.chdir("/");
+	#elif defined(ESP32)
+	LittleFS.mkdir(LOG_PREFIX);
 	#endif
 #endif
 	strcpy(tmp_buffer+TMP_BUFFER_SIZE-10, name); // hack: we do this because name is from tmp_buffer too
@@ -1832,11 +1843,18 @@ bool delete_log_oldest() {
 #elif defined(ESP32)
 bool delete_log_oldest() {
 	File root = LittleFS.open(LOG_PREFIX);
+	if ( ! root ) {
+		DEBUG_PRINTLN(F("Del oldest log; Failed to open LOG_PREFIX"));
+		return false;
+	}
  	File file = root.openNextFile();
  
 	time_t oldest_t = ULONG_MAX;
 	String oldest_fn;
 	while (file) {
+		if(file.isDirectory()){
+			continue;
+		}
 		time_t t = file.getLastWrite();
 		if(t<oldest_t) {
 			oldest_t = t;
@@ -1845,7 +1863,7 @@ bool delete_log_oldest() {
 		file = root.openNextFile();
 	}
 	if(oldest_fn.length()>0) {
-		DEBUG_PRINT(F("deleting "))
+		DEBUG_PRINT(F("Deleting oldest log file "))
 		DEBUG_PRINTLN(LOG_PREFIX+oldest_fn);
 		LittleFS.remove(LOG_PREFIX+oldest_fn);
 		return true;

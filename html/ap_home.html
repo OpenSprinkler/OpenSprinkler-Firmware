@@ -11,7 +11,7 @@
 <br>
 <table>
   <tr><td><b>SSID</b>:</td><td><input type='text' id='ssid' class='ipt' size=18></td></tr>
-  <tr><td><b>Password</b>:</td><td><input type='password' id='pass' class='ipt' size=18></td></tr>
+  <tr><td><b>Password</b>:</td><td><input type='password' id='pass' class='ipt' size=18>&nbsp;<input type="checkbox" onclick="var x = document.getElementById('pass'); if ( this.checked ) { x.type = 'text'; } else { x.type = 'password'; }"/></td></tr>
   <tr><td><b>BSSID</b>:</td><td><input type='text' id='bssid' class='ipt' size=18 placeholder='(optional)'></td></tr>
   <tr><td><b>Channel</b>:<td><input type='text' id='channel' class='ipt' size=18 placeholder='(optional)'></td></tr>
   <tr><td colspan=2><p id='msg'></p></td></tr>

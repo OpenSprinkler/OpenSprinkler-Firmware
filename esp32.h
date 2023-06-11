@@ -3,8 +3,9 @@
 
 #if defined(ESP32)
 
- #define CONFIG_LITTLEFS_SPIFFS_COMPAT 1
- 
+// this will enable SPIFFS compatiblity => no "real" folders
+//#define CONFIG_LITTLEFS_SPIFFS_COMPAT 1
+
 /** Data file names for esp32 / in filename is needed to work correctly */
 #define IOPTS_FILENAME        "/iopts.dat"   // integer options data file
 #define SOPTS_FILENAME        "/sopts.dat"   // string options data file
@@ -33,8 +34,8 @@
 #define IOEXP_PIN        0x99 // base for pins on main IO expander
 
 /*  ESP32 port support only AC mode as DC and Latch need dedicated HW
- *  Dont need this to declere and saerch for Main IO controler and  
- *  ac, dc or latch drivers. However you may use DC nad Latch when deciated HW builded - not tested
+ *  Dont need this to declare and search for Main IO controller and  
+ *  ac, dc or latch drivers. However you may use DC nad Latch when dedicated HW builded - not tested
  */
 #define MAIN_I2CADDR     0x20 // main IO expander I2C address
 #define ACDR_I2CADDR     0x21 // ac driver I2C address
@@ -81,6 +82,7 @@
   #define ON_BOARD_GPIN_LIST     {2,4,255,255,255,255,255,255} //  ESP32 on board gpins to be usead as sections, 255 - pin not defined
   #define PIN_FREE_LIST     {} // no free GPIO pin at the moment
 
+  // if set to a real ADC pin, than it means the board has current sensor capabilities
   #define PIN_CURR_SENSE      255
   
   #define STATION_LOGIC  1 // Zone output logic for relays - 1 => HIGH in ON, 0 => LOW is ON

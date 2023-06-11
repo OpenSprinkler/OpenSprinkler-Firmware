@@ -53,6 +53,9 @@ ulong OpenSprinkler::pause_timer;
 ulong OpenSprinkler::flowcount_log_start;
 ulong OpenSprinkler::flowcount_rt;
 byte OpenSprinkler::button_timeout;
+#if defined(ESP32)
+bool OpenSprinkler::lcd_dimmed = false;
+#endif
 ulong OpenSprinkler::checkwt_lasttime;
 ulong OpenSprinkler::checkwt_success_lasttime;
 ulong OpenSprinkler::powerup_lasttime;
@@ -362,7 +365,11 @@ byte OpenSprinkler::iopts[] = {
 	0,  // device id
 	150,// lcd contrast
 	100,// lcd backlight
+	#if defined(ESP32)
+	40,
+	#else
 	15, // lcd dimming
+	#endif
 	80, // boost time (only valid to DC and LATCH type)
 	0,  // weather algorithm (0 means not using weather algorithm)
 	0,  // this and the next three bytes define the ntp server ip
@@ -997,8 +1004,11 @@ void OpenSprinkler::begin() {
 #if defined(ARDUINO)  // AVR SD and LCD functions
 
 	#if defined(ESP8266) || defined(ESP32)  // OS3.0 specific detections
-
+		#if PIN_CURR_SENSE != 255
 		status.has_curr_sense = 1;  // OS3.0 has current sensing capacility
+		# else
+		status.has_curr_sense = 0;  // OS3.0 has current sensing capacility
+		#endif
 		// measure baseline current
 		baseline_current = 80;
 
@@ -2414,7 +2424,7 @@ void OpenSprinkler::options_setup() {
 
 	if (!button) {
 		// flash screen
-		lcd_print_line_clear_pgm(PSTR(" OpenSprinkler"),0);
+		lcd_print_line_clear_pgm(PSTR("OpenSprinkler ESP32"),0);
 		lcd.setCursor((hw_type==HW_TYPE_LATCH)?2:4, 1);
 		lcd_print_pgm(PSTR("v"));
 		byte hwv = iopts[IOPT_HW_VERSION];
@@ -2767,8 +2777,10 @@ void OpenSprinkler::lcd_print_screen(char c) {
 		lcd.setCursor(2, 2);
 		if(status.program_busy && !status.pause_state) {
 			//lcd.print(F("Curr: "));
+			#if ! defined(ESP32) || ( defined(ESP32) && PIN_CURR_SENSE != 255 )
 			lcd.print(read_current());
 			lcd.print(F(" mA      "));
+			#endif
 		} else {
 			lcd.clear(2, 2);
 		}
