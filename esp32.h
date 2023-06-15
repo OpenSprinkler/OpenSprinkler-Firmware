@@ -28,7 +28,9 @@
 //#define RFTX // uncoment when planning to use RX controler
 //#define ETHPORT // uncoment when palnning to use wired etherner
 
-
+// override of default I2C pins 21/22
+#define SDA_PIN 5
+#define SCL_PIN 4
 #define LCD_I2CADDR      0x3c // 128x64 OLED display I2C address
 
 #define IOEXP_PIN        0x99 // base for pins on main IO expander
@@ -45,7 +47,7 @@
 #define EXP_I2CADDR_BASE 0x24 // base of expander I2C address
 
  
-  #define ETHER_BUFFER_SIZE   4092 // was 8192 
+  #define ETHER_BUFFER_SIZE   8192 // was 8192 
 
   /* To accommodate different OS30 versions, we use software defines pins */ 
   extern byte PIN_BUTTON_1;
@@ -63,35 +65,38 @@
   extern byte PIN_IOEXP_INT;
 
 
-  #define E0_PIN_BUTTON_1      18 // button 1
-  #define E0_PIN_BUTTON_2      5 // button 2
-  #define E0_PIN_BUTTON_3      17 // button 3
+  #define E0_PIN_BUTTON_1      25 // button 1 - v1pr 18
+  #define E0_PIN_BUTTON_2      0 // button 2 - v1pr 5
+  #define E0_PIN_BUTTON_3      26 // button 3 - vipr 17
   #define E0_PIN_RFRX          255
   #define E0_PIN_RFTX          255
   #define E0_PIN_BOOST         255// special HW needed
   #define E0_PIN_BOOST_EN      255// special HW needed
   #define E0_PIN_LATCH_COM     255// not needed for ESP32
-  #define E0_PIN_SENSOR1       39 // sensor 1
-  #define E0_PIN_SENSOR2       33 // sensor 2  
+  #define E0_PIN_SENSOR1       26 // sensor 1 - v1pr 39
+  #define E0_PIN_SENSOR2       2 // sensor 2  - v1pr 33
   #define E0_PIN_IOEXP_INT     255// not needed for ESP32
  
   #define PIN_ETHER_CS         255 // ENC28J60 CS (chip select pin) is 16 on OS 3.2.
 
   #define USE_IOEXP_SR 0 // use Shift-register as station setting - uncomment this to use built-in gpio style
   
-  #define ON_BOARD_GPIN_LIST     {2,4,255,255,255,255,255,255} //  ESP32 on board gpins to be usead as sections, 255 - pin not defined
+  #define ON_BOARD_GPIN_LIST     {12,13,14,15,16,255,255,255} //  ESP32 on board gpins to be usead as sections, 255 - pin not defined
   #define PIN_FREE_LIST     {} // no free GPIO pin at the moment
 
   // if set to a real ADC pin, than it means the board has current sensor capabilities
-  #define PIN_CURR_SENSE      255
+  #define PIN_CURR_SENSE      39 // not used on v1pr's board, so 255
   
-  #define STATION_LOGIC  1 // Zone output logic for relays - 1 => HIGH in ON, 0 => LOW is ON
+  #define STATION_LOGIC  0 // Zone output logic for relays - 1 => HIGH in ON, 0 => LOW is ON - v1pr board: 1
 
   // Rotary Encoder instead of buttons - not used for now
+  //#define USE_ROTARY_ENCODER
   #define ROTARY_ENCODER_A_PIN 35
   #define ROTARY_ENCODER_B_PIN 34
-  #define ROTARY_ENCODER_BUTTON_PIN 36
+  #define ROTARY_ENCODER_BUTTON_PIN 36 // this should be same, as one of the BUTTON_PINS
   #define ROTARY_ENCODER_VCC_PIN -1
+
+  #define BOOT_MENU_V2
 
   #define SEPARATE_MASTER_VALVE 19
 
@@ -103,11 +108,11 @@
 
   #define SYS_STATUS_LED_PIN  13
 
-
   // this it not nice, should be cleaned up
  	/* Original OS30 pin defines */
 	//#define V0_MAIN_INPUTMASK 0b00001010 // main input pin mask
 	// pins on main PCF8574 IO expander have pin numbers IOEXP_PIN+i
+	/*
 	#define V0_PIN_BUTTON_1      IOEXP_PIN+1 // button 1
 	#define V0_PIN_BUTTON_2      0           // button 2
 	#define V0_PIN_BUTTON_3      IOEXP_PIN+3 // button 3
@@ -119,9 +124,10 @@
 	#define V0_PIN_BOOST_EN      IOEXP_PIN+7
 	#define V0_PIN_SENSOR1       12 // sensor 1
 	#define V0_PIN_SENSOR2       13 // sensor 2
-
+*/
 	/* OS31 pin defines */
 	// pins on PCA9555A IO expander have pin numbers IOEXP_PIN+i
+	/*
 	#define V1_IO_CONFIG         0x1F00 // config bits
 	#define V1_IO_OUTPUT         0x1F00 // output bits
 	#define V1_PIN_BUTTON_1      IOEXP_PIN+10 // button 1
@@ -135,9 +141,10 @@
 	#define V1_PIN_LATCH_COM     IOEXP_PIN+15
 	#define V1_PIN_SENSOR1       IOEXP_PIN+8 // sensor 1
 	#define V1_PIN_SENSOR2       IOEXP_PIN+9 // sensor 2
-
+*/
 	/* OS32 pin defines */
 	// pins on PCA9555A IO expander have pin numbers IOEXP_PIN+i
+	/*
 	#define V2_IO_CONFIG         0x1000 // config bits
 	#define V2_IO_OUTPUT         0x1E00 // output bits
 	#define V2_PIN_BUTTON_1      2 // button 1
@@ -153,6 +160,6 @@
 	#define V2_PIN_LATCH_COMK    IOEXP_PIN+15 // latch COM- (cathode)
 	#define V2_PIN_SENSOR1       3  // sensor 1
 	#define V2_PIN_SENSOR2       10 // sensor 2
-
+*/
 #endif
 #endif //_ESP32_H
