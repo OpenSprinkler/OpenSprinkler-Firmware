@@ -893,6 +893,8 @@ void do_loop()
 					// skip if this is the master station
 					if (mas_id == sid + 1) continue;
 
+					if(pd.station_qid[sid]==255) continue; // skip if station is not in the queue
+
 					q = pd.queue + pd.station_qid[sid];
 
 					if (os.bound_to_master(q->sid, mas)) {
