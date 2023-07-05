@@ -578,7 +578,8 @@ byte OpenSprinkler::start_ether() {
 	eth.setDefault();
 	if(!eth.begin((uint8_t*)tmp_buffer))	return 0;
 	lcd_print_line_clear_pgm(PSTR("Start wired link"), 1);
-
+	lcd_print_line_clear_pgm(eth.isW5500 ? PSTR("    (w5500)    ") : PSTR("   (enc28j60)   "), 2);
+	
 	ulong timeout = millis()+30000; // 30 seconds time out
 	while (!eth.connected()) {
 		DEBUG_PRINT(".");
