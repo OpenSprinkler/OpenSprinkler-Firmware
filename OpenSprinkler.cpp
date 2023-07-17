@@ -865,9 +865,11 @@ void OpenSprinkler::begin() {
 	nboards = 1;
 	nstations = nboards*8;
 
-	// set rf data pin
-	pinModeExt(PIN_RFTX, OUTPUT);
-	digitalWriteExt(PIN_RFTX, LOW);
+	// set rf data pin, unless it is not being used
+	if(PIN_RFTX != 255) {
+		pinModeExt(PIN_RFTX, OUTPUT);
+		digitalWriteExt(PIN_RFTX, LOW);
+	}
 
 #if defined(ARDUINO)  // AVR SD and LCD functions
 
@@ -1753,6 +1755,9 @@ void send_rfsignal(ulong code, ulong len) {
 void OpenSprinkler::switch_rfstation(RFStationData *data, bool turnon) {
 	ulong on, off;
 	uint16_t length = parse_rfstation_code(data, &on, &off);
+
+	if(PIN_RFTX == 255) return; // ignore RF station if RF pin disabled
+
 #if defined(ARDUINO)
 	#if defined(ESP8266)
 	rfswitch.enableTransmit(PIN_RFTX);
