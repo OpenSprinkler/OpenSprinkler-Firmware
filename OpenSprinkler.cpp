@@ -523,7 +523,7 @@ byte OpenSprinkler::start_ether() {
 	while (!eth.connected()) {
 		DEBUG_PRINT(".");
 		delay(1000);
-		if(millis()>timeout) return 0;
+		if(millis()>timeout) break;
 	}
 
 	DEBUG_PRINTLN();

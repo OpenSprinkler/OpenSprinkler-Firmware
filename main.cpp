@@ -993,7 +993,7 @@ void do_loop()
 				if (os.iopts[IOPT_USE_DHCP])
 					dhcp_renew(intf);
 
-				if (dhcp_timeout > 0 && !check_enc28j60()) { //ENC28J60 REGISTER CHECK!!
+/**				if (dhcp_timeout > 0 && !check_enc28j60()) { //ENC28J60 REGISTER CHECK!!
 					DEBUG_PRINT(F("Reconnect"));
 					//eth.resetEther();
 	
@@ -1008,7 +1008,7 @@ void do_loop()
 						os.nvdata.reboot_cause = REBOOT_CAUSE_NETWORK_FAIL;
 						os.status.safe_reboot = 1;
 					}
-				}
+				}*/
 			}
 			//else if (os.iopts[IOPT_USE_DHCP] && WiFi.status() == WL_CONNECTED && os.get_wifi_mode()==WIFI_MODE_STA) {
 			//	netif* intf = eagle_lwip_getif(STATION_IF);
@@ -2020,6 +2020,7 @@ void check_network() {
 #endif
 }
 
+/**
 #if defined(ESP8266)
 
 #define NET_ENC28J60_EIR                                 0x1C
@@ -2044,6 +2045,7 @@ bool check_enc28j60() {
 	return true;
 }
 #endif
+*/
 
 /** Perform NTP sync */
 void perform_ntp_sync() {
