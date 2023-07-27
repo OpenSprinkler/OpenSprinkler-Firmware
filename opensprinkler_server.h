@@ -51,13 +51,11 @@ public:
 			c = pgm_read_byte(fmt++);
 			switch (c) {
 			case 'D':
-				//wtoa(va_arg(ap, uint16_t), (char*) ptr);
 				itoa(va_arg(ap, int), (char*) ptr, 10);  // ray
 				break;
 			case 'L':
-				//ltoa(va_arg(ap, long), (char*) ptr, 10);
-				//ultoa(va_arg(ap, long), (char*) ptr, 10); // ray
-				sprintf((char*) ptr, "%lu", va_arg(ap, long));
+				ultoa(va_arg(ap, uint32_t), (char*) ptr, 10);
+				//sprintf((char*) ptr, "%lu", va_arg(ap, uint32_t));
 				break;
 			case 'S':
 				strcpy((char*) ptr, va_arg(ap, const char*));
