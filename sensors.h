@@ -48,6 +48,8 @@
 #define SENSORLOG_FILENAME_MONTH1 "sensorlogM1.dat"   // analog sensor log filename for month average
 #define SENSORLOG_FILENAME_MONTH2 "sensorlogM2.dat"   // analog sensor log filename2 for month average
 
+#define SENSORURL_FILENAME       "sensorurl.dat"  // long urls filename
+
 //MaxLogSize
 #define MAX_LOG_SIZE 8000
 #define MAX_LOG_SIZE_WEEK 2000
@@ -156,6 +158,16 @@ typedef struct ProgSensorAdjust {
 } ProgSensorAdjust_t;
 #define PROGSENSOR_STORE_SIZE (sizeof(ProgSensorAdjust_t)-sizeof(ProgSensorAdjust_t*))
 
+typedef struct SensorUrl {
+	uint nr;
+	uint type; //unused, for later
+	uint length;
+	char *urlstr;
+	SensorUrl *next;
+} SensorUrl_t;
+#define SENSORURL_STORE_SIZE (sizeof(SensorUrl_t)-sizeof(char*)-sizeof(SensorUrl_t*))
+
+
 #define UNIT_NONE        0
 #define UNIT_PERCENT     1
 #define UNIT_DEGREE      2
@@ -227,6 +239,12 @@ double calc_sensor_watering(uint prog);
 double calc_sensor_watering_by_nr(uint nr);
 
 void GetSensorWeather();
+
+void SensorUrl_load();
+void SensorUrl_save();
+bool SensorUrl_delete(uint nr);
+bool SensorUrl_add(uint nr, char *urlstr);
+char *SensorUrl_get(uint nr);
 
 #if defined(ESP8266)
 ulong diskFree();

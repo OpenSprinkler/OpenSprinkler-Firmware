@@ -34,6 +34,9 @@ byte findKeyVal (const char *str,char *strbuf, uint16_t maxlen,const char *key,b
 //All sensors:
 static Sensor_t *sensors = NULL;
 
+//Sensor URLS:
+static SensorUrl_t * sensorUrls = NULL;
+
 //Program sensor data 
 static ProgSensorAdjust_t *progSensorAdjusts = NULL;
 
@@ -193,6 +196,8 @@ void sensor_load() {
 		sensor->next = NULL;
 		pos += SENSOR_STORE_SIZE;
 	}
+
+	SensorUrl_load();
 }
 
 /**
@@ -1707,4 +1712,103 @@ void GetSensorWeather() {
 	} else {
 		current_weather_ok = false;
 	}
+}
+
+void SensorUrl_load() {
+	sensorUrls = NULL;
+	if (!file_exists(SENSORURL_FILENAME))
+		return;
+
+	ulong pos = 0;
+	SensorUrl_t *last = NULL;
+	while (true) {
+		SensorUrl_t *sensorUrl = new SensorUrl_t;
+		memset(sensorUrl, 0, sizeof(SensorUrl_t));
+		file_read_block (SENSORURL_FILENAME, sensorUrl, pos, SENSORURL_STORE_SIZE);
+		sensorUrl->urlstr = (char*)malloc(sensorUrl->length+1);
+		pos += SENSORURL_STORE_SIZE;
+		file_read_block(SENSORURL_FILENAME, sensorUrl->urlstr, pos, sensorUrl->length);
+		pos += sensorUrl->length;
+
+		if (!last) sensorUrls = sensorUrl;
+		else last->next = sensorUrl;
+		last = sensorUrl;
+		sensorUrl->next = NULL;
+	}	
+}
+
+void SensorUrl_save() {
+	if (file_exists(SENSORURL_FILENAME))
+		remove_file(SENSORURL_FILENAME);
+	
+	ulong pos = 0;
+	SensorUrl_t *sensorUrl = sensorUrls;
+	while (sensorUrl) {
+		file_write_block(SENSORURL_FILENAME, sensorUrl, pos, SENSORURL_STORE_SIZE);
+		pos += SENSORURL_STORE_SIZE;
+		file_write_block(SENSORURL_FILENAME, sensorUrl->urlstr, pos, sensorUrl->length);
+		pos += sensorUrl->length;
+
+		sensorUrl = sensorUrl->next;
+	}	
+}
+
+bool SensorUrl_delete(uint nr) {
+	SensorUrl_t *sensorUrl = sensorUrls;
+	SensorUrl_t *last = NULL;
+	while (sensorUrl) {
+		if (sensorUrl->nr == nr) {
+			if (last)
+				last->next = sensorUrl->next;
+			else
+				sensorUrls = sensorUrl->next;
+			delete sensorUrl->urlstr;
+			delete sensorUrl;
+			SensorUrl_save();
+			return true;
+		}
+		last = sensorUrl;
+		sensorUrl = sensorUrl->next;
+	}
+	return false;
+}
+
+bool SensorUrl_add(uint nr, char *urlstr) {
+	if (!urlstr || !strlen(urlstr)) { //empty string? delete!
+		SensorUrl_delete(nr);
+		return false;
+	}
+	SensorUrl_t *sensorUrl = sensorUrls;
+	while (sensorUrl) {
+		if (sensorUrl->nr == nr) { //replace existing
+			delete sensorUrl->urlstr;
+			sensorUrl->urlstr = (char*) malloc(strlen(urlstr)+1);
+			strcpy(sensorUrl->urlstr, urlstr);
+			SensorUrl_save();
+			return false;
+		}
+		sensorUrl = sensorUrl->next;
+	}
+
+	//Add new:
+	sensorUrl = new SensorUrl_t;
+	memset(sensorUrl, 0, sizeof(SensorUrl_t));
+	sensorUrl->nr = nr;
+	sensorUrl->length = strlen(urlstr);
+	sensorUrl->urlstr = (char*) malloc(strlen(urlstr)+1);
+	strcpy(sensorUrl->urlstr, urlstr);
+	sensorUrl->next = sensorUrls;
+	sensorUrls = sensorUrl;
+	SensorUrl_save();
+	return true;
+}
+
+char *SensorUrl_get(uint nr) {
+	SensorUrl_t *sensorUrl = sensorUrls;
+	while (sensorUrl) {
+		if (sensorUrl->nr == nr)  //replace existing
+			return sensorUrl->urlstr;
+		sensorUrl = sensorUrl->next;
+	}
+	return NULL;
 }

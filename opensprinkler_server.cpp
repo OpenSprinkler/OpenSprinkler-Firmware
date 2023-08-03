@@ -1021,6 +1021,9 @@ void server_json_options_main() {
 			bfill.emit_p(PSTR(","));
 	}
 
+	//feature flag Analog Sensor API
+	bfill.emit_p(PSTR(",\"feature\":\"ASB\""));
+
 	bfill.emit_p(PSTR(",\"dexp\":$D,\"mexp\":$D,\"hwt\":$D,"), os.detect_exp(), MAX_EXT_BOARDS, os.hw_type);
 	// print master array
 	byte masid, optidx;
@@ -2244,13 +2247,20 @@ void server_sensor_list(OTF_PARAMS_DEF) {
 	print_header();
 #endif
 
-	int count = sensor_count();
-	bfill.emit_p(PSTR("{\"count\":$D,"), count);
-	bfill.emit_p(PSTR("\"sensors\":["));
-	sensorconfig_json(OTF_PARAMS);
-	bfill.emit_p(PSTR("]"));
-	bfill.emit_p(PSTR("}"));
+	uint test = 0;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("test"), true))
+		test = strtoul(tmp_buffer, NULL, 0); // Sensor nr
 
+	if (test) {
+		bfill.emit_p(PSTR("{\"test\":$D}"), test);
+	} else {
+		int count = sensor_count();
+		bfill.emit_p(PSTR("{\"count\":$D,"), count);
+		bfill.emit_p(PSTR("\"sensors\":["));
+		sensorconfig_json(OTF_PARAMS);
+		bfill.emit_p(PSTR("]"));
+		bfill.emit_p(PSTR("}"));
+	}
 	handle_return(HTML_OK);
 }
 
