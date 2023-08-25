@@ -400,6 +400,9 @@ void do_setup() {
 
 	os.mqtt.init();
 	os.status.req_mqtt_restart = true;
+	
+	sensor_load();
+	prog_adjust_load();
 }
 #endif
 

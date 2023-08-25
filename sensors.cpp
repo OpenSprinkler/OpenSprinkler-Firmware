@@ -455,6 +455,24 @@ ulong findLogPosition(uint8_t log, ulong after) {
 	return 0;
 }
 
+#if !defined(ARDUINO)
+/**
+/* compatibility functions for OSPi:
+**/
+#define timeSet 0
+int timeStatus() {
+	return timeSet;
+}
+
+void dtostrf(float value, int min_width, int precision, char *txt) {
+	printf(txt, "%*.*f", min_width, precision, value);
+}
+
+void dtostrf(double value, int min_width, int precision, char *txt) {
+	printf(txt, "%*.*d", min_width, precision, value);
+}
+#endif
+
 // 1/4 of a day: 6*60*60
 #define BLOCKSIZE 64
 #define CALCRANGE_WEEK 21600
