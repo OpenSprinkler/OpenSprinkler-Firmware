@@ -1618,6 +1618,7 @@ byte getSensorUnitId(int type) {
 	switch(type) {
 		case SENSOR_SMT100_MODBUS_RTU_MOIS:   return UNIT_PERCENT; 
 		case SENSOR_SMT100_MODBUS_RTU_TEMP:   return UNIT_DEGREE;
+#if defined(ARDUINO)
 #if defined(ESP8266)
 	    case SENSOR_ANALOG_EXTENSION_BOARD:   return UNIT_VOLT;
 	    case SENSOR_ANALOG_EXTENSION_BOARD_P: return UNIT_PERCENT;
@@ -1630,11 +1631,12 @@ byte getSensorUnitId(int type) {
 		case SENSOR_THERM200:                 return UNIT_DEGREE;
 		case SENSOR_AQUAPLUMB:                return UNIT_PERCENT;
 #endif
+#else
 		case SENSOR_OSPI_ANALOG: 		return UNIT_VOLT;
 		case SENSOR_OSPI_ANALOG_P:		return UNIT_PERCENT;
 		case SENSOR_OSPI_ANALOG_SMT50_MOIS:	return UNIT_PERCENT;
 		case SENSOR_OSPI_ANALOG_SMT50_TEMP:	return UNIT_DEGREE;
-
+#endif
 		case SENSOR_WEATHER_TEMP_F:           return UNIT_FAHRENHEIT;
 		case SENSOR_WEATHER_TEMP_C:           return UNIT_DEGREE;
 		case SENSOR_WEATHER_HUM:              return UNIT_HUM_PERCENT;
@@ -1654,6 +1656,7 @@ byte getSensorUnitId(Sensor_t *sensor) {
 	switch(sensor->type) {
 		case SENSOR_SMT100_MODBUS_RTU_MOIS:   return UNIT_PERCENT; 
 		case SENSOR_SMT100_MODBUS_RTU_TEMP:   return UNIT_DEGREE;
+#if defined(ARDUINO)	
 #if defined(ESP8266)		
 	    case SENSOR_ANALOG_EXTENSION_BOARD:   return UNIT_VOLT;
 		case SENSOR_ANALOG_EXTENSION_BOARD_P: return UNIT_LEVEL;
@@ -1666,11 +1669,12 @@ byte getSensorUnitId(Sensor_t *sensor) {
 		case SENSOR_THERM200:                 return UNIT_DEGREE;
 		case SENSOR_AQUAPLUMB:                return UNIT_PERCENT;
 #endif
+#else
 		case SENSOR_OSPI_ANALOG: 		return UNIT_VOLT;
 		case SENSOR_OSPI_ANALOG_P:              return UNIT_PERCENT;
 		case SENSOR_OSPI_ANALOG_SMT50_MOIS:     return UNIT_PERCENT;
 		case SENSOR_OSPI_ANALOG_SMT50_TEMP: 	return UNIT_DEGREE;
-		
+#endif
 		case SENSOR_REMOTE:                	  return sensor->unitid;
 
 		case SENSOR_WEATHER_TEMP_F:           return UNIT_FAHRENHEIT;
