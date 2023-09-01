@@ -698,6 +698,7 @@ void read_all_sensors() {
 	calc_sensorlogs();
 }
 
+#if defined(ARDUINO)
 #if defined(ESP8266)
 /**
  * Read ADS1115 sensors
@@ -782,15 +783,65 @@ int read_sensor_adc(Sensor_t *sensor) {
 	return HTTP_RQT_SUCCESS;
 }
 #endif
-
+#else
+/**
+/* Read the OSPi onboard PCF8591 A2D
+**/
 int read_sensor_ospi(Sensor_t *sensor) {
 	DEBUG_PRINTLN(F("read_sensor_ospi"));
 	if (!sensor || !sensor->flags.enable) return HTTP_RQT_NOT_RECEIVED;
 
-	//currently not implemented 
+	sensor->flags.data_ok = false;
 
-	return HTTP_RQT_SUCCESS;
+	/**
+	/* https://medium.com/geekculture/raspberry-pi-c-libraries-for-working-with-i2c-spi-and-uart-4677f401b584
+	/* http://www.pibits.net/amp/code/raspberry-pi-and-a-pcf8591-example.php
+	**/
+	int adapter_nr = 1;
+	char filename[20];
+	__u8 addr = sensor->port == 0? 0x48 : sensor->port;
+	__u8 chn = sensor->id;
+
+	//Open I2C:	
+	snprintf(filename, 19, "/dev/i2c-%d", adapter_nr);
+	int file = open(filename, O_RDWR);
+	if (file < 0) return HTTP_RQT_NOT_RECEIVED;
+	
+	//Select address:
+	if (ioctl(file, I2C_SLAVE, addr) < 0) return HTTP_RQT_NOT_RECEIVED;
+	
+	//Select channel:
+	i2c_smbus_write_byte(file, chn);
+	
+	//dummy read to start conversion:
+	i2c_smbus_read_byte(file);
+
+	//read current value:
+	__s32 res = i2c_smbus_read_byte(file);
+
+	if (res < 0) return HTTP_RQT_NOT_RECEIVED;
+	
+	sensor->last_native_data = res;
+	sensor->flags.data_ok = true;
+	
+	//convert values:
+	switch(sensor->type) {
+		case SENSOR_OSPI_ANALOG:
+			sensor->last_data = (double)res * 3.3/255;
+			return HTTP_RQT_SUCCESS;
+		case SENSOR_OSPI_ANALOG_P:
+			sensor->last_data = (double)res * 100/255;
+			return HTTP_RQT_SUCCESS;
+		case SENSOR_OSPI_ANALOG_SMT50_MOIS:
+			sensor->last_data = (double)res * 3.3/255 * 50 / 3;
+			return HTTP_RQT_SUCCESS;		
+		case SENSOR_OSPI_ANALOG_SMT50_TEMP:
+			sensor->last_data = (((double)res * 3.3/255) - 0.5) * 100;
+			return HTTP_RQT_SUCCESS;				
+	}	
+	return HTTP_RQT_NOT_RECEIVED;	
 }
+#endif
 
 bool extract(char *s, char *buf, int maxlen) {
 	s = strstr(s, ":");
@@ -910,7 +961,7 @@ int read_sensor_ip(Sensor_t *sensor) {
 		return HTTP_RQT_CONNECT_ERR;
 	}
 
-	uint8_t buffer[10];
+uint8_t buffer[10];
 	int len = 0;
 	boolean addCrc16 = false;
 	switch(sensor->type)
@@ -1055,6 +1106,7 @@ int read_sensor(Sensor_t *sensor) {
 			sensor->last_read = time;
 			return read_sensor_ip(sensor);
 
+#if defined(ARDUINO)
 #if defined(ESP8266)
 		case SENSOR_ANALOG_EXTENSION_BOARD:
 		case SENSOR_ANALOG_EXTENSION_BOARD_P:
@@ -1068,13 +1120,18 @@ int read_sensor(Sensor_t *sensor) {
 			sensor->last_read = time;
 			return read_sensor_adc(sensor);
 #endif
-
-		//case SENSOR_OSPI_ANALOG_INPUTS:
-		//	return read_sensor_ospi(sensor);
+#else
+		case SENSOR_OSPI_ANALOG:
+		case SENSOR_OSPI_ANALOG_P:
+		case SENSOR_OSPI_ANALOG_SMT50_MOIS:
+		case SENSOR_OSPI_ANALOG_SMT50_TEMP:
+			sensor->last_read = time;
+			return read_sensor_ospi(sensor);
+		
 		case SENSOR_REMOTE:
 			sensor->last_read = time;
 			return read_sensor_http(sensor);
-
+#endif
 		case SENSOR_WEATHER_TEMP_F:
 		case SENSOR_WEATHER_TEMP_C: 
 		case SENSOR_WEATHER_HUM:
@@ -1573,7 +1630,10 @@ byte getSensorUnitId(int type) {
 		case SENSOR_THERM200:                 return UNIT_DEGREE;
 		case SENSOR_AQUAPLUMB:                return UNIT_PERCENT;
 #endif
-		case SENSOR_OSPI_ANALOG_INPUTS: 	  return UNIT_VOLT;
+		case SENSOR_OSPI_ANALOG: 		return UNIT_VOLT;
+		case SENSOR_OSPI_ANALOG_P:		return UNIT_PERCENT;
+		case SENSOR_OSPI_ANALOG_SMT50_MOIS:	return UNIT_PERCENT;
+		case SENSOR_OSPI_ANALOG_SMT50_TEMP:	return UNIT_DEGREE;
 
 		case SENSOR_WEATHER_TEMP_F:           return UNIT_FAHRENHEIT;
 		case SENSOR_WEATHER_TEMP_C:           return UNIT_DEGREE;
@@ -1606,7 +1666,11 @@ byte getSensorUnitId(Sensor_t *sensor) {
 		case SENSOR_THERM200:                 return UNIT_DEGREE;
 		case SENSOR_AQUAPLUMB:                return UNIT_PERCENT;
 #endif
-		case SENSOR_OSPI_ANALOG_INPUTS: 	  return UNIT_VOLT;
+		case SENSOR_OSPI_ANALOG: 		return UNIT_VOLT;
+		case SENSOR_OSPI_ANALOG_P:              return UNIT_PERCENT;
+		case SENSOR_OSPI_ANALOG_SMT50_MOIS:     return UNIT_PERCENT;
+		case SENSOR_OSPI_ANALOG_SMT50_TEMP: 	return UNIT_DEGREE;
+		
 		case SENSOR_REMOTE:                	  return sensor->unitid;
 
 		case SENSOR_WEATHER_TEMP_F:           return UNIT_FAHRENHEIT;
