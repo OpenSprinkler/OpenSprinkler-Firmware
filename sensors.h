@@ -29,7 +29,11 @@
 	#include <stdio.h>
 	#include <limits.h>
 	#include <sys/time.h>
-
+	#include <sys/ioctl.h>
+extern "C" {
+	#include <linux/i2c-dev.h>
+	#include <i2c/smbus.h>
+}
 #endif
 #include "defines.h"
 #include "utils.h"
@@ -59,6 +63,7 @@
 #define SENSOR_NONE                       0   //None or deleted sensor
 #define SENSOR_SMT100_MODBUS_RTU_MOIS     1   //Truebner SMT100 RS485 Modbus RTU over TCP, moisture mode
 #define SENSOR_SMT100_MODBUS_RTU_TEMP     2   //Truebner SMT100 RS485 Modbus RTU over TCP, temperature mode
+#if defined(ARDUINO)
 #if defined(ESP8266)
 #define SENSOR_ANALOG_EXTENSION_BOARD     10  //New OpenSprinkler analog extension board x8 - voltage mode 0..4V
 #define SENSOR_ANALOG_EXTENSION_BOARD_P   11  //New OpenSprinkler analog extension board x8 - percent 0..3.3V to 0..100%
@@ -72,7 +77,13 @@
 #define SENSOR_AQUAPLUMB                  32  //New OpenSprinkler analog extension board x8 - Vegetronix Aquaplumb
 
 #endif
-#define SENSOR_OSPI_ANALOG_INPUTS         50  //Old OSPi analog input
+#else
+#define SENSOR_OSPI_ANALOG                50  //Old OSPi analog input - voltage mode 0..3.3V
+#define SENSOR_OSPI_ANALOG_P              51  //Old OSPi analog input - percent 0..3.3V to 0...100%
+#define SENSOR_OSPI_ANALOG_SMT50_MOIS     52  //Old OSPi analog input - SMT50 VWC [%] = (U * 50) : 3
+#define SENSOR_OSPI_ANALOG_SMT50_TEMP     53  //Old OSPi analog input - SMT50 T [°C] = (U – 0,5) * 100
+#endif
+
 #define SENSOR_REMOTE                     100 //Remote sensor of an remote opensprinkler
 #define SENSOR_WEATHER_TEMP_F             101 //Weather service - temperature (Fahrenheit)
 #define SENSOR_WEATHER_TEMP_C             102 //Weather service - temperature (Celcius)
