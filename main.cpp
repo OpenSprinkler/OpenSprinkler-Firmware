@@ -2006,12 +2006,17 @@ void check_network() {
     			return true; 
 			});
 		}
-		if (useEth && (!eth.connected() || !eth.gatewayIP() || !eth.gatewayIP().isSet()))
+		if (useEth && (!eth.connected() || !eth.gatewayIP() || !eth.gatewayIP().isSet())) {
+			os.status.network_fails++;
 			return;
-		if (!useEth && (!WiFi.isConnected() || !WiFi.gatewayIP() || !WiFi.gatewayIP().isSet() || os.get_wifi_mode()==WIFI_MODE_AP))
+		}
+		if (!useEth && (!WiFi.isConnected() || !WiFi.gatewayIP() || !WiFi.gatewayIP().isSet() || os.get_wifi_mode()==WIFI_MODE_AP)) {
+			os.status.network_fails++;
 			return;
+		}
 			
 		if(!pinger->Ping(useEth?eth.gatewayIP() : WiFi.gatewayIP())) {
+			os.status.network_fails++;
 #if defined(ENABLE_DEBUG)
     		Serial.println("Error during last ping command.");
 #endif

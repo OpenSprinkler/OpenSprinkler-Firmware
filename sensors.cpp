@@ -1635,7 +1635,7 @@ void GetSensorWeather() {
 
 	// use temp buffer to construct get command
 	BufferFiller bf = tmp_buffer;
-	bf.emit_p(PSTR("weatherData?loc=$O"), SOPT_LOCATION);
+	bf.emit_p(PSTR("weatherData?loc=$O&wto=$O"), SOPT_LOCATION, SOPT_WEATHER_OPTS);
 
 	char *src=tmp_buffer+strlen(tmp_buffer);
 	char *dst=tmp_buffer+TMP_BUFFER_SIZE-12;
