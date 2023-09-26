@@ -1472,7 +1472,7 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 					sprintf_P(postval + strlen(postval), PSTR("<br>Flow rate: %d.%02d<br>Flow Alert Setpoint: %d.%02d"), (int)(flow_last_gpm*flow_pulse_rate_factor), (int)((flow_last_gpm*flow_pulse_rate_factor) * 100) % 100, (int)flow_gpm_alert_setpoint, (int)(flow_gpm_alert_setpoint * 100) % 100);
 
 					// Compare flow_gpm_alert_setpoint with flow_last_gpm and disable ifttt message if flow is below setpoint				
-					if ((flow_last_gpm*flow_pulse_rate_factor) < flow_gpm_alert_setpoint) {
+					if ((flow_last_gpm*flow_pulse_rate_factor) <= flow_gpm_alert_setpoint) {
 						ifttt_enabled = false;
 					} 
 				}
