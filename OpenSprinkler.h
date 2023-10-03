@@ -66,6 +66,7 @@
 	#if defined(ESP8266)
 	extern ESP8266WebServer *update_server;
 	extern OTF::OpenThingsFramework *otf;
+	extern bool otf_callbacksInitialised;
 	extern ENC28J60lwIP eth;
 	#else
 	extern EthernetServer *m_server;
