@@ -3091,19 +3091,22 @@ void on_ap_upload() { on_sta_upload(); }
 void start_server_client() {
 	if(!otf) return;
 
-	otf->on("/", server_home);  // handle home page
-	otf->on("/index.html", server_home);
-	otf->on("/update", on_sta_update, OTF::HTTP_GET); // handle firmware update
-	update_server->on("/update", HTTP_POST, on_sta_upload_fin, on_sta_upload);
+	if (!otf_callbacksInitialised) {
+		otf->on("/", server_home);  // handle home page
+		otf->on("/index.html", server_home);
+		otf->on("/update", on_sta_update, OTF::HTTP_GET); // handle firmware update
+		update_server->on("/update", HTTP_POST, on_sta_upload_fin, on_sta_upload);
 
-	// set up all other handlers
-	char uri[4];
-	uri[0]='/';
-	uri[3]=0;
-	for(byte i=0;i<sizeof(urls)/sizeof(URLHandler);i++) {
-		uri[1]=pgm_read_byte(_url_keys+2*i);
-		uri[2]=pgm_read_byte(_url_keys+2*i+1);
-		otf->on(uri, urls[i]);
+		// set up all other handlers
+		char uri[4];
+		uri[0]='/';
+		uri[3]=0;
+		for(byte i=0;i<sizeof(urls)/sizeof(URLHandler);i++) {
+			uri[1]=pgm_read_byte(_url_keys+2*i);
+			uri[2]=pgm_read_byte(_url_keys+2*i+1);
+			otf->on(uri, urls[i]);
+		}
+		otf_callbacksInitialised = true;
 	}
 	update_server->begin();
 }

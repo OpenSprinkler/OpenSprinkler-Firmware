@@ -38,6 +38,7 @@
 		Pinger *pinger = NULL;
 		ESP8266WebServer *update_server = NULL;
 		OTF::OpenThingsFramework *otf = NULL;
+		bool otf_callbacksInitialised = false;
 		DNSServer *dns = NULL;
 		ENC28J60lwIP eth(PIN_ETHER_CS); // ENC28J60 lwip for wired Ether
 		bool useEth = false; // tracks whether we are using WiFi or wired Ether connection
