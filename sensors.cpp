@@ -808,7 +808,10 @@ int read_sensor_ospi(Sensor_t *sensor) {
 	if (file < 0) return HTTP_RQT_NOT_RECEIVED;
 	
 	//Select address:
-	if (ioctl(file, I2C_SLAVE, addr) < 0) return HTTP_RQT_NOT_RECEIVED;
+	if (ioctl(file, I2C_SLAVE, addr) < 0) {
+		close(file);
+		return HTTP_RQT_NOT_RECEIVED;
+	}
 	
 	//Select channel:
 	i2c_smbus_write_byte(file, chn);
@@ -818,7 +821,8 @@ int read_sensor_ospi(Sensor_t *sensor) {
 
 	//read current value:
 	__s32 res = i2c_smbus_read_byte(file);
-
+	close(file);
+	
 	if (res < 0) return HTTP_RQT_NOT_RECEIVED;
 	
 	sensor->last_native_data = res;
