@@ -28,11 +28,17 @@
 #include "weather.h"
 #include "opensprinkler_server.h"
 #include "mqtt.h"
+#include "sensors.h"
 
 #if defined(ARDUINO)
 	#if defined(ESP8266)
+		#include <pinger.h>
+		#include <lwip/icmp.h>
+		extern "C" struct netif* eagle_lwip_getif (int netif_index);
+		Pinger *pinger = NULL;
 		ESP8266WebServer *update_server = NULL;
 		OTF::OpenThingsFramework *otf = NULL;
+		bool otf_callbacksInitialised = false;
 		DNSServer *dns = NULL;
 		ENC28J60lwIP eth(PIN_ETHER_CS); // ENC28J60 lwip for wired Ether
 		bool useEth = false; // tracks whether we are using WiFi or wired Ether connection
@@ -86,6 +92,7 @@ byte prev_flow_state = HIGH;
 float flow_last_gpm=0;
 
 uint32_t reboot_timer = 0;
+uint32_t ping_ok = 0;
 
 void flow_poll() {
 	#if defined(ESP8266)
@@ -346,6 +353,9 @@ void do_setup() {
 	}
 
 	os.button_timeout = LCD_BACKLIGHT_TIMEOUT;
+	
+	sensor_load();
+	prog_adjust_load();
 }
 
 // Arduino software reset function
@@ -391,6 +401,9 @@ void do_setup() {
 
 	os.mqtt.init();
 	os.status.req_mqtt_restart = true;
+	
+	sensor_load();
+	prog_adjust_load();
 }
 #endif
 
@@ -418,6 +431,7 @@ void reboot_in(uint32_t ms) {
 		reboot_ticker.once_ms(ms, ESP.restart);
 	}
 }
+bool check_enc28j60();
 #else
 void handle_web_request(char *p);
 #endif
@@ -708,6 +722,16 @@ void do_loop()
 			// check through all programs
 			for(pid=0; pid<pd.nprograms; pid++) {
 				pd.read(pid, &prog);	// todo future: reduce load time
+				if(prog.check_match(curr_time+60)) {
+					// Check and update weather if weatherdata is older than 30min:
+					if (os.checkwt_success_lasttime && (!os.checkwt_lasttime || os.now_tz() > os.checkwt_lasttime + 30*60)) {
+						os.checkwt_lasttime = 0;
+						os.checkwt_success_lasttime = 0;
+						check_weather();
+					}
+					break;
+				}
+
 				if(prog.check_match(curr_time)) {
 					// program match found
 					// check and process special program command
@@ -733,6 +757,9 @@ void do_loop()
 																								// do not water
 									water_time = 0;
 							}
+
+							// Analog sensor water time adjustments:
+							water_time = (ulong)((double)water_time * calc_sensor_watering(pid));
 
 							if (water_time) {
 								// check if water time is still valid
@@ -961,6 +988,40 @@ void do_loop()
 			}
 		}
 
+#if defined(ESP8266)
+		// dhcp and hw check:
+		static unsigned long dhcp_timeout = 0;
+		if(curr_time > dhcp_timeout) {
+			if (useEth) {
+				netif* intf = (netif*) eth.getNetIf();
+				if (os.iopts[IOPT_USE_DHCP])
+					dhcp_renew(intf);
+
+/**				if (dhcp_timeout > 0 && !check_enc28j60()) { //ENC28J60 REGISTER CHECK!!
+					DEBUG_PRINT(F("Reconnect"));
+					//eth.resetEther();
+	
+					// todo: lwip add timeout
+					int n = os.iopts[IOPT_USE_DHCP]?30:2;
+  					while (!eth.connected() && n-- >0) {
+    					DEBUG_PRINT(".");
+    					delay(1000);
+  					}					
+
+					if (!eth.connected()) {
+						os.nvdata.reboot_cause = REBOOT_CAUSE_NETWORK_FAIL;
+						os.status.safe_reboot = 1;
+					}
+				}*/
+			}
+			//else if (os.iopts[IOPT_USE_DHCP] && WiFi.status() == WL_CONNECTED && os.get_wifi_mode()==WIFI_MODE_STA) {
+			//	netif* intf = eagle_lwip_getif(STATION_IF);
+			//	dhcp_renew(intf);
+			//}
+			dhcp_timeout = curr_time + DHCP_CHECKLEASE_INTERVAL;
+		}
+#endif
+
 		// perform ntp sync
 		// instead of using curr_time, which may change due to NTP sync itself
 		// we use Arduino's millis() method
@@ -981,6 +1042,11 @@ void do_loop()
 			push_message(NOTIFY_WEATHER_UPDATE, 0, os.iopts[IOPT_WATER_PERCENTAGE]);
 			os.weather_update_flag = 0;
 		}
+
+		// read analog sensors
+		if (curr_time && os.network_connected() && os.checkwt_success_lasttime) 
+			read_all_sensors();
+
 		static byte reboot_notification = 1;
 		if(reboot_notification) {
 			reboot_notification = 0;
@@ -1843,10 +1909,152 @@ void check_network() {
 				os.status.network_fails=0;
 		}
 	}
-#else
-	// nothing to do for other platforms
+#endif
+#if defined(ESP8266)
+	if (os.status.program_busy) {return;}
+
+	if (os.status.req_network) {
+		os.status.req_network = 0;
+		// change LCD icon to indicate it's checking network
+		if (!ui_state) {
+			os.lcd.setCursor(LCD_CURSOR_NETWORK, 1);
+			os.lcd.write('>');
+		}
+
+		if (!pinger) {
+			pinger = new Pinger();
+#if defined(ENABLE_DEBUG)
+			pinger->OnReceive([](const PingerResponse& response) {
+    			if (response.ReceivedResponse) {
+      				Serial.printf(
+        				"Reply from %s: bytes=%d time=%lums TTL=%d\r\n",
+        			response.DestIPAddress.toString().c_str(),
+        			response.EchoMessageSize - sizeof(struct icmp_echo_hdr),
+        			response.ResponseTime,
+        			response.TimeToLive);
+    			} else {
+      				Serial.printf("Request timed out.\r\n");
+    			}
+
+    			// Return true to continue the ping sequence.
+    			// If current event returns false, the ping sequence is interrupted.
+    			return true;
+  			});
+#endif
+
+			pinger->OnEnd([](const PingerResponse &response) {
+#if defined(ENABLE_DEBUG)
+    			// Evaluate lost packet percentage
+    			float loss = 100;
+    			if(response.TotalReceivedResponses > 0) {
+      				loss = (response.TotalSentRequests - response.TotalReceivedResponses) * 100 / response.TotalSentRequests;
+    			}
+    
+    			// Print packet trip data
+    			Serial.printf("Ping statistics for %s:\r\n",
+      			response.DestIPAddress.toString().c_str());
+    			Serial.printf("    Packets: Sent = %lu, Received = %lu, Lost = %lu (%.2f%% loss),\r\n",
+      				response.TotalSentRequests,
+      				response.TotalReceivedResponses,
+      				response.TotalSentRequests - response.TotalReceivedResponses,
+      				loss);
+
+			    // Print time information
+    			if(response.TotalReceivedResponses > 0)
+    			{
+      				Serial.printf("Approximate round trip times in milli-seconds:\r\n");
+      				Serial.printf("    Minimum = %lums, Maximum = %lums, Average = %.2fms\r\n",
+        				response.MinResponseTime,
+        				response.MaxResponseTime,
+        				response.AvgResponseTime);
+    			}
+    
+    			// Print host data
+    			Serial.printf("Destination host data:\r\n");
+    			Serial.printf("    IP address: %s\r\n", 
+					response.DestIPAddress.toString().c_str());
+    			if(response.DestMacAddress != nullptr) {
+      				Serial.printf("    MAC address: " MACSTR "\r\n",
+        			MAC2STR(response.DestMacAddress->addr));
+    			}
+    			if(response.DestHostname != "") {
+      				Serial.printf("    DNS name: %s\r\n",
+        			response.DestHostname.c_str());
+    			}
+#endif	
+				boolean failed = response.TotalSentRequests > response.TotalReceivedResponses;
+
+				//Idee: If we never received a ping response, then the gateway is blocked.
+				//      So only reboot if we failed 3 times and we never received any ping response.
+				ping_ok += response.TotalReceivedResponses;
+				if (!ping_ok)
+					return true;
+
+				if (failed)  {
+					if(os.status.network_fails<3)  os.status.network_fails++;
+					// clamp it to 6
+					//if (os.status.network_fails > 6) os.status.network_fails = 6;
+				}
+				else os.status.network_fails=0;
+				// if failed more than 3 times, restart
+				if (os.status.network_fails==3) {
+					// mark for safe restart
+					os.nvdata.reboot_cause = REBOOT_CAUSE_NETWORK_FAIL;
+					os.status.safe_reboot = 1;
+				} else if (os.status.network_fails>2) {
+					// if failed more than twice, try to reconnect
+					if (os.start_network())
+						os.status.network_fails=0;
+				}
+
+    			return true; 
+			});
+		}
+		if (useEth && (!eth.connected() || !eth.gatewayIP() || !eth.gatewayIP().isSet())) {
+			os.status.network_fails++;
+			return;
+		}
+		if (!useEth && (!WiFi.isConnected() || !WiFi.gatewayIP() || !WiFi.gatewayIP().isSet() || os.get_wifi_mode()==WIFI_MODE_AP)) {
+			os.status.network_fails++;
+			return;
+		}
+			
+		if(!pinger->Ping(useEth?eth.gatewayIP() : WiFi.gatewayIP())) {
+			os.status.network_fails++;
+#if defined(ENABLE_DEBUG)
+    		Serial.println("Error during last ping command.");
+#endif
+  		}
+	}
 #endif
 }
+
+/**
+#if defined(ESP8266)
+
+#define NET_ENC28J60_EIR                                 0x1C
+#define NET_ENC28J60_ESTAT                               0x1D
+#define NET_ENC28J60_ECON1                               0x1F
+#define NET_ENC28J60_EIR_RXERIF                          0x01
+#define NET_ENC28J60_ESTAT_BUFFER                        0x40
+#define NET_ENC28J60_ECON1_RXEN                          0x04
+
+bool check_enc28j60() {
+	
+	uint8_t stateEconRxen = eth.readreg((uint8_t) NET_ENC28J60_ECON1) & NET_ENC28J60_ECON1_RXEN;
+    // ESTAT.BUFFER rised on TX or RX error
+    // I think the test of this register is not necessary - EIR.RXERIF state checking may be enough
+    uint8_t stateEstatBuffer = eth.readreg((uint8_t) NET_ENC28J60_ESTAT) & NET_ENC28J60_ESTAT_BUFFER;
+    // EIR.RXERIF set on RX error
+    uint8_t stateEirRxerif = eth.readreg((uint8_t) NET_ENC28J60_EIR) & NET_ENC28J60_EIR_RXERIF;
+    if (!stateEconRxen || (stateEstatBuffer && stateEirRxerif)) {
+		DEBUG_PRINTLN(F("ENC28J60 FAILED - REBOOT!"))
+		return false;
+	}
+	return true;
+}
+#endif
+*/
 
 /** Perform NTP sync */
 void perform_ntp_sync() {

@@ -1,0 +1,34 @@
+SKETCH = ./mainArduino.ino
+LIBS = . \
+  $(ESP_LIBS)/Wire \
+  $(ESP_LIBS)/SPI \
+  $(ESP_LIBS)/ESP8266WiFi \
+  $(ESP_LIBS)/ESP8266WebServer \
+  $(ESP_LIBS)/ESP8266mDNS \
+  $(ESP_LIBS)/LittleFS \
+  $(ESP_LIBS)/lwIP_enc28j60 \
+  /data/libs/SSD1306 \
+  /data/libs/rc-switch \
+  /data/libs/pubsubclient \
+
+ESP_ROOT = /data/esp8266_3.0.2-master
+ESPCORE_VERSION = 302
+BUILD_ROOT = /data/opensprinkler-firmware/$(MAIN_NAME)
+
+UPLOAD_SPEED = 460800
+UPLOAD_VERB = -v
+# for OS3.0 revision 1: reset mode is nodemcu
+# UPLOAD_RESET = nodemcu
+# Uncomment the line below for OS3.0 revision 0: reset mode is ck
+# UPLOAD_RESET = ck
+
+FLASH_DEF = 4M3M
+FLASH_MODE = dio
+FLASH_SPEED = 80
+F_CPU = 160000000L
+
+BOARD = generic
+
+EXCLUDE_DIRS = ./build-1284
+
+include ./makeEspArduino.mk
