@@ -15,8 +15,12 @@ creates, modifies or deletes a sensor.
 "port" for the ip-port-address, only for network connected sensors. All others use port=0
 "id" sub-id, e.a. modbus address or subid, for ADC Sensors 0..7
 "ri" read interval in seconds
+"fac" factor for user defined sensors
+"div" divider for user defined sensors
+"unit" unit for user defined sensors (unitid=99)
 "enable" 0=sensor disabled, 1=sensor enabled
 "log" 0=logging disabled, 1=logging enabled
+"show" 0=hide 1=show current value on main screen
 
 examples:
 http://<ip>/sc?pw=<pw>&nr=1&type=1&group=0&name=SMT100-Mois&ip=4261456064&port=8899&id=253&ri=60&enable=1&log=1
@@ -45,6 +49,10 @@ SENSOR_ANALOG_EXTENSION_BOARD_P   11  New OpenSprinkler analog extension board x
 SENSOR_SMT50_MOIS                 15  New OpenSprinkler analog extension board x8 - SMT50 VWC [%] = (U * 50) : 3
 SENSOR_SMT50_TEMP                 16  New OpenSprinkler analog extension board x8 - SMT50 T [°C] = (U – 0,5) * 100
 SENSOR_OSPI_ANALOG_INPUTS         20  Old OSPi analog input
+SENSOR_VH400                      30  New OpenSprinkler analog extension board x8 - Vegetronix VH400
+SENSOR_THERM200                   31  New OpenSprinkler analog extension board x8 - Vegetronix THERM200
+SENSOR_AQUAPLUMB                  32  New OpenSprinkler analog extension board x8 - Vegetronix Aquaplumb
+SENSOR_USERDEF                    49  New OpenSprinkler analog extension board x8 - User defined sensor
 SENSOR_REMOTE                     100 Remote sensor of an remote opensprinkler
 SENSOR_GROUP_MIN                 1000 Sensor group with min value
 SENSOR_GROUP_MAX                 1001 Sensor group with max value
@@ -132,6 +140,12 @@ List supported program adjustments (sh):
 http://<ip>/sh?pw=<pw>
 
 System used and free space (du):
+examples:
 http://<ip>/du?pw=<pw>
+
+Sensor config User Defined (si):
+Updates the user config values of a sensor
+examples:
+http://<ip>/si?pw=<pw>&nr=1&fac=100&div=10&unit='bar'
 
 
