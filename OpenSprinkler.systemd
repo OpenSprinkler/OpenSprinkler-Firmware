@@ -1,0 +1,10 @@
+[Unit]
+Description=OpenSprinkler
+
+[Service]
+ExecStart=__OpenSprinkler_Path__/OpenSprinkler
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
