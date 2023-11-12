@@ -1984,6 +1984,47 @@ void server_fill_files(OTF_PARAMS_DEF) {
 }
 */
 
+/**
+ * si
+ * Sensor config User Defined
+ * {"nr":1,"fac":100,"div":1,"unit":"bar"}
+ */
+void server_sensor_config_userdef(OTF_PARAMS_DEF)
+{
+#if defined(ESP8266)
+	if(!process_password(OTF_PARAMS)) return;
+#else
+	char *p = get_buffer;
+#endif
+
+	DEBUG_PRINTLN(F("server_sensor_config userder"));
+
+	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("nr"), true))
+		handle_return(HTML_DATA_MISSING);
+	uint nr = strtoul(tmp_buffer, NULL, 0); // Sensor nr
+	if (nr == 0) handle_return(HTML_DATA_MISSING);
+
+	int16_t factor = 0;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("fac"), true))
+		factor = strtol(tmp_buffer, NULL, 0); // factor
+
+	int16_t divider = 0;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("div"), true))
+		divider = strtol(tmp_buffer, NULL, 0); // divider
+
+	char userdef_unit_str[8];
+	char *userdef_unit;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("unit"), true)) {
+		strncpy(userdef_unit_str, tmp_buffer, sizeof(userdef_unit_str)-1); // unit
+		userdef_unit = userdef_unit_str;
+	} else {
+		userdef_unit = NULL;
+	}
+
+	int ret = sensor_define_userdef(nr, factor, divider, userdef_unit);
+	ret = ret == HTTP_RQT_SUCCESS?HTML_SUCCESS:HTML_DATA_MISSING;
+	handle_return(ret);	
+}
 
 /**
  * sc
@@ -2043,6 +2084,23 @@ void server_sensor_config(OTF_PARAMS_DEF)
 		handle_return(HTML_DATA_MISSING);
 	uint ri = strtoul(tmp_buffer, NULL, 0); // Read Interval (s)
 
+	int16_t factor = 0;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("fac"), true))
+		factor = strtol(tmp_buffer, NULL, 0); // factor
+
+	int16_t divider = 0;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("div"), true))
+		divider = strtol(tmp_buffer, NULL, 0); // divider
+
+	char userdef_unit_str[8];
+	char *userdef_unit;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("unit"), true)) {
+		strncpy(userdef_unit_str, tmp_buffer, sizeof(userdef_unit_str)-1); // unit
+		userdef_unit = userdef_unit_str;
+	} else {
+		userdef_unit = NULL;
+	}
+
 	uint enable = 1;
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("enable"), true))
 		enable = strtoul(tmp_buffer, NULL, 0); // 1=enable/0=disable
@@ -2056,7 +2114,7 @@ void server_sensor_config(OTF_PARAMS_DEF)
 		show = strtoul(tmp_buffer, NULL, 0); // 1=show enabled/0=show disabled
 
 	SensorFlags_t flags = {.enable=enable, .log=log, .show=show};
-	int ret = sensor_define(nr, name, type, group, ip, port, id, ri, flags);
+	int ret = sensor_define(nr, name, type, group, ip, port, id, ri, factor, divider, userdef_unit, flags);
 	ret = ret == HTTP_RQT_SUCCESS?HTML_SUCCESS:HTML_DATA_MISSING;
 	handle_return(ret);
 }
@@ -2201,7 +2259,7 @@ void sensorconfig_json(OTF_PARAMS_DEF) {
 
 		if (first) first = false; else bfill.emit_p(PSTR(","));
 
-		bfill.emit_p(PSTR("{\"nr\":$D,\"type\":$D,\"group\":$D,\"name\":\"$S\",\"ip\":$L,\"port\":$D,\"id\":$D,\"ri\":$D,\"nativedata\":$L,\"data\":$E,\"unit\":\"$S\",\"unitid\":$D,\"enable\":$D,\"log\":$D,\"show\":$D,\"data_ok\":$D,\"last\":$L}"),
+		bfill.emit_p(PSTR("{\"nr\":$D,\"type\":$D,\"group\":$D,\"name\":\"$S\",\"ip\":$L,\"port\":$D,\"id\":$D,\"ri\":$D,\"fac\":$D,\"div\":$D,\"nativedata\":$L,\"data\":$E,\"unit\":\"$S\",\"unitid\":$D,\"enable\":$D,\"log\":$D,\"show\":$D,\"data_ok\":$D,\"last\":$L}"),
 			sensor->nr, 
 			sensor->type,
 			sensor->group,
@@ -2210,6 +2268,8 @@ void sensorconfig_json(OTF_PARAMS_DEF) {
 			sensor->port,
 			sensor->id,
 			sensor->read_interval,
+			sensor->factor,
+			sensor->divider,
 			sensor->last_native_data,
 			sensor->last_data,
 			getSensorUnit(sensor),
@@ -2656,6 +2716,7 @@ const int sensor_types[] = {
 	SENSOR_VH400,
 	SENSOR_THERM200,
 	SENSOR_AQUAPLUMB,  
+	SENSOR_USERDEF,
  #endif
 #else
 	SENSOR_OSPI_ANALOG,
@@ -2692,6 +2753,8 @@ const char* sensor_names[] = {
 	"OpenSprinkler analog extension board 2xADS1x15 x8 - Vegetronix VH400",
 	"OpenSprinkler analog extension board 2xADS1x15 x8 - Vegetronix THERM200",
 	"OpenSprinkler analog extension board 2xADS1x15 x8 - Vegetronix AquaPlumb",
+
+	"OpenSprinkler analog extension board 2xADS1x15 x8 - user defined sensor",
  #endif
 #else
 	"OSPi analog input - voltage mode 0..3.3V",
@@ -2743,7 +2806,7 @@ void server_sensor_types(OTF_PARAMS_DEF) {
 			bfill.emit_p(PSTR(","));
 		byte unitid = getSensorUnitId(sensor_types[i]);
 		bfill.emit_p(PSTR("{\"type\":$D,\"name\":\"$S\",\"unit\":\"$S\",\"unitid\":$D}"), 
-			sensor_types[i], sensor_names[i], sensor_unitNames[unitid], unitid);
+			sensor_types[i], sensor_names[i], getSensorUnit(unitid), unitid);
 		send_packet(OTF_PARAMS);
 	}
 	bfill.emit_p(PSTR("]}"));
@@ -2956,6 +3019,7 @@ const char _url_keys[] PROGMEM =
 	"cu"
 	"ja"
 	"pq"
+	"si"
 	"sc"
 	"sl"
 	"sg"
@@ -3001,6 +3065,7 @@ URLHandler urls[] = {
 	server_change_scripturl,// cu
 	server_json_all,        // ja
 	server_pause_queue,     // pq
+	server_sensor_config_userdef, // si
 	server_sensor_config,    // sc
 	server_sensor_list,      // sl
 	server_sensor_get,       // sg

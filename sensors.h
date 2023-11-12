@@ -76,6 +76,8 @@ extern "C" {
 #define SENSOR_THERM200                   31  //New OpenSprinkler analog extension board x8 - Vegetronix THERM200
 #define SENSOR_AQUAPLUMB                  32  //New OpenSprinkler analog extension board x8 - Vegetronix Aquaplumb
 
+#define SENSOR_USERDEF                    49  //New OpenSprinkler analog extension board x8 - User defined sensor
+
 #endif
 #else
 #define SENSOR_OSPI_ANALOG                50  //Old OSPi analog input - voltage mode 0..3.3V
@@ -122,7 +124,10 @@ typedef struct Sensor {
 	uint32_t last_native_data; // last native sensor data
 	double   last_data;        // last converted sensor data
 	SensorFlags_t flags;       // Flags see obove
-	byte     undef[32];        //for later
+	int16_t  factor;           // faktor  - for custom sensor
+	int16_t  divider;          // divider - for custom sensor
+	char     userdef_unit[8];  // unit    - for custom sensor
+	byte     undef[20];        // for later
 	//unstored
 	byte     unitid;
 	ulong    last_read; //millis
@@ -190,10 +195,12 @@ typedef struct SensorUrl {
 #define UNIT_MPH         8
 #define UNIT_KMH         9
 #define UNIT_LEVEL      10
+#define UNIT_USERDEF    99
 
 //Unitnames
-extern const char* sensor_unitNames[];
+// extern const char* sensor_unitNames[];
 
+const char* getSensorUnit(int unitid);
 const char* getSensorUnit(Sensor_t *sensor);
 byte getSensorUnitId(int type);
 byte getSensorUnitId(Sensor_t *sensor);
@@ -206,7 +213,8 @@ uint16_t CRC16 (byte buf[], int len);
 
 //Sensor API functions:
 int sensor_delete(uint nr);
-int sensor_define(uint nr, char *name, uint type, uint group, uint32_t ip, uint port, uint id, uint ri, SensorFlags_t flags);
+int sensor_define(uint nr, char *name, uint type, uint group, uint32_t ip, uint port, uint id, uint ri, int16_t factor, int16_t divider, char* userdef_unit, SensorFlags_t flags);
+int sensor_define_userdef(uint nr, int16_t factor, int16_t divider, char* userdef_unit);
 void sensor_load();
 void sensor_save();
 uint sensor_count();

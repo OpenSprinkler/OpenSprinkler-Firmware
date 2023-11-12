@@ -118,7 +118,7 @@ int sensor_delete(uint nr) {
  * @param port 
  * @param id 
  */
-int sensor_define(uint nr, char *name, uint type, uint group, uint32_t ip, uint port, uint id, uint ri, SensorFlags_t flags) {
+int sensor_define(uint nr, char *name, uint type, uint group, uint32_t ip, uint port, uint id, uint ri, int16_t factor, int16_t divider, char* userdef_unit, SensorFlags_t flags) {
 
 	if (nr == 0 || type == 0)
 		return HTTP_RQT_NOT_RECEIVED;
@@ -136,6 +136,12 @@ int sensor_define(uint nr, char *name, uint type, uint group, uint32_t ip, uint 
 			sensor->port = port;
 			sensor->id = id;
 			sensor->read_interval = ri;
+			sensor->factor = factor;
+			sensor->divider = divider;
+			if (userdef_unit)
+				strncpy(sensor->userdef_unit, userdef_unit, sizeof(sensor->userdef_unit)-1);
+			else
+				memset(sensor->userdef_unit, 0, sizeof(sensor->userdef_unit));
 			sensor->flags = flags;
 			sensor_save();
 			return HTTP_RQT_SUCCESS;
@@ -158,6 +164,12 @@ int sensor_define(uint nr, char *name, uint type, uint group, uint32_t ip, uint 
 	new_sensor->port = port;
 	new_sensor->id = id;
 	new_sensor->read_interval = ri;
+	new_sensor->factor = factor;
+	new_sensor->divider = divider;
+	if (userdef_unit)
+		strncpy(sensor->userdef_unit, userdef_unit, sizeof(sensor->userdef_unit)-1);
+	else
+		memset(sensor->userdef_unit, 0, sizeof(sensor->userdef_unit));
 	new_sensor->flags = flags;
 	if (last) {
 		new_sensor->next = last->next;
@@ -167,6 +179,21 @@ int sensor_define(uint nr, char *name, uint type, uint group, uint32_t ip, uint 
 		sensors = new_sensor;
 	}
 	sensor_save();
+	return HTTP_RQT_SUCCESS;
+}
+
+int sensor_define_userdef(uint nr, int16_t factor, int16_t divider, char* userdef_unit) {
+	Sensor_t *sensor = sensor_by_nr(nr);
+	if (!sensor)
+		return HTTP_RQT_NOT_RECEIVED;
+
+	sensor->factor = factor;
+	sensor->divider = divider;
+	if (userdef_unit)
+		strncpy(sensor->userdef_unit, userdef_unit, sizeof(sensor->userdef_unit)-1);
+	else
+		memset(sensor->userdef_unit, 0, sizeof(sensor->userdef_unit));
+
 	return HTTP_RQT_SUCCESS;
 }
 
@@ -771,6 +798,15 @@ int read_sensor_adc(Sensor_t *sensor) {
 			else if (sensor->last_data > 100)
 				sensor->last_data = 100;
 			break;
+		case SENSOR_USERDEF: //User defined sensor
+			if (sensor->factor && sensor->divider)
+				v *= sensor->factor / sensor->divider;
+			else if (sensor->divider)
+				v /= sensor->divider;
+			else if (sensor->factor)
+				v *= sensor->factor;
+			sensor->last_data = v;
+			break;
 	}
 
 	sensor->flags.data_ok = true;
@@ -1117,6 +1153,7 @@ int read_sensor(Sensor_t *sensor) {
 		case SENSOR_VH400:
 		case SENSOR_THERM200:
 		case SENSOR_AQUAPLUMB:
+		case SENSOR_USERDEF:
 			sensor->last_read = time;
 			return read_sensor_adc(sensor);
 #endif
@@ -1593,11 +1630,24 @@ bool checkDiskFree() {
 }
 #endif
 
+const char* getSensorUnit(int unitid) {
+	if (unitid == UNIT_USERDEF)
+		return "?";
+	if (unitid < 0 || (uint16_t)unitid >= sizeof(sensor_unitNames))
+		return sensor_unitNames[0];
+	return sensor_unitNames[unitid];
+}
+
 const char* getSensorUnit(Sensor_t *sensor) {
 	if (!sensor)
 		return sensor_unitNames[0];
 
-	return sensor_unitNames[getSensorUnitId(sensor)];
+	int unitid = getSensorUnitId(sensor);
+	if (unitid == UNIT_USERDEF)
+		return sensor->userdef_unit;
+	if (unitid < 0 || (uint16_t)unitid >= sizeof(sensor_unitNames))
+		return sensor_unitNames[0];
+	return sensor_unitNames[unitid];
 }
 
 boolean sensor_isgroup(Sensor_t *sensor) {
@@ -1630,6 +1680,7 @@ byte getSensorUnitId(int type) {
 		case SENSOR_VH400:                    return UNIT_PERCENT;
 		case SENSOR_THERM200:                 return UNIT_DEGREE;
 		case SENSOR_AQUAPLUMB:                return UNIT_PERCENT;
+		case SENSOR_USERDEF:	              return UNIT_USERDEF;
 #endif
 #else
 		case SENSOR_OSPI_ANALOG: 		return UNIT_VOLT;
@@ -1668,6 +1719,7 @@ byte getSensorUnitId(Sensor_t *sensor) {
 		case SENSOR_VH400:                    return UNIT_PERCENT;
 		case SENSOR_THERM200:                 return UNIT_DEGREE;
 		case SENSOR_AQUAPLUMB:                return UNIT_PERCENT;
+		case SENSOR_USERDEF:                  return UNIT_USERDEF;
 #endif
 #else
 		case SENSOR_OSPI_ANALOG: 		return UNIT_VOLT;
