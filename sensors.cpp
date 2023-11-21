@@ -118,12 +118,14 @@ int sensor_delete(uint nr) {
  * @param port 
  * @param id 
  */
-int sensor_define(uint nr, char *name, uint type, uint group, uint32_t ip, uint port, uint id, uint ri, int16_t factor, int16_t divider, char* userdef_unit, SensorFlags_t flags) {
+int sensor_define(uint nr, char *name, uint type, uint group, uint32_t ip, uint port, uint id, uint ri, int16_t factor, int16_t divider, char *userdef_unit, SensorFlags_t flags) {
 
 	if (nr == 0 || type == 0)
 		return HTTP_RQT_NOT_RECEIVED;
 	if (ri < 10)
 		ri = 10;
+
+	DEBUG_PRINTLN(F("server_define"));
 
 	Sensor_t *sensor = sensors;
 	Sensor_t *last = NULL;
@@ -138,10 +140,7 @@ int sensor_define(uint nr, char *name, uint type, uint group, uint32_t ip, uint 
 			sensor->read_interval = ri;
 			sensor->factor = factor;
 			sensor->divider = divider;
-			if (userdef_unit)
-				strncpy(sensor->userdef_unit, userdef_unit, sizeof(sensor->userdef_unit)-1);
-			else
-				memset(sensor->userdef_unit, 0, sizeof(sensor->userdef_unit));
+			strncpy(sensor->userdef_unit, userdef_unit, sizeof(sensor->userdef_unit)-1);
 			sensor->flags = flags;
 			sensor_save();
 			return HTTP_RQT_SUCCESS;
@@ -153,6 +152,9 @@ int sensor_define(uint nr, char *name, uint type, uint group, uint32_t ip, uint 
 		last = sensor;
 		sensor = sensor->next;
 	}
+
+	DEBUG_PRINTLN(F("server_define2"));
+
 	//Insert new
 	Sensor_t *new_sensor = new Sensor_t;
 	memset(new_sensor, 0, sizeof(Sensor_t));
@@ -166,10 +168,7 @@ int sensor_define(uint nr, char *name, uint type, uint group, uint32_t ip, uint 
 	new_sensor->read_interval = ri;
 	new_sensor->factor = factor;
 	new_sensor->divider = divider;
-	if (userdef_unit)
-		strncpy(sensor->userdef_unit, userdef_unit, sizeof(sensor->userdef_unit)-1);
-	else
-		memset(sensor->userdef_unit, 0, sizeof(sensor->userdef_unit));
+	strncpy(new_sensor->userdef_unit, userdef_unit, sizeof(new_sensor->userdef_unit)-1);
 	new_sensor->flags = flags;
 	if (last) {
 		new_sensor->next = last->next;
@@ -182,7 +181,7 @@ int sensor_define(uint nr, char *name, uint type, uint group, uint32_t ip, uint 
 	return HTTP_RQT_SUCCESS;
 }
 
-int sensor_define_userdef(uint nr, int16_t factor, int16_t divider, char* userdef_unit) {
+int sensor_define_userdef(uint nr, int16_t factor, int16_t divider, char *userdef_unit) {
 	Sensor_t *sensor = sensor_by_nr(nr);
 	if (!sensor)
 		return HTTP_RQT_NOT_RECEIVED;
@@ -232,7 +231,7 @@ void sensor_load() {
  * 
  */
 void sensor_save() {
-	//DEBUG_PRINTLN(F("sensor_save"));
+	DEBUG_PRINTLN(F("sensor_save"));
 	if (file_exists(SENSOR_FILENAME))
 		remove_file(SENSOR_FILENAME);
 	
@@ -243,6 +242,8 @@ void sensor_save() {
 		sensor = sensor->next;
 		pos += SENSOR_STORE_SIZE; 
 	}
+
+	DEBUG_PRINTLN(F("sensor_save2"));
 }
 
 uint sensor_count() {
@@ -484,7 +485,7 @@ ulong findLogPosition(uint8_t log, ulong after) {
 
 #if !defined(ARDUINO)
 /**
-/* compatibility functions for OSPi:
+* compatibility functions for OSPi:
 **/
 #define timeSet 0
 int timeStatus() {
@@ -821,7 +822,7 @@ int read_sensor_adc(Sensor_t *sensor) {
 #endif
 #else
 /**
-/* Read the OSPi onboard PCF8591 A2D
+* Read the OSPi onboard PCF8591 A2D
 **/
 int read_sensor_ospi(Sensor_t *sensor) {
 	DEBUG_PRINTLN(F("read_sensor_ospi"));
@@ -830,8 +831,8 @@ int read_sensor_ospi(Sensor_t *sensor) {
 	sensor->flags.data_ok = false;
 
 	/**
-	/* https://medium.com/geekculture/raspberry-pi-c-libraries-for-working-with-i2c-spi-and-uart-4677f401b584
-	/* http://www.pibits.net/amp/code/raspberry-pi-and-a-pcf8591-example.php
+	* https://medium.com/geekculture/raspberry-pi-c-libraries-for-working-with-i2c-spi-and-uart-4677f401b584
+	* http://www.pibits.net/amp/code/raspberry-pi-and-a-pcf8591-example.php
 	**/
 	int adapter_nr = 1;
 	char filename[20];

@@ -213,8 +213,8 @@ uint16_t CRC16 (byte buf[], int len);
 
 //Sensor API functions:
 int sensor_delete(uint nr);
-int sensor_define(uint nr, char *name, uint type, uint group, uint32_t ip, uint port, uint id, uint ri, int16_t factor, int16_t divider, char* userdef_unit, SensorFlags_t flags);
-int sensor_define_userdef(uint nr, int16_t factor, int16_t divider, char* userdef_unit);
+int sensor_define(uint nr, char *name, uint type, uint group, uint32_t ip, uint port, uint id, uint ri, int16_t factor, int16_t divider, char *userdef_unit, SensorFlags_t flags);
+int sensor_define_userdef(uint nr, int16_t factor, int16_t divider, char *userdef_unit);
 void sensor_load();
 void sensor_save();
 uint sensor_count();

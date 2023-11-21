@@ -1997,7 +1997,7 @@ void server_sensor_config_userdef(OTF_PARAMS_DEF)
 	char *p = get_buffer;
 #endif
 
-	DEBUG_PRINTLN(F("server_sensor_config userder"));
+	DEBUG_PRINTLN(F("server_sensor_config userdef"));
 
 	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("nr"), true))
 		handle_return(HTML_DATA_MISSING);
@@ -2012,13 +2012,13 @@ void server_sensor_config_userdef(OTF_PARAMS_DEF)
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("div"), true))
 		divider = strtol(tmp_buffer, NULL, 0); // divider
 
-	char userdef_unit_str[8];
-	char *userdef_unit;
+	char userdef_unit[8];
+	memset(userdef_unit, 0, sizeof(userdef_unit));
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("unit"), true)) {
-		strncpy(userdef_unit_str, tmp_buffer, sizeof(userdef_unit_str)-1); // unit
-		userdef_unit = userdef_unit_str;
-	} else {
-		userdef_unit = NULL;
+		urlDecode(tmp_buffer);
+		strReplace(tmp_buffer, '\"', '\'');
+		strReplace(tmp_buffer, '\\', '/');	
+		strncpy(userdef_unit, tmp_buffer, sizeof(userdef_unit)-1); // unit
 	}
 
 	int ret = sensor_define_userdef(nr, factor, divider, userdef_unit);
@@ -2055,6 +2055,8 @@ void server_sensor_config(OTF_PARAMS_DEF)
 		handle_return(HTML_SUCCESS);
 	}
 
+	DEBUG_PRINTLN(F("server_sensor_config2"));
+
 	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("group"), true))
 		handle_return(HTML_DATA_MISSING);
 	uint group = strtoul(tmp_buffer, NULL, 0); // Sensor group
@@ -2066,7 +2068,7 @@ void server_sensor_config(OTF_PARAMS_DEF)
 	strReplace(tmp_buffer, '\\', '/');	
 	char name[30];
 
-	strncpy(name, tmp_buffer, sizeof(name)-1); // Sensor nr
+	strncpy(name, tmp_buffer, sizeof(name)-1); // Sensor name
 
 	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("ip"), true))
 		handle_return(HTML_DATA_MISSING);
@@ -2092,13 +2094,15 @@ void server_sensor_config(OTF_PARAMS_DEF)
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("div"), true))
 		divider = strtol(tmp_buffer, NULL, 0); // divider
 
-	char userdef_unit_str[8];
-	char *userdef_unit;
+	DEBUG_PRINTLN(F("server_sensor_config3"));
+
+	char userdef_unit[8];
+	memset(userdef_unit, 0, sizeof(userdef_unit));
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("unit"), true)) {
-		strncpy(userdef_unit_str, tmp_buffer, sizeof(userdef_unit_str)-1); // unit
-		userdef_unit = userdef_unit_str;
-	} else {
-		userdef_unit = NULL;
+		urlDecode(tmp_buffer);
+		strReplace(tmp_buffer, '\"', '\'');
+		strReplace(tmp_buffer, '\\', '/');	
+		strncpy(userdef_unit, tmp_buffer, sizeof(userdef_unit)-1); // unit
 	}
 
 	uint enable = 1;
@@ -2113,10 +2117,15 @@ void server_sensor_config(OTF_PARAMS_DEF)
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("show"), true))
 		show = strtoul(tmp_buffer, NULL, 0); // 1=show enabled/0=show disabled
 
+	DEBUG_PRINTLN(F("server_sensor_config4"));
+
 	SensorFlags_t flags = {.enable=enable, .log=log, .show=show};
 	int ret = sensor_define(nr, name, type, group, ip, port, id, ri, factor, divider, userdef_unit, flags);
 	ret = ret == HTTP_RQT_SUCCESS?HTML_SUCCESS:HTML_DATA_MISSING;
 	handle_return(ret);
+	
+	DEBUG_PRINTLN(F("server_sensor_config5"));
+
 }
 
 /**
