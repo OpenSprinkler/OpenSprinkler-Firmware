@@ -227,7 +227,7 @@ void rewind_ether_buffer() {
 
 void send_packet(OTF_PARAMS_DEF) {
 #if defined(ESP8266)
-	if (bfill.position() > 8192 || !res.willFit(bfill.position()))
+	if (bfill.position() >= 8192 || !res.willFit(bfill.position()))
 		res.flush(); 
 	res.writeBodyChunk((char *)"%s",ether_buffer);
 #else

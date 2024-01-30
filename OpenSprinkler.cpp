@@ -507,6 +507,37 @@ byte OpenSprinkler::start_ether() {
 	SPI.setDataMode(SPI_MODE0);
 	SPI.setFrequency(4000000);
 
+	//TODO 3.3 Network interface
+	{
+		/* this is copied from enc28j60.cpp geterevid
+		 * check to see if the hardware revision number if expected
+		 * */
+		DEBUG_PRINTLN(F("detect existence of ENC28J60"));
+		#define MAADRX_BANK 0x03
+		#define EREVID 0x12
+		#define ECON1 0x1f
+
+		// ==> setregbank(MAADRX_BANK);
+		pinMode(PIN_ETHER_CS, OUTPUT);
+		uint8_t r;
+		digitalWrite(PIN_ETHER_CS, LOW);
+		SPI.transfer(0x00 | (ECON1 & 0x1f));
+		r = SPI.transfer(0);
+		digitalWrite(PIN_ETHER_CS, HIGH);
+
+		digitalWrite(PIN_ETHER_CS, LOW);
+		SPI.transfer(0x40 | (ECON1 & 0x1f));
+		SPI.transfer((r & 0xfc) | (MAADRX_BANK & 0x03));
+		digitalWrite(PIN_ETHER_CS, HIGH);
+
+		// ==> r = readreg(EREVID);
+		digitalWrite(PIN_ETHER_CS, LOW);
+		SPI.transfer(0x00 | (EREVID & 0x1f));
+		r = SPI.transfer(0);
+		digitalWrite(PIN_ETHER_CS, HIGH);
+		if(r==0 || r==255) return 0; // r is expected to be a non-255 revision number
+	}
+	
 	load_hardware_mac((uint8_t*)tmp_buffer, true);
 	if (iopts[IOPT_USE_DHCP]==0) { // config static IP before calling eth.begin
 		IPAddress staticip(iopts+IOPT_STATIC_IP1);
