@@ -34,7 +34,7 @@
 	#if defined(ESP8266)
 		#include <pinger.h>
 		#include <lwip/icmp.h>
-		extern "C" struct netif* eagle_lwip_getif (int netif_index);
+		//extern "C" struct netif* eagle_lwip_getif (int netif_index);
 		Pinger *pinger = NULL;
 		ESP8266WebServer *update_server = NULL;
 		OTF::OpenThingsFramework *otf = NULL;

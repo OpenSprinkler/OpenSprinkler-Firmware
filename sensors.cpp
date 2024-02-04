@@ -40,6 +40,9 @@ static SensorUrl_t * sensorUrls = NULL;
 //Program sensor data 
 static ProgSensorAdjust_t *progSensorAdjusts = NULL;
 
+//modbus transaction id
+static uint16_t modbusTcpId = 0;
+
 const char*   sensor_unitNames[] {
 	"", "%", "°C", "°F", "V", "%", "in", "mm", "mph", "kmh", "%"
 //   0   1     2     3    4    5     6      7      8      9   10
@@ -118,7 +121,7 @@ int sensor_delete(uint nr) {
  * @param port 
  * @param id 
  */
-int sensor_define(uint nr, char *name, uint type, uint group, uint32_t ip, uint port, uint id, uint ri, int16_t factor, int16_t divider, char *userdef_unit, SensorFlags_t flags) {
+int sensor_define(uint nr, char *name, uint type, uint group, uint32_t ip, uint port, uint id, uint ri, int16_t factor, int16_t divider, char *userdef_unit, int16_t offset_mv, SensorFlags_t flags) {
 
 	if (nr == 0 || type == 0)
 		return HTTP_RQT_NOT_RECEIVED;
@@ -140,6 +143,7 @@ int sensor_define(uint nr, char *name, uint type, uint group, uint32_t ip, uint 
 			sensor->read_interval = ri;
 			sensor->factor = factor;
 			sensor->divider = divider;
+			sensor->offset_mv = offset_mv;
 			strncpy(sensor->userdef_unit, userdef_unit, sizeof(sensor->userdef_unit)-1);
 			sensor->flags = flags;
 			sensor_save();
@@ -168,6 +172,7 @@ int sensor_define(uint nr, char *name, uint type, uint group, uint32_t ip, uint 
 	new_sensor->read_interval = ri;
 	new_sensor->factor = factor;
 	new_sensor->divider = divider;
+	new_sensor->offset_mv = offset_mv;
 	strncpy(new_sensor->userdef_unit, userdef_unit, sizeof(new_sensor->userdef_unit)-1);
 	new_sensor->flags = flags;
 	if (last) {
@@ -181,13 +186,14 @@ int sensor_define(uint nr, char *name, uint type, uint group, uint32_t ip, uint 
 	return HTTP_RQT_SUCCESS;
 }
 
-int sensor_define_userdef(uint nr, int16_t factor, int16_t divider, char *userdef_unit) {
+int sensor_define_userdef(uint nr, int16_t factor, int16_t divider, char *userdef_unit, int16_t offset_mv) {
 	Sensor_t *sensor = sensor_by_nr(nr);
 	if (!sensor)
 		return HTTP_RQT_NOT_RECEIVED;
 
 	sensor->factor = factor;
 	sensor->divider = divider;
+	sensor->offset_mv = offset_mv;
 	if (userdef_unit)
 		strncpy(sensor->userdef_unit, userdef_unit, sizeof(sensor->userdef_unit)-1);
 	else
@@ -714,10 +720,13 @@ void read_all_sensors() {
 
 	while (sensor) {
 		if (time >= sensor->last_read + sensor->read_interval) {
-			if (read_sensor(sensor) == HTTP_RQT_SUCCESS) {
+			int result = read_sensor(sensor);
+			if (result == HTTP_RQT_SUCCESS) {
 				sensorlog_add(LOG_STD, sensor, time);
+				push_message(sensor);
+			} else if (result == HTTP_RQT_TIMEOUT) {
+				sensor->last_read = time - sensor->read_interval + 5;
 			}
-			push_message(sensor);
 		}
 		sensor = sensor->next;
 	}
@@ -751,8 +760,14 @@ int read_sensor_adc(Sensor_t *sensor) {
 	if (!active)
 		return HTTP_RQT_NOT_RECEIVED;
 
-	//Read values:
-	sensor->last_native_data = adc.readADC(id);
+	//Read values, 3x:
+	uint64_t avgValue = adc.readADC(id);
+	delay(100);
+	avgValue += adc.readADC(id);
+	delay(100);
+	avgValue += adc.readADC(id);
+
+	sensor->last_native_data = avgValue / 3;
 	sensor->last_data = adc.toVoltage(sensor->last_native_data);
 	double v = sensor->last_data;
 
@@ -800,8 +815,9 @@ int read_sensor_adc(Sensor_t *sensor) {
 				sensor->last_data = 100;
 			break;
 		case SENSOR_USERDEF: //User defined sensor
+			v -= (double)sensor->offset_mv/1000; // adjust zero-point offset in millivolt
 			if (sensor->factor && sensor->divider)
-				v *= sensor->factor / sensor->divider;
+				v *= (double)sensor->factor / (double)sensor->divider;
 			else if (sensor->divider)
 				v /= sensor->divider;
 			else if (sensor->factor)
@@ -990,57 +1006,61 @@ int read_sensor_ip(Sensor_t *sensor) {
 	ip[2] = (byte)((sensor->ip >> 8) &0xFF);
 	ip[3] = (byte)((sensor->ip &0xFF));
 #endif
-
-	if(!client->connect(ip, sensor->port)) {
-		DEBUG_PRINT(F("Cannot connect to "));
-		DEBUG_PRINT(ip[0]); DEBUG_PRINT(".");
-		DEBUG_PRINT(ip[1]); DEBUG_PRINT(".");
-		DEBUG_PRINT(ip[2]); DEBUG_PRINT(".");
-		DEBUG_PRINT(ip[3]); DEBUG_PRINT(":");
-		DEBUG_PRINTLN(sensor->port);
+	char server[20];
+	sprintf(server, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
+	client->setTimeout(200);
+	if(!client->connect(server, sensor->port)) {
+		DEBUG_PRINT(server);
+		DEBUG_PRINT(":");
+		DEBUG_PRINT(sensor->port);
+		DEBUG_PRINT(" ");
+		DEBUG_PRINTLN(F("failed."));
 		client->stop();
-		return HTTP_RQT_CONNECT_ERR;
+		return HTTP_RQT_TIMEOUT;
 	}
 
-uint8_t buffer[10];
-	int len = 0;
-	boolean addCrc16 = false;
+	uint8_t buffer[20];
+
+	//https://ipc2u.com/articles/knowledge-base/detailed-description-of-the-modbus-tcp-protocol-with-command-examples/
+
+	if (modbusTcpId >= 0xFFFE)
+		modbusTcpId = 1;
+	else
+		modbusTcpId++;
+
+	buffer[0] = (0xFF00&modbusTcpId) >> 8;
+	buffer[1] = (0x00FF&modbusTcpId);
+	buffer[2] = 0;
+	buffer[3] = 0;
+	buffer[4] = 0;
+	buffer[5] = 6; //len
+
 	switch(sensor->type)
 	{
 		case SENSOR_SMT100_MODBUS_RTU_MOIS:
-			buffer[0] = sensor->id; //Modbus ID
-			buffer[1] = 0x03; //Read Holding Registers
-			buffer[2] = 0x00; 
-			buffer[3] = 0x01; //soil moisture is at address 0x0001 
-			buffer[4] = 0x00; 
-			buffer[5] = 0x01; //Number of registers to read (soil moisture value is one 16-bit register)
-			len = 6;
-			addCrc16 = true;
+			buffer[6] = sensor->id; //Modbus ID
+			buffer[7] = 0x03; //Read Holding Registers
+			buffer[8] = 0x00; 
+			buffer[9] = 0x01; //soil moisture is at address 0x0001 
+			buffer[10] = 0x00; 
+			buffer[11] = 0x01; //Number of registers to read (soil moisture value is one 16-bit register)
 			break;
  
 		case SENSOR_SMT100_MODBUS_RTU_TEMP:
-			buffer[0] = sensor->id;
-			buffer[1] = 0x03; //Read Holding Registers
-			buffer[2] = 0x00; 
-			buffer[3] = 0x00; //temperature is at address 0x0000 
-			buffer[4] = 0x00; 
-			buffer[5] = 0x01; //Number of registers to read (soil moisture value is one 16-bit register)
-			len = 6;
-			addCrc16 = true;
+			buffer[6] = sensor->id;
+			buffer[7] = 0x03; //Read Holding Registers
+			buffer[8] = 0x00; 
+			buffer[9] = 0x00; //temperature is at address 0x0000 
+			buffer[10] = 0x00; 
+			buffer[11] = 0x01; //Number of registers to read (soil moisture value is one 16-bit register)
 			break;
 
 		default:
 			client->stop();
 		 	return HTTP_RQT_NOT_RECEIVED;
 	}
-	if (addCrc16) {
-		uint16_t crc = CRC16(buffer, len);
-		buffer[len+0] = (0x00FF&crc);
-		buffer[len+1] = (0xFF00&crc)>>8;
-		len += 2;
-	}
 
-	client->write(buffer, len);
+	client->write(buffer, 12);
 #if defined(ESP8266)
 	client->flush();
 #endif
@@ -1059,16 +1079,21 @@ uint8_t buffer[10];
 					client->stop();
 					DEBUG_PRINT(F("Sensor "));
 					DEBUG_PRINT(sensor->nr);
-					DEBUG_PRINT(F(" timeout read!"));
+					DEBUG_PRINTLN(F(" timeout read!"));
 					return HTTP_RQT_TIMEOUT;
 				}
 				delay(5);
 			}
-			int n = client->read(buffer, 7);
+
+			int n = client->read(buffer, 11);
+			if (n < 11)
+				n += client->read(buffer+n, 11-n);
 #else
-			int n = 0;
+			n = 0;
 			while (true) {
-				n = client->read(buffer, 7);
+				n = client->read(buffer, 11);
+				if (n < 11)
+					n += client->read(buffer+n, 11-n);
 				if (n > 0)
 					break;
 				if (millis() >=  stoptime) {
@@ -1084,25 +1109,25 @@ uint8_t buffer[10];
 			client->stop();
 			DEBUG_PRINT(F("Sensor "));
 			DEBUG_PRINT(sensor->nr);
-			if (n != 7) {
+			if (n != 11) {
 				DEBUG_PRINT(F(" returned "));
 				DEBUG_PRINT(n); 
-				DEBUG_PRINT(F(" bytes??")); 	
+				DEBUG_PRINTLN(F(" bytes??")); 	
 				return n == 0 ? HTTP_RQT_EMPTY_RETURN:HTTP_RQT_TIMEOUT;
 			}
-			if ((buffer[0] != sensor->id && sensor->id != 253)) { //253 is broadcast
-				DEBUG_PRINT(F(" returned sensor id "));
-				DEBUG_PRINT((int)buffer[0]);
+			if (buffer[0] != (0xFF00&modbusTcpId) >> 8 || buffer[1] != (0x00FF&modbusTcpId)) {
+				DEBUG_PRINT(F(" returned transaction id "));
+				DEBUG_PRINTLN((uint16_t)((buffer[0] << 8) + buffer[1]));
 				return HTTP_RQT_NOT_RECEIVED;
 			}
-			uint16_t crc = (buffer[6] << 8) | buffer[5];
-			if (crc != CRC16(buffer, 5)) {
-				DEBUG_PRINT(F(" crc error!"));
+			if ((buffer[6] != sensor->id && sensor->id != 253)) { //253 is broadcast
+				DEBUG_PRINT(F(" returned sensor id "));
+				DEBUG_PRINTLN((int)buffer[0]);
 				return HTTP_RQT_NOT_RECEIVED;
 			}
 
 			//Valid result:
-			sensor->last_native_data = (buffer[3] << 8) | buffer[4];
+			sensor->last_native_data = (buffer[9] << 8) | buffer[10];
 			DEBUG_PRINT(F(" native: "));
 			DEBUG_PRINT(sensor->last_native_data);
 
@@ -1298,18 +1323,6 @@ int set_sensor_address(Sensor_t *sensor, byte new_address) {
 	{
 		case SENSOR_SMT100_MODBUS_RTU_MOIS:
 		case SENSOR_SMT100_MODBUS_RTU_TEMP:
-			uint8_t buffer[10];
-			int len = 8;
-			buffer[0] = sensor->id;
-			buffer[1] = 0x06;
-			buffer[2] = 0x00;
-			buffer[3] = 0x04;
-			buffer[4] = 0x00;
-			buffer[5] = new_address;
-			uint16_t crc = CRC16(buffer, 6);
-			buffer[6] = (0x00FF&crc);
-			buffer[7] = (0xFF00&crc)>>8;
-			len = 8;
 
 #if defined(ARDUINO)
 			Client *client;
@@ -1340,41 +1353,64 @@ int set_sensor_address(Sensor_t *sensor, byte new_address) {
 			ip[2] = (byte)((sensor->ip >> 8) &0xFF);
 			ip[3] = (byte)((sensor->ip &0xFF));
 #endif		
-			if(!client->connect(ip, sensor->port)) {
+			char server[20];
+			sprintf(server, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
+			client->setTimeout(200);
+			if(!client->connect(server, sensor->port)) {
 				DEBUG_PRINT(F("Cannot connect to "));
-				DEBUG_PRINT(ip[0]); DEBUG_PRINT(".");
-				DEBUG_PRINT(ip[1]); DEBUG_PRINT(".");
-				DEBUG_PRINT(ip[2]); DEBUG_PRINT(".");
-				DEBUG_PRINT(ip[3]); DEBUG_PRINT(":");
+				DEBUG_PRINT(server); 
+				DEBUG_PRINT(":");
 				DEBUG_PRINTLN(sensor->port);
 				client->stop();
 				return HTTP_RQT_CONNECT_ERR;
 			}
 
-			client->write(buffer, len);
+			uint8_t buffer[20];
+
+			//https://ipc2u.com/articles/knowledge-base/detailed-description-of-the-modbus-tcp-protocol-with-command-examples/
+
+			if (modbusTcpId >= 0xFFFE)
+				modbusTcpId = 1;
+			else
+				modbusTcpId++;
+
+			buffer[0] = (0xFF00&modbusTcpId) >> 8;
+			buffer[1] = (0x00FF&modbusTcpId);
+			buffer[2] = 0;
+			buffer[3] = 0;
+			buffer[4] = 0;
+			buffer[5] = 6; //len
+			buffer[6] = sensor->id;
+			buffer[7] = 0x06;
+			buffer[8] = 0x00;
+			buffer[9] = 0x04;
+			buffer[10] = 0x00;
+			buffer[11] = new_address;
+
+			client->write(buffer, 12);
 #if defined(ESP8266)
 			client->flush();
 #endif
 
 			//Read result:
-			int n = client->read(buffer, 8);
+			int n = client->read(buffer, 12);
 			client->stop();
 			DEBUG_PRINT(F("Sensor "));
 			DEBUG_PRINT(sensor->nr);
-			if (n != 8) {
+			if (n != 12) {
 				DEBUG_PRINT(F(" returned "));
 				DEBUG_PRINT(n); 
 				DEBUG_PRINT(F(" bytes??")); 	
 				return n == 0 ? HTTP_RQT_EMPTY_RETURN:HTTP_RQT_TIMEOUT;
 			}
-			if ((buffer[0] != sensor->id && sensor->id != 253)) { //253 is broadcast
-				DEBUG_PRINT(F(" returned sensor id "));
-				DEBUG_PRINT((int)buffer[0]);
+			if (buffer[0] != (0xFF00&modbusTcpId) >> 8 || buffer[1] != (0x00FF&modbusTcpId)) {
+				DEBUG_PRINT(F(" returned transaction id "));
+				DEBUG_PRINTLN((uint16_t)((buffer[0] << 8) + buffer[1]));
 				return HTTP_RQT_NOT_RECEIVED;
 			}
-			crc = (buffer[6] | buffer[7] << 8);
-			if (crc != CRC16(buffer, 6)) {
-				DEBUG_PRINT(F(" crc error!"));
+			if ((buffer[6] != sensor->id && sensor->id != 253)) { //253 is broadcast
+				DEBUG_PRINT(F(" returned sensor id "));
+				DEBUG_PRINT((int)buffer[0]);
 				return HTTP_RQT_NOT_RECEIVED;
 			}
 			//Read OK:

@@ -227,8 +227,14 @@ void rewind_ether_buffer() {
 
 void send_packet(OTF_PARAMS_DEF) {
 #if defined(ESP8266)
-	if (bfill.position() >= 8192 || !res.willFit(bfill.position()))
+	DEBUG_PRINT(F("bfill position: "));
+	DEBUG_PRINTLN(bfill.position());
+	if (bfill.position() >= 8192 || !res.willFit(bfill.position())) {
+		DEBUG_PRINTLN("res.flush");
 		res.flush(); 
+	}
+	DEBUG_PRINT("res.writeBodyChunk: ");
+	DEBUG_PRINTLN(strlen(ether_buffer));
 	res.writeBodyChunk((char *)"%s",ether_buffer);
 #else
 	m_client->write((const uint8_t *)ether_buffer, strlen(ether_buffer));
@@ -2020,8 +2026,11 @@ void server_sensor_config_userdef(OTF_PARAMS_DEF)
 		strReplace(tmp_buffer, '\\', '/');	
 		strncpy(userdef_unit, tmp_buffer, sizeof(userdef_unit)-1); // unit
 	}
+	int16_t offset_mv = 0;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("offset"), true))
+		offset_mv = strtol(tmp_buffer, NULL, 0); // offset in millivolt
 
-	int ret = sensor_define_userdef(nr, factor, divider, userdef_unit);
+	int ret = sensor_define_userdef(nr, factor, divider, userdef_unit, offset_mv);
 	ret = ret == HTTP_RQT_SUCCESS?HTML_SUCCESS:HTML_DATA_MISSING;
 	handle_return(ret);	
 }
@@ -2104,6 +2113,9 @@ void server_sensor_config(OTF_PARAMS_DEF)
 		strReplace(tmp_buffer, '\\', '/');	
 		strncpy(userdef_unit, tmp_buffer, sizeof(userdef_unit)-1); // unit
 	}
+	int16_t offset_mv = 0;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("offset"), true))
+		offset_mv = strtol(tmp_buffer, NULL, 0); // offset in millivolt
 
 	uint enable = 1;
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("enable"), true))
@@ -2120,7 +2132,7 @@ void server_sensor_config(OTF_PARAMS_DEF)
 	DEBUG_PRINTLN(F("server_sensor_config4"));
 
 	SensorFlags_t flags = {.enable=enable, .log=log, .show=show};
-	int ret = sensor_define(nr, name, type, group, ip, port, id, ri, factor, divider, userdef_unit, flags);
+	int ret = sensor_define(nr, name, type, group, ip, port, id, ri, factor, divider, userdef_unit, offset_mv, flags);
 	ret = ret == HTTP_RQT_SUCCESS?HTML_SUCCESS:HTML_DATA_MISSING;
 	handle_return(ret);
 	
@@ -2268,7 +2280,7 @@ void sensorconfig_json(OTF_PARAMS_DEF) {
 
 		if (first) first = false; else bfill.emit_p(PSTR(","));
 
-		bfill.emit_p(PSTR("{\"nr\":$D,\"type\":$D,\"group\":$D,\"name\":\"$S\",\"ip\":$L,\"port\":$D,\"id\":$D,\"ri\":$D,\"fac\":$D,\"div\":$D,\"nativedata\":$L,\"data\":$E,\"unit\":\"$S\",\"unitid\":$D,\"enable\":$D,\"log\":$D,\"show\":$D,\"data_ok\":$D,\"last\":$L}"),
+		bfill.emit_p(PSTR("{\"nr\":$D,\"type\":$D,\"group\":$D,\"name\":\"$S\",\"ip\":$L,\"port\":$D,\"id\":$D,\"ri\":$D,\"fac\":$D,\"div\":$D,\"offset\":$D,\"nativedata\":$L,\"data\":$E,\"unit\":\"$S\",\"unitid\":$D,\"enable\":$D,\"log\":$D,\"show\":$D,\"data_ok\":$D,\"last\":$L}"),
 			sensor->nr, 
 			sensor->type,
 			sensor->group,
@@ -2279,6 +2291,7 @@ void sensorconfig_json(OTF_PARAMS_DEF) {
 			sensor->read_interval,
 			sensor->factor,
 			sensor->divider,
+			sensor->offset_mv,
 			sensor->last_native_data,
 			sensor->last_data,
 			getSensorUnit(sensor),
@@ -2446,6 +2459,7 @@ void server_sensorlog_list(OTF_PARAMS_DEF) {
 
 	uint sensor_type = 0;
 
+	DEBUG_PRINTLN(F("start so"));
 	ulong idx = startAt; 
 	while (idx < log_size) {
 		int n = sensorlog_load2(log, idx, BLOCKSIZE, sensorlog);
@@ -2501,17 +2515,25 @@ void server_sensorlog_list(OTF_PARAMS_DEF) {
 			}
 			// if available ether buffer is getting small
 			// send out a packet
-			if (count++ >= maxResults)
+			if (available_ether_buffer() <=0 ) {
+				send_packet(OTF_PARAMS);
+			}
+			if (count++ >= maxResults) {
 				break;
-			send_packet(OTF_PARAMS);
+			}
 		}
 		if (count >= maxResults)
 			break;
 	}
+	DEBUG_PRINTLN(F("end so"));
 
 	if (isjson)
 		bfill.emit_p(PSTR("]}"));
+	else
+		bfill.emit_p(PSTR("\r\n"));
 	free(sensorlog);
+
+	DEBUG_PRINTLN(F("finish so"));
 
 	handle_return(HTML_OK);	
 }
