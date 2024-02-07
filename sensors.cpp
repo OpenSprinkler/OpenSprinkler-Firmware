@@ -996,7 +996,7 @@ int read_sensor_ip(Sensor_t *sensor) {
 		return HTTP_RQT_CONNECT_ERR;
 	}
 
-#if defined(ESP8266)
+#if defined(ARDUINO)
     IPAddress _ip(sensor->ip);
 	byte ip[4] = {_ip[0], _ip[1], _ip[2], _ip[3]};
 #else
@@ -1008,8 +1008,14 @@ int read_sensor_ip(Sensor_t *sensor) {
 #endif
 	char server[20];
 	sprintf(server, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
+#if defined(ESP8266)
 	client->setTimeout(200);
 	if(!client->connect(server, sensor->port)) {
+#else
+	struct hostent *host = gethostbyname(server);
+	if (!host) { return HTTP_RQT_CONNECT_ERR; }
+	if(!client->connect((uint8_t*)host->h_addr, sensor->port)) {
+#endif
 		DEBUG_PRINT(server);
 		DEBUG_PRINT(":");
 		DEBUG_PRINT(sensor->port);
@@ -1089,7 +1095,7 @@ int read_sensor_ip(Sensor_t *sensor) {
 			if (n < 11)
 				n += client->read(buffer+n, 11-n);
 #else
-			n = 0;
+			int n = 0;
 			while (true) {
 				n = client->read(buffer, 11);
 				if (n < 11)
@@ -1344,10 +1350,10 @@ int set_sensor_address(Sensor_t *sensor, byte new_address) {
 			}
 
 #if defined(ESP8266)
-		    IPAddress _ip(sensor->ip);
+			IPAddress _ip(sensor->ip);
 			byte ip[4] = {_ip[0], _ip[1], _ip[2], _ip[3]};
 #else
-    		byte ip[4];
+    			byte ip[4];
 			ip[0] = (byte)((sensor->ip >> 24) &0xFF);
 			ip[1] = (byte)((sensor->ip >> 16) &0xFF);
 			ip[2] = (byte)((sensor->ip >> 8) &0xFF);
@@ -1355,8 +1361,14 @@ int set_sensor_address(Sensor_t *sensor, byte new_address) {
 #endif		
 			char server[20];
 			sprintf(server, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
-			client->setTimeout(200);
-			if(!client->connect(server, sensor->port)) {
+#if defined(ESP8266)
+		        client->setTimeout(200);
+		        if(!client->connect(server, sensor->port)) {
+#else
+		        struct hostent *host = gethostbyname(server);
+		        if (!host) { return HTTP_RQT_CONNECT_ERR; }
+		        if(!client->connect((uint8_t*)host->h_addr, sensor->port)) {
+#endif
 				DEBUG_PRINT(F("Cannot connect to "));
 				DEBUG_PRINT(server); 
 				DEBUG_PRINT(":");
