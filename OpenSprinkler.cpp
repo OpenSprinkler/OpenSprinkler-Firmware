@@ -464,6 +464,7 @@ byte OpenSprinkler::start_network() {
 
 	if (start_ether()) {
 		useEth = true;
+		WiFi.mode(WIFI_OFF);
 	} else {
 		useEth = false;
 	}

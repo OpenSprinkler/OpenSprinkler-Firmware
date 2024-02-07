@@ -760,14 +760,14 @@ int read_sensor_adc(Sensor_t *sensor) {
 	if (!active)
 		return HTTP_RQT_NOT_RECEIVED;
 
-	//Read values, 3x:
-	uint64_t avgValue = adc.readADC(id);
-	delay(100);
-	avgValue += adc.readADC(id);
-	delay(100);
-	avgValue += adc.readADC(id);
-
-	sensor->last_native_data = avgValue / 3;
+	//Read values multiple times:
+	uint64_t avgValue = 0;
+#define MAX_READ 7
+	for (int t = 0; t < MAX_READ; t++) {
+		if (t > 0) delay(100);
+		avgValue += adc.readADC(id);
+	}
+	sensor->last_native_data = avgValue / MAX_READ;
 	sensor->last_data = adc.toVoltage(sensor->last_native_data);
 	double v = sensor->last_data;
 
