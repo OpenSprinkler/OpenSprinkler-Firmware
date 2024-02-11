@@ -2029,8 +2029,11 @@ void server_sensor_config_userdef(OTF_PARAMS_DEF)
 	int16_t offset_mv = 0;
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("offset"), true))
 		offset_mv = strtol(tmp_buffer, NULL, 0); // offset in millivolt
+	int16_t offset2 = 0;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("offset2"), true))
+		offset2 = strtol(tmp_buffer, NULL, 0); // offset unit value
 
-	int ret = sensor_define_userdef(nr, factor, divider, userdef_unit, offset_mv);
+	int ret = sensor_define_userdef(nr, factor, divider, userdef_unit, offset_mv, offset2);
 	ret = ret == HTTP_RQT_SUCCESS?HTML_SUCCESS:HTML_DATA_MISSING;
 	handle_return(ret);	
 }
@@ -2117,6 +2120,10 @@ void server_sensor_config(OTF_PARAMS_DEF)
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("offset"), true))
 		offset_mv = strtol(tmp_buffer, NULL, 0); // offset in millivolt
 
+	int16_t offset2 = 0;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("offset2"), true))
+		offset2 = strtol(tmp_buffer, NULL, 0); // offset2
+
 	uint enable = 1;
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("enable"), true))
 		enable = strtoul(tmp_buffer, NULL, 0); // 1=enable/0=disable
@@ -2132,7 +2139,7 @@ void server_sensor_config(OTF_PARAMS_DEF)
 	DEBUG_PRINTLN(F("server_sensor_config4"));
 
 	SensorFlags_t flags = {.enable=enable, .log=log, .show=show};
-	int ret = sensor_define(nr, name, type, group, ip, port, id, ri, factor, divider, userdef_unit, offset_mv, flags);
+	int ret = sensor_define(nr, name, type, group, ip, port, id, ri, factor, divider, userdef_unit, offset_mv, offset2, flags);
 	ret = ret == HTTP_RQT_SUCCESS?HTML_SUCCESS:HTML_DATA_MISSING;
 	handle_return(ret);
 	
@@ -2280,7 +2287,7 @@ void sensorconfig_json(OTF_PARAMS_DEF) {
 
 		if (first) first = false; else bfill.emit_p(PSTR(","));
 
-		bfill.emit_p(PSTR("{\"nr\":$D,\"type\":$D,\"group\":$D,\"name\":\"$S\",\"ip\":$L,\"port\":$D,\"id\":$D,\"ri\":$D,\"fac\":$D,\"div\":$D,\"offset\":$D,\"nativedata\":$L,\"data\":$E,\"unit\":\"$S\",\"unitid\":$D,\"enable\":$D,\"log\":$D,\"show\":$D,\"data_ok\":$D,\"last\":$L}"),
+		bfill.emit_p(PSTR("{\"nr\":$D,\"type\":$D,\"group\":$D,\"name\":\"$S\",\"ip\":$L,\"port\":$D,\"id\":$D,\"ri\":$D,\"fac\":$D,\"div\":$D,\"offset\":$D,\"offset2\":$D,\"nativedata\":$L,\"data\":$E,\"unit\":\"$S\",\"unitid\":$D,\"enable\":$D,\"log\":$D,\"show\":$D,\"data_ok\":$D,\"last\":$L}"),
 			sensor->nr, 
 			sensor->type,
 			sensor->group,
@@ -2292,6 +2299,7 @@ void sensorconfig_json(OTF_PARAMS_DEF) {
 			sensor->factor,
 			sensor->divider,
 			sensor->offset_mv,
+			sensor->offset2,
 			sensor->last_native_data,
 			sensor->last_data,
 			getSensorUnit(sensor),
@@ -2680,12 +2688,16 @@ void server_sensorprog_list(OTF_PARAMS_DEF) {
 
 	uint nr = 0;
 	int prog = -1;
+	uint sensor_nr = 0;
 
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("nr"), true))
 		nr = strtoul(tmp_buffer, NULL, 0);
 
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("prog"), true))
 		prog = strtoul(tmp_buffer, NULL, 0);
+
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("sensor"), true))
+		 sensor_nr = strtoul(tmp_buffer, NULL, 0);
 
 #if defined(ESP8266)
 	// as the log data can be large, we will use ESP8266's sendContent function to
@@ -2705,6 +2717,8 @@ void server_sensorprog_list(OTF_PARAMS_DEF) {
 			continue;
 		if (prog >= 0 && p->prog != (uint)prog)
 			continue;
+		if (sensor_nr > 0 && p->sensor != sensor_nr)
+			continue;
 		count++;
 	}
 
@@ -2719,6 +2733,8 @@ void server_sensorprog_list(OTF_PARAMS_DEF) {
 		if (nr > 0 && p->nr != nr)
 			continue;
 		if (prog >= 0 && p->prog != (uint)prog)
+			continue;
+		if (sensor_nr > 0 && p->sensor != sensor_nr)
 			continue;
 
 		double current = calc_sensor_watering_by_nr(p->nr);

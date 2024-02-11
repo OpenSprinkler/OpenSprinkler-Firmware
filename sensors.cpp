@@ -121,7 +121,8 @@ int sensor_delete(uint nr) {
  * @param port 
  * @param id 
  */
-int sensor_define(uint nr, char *name, uint type, uint group, uint32_t ip, uint port, uint id, uint ri, int16_t factor, int16_t divider, char *userdef_unit, int16_t offset_mv, SensorFlags_t flags) {
+int sensor_define(uint nr, char *name, uint type, uint group, uint32_t ip, uint port, uint id, uint ri, int16_t factor, int16_t divider, 
+	char *userdef_unit, int16_t offset_mv, int16_t offset2, SensorFlags_t flags) {
 
 	if (nr == 0 || type == 0)
 		return HTTP_RQT_NOT_RECEIVED;
@@ -144,6 +145,7 @@ int sensor_define(uint nr, char *name, uint type, uint group, uint32_t ip, uint 
 			sensor->factor = factor;
 			sensor->divider = divider;
 			sensor->offset_mv = offset_mv;
+			sensor->offset2 = offset2;
 			strncpy(sensor->userdef_unit, userdef_unit, sizeof(sensor->userdef_unit)-1);
 			sensor->flags = flags;
 			sensor_save();
@@ -173,6 +175,7 @@ int sensor_define(uint nr, char *name, uint type, uint group, uint32_t ip, uint 
 	new_sensor->factor = factor;
 	new_sensor->divider = divider;
 	new_sensor->offset_mv = offset_mv;
+	new_sensor->offset2 = offset2;
 	strncpy(new_sensor->userdef_unit, userdef_unit, sizeof(new_sensor->userdef_unit)-1);
 	new_sensor->flags = flags;
 	if (last) {
@@ -186,7 +189,7 @@ int sensor_define(uint nr, char *name, uint type, uint group, uint32_t ip, uint 
 	return HTTP_RQT_SUCCESS;
 }
 
-int sensor_define_userdef(uint nr, int16_t factor, int16_t divider, char *userdef_unit, int16_t offset_mv) {
+int sensor_define_userdef(uint nr, int16_t factor, int16_t divider, char *userdef_unit, int16_t offset_mv, int16_t offset2) {
 	Sensor_t *sensor = sensor_by_nr(nr);
 	if (!sensor)
 		return HTTP_RQT_NOT_RECEIVED;
@@ -194,6 +197,7 @@ int sensor_define_userdef(uint nr, int16_t factor, int16_t divider, char *userde
 	sensor->factor = factor;
 	sensor->divider = divider;
 	sensor->offset_mv = offset_mv;
+	sensor->offset2 = offset2;
 	if (userdef_unit)
 		strncpy(sensor->userdef_unit, userdef_unit, sizeof(sensor->userdef_unit)-1);
 	else
@@ -822,7 +826,7 @@ int read_sensor_adc(Sensor_t *sensor) {
 				v /= sensor->divider;
 			else if (sensor->factor)
 				v *= sensor->factor;
-			sensor->last_data = v;
+			sensor->last_data = v + sensor->offset2/100;
 			break;
 	}
 
