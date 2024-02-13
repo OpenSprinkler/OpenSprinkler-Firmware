@@ -2938,6 +2938,7 @@ const int prog_types[] = {
 	PROG_LINEAR,
 	PROG_DIGITAL_MIN,
 	PROG_DIGITAL_MAX,
+	PROG_DIGITAL_MINMAX,
 };
 
 const char* prog_names[] = {
@@ -2945,6 +2946,7 @@ const char* prog_names[] = {
 	"Linear scaling",
 	"Digital under min",
 	"Digital over max",
+	"Digital under min or over max",
 };
 
 /**

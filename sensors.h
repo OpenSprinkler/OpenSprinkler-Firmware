@@ -158,11 +158,12 @@ typedef struct SensorLog {
 //    a   b    c  d
 //   (sensorData-a) / (b-a) * (d-c) + c
 
-#define PROG_DELETE      0 //deleted
-#define PROG_LINEAR      1 //formula see above
-#define PROG_DIGITAL_MIN 2 //1=under or equal min, 0=above
-#define PROG_DIGITAL_MAX 3 //1=over or equal max, 0=below
-#define PROG_NONE        99 //No adjustment
+#define PROG_DELETE      	0 //deleted
+#define PROG_LINEAR      	1 //formula see above
+#define PROG_DIGITAL_MIN 	2 //under or equal min : factor1 else factor2
+#define PROG_DIGITAL_MAX 	3 //over or equal max  : factor2 else factor1
+#define PROG_DIGITAL_MINMAX 4 //under min or over max : factor1 else factor2
+#define PROG_NONE        	99 //No adjustment
 
 typedef struct ProgSensorAdjust {
 	uint   nr;       //adjust-nr 1..x

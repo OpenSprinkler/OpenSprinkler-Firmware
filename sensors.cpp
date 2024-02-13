@@ -1462,13 +1462,18 @@ double calc_linear(ProgSensorAdjust_t *p, Sensor_t *sensor) {
 }
 
 double calc_digital_min(ProgSensorAdjust_t *p, Sensor_t *sensor) {
-	return sensor->last_data <= p->min? 1:0;
+	return sensor->last_data <= p->min? p->factor1:p->factor2;
 }
 
 double calc_digital_max(ProgSensorAdjust_t *p, Sensor_t *sensor) {
-	return sensor->last_data >= p->max? 1:0;
+	return sensor->last_data >= p->max? p->factor2:p->factor1;
 }
 
+double calc_digital_minmax(ProgSensorAdjust_t *p, Sensor_t *sensor) {
+	if (sensor->last_data <= p->min) return p->factor1;
+	if (sensor->last_data >= p->max) return p->factor1;
+	return p->factor2;
+}
 /**
  * @brief calculate adjustment
  * 
@@ -1490,6 +1495,7 @@ double calc_sensor_watering(uint prog) {
 					case PROG_LINEAR:      res = calc_linear(p, sensor); break;
 					case PROG_DIGITAL_MIN: res = calc_digital_min(p, sensor); break;
 					case PROG_DIGITAL_MAX: res = calc_digital_max(p, sensor); break;
+					case PROG_DIGITAL_MINMAX: res = calc_digital_minmax(p, sensor); break;
 					default:               res = 0; 
 				}
 

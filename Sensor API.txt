@@ -104,10 +104,12 @@ examples:
 http://<ip>/sb?pw=<pw>&nr=1&type=1&sensor=4&prog=1&factor1=0&factor2=2&min=0&max=50
 
 type:
-PROG_NONE        0 //No adjustment (delete)
-PROG_LINEAR      1 //formula
-PROG_DIGITAL_MIN 2 //1=under or equal min, 0=above
-PROG_DIGITAL_MAX 3 //1=over or equal max, 0=below
+#define PROG_DELETE      	0 //deleted
+#define PROG_LINEAR      	1 //formula see above
+#define PROG_DIGITAL_MIN 	2 //under or equal min : factor1 else factor2
+#define PROG_DIGITAL_MAX 	3 //over or equal max  : factor2 else factor1
+#define PROG_DIGITAL_MINMAX 4 //under min or over max : factor1 else factor2
+#define PROG_NONE        	99 //No adjustment
 
 formula:
    min max  factor1 factor2
