@@ -2464,6 +2464,10 @@ void server_sensorlog_list(OTF_PARAMS_DEF) {
 		}
 		startAt = lastIdx;
 	}
+	else if (startAt==0 && maxResults > 0 && maxResults != log_size)
+	{
+		startAt = log_size-maxResults;
+	}
 
 	uint sensor_type = 0;
 
@@ -2526,7 +2530,7 @@ void server_sensorlog_list(OTF_PARAMS_DEF) {
 			if (available_ether_buffer() <=0 ) {
 				send_packet(OTF_PARAMS);
 			}
-			if (count++ >= maxResults) {
+			if (++count >= maxResults) {
 				break;
 			}
 		}
