@@ -1170,15 +1170,14 @@ int read_sensor(Sensor_t *sensor) {
 	if (!sensor || !sensor->flags.enable)
 		return HTTP_RQT_NOT_RECEIVED;
 
-	DEBUG_PRINT(F("Reading sensor "));
-	DEBUG_PRINTLN(sensor->name);
-
 	ulong time = os.now_tz();
 
 	switch(sensor->type)
 	{
 		case SENSOR_SMT100_MODBUS_RTU_MOIS:
 		case SENSOR_SMT100_MODBUS_RTU_TEMP:
+			DEBUG_PRINT(F("Reading sensor "));
+			DEBUG_PRINTLN(sensor->name);
 			sensor->last_read = time;
 			return read_sensor_ip(sensor);
 
@@ -1194,6 +1193,8 @@ int read_sensor(Sensor_t *sensor) {
 		case SENSOR_THERM200:
 		case SENSOR_AQUAPLUMB:
 		case SENSOR_USERDEF:
+			DEBUG_PRINT(F("Reading sensor "));
+			DEBUG_PRINTLN(sensor->name);
 			sensor->last_read = time;
 			return read_sensor_adc(sensor);
 #endif
@@ -1219,6 +1220,9 @@ int read_sensor(Sensor_t *sensor) {
 		{
 			GetSensorWeather();
 			if (current_weather_ok) {
+				DEBUG_PRINT(F("Reading sensor "));
+				DEBUG_PRINTLN(sensor->name);
+
 				sensor->last_read = time;
 				sensor->last_native_data = 0;
 				sensor->flags.data_ok = true;

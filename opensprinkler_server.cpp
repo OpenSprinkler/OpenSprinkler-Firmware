@@ -227,19 +227,20 @@ void rewind_ether_buffer() {
 
 void send_packet(OTF_PARAMS_DEF) {
 #if defined(ESP8266)
-	DEBUG_PRINT(F("bfill position: "));
-	DEBUG_PRINTLN(bfill.position());
-	if (bfill.position() >= 8192 || !res.willFit(bfill.position())) {
-		DEBUG_PRINTLN("res.flush");
-		res.flush(); 
+	//DEBUG_PRINT(F("bfill position: "));
+	//DEBUG_PRINTLN(bfill.position());
+	if (!res.willFit(bfill.position())) {
+		DEBUG_PRINT(F("flush packet size: "));
+		DEBUG_PRINTLN(res.getLength());
+		res.flush();
 	}
-	DEBUG_PRINT("res.writeBodyChunk: ");
-	DEBUG_PRINTLN(strlen(ether_buffer));
+	//DEBUG_PRINT("res.writeBodyChunk: ");
+	//DEBUG_PRINTLN(strlen(ether_buffer));
 	res.writeBodyChunk((char *)"%s",ether_buffer);
 #else
 	m_client->write((const uint8_t *)ether_buffer, strlen(ether_buffer));
 #endif
-    
+
 	rewind_ether_buffer();
 }
 
@@ -2023,7 +2024,7 @@ void server_sensor_config_userdef(OTF_PARAMS_DEF)
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("unit"), true)) {
 		urlDecode(tmp_buffer);
 		strReplace(tmp_buffer, '\"', '\'');
-		strReplace(tmp_buffer, '\\', '/');	
+		strReplace(tmp_buffer, '\\', '/');
 		strncpy(userdef_unit, tmp_buffer, sizeof(userdef_unit)-1); // unit
 	}
 	int16_t offset_mv = 0;
@@ -2035,7 +2036,7 @@ void server_sensor_config_userdef(OTF_PARAMS_DEF)
 
 	int ret = sensor_define_userdef(nr, factor, divider, userdef_unit, offset_mv, offset2);
 	ret = ret == HTTP_RQT_SUCCESS?HTML_SUCCESS:HTML_DATA_MISSING;
-	handle_return(ret);	
+	handle_return(ret);
 }
 
 /**
@@ -2077,7 +2078,7 @@ void server_sensor_config(OTF_PARAMS_DEF)
 		handle_return(HTML_DATA_MISSING);
 	urlDecode(tmp_buffer);
 	strReplace(tmp_buffer, '\"', '\'');
-	strReplace(tmp_buffer, '\\', '/');	
+	strReplace(tmp_buffer, '\\', '/');
 	char name[30];
 
 	strncpy(name, tmp_buffer, sizeof(name)-1); // Sensor name
@@ -2113,7 +2114,7 @@ void server_sensor_config(OTF_PARAMS_DEF)
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("unit"), true)) {
 		urlDecode(tmp_buffer);
 		strReplace(tmp_buffer, '\"', '\'');
-		strReplace(tmp_buffer, '\\', '/');	
+		strReplace(tmp_buffer, '\\', '/');
 		strncpy(userdef_unit, tmp_buffer, sizeof(userdef_unit)-1); // unit
 	}
 	int16_t offset_mv = 0;
@@ -2142,7 +2143,7 @@ void server_sensor_config(OTF_PARAMS_DEF)
 	int ret = sensor_define(nr, name, type, group, ip, port, id, ri, factor, divider, userdef_unit, offset_mv, offset2, flags);
 	ret = ret == HTTP_RQT_SUCCESS?HTML_SUCCESS:HTML_DATA_MISSING;
 	handle_return(ret);
-	
+
 	DEBUG_PRINTLN(F("server_sensor_config5"));
 
 }
@@ -2177,7 +2178,7 @@ void server_set_sensor_address(OTF_PARAMS_DEF) {
 /**
  * sg
  * @brief return one or all last sensor values
- * 
+ *
  */
 void server_sensor_get(OTF_PARAMS_DEF) {
 #if defined(ESP8266)
@@ -2213,7 +2214,7 @@ void server_sensor_get(OTF_PARAMS_DEF) {
 		if (first) first = false; else bfill.emit_p(PSTR(","));
 
 		bfill.emit_p(PSTR("{\"nr\":$D,\"nativedata\":$L,\"data\":$E,\"unit\":\"$S\",\"unitid\":$D,\"last\":$L}"),
-			sensor->nr, 
+			sensor->nr,
 			sensor->last_native_data,
 			sensor->last_data,
 			getSensorUnit(sensor),
@@ -2228,7 +2229,7 @@ void server_sensor_get(OTF_PARAMS_DEF) {
 /**
  * sr
  * @brief read now and return status and last data
- * 
+ *
  */
 void server_sensor_readnow(OTF_PARAMS_DEF) {
 #if defined(ESP8266)
@@ -2266,7 +2267,7 @@ void server_sensor_readnow(OTF_PARAMS_DEF) {
 		if (first) first = false; else bfill.emit_p(PSTR(","));
 
 		bfill.emit_p(PSTR("{\"nr\":$D,\"status\":$D,\"nativedata\":$L,\"data\":$E,\"unit\":\"$S\",\"unitid\":$D}"),
-			sensor->nr, 
+			sensor->nr,
 			status,
 			sensor->last_native_data,
 			sensor->last_data,
@@ -2288,7 +2289,7 @@ void sensorconfig_json(OTF_PARAMS_DEF) {
 		if (first) first = false; else bfill.emit_p(PSTR(","));
 
 		bfill.emit_p(PSTR("{\"nr\":$D,\"type\":$D,\"group\":$D,\"name\":\"$S\",\"ip\":$L,\"port\":$D,\"id\":$D,\"ri\":$D,\"fac\":$D,\"div\":$D,\"offset\":$D,\"offset2\":$D,\"nativedata\":$L,\"data\":$E,\"unit\":\"$S\",\"unitid\":$D,\"enable\":$D,\"log\":$D,\"show\":$D,\"data_ok\":$D,\"last\":$L}"),
-			sensor->nr, 
+			sensor->nr,
 			sensor->type,
 			sensor->group,
 			sensor->name,
@@ -2316,7 +2317,7 @@ void sensorconfig_json(OTF_PARAMS_DEF) {
 /**
  * sl
  * @brief Lists all sensors
- * 
+ *
  */
 void server_sensor_list(OTF_PARAMS_DEF) {
 #if defined(ESP8266)
@@ -2358,7 +2359,7 @@ void server_sensor_list(OTF_PARAMS_DEF) {
 /**
  * so
  * @brief output sensorlog
- * 
+ *
  */
 void server_sensorlog_list(OTF_PARAMS_DEF) {
 #if defined(ESP8266)
@@ -2372,7 +2373,7 @@ void server_sensorlog_list(OTF_PARAMS_DEF) {
 	uint8_t log = LOG_STD;
 
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("log"), true)) // Log type 0=DAY 1=WEEK 2=MONTH
-		log = strtoul(tmp_buffer, NULL, 0); 
+		log = strtoul(tmp_buffer, NULL, 0);
 	if (log > LOG_MONTH)
 		log = LOG_STD;
 	ulong log_size = sensorlog_size(log);
@@ -2381,11 +2382,11 @@ void server_sensorlog_list(OTF_PARAMS_DEF) {
 	ulong startAt = 0;
 	ulong maxResults = log_size;
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("start"), true)) // Log start
-		startAt = strtoul(tmp_buffer, NULL, 0); 
+		startAt = strtoul(tmp_buffer, NULL, 0);
 
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("max"), true)) // Log Lines count
 		maxResults = strtoul(tmp_buffer, NULL, 0);
-	
+
 	//Filters:
 	uint nr = 0;
 	uint type = 0;
@@ -2396,10 +2397,10 @@ void server_sensorlog_list(OTF_PARAMS_DEF) {
 	bool shortcsv = false;
 
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("nr"), true)) // Filter log for sensor-nr
-		nr = strtoul(tmp_buffer, NULL, 0); 
+		nr = strtoul(tmp_buffer, NULL, 0);
 
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("type"), true)) // Filter log for sensor-type
-		type = strtoul(tmp_buffer, NULL, 0); 
+		type = strtoul(tmp_buffer, NULL, 0);
 
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("after"), true)) // Filter time after
 		after = strtoul(tmp_buffer, NULL, 0);
@@ -2429,7 +2430,7 @@ void server_sensorlog_list(OTF_PARAMS_DEF) {
 #endif
 
 	if (isjson) {
-		bfill.emit_p(PSTR("{\"logtype\":$D,\"logsize\":$D,\"filesize\":$D,\"log\":["), 
+		bfill.emit_p(PSTR("{\"logtype\":$D,\"logsize\":$D,\"filesize\":$D,\"log\":["),
 			log, log_size, sensorlog_filesize(log));
 	} else {
 		if (shortcsv)
@@ -2446,7 +2447,9 @@ void server_sensorlog_list(OTF_PARAMS_DEF) {
 	//lastHours: find limit for this
 	if (lastHours > 0 && log_size > 0) {
 		after = os.now_tz() - lastHours * 60 * 60; //seconds
-		DEBUG_PRINTLN(F("lastHours"));
+		DEBUG_PRINT(F("lastHours="));
+		DEBUG_PRINT(lastHours);
+		DEBUG_PRINTLN();
 
 		ulong a = 0;
 		ulong b = log_size-1;
@@ -2464,15 +2467,20 @@ void server_sensorlog_list(OTF_PARAMS_DEF) {
 		}
 		startAt = lastIdx;
 	}
-	else if (startAt==0 && maxResults > 0 && maxResults != log_size)
+	if (maxResults > 0 && maxResults < log_size)
 	{
-		startAt = log_size-maxResults;
+		DEBUG_PRINT(F("max="));
+		DEBUG_PRINT(maxResults);
+		DEBUG_PRINTLN();
+		ulong startAt2 = log_size-maxResults;
+		if (startAt2 > startAt)
+			startAt = startAt2;
 	}
 
 	uint sensor_type = 0;
 
 	DEBUG_PRINTLN(F("start so"));
-	ulong idx = startAt; 
+	ulong idx = startAt;
 	while (idx < log_size) {
 		int n = sensorlog_load2(log, idx, BLOCKSIZE, sensorlog);
 		if (n <= 0) break;
@@ -2495,7 +2503,7 @@ void server_sensorlog_list(OTF_PARAMS_DEF) {
 				if (type && sensor_type != type)
 					continue;
 			}
-		
+
 			if (count > 0 && isjson) {
 				bfill.emit_p(PSTR(","));
 			}
@@ -2547,13 +2555,13 @@ void server_sensorlog_list(OTF_PARAMS_DEF) {
 
 	DEBUG_PRINTLN(F("finish so"));
 
-	handle_return(HTML_OK);	
+	handle_return(HTML_OK);
 }
 
 /**
- * sn 
+ * sn
  * @brief Delete/Clear Sensor log
- * 
+ *
  */
 void server_sensorlog_clear(OTF_PARAMS_DEF) {
 #if defined(ESP8266)
@@ -2563,7 +2571,7 @@ void server_sensorlog_clear(OTF_PARAMS_DEF) {
 #endif
 	int log = -1;
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("log"), true)) // Filter log for sensor-nr
-		log = atoi(tmp_buffer); 
+		log = atoi(tmp_buffer);
 
 	DEBUG_PRINTLN(F("server_sensorlog_clear"));
 
@@ -2653,11 +2661,11 @@ void server_sensorprog_config(OTF_PARAMS_DEF) {
 
 void progconfig_json(ProgSensorAdjust_t *p, double current) {
 	bfill.emit_p(PSTR("{\"nr\":$D,\"type\":$D,\"sensor\":$D,\"prog\":$D,\"factor1\":$E,\"factor2\":$E,\"min\":$E,\"max\":$E, \"current\":$E}"),
-		p->nr,          
+		p->nr,
 		p->type,
 		p->sensor,
 		p->prog,
-		p->factor1, 
+		p->factor1,
 		p->factor2,
 		p->min,
 		p->max,
@@ -2766,7 +2774,7 @@ const int sensor_types[] = {
 	SENSOR_SMT100_ANALOG_TEMP,
 	SENSOR_VH400,
 	SENSOR_THERM200,
-	SENSOR_AQUAPLUMB,  
+	SENSOR_AQUAPLUMB,
 	SENSOR_USERDEF,
  #endif
 #else
@@ -2774,7 +2782,7 @@ const int sensor_types[] = {
 	SENSOR_OSPI_ANALOG_P,
 	SENSOR_OSPI_ANALOG_SMT50_MOIS,
 	SENSOR_OSPI_ANALOG_SMT50_TEMP,
-#endif	
+#endif
 	SENSOR_REMOTE,
 	SENSOR_WEATHER_TEMP_F,
 	SENSOR_WEATHER_TEMP_C,
@@ -2856,7 +2864,7 @@ void server_sensor_types(OTF_PARAMS_DEF) {
 		if (i > 0)
 			bfill.emit_p(PSTR(","));
 		byte unitid = getSensorUnitId(sensor_types[i]);
-		bfill.emit_p(PSTR("{\"type\":$D,\"name\":\"$S\",\"unit\":\"$S\",\"unitid\":$D}"), 
+		bfill.emit_p(PSTR("{\"type\":$D,\"name\":\"$S\",\"unit\":\"$S\",\"unitid\":$D}"),
 			sensor_types[i], sensor_names[i], getSensorUnit(unitid), unitid);
 		send_packet(OTF_PARAMS);
 	}
@@ -2894,13 +2902,13 @@ void server_usage(OTF_PARAMS_DEF) {
 	boolean ok = LittleFS.info(fsinfo);
 
 	bfill.emit_p(PSTR("{\"status\":$D,\"totalBytes\":$D,\"usedBytes\":$D,\"freeBytes\":$D,\"blockSize\":$D,\"pageSize\":$D,\"maxOpenFiles\":$D,\"maxPathLength\":$D}"),
-		ok, 
-		fsinfo.totalBytes, 
-		fsinfo.usedBytes, 
+		ok,
+		fsinfo.totalBytes,
+		fsinfo.usedBytes,
 		fsinfo.totalBytes-fsinfo.usedBytes,
-		fsinfo.blockSize, 
-		fsinfo.pageSize, 
-		fsinfo.maxOpenFiles, 
+		fsinfo.blockSize,
+		fsinfo.pageSize,
+		fsinfo.maxOpenFiles,
 		fsinfo.maxPathLength);
 #endif
 	handle_return(HTML_OK);
@@ -2919,21 +2927,21 @@ void server_sensorprog_calc(OTF_PARAMS_DEF) {
 
 	DEBUG_PRINTLN(F("server_sensorprog_calc"));
 	//uint nr or uint prog
-        
+
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("nr"), true)) {
 		uint nr = strtoul(tmp_buffer, NULL, 0); // Adjustment nr
 		double adj = calc_sensor_watering_by_nr(nr);
 		bfill.emit_p(PSTR("{\"adjustment\":$E}"), adj);
-		handle_return(HTML_OK);	        
+		handle_return(HTML_OK);
 	}
-	
+
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("prog"), true)) {
 		uint prog = strtoul(tmp_buffer, NULL, 0); // Adjustment nr
     	double adj = calc_sensor_watering(prog);
 		bfill.emit_p(PSTR("{\"adjustment\":$E}"), adj);
 		handle_return(HTML_OK);
 	}
-	
+
 	handle_return(HTML_DATA_MISSING);
 }
 
@@ -2955,7 +2963,7 @@ const char* prog_names[] = {
 
 /**
  * sh
- * List supported adjustment types 
+ * List supported adjustment types
  */
 void server_sensorprog_types(OTF_PARAMS_DEF) {
 #if defined(ESP8266)
@@ -2994,7 +3002,7 @@ void server_sensorprog_types(OTF_PARAMS_DEF) {
 /**
  * sx
  * @brief backup sensor configuration
- * 
+ *
  */
 void server_sensorconfig_backup(OTF_PARAMS_DEF) {
 #if defined(ESP8266)
@@ -3027,7 +3035,7 @@ void server_sensorconfig_backup(OTF_PARAMS_DEF) {
 /**
  * sy
  * @brief restore sensor configuration
- * 
+ *
  */
 void server_sensorconfig_restore(OTF_PARAMS_DEF) {
 #if defined(ESP8266)
