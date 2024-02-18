@@ -422,6 +422,24 @@ enum {
 	#define PIN_FREE_LIST       {5,6,7,8,9,10,11,12,13,16,18,19,20,21,23,24,25,26}  // free GPIO pins
 	#define ETHER_BUFFER_SIZE   16384
 
+#elif defined(OSOPI) // for OSPi on OrangePi
+
+	#define OS_HW_VERSION    OSPI_HW_VERSION_BASE
+	#define PIN_SR_LATCH       3    // shift register latch pin
+	#define PIN_SR_DATA        0    // shift register data pin
+	#define PIN_SR_DATA_ALT  199    // shift register data pin (alternative, for RPi 1 rev. 1 boards)
+	#define PIN_SR_CLOCK       6    // shift register clock pin
+	#define PIN_SR_OE          1    // shift register output enable pin
+	#define PIN_SENSOR1       13
+	#define PIN_SENSOR2       68
+	#define PIN_RFTX          14    // RF transmitter pin
+	//#define PIN_BUTTON_1      23    // button 1
+	//#define PIN_BUTTON_2      24    // button 2
+	//#define PIN_BUTTON_3      25    // button 3
+
+	#define PIN_FREE_LIST       {2,7,8,9,10,11,12,18,19,20,21,64,65,66,67,71,110,198,200,201}  // free GPIO pins
+	#define ETHER_BUFFER_SIZE   16384
+
 #elif defined(OSBO) // for OSBo
 
 	#define OS_HW_VERSION    OSBO_HW_VERSION_BASE

@@ -93,7 +93,7 @@ extern ProgramData pd;
 	LiquidCrystal OpenSprinkler::lcd;
 	extern SdFat sd;
 #else
-	#if defined(OSPI)
+	#if defined(OSPI) || defined(OSOPI)
 		byte OpenSprinkler::pin_sr_data = PIN_SR_DATA;
 	#endif
 	// todo future: LCD define for Linux-based systems
@@ -882,7 +882,7 @@ void OpenSprinkler::begin() {
 
 	pinMode(PIN_SR_CLOCK, OUTPUT);
 
-	#if defined(OSPI)
+	#if defined(OSPI) || defined(OSOPI)
 		pin_sr_data = PIN_SR_DATA;
 		// detect RPi revision
 		unsigned int rev = detect_rpi_rev();
@@ -1254,7 +1254,7 @@ void OpenSprinkler::apply_all_station_bits() {
 
 		for(s=0;s<8;s++) {
 			digitalWrite(PIN_SR_CLOCK, LOW);
-	#if defined(OSPI) // if OSPI, use dynamically assigned pin_sr_data
+	#if defined(OSPI) || defined(OSOPI) // if OSPI, use dynamically assigned pin_sr_data
 			digitalWrite(pin_sr_data, (sbits & ((byte)1<<(7-s))) ? HIGH : LOW );
 	#else
 			digitalWrite(PIN_SR_DATA, (sbits & ((byte)1<<(7-s))) ? HIGH : LOW );

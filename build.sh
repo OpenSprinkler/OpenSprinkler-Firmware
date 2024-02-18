@@ -20,6 +20,32 @@ elif [ "$1" == "osbo" ]; then
 	apt-get install -y libmosquitto-dev
 	echo "Compiling firmware..."
 	g++ -o OpenSprinkler -DOSBO -std=c++14 main.cpp OpenSprinkler.cpp program.cpp opensprinkler_server.cpp utils.cpp weather.cpp gpio.cpp etherport.cpp mqtt.cpp -lpthread -lmosquitto
+elif [ "$1" == "opipc" ]; then
+	echo "Installing required libraries..."
+	apt-get update
+	apt-get install -y libmosquitto-dev
+	echo "Downloading and installing wiringOP..."
+	if [ -d "wiringOP" ]; then
+		echo "wiringOP folder exists, updating to latest master"
+		cd wiringOP
+		git checkout master
+		git pull
+	else
+		git clone https://github.com/orangepi-xunlong/wiringOP.git
+		cd wiringOP
+	fi
+	./build clean
+	./build 
+	cd ..
+	echo "Done installing wiringOP"
+	if ! command -v gpio &> /dev/null
+	then
+		echo "Command gpio is required and is not installed"
+		exit 0
+	fi
+	echo "Compiling firmware..."
+	g++ -o OpenSprinkler -DOSOPI -std=c++14 main.cpp OpenSprinkler.cpp program.cpp opensprinkler_server.cpp utils.cpp weather.cpp gpio.cpp etherport.cpp mqtt.cpp -lpthread -lmosquitto
+
 else
 	echo "Installing required libraries..."
 	apt-get update

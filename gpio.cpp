@@ -175,7 +175,7 @@ byte digitalReadExt(byte pin) {
 }
 #endif
 
-#elif defined(OSPI) || defined(OSBO)
+#elif defined(OSPI) || defined(OSBO) || defined(OSOPI)
 
 #include <sys/types.h>
 #include <sys/ioctl.h>
@@ -281,7 +281,7 @@ void pinMode(int pin, byte mode) {
 	}
 
 	close(fd);
-#if defined(OSPI)
+#if defined(OSPI) || defined(OSOPI)
 	if(mode==INPUT_PULLUP) {
 		char cmd[BUFFER_MAX];
 		//snprintf(cmd, BUFFER_MAX, "gpio -g mode %d up", pin);
