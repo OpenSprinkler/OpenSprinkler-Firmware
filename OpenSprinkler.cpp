@@ -1724,6 +1724,10 @@ void OpenSprinkler::switch_special_station(byte sid, byte value, uint16_t dur) {
 		case STN_TYPE_HTTP:
 			switch_httpstation((HTTPStationData *)pdata->sped, value);
 			break;
+		
+		case STN_TYPE_HTTPS:
+			switch_https_station((HTTPStationData *)pdata->sped, value);
+			break;
 		}
 	}
 }
@@ -1966,6 +1970,113 @@ int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char*
 	return HTTP_RQT_SUCCESS;
 }
 
+int8_t OpenSprinkler::send_https_request(const char* server, uint16_t port, char* p, void(*callback)(char*), uint16_t timeout) {
+
+#if defined(ARDUINO)
+
+	Client *client;
+	#if defined(ESP8266)
+		WiFiClientSecure wifiClient;
+		client = &wifiClient;
+	#else
+		// Choose the analog pin to get semi-random data from for SSL
+		// Pick a pin that's not connected or attached to a randomish voltage source
+		const int rand_pin = A5;
+
+		EthernetClient etherClient;
+		SSLClient *client = new SSLClient(base_client, TAs, (size_t)TAs_NUM, rand_pin);
+
+	#endif
+
+	#define HTTP_CONNECT_NTRIES 3
+	byte tries = 0;
+	do {
+		DEBUG_PRINT(server);
+		DEBUG_PRINT(":");
+		DEBUG_PRINT(port);
+		DEBUG_PRINT("(");
+		DEBUG_PRINT(tries);
+		DEBUG_PRINTLN(")");
+
+		if(client->connect(server, port)==1) break;
+		tries++;
+	} while(tries<HTTP_CONNECT_NTRIES);
+
+	if(tries==HTTP_CONNECT_NTRIES) {
+		DEBUG_PRINTLN(F("failed."));
+		client->stop();
+		return HTTP_RQT_CONNECT_ERR;
+	}
+#else
+	//
+
+	EthernetClientSsl etherClient;
+	EthernetClientSsl *client = &etherClient;
+	struct hostent *host;
+	DEBUG_PRINT(server);
+	DEBUG_PRINT(":");
+	DEBUG_PRINTLN(port);
+	host = gethostbyname(server);
+	if (!host) { return HTTP_RQT_CONNECT_ERR; }
+	if(!client->connect((uint8_t*)host->h_addr, port)) {
+		DEBUG_PRINT(F("failed."));
+		client->stop();
+		return HTTP_RQT_CONNECT_ERR;
+	}
+
+#endif
+
+	uint16_t len = strlen(p);
+	if(len > ETHER_BUFFER_SIZE) len = ETHER_BUFFER_SIZE;
+	if(client->connected()) {
+		client->write((uint8_t *)p, len);
+	} else {
+		DEBUG_PRINTLN(F("client no longer connected"));
+	}
+	memset(ether_buffer, 0, ETHER_BUFFER_SIZE);
+	uint32_t stoptime = millis()+timeout;
+
+	int pos = 0;
+#if defined(ARDUINO)
+	// with ESP8266 core 3.0.2, client->connected() is not always true even if there is more data
+	// so this loop is going to take longer than it should be
+	// todo: can consider using HTTPClient for ESP8266
+	while(true) {
+		int nbytes = client->available();
+		if(nbytes>0) {
+			if(pos+nbytes>ETHER_BUFFER_SIZE) nbytes=ETHER_BUFFER_SIZE-pos; // cannot read more than buffer size
+			client->read((uint8_t*)ether_buffer+pos, nbytes);
+			pos+=nbytes;
+		}
+		if(millis()>stoptime) {
+			DEBUG_PRINTLN(F("host timeout occured"));
+			//return HTTP_RQT_TIMEOUT; // instead of returning with timeout, we'll work with data received so far
+			break;
+		}
+		if(!client->connected() && !client->available()) {
+			//DEBUG_PRINTLN(F("host disconnected"));
+			break;
+		}
+	}
+#else
+	while(client->connected()) {
+		int len=client->read((uint8_t *)ether_buffer+pos, ETHER_BUFFER_SIZE);
+		if (len<=0) continue;
+		pos+=len;
+		if(millis()>stoptime) {
+			DEBUG_PRINTLN(F("host timeout occured"));
+			//return HTTP_RQT_TIMEOUT; // instead of returning with timeout, we'll work with data received so far
+			break;
+		}
+	}
+#endif
+	ether_buffer[pos]=0; // properly end buffer with 0
+	client->stop();
+	if(strlen(ether_buffer)==0) return HTTP_RQT_EMPTY_RETURN;
+	if(callback) callback(ether_buffer);
+	return HTTP_RQT_SUCCESS;
+}
+
 int8_t OpenSprinkler::send_http_request(uint32_t ip4, uint16_t port, char* p, void(*callback)(char*), uint16_t timeout) {
 	char server[20];
 	byte ip[4];
@@ -1977,10 +2088,27 @@ int8_t OpenSprinkler::send_http_request(uint32_t ip4, uint16_t port, char* p, vo
 	return send_http_request(server, port, p, callback, timeout);
 }
 
+int8_t OpenSprinkler::send_https_request(uint32_t ip4, uint16_t port, char* p, void(*callback)(char*), uint16_t timeout) {
+	char server[20];
+	byte ip[4];
+	ip[0] = ip4>>24;
+	ip[1] = (ip4>>16)&0xff;
+	ip[2] = (ip4>>8)&0xff;
+	ip[3] = ip4&0xff;
+	sprintf(server, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
+	return send_https_request(server, port, p, callback, timeout);
+}
+
 int8_t OpenSprinkler::send_http_request(char* server_with_port, char* p, void(*callback)(char*), uint16_t timeout) {
 	char * server = strtok(server_with_port, ":");
 	char * port = strtok(NULL, ":");
 	return send_http_request(server, (port==NULL)?80:atoi(port), p, callback, timeout);
+}
+
+int8_t OpenSprinkler::send_https_request(char* server_with_port, char* p, void(*callback)(char*), uint16_t timeout) {
+	char * server = strtok(server_with_port, ":");
+	char * port = strtok(NULL, ":");
+	return send_https_request(server, (port==NULL)?80:atoi(port), p, callback, timeout);
 }
 
 /** Switch remote station
@@ -2054,6 +2182,31 @@ void OpenSprinkler::switch_httpstation(HTTPStationData *data, bool turnon) {
 	bf.emit_p(PSTR("GET /$S HTTP/1.0\r\nHOST: $S\r\n\r\n"), cmd, server);
 
 	send_http_request(server, atoi(port), p, remote_http_callback);
+}
+
+/** Switch https station
+ * This function takes an https station code,
+ * parses it into a server name and two HTTPS GET requests.
+ */
+void OpenSprinkler::switch_https_station(HTTPStationData *data, bool turnon) {
+
+	HTTPStationData copy;
+	// make a copy of the HTTP station data and work with it
+	memcpy((char*)&copy, (char*)data, sizeof(HTTPStationData));
+	char * server = strtok((char *)copy.data, ",");
+	char * port = strtok(NULL, ",");
+	char * on_cmd = strtok(NULL, ",");
+	char * off_cmd = strtok(NULL, ",");
+	char * cmd = turnon ? on_cmd : off_cmd;
+
+	char *p = tmp_buffer;
+	BufferFiller bf = p;
+
+	if(cmd==NULL || server==NULL) return; // proceed only if cmd and server are valid
+
+	bf.emit_p(PSTR("GET /$S HTTP/1.0\r\nHOST: $S\r\n\r\n"), cmd, server);
+
+	send_https_request(server, atoi(port), p, remote_http_callback);
 }
 
 /** Prepare factory reset */

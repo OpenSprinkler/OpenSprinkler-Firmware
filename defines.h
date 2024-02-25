@@ -64,6 +64,7 @@ typedef unsigned long ulong;
 #define STN_TYPE_REMOTE      0x02	// Remote OpenSprinkler station
 #define STN_TYPE_GPIO        0x03	// direct GPIO station
 #define STN_TYPE_HTTP        0x04	// HTTP station
+#define STN_TYPE_HTTPS       0x05	// HTTPS station
 #define STN_TYPE_OTHER       0xFF
 
 /** Notification macro defines */
