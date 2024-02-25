@@ -25,6 +25,7 @@
 #define _DEFINES_H
 
 //#define ENABLE_DEBUG  // enable serial debug
+//#define SERIAL_DEBUG
 
 typedef unsigned char byte;
 typedef unsigned long ulong;
@@ -32,11 +33,11 @@ typedef unsigned long ulong;
 #define TMP_BUFFER_SIZE      255   // scratch buffer size
 
 /** Firmware version, hardware version, and maximal values */
-#define OS_FW_VERSION  220  // Firmware version: 220 means 2.2.0
+#define OS_FW_VERSION  230  // Firmware version: 220 means 2.2.0
 														// if this number is different from the one stored in non-volatile memory
 														// a device reset will be automatically triggered
 
-#define OS_FW_MINOR      3  // Firmware minor version
+#define OS_FW_MINOR      140  // Firmware minor version
 
 /** Hardware version base numbers */
 #define OS_HW_VERSION_BASE   0x00 // OpenSprinkler
@@ -140,13 +141,13 @@ typedef unsigned long ulong;
 
 /** Default string option values */
 #define DEFAULT_PASSWORD          "a6d82bced638de3def1e9bbb4983225c"  // md5 of 'opendoor'
-#define DEFAULT_LOCATION          "42.36,-71.06"  // Boston,MA
-#define DEFAULT_JAVASCRIPT_URL    "https://ui.opensprinkler.com/js"
+#define DEFAULT_LOCATION          "49.484018,8.475593"  // Mannheim,Germany
+#define DEFAULT_JAVASCRIPT_URL    "https://ui.opensprinklershop.de/js"
 #define DEFAULT_WEATHER_URL       "weather.opensprinkler.com"
 #define DEFAULT_IFTTT_URL         "maker.ifttt.com"
 #define DEFAULT_OTC_SERVER        "ws.cloud.openthings.io"
 #define DEFAULT_OTC_PORT          80
-#define DEFAULT_DEVICE_NAME       "My OpenSprinkler"
+#define DEFAULT_DEVICE_NAME       "Mein OpenSprinkler"
 #define DEFAULT_EMPTY_STRING      ""
 
 /* Weather Adjustment Methods */
