@@ -501,15 +501,44 @@ byte OpenSprinkler::start_network() {
 
 byte OpenSprinkler::start_ether() {
 #if defined(ESP8266)
-	if(hw_rev<2) return 0;  // ethernet capability is only available after hw_rev 2
+	if(hw_rev<2) return 0;  // ethernet capability is only available when hw_rev>=2
+	eth.isW5500 = (hw_rev==2)?false:true; // os 3.2 uses enc28j60 and 3.3 uses w5500
 
 	SPI.begin();
 	SPI.setBitOrder(MSBFIRST);
 	SPI.setDataMode(SPI_MODE0);
 	SPI.setFrequency(4000000);
 
-	//TODO 3.3 Network interface
-	{
+	if(eth.isW5500) {
+		DEBUG_PRINTLN(F("detect existence of W5500"));
+		/* this is copied from w5500.cpp wizchip_sw_reset
+		 * perform a software reset and see if we get a correct response
+		 * without this, eth.begin will crash if W5500 is not connected
+		 * ideally wizchip_sw_reset should return a value but since it doesn't
+		 * we have to extract it code here
+		 * */
+		static const uint8_t AccessModeRead = (0x00 << 2);
+		static const uint8_t AccessModeWrite = (0x01 << 2);
+		static const uint8_t BlockSelectCReg = (0x00 << 3);
+		pinMode(PIN_ETHER_CS, OUTPUT);
+		// ==> setMR(MR_RST)
+		digitalWrite(PIN_ETHER_CS, LOW);
+		SPI.transfer((0x00 & 0xFF00) >> 8);
+		SPI.transfer((0x00 & 0x00FF) >> 0);
+		SPI.transfer(BlockSelectCReg | AccessModeWrite);
+		SPI.transfer(0x80);
+		digitalWrite(PIN_ETHER_CS, HIGH);
+
+		// ==> ret = getMR()
+		uint8_t ret;
+		digitalWrite(PIN_ETHER_CS, LOW);
+		SPI.transfer((0x00 & 0xFF00) >> 8);
+		SPI.transfer((0x00 & 0x00FF) >> 0);
+		SPI.transfer(BlockSelectCReg | AccessModeRead);
+		ret = SPI.transfer(0);
+		digitalWrite(PIN_ETHER_CS, HIGH);
+		if(ret!=0) return 0; // ret is expected to be 0
+	} else {
 		/* this is copied from enc28j60.cpp geterevid
 		 * check to see if the hardware revision number if expected
 		 * */
@@ -538,7 +567,7 @@ byte OpenSprinkler::start_ether() {
 		digitalWrite(PIN_ETHER_CS, HIGH);
 		if(r==0 || r==255) return 0; // r is expected to be a non-255 revision number
 	}
-	
+
 	load_hardware_mac((uint8_t*)tmp_buffer, true);
 	if (iopts[IOPT_USE_DHCP]==0) { // config static IP before calling eth.begin
 		IPAddress staticip(iopts+IOPT_STATIC_IP1);
@@ -550,7 +579,8 @@ byte OpenSprinkler::start_ether() {
 	eth.setDefault();
 	if(!eth.begin((uint8_t*)tmp_buffer))	return 0;
 	lcd_print_line_clear_pgm(PSTR("Start wired link"), 1);
-
+	lcd_print_line_clear_pgm(eth.isW5500 ? PSTR("    (w5500)    ") : PSTR("   (enc28j60)   "), 2);
+	
 	ulong timeout = millis()+30000; // 30 seconds time out
 	while (!eth.connected()) {
 		DEBUG_PRINT(".");
@@ -815,8 +845,12 @@ void OpenSprinkler::begin() {
 			PIN_SENSOR1 = V1_PIN_SENSOR1;
 			PIN_SENSOR2 = V1_PIN_SENSOR2;
 		} else {
-			// revision 2
-			hw_rev = 2;
+			// revision 2 and 3
+			if(detect_i2c(EEPROM_I2CADDR)) { // revision 3 has a I2C EEPROM
+				hw_rev = 3;
+			} else {
+				hw_rev = 2;
+			}
 			mainio->i2c_write(NXP_CONFIG_REG, V2_IO_CONFIG);
 			mainio->i2c_write(NXP_OUTPUT_REG, V2_IO_OUTPUT);
 
@@ -1092,7 +1126,7 @@ void OpenSprinkler::latch_setzoneoutput_v2(byte sid, byte A, byte K) {
  *
  */
 void OpenSprinkler::latch_open(byte sid) {
-	if(hw_rev==2) {
+	if(hw_rev>=2) {
 		DEBUG_PRINTLN(F("latch_open_v2"));
 		latch_disable_alloutputs_v2(); // disable all output pins
 		latch_boost(); // generate boost voltage
@@ -1115,7 +1149,7 @@ void OpenSprinkler::latch_open(byte sid) {
 }
 
 void OpenSprinkler::latch_close(byte sid) {
-	if(hw_rev==2) {
+	if(hw_rev>=2) {
 		DEBUG_PRINTLN(F("latch_close_v2"));
 		latch_disable_alloutputs_v2(); // disable all output pins
 		latch_boost(); // generate boost voltage
@@ -1282,7 +1316,7 @@ void OpenSprinkler::apply_all_station_bits() {
 void OpenSprinkler::detect_binarysensor_status(ulong curr_time) {
 	// sensor_type: 0 if normally closed, 1 if normally open
 	if(iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_RAIN || iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_SOIL) {
-		if(hw_rev==2)	pinModeExt(PIN_SENSOR1, INPUT_PULLUP); // this seems necessary for OS 3.2
+		if(hw_rev>=2)	pinModeExt(PIN_SENSOR1, INPUT_PULLUP); // this seems necessary for OS 3.2
 		byte val = digitalReadExt(PIN_SENSOR1);
 		status.sensor1 = (val == iopts[IOPT_SENSOR1_OPTION]) ? 0 : 1;
 		if(status.sensor1) {
@@ -1312,7 +1346,7 @@ void OpenSprinkler::detect_binarysensor_status(ulong curr_time) {
 // ESP8266 is guaranteed to have sensor 2
 #if defined(ESP8266) || defined(PIN_SENSOR2)
 	if(iopts[IOPT_SENSOR2_TYPE]==SENSOR_TYPE_RAIN || iopts[IOPT_SENSOR2_TYPE]==SENSOR_TYPE_SOIL) {
-		if(hw_rev==2)	pinModeExt(PIN_SENSOR2, INPUT_PULLUP); // this seems necessary for OS 3.2
+		if(hw_rev>=2)	pinModeExt(PIN_SENSOR2, INPUT_PULLUP); // this seems necessary for OS 3.2
 		byte val = digitalReadExt(PIN_SENSOR2);
 		status.sensor2 = (val == iopts[IOPT_SENSOR2_OPTION]) ? 0 : 1;
 		if(status.sensor2) {
@@ -1347,7 +1381,7 @@ byte OpenSprinkler::detect_programswitch_status(ulong curr_time) {
 	byte ret = 0;
 	if(iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_PSWITCH) {
 		static byte sensor1_hist = 0;
-		if(hw_rev==2) pinModeExt(PIN_SENSOR1, INPUT_PULLUP); // this seems necessary for OS 3.2
+		if(hw_rev>=2) pinModeExt(PIN_SENSOR1, INPUT_PULLUP); // this seems necessary for OS 3.2
 		status.sensor1 = (digitalReadExt(PIN_SENSOR1) != iopts[IOPT_SENSOR1_OPTION]); // is switch activated?
 		sensor1_hist = (sensor1_hist<<1) | status.sensor1;
 		// basic noise filtering: only trigger if sensor matches pattern:
@@ -1359,7 +1393,7 @@ byte OpenSprinkler::detect_programswitch_status(ulong curr_time) {
 #if defined(ESP8266) || defined(PIN_SENSOR2)
 	if(iopts[IOPT_SENSOR2_TYPE]==SENSOR_TYPE_PSWITCH) {
 		static byte sensor2_hist = 0;
-		if(hw_rev==2) pinModeExt(PIN_SENSOR2, INPUT_PULLUP); // this seems necessary for OS 3.2
+		if(hw_rev>=2) pinModeExt(PIN_SENSOR2, INPUT_PULLUP); // this seems necessary for OS 3.2
 		status.sensor2 = (digitalReadExt(PIN_SENSOR2) != iopts[IOPT_SENSOR2_OPTION]); // is sensor activated?
 		sensor2_hist = (sensor2_hist<<1) | status.sensor2;
 		if((sensor2_hist&0b1111) == 0b0011) {
@@ -1691,6 +1725,10 @@ void OpenSprinkler::switch_special_station(byte sid, byte value, uint16_t dur) {
 		case STN_TYPE_HTTP:
 			switch_httpstation((HTTPStationData *)pdata->sped, value);
 			break;
+
+		case STN_TYPE_HTTPS:
+			switch_https_station((HTTPStationData *)pdata->sped, value);
+			break;
 		}
 	}
 }
@@ -1933,6 +1971,113 @@ int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char*
 	return HTTP_RQT_SUCCESS;
 }
 
+int8_t OpenSprinkler::send_https_request(const char* server, uint16_t port, char* p, void(*callback)(char*), uint16_t timeout) {
+
+#if defined(ARDUINO)
+
+	Client *client;
+	#if defined(ESP8266)
+		WiFiClientSecure wifiClient;
+		client = &wifiClient;
+	#else
+		// Choose the analog pin to get semi-random data from for SSL
+		// Pick a pin that's not connected or attached to a randomish voltage source
+		const int rand_pin = A5;
+
+		EthernetClient etherClient;
+		SSLClient *client = new SSLClient(base_client, TAs, (size_t)TAs_NUM, rand_pin);
+
+	#endif
+
+	#define HTTP_CONNECT_NTRIES 3
+	byte tries = 0;
+	do {
+		DEBUG_PRINT(server);
+		DEBUG_PRINT(":");
+		DEBUG_PRINT(port);
+		DEBUG_PRINT("(");
+		DEBUG_PRINT(tries);
+		DEBUG_PRINTLN(")");
+
+		if(client->connect(server, port)==1) break;
+		tries++;
+	} while(tries<HTTP_CONNECT_NTRIES);
+
+	if(tries==HTTP_CONNECT_NTRIES) {
+		DEBUG_PRINTLN(F("failed."));
+		client->stop();
+		return HTTP_RQT_CONNECT_ERR;
+	}
+#else
+	//
+
+	EthernetClientSsl etherClient;
+	EthernetClientSsl *client = &etherClient;
+	struct hostent *host;
+	DEBUG_PRINT(server);
+	DEBUG_PRINT(":");
+	DEBUG_PRINTLN(port);
+	host = gethostbyname(server);
+	if (!host) { return HTTP_RQT_CONNECT_ERR; }
+	if(!client->connect((uint8_t*)host->h_addr, port)) {
+		DEBUG_PRINT(F("failed."));
+		client->stop();
+		return HTTP_RQT_CONNECT_ERR;
+	}
+
+#endif
+
+	uint16_t len = strlen(p);
+	if(len > ETHER_BUFFER_SIZE) len = ETHER_BUFFER_SIZE;
+	if(client->connected()) {
+		client->write((uint8_t *)p, len);
+	} else {
+		DEBUG_PRINTLN(F("client no longer connected"));
+	}
+	memset(ether_buffer, 0, ETHER_BUFFER_SIZE);
+	uint32_t stoptime = millis()+timeout;
+
+	int pos = 0;
+#if defined(ARDUINO)
+	// with ESP8266 core 3.0.2, client->connected() is not always true even if there is more data
+	// so this loop is going to take longer than it should be
+	// todo: can consider using HTTPClient for ESP8266
+	while(true) {
+		int nbytes = client->available();
+		if(nbytes>0) {
+			if(pos+nbytes>ETHER_BUFFER_SIZE) nbytes=ETHER_BUFFER_SIZE-pos; // cannot read more than buffer size
+			client->read((uint8_t*)ether_buffer+pos, nbytes);
+			pos+=nbytes;
+		}
+		if(millis()>stoptime) {
+			DEBUG_PRINTLN(F("host timeout occured"));
+			//return HTTP_RQT_TIMEOUT; // instead of returning with timeout, we'll work with data received so far
+			break;
+		}
+		if(!client->connected() && !client->available()) {
+			//DEBUG_PRINTLN(F("host disconnected"));
+			break;
+		}
+	}
+#else
+	while(client->connected()) {
+		int len=client->read((uint8_t *)ether_buffer+pos, ETHER_BUFFER_SIZE);
+		if (len<=0) continue;
+		pos+=len;
+		if(millis()>stoptime) {
+			DEBUG_PRINTLN(F("host timeout occured"));
+			//return HTTP_RQT_TIMEOUT; // instead of returning with timeout, we'll work with data received so far
+			break;
+		}
+	}
+#endif
+	ether_buffer[pos]=0; // properly end buffer with 0
+	client->stop();
+	if(strlen(ether_buffer)==0) return HTTP_RQT_EMPTY_RETURN;
+	if(callback) callback(ether_buffer);
+	return HTTP_RQT_SUCCESS;
+}
+
 int8_t OpenSprinkler::send_http_request(uint32_t ip4, uint16_t port, char* p, void(*callback)(char*), uint16_t timeout) {
 	char server[20];
 	byte ip[4];
@@ -2021,6 +2166,31 @@ void OpenSprinkler::switch_httpstation(HTTPStationData *data, bool turnon) {
 	bf.emit_p(PSTR("GET /$S HTTP/1.0\r\nHOST: $S\r\n\r\n"), cmd, server);
 
 	send_http_request(server, atoi(port), p, remote_http_callback);
+}
+
+/** Switch https station
+ * This function takes an https station code,
+ * parses it into a server name and two HTTPS GET requests.
+ */
+void OpenSprinkler::switch_https_station(HTTPStationData *data, bool turnon) {
+
+	HTTPStationData copy;
+	// make a copy of the HTTP station data and work with it
+	memcpy((char*)&copy, (char*)data, sizeof(HTTPStationData));
+	char * server = strtok((char *)copy.data, ",");
+	char * port = strtok(NULL, ",");
+	char * on_cmd = strtok(NULL, ",");
+	char * off_cmd = strtok(NULL, ",");
+	char * cmd = turnon ? on_cmd : off_cmd;
+
+	char *p = tmp_buffer;
+	BufferFiller bf = p;
+
+	if(cmd==NULL || server==NULL) return; // proceed only if cmd and server are valid
+
+	bf.emit_p(PSTR("GET /$S HTTP/1.0\r\nHOST: $S\r\n\r\n"), cmd, server);
+
+	send_https_request(server, atoi(port), p, remote_http_callback);
 }
 
 /** Prepare factory reset */

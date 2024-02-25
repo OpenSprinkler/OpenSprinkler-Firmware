@@ -32,6 +32,7 @@
 #include <stdio.h>
 #include <inttypes.h>
 #include <ctype.h>
+#include<openssl/ssl.h>
 
 #ifdef __APPLE__
 #define MSG_NOSIGNAL SO_NOSIGPIPE
@@ -56,6 +57,28 @@ public:
 	}
 private:
 	int m_sock;
+	bool m_connected;
+	friend class EthernetServer;
+};
+
+class EthernetClientSsl {
+public:
+	EthernetClientSsl();
+	EthernetClientSsl(int sock);
+	~EthernetClientSsl();
+	int connect(uint8_t ip[4], uint16_t port);
+	bool connected();
+	void stop();
+	int read(uint8_t *buf, size_t size);
+	size_t write(const uint8_t *buf, size_t size);
+	operator bool();
+	int GetSocket()
+	{
+		return m_sock;
+	}
+private:
+	int m_sock;
+	SSL* ssl;
 	bool m_connected;
 	friend class EthernetServer;
 };

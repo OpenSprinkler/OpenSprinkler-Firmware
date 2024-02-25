@@ -41,10 +41,12 @@
 		#include <FS.h>
 		#include <LittleFS.h>
 		#include <ENC28J60lwIP.h>
+		#include <W5500lwIP.h>
 		#include <RCSwitch.h>
 		#include <OpenThingsFramework.h>
 		#include <DNSServer.h>
 		#include <Ticker.h>
+		#include <WiFiClientSecure.h>
 		#include "SSD1306Display.h"
 		#include "espconnect.h"
 	#else // for AVR
@@ -66,8 +68,36 @@
 	#if defined(ESP8266)
 	extern ESP8266WebServer *update_server;
 	extern OTF::OpenThingsFramework *otf;
-	extern bool otf_callbacksInitialised;
-	extern ENC28J60lwIP eth;
+	extern ENC28J60lwIP enc28j60;
+	extern Wiznet5500lwIP w5500;
+	struct lwipEth {
+		bool isW5500 = false;
+		inline boolean config(const IPAddress& local_ip, const IPAddress& arg1, const IPAddress& arg2, const IPAddress& arg3 = IPADDR_NONE, const IPAddress& dns2 = IPADDR_NONE) {
+			return (isW5500)?w5500.config(local_ip, arg1, arg2, arg3, dns2) : enc28j60.config(local_ip, arg1, arg2, arg3, dns2);
+		}
+		inline boolean begin(const uint8_t *macAddress = nullptr) {
+			return (isW5500)?w5500.begin(macAddress):enc28j60.begin(macAddress);
+		}
+		inline IPAddress localIP() {
+			return (isW5500)?w5500.localIP():enc28j60.localIP();
+		}
+		inline IPAddress subnetMask() {
+			return (isW5500)?w5500.subnetMask():enc28j60.subnetMask();
+		}
+		inline IPAddress gatewayIP() {
+			return (isW5500)?w5500.gatewayIP():enc28j60.gatewayIP();
+		}
+		inline void setDefault() {
+			(isW5500)?w5500.setDefault():enc28j60.setDefault();
+		}
+		inline bool connected() {
+			return (isW5500)?w5500.connected():enc28j60.connected();
+		}
+		inline wl_status_t status() {
+			return (isW5500)?w5500.status():enc28j60.status();
+		}
+	};
+	extern lwipEth eth;
 	#else
 	extern EthernetServer *m_server;
 	#endif
@@ -257,6 +287,8 @@ public:
 	static void switch_gpiostation(GPIOStationData *data, bool turnon); // switch gpio station
 	static void switch_httpstation(HTTPStationData *data, bool turnon); // switch http station
 
+	static void switch_https_station(HTTPStationData *data, bool turnon); // switch https station
+
 	// -- options and data storeage
 	static void nvdata_load();
 	static void nvdata_save();
@@ -295,6 +327,11 @@ public:
 	static int8_t send_http_request(uint32_t ip4, uint16_t port, char* p, void(*callback)(char*)=NULL, uint16_t timeout=5000);
 	static int8_t send_http_request(const char* server, uint16_t port, char* p, void(*callback)(char*)=NULL, uint16_t timeout=5000);
 	static int8_t send_http_request(char* server_with_port, char* p, void(*callback)(char*)=NULL, uint16_t timeout=5000);
+
+	static int8_t send_https_request(uint32_t ip4, uint16_t port, char* p, void(*callback)(char*)=NULL, uint16_t timeout=5000);
+	static int8_t send_https_request(const char* server, uint16_t port, char* p, void(*callback)(char*)=NULL, uint16_t timeout=5000);
+	static int8_t send_https_request(char* server_with_port, char* p, void(*callback)(char*)=NULL, uint16_t timeout=5000);
+
 	// -- LCD functions
 #if defined(ARDUINO) // LCD functions for Arduino
 	#if defined(ESP8266)

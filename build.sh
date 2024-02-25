@@ -26,13 +26,14 @@ else
 	apt-get install -y libmosquitto-dev
 	apt-get install -y raspi-gpio
 	apt-get install -y libi2c-dev
+	apt-get install -y libssl-dev
 	if ! command -v raspi-gpio &> /dev/null
 	then
 		echo "Command raspi-gpio is required and is not installed"
 		exit 0
 	fi
 	echo "Compiling firmware..."
-	g++ -o OpenSprinkler -DOSPI main.cpp OpenSprinkler.cpp program.cpp opensprinkler_server.cpp utils.cpp weather.cpp gpio.cpp etherport.cpp mqtt.cpp sensors.cpp -li2c -lpthread -lmosquitto
+	g++ -o OpenSprinkler -DOSPI main.cpp OpenSprinkler.cpp program.cpp opensprinkler_server.cpp utils.cpp weather.cpp gpio.cpp etherport.cpp mqtt.cpp -li2c -lpthread -lmosquitto -lcrypto -lssl
 fi
 
 if [ ! "$SILENT" = true ] && [ -f OpenSprinkler.launch ] && [ ! -f /etc/init.d/OpenSprinkler.sh ]; then
