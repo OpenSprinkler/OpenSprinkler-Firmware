@@ -2089,10 +2089,27 @@ int8_t OpenSprinkler::send_http_request(uint32_t ip4, uint16_t port, char* p, vo
 	return send_http_request(server, port, p, callback, timeout);
 }
 
+int8_t OpenSprinkler::send_https_request(uint32_t ip4, uint16_t port, char* p, void(*callback)(char*), uint16_t timeout) {
+	char server[20];
+	byte ip[4];
+	ip[0] = ip4>>24;
+	ip[1] = (ip4>>16)&0xff;
+	ip[2] = (ip4>>8)&0xff;
+	ip[3] = ip4&0xff;
+	sprintf(server, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
+	return send_https_request(server, port, p, callback, timeout);
+}
+
 int8_t OpenSprinkler::send_http_request(char* server_with_port, char* p, void(*callback)(char*), uint16_t timeout) {
 	char * server = strtok(server_with_port, ":");
 	char * port = strtok(NULL, ":");
 	return send_http_request(server, (port==NULL)?80:atoi(port), p, callback, timeout);
+}
+
+int8_t OpenSprinkler::send_https_request(char* server_with_port, char* p, void(*callback)(char*), uint16_t timeout) {
+	char * server = strtok(server_with_port, ":");
+	char * port = strtok(NULL, ":");
+	return send_https_request(server, (port==NULL)?80:atoi(port), p, callback, timeout);
 }
 
 /** Switch remote station
