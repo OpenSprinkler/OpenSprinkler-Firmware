@@ -39,7 +39,8 @@
 
 		extern ESP8266WebServer *update_server;
 		extern OTF::OpenThingsFramework *otf;
-		extern ENC28J60lwIP eth;
+		extern lwipEth eth;
+		extern bool otf_callbacksInitialised;
 		#define OTF_PARAMS_DEF const OTF::Request &req,OTF::Response &res
 		#define OTF_PARAMS req,res
 		#define FKV_SOURCE req

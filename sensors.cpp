@@ -1509,7 +1509,10 @@ double calc_sensor_watering(uint prog) {
 
 		p = p->next;
 	}
-
+	if (result < 0.0)
+		result = 0.0;
+	if (result > 20.0) // Factor 20 is a huge value!
+		result = 20.0;
 	return result;
 }
 

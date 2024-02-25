@@ -96,6 +96,9 @@
 		inline wl_status_t status() {
 			return (isW5500)?w5500.status():enc28j60.status();
 		}
+		inline const netif* getNetIf() {
+			return (isW5500)?w5500.getNetIf():enc28j60.getNetIf();
+		}
 	};
 	extern lwipEth eth;
 	#else

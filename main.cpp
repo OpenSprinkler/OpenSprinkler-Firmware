@@ -40,7 +40,9 @@
 		OTF::OpenThingsFramework *otf = NULL;
 		bool otf_callbacksInitialised = false;
 		DNSServer *dns = NULL;
-		ENC28J60lwIP eth(PIN_ETHER_CS); // ENC28J60 lwip for wired Ether
+		ENC28J60lwIP enc28j60(PIN_ETHER_CS); // ENC28J60 lwip for wired Ether
+		Wiznet5500lwIP w5500(PIN_ETHER_CS); // W5500 lwip for wired Ether
+		lwipEth eth;
 		bool useEth = false; // tracks whether we are using WiFi or wired Ether connection
 		static uint16_t led_blink_ms = LED_FAST_BLINK;
 	#else
