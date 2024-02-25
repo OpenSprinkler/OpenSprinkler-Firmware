@@ -610,7 +610,7 @@ void server_change_stations(OTF_PARAMS_DEF) {
 				if (!found || activeState > 1) {
 					handle_return(HTML_DATA_OUTOFBOUND);
 				}
-			} else if (tmp_buffer[0] == STN_TYPE_HTTP) {
+			} else if (tmp_buffer[0] == STN_TYPE_HTTP || tmp_buffer[0] == STN_TYPE_HTTPS) {
 				#if !defined(ESP8266)
 					urlDecode(tmp_buffer + 1);
 				#endif
