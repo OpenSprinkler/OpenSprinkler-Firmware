@@ -34,7 +34,9 @@
 		ESP8266WebServer *update_server = NULL;
 		OTF::OpenThingsFramework *otf = NULL;
 		DNSServer *dns = NULL;
-		ENC28J60lwIP eth(PIN_ETHER_CS); // ENC28J60 lwip for wired Ether
+		ENC28J60lwIP enc28j60(PIN_ETHER_CS); // ENC28J60 lwip for wired Ether
+		Wiznet5500lwIP w5500(PIN_ETHER_CS); // W5500 lwip for wired Ether
+		lwipEth eth;
 		bool useEth = false; // tracks whether we are using WiFi or wired Ether connection
 		static uint16_t led_blink_ms = LED_FAST_BLINK;
 	#else
@@ -89,7 +91,7 @@ uint32_t reboot_timer = 0;
 
 void flow_poll() {
 	#if defined(ESP8266)
-	if(os.hw_rev == 2) pinModeExt(PIN_SENSOR1, INPUT_PULLUP); // this seems necessary for OS 3.2
+	if(os.hw_rev>=2) pinModeExt(PIN_SENSOR1, INPUT_PULLUP); // this seems necessary for OS 3.2
 	#endif
 	byte curr_flow_state = digitalReadExt(PIN_SENSOR1);
 	if(!(prev_flow_state==HIGH && curr_flow_state==LOW)) { // only record on falling edge
@@ -615,7 +617,7 @@ void do_loop()
 	if (curr_time != last_time) {
 
 		#if defined(ESP8266)
-		if(os.hw_rev==2) {
+		if(os.hw_rev>=2) {
 			pinModeExt(PIN_SENSOR1, INPUT_PULLUP); // this seems necessary for OS 3.2
 			pinModeExt(PIN_SENSOR2, INPUT_PULLUP);
 		}
