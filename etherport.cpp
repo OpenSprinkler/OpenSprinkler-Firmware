@@ -243,7 +243,7 @@ int EthernetClientSsl::connect(uint8_t ip[4], uint16_t port)
 
 	if (!sslInit) {
 	    OpenSSL_add_all_algorithms();
-    	ERR_load_BIO_strings();
+    	//ERR_load_BIO_strings();
     	ERR_load_crypto_strings();
     	SSL_load_error_strings();	
 		//BIO* certbio = BIO_new(BIO_s_file());
