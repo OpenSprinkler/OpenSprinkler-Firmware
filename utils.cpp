@@ -79,6 +79,9 @@ void set_data_dir(const char *new_data_dir) {
 char* get_filename_fullpath(const char *filename) {
 	static char fullpath[PATH_MAX];
 	strcpy(fullpath, get_data_dir());
+	if ('/' != fullpath[strlen(fullpath) - 1]) {
+		strcat(fullpath, "/");
+	}
 	strcat(fullpath, filename);
 	return fullpath;
 }
