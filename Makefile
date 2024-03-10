@@ -21,3 +21,7 @@ $(BINARY): $(OBJECTS)
 .PHONY: clean
 clean:
 	rm -f $(OBJECTS) $(BINARY)
+
+.PHONY: container
+container:
+	docker build .
