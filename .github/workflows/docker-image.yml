@@ -2,7 +2,7 @@ name: Docker Image CI
 
 on:
   push:
-    branches: [ "containerize2" ]
+    branches: [ "*" ]
   pull_request:
     branches: [ "*" ]
 
