@@ -26,6 +26,7 @@
 #include "utils.h"
 #include "opensprinkler_server.h"
 #include "weather.h"
+#include "main.h"
 
 extern OpenSprinkler os; // OpenSprinkler object
 extern char tmp_buffer[];
@@ -35,7 +36,6 @@ int wt_errCode = HTTP_RQT_NOT_RECEIVED;
 byte wt_monthly[12] = {100,100,100,100,100,100,100,100,100,100,100,100};
 
 byte findKeyVal (const char *str,char *strbuf, uint16_t maxlen,const char *key,bool key_in_pgm=false,uint8_t *keyfound=NULL);
-void write_log(byte type, ulong curr_time);
 
 // The weather function calls getweather.py on remote server to retrieve weather data
 // the default script is WEATHER_SCRIPT_HOST/weather?.py
@@ -198,7 +198,7 @@ void load_wt_monthly(char* wto) {
 	}
 }
 
-void apply_monthly_adjustment(ulong curr_time) {
+void apply_monthly_adjustment(time_t curr_time) {
 		// ====== Check monthly water percentage ======
 		if(os.iopts[IOPT_USE_WEATHER]==WEATHER_METHOD_MONTHLY) {
 #if defined(ARDUINO)

@@ -71,7 +71,7 @@
 extern OpenSprinkler os;
 extern char tmp_buffer[];
 
-#define MQTT_KEEPALIVE      60
+#define OS_MQTT_KEEPALIVE      60
 #define MQTT_DEFAULT_PORT   1883  // Default port for MQTT. Can be overwritten through App config
 #define MQTT_MAX_HOST_LEN   50    // Note: App is set to max 50 chars for broker name
 #define MQTT_MAX_USERNAME_LEN 32  // Note: App is set to max 32 chars for username
@@ -195,7 +195,11 @@ void OSMqtt::loop(void) {
 		last_reconnect_attempt = millis();
 	}
 
+#if defined(ENABLE_DEBUG)
 	int state = _loop();
+#else
+	(void) _loop();
+#endif
 
 #if defined(ENABLE_DEBUG)
 	// Print a diagnostic message whenever the MQTT state changes
@@ -234,7 +238,7 @@ int OSMqtt::_init(void) {
 	#endif
 
 	mqtt_client = new PubSubClient(*client);
-	mqtt_client->setKeepAlive(MQTT_KEEPALIVE);
+	mqtt_client->setKeepAlive(OS_MQTT_KEEPALIVE);
 
 	if (mqtt_client == NULL) {
 		DEBUG_LOGF("MQTT Init: Failed to initialise client\r\n");
@@ -366,7 +370,7 @@ int OSMqtt::_connect(void) {
 			return MQTT_ERROR;
 		}
 	}
-	rc = mosquitto_connect(mqtt_client, _host, _port, MQTT_KEEPALIVE);
+	rc = mosquitto_connect(mqtt_client, _host, _port, OS_MQTT_KEEPALIVE);
 	if (rc != MOSQ_ERR_SUCCESS) {
 		DEBUG_LOGF("MQTT Connect: Connection Failed (%s)\r\n", mosquitto_strerror(rc));
 		return MQTT_ERROR;
