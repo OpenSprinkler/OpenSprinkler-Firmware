@@ -1377,7 +1377,6 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 	static char payload[TMP_BUFFER_SIZE];
 	char* postval = tmp_buffer;
 	uint32_t volume;
-	float flow_pulse_rate_factor;
 
 	bool ifttt_enabled = os.iopts[IOPT_IFTTT_ENABLE]&type;
 
@@ -1434,53 +1433,83 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 			}
 			break;
 
-		case NOTIFY_FLOW_ALERT:
+		case NOTIFY_FLOW_ALERT:{
+			//First determine if a Flow Alert should be sent based on flow amount and setpoint
 
-			// todo: add MQTT support for this event as well.
-			/*if (os.mqtt.enabled()) {
-				sprintf_P(topic, PSTR("opensprinkler/station/%d"), lval);
-					sprintf_P(payload, PSTR("{\"state\":0,\"duration\":%d,\"flow\":%d.%02d}"), (int)fval, (int)flow_last_gpm, (int)(flow_last_gpm*100)%100);
-			}*/
-			if (ifttt_enabled) {
-				//Added new variable for flow_gpm_alert_setpoint and set default value to max
-				float flow_gpm_alert_setpoint = 999.9f;
+			//Added variable to track flow alert status
+			bool flow_alert_flag = false;
 
-				strcat_P(postval, PSTR("<br>Station: "));
-				os.get_station_name(lval, postval+strlen(postval));
+			//Added variable for flow_gpm_alert_setpoint and set default value to max
+			float flow_gpm_alert_setpoint = 999.9f;
 
-				//Extract flow_gpm_alert_setpoint from last 5 characters of station name
-				const char *station_name_last_five_chars = postval;
-				if (strlen(postval) > 5) {
-					station_name_last_five_chars = postval + strlen(postval) - 5;
-				}
+			//Added variable for to get flow_pulse_rate_factor and set to 1 as default
+			float flow_pulse_rate_factor = 1;
+
+			//Added variable for tmp station name
+			char tmp_station_name[STATION_NAME_SIZE];
+
+			//Get satation name
+			os.get_station_name(lval, tmp_station_name);
+
+			//Extract flow_gpm_alert_setpoint from last 5 characters of station name
+			if (strlen(tmp_station_name) > 5) {
+				const char *station_name_last_five_chars = tmp_station_name;
+				station_name_last_five_chars = tmp_station_name + strlen(tmp_station_name) - 5;
 
 				//Convert last five characters to number and check if valid
-				if (sscanf(station_name_last_five_chars, "%f", &flow_gpm_alert_setpoint) != 1) {
-					//Not a valid number, disable ifttt. If a number is not detected in the station name, it will never send an alert
-					ifttt_enabled = false;
-				} else {
-					//String was successfully converted to a number so truncate it off postval to clean up the station name in message
-					postval[(strlen(postval) - 5)] = '\0';
+				if (sscanf(station_name_last_five_chars, "%f", &flow_gpm_alert_setpoint) == 1) {
 
-					//flow_last_gpm is atually collected and stored as pulses per minute, not gallons per minute
+					//station_name_last_five_chars was successfully converted to a number 
+
+					//flow_last_gpm is actually collected and stored as pulses per minute, not gallons per minute
 					//Get Flow Pulse Rate factor and apply to flow_last_gpm when comparing and outputting
 					flow_pulse_rate_factor = static_cast<float>(os.iopts[IOPT_PULSE_RATE_1]) + static_cast<float>(os.iopts[IOPT_PULSE_RATE_0]) / 100.0;
-					
-					//Format message
+
+					// Alert Check - Compare flow_gpm_alert_setpoint with flow_last_gpm and enable flow_alert_flag if flow is above setpoint
+					if ((flow_last_gpm*flow_pulse_rate_factor) > flow_gpm_alert_setpoint) {
+						flow_alert_flag = true;
+					}
+				} else {
+					//Could not convert to a valid number. If a number is not detected as a station name suffix, never send an alert
+					flow_alert_flag = false;
+				}
+			} else {
+ 				//Station name was not long enough to include 5 character flow setpoint.
+				flow_alert_flag = false;
+			}
+
+			// If flow_alert_flag is true, format the appropriate messages, else don't send alert
+			if (flow_alert_flag == true) {
+
+				if (os.mqtt.enabled()) {
+					//Format mqtt message
+					sprintf_P(topic, PSTR("opensprinkler/station/%d/alert/flow"), lval);
+					sprintf_P(payload, PSTR("{\"flow_rate\":%d.%02d,\"duration\":%d,\"alert_setpoint\":%d.%02d}"), (int)(flow_last_gpm*flow_pulse_rate_factor), (int)((flow_last_gpm*flow_pulse_rate_factor) * 100) % 100, (int)fval, (int)flow_gpm_alert_setpoint, (int)(flow_gpm_alert_setpoint * 100) % 100);
+				}
+
+
+				if (ifttt_enabled) {
+					//Format ifttt message
+					strcat_P(postval, PSTR("<br>Station: "));
+					//Truncate flow setpoint value off station name to shorten ifttt message
+					tmp_station_name[(strlen(tmp_station_name) - 5)] = '\0';
+					strcat_P(postval, tmp_station_name);
+	
 					strcat_P(postval, PSTR("<br>Duration: "));
 					sprintf_P(postval+strlen(postval), PSTR(" %d minutes %d seconds"), (int)fval/60, (int)fval%60);
 
 					strcat_P(postval, PSTR("<br><br>FLOW ALERT!"));
 					sprintf_P(postval + strlen(postval), PSTR("<br>Flow rate: %d.%02d<br>Flow Alert Setpoint: %d.%02d"), (int)(flow_last_gpm*flow_pulse_rate_factor), (int)((flow_last_gpm*flow_pulse_rate_factor) * 100) % 100, (int)flow_gpm_alert_setpoint, (int)(flow_gpm_alert_setpoint * 100) % 100);
-
-					// Compare flow_gpm_alert_setpoint with flow_last_gpm and disable ifttt message if flow is below setpoint				
-					if ((flow_last_gpm*flow_pulse_rate_factor) <= flow_gpm_alert_setpoint) {
-						ifttt_enabled = false;
-					} 
+			
 				}
+			} else {
+				//Do not send an alert - must force ifftt_enabled to false to prevent sending
+				//Mqtt will have a empty topic/payload and will not send.
+				ifttt_enabled=false;
 			}
-			break;
-
+		break;
+		}
+		
 		case NOTIFY_PROGRAM_SCHED:
 
 			if (ifttt_enabled) {
