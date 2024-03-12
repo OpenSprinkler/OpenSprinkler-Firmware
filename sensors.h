@@ -86,6 +86,8 @@ extern "C" {
 #define SENSOR_OSPI_ANALOG_SMT50_TEMP     53  //Old OSPi analog input - SMT50 T [°C] = (U – 0,5) * 100
 #endif
 
+#define SENSOR_MQTT                       90  //subscribe to a MQTT server and query a value
+
 #define SENSOR_REMOTE                     100 //Remote sensor of an remote opensprinkler
 #define SENSOR_WEATHER_TEMP_F             101 //Weather service - temperature (Fahrenheit)
 #define SENSOR_WEATHER_TEMP_C             102 //Weather service - temperature (Celcius)
@@ -105,10 +107,10 @@ extern "C" {
 #define MIN_DISK_FREE                  8192   //8Kb min 
 
 typedef struct SensorFlags {
-	uint     enable:1;
-	uint     log:1;
-	uint     data_ok:1;
-	uint     show:1;
+	uint     enable:1;  // enabled
+	uint     log:1;     // log data enabled
+	uint     data_ok:1; // last data is ok 
+	uint     show:1;    // show on mainpage
 } SensorFlags_t;
 
 //Definition of a sensor
@@ -132,6 +134,8 @@ typedef struct Sensor {
 							   //   sensorvalue = (read_value-offset_mv/1000) * factor / divider + offset2/100
 	byte     undef[16];        // for later
 	//unstored
+	bool     mqtt_init:1;
+	bool     mqtt_push:1;
 	byte     unitid;
 	ulong    last_read; //millis
 	Sensor   *next; 
@@ -179,15 +183,18 @@ typedef struct ProgSensorAdjust {
 } ProgSensorAdjust_t;
 #define PROGSENSOR_STORE_SIZE (sizeof(ProgSensorAdjust_t)-sizeof(ProgSensorAdjust_t*))
 
+#define SENSORURL_TYPE_URL   0 //URL for Host/Path
+#define SENSORURL_TYPE_TOPIC 1 //TOPIC for MQTT
+#define SENSORURL_TYPE_JSON  2 //JSON Filter for MQTT
+
 typedef struct SensorUrl {
 	uint nr;
-	uint type; //unused, for later
+	uint type; //see SENSORURL_TYPE
 	uint length;
 	char *urlstr;
 	SensorUrl *next;
 } SensorUrl_t;
 #define SENSORURL_STORE_SIZE (sizeof(SensorUrl_t)-sizeof(char*)-sizeof(SensorUrl_t*))
-
 
 #define UNIT_NONE        0
 #define UNIT_PERCENT     1
@@ -205,6 +212,9 @@ typedef struct SensorUrl {
 //Unitnames
 // extern const char* sensor_unitNames[];
 
+void sensor_api_init();
+
+Sensor_t* getSensors();
 const char* getSensorUnit(int unitid);
 const char* getSensorUnit(Sensor_t *sensor);
 byte getSensorUnitId(int type);
@@ -264,12 +274,15 @@ double calc_sensor_watering(uint prog);
 double calc_sensor_watering_by_nr(uint nr);
 
 void GetSensorWeather();
+//PUSH Message to MQTT and others:
+void push_message(Sensor_t *sensor);
 
+//Web URLS Host/Path and MQTT topics:
 void SensorUrl_load();
 void SensorUrl_save();
-bool SensorUrl_delete(uint nr);
-bool SensorUrl_add(uint nr, char *urlstr);
-char *SensorUrl_get(uint nr);
+bool SensorUrl_delete(uint nr, uint type);
+bool SensorUrl_add(uint nr, uint type, char *urlstr);
+char *SensorUrl_get(uint nr, uint type);
 
 #if defined(ESP8266)
 ulong diskFree();

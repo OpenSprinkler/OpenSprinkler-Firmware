@@ -235,6 +235,7 @@ int OSMqtt::_init(void) {
 
 	mqtt_client = new PubSubClient(*client);
 	mqtt_client->setKeepAlive(MQTT_KEEPALIVE);
+	mqtt_client->setBufferSize(2048); //Most LORA Pakets are bigger!
 
 	if (mqtt_client == NULL) {
 		DEBUG_LOGF("MQTT Init: Failed to initialise client\r\n");
@@ -287,6 +288,24 @@ int OSMqtt::_publish(const char *topic, const char *payload) {
 int OSMqtt::_loop(void) {
 	mqtt_client->loop();
 	return mqtt_client->state();
+}
+
+bool OSMqtt::subscribe(const char *topic) {
+	DEBUG_PRINTLN("subscribe1");
+	if (mqtt_client == NULL || !_enabled || os.status.network_fails > 0 || !_connected()) return false;
+	DEBUG_PRINTLN("subscribe2");
+	return mqtt_client->subscribe(topic);
+}
+
+bool OSMqtt::unsubscribe(const char *topic) {
+	DEBUG_PRINTLN("unsubscribe1");
+	if (mqtt_client == NULL || !_enabled || os.status.network_fails > 0 || !_connected()) return false;
+	DEBUG_PRINTLN("unsubscribe2");
+	return mqtt_client->unsubscribe(topic);
+}
+
+void OSMqtt::setCallback(MQTT_CALLBACK_SIGNATURE) {
+	mqtt_client->setCallback(callback);
 }
 
 const char * OSMqtt::_state_string(int rc) {
@@ -343,7 +362,7 @@ int OSMqtt::_init(void) {
 
 	if (mqtt_client) { mosquitto_destroy(mqtt_client); mqtt_client = NULL; };
 
-	mqtt_client = mosquitto_new("OS", true, NULL);
+	mqtt_client = mosquitto_new("OS", true, &this);
 	if (mqtt_client == NULL) {
 		DEBUG_PRINTF("MQTT Init: Failed to initialise client\r\n");
 		return MQTT_ERROR;
@@ -397,6 +416,20 @@ int OSMqtt::_publish(const char *topic, const char *payload) {
 
 int OSMqtt::_loop(void) {
 	return mosquitto_loop(mqtt_client, 0 , 1);
+}
+
+bool OSMqtt::subscribe(const char *topic) {
+	if (!mqtt_client || !_enabled || os.status.network_fails > 0 || !_connected()) return false;
+	return mosquitto_subscribe(mqtt_client, NULL, topic, 0);
+}
+
+bool OSMqtt::unsubscribe(const char *topic) {
+	if (!mqtt_client || !_enabled || os.status.network_fails > 0 || !_connected()) return false;
+	return mosquitto_unsubscribe(mqtt_client, NULL, topic, 0);
+}
+
+void OSMqtt::setCallback(void (*on_message)(struct mosquitto *, void *, const struct mosquitto_message *)) {
+	mosquitto_message_callback_set(mqtt_client, on_message);
 }
 
 const char * OSMqtt::_state_string(int error) {

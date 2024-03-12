@@ -2041,6 +2041,68 @@ void server_sensor_config_userdef(OTF_PARAMS_DEF)
 }
 
 /**
+ * sj
+ * get sensorurl
+ * {"nr":1,"type":1}
+ * return { "value": "text"}
+ */
+void server_sensorurl_get(OTF_PARAMS_DEF)
+{
+#if defined(ESP8266)
+	if(!process_password(OTF_PARAMS)) return;
+#else
+	char *p = get_buffer;
+#endif
+	DEBUG_PRINTLN(F("sensorUrl_get"));
+
+	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("nr"), true))
+		handle_return(HTML_DATA_MISSING);
+	uint nr = strtoul(tmp_buffer, NULL, 0); // Sensor nr
+	if (nr == 0) handle_return(HTML_DATA_MISSING);
+
+	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("type"), true))
+		handle_return(HTML_DATA_MISSING);
+	uint type = strtoul(tmp_buffer, NULL, 0); // Sensor type
+
+	bfill.emit_p(PSTR("{\"value\":\"$S\"}"), SensorUrl_get(nr, type));
+	handle_return(HTML_OK);
+}
+
+/**
+ * sk
+ * MQTT and other URL configuration
+ * type = 0 URL, 1=MQTT Subscription, 2=JSON Filter
+ * {"nr":1,"type":1,"value":abc}
+ */
+void server_sensorurl_config(OTF_PARAMS_DEF)
+{
+#if defined(ESP8266)
+	if(!process_password(OTF_PARAMS)) return;
+#else
+	char *p = get_buffer;
+#endif
+	DEBUG_PRINTLN(F("serverUrl_config"));
+
+	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("nr"), true))
+		handle_return(HTML_DATA_MISSING);
+	uint nr = strtoul(tmp_buffer, NULL, 0); // Sensor nr
+	if (nr == 0) handle_return(HTML_DATA_MISSING);
+
+	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("type"), true))
+		handle_return(HTML_DATA_MISSING);
+	uint type = strtoul(tmp_buffer, NULL, 0); // Sensor type
+
+	char *value = NULL;
+	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("value"), true))
+		handle_return(HTML_DATA_MISSING);
+	value = strdup(tmp_buffer);
+
+	bool ok = SensorUrl_add(nr, type, value);
+	free(value);
+	handle_return(ok?HTML_SUCCESS:HTML_DATA_MISSING);
+}
+
+/**
  * sc
  * Modus RS485 Sensor config
  * {"nr":1,"type":1,"group":0,"name":"myname","ip":123456789,"port":3000,"id":1,"ri":1000,"enable":1,"log":1}
@@ -2784,6 +2846,7 @@ const int sensor_types[] = {
 	SENSOR_OSPI_ANALOG_SMT50_MOIS,
 	SENSOR_OSPI_ANALOG_SMT50_TEMP,
 #endif
+	SENSOR_MQTT,
 	SENSOR_REMOTE,
 	SENSOR_WEATHER_TEMP_F,
 	SENSOR_WEATHER_TEMP_C,
@@ -2822,7 +2885,8 @@ const char* sensor_names[] = {
 	"OSPi analog input - SMT50 moisture mode",
 	"OSPi analog input - SMT50 temperature mode",
 #endif
-	"Remote sensor of an remote opensprinkler",
+	"MQTT subscription",
+	"Remote opensprinkler sensor",
 	"Weather data - temperature (°F)",
 	"Weather data - temperature (°C)",
 	"Weather data - humidity (%)",
@@ -3082,6 +3146,8 @@ const char _url_keys[] PROGMEM =
 	"ja"
 	"pq"
 	"si"
+	"sj"
+	"sk"
 	"sc"
 	"sl"
 	"sg"
@@ -3128,16 +3194,18 @@ URLHandler urls[] = {
 	server_json_all,        // ja
 	server_pause_queue,     // pq
 	server_sensor_config_userdef, // si
-	server_sensor_config,    // sc
-	server_sensor_list,      // sl
-	server_sensor_get,       // sg
-	server_sensor_readnow,       // sr
+	server_sensorurl_get,     // sj
+	server_sensorurl_config,  // sk
+	server_sensor_config,     // sc
+	server_sensor_list,       // sl
+	server_sensor_get,        // sg
+	server_sensor_readnow,    // sr
 	server_set_sensor_address,  // sa
-	server_sensorlog_list,          // so
-	server_sensorlog_clear,         // sn
-	server_sensorprog_config,    // sb
-	server_sensorprog_calc,      // sd
-	server_sensorprog_list,    // se
+	server_sensorlog_list,      // so
+	server_sensorlog_clear,     // sn
+	server_sensorprog_config,   // sb
+	server_sensorprog_calc,     // sd
+	server_sensorprog_list,     // se
 	server_sensor_types,    // sf
 	server_usage,           // du
 	server_sensorprog_types, // sh

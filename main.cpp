@@ -356,8 +356,7 @@ void do_setup() {
 
 	os.button_timeout = LCD_BACKLIGHT_TIMEOUT;
 	
-	sensor_load();
-	prog_adjust_load();
+	sensor_api_init();
 }
 
 // Arduino software reset function
