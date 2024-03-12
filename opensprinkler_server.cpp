@@ -601,9 +601,7 @@ void server_change_stations(OTF_PARAMS_DEF) {
 	for(sid=0;sid<os.nstations;sid++) {
 		itoa(sid, tbuf2+1, 10);
 		if(findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, tbuf2)) {
-			urlDecode(tmp_buffer);
-			strReplace(tmp_buffer, '\"', '\'');
-			strReplace(tmp_buffer, '\\', '/');
+			urlDecodeAndUnescape(tmp_buffer);
 			os.set_station_name(sid, tmp_buffer);
 		}
 	}
@@ -881,10 +879,7 @@ void server_change_program(OTF_PARAMS_DEF) {
 
 	// parse program name
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("name"), true)) {
-		urlDecode(tmp_buffer);
-		strReplace(tmp_buffer, '\"', '\'');
-		strReplace(tmp_buffer, '\\', '/');
-		strncpy(prog.name, tmp_buffer, PROGRAM_NAME_SIZE);
+		strncpy(prog.name, urlDecodeAndUnescape(tmp_buffer), PROGRAM_NAME_SIZE);
 	} else {
 		strcpy_P(prog.name, _str_program);
 		itoa((pid==-1)? (pd.nprograms+1): (pid+1), prog.name+8, 10);
@@ -1992,6 +1987,13 @@ void server_fill_files(OTF_PARAMS_DEF) {
 }
 */
 
+char* urlDecodeAndUnescape(char *buf) {
+	urlDecode(buf);
+	strReplace(buf, '\"', '\'');
+	strReplace(buf, '\\', '/');
+	return buf;
+}
+
 /**
  * si
  * Sensor config User Defined
@@ -2023,11 +2025,12 @@ void server_sensor_config_userdef(OTF_PARAMS_DEF)
 	char userdef_unit[8];
 	memset(userdef_unit, 0, sizeof(userdef_unit));
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("unit"), true)) {
-		urlDecode(tmp_buffer);
-		strReplace(tmp_buffer, '\"', '\'');
-		strReplace(tmp_buffer, '\\', '/');
-		strncpy(userdef_unit, tmp_buffer, sizeof(userdef_unit)-1); // unit
+		strncpy(userdef_unit, urlDecodeAndUnescape(tmp_buffer), sizeof(userdef_unit)-1); // unit
 	}
+	int16_t assigned_unitid = -1;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("unitid"), true))
+		assigned_unitid = strtol(tmp_buffer, NULL, 0); // divider
+
 	int16_t offset_mv = 0;
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("offset"), true))
 		offset_mv = strtol(tmp_buffer, NULL, 0); // offset in millivolt
@@ -2035,7 +2038,7 @@ void server_sensor_config_userdef(OTF_PARAMS_DEF)
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("offset2"), true))
 		offset2 = strtol(tmp_buffer, NULL, 0); // offset unit value
 
-	int ret = sensor_define_userdef(nr, factor, divider, userdef_unit, offset_mv, offset2);
+	int ret = sensor_define_userdef(nr, factor, divider, userdef_unit, offset_mv, offset2, assigned_unitid);
 	ret = ret == HTTP_RQT_SUCCESS?HTML_SUCCESS:HTML_DATA_MISSING;
 	handle_return(ret);
 }
@@ -2064,7 +2067,8 @@ void server_sensorurl_get(OTF_PARAMS_DEF)
 		handle_return(HTML_DATA_MISSING);
 	uint type = strtoul(tmp_buffer, NULL, 0); // Sensor type
 
-	bfill.emit_p(PSTR("{\"value\":\"$S\"}"), SensorUrl_get(nr, type));
+	char *value = SensorUrl_get(nr, type);
+	bfill.emit_p(PSTR("{\"value\":\"$S\"}"), value?value:"");
 	handle_return(HTML_OK);
 }
 
@@ -2104,7 +2108,7 @@ void server_sensorurl_config(OTF_PARAMS_DEF)
 
 /**
  * sc
- * Modus RS485 Sensor config
+ * Sensor config
  * {"nr":1,"type":1,"group":0,"name":"myname","ip":123456789,"port":3000,"id":1,"ri":1000,"enable":1,"log":1}
  */
 void server_sensor_config(OTF_PARAMS_DEF)
@@ -2139,12 +2143,8 @@ void server_sensor_config(OTF_PARAMS_DEF)
 
 	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("name"), true))
 		handle_return(HTML_DATA_MISSING);
-	urlDecode(tmp_buffer);
-	strReplace(tmp_buffer, '\"', '\'');
-	strReplace(tmp_buffer, '\\', '/');
 	char name[30];
-
-	strncpy(name, tmp_buffer, sizeof(name)-1); // Sensor name
+	strncpy(name, urlDecodeAndUnescape(tmp_buffer), sizeof(name)-1); // Sensor name
 
 	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("ip"), true))
 		handle_return(HTML_DATA_MISSING);
@@ -2175,11 +2175,12 @@ void server_sensor_config(OTF_PARAMS_DEF)
 	char userdef_unit[8];
 	memset(userdef_unit, 0, sizeof(userdef_unit));
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("unit"), true)) {
-		urlDecode(tmp_buffer);
-		strReplace(tmp_buffer, '\"', '\'');
-		strReplace(tmp_buffer, '\\', '/');
-		strncpy(userdef_unit, tmp_buffer, sizeof(userdef_unit)-1); // unit
+		strncpy(userdef_unit, urlDecodeAndUnescape(tmp_buffer), sizeof(userdef_unit)-1); // unit
 	}
+	int16_t assigned_unitid = -1;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("unitid"), true))
+		assigned_unitid = strtol(tmp_buffer, NULL, 0); // divider
+
 	int16_t offset_mv = 0;
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("offset"), true))
 		offset_mv = strtol(tmp_buffer, NULL, 0); // offset in millivolt
@@ -2199,11 +2200,35 @@ void server_sensor_config(OTF_PARAMS_DEF)
 	uint show = 0;
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("show"), true))
 		show = strtoul(tmp_buffer, NULL, 0); // 1=show enabled/0=show disabled
+	
+	//mqtt and other:
+	char* url = NULL;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("url"), true))
+		url = strdup(urlDecodeAndUnescape(tmp_buffer));
+	char* topic = NULL;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("topic"), true))
+		topic = strdup(urlDecodeAndUnescape(tmp_buffer));
+	char* filter = NULL;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("filter"), true))
+		filter = strdup(urlDecodeAndUnescape(tmp_buffer));
 
 	DEBUG_PRINTLN(F("server_sensor_config4"));
 
 	SensorFlags_t flags = {.enable=enable, .log=log, .show=show};
-	int ret = sensor_define(nr, name, type, group, ip, port, id, ri, factor, divider, userdef_unit, offset_mv, offset2, flags);
+	int ret = sensor_define(nr, name, type, group, ip, port, id, ri, factor, divider, userdef_unit, offset_mv, offset2, flags, assigned_unitid);
+	if (url) {
+		SensorUrl_add(nr, SENSORURL_TYPE_URL, url);
+		free(url);
+	}
+	if (topic) {
+		SensorUrl_add(nr, SENSORURL_TYPE_TOPIC, topic);
+		free(topic);
+	}
+	if (filter) {
+		SensorUrl_add(nr, SENSORURL_TYPE_FILTER, filter);
+		free(filter);
+	}
+	
 	ret = ret == HTTP_RQT_SUCCESS?HTML_SUCCESS:HTML_DATA_MISSING;
 	handle_return(ret);
 
@@ -2351,7 +2376,11 @@ void sensorconfig_json(OTF_PARAMS_DEF) {
 
 		if (first) first = false; else bfill.emit_p(PSTR(","));
 
-		bfill.emit_p(PSTR("{\"nr\":$D,\"type\":$D,\"group\":$D,\"name\":\"$S\",\"ip\":$L,\"port\":$D,\"id\":$D,\"ri\":$D,\"fac\":$D,\"div\":$D,\"offset\":$D,\"offset2\":$D,\"nativedata\":$L,\"data\":$E,\"unit\":\"$S\",\"unitid\":$D,\"enable\":$D,\"log\":$D,\"show\":$D,\"data_ok\":$D,\"last\":$L}"),
+		char* url = SensorUrl_get(sensor->nr, SENSORURL_TYPE_URL);
+		char* topic = SensorUrl_get(sensor->nr, SENSORURL_TYPE_TOPIC);
+		char* filter = SensorUrl_get(sensor->nr, SENSORURL_TYPE_FILTER);
+
+		bfill.emit_p(PSTR("{\"nr\":$D,\"type\":$D,\"group\":$D,\"name\":\"$S\",\"ip\":$L,\"port\":$D,\"id\":$D,\"ri\":$D,\"fac\":$D,\"div\":$D,\"offset\":$D,\"offset2\":$D,\"nativedata\":$L,\"data\":$E,\"unit\":\"$S\",\"unitid\":$D,\"enable\":$D,\"log\":$D,\"show\":$D,\"data_ok\":$D,\"last\":$L,\"url\":\"$S\",\"topic\":\"$S\",\"filter\":\"$S\"}"),
 			sensor->nr,
 			sensor->type,
 			sensor->group,
@@ -2372,7 +2401,8 @@ void sensorconfig_json(OTF_PARAMS_DEF) {
 			sensor->flags.log,
 			sensor->flags.show,
 			sensor->flags.data_ok,
-			sensor->last_read);
+			sensor->last_read,
+			url?url:"", topic?topic:"", filter?filter:"");
 		send_packet(OTF_PARAMS);
 	}
 }

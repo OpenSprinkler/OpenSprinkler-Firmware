@@ -132,7 +132,8 @@ typedef struct Sensor {
 	int16_t  offset_mv;        // offset millivolt - for custom sensor (before)
 	int16_t  offset2;          // offset unit value 1/100 - for custom sensor (after): 
 							   //   sensorvalue = (read_value-offset_mv/1000) * factor / divider + offset2/100
-	byte     undef[16];        // for later
+	byte     assigned_unitid;  // unitid for userdef and mqtt sensors
+	byte     undef[15];        // for later
 	//unstored
 	bool     mqtt_init:1;
 	bool     mqtt_push:1;
@@ -185,7 +186,7 @@ typedef struct ProgSensorAdjust {
 
 #define SENSORURL_TYPE_URL   0 //URL for Host/Path
 #define SENSORURL_TYPE_TOPIC 1 //TOPIC for MQTT
-#define SENSORURL_TYPE_JSON  2 //JSON Filter for MQTT
+#define SENSORURL_TYPE_FILTER  2 //JSON Filter for MQTT
 
 typedef struct SensorUrl {
 	uint nr;
@@ -229,8 +230,8 @@ uint16_t CRC16 (byte buf[], int len);
 //Sensor API functions:
 int sensor_delete(uint nr);
 int sensor_define(uint nr, char *name, uint type, uint group, uint32_t ip, uint port, uint id, uint ri, int16_t factor, int16_t divider, 
-	char *userdef_unit, int16_t offset_mv, int16_t offset2, SensorFlags_t flags);
-int sensor_define_userdef(uint nr, int16_t factor, int16_t divider, char *userdef_unit, int16_t offset_mv, int16_t offset2);
+	char *userdef_unit, int16_t offset_mv, int16_t offset2, SensorFlags_t flags, int16_t assigned_unitid);
+int sensor_define_userdef(uint nr, int16_t factor, int16_t divider, char *userdef_unit, int16_t offset_mv, int16_t offset2, int16_t sensor_define_userdef);
 void sensor_load();
 void sensor_save();
 uint sensor_count();

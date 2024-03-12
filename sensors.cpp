@@ -136,7 +136,7 @@ int sensor_delete(uint nr) {
  * @param id 
  */
 int sensor_define(uint nr, char *name, uint type, uint group, uint32_t ip, uint port, uint id, uint ri, int16_t factor, int16_t divider, 
-	char *userdef_unit, int16_t offset_mv, int16_t offset2, SensorFlags_t flags) {
+	char *userdef_unit, int16_t offset_mv, int16_t offset2, SensorFlags_t flags, int16_t assigned_unitid) {
 
 	if (nr == 0 || type == 0)
 		return HTTP_RQT_NOT_RECEIVED;
@@ -162,6 +162,8 @@ int sensor_define(uint nr, char *name, uint type, uint group, uint32_t ip, uint 
 			sensor->offset2 = offset2;
 			strncpy(sensor->userdef_unit, userdef_unit, sizeof(sensor->userdef_unit)-1);
 			sensor->flags = flags;
+			if (assigned_unitid >= 0)
+				sensor->assigned_unitid = assigned_unitid;
 			sensor_save();
 			return HTTP_RQT_SUCCESS;
 		}
@@ -192,6 +194,9 @@ int sensor_define(uint nr, char *name, uint type, uint group, uint32_t ip, uint 
 	new_sensor->offset2 = offset2;
 	strncpy(new_sensor->userdef_unit, userdef_unit, sizeof(new_sensor->userdef_unit)-1);
 	new_sensor->flags = flags;
+	if (assigned_unitid >= 0)
+		new_sensor->assigned_unitid = assigned_unitid;
+
 	if (last) {
 		new_sensor->next = last->next;
 		last->next = new_sensor;
@@ -203,7 +208,7 @@ int sensor_define(uint nr, char *name, uint type, uint group, uint32_t ip, uint 
 	return HTTP_RQT_SUCCESS;
 }
 
-int sensor_define_userdef(uint nr, int16_t factor, int16_t divider, char *userdef_unit, int16_t offset_mv, int16_t offset2) {
+int sensor_define_userdef(uint nr, int16_t factor, int16_t divider, char *userdef_unit, int16_t offset_mv, int16_t offset2, int16_t assigned_unitid) {
 	Sensor_t *sensor = sensor_by_nr(nr);
 	if (!sensor)
 		return HTTP_RQT_NOT_RECEIVED;
@@ -212,6 +217,7 @@ int sensor_define_userdef(uint nr, int16_t factor, int16_t divider, char *userde
 	sensor->divider = divider;
 	sensor->offset_mv = offset_mv;
 	sensor->offset2 = offset2;
+	sensor->assigned_unitid = assigned_unitid;
 	if (userdef_unit)
 		strncpy(sensor->userdef_unit, userdef_unit, sizeof(sensor->userdef_unit)-1);
 	else
@@ -1816,7 +1822,7 @@ byte getSensorUnitId(Sensor_t *sensor) {
 		case SENSOR_OSPI_ANALOG_SMT50_MOIS:     return UNIT_PERCENT;
 		case SENSOR_OSPI_ANALOG_SMT50_TEMP: 	return UNIT_DEGREE;
 #endif
-		case SENSOR_MQTT:	 	              return UNIT_USERDEF;
+		case SENSOR_MQTT:	 	              return sensor->assigned_unitid > 0?sensor->assigned_unitid:UNIT_USERDEF;
 		case SENSOR_REMOTE:                	  return sensor->unitid;
 
 		case SENSOR_WEATHER_TEMP_F:           return UNIT_FAHRENHEIT;

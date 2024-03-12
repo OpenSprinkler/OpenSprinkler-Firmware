@@ -91,7 +91,7 @@ void (*sensor_mqtt_callback)(struct mosquitto *mosq, void *obj, const struct mos
 			
 			if (topic && mqtt_filter_matches(mtopic, topic)) {
 				DEBUG_PRINTLN("topic match!");
-				char *jsonFilter =  SensorUrl_get(sensor->nr, SENSORURL_TYPE_JSON);
+				char *jsonFilter =  SensorUrl_get(sensor->nr, SENSORURL_TYPE_FILTER);
 				char *p = (char*)payload;				
 				char *f = jsonFilter;
 
@@ -155,7 +155,7 @@ int read_sensor_mqtt(Sensor_t *sensor) {
         DEBUG_PRINT("read_sensor_mqtt1: ");
 		DEBUG_PRINTLN(sensor->name);
 		char *topic = SensorUrl_get(sensor->nr, SENSORURL_TYPE_TOPIC);
-		if (topic) {
+		if (topic && topic[0]) {
             os.mqtt.setCallback(&sensor_mqtt_callback);
             DEBUG_PRINT("subscribe: ");
             DEBUG_PRINTLN(topic);
@@ -169,7 +169,7 @@ int read_sensor_mqtt(Sensor_t *sensor) {
 
 void sensor_mqtt_subscribe(uint nr, uint type, char *urlstr) {
     Sensor_t* sensor = sensor_by_nr(nr);
-    if (urlstr && type == SENSORURL_TYPE_TOPIC && sensor && sensor->type == SENSOR_MQTT) {
+    if (urlstr && urlstr[0] && type == SENSORURL_TYPE_TOPIC && sensor && sensor->type == SENSOR_MQTT) {
 	    DEBUG_PRINT("sensor_mqtt_subscribe1: ");
 		DEBUG_PRINTLN(sensor->name);
 		if (os.mqtt.subscribe(urlstr)) {
@@ -184,7 +184,7 @@ void sensor_mqtt_subscribe(uint nr, uint type, char *urlstr) {
 
 void sensor_mqtt_unsubscribe(uint nr, uint type, char *urlstr) {
     Sensor_t* sensor = sensor_by_nr(nr);
-    if (urlstr && type == SENSORURL_TYPE_TOPIC && sensor && sensor->type == SENSOR_MQTT) {
+    if (urlstr && urlstr[0] && type == SENSORURL_TYPE_TOPIC && sensor && sensor->type == SENSOR_MQTT) {
 	    DEBUG_PRINT("sensor_mqtt_unsubscribe1: ");
 		DEBUG_PRINTLN(sensor->name);
         os.mqtt.setCallback(&sensor_mqtt_callback);
