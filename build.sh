@@ -33,7 +33,7 @@ else
 		exit 0
 	fi
 	echo "Compiling firmware..."
-	g++ -o OpenSprinkler -DOSPI main.cpp OpenSprinkler.cpp program.cpp opensprinkler_server.cpp utils.cpp weather.cpp gpio.cpp etherport.cpp mqtt.cpp -li2c -lpthread -lmosquitto -lcrypto -lssl
+	g++ -o OpenSprinkler -DOSPI -std=c++14 main.cpp OpenSprinkler.cpp program.cpp opensprinkler_server.cpp utils.cpp weather.cpp gpio.cpp etherport.cpp mqtt.cpp sensors.cpp -li2c -lpthread -lmosquitto -lcrypto -lssl
 fi
 
 if [ ! "$SILENT" = true ] && [ -f OpenSprinkler.launch ] && [ ! -f /etc/init.d/OpenSprinkler.sh ]; then

@@ -2511,8 +2511,7 @@ void server_sensorlog_list(OTF_PARAMS_DEF) {
 	if (lastHours > 0 && log_size > 0) {
 		after = os.now_tz() - lastHours * 60 * 60; //seconds
 		DEBUG_PRINT(F("lastHours="));
-		DEBUG_PRINT(lastHours);
-		DEBUG_PRINTLN();
+		DEBUG_PRINTLN(lastHours);
 
 		ulong a = 0;
 		ulong b = log_size-1;
@@ -2533,8 +2532,7 @@ void server_sensorlog_list(OTF_PARAMS_DEF) {
 	if (maxResults > 0 && maxResults < log_size)
 	{
 		DEBUG_PRINT(F("max="));
-		DEBUG_PRINT(maxResults);
-		DEBUG_PRINTLN();
+		DEBUG_PRINTLN(maxResults);
 		ulong startAt2 = log_size-maxResults;
 		if (startAt2 > startAt)
 			startAt = startAt2;
