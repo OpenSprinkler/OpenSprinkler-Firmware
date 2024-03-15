@@ -702,7 +702,8 @@ void push_message(Sensor_t *sensor) {
 	char* postval = tmp_buffer;
 
 	if (os.mqtt.enabled()) {
-		strcpy_P(topic, PSTR("opensprinkler/analogsensor/"));
+		os.sopt_load(SOPT_DEVICE_NAME, topic);
+		strncat_P(topic, PSTR("/analogsensor/"), sizeof(topic)-1);
 		strncat(topic, sensor->name, sizeof(topic)-1);
 		sprintf_P(payload, PSTR("{\"nr\":%u,\"type\":%u,\"data_ok\":%u,\"time\":%u,\"value\":%d.%02d,\"unit\":\"%s\"}"), 
 			sensor->nr, sensor->type, sensor->flags.data_ok, sensor->last_read, (int)sensor->last_data, (int)(sensor->last_data*100)%100, getSensorUnit(sensor));

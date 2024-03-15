@@ -56,6 +56,7 @@ public:
     static void publish(const char *topic, const char *payload);
     static void loop(void);
 
+    static bool connected();
     static bool subscribe(const char *topic);
     static bool unsubscribe(const char *topic);
 #if defined(ARDUINO)

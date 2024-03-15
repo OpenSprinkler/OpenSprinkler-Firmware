@@ -150,8 +150,10 @@ void (*sensor_mqtt_callback)(struct mosquitto *mosq, void *obj, const struct mos
 }
 
 int read_sensor_mqtt(Sensor_t *sensor) {
-	sensor->flags.data_ok = false;
-	if (!sensor->mqtt_init && os.mqtt.enabled) {
+	if (!os.mqtt.enabled() || !os.mqtt.connected()) {
+		sensor->flags.data_ok = false;
+		sensor->mqtt_init = false;
+	} else {
         DEBUG_PRINT("read_sensor_mqtt1: ");
 		DEBUG_PRINTLN(sensor->name);
 		char *topic = SensorUrl_get(sensor->nr, SENSORURL_TYPE_TOPIC);
@@ -159,8 +161,7 @@ int read_sensor_mqtt(Sensor_t *sensor) {
             os.mqtt.setCallback(&sensor_mqtt_callback);
             DEBUG_PRINT("subscribe: ");
             DEBUG_PRINTLN(topic);
-			if (!os.mqtt.subscribe(topic))
-				DEBUG_PRINTLN("error subscribe!!");
+			os.mqtt.subscribe(topic);
 			sensor->mqtt_init = true;
 		}
 	}
@@ -172,13 +173,11 @@ void sensor_mqtt_subscribe(uint nr, uint type, char *urlstr) {
     if (urlstr && urlstr[0] && type == SENSORURL_TYPE_TOPIC && sensor && sensor->type == SENSOR_MQTT) {
 	    DEBUG_PRINT("sensor_mqtt_subscribe1: ");
 		DEBUG_PRINTLN(sensor->name);
-		if (os.mqtt.subscribe(urlstr)) {
-            os.mqtt.setCallback(&sensor_mqtt_callback);
-            DEBUG_PRINT("subscribe: ");
-            DEBUG_PRINTLN(urlstr);
-		    sensor->mqtt_init = true;
-        }
-		else DEBUG_PRINTLN("error subscribe!!");
+        DEBUG_PRINT("subscribe: ");
+        DEBUG_PRINTLN(urlstr);
+		os.mqtt.subscribe(urlstr);
+        os.mqtt.setCallback(&sensor_mqtt_callback);
+	    sensor->mqtt_init = true;
     }
 }
 

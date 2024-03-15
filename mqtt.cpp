@@ -290,6 +290,12 @@ int OSMqtt::_loop(void) {
 	return mqtt_client->state();
 }
 
+bool OSMqtt::connected(void) { 
+	if (mqtt_client == NULL || !_enabled || os.status.network_fails > 0 || !_connected()) 
+		return false;
+	return mqtt_client->connected(); 
+}
+
 bool OSMqtt::subscribe(const char *topic) {
 	DEBUG_PRINTLN("subscribe1");
 	if (mqtt_client == NULL || !_enabled || os.status.network_fails > 0 || !_connected()) return false;
