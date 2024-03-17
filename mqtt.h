@@ -23,6 +23,11 @@
 
 #ifndef _MQTT_H
 #define _MQTT_H
+#if defined(ARDUINO)
+	#include <PubSubClient.h>
+#else
+	#include <mosquitto.h>
+#endif
 
 class OSMqtt {
 private:
@@ -32,6 +37,7 @@ private:
     static char _username[];
     static char _password[];
     static bool _enabled;
+
 
     // Following routines are platform specific versions of the public interface
     static int _init(void);
@@ -49,6 +55,15 @@ public:
     static bool enabled(void) { return _enabled; };
     static void publish(const char *topic, const char *payload);
     static void loop(void);
+
+    static bool connected();
+    static bool subscribe(const char *topic);
+    static bool unsubscribe(const char *topic);
+#if defined(ARDUINO)
+    static void setCallback(MQTT_CALLBACK_SIGNATURE);
+#else
+	static void setCallback(void (*on_message)(struct mosquitto *, void *, const struct mosquitto_message *));
+#endif
 };
 
 #endif	// _MQTT_H

@@ -601,9 +601,7 @@ void server_change_stations(OTF_PARAMS_DEF) {
 	for(sid=0;sid<os.nstations;sid++) {
 		itoa(sid, tbuf2+1, 10);
 		if(findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, tbuf2)) {
-			urlDecode(tmp_buffer);
-			strReplace(tmp_buffer, '\"', '\'');
-			strReplace(tmp_buffer, '\\', '/');
+			urlDecodeAndUnescape(tmp_buffer);
 			os.set_station_name(sid, tmp_buffer);
 		}
 	}
@@ -881,10 +879,7 @@ void server_change_program(OTF_PARAMS_DEF) {
 
 	// parse program name
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("name"), true)) {
-		urlDecode(tmp_buffer);
-		strReplace(tmp_buffer, '\"', '\'');
-		strReplace(tmp_buffer, '\\', '/');
-		strncpy(prog.name, tmp_buffer, PROGRAM_NAME_SIZE);
+		strncpy(prog.name, urlDecodeAndUnescape(tmp_buffer), PROGRAM_NAME_SIZE);
 	} else {
 		strcpy_P(prog.name, _str_program);
 		itoa((pid==-1)? (pd.nprograms+1): (pid+1), prog.name+8, 10);
@@ -1992,6 +1987,13 @@ void server_fill_files(OTF_PARAMS_DEF) {
 }
 */
 
+char* urlDecodeAndUnescape(char *buf) {
+	urlDecode(buf);
+	strReplace(buf, '\"', '\'');
+	strReplace(buf, '\\', '/');
+	return buf;
+}
+
 /**
  * si
  * Sensor config User Defined
@@ -2023,11 +2025,12 @@ void server_sensor_config_userdef(OTF_PARAMS_DEF)
 	char userdef_unit[8];
 	memset(userdef_unit, 0, sizeof(userdef_unit));
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("unit"), true)) {
-		urlDecode(tmp_buffer);
-		strReplace(tmp_buffer, '\"', '\'');
-		strReplace(tmp_buffer, '\\', '/');
-		strncpy(userdef_unit, tmp_buffer, sizeof(userdef_unit)-1); // unit
+		strncpy(userdef_unit, urlDecodeAndUnescape(tmp_buffer), sizeof(userdef_unit)-1); // unit
 	}
+	int16_t assigned_unitid = -1;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("unitid"), true))
+		assigned_unitid = strtol(tmp_buffer, NULL, 0); // divider
+
 	int16_t offset_mv = 0;
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("offset"), true))
 		offset_mv = strtol(tmp_buffer, NULL, 0); // offset in millivolt
@@ -2035,14 +2038,77 @@ void server_sensor_config_userdef(OTF_PARAMS_DEF)
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("offset2"), true))
 		offset2 = strtol(tmp_buffer, NULL, 0); // offset unit value
 
-	int ret = sensor_define_userdef(nr, factor, divider, userdef_unit, offset_mv, offset2);
+	int ret = sensor_define_userdef(nr, factor, divider, userdef_unit, offset_mv, offset2, assigned_unitid);
 	ret = ret == HTTP_RQT_SUCCESS?HTML_SUCCESS:HTML_DATA_MISSING;
 	handle_return(ret);
 }
 
 /**
+ * sj
+ * get sensorurl
+ * {"nr":1,"type":1}
+ * return { "value": "text"}
+ */
+void server_sensorurl_get(OTF_PARAMS_DEF)
+{
+#if defined(ESP8266)
+	if(!process_password(OTF_PARAMS)) return;
+#else
+	char *p = get_buffer;
+#endif
+	DEBUG_PRINTLN(F("sensorUrl_get"));
+
+	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("nr"), true))
+		handle_return(HTML_DATA_MISSING);
+	uint nr = strtoul(tmp_buffer, NULL, 0); // Sensor nr
+	if (nr == 0) handle_return(HTML_DATA_MISSING);
+
+	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("type"), true))
+		handle_return(HTML_DATA_MISSING);
+	uint type = strtoul(tmp_buffer, NULL, 0); // Sensor type
+
+	char *value = SensorUrl_get(nr, type);
+	bfill.emit_p(PSTR("{\"value\":\"$S\"}"), value?value:"");
+	handle_return(HTML_OK);
+}
+
+/**
+ * sk
+ * MQTT and other URL configuration
+ * type = 0 URL, 1=MQTT Subscription, 2=JSON Filter
+ * {"nr":1,"type":1,"value":abc}
+ */
+void server_sensorurl_config(OTF_PARAMS_DEF)
+{
+#if defined(ESP8266)
+	if(!process_password(OTF_PARAMS)) return;
+#else
+	char *p = get_buffer;
+#endif
+	DEBUG_PRINTLN(F("serverUrl_config"));
+
+	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("nr"), true))
+		handle_return(HTML_DATA_MISSING);
+	uint nr = strtoul(tmp_buffer, NULL, 0); // Sensor nr
+	if (nr == 0) handle_return(HTML_DATA_MISSING);
+
+	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("type"), true))
+		handle_return(HTML_DATA_MISSING);
+	uint type = strtoul(tmp_buffer, NULL, 0); // Sensor type
+
+	char *value = NULL;
+	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("value"), true))
+		handle_return(HTML_DATA_MISSING);
+	value = strdup(tmp_buffer);
+
+	bool ok = SensorUrl_add(nr, type, value);
+	free(value);
+	handle_return(ok?HTML_SUCCESS:HTML_DATA_MISSING);
+}
+
+/**
  * sc
- * Modus RS485 Sensor config
+ * Sensor config
  * {"nr":1,"type":1,"group":0,"name":"myname","ip":123456789,"port":3000,"id":1,"ri":1000,"enable":1,"log":1}
  */
 void server_sensor_config(OTF_PARAMS_DEF)
@@ -2077,12 +2143,8 @@ void server_sensor_config(OTF_PARAMS_DEF)
 
 	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("name"), true))
 		handle_return(HTML_DATA_MISSING);
-	urlDecode(tmp_buffer);
-	strReplace(tmp_buffer, '\"', '\'');
-	strReplace(tmp_buffer, '\\', '/');
 	char name[30];
-
-	strncpy(name, tmp_buffer, sizeof(name)-1); // Sensor name
+	strncpy(name, urlDecodeAndUnescape(tmp_buffer), sizeof(name)-1); // Sensor name
 
 	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("ip"), true))
 		handle_return(HTML_DATA_MISSING);
@@ -2113,11 +2175,12 @@ void server_sensor_config(OTF_PARAMS_DEF)
 	char userdef_unit[8];
 	memset(userdef_unit, 0, sizeof(userdef_unit));
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("unit"), true)) {
-		urlDecode(tmp_buffer);
-		strReplace(tmp_buffer, '\"', '\'');
-		strReplace(tmp_buffer, '\\', '/');
-		strncpy(userdef_unit, tmp_buffer, sizeof(userdef_unit)-1); // unit
+		strncpy(userdef_unit, urlDecodeAndUnescape(tmp_buffer), sizeof(userdef_unit)-1); // unit
 	}
+	int16_t assigned_unitid = -1;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("unitid"), true))
+		assigned_unitid = strtol(tmp_buffer, NULL, 0); // divider
+
 	int16_t offset_mv = 0;
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("offset"), true))
 		offset_mv = strtol(tmp_buffer, NULL, 0); // offset in millivolt
@@ -2137,11 +2200,35 @@ void server_sensor_config(OTF_PARAMS_DEF)
 	uint show = 0;
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("show"), true))
 		show = strtoul(tmp_buffer, NULL, 0); // 1=show enabled/0=show disabled
+	
+	//mqtt and other:
+	char* url = NULL;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("url"), true))
+		url = strdup(urlDecodeAndUnescape(tmp_buffer));
+	char* topic = NULL;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("topic"), true))
+		topic = strdup(urlDecodeAndUnescape(tmp_buffer));
+	char* filter = NULL;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("filter"), true))
+		filter = strdup(urlDecodeAndUnescape(tmp_buffer));
 
 	DEBUG_PRINTLN(F("server_sensor_config4"));
 
 	SensorFlags_t flags = {.enable=enable, .log=log, .show=show};
-	int ret = sensor_define(nr, name, type, group, ip, port, id, ri, factor, divider, userdef_unit, offset_mv, offset2, flags);
+	int ret = sensor_define(nr, name, type, group, ip, port, id, ri, factor, divider, userdef_unit, offset_mv, offset2, flags, assigned_unitid);
+	if (url) {
+		SensorUrl_add(nr, SENSORURL_TYPE_URL, url);
+		free(url);
+	}
+	if (topic) {
+		SensorUrl_add(nr, SENSORURL_TYPE_TOPIC, topic);
+		free(topic);
+	}
+	if (filter) {
+		SensorUrl_add(nr, SENSORURL_TYPE_FILTER, filter);
+		free(filter);
+	}
+	
 	ret = ret == HTTP_RQT_SUCCESS?HTML_SUCCESS:HTML_DATA_MISSING;
 	handle_return(ret);
 
@@ -2289,7 +2376,11 @@ void sensorconfig_json(OTF_PARAMS_DEF) {
 
 		if (first) first = false; else bfill.emit_p(PSTR(","));
 
-		bfill.emit_p(PSTR("{\"nr\":$D,\"type\":$D,\"group\":$D,\"name\":\"$S\",\"ip\":$L,\"port\":$D,\"id\":$D,\"ri\":$D,\"fac\":$D,\"div\":$D,\"offset\":$D,\"offset2\":$D,\"nativedata\":$L,\"data\":$E,\"unit\":\"$S\",\"unitid\":$D,\"enable\":$D,\"log\":$D,\"show\":$D,\"data_ok\":$D,\"last\":$L}"),
+		char* url = SensorUrl_get(sensor->nr, SENSORURL_TYPE_URL);
+		char* topic = SensorUrl_get(sensor->nr, SENSORURL_TYPE_TOPIC);
+		char* filter = SensorUrl_get(sensor->nr, SENSORURL_TYPE_FILTER);
+
+		bfill.emit_p(PSTR("{\"nr\":$D,\"type\":$D,\"group\":$D,\"name\":\"$S\",\"ip\":$L,\"port\":$D,\"id\":$D,\"ri\":$D,\"fac\":$D,\"div\":$D,\"offset\":$D,\"offset2\":$D,\"nativedata\":$L,\"data\":$E,\"unit\":\"$S\",\"unitid\":$D,\"enable\":$D,\"log\":$D,\"show\":$D,\"data_ok\":$D,\"last\":$L,\"url\":\"$S\",\"topic\":\"$S\",\"filter\":\"$S\"}"),
 			sensor->nr,
 			sensor->type,
 			sensor->group,
@@ -2310,7 +2401,8 @@ void sensorconfig_json(OTF_PARAMS_DEF) {
 			sensor->flags.log,
 			sensor->flags.show,
 			sensor->flags.data_ok,
-			sensor->last_read);
+			sensor->last_read,
+			url?url:"", topic?topic:"", filter?filter:"");
 		send_packet(OTF_PARAMS);
 	}
 }
@@ -2785,6 +2877,7 @@ const int sensor_types[] = {
 	SENSOR_OSPI_ANALOG_SMT50_TEMP,
 #endif
 #endif
+	SENSOR_MQTT,
 	SENSOR_REMOTE,
 	SENSOR_WEATHER_TEMP_F,
 	SENSOR_WEATHER_TEMP_C,
@@ -2825,7 +2918,9 @@ const char* sensor_names[] = {
 	"OSPi analog input - SMT50 temperature mode",
 #endif
 #endif
-	"Remote sensor of an remote opensprinkler",
+#endif
+	"MQTT subscription",
+	"Remote opensprinkler sensor",
 	"Weather data - temperature (°F)",
 	"Weather data - temperature (°C)",
 	"Weather data - humidity (%)",
@@ -3015,6 +3110,16 @@ void server_sensorconfig_backup(OTF_PARAMS_DEF) {
 	char *p = get_buffer;
 #endif
 
+#define BACKUP_SENSORS 1
+#define BACKUP_ADJUSTMENTS 2
+
+	//Backup type: 0=no backup 1=Sensors 2=Adjustments 3=Sensors+Adjustments
+	int backup = BACKUP_SENSORS|BACKUP_ADJUSTMENTS;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("backup"), true)) {
+		backup = strtol(tmp_buffer, NULL, 0); 
+	}
+
+
 #if defined(ESP8266)
 	// as the log data can be large, we will use ESP8266's sendContent function to
 	// send multiple packets of data, instead of the standard way of using send().
@@ -3024,33 +3129,25 @@ void server_sensorconfig_backup(OTF_PARAMS_DEF) {
 	print_header();
 #endif
 
-	bfill.emit_p(PSTR("\"sensors\":["));
-	sensorconfig_json(OTF_PARAMS);
-	bfill.emit_p(PSTR("],"));
+	ulong time = os.now_tz();
+	bfill.emit_p(PSTR("{\"backup\":$D,\"time\":$L,\"os-version\":$D,\"minor\":$D"), backup, time, OS_FW_VERSION, OS_FW_MINOR);
+	if (backup & BACKUP_SENSORS) {
+		bfill.emit_p(PSTR(",\"sensors\":["));
+		sensorconfig_json(OTF_PARAMS);
+		bfill.emit_p(PSTR("]"));
+	}
 	send_packet(OTF_PARAMS);
-	bfill.emit_p(PSTR("\"progadjust\":["));
-	progconfig_json();
-	bfill.emit_p(PSTR("]"));
-	send_packet(OTF_PARAMS);
+	if (backup & BACKUP_ADJUSTMENTS)  {
+		bfill.emit_p(PSTR(",\"progadjust\":["));
+		progconfig_json();
+		bfill.emit_p(PSTR("]"));
+	}
 	bfill.emit_p(PSTR("}"));
+	send_packet(OTF_PARAMS);
+
 	handle_return(HTML_OK);
 }
 
-/**
- * sy
- * @brief restore sensor configuration
- *
- */
-void server_sensorconfig_restore(OTF_PARAMS_DEF) {
-#if defined(ESP8266)
-	if(!process_password(OTF_PARAMS)) return;
-#else
-	char *p = get_buffer;
-#endif
-
-
-
-}
 
 
 typedef void (*URLHandler)(OTF_PARAMS_DEF);
@@ -3085,6 +3182,8 @@ const char _url_keys[] PROGMEM =
 	"ja"
 	"pq"
 	"si"
+	"sj"
+	"sk"
 	"sc"
 	"sl"
 	"sg"
@@ -3099,7 +3198,6 @@ const char _url_keys[] PROGMEM =
 	"du"
 	"sh"
 	"sx"
-	"sy"
 #if defined(ARDUINO)
   "db"
 	//"ff"
@@ -3131,21 +3229,22 @@ URLHandler urls[] = {
 	server_json_all,        // ja
 	server_pause_queue,     // pq
 	server_sensor_config_userdef, // si
-	server_sensor_config,    // sc
-	server_sensor_list,      // sl
-	server_sensor_get,       // sg
-	server_sensor_readnow,       // sr
+	server_sensorurl_get,     // sj
+	server_sensorurl_config,  // sk
+	server_sensor_config,     // sc
+	server_sensor_list,       // sl
+	server_sensor_get,        // sg
+	server_sensor_readnow,    // sr
 	server_set_sensor_address,  // sa
-	server_sensorlog_list,          // so
-	server_sensorlog_clear,         // sn
-	server_sensorprog_config,    // sb
-	server_sensorprog_calc,      // sd
-	server_sensorprog_list,    // se
+	server_sensorlog_list,      // so
+	server_sensorlog_clear,     // sn
+	server_sensorprog_config,   // sb
+	server_sensorprog_calc,     // sd
+	server_sensorprog_list,     // se
 	server_sensor_types,    // sf
 	server_usage,           // du
 	server_sensorprog_types, // sh
 	server_sensorconfig_backup, // sx
-	server_sensorconfig_restore, // sy
 #if defined(ARDUINO)
 	server_json_debug,      // db
 	//server_fill_files,
@@ -3235,7 +3334,7 @@ void start_server_client() {
 			uri[1]=pgm_read_byte(_url_keys+2*i);
 			uri[2]=pgm_read_byte(_url_keys+2*i+1);
 			otf->on(uri, urls[i]);
-		}
+		}    
 		otf_callbacksInitialised = true;
 	}
 	update_server->begin();

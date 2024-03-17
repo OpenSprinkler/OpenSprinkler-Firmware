@@ -27,7 +27,7 @@
 #include "opensprinkler_server.h"
 #include "sensors.h"
 #include "weather.h"
-#include "mqtt.h"
+#include "sensor_mqtt.h"
 
 byte findKeyVal (const char *str,char *strbuf, uint16_t maxlen,const char *key,bool key_in_pgm=false,uint8_t *keyfound=NULL);
 
@@ -86,6 +86,20 @@ uint16_t CRC16 (byte buf[], int len) {
   	return crc;  
 } // End: CRC16
 
+/*
+ * init sensor api and load data
+ */
+void sensor_api_init() {
+	sensor_load();
+	prog_adjust_load();
+}
+
+/*
+ * get list of all configured sensors
+ */
+Sensor_t* getSensors() {
+	return sensors;
+}
 /**
  * @brief delete a sensor
  * 
@@ -121,8 +135,8 @@ int sensor_delete(uint nr) {
  * @param port 
  * @param id 
  */
-int sensor_define(uint nr, char *name, uint type, uint group, uint32_t ip, uint port, uint id, uint ri, int16_t factor, int16_t divider, 
-	char *userdef_unit, int16_t offset_mv, int16_t offset2, SensorFlags_t flags) {
+int sensor_define(uint nr, const char *name, uint type, uint group, uint32_t ip, uint port, uint id, uint ri, int16_t factor, int16_t divider, 
+	const char *userdef_unit, int16_t offset_mv, int16_t offset2, SensorFlags_t flags, int16_t assigned_unitid) {
 
 	if (nr == 0 || type == 0)
 		return HTTP_RQT_NOT_RECEIVED;
@@ -148,6 +162,8 @@ int sensor_define(uint nr, char *name, uint type, uint group, uint32_t ip, uint 
 			sensor->offset2 = offset2;
 			strncpy(sensor->userdef_unit, userdef_unit, sizeof(sensor->userdef_unit)-1);
 			sensor->flags = flags;
+			if (assigned_unitid >= 0)
+				sensor->assigned_unitid = assigned_unitid;
 			sensor_save();
 			return HTTP_RQT_SUCCESS;
 		}
@@ -178,6 +194,9 @@ int sensor_define(uint nr, char *name, uint type, uint group, uint32_t ip, uint 
 	new_sensor->offset2 = offset2;
 	strncpy(new_sensor->userdef_unit, userdef_unit, sizeof(new_sensor->userdef_unit)-1);
 	new_sensor->flags = flags;
+	if (assigned_unitid >= 0)
+		new_sensor->assigned_unitid = assigned_unitid;
+
 	if (last) {
 		new_sensor->next = last->next;
 		last->next = new_sensor;
@@ -189,7 +208,7 @@ int sensor_define(uint nr, char *name, uint type, uint group, uint32_t ip, uint 
 	return HTTP_RQT_SUCCESS;
 }
 
-int sensor_define_userdef(uint nr, int16_t factor, int16_t divider, char *userdef_unit, int16_t offset_mv, int16_t offset2) {
+int sensor_define_userdef(uint nr, int16_t factor, int16_t divider, const char *userdef_unit, int16_t offset_mv, int16_t offset2, int16_t assigned_unitid) {
 	Sensor_t *sensor = sensor_by_nr(nr);
 	if (!sensor)
 		return HTTP_RQT_NOT_RECEIVED;
@@ -198,6 +217,7 @@ int sensor_define_userdef(uint nr, int16_t factor, int16_t divider, char *userde
 	sensor->divider = divider;
 	sensor->offset_mv = offset_mv;
 	sensor->offset2 = offset2;
+	sensor->assigned_unitid = assigned_unitid;
 	if (userdef_unit)
 		strncpy(sensor->userdef_unit, userdef_unit, sizeof(sensor->userdef_unit)-1);
 	else
@@ -682,7 +702,8 @@ void push_message(Sensor_t *sensor) {
 	char* postval = tmp_buffer;
 
 	if (os.mqtt.enabled()) {
-		strcpy_P(topic, PSTR("opensprinkler/analogsensor/"));
+		os.sopt_load(SOPT_DEVICE_NAME, topic);
+		strncat_P(topic, PSTR("/analogsensor/"), sizeof(topic)-1);
 		strncat(topic, sensor->name, sizeof(topic)-1);
 		sprintf_P(payload, PSTR("{\"nr\":%u,\"type\":%u,\"data_ok\":%u,\"time\":%u,\"value\":%d.%02d,\"unit\":\"%s\"}"), 
 			sensor->nr, sensor->type, sensor->flags.data_ok, sensor->last_read, (int)sensor->last_data, (int)(sensor->last_data*100)%100, getSensorUnit(sensor));
@@ -1210,6 +1231,10 @@ int read_sensor(Sensor_t *sensor) {
 			sensor->last_read = time;
 			return read_sensor_http(sensor);
 #endif
+		case SENSOR_MQTT:
+			sensor->last_read = time;
+			return read_sensor_mqtt(sensor);
+
 		case SENSOR_WEATHER_TEMP_F:
 		case SENSOR_WEATHER_TEMP_C: 
 		case SENSOR_WEATHER_HUM:
@@ -1758,6 +1783,7 @@ byte getSensorUnitId(int type) {
 		case SENSOR_OSPI_ANALOG_SMT50_MOIS:	return UNIT_PERCENT;
 		case SENSOR_OSPI_ANALOG_SMT50_TEMP:	return UNIT_DEGREE;
 #endif
+		case SENSOR_MQTT:		              return UNIT_USERDEF;
 		case SENSOR_WEATHER_TEMP_F:           return UNIT_FAHRENHEIT;
 		case SENSOR_WEATHER_TEMP_C:           return UNIT_DEGREE;
 		case SENSOR_WEATHER_HUM:              return UNIT_HUM_PERCENT;
@@ -1797,6 +1823,7 @@ byte getSensorUnitId(Sensor_t *sensor) {
 		case SENSOR_OSPI_ANALOG_SMT50_MOIS:     return UNIT_PERCENT;
 		case SENSOR_OSPI_ANALOG_SMT50_TEMP: 	return UNIT_DEGREE;
 #endif
+		case SENSOR_MQTT:	 	              return sensor->assigned_unitid > 0?sensor->assigned_unitid:UNIT_USERDEF;
 		case SENSOR_REMOTE:                	  return sensor->unitid;
 
 		case SENSOR_WEATHER_TEMP_F:           return UNIT_FAHRENHEIT;
@@ -1924,25 +1951,35 @@ void GetSensorWeather() {
 
 void SensorUrl_load() {
 	sensorUrls = NULL;
+	DEBUG_PRINTLN("SensorUrl_load1");
 	if (!file_exists(SENSORURL_FILENAME))
 		return;
 
+	DEBUG_PRINTLN("SensorUrl_load2");
 	ulong pos = 0;
 	SensorUrl_t *last = NULL;
 	while (true) {
 		SensorUrl_t *sensorUrl = new SensorUrl_t;
 		memset(sensorUrl, 0, sizeof(SensorUrl_t));
-		file_read_block (SENSORURL_FILENAME, sensorUrl, pos, SENSORURL_STORE_SIZE);
+		if (file_read_block (SENSORURL_FILENAME, sensorUrl, pos, SENSORURL_STORE_SIZE) < SENSORURL_STORE_SIZE)
+		{
+			free(sensorUrl);
+			break;
+		}
 		sensorUrl->urlstr = (char*)malloc(sensorUrl->length+1);
 		pos += SENSORURL_STORE_SIZE;
 		file_read_block(SENSORURL_FILENAME, sensorUrl->urlstr, pos, sensorUrl->length);
+		sensorUrl->urlstr[sensorUrl->length] = 0;
 		pos += sensorUrl->length;
 
+		DEBUG_PRINT(sensorUrl->nr); DEBUG_PRINT("/"); DEBUG_PRINT(sensorUrl->type);DEBUG_PRINT(": ");
+		DEBUG_PRINTLN(sensorUrl->urlstr);
 		if (!last) sensorUrls = sensorUrl;
 		else last->next = sensorUrl;
 		last = sensorUrl;
 		sensorUrl->next = NULL;
 	}	
+	DEBUG_PRINTLN("SensorUrl_load3");
 }
 
 void SensorUrl_save() {
@@ -1961,17 +1998,20 @@ void SensorUrl_save() {
 	}	
 }
 
-bool SensorUrl_delete(uint nr) {
+bool SensorUrl_delete(uint nr, uint type) {
 	SensorUrl_t *sensorUrl = sensorUrls;
 	SensorUrl_t *last = NULL;
 	while (sensorUrl) {
-		if (sensorUrl->nr == nr) {
+		if (sensorUrl->nr == nr && sensorUrl->type == type) {
 			if (last)
 				last->next = sensorUrl->next;
 			else
 				sensorUrls = sensorUrl->next;
-			delete sensorUrl->urlstr;
-			delete sensorUrl;
+
+			sensor_mqtt_unsubscribe(nr, type, sensorUrl->urlstr);
+
+			free(sensorUrl->urlstr);
+			free(sensorUrl);
 			SensorUrl_save();
 			return true;
 		}
@@ -1981,19 +2021,20 @@ bool SensorUrl_delete(uint nr) {
 	return false;
 }
 
-bool SensorUrl_add(uint nr, char *urlstr) {
+bool SensorUrl_add(uint nr, uint type, const char *urlstr) {
 	if (!urlstr || !strlen(urlstr)) { //empty string? delete!
-		SensorUrl_delete(nr);
-		return false;
+		return SensorUrl_delete(nr, type);
 	}
 	SensorUrl_t *sensorUrl = sensorUrls;
 	while (sensorUrl) {
-		if (sensorUrl->nr == nr) { //replace existing
-			delete sensorUrl->urlstr;
-			sensorUrl->urlstr = (char*) malloc(strlen(urlstr)+1);
-			strcpy(sensorUrl->urlstr, urlstr);
+		if (sensorUrl->nr == nr && sensorUrl->type == type) { //replace existing
+			sensor_mqtt_unsubscribe(nr, type, sensorUrl->urlstr);
+			free(sensorUrl->urlstr);
+			sensorUrl->length = strlen(urlstr);
+			sensorUrl->urlstr = strdup(urlstr);
 			SensorUrl_save();
-			return false;
+			sensor_mqtt_subscribe(nr, type, urlstr);
+			return true;
 		}
 		sensorUrl = sensorUrl->next;
 	}
@@ -2002,21 +2043,25 @@ bool SensorUrl_add(uint nr, char *urlstr) {
 	sensorUrl = new SensorUrl_t;
 	memset(sensorUrl, 0, sizeof(SensorUrl_t));
 	sensorUrl->nr = nr;
+	sensorUrl->type = type;
 	sensorUrl->length = strlen(urlstr);
-	sensorUrl->urlstr = (char*) malloc(strlen(urlstr)+1);
-	strcpy(sensorUrl->urlstr, urlstr);
+	sensorUrl->urlstr = strdup(urlstr);
 	sensorUrl->next = sensorUrls;
 	sensorUrls = sensorUrl;
 	SensorUrl_save();
+
+	sensor_mqtt_subscribe(nr, type, urlstr);
+
 	return true;
 }
 
-char *SensorUrl_get(uint nr) {
+char *SensorUrl_get(uint nr, uint type) {
 	SensorUrl_t *sensorUrl = sensorUrls;
 	while (sensorUrl) {
-		if (sensorUrl->nr == nr)  //replace existing
+		if (sensorUrl->nr == nr && sensorUrl->type == type)  //replace existing
 			return sensorUrl->urlstr;
 		sensorUrl = sensorUrl->next;
 	}
 	return NULL;
 }
+

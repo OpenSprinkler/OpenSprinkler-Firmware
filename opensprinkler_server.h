@@ -97,5 +97,6 @@ public:
 	unsigned int position () const { return ptr - start; }
 };
 
+char* urlDecodeAndUnescape(char *buf);
 
 #endif // _OPENSPRINKLER_SERVER_H

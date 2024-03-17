@@ -21,6 +21,8 @@ creates, modifies or deletes a sensor.
 "enable" 0=sensor disabled, 1=sensor enabled
 "log" 0=logging disabled, 1=logging enabled
 "show" 0=hide 1=show current value on main screen
+"offset", "offset2" Offset for user defined sensor
+"url", "topic", "filter" mqtt/external sensor (url currently not used)
 
 examples:
 http://<ip>/sc?pw=<pw>&nr=1&type=1&group=0&name=SMT100-Mois&ip=4261456064&port=8899&id=253&ri=60&enable=1&log=1
