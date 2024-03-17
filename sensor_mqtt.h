@@ -28,7 +28,8 @@
 #if defined(ARDUINO)
 void sensor_mqtt_callback(char* mtopic, byte* payload, unsigned int length);
 #else
-void (*sensor_mqtt_callback)(struct mosquitto *mosq, void *obj, const struct mosquitto_message *msg);
+char *strnstr(const char *haystack, const char *needle, size_t len);
+void sensor_mqtt_callback(struct mosquitto *mosq, void *obj, const struct mosquitto_message *msg);
 #endif
 
 int read_sensor_mqtt(Sensor_t *sensor);

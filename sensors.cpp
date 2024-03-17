@@ -28,6 +28,12 @@
 #include "sensors.h"
 #include "weather.h"
 #include "sensor_mqtt.h"
+#ifdef ADS1115
+#include "sensor_ospi_ads1115.h"
+#endif
+#ifdef PCF8591
+#include "sensor_ospi_pcf8591.h"
+#endif
 
 byte findKeyVal (const char *str,char *strbuf, uint16_t maxlen,const char *key,bool key_in_pgm=false,uint8_t *keyfound=NULL);
 
@@ -763,7 +769,7 @@ void read_all_sensors() {
 #if defined(ARDUINO)
 #if defined(ESP8266)
 /**
- * Read ADS1115 sensors
+ * Read ESP8296 ADS1115 sensors
 */
 int read_sensor_adc(Sensor_t *sensor) {
 	DEBUG_PRINTLN(F("read_sensor_adc"));
@@ -861,68 +867,6 @@ int read_sensor_adc(Sensor_t *sensor) {
 	return HTTP_RQT_SUCCESS;
 }
 #endif
-#else
-/**
-* Read the OSPi onboard PCF8591 A2D
-**/
-int read_sensor_ospi(Sensor_t *sensor) {
-	DEBUG_PRINTLN(F("read_sensor_ospi"));
-	if (!sensor || !sensor->flags.enable) return HTTP_RQT_NOT_RECEIVED;
-
-	sensor->flags.data_ok = false;
-
-	/**
-	* https://medium.com/geekculture/raspberry-pi-c-libraries-for-working-with-i2c-spi-and-uart-4677f401b584
-	* http://www.pibits.net/amp/code/raspberry-pi-and-a-pcf8591-example.php
-	**/
-	int adapter_nr = 1;
-	char filename[20];
-	__u8 addr = sensor->port == 0? 0x48 : sensor->port;
-	__u8 chn = sensor->id;
-
-	//Open I2C:	
-	snprintf(filename, 19, "/dev/i2c-%d", adapter_nr);
-	int file = open(filename, O_RDWR);
-	if (file < 0) return HTTP_RQT_NOT_RECEIVED;
-	
-	//Select address:
-	if (ioctl(file, I2C_SLAVE, addr) < 0) {
-		close(file);
-		return HTTP_RQT_NOT_RECEIVED;
-	}
-	
-	//Select channel:
-	i2c_smbus_write_byte(file, chn);
-	
-	//dummy read to start conversion:
-	i2c_smbus_read_byte(file);
-
-	//read current value:
-	__s32 res = i2c_smbus_read_byte(file);
-	close(file);
-	
-	if (res < 0) return HTTP_RQT_NOT_RECEIVED;
-	
-	sensor->last_native_data = res;
-	sensor->flags.data_ok = true;
-	
-	//convert values:
-	switch(sensor->type) {
-		case SENSOR_OSPI_ANALOG:
-			sensor->last_data = (double)res * 3.3/255;
-			return HTTP_RQT_SUCCESS;
-		case SENSOR_OSPI_ANALOG_P:
-			sensor->last_data = (double)res * 100/255;
-			return HTTP_RQT_SUCCESS;
-		case SENSOR_OSPI_ANALOG_SMT50_MOIS:
-			sensor->last_data = (double)res * 3.3/255 * 50 / 3;
-			return HTTP_RQT_SUCCESS;		
-		case SENSOR_OSPI_ANALOG_SMT50_TEMP:
-			sensor->last_data = (((double)res * 3.3/255) - 0.5) * 100;
-			return HTTP_RQT_SUCCESS;				
-	}	
-	return HTTP_RQT_NOT_RECEIVED;	
-}
 #endif
 
 bool extract(char *s, char *buf, int maxlen) {
@@ -1220,13 +1164,14 @@ int read_sensor(Sensor_t *sensor) {
 			return read_sensor_adc(sensor);
 #endif
 #else
+#if defined ADS1115|PCF8591
 		case SENSOR_OSPI_ANALOG:
 		case SENSOR_OSPI_ANALOG_P:
 		case SENSOR_OSPI_ANALOG_SMT50_MOIS:
 		case SENSOR_OSPI_ANALOG_SMT50_TEMP:
 			sensor->last_read = time;
 			return read_sensor_ospi(sensor);
-		
+#endif
 		case SENSOR_REMOTE:
 			sensor->last_read = time;
 			return read_sensor_http(sensor);

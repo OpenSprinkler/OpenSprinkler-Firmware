@@ -23,7 +23,7 @@
 #ifndef _SENSOR_OSPI_ADS1115_H
 #define _SENSOR_OSPI_ADS1115_H
 
-#if defined ADS1115
+#ifdef ADS1115
 
 #include "sensors.h"
 

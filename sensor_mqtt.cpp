@@ -63,6 +63,29 @@ bool mqtt_filter_matches(char* mtopic, char* topic) {
 	return true;
 }
 
+#ifndef ARDUINO 
+#include <string.h>
+
+//Compatibility for Raspberry PI:
+char *strnstr(const char *haystack, const char *needle, size_t len)
+{
+        int i;
+        size_t needle_len;
+
+        if (0 == (needle_len = strnlen(needle, len)))
+                return (char *)haystack;
+
+        for (i=0; i<=(int)(len-needle_len); i++)
+        {
+                if ((haystack[0] == needle[0]) &&
+                        (0 == strncmp(haystack, needle, needle_len)))
+                        return (char *)haystack;
+
+                haystack++;
+        }
+        return NULL;
+}
+#endif
 
 /**
  * @brief mqtt callback
@@ -71,8 +94,8 @@ bool mqtt_filter_matches(char* mtopic, char* topic) {
 #if defined(ARDUINO)
 void sensor_mqtt_callback(char* mtopic, byte* payload, unsigned int length) {
 #else
-void (*sensor_mqtt_callback)(struct mosquitto *mosq, void *obj, const struct mosquitto_message *msg) {
-	char* mtopic = msg->topic
+void sensor_mqtt_callback(struct mosquitto *mosq, void *obj, const struct mosquitto_message *msg) {
+	char* mtopic = msg->topic;
 	byte* payload = (byte*)msg->payload;
 	unsigned int length = msg->payloadlen;
 #endif

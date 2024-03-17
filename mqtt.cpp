@@ -368,7 +368,7 @@ int OSMqtt::_init(void) {
 
 	if (mqtt_client) { mosquitto_destroy(mqtt_client); mqtt_client = NULL; };
 
-	mqtt_client = mosquitto_new("OS", true, &this);
+	mqtt_client = mosquitto_new("OS", true, NULL);
 	if (mqtt_client == NULL) {
 		DEBUG_PRINTF("MQTT Init: Failed to initialise client\r\n");
 		return MQTT_ERROR;
@@ -411,6 +411,8 @@ int OSMqtt::_disconnect(void) {
 
 bool OSMqtt::_connected(void) { return ::_connected; }
 
+bool OSMqtt::connected(void) { return connected(); }
+
 int OSMqtt::_publish(const char *topic, const char *payload) {
 	int rc = mosquitto_publish(mqtt_client, NULL, topic, strlen(payload), payload, 0, false);
 	if (rc != MOSQ_ERR_SUCCESS) {
@@ -431,7 +433,7 @@ bool OSMqtt::subscribe(const char *topic) {
 
 bool OSMqtt::unsubscribe(const char *topic) {
 	if (!mqtt_client || !_enabled || os.status.network_fails > 0 || !_connected()) return false;
-	return mosquitto_unsubscribe(mqtt_client, NULL, topic, 0);
+	return mosquitto_unsubscribe(mqtt_client, NULL, topic);
 }
 
 void OSMqtt::setCallback(void (*on_message)(struct mosquitto *, void *, const struct mosquitto_message *)) {

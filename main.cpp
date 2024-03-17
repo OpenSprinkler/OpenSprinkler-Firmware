@@ -393,6 +393,7 @@ void do_setup() {
 		os.status.network_fails = 1;
 	}
 	os.status.req_network = 0;
+	os.powerup_lasttime = os.now_tz();
 
 	// because at reboot we don't know if special stations
 	// are in OFF state, here we explicitly turn them off

@@ -23,7 +23,7 @@
 #ifndef _SENSOR_OSPI_PCF8591_H
 #define _SENSOR_OSPI_PCF8591_H
 
-#if defined PCF8591
+#ifdef PCF8591
 
 #include "sensors.h"
 

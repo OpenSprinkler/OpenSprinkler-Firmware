@@ -2918,7 +2918,6 @@ const char* sensor_names[] = {
 	"OSPi analog input - SMT50 temperature mode",
 #endif
 #endif
-#endif
 	"MQTT subscription",
 	"Remote opensprinkler sensor",
 	"Weather data - temperature (°F)",
