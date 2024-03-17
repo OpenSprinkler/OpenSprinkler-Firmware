@@ -229,9 +229,9 @@ uint16_t CRC16 (byte buf[], int len);
 
 //Sensor API functions:
 int sensor_delete(uint nr);
-int sensor_define(uint nr, char *name, uint type, uint group, uint32_t ip, uint port, uint id, uint ri, int16_t factor, int16_t divider, 
-	char *userdef_unit, int16_t offset_mv, int16_t offset2, SensorFlags_t flags, int16_t assigned_unitid);
-int sensor_define_userdef(uint nr, int16_t factor, int16_t divider, char *userdef_unit, int16_t offset_mv, int16_t offset2, int16_t sensor_define_userdef);
+int sensor_define(uint nr, const char *name, uint type, uint group, uint32_t ip, uint port, uint id, uint ri, int16_t factor, int16_t divider, 
+	const char *userdef_unit, int16_t offset_mv, int16_t offset2, SensorFlags_t flags, int16_t assigned_unitid);
+int sensor_define_userdef(uint nr, int16_t factor, int16_t divider, const char *userdef_unit, int16_t offset_mv, int16_t offset2, int16_t sensor_define_userdef);
 void sensor_load();
 void sensor_save();
 uint sensor_count();
@@ -282,7 +282,7 @@ void push_message(Sensor_t *sensor);
 void SensorUrl_load();
 void SensorUrl_save();
 bool SensorUrl_delete(uint nr, uint type);
-bool SensorUrl_add(uint nr, uint type, char *urlstr);
+bool SensorUrl_add(uint nr, uint type, const char *urlstr);
 char *SensorUrl_get(uint nr, uint type);
 
 #if defined(ESP8266)

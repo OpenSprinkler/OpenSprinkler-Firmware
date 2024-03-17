@@ -135,8 +135,8 @@ int sensor_delete(uint nr) {
  * @param port 
  * @param id 
  */
-int sensor_define(uint nr, char *name, uint type, uint group, uint32_t ip, uint port, uint id, uint ri, int16_t factor, int16_t divider, 
-	char *userdef_unit, int16_t offset_mv, int16_t offset2, SensorFlags_t flags, int16_t assigned_unitid) {
+int sensor_define(uint nr, const char *name, uint type, uint group, uint32_t ip, uint port, uint id, uint ri, int16_t factor, int16_t divider, 
+	const char *userdef_unit, int16_t offset_mv, int16_t offset2, SensorFlags_t flags, int16_t assigned_unitid) {
 
 	if (nr == 0 || type == 0)
 		return HTTP_RQT_NOT_RECEIVED;
@@ -208,7 +208,7 @@ int sensor_define(uint nr, char *name, uint type, uint group, uint32_t ip, uint 
 	return HTTP_RQT_SUCCESS;
 }
 
-int sensor_define_userdef(uint nr, int16_t factor, int16_t divider, char *userdef_unit, int16_t offset_mv, int16_t offset2, int16_t assigned_unitid) {
+int sensor_define_userdef(uint nr, int16_t factor, int16_t divider, const char *userdef_unit, int16_t offset_mv, int16_t offset2, int16_t assigned_unitid) {
 	Sensor_t *sensor = sensor_by_nr(nr);
 	if (!sensor)
 		return HTTP_RQT_NOT_RECEIVED;
@@ -2021,7 +2021,7 @@ bool SensorUrl_delete(uint nr, uint type) {
 	return false;
 }
 
-bool SensorUrl_add(uint nr, uint type, char *urlstr) {
+bool SensorUrl_add(uint nr, uint type, const char *urlstr) {
 	if (!urlstr || !strlen(urlstr)) { //empty string? delete!
 		return SensorUrl_delete(nr, type);
 	}

@@ -33,7 +33,7 @@ void (*sensor_mqtt_callback)(struct mosquitto *mosq, void *obj, const struct mos
 
 int read_sensor_mqtt(Sensor_t *sensor);
 
-void sensor_mqtt_subscribe(uint nr, uint type, char *urlstr);
-void sensor_mqtt_unsubscribe(uint nr, uint type, char *urlstr);
+void sensor_mqtt_subscribe(uint nr, uint type, const char *urlstr);
+void sensor_mqtt_unsubscribe(uint nr, uint type, const char *urlstr);
 
 #endif // _SENSOR_MQTT_H

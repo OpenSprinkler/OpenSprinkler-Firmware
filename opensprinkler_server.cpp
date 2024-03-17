@@ -3104,6 +3104,16 @@ void server_sensorconfig_backup(OTF_PARAMS_DEF) {
 	char *p = get_buffer;
 #endif
 
+#define BACKUP_SENSORS 1
+#define BACKUP_ADJUSTMENTS 2
+
+	//Backup type: 0=no backup 1=Sensors 2=Adjustments 3=Sensors+Adjustments
+	int backup = BACKUP_SENSORS|BACKUP_ADJUSTMENTS;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("backup"), true)) {
+		backup = strtol(tmp_buffer, NULL, 0); 
+	}
+
+
 #if defined(ESP8266)
 	// as the log data can be large, we will use ESP8266's sendContent function to
 	// send multiple packets of data, instead of the standard way of using send().
@@ -3113,33 +3123,25 @@ void server_sensorconfig_backup(OTF_PARAMS_DEF) {
 	print_header();
 #endif
 
-	bfill.emit_p(PSTR("\"sensors\":["));
-	sensorconfig_json(OTF_PARAMS);
-	bfill.emit_p(PSTR("],"));
+	ulong time = os.now_tz();
+	bfill.emit_p(PSTR("{\"backup\":$D,\"time\":$L,\"os-version\":$D,\"minor\":$D"), backup, time, OS_FW_VERSION, OS_FW_MINOR);
+	if (backup & BACKUP_SENSORS) {
+		bfill.emit_p(PSTR(",\"sensors\":["));
+		sensorconfig_json(OTF_PARAMS);
+		bfill.emit_p(PSTR("]"));
+	}
 	send_packet(OTF_PARAMS);
-	bfill.emit_p(PSTR("\"progadjust\":["));
-	progconfig_json();
-	bfill.emit_p(PSTR("]"));
-	send_packet(OTF_PARAMS);
+	if (backup & BACKUP_ADJUSTMENTS)  {
+		bfill.emit_p(PSTR(",\"progadjust\":["));
+		progconfig_json();
+		bfill.emit_p(PSTR("]"));
+	}
 	bfill.emit_p(PSTR("}"));
+	send_packet(OTF_PARAMS);
+
 	handle_return(HTML_OK);
 }
 
-/**
- * sy
- * @brief restore sensor configuration
- *
- */
-void server_sensorconfig_restore(OTF_PARAMS_DEF) {
-#if defined(ESP8266)
-	if(!process_password(OTF_PARAMS)) return;
-#else
-	char *p = get_buffer;
-#endif
-
-
-
-}
 
 
 typedef void (*URLHandler)(OTF_PARAMS_DEF);
@@ -3190,7 +3192,6 @@ const char _url_keys[] PROGMEM =
 	"du"
 	"sh"
 	"sx"
-	"sy"
 #if defined(ARDUINO)
   "db"
 	//"ff"
@@ -3238,7 +3239,6 @@ URLHandler urls[] = {
 	server_usage,           // du
 	server_sensorprog_types, // sh
 	server_sensorconfig_backup, // sx
-	server_sensorconfig_restore, // sy
 #if defined(ARDUINO)
 	server_json_debug,      // db
 	//server_fill_files,
@@ -3328,7 +3328,7 @@ void start_server_client() {
 			uri[1]=pgm_read_byte(_url_keys+2*i);
 			uri[2]=pgm_read_byte(_url_keys+2*i+1);
 			otf->on(uri, urls[i]);
-		}
+		}    
 		otf_callbacksInitialised = true;
 	}
 	update_server->begin();

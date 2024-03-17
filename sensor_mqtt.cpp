@@ -82,9 +82,10 @@ void (*sensor_mqtt_callback)(struct mosquitto *mosq, void *obj, const struct mos
 	if (!mtopic || !payload) return;
 	payload[length] = 0;
 
+	time_t now = os.now_tz();
 	Sensor_t *sensor = getSensors();
 	while (sensor) {
-		if (sensor->type == SENSOR_MQTT) {
+		if (sensor->type == SENSOR_MQTT && sensor->last_read != now) {
 			char *topic = SensorUrl_get(sensor->nr, SENSORURL_TYPE_TOPIC);
 			DEBUG_PRINT("mtopic: "); DEBUG_PRINTLN(mtopic);
 			DEBUG_PRINT("topic:  "); DEBUG_PRINTLN(topic);
@@ -125,7 +126,7 @@ void (*sensor_mqtt_callback)(struct mosquitto *mosq, void *obj, const struct mos
 					DEBUG_PRINTLN(buf);	
 					sensor->last_data = atof(buf);
 					sensor->flags.data_ok = true;
-					sensor->last_read = os.now_tz();
+					sensor->last_read = now;
                     DEBUG_PRINTLN("sensor_mqtt_callback2");
     	
         			sensorlog_add(LOG_STD, sensor, sensor->last_read);
@@ -168,7 +169,7 @@ int read_sensor_mqtt(Sensor_t *sensor) {
 	return HTTP_RQT_NOT_RECEIVED;
 }
 
-void sensor_mqtt_subscribe(uint nr, uint type, char *urlstr) {
+void sensor_mqtt_subscribe(uint nr, uint type, const char *urlstr) {
     Sensor_t* sensor = sensor_by_nr(nr);
     if (urlstr && urlstr[0] && type == SENSORURL_TYPE_TOPIC && sensor && sensor->type == SENSOR_MQTT) {
 	    DEBUG_PRINT("sensor_mqtt_subscribe1: ");
@@ -181,7 +182,7 @@ void sensor_mqtt_subscribe(uint nr, uint type, char *urlstr) {
     }
 }
 
-void sensor_mqtt_unsubscribe(uint nr, uint type, char *urlstr) {
+void sensor_mqtt_unsubscribe(uint nr, uint type, const char *urlstr) {
     Sensor_t* sensor = sensor_by_nr(nr);
     if (urlstr && urlstr[0] && type == SENSORURL_TYPE_TOPIC && sensor && sensor->type == SENSOR_MQTT) {
 	    DEBUG_PRINT("sensor_mqtt_unsubscribe1: ");
