@@ -34,6 +34,7 @@
  * </table>
  */
 
+#ifndef ARDUINO
 #include "iic.h"
 #include <linux/i2c.h>
 #include <linux/i2c-dev.h>
@@ -363,3 +364,5 @@ uint8_t iic_write_address16(int fd, uint8_t addr, uint16_t reg, uint8_t *buf, ui
      
     return 0;
 }
+
+#endif
