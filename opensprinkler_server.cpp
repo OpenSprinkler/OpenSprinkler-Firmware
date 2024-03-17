@@ -2777,10 +2777,13 @@ const int sensor_types[] = {
 	SENSOR_USERDEF,
  #endif
 #else
+
+#if defined ADS1115||PCF8591
 	SENSOR_OSPI_ANALOG,
 	SENSOR_OSPI_ANALOG_P,
 	SENSOR_OSPI_ANALOG_SMT50_MOIS,
 	SENSOR_OSPI_ANALOG_SMT50_TEMP,
+#endif
 #endif
 	SENSOR_REMOTE,
 	SENSOR_WEATHER_TEMP_F,
@@ -2815,10 +2818,12 @@ const char* sensor_names[] = {
 	"OpenSprinkler analog extension board 2xADS1x15 x8 - user defined sensor",
  #endif
 #else
+#if defined ADS1115||PCF8591
 	"OSPi analog input - voltage mode 0..3.3V",
 	"OSPi analog input - 0.3.3V to 0..100%",
 	"OSPi analog input - SMT50 moisture mode",
 	"OSPi analog input - SMT50 temperature mode",
+#endif
 #endif
 	"Remote sensor of an remote opensprinkler",
 	"Weather data - temperature (°F)",
