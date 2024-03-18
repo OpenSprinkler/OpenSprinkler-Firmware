@@ -932,6 +932,12 @@ int read_sensor_http(Sensor_t *sensor) {
 		s = strstr(p, "\"unitid\":");
 		if (s && extract(s, buf, sizeof(buf))) {
 			sensor->unitid = atoi(buf);
+			sensor->assigned_unitid = sensor->unitid;
+		}
+		s = strstr(p, "\"unit\":");
+		if (s && extract(s, buf, sizeof(buf))) {
+			urlDecodeAndUnescape(buf);
+			strncpy(sensor->userdef_unit, buf, sizeof(sensor->userdef_unit)-1);
 		}
 	
 		return HTTP_RQT_SUCCESS;
