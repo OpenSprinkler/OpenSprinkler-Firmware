@@ -2099,6 +2099,9 @@ void server_sensorurl_config(OTF_PARAMS_DEF)
 	char *value = NULL;
 	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("value"), true))
 		handle_return(HTML_DATA_MISSING);
+	DEBUG_PRINTLN(tmp_buffer);
+	urlDecodeAndUnescape(tmp_buffer);
+	DEBUG_PRINTLN(tmp_buffer);
 	value = strdup(tmp_buffer);
 
 	bool ok = SensorUrl_add(nr, type, value);
@@ -2175,7 +2178,10 @@ void server_sensor_config(OTF_PARAMS_DEF)
 	char userdef_unit[8];
 	memset(userdef_unit, 0, sizeof(userdef_unit));
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("unit"), true)) {
-		strncpy(userdef_unit, urlDecodeAndUnescape(tmp_buffer), sizeof(userdef_unit)-1); // unit
+		DEBUG_PRINTLN(tmp_buffer)
+		urlDecodeAndUnescape(tmp_buffer);
+		DEBUG_PRINTLN(tmp_buffer)
+		strncpy(userdef_unit, tmp_buffer, sizeof(userdef_unit)-1); // unit
 	}
 	int16_t assigned_unitid = -1;
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("unitid"), true))
@@ -2206,8 +2212,13 @@ void server_sensor_config(OTF_PARAMS_DEF)
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("url"), true))
 		url = strdup(urlDecodeAndUnescape(tmp_buffer));
 	char* topic = NULL;
-	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("topic"), true))
-		topic = strdup(urlDecodeAndUnescape(tmp_buffer));
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("topic"), true)) {
+		DEBUG_PRINTLN(tmp_buffer)
+		urlDecodeAndUnescape(tmp_buffer);
+		DEBUG_PRINTLN(tmp_buffer)
+		topic = strdup(tmp_buffer);
+	}
+		
 	char* filter = NULL;
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("filter"), true))
 		filter = strdup(urlDecodeAndUnescape(tmp_buffer));

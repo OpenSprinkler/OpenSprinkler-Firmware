@@ -199,7 +199,8 @@ void sensor_mqtt_subscribe(uint nr, uint type, const char *urlstr) {
 		DEBUG_PRINTLN(sensor->name);
         DEBUG_PRINT("subscribe: ");
         DEBUG_PRINTLN(urlstr);
-		os.mqtt.subscribe(urlstr);
+		if (!os.mqtt.subscribe(urlstr))
+			DEBUG_PRINTLN("error subscribe!!");
         os.mqtt.setCallback(&sensor_mqtt_callback);
 	    sensor->mqtt_init = true;
     }
@@ -214,7 +215,7 @@ void sensor_mqtt_unsubscribe(uint nr, uint type, const char *urlstr) {
         DEBUG_PRINT("unsubscribe: ");
         DEBUG_PRINTLN(urlstr);
 		if (!os.mqtt.unsubscribe(urlstr))
-			DEBUG_PRINTLN("error subscribe!!");
+			DEBUG_PRINTLN("error unsubscribe!!");
 		sensor->mqtt_init = false;
     }
 }

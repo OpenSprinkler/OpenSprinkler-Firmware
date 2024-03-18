@@ -893,10 +893,10 @@ int read_sensor_http(Sensor_t *sensor) {
 	byte ip[4] = {_ip[0], _ip[1], _ip[2], _ip[3]};
 #else
     byte ip[4];
-	ip[0] = (byte)((sensor->ip >> 24) &0xFF);
-	ip[1] = (byte)((sensor->ip >> 16) &0xFF);
-	ip[2] = (byte)((sensor->ip >> 8) &0xFF);
-	ip[3] = (byte)((sensor->ip &0xFF));
+	ip[3] = (byte)((sensor->ip >> 24) &0xFF);
+	ip[2] = (byte)((sensor->ip >> 16) &0xFF);
+	ip[1] = (byte)((sensor->ip >> 8) &0xFF);
+	ip[0] = (byte)((sensor->ip &0xFF));
 #endif
 
 	DEBUG_PRINTLN(F("read_sensor_http"));
@@ -970,10 +970,10 @@ int read_sensor_ip(Sensor_t *sensor) {
 	byte ip[4] = {_ip[0], _ip[1], _ip[2], _ip[3]};
 #else
     byte ip[4];
-	ip[0] = (byte)((sensor->ip >> 24) &0xFF);
-	ip[1] = (byte)((sensor->ip >> 16) &0xFF);
-	ip[2] = (byte)((sensor->ip >> 8) &0xFF);
-	ip[3] = (byte)((sensor->ip &0xFF));
+	ip[3] = (byte)((sensor->ip >> 24) &0xFF);
+	ip[2] = (byte)((sensor->ip >> 16) &0xFF);
+	ip[1] = (byte)((sensor->ip >> 8) &0xFF);
+	ip[0] = (byte)((sensor->ip &0xFF));
 #endif
 	char server[20];
 	sprintf(server, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
@@ -1331,11 +1331,11 @@ int set_sensor_address(Sensor_t *sensor, byte new_address) {
 			IPAddress _ip(sensor->ip);
 			byte ip[4] = {_ip[0], _ip[1], _ip[2], _ip[3]};
 #else
-    			byte ip[4];
-			ip[0] = (byte)((sensor->ip >> 24) &0xFF);
-			ip[1] = (byte)((sensor->ip >> 16) &0xFF);
-			ip[2] = (byte)((sensor->ip >> 8) &0xFF);
-			ip[3] = (byte)((sensor->ip &0xFF));
+    		byte ip[4];
+			ip[3] = (byte)((sensor->ip >> 24) &0xFF);
+			ip[2] = (byte)((sensor->ip >> 16) &0xFF);
+			ip[1] = (byte)((sensor->ip >> 8) &0xFF);
+			ip[0] = (byte)((sensor->ip &0xFF));
 #endif		
 			char server[20];
 			sprintf(server, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
@@ -1768,8 +1768,8 @@ byte getSensorUnitId(Sensor_t *sensor) {
 		case SENSOR_OSPI_ANALOG_SMT50_MOIS:     return UNIT_PERCENT;
 		case SENSOR_OSPI_ANALOG_SMT50_TEMP: 	return UNIT_DEGREE;
 #endif
-		case SENSOR_MQTT:	 	              return sensor->assigned_unitid > 0?sensor->assigned_unitid:UNIT_USERDEF;
-		case SENSOR_REMOTE:                	  return sensor->unitid;
+		case SENSOR_MQTT:	 	              
+		case SENSOR_REMOTE:                	  return sensor->assigned_unitid > 0?sensor->assigned_unitid:UNIT_USERDEF;
 
 		case SENSOR_WEATHER_TEMP_F:           return UNIT_FAHRENHEIT;
 		case SENSOR_WEATHER_TEMP_C:           return UNIT_DEGREE;
