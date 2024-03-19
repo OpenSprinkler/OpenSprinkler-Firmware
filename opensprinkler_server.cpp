@@ -39,6 +39,8 @@
 
 		extern ESP8266WebServer *update_server;
 		extern OTF::OpenThingsFramework *otf;
+		extern ENC28J60lwIP enc28j60;
+		extern Wiznet5500lwIP w5500;
 		extern lwipEth eth;
 		extern bool otf_callbacksInitialised;
 		#define OTF_PARAMS_DEF const OTF::Request &req,OTF::Response &res
@@ -1938,8 +1940,13 @@ void server_json_debug(OTF_PARAMS_DEF) {
 	(uint16_t)ESP.getFreeHeap());
 	FSInfo fs_info;
 	LittleFS.info(fs_info);
-	bfill.emit_p(PSTR(",\"flash\":$D,\"used\":$D,\"rssi\":$D,\"bssid\":\"$S\",\"bssidchl\":\"$O\"}"),
-		fs_info.totalBytes, fs_info.usedBytes, WiFi.RSSI(), WiFi.BSSIDstr().c_str(), SOPT_STA_BSSID_CHL);
+	bfill.emit_p(PSTR(",\"flash\":$D,\"used\":$D,"), fs_info.totalBytes, fs_info.usedBytes);
+	if(useEth) {
+		bfill.emit_p(PSTR("\"isW5500\":$D}"), eth.isW5500);
+	} else {
+		bfill.emit_p(PSTR("\"rssi\":$D,\"bssid\":\"$S\",\"bssidchl\":\"$O\"}"),
+		WiFi.RSSI(), WiFi.BSSIDstr().c_str(), SOPT_STA_BSSID_CHL);
+	}
 
 /*
 // print out all log files and all files in the main folder with file sizes
