@@ -142,11 +142,11 @@ typedef struct Sensor {
 	byte     unitid;
 	byte     repeat_read;
 	double   repeat_data;
-	uint32_t repeat_native;
+	uint64_t repeat_native;
 	ulong    last_read; //millis
 	Sensor   *next; 
 } Sensor_t;
-#define SENSOR_STORE_SIZE (sizeof(Sensor_t)-sizeof(Sensor_t*)-sizeof(ulong)-sizeof(uint32_t)-sizeof(double)-5*sizeof(byte))
+#define SENSOR_STORE_SIZE (sizeof(Sensor_t)-sizeof(Sensor_t*)-sizeof(ulong)-sizeof(uint64_t)-sizeof(double)-5*sizeof(byte))
 
 //Definition of a log data
 typedef struct SensorLog {
