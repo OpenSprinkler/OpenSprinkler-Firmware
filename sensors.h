@@ -146,7 +146,7 @@ typedef struct Sensor {
 	ulong    last_read; //millis
 	Sensor   *next; 
 } Sensor_t;
-#define SENSOR_STORE_SIZE (sizeof(Sensor_t)-sizeof(Sensor_t*)-sizeof(ulong)-sizeof(uint64_t)-sizeof(double)-5*sizeof(byte))
+#define SENSOR_STORE_SIZE 111
 
 //Definition of a log data
 typedef struct SensorLog {
