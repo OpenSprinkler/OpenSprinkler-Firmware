@@ -26,4 +26,4 @@ g++ -o OpenSprinkler -DOSPI $ADS1115 $PCF8591 -std=c++14 \
 	main.cpp OpenSprinkler.cpp program.cpp opensprinkler_server.cpp \
 	utils.cpp weather.cpp gpio.cpp etherport.cpp mqtt.cpp sensor*.cpp \
 	$ADS1115FILES $PCF8591FILES \
-	-li2c -lpthread -lmosquitto -lcrypto -lssl -v
+	-li2c -lpthread -lmosquitto -lcrypto -lssl
