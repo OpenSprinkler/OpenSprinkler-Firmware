@@ -115,6 +115,18 @@ int read_sensor_ospi(Sensor_t *sensor) {
 
         ads1115_deinit(&gs_handle);
 
+        sensor->repeat_native += raw;
+        sensor->repeat_data += v;
+        if (++sensor->repeat_read < MAX_SENSOR_REPEAT_READ)
+                return HTTP_RQT_NOT_RECEIVED;
+
+        raw = sensor->repeat_native/MAX_SENSOR_REPEAT_READ;
+        v = sensor->repeat_data/MAX_SENSOR_REPEAT_READ;
+
+        sensor->repeat_native = 0;
+        sensor->repeat_data = 0;
+        sensor->repeat_read = 0;
+        
         sensor->last_native_data = raw;
         sensor->flags.data_ok = true;
 

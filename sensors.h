@@ -106,6 +106,8 @@ extern "C" {
 
 #define MIN_DISK_FREE                  8192   //8Kb min 
 
+#define MAX_SENSOR_REPEAT_READ          7 //read analog sensors 7x and calculate avg
+
 typedef struct SensorFlags {
 	uint     enable:1;  // enabled
 	uint     log:1;     // log data enabled
@@ -134,14 +136,17 @@ typedef struct Sensor {
 							   //   sensorvalue = (read_value-offset_mv/1000) * factor / divider + offset2/100
 	byte     assigned_unitid;  // unitid for userdef and mqtt sensors
 	byte     undef[15];        // for later
-	//unstored
+	//unstored:
 	bool     mqtt_init:1;
 	bool     mqtt_push:1;
 	byte     unitid;
+	byte     repeat_read;
+	double   repeat_data;
+	uint32_t repeat_native;
 	ulong    last_read; //millis
 	Sensor   *next; 
 } Sensor_t;
-#define SENSOR_STORE_SIZE (sizeof(Sensor_t)-sizeof(Sensor_t*)-sizeof(ulong)-sizeof(byte))
+#define SENSOR_STORE_SIZE (sizeof(Sensor_t)-sizeof(Sensor_t*)-sizeof(ulong)-sizeof(uint32_t)-sizeof(double)-5*sizeof(byte))
 
 //Definition of a log data
 typedef struct SensorLog {

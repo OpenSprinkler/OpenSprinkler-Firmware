@@ -750,7 +750,7 @@ void read_all_sensors() {
 	Sensor_t *sensor = sensors;
 
 	while (sensor) {
-		if (time >= sensor->last_read + sensor->read_interval) {
+		if (time >= sensor->last_read + sensor->read_interval || sensor->repeat_read) {
 			int result = read_sensor(sensor);
 			if (result == HTTP_RQT_SUCCESS) {
 				sensorlog_add(LOG_STD, sensor, time);
@@ -791,14 +791,18 @@ int read_sensor_adc(Sensor_t *sensor) {
 	if (!active)
 		return HTTP_RQT_NOT_RECEIVED;
 
-	//Read values multiple times:
-	uint64_t avgValue = 0;
-#define MAX_READ 7
-	for (int t = 0; t < MAX_READ; t++) {
-		if (t > 0) delay(100);
-		avgValue += adc.readADC(id);
-	}
-	sensor->last_native_data = avgValue / MAX_READ;
+
+	sensor->repeat_native += adc.readADC(id);
+    if (++sensor->repeat_read < MAX_SENSOR_REPEAT_READ)
+        return HTTP_RQT_NOT_RECEIVED;
+
+    uint64_t avgValue = sensor->repeat_native/MAX_SENSOR_REPEAT_READ;
+
+    sensor->repeat_native = 0;
+    sensor->repeat_data = 0;
+    sensor->repeat_read = 0;
+
+	sensor->last_native_data = avgValue;
 	sensor->last_data = adc.toVoltage(sensor->last_native_data);
 	double v = sensor->last_data;
 
