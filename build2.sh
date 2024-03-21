@@ -8,7 +8,7 @@ PCF8591=""
 PCF8591FILES=""
 USEGPIO=""
 GPIOLIB=""
-if [ -h "/sys/class/gpio/gpio??" ]; then
+if [ -h "/sys/class/gpio/gpio14" ]; then
 	echo "using raspi-gpio"
 	USEGPIO="-DRASPIGPIO"
 fi

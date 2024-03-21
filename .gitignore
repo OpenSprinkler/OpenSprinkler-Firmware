@@ -6,5 +6,5 @@ testmode.h
 build-1284/*
 .vscode
 .pio
-*.bak
-*.*~
+.gitignore~
+build2.sh~
