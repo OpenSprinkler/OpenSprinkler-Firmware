@@ -27,6 +27,9 @@
 
 extern OpenSprinkler os;
 
+void sensor_mqtt_init() {
+	os.mqtt.setCallback(sensor_mqtt_callback);
+}
 /**
  * @brief 
  * 
@@ -66,21 +69,16 @@ bool mqtt_filter_matches(char* mtopic, char* topic) {
 #ifndef ARDUINO 
 #include <string.h>
 
-//Compatibility for Raspberry PI:
-char *strnstr(const char *haystack, const char *needle, size_t len)
+char *strnlstr(const char *haystack, const char *needle, size_t needle_len, size_t len)
 {
         int i;
-        size_t needle_len;
-
-        if (0 == (needle_len = strnlen(needle, len)))
-                return (char *)haystack;
-
         for (i=0; i<=(int)(len-needle_len); i++)
         {
+				if (haystack[0] == 0)
+					break;
                 if ((haystack[0] == needle[0]) &&
-                        (0 == strncmp(haystack, needle, needle_len)))
+                    (0 == strncmp(haystack, needle, needle_len)))
                         return (char *)haystack;
-
                 haystack++;
         }
         return NULL;
@@ -94,7 +92,8 @@ char *strnstr(const char *haystack, const char *needle, size_t len)
 #if defined(ARDUINO)
 void sensor_mqtt_callback(char* mtopic, byte* payload, unsigned int length) {
 #else
-void sensor_mqtt_callback(struct mosquitto *mosq, void *obj, const struct mosquitto_message *msg) {
+static void sensor_mqtt_callback(struct mosquitto *mosq, void *obj, const struct mosquitto_message *msg) {
+    DEBUG_PRINTLN("sensor_mqtt_callback0");
 	char* mtopic = msg->topic;
 	byte* payload = (byte*)msg->payload;
 	unsigned int length = msg->payloadlen;
@@ -103,8 +102,6 @@ void sensor_mqtt_callback(struct mosquitto *mosq, void *obj, const struct mosqui
     DEBUG_PRINTLN("sensor_mqtt_callback1");
 
 	if (!mtopic || !payload) return;
-	payload[length] = 0;
-
 	time_t now = os.now_tz();
 	Sensor_t *sensor = getSensors();
 	while (sensor) {
@@ -128,7 +125,7 @@ void sensor_mqtt_callback(struct mosquitto *mosq, void *obj, const struct mosqui
 				while (f && p) {
 					f = strstr(jsonFilter, "|");
 					if (f) {
-						p = strnstr(p, jsonFilter, f-jsonFilter);
+						p = strnlstr(p, jsonFilter, f-jsonFilter, (char*)payload+length-p);
 						jsonFilter = f+1;
 					} else {
 						p = strstr(p, jsonFilter);
@@ -182,7 +179,6 @@ int read_sensor_mqtt(Sensor_t *sensor) {
 		DEBUG_PRINTLN(sensor->name);
 		char *topic = SensorUrl_get(sensor->nr, SENSORURL_TYPE_TOPIC);
 		if (topic && topic[0]) {
-            os.mqtt.setCallback(&sensor_mqtt_callback);
             DEBUG_PRINT("subscribe: ");
             DEBUG_PRINTLN(topic);
 			os.mqtt.subscribe(topic);
@@ -201,7 +197,6 @@ void sensor_mqtt_subscribe(uint nr, uint type, const char *urlstr) {
         DEBUG_PRINTLN(urlstr);
 		if (!os.mqtt.subscribe(urlstr))
 			DEBUG_PRINTLN("error subscribe!!");
-        os.mqtt.setCallback(&sensor_mqtt_callback);
 	    sensor->mqtt_init = true;
     }
 }
@@ -211,7 +206,6 @@ void sensor_mqtt_unsubscribe(uint nr, uint type, const char *urlstr) {
     if (urlstr && urlstr[0] && type == SENSORURL_TYPE_TOPIC && sensor && sensor->type == SENSOR_MQTT) {
 	    DEBUG_PRINT("sensor_mqtt_unsubscribe1: ");
 		DEBUG_PRINTLN(sensor->name);
-        os.mqtt.setCallback(&sensor_mqtt_callback);
         DEBUG_PRINT("unsubscribe: ");
         DEBUG_PRINTLN(urlstr);
 		if (!os.mqtt.unsubscribe(urlstr))

@@ -98,6 +98,7 @@ uint16_t CRC16 (byte buf[], int len) {
 void sensor_api_init() {
 	sensor_load();
 	prog_adjust_load();
+	sensor_mqtt_init();
 }
 
 /*
