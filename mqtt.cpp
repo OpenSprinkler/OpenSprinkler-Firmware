@@ -411,7 +411,7 @@ int OSMqtt::_disconnect(void) {
 
 bool OSMqtt::_connected(void) { return ::_connected; }
 
-bool OSMqtt::connected(void) { return connected(); }
+bool OSMqtt::connected(void) { return _connected(); }
 
 int OSMqtt::_publish(const char *topic, const char *payload) {
 	int rc = mosquitto_publish(mqtt_client, NULL, topic, strlen(payload), payload, 0, false);
