@@ -36,7 +36,6 @@
 * Read the OSPi 1.6 onboard ADS1115 A2D
 **/
 int read_sensor_ospi(Sensor_t *sensor) {
-        DEBUG_PRINTLN(F("read_sensor_ospi"));
         if (!sensor || !sensor->flags.enable) return HTTP_RQT_NOT_RECEIVED;
 
         sensor->flags.data_ok = false;

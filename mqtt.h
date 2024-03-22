@@ -59,6 +59,7 @@ public:
     static bool connected();
     static bool subscribe(const char *topic);
     static bool unsubscribe(const char *topic);
+    static bool reconnect();
 #if defined(ARDUINO)
     static void setCallback(MQTT_CALLBACK_SIGNATURE);
 #else

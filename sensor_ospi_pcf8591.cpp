@@ -34,7 +34,6 @@
 * Read the OSPi onboard PCF8591 A2D
 **/
 int read_sensor_ospi(Sensor_t *sensor) {
-        DEBUG_PRINTLN(F("read_sensor_ospi"));
         if (!sensor || !sensor->flags.enable) return HTTP_RQT_NOT_RECEIVED;
 
         sensor->flags.data_ok = false;

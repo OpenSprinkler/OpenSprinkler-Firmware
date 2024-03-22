@@ -36,6 +36,8 @@
 	#include <time.h>
 	#include <stdio.h>
 	#include <mosquitto.h>
+	#include <ifaddrs.h>
+	#include <netpacket/packet.h>
 
 	struct mosquitto *mqtt_client = NULL;
 #endif
@@ -70,6 +72,7 @@
 
 extern OpenSprinkler os;
 extern char tmp_buffer[];
+static unsigned long last_reconnect_attempt;
 
 #define MQTT_KEEPALIVE      60
 #define MQTT_DEFAULT_PORT   1883  // Default port for MQTT. Can be overwritten through App config
@@ -79,8 +82,7 @@ extern char tmp_buffer[];
 #define MQTT_MAX_ID_LEN       16  // MQTT Client Id to uniquely reference this unit
 #define MQTT_RECONNECT_DELAY  120 // Minumum of 60 seconds between reconnect attempts
 
-#define MQTT_ROOT_TOPIC    "opensprinkler"
-#define MQTT_AVAILABILITY_TOPIC	MQTT_ROOT_TOPIC  "/availability"
+#define MQTT_AVAILABILITY_TOPIC	"/availability"
 #define MQTT_ONLINE_PAYLOAD  "online"
 #define MQTT_OFFLINE_PAYLOAD "offline"
 
@@ -107,10 +109,34 @@ void OSMqtt::init(void) {
 	os.load_hardware_mac(mac, true);
 	#endif
 	snprintf(id, MQTT_MAX_ID_LEN, "OS-%02X%02X%02X%02X%02X%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+#else
+	struct ifaddrs *ifaddr=NULL;
+    struct ifaddrs *ifa = NULL;
+    int i = 0;
+
+    if (getifaddrs(&ifaddr) != -1) //OSPi: Generate Client Id from MAC:
+    {
+         for ( ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
+             if ( (ifa->ifa_addr) && (ifa->ifa_addr->sa_family == AF_PACKET) ) {
+				if (strcmp(ifa->ifa_name, "lo") == 0) continue;
+                struct sockaddr_ll *s = (struct sockaddr_ll*)ifa->ifa_addr;
+				sprintf(id, "OS-%02x%02x%02x%02x%02x%02x", s->sll_addr[0], s->sll_addr[1], s->sll_addr[2], s->sll_addr[3], s->sll_addr[4], s->sll_addr[5]);
+				break;
+             }
+         }
+         freeifaddrs(ifaddr);
+    }
 #endif
 
 	init(id);
-};
+}
+
+const char* getOnlineTopic() {
+	os.sopt_load(SOPT_DEVICE_NAME, tmp_buffer);
+	strncat(tmp_buffer, MQTT_AVAILABILITY_TOPIC, TMP_BUFFER_SIZE*2);
+	return tmp_buffer;
+}
+
 
 // Initialise the client libraries and event handlers.
 void OSMqtt::init(const char * clientId) {
@@ -119,7 +145,7 @@ void OSMqtt::init(const char * clientId) {
 	strncpy(_id, clientId, MQTT_MAX_ID_LEN);
 	_id[MQTT_MAX_ID_LEN] = 0;
 	_init();
-};
+}
 
 // Start the MQTT service and connect to the MQTT broker using the stored configuration.
 void OSMqtt::begin(void) {
@@ -184,14 +210,16 @@ void OSMqtt::publish(const char *topic, const char *payload) {
 
 // Regularly call the loop function to ensure "keep alive" messages are sent to the broker and to reconnect if needed.
 void OSMqtt::loop(void) {
-	static unsigned long last_reconnect_attempt = 0;
 
 	if (mqtt_client == NULL || !_enabled || os.status.network_fails > 0) return;
 
 	// Only attemp to reconnect every MQTT_RECONNECT_DELAY seconds to avoid blocking the main loop
 	if (!_connected() && (millis() - last_reconnect_attempt >= MQTT_RECONNECT_DELAY * 1000UL)) {
 		DEBUG_LOGF("MQTT Loop: Reconnecting\r\n");
-		_connect();
+		if (!last_reconnect_attempt)
+			_connect();
+		else
+			reconnect();
 		last_reconnect_attempt = millis();
 	}
 
@@ -253,19 +281,20 @@ int OSMqtt::_connect(void) {
 	do {
 		DEBUG_PRINT(F("mqtt: "));
 		DEBUG_PRINTLN(_host);
-		if (_username[0])
-			state = mqtt_client->connect(_id, _username, _password, MQTT_AVAILABILITY_TOPIC, 0, true, MQTT_OFFLINE_PAYLOAD);
+		if (_username[0]) 
+			state = mqtt_client->connect(_id, _username, _password, getOnlineTopic(), 0, true, MQTT_OFFLINE_PAYLOAD);
 		else
-			state = mqtt_client->connect(_id, NULL, NULL, MQTT_AVAILABILITY_TOPIC, 0, true, MQTT_OFFLINE_PAYLOAD);
+			state = mqtt_client->connect(_id, NULL, NULL, getOnlineTopic(), 0, true, MQTT_OFFLINE_PAYLOAD);
 		if(state) break;
 		tries++;
 	} while(tries<MQTT_CONNECT_NTRIES);
+	last_reconnect_attempt = millis();
 
 	if(tries==MQTT_CONNECT_NTRIES) {
 		DEBUG_LOGF("MQTT Connect: Failed (%d)\r\n", mqtt_client->state());
 		return MQTT_ERROR;
 	} else {
-		mqtt_client->publish(MQTT_AVAILABILITY_TOPIC, MQTT_ONLINE_PAYLOAD, true);
+		mqtt_client->publish(getOnlineTopic(), MQTT_ONLINE_PAYLOAD, true);
 	}
 	return MQTT_SUCCESS;
 }
@@ -297,16 +326,12 @@ bool OSMqtt::connected(void) {
 }
 
 bool OSMqtt::subscribe(const char *topic) {
-	DEBUG_PRINTLN("subscribe1");
-	if (mqtt_client == NULL || !_enabled || os.status.network_fails > 0 || !_connected()) return false;
-	DEBUG_PRINTLN("subscribe2");
+	if (mqtt_client == NULL || !_enabled || os.status.network_fails > 0) return false;
 	return mqtt_client->subscribe(topic);
 }
 
 bool OSMqtt::unsubscribe(const char *topic) {
-	DEBUG_PRINTLN("unsubscribe1");
-	if (mqtt_client == NULL || !_enabled || os.status.network_fails > 0 || !_connected()) return false;
-	DEBUG_PRINTLN("unsubscribe2");
+	if (mqtt_client == NULL || !_enabled || os.status.network_fails > 0) return false;
 	return mqtt_client->unsubscribe(topic);
 }
 
@@ -329,6 +354,12 @@ const char * OSMqtt::_state_string(int rc) {
 		default:  return "Unrecognised state";
 	}
 }
+
+bool OSMqtt::reconnect() {
+	if (mqtt_client == NULL || !_enabled || os.status.network_fails > 0) return false;
+	mqtt_client->reconnect();
+}
+
 #else
 
 /************************** RASPBERRY PI / BBB / DEMO ****************************************/
@@ -341,9 +372,10 @@ static void _mqtt_connection_cb(struct mosquitto *mqtt_client, void *obj, int re
 	::_connected = true;
 
 	if (reason == 0) {
-		int rc = mosquitto_publish(mqtt_client, NULL, MQTT_AVAILABILITY_TOPIC, strlen(MQTT_ONLINE_PAYLOAD), MQTT_ONLINE_PAYLOAD, 0, true);
+		const char* topic = getOnlineTopic();
+		int rc = mosquitto_publish(mqtt_client, NULL, topic, strlen(MQTT_ONLINE_PAYLOAD), MQTT_ONLINE_PAYLOAD, 0, true);
 		if (rc != MOSQ_ERR_SUCCESS) {
-			DEBUG_LOGF("MQTT Publish: Failed (%s)\r\n", mosquitto_strerror(rc));
+			DEBUG_LOGF("MQTT Publish: Failed (%s)\r\n(%s)\r\n", mosquitto_strerror(rc), topic);
 		}
 	}
 }
@@ -368,7 +400,7 @@ int OSMqtt::_init(void) {
 
 	if (mqtt_client) { mosquitto_destroy(mqtt_client); mqtt_client = NULL; };
 
-	mqtt_client = mosquitto_new("OS", true, NULL);
+	mqtt_client = mosquitto_new(_id, true, NULL);
 	if (mqtt_client == NULL) {
 		DEBUG_PRINTF("MQTT Init: Failed to initialise client\r\n");
 		return MQTT_ERROR;
@@ -377,8 +409,8 @@ int OSMqtt::_init(void) {
 	mosquitto_connect_callback_set(mqtt_client, _mqtt_connection_cb);
 	mosquitto_disconnect_callback_set(mqtt_client, _mqtt_disconnection_cb);
 	mosquitto_log_callback_set(mqtt_client, _mqtt_log_cb);
-	mosquitto_will_set(mqtt_client, MQTT_AVAILABILITY_TOPIC, strlen(MQTT_OFFLINE_PAYLOAD), MQTT_OFFLINE_PAYLOAD, 0, true);
-
+	mosquitto_will_set(mqtt_client, getOnlineTopic(), strlen(MQTT_OFFLINE_PAYLOAD), MQTT_OFFLINE_PAYLOAD, 0, true);
+	
 	return MQTT_SUCCESS;
 }
 
@@ -400,8 +432,13 @@ int OSMqtt::_connect(void) {
 	// Allow 10ms for the Broker's ack to be received. We need this on start-up so that the
 	// connection is registered before we attempt to send our first NOTIFY_REBOOT notification.
 	usleep(10000);
+	last_reconnect_attempt = millis();
 
 	return MQTT_SUCCESS;
+}
+
+bool OSMqtt::reconnect() {
+	return mosquitto_reconnect(mqtt_client);
 }
 
 int OSMqtt::_disconnect(void) {
@@ -427,12 +464,12 @@ int OSMqtt::_loop(void) {
 }
 
 bool OSMqtt::subscribe(const char *topic) {
-	if (!mqtt_client || !_enabled || os.status.network_fails > 0 || !_connected()) return false;
+	if (!mqtt_client || !_enabled || os.status.network_fails > 0) return false;
 	return mosquitto_subscribe(mqtt_client, NULL, topic, 0);
 }
 
 bool OSMqtt::unsubscribe(const char *topic) {
-	if (!mqtt_client || !_enabled || os.status.network_fails > 0 || !_connected()) return false;
+	if (!mqtt_client || !_enabled || os.status.network_fails > 0) return false;
 	return mosquitto_unsubscribe(mqtt_client, NULL, topic);
 }
 
@@ -443,4 +480,5 @@ void OSMqtt::setCallback(void (*on_message)(struct mosquitto *, void *, const st
 const char * OSMqtt::_state_string(int error) {
 	return mosquitto_strerror(error);
 }
+
 #endif

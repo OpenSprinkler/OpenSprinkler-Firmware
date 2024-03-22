@@ -715,6 +715,8 @@ void push_message(Sensor_t *sensor) {
 		sprintf_P(payload, PSTR("{\"nr\":%u,\"type\":%u,\"data_ok\":%u,\"time\":%u,\"value\":%d.%02d,\"unit\":\"%s\"}"), 
 			sensor->nr, sensor->type, sensor->flags.data_ok, sensor->last_read, (int)sensor->last_data, (int)(sensor->last_data*100)%100, getSensorUnit(sensor));
 
+		if (!os.mqtt.connected())
+			os.mqtt.reconnect();
 		os.mqtt.publish(topic, payload);
 	}
 	if (os.iopts[IOPT_IFTTT_ENABLE]) {

@@ -34,29 +34,30 @@ void sensor_mqtt_init() {
  * @brief 
  * 
  * @param mtopic reported topic opensprinkler/analogsensor/name
- * @param topic  topic pattern  opensprinkler/ <star> or opensprinkler/# or opensprinkler/#/abc/#
+ * @param pattern topic pattern  opensprinkler/ <star> or opensprinkler/# or opensprinkler/#/abc/#
  * @return true 
  * @return false 
  */
-bool mqtt_filter_matches(char* mtopic, char* topic) {
+bool mqtt_filter_matches(char* mtopic, char* pattern) {
 	
-	while (topic && mtopic) {
+	while (pattern && mtopic) {
 		char ch1 = *mtopic++;
-		char ch2 = *topic++;
+		char ch2 = *pattern++;
 		if (ch2 == '+') { //level ok up to "/"
-			while (mtopic) {
+			while (mtopic[0]) {
 				if (ch1 == '/')
 					break;
 				ch1 = *mtopic++;
 			}
 		} else if (ch2 == '#') { //multilevel
-			char *p = strpbrk(topic, "#+");
+			char *p = strpbrk(pattern, "#+");
 			if (!p) return true;
-			if (strncmp(topic, mtopic, p-topic)) {
-				mtopic = mtopic + (p-topic);
-				topic = p;
+			if (strncmp(pattern, mtopic, p-pattern) ==0) {
+				mtopic = mtopic + (p-pattern);
+				pattern = p;
 			}
-		} else if (ch1 != ch2) 
+		} 
+		if (ch1 != ch2) 
 			return false;
 		else if (ch1 == 0 && ch2 == 0)
 			return true;
@@ -74,10 +75,10 @@ char *strnlstr(const char *haystack, const char *needle, size_t needle_len, size
         int i;
         for (i=0; i<=(int)(len-needle_len); i++)
         {
-				if (haystack[0] == 0)
-					break;
+		if (haystack[0] == 0)
+			break;
                 if ((haystack[0] == needle[0]) &&
-                    (0 == strncmp(haystack, needle, needle_len)))
+                    (strncmp(haystack, needle, needle_len) == 0))
                         return (char *)haystack;
                 haystack++;
         }
