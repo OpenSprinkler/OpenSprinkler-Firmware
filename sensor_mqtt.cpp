@@ -67,9 +67,6 @@ bool mqtt_filter_matches(char* mtopic, char* pattern) {
 	return true;
 }
 
-#ifndef ARDUINO 
-#include <string.h>
-
 char *strnlstr(const char *haystack, const char *needle, size_t needle_len, size_t len)
 {
         int i;
@@ -84,7 +81,6 @@ char *strnlstr(const char *haystack, const char *needle, size_t needle_len, size
         }
         return NULL;
 }
-#endif
 
 /**
  * @brief mqtt callback

@@ -9,3 +9,4 @@ build-1284/*
 .gitignore~
 build2.sh~
 sensor_mqtt.cpp~
+opensprinkler_server.cpp.bak

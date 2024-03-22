@@ -357,7 +357,7 @@ const char * OSMqtt::_state_string(int rc) {
 
 bool OSMqtt::reconnect() {
 	if (mqtt_client == NULL || !_enabled || os.status.network_fails > 0) return false;
-	mqtt_client->reconnect();
+	return _connect();
 }
 
 #else
