@@ -3011,13 +3011,15 @@ void server_usage(OTF_PARAMS_DEF) {
 	print_header();
 #endif
 
+extern uint32_t ping_ok;
+
 #if defined(ESP8266)
 
 	struct FSInfo fsinfo;
 
 	boolean ok = LittleFS.info(fsinfo);
 
-	bfill.emit_p(PSTR("{\"status\":$D,\"totalBytes\":$D,\"usedBytes\":$D,\"freeBytes\":$D,\"blockSize\":$D,\"pageSize\":$D,\"maxOpenFiles\":$D,\"maxPathLength\":$D}"),
+	bfill.emit_p(PSTR("{\"status\":$D,\"totalBytes\":$D,\"usedBytes\":$D,\"freeBytes\":$D,\"blockSize\":$D,\"pageSize\":$D,\"maxOpenFiles\":$D,\"maxPathLength\":$D,\"pingok\":$D,\"mqtt\":$D}"),
 		ok,
 		fsinfo.totalBytes,
 		fsinfo.usedBytes,
@@ -3025,7 +3027,12 @@ void server_usage(OTF_PARAMS_DEF) {
 		fsinfo.blockSize,
 		fsinfo.pageSize,
 		fsinfo.maxOpenFiles,
-		fsinfo.maxPathLength);
+		fsinfo.maxPathLength,
+		ping_ok,
+		os.mqtt.connected());
+#else
+	bfill.emit_p(PSTR("{\"pingok\":$D,\"mqtt\":$D}"), ping_ok, os.mqtt.connected());
+
 #endif
 	handle_return(HTML_OK);
 }
