@@ -3019,7 +3019,7 @@ extern uint32_t ping_ok;
 
 	boolean ok = LittleFS.info(fsinfo);
 
-	bfill.emit_p(PSTR("{\"status\":$D,\"totalBytes\":$D,\"usedBytes\":$D,\"freeBytes\":$D,\"blockSize\":$D,\"pageSize\":$D,\"maxOpenFiles\":$D,\"maxPathLength\":$D,\"pingok\":$D,\"mqtt\":$D}"),
+	bfill.emit_p(PSTR("{\"status\":$D,\"totalBytes\":$D,\"usedBytes\":$D,\"freeBytes\":$D,\"blockSize\":$D,\"pageSize\":$D,\"maxOpenFiles\":$D,\"maxPathLength\":$D,\"pingok\":$D,\"mqtt\":$D,\"ifttt\":$D}"),
 		ok,
 		fsinfo.totalBytes,
 		fsinfo.usedBytes,
@@ -3029,9 +3029,10 @@ extern uint32_t ping_ok;
 		fsinfo.maxOpenFiles,
 		fsinfo.maxPathLength,
 		ping_ok,
-		os.mqtt.connected());
+		os.mqtt.connected(),
+		os.iopts[IOPT_IFTTT_ENABLE]);
 #else
-	bfill.emit_p(PSTR("{\"pingok\":$D,\"mqtt\":$D}"), ping_ok, os.mqtt.connected());
+	bfill.emit_p(PSTR("{\"status\":$D,\"pingok\":$D,\"mqtt\":$D,\"ifttt\":$D}"), 1, ping_ok, os.mqtt.connected(), os.iopts[IOPT_IFTTT_ENABLE]);
 
 #endif
 	handle_return(HTML_OK);
