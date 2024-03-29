@@ -2991,7 +2991,7 @@ void server_sensor_types(OTF_PARAMS_DEF) {
 
 /**
  * du
- * List supported sensor types
+ * system resources status
  **/
 void server_usage(OTF_PARAMS_DEF) {
 #if defined(ESP8266)
