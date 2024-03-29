@@ -3032,7 +3032,7 @@ extern uint32_t ping_ok;
 		os.mqtt.connected(),
 		os.iopts[IOPT_IFTTT_ENABLE]);
 #else
-	bfill.emit_p(PSTR("{\"status\":$D,\"pingok\":$D,\"mqtt\":$D,\"ifttt\":$D}"), 1, ping_ok, os.mqtt.connected(), os.iopts[IOPT_IFTTT_ENABLE]);
+	bfill.emit_p(PSTR("{\"status\":$D,\"mqtt\":$D,\"ifttt\":$D}"), 1, os.mqtt.connected(), os.iopts[IOPT_IFTTT_ENABLE]);
 
 #endif
 	handle_return(HTML_OK);
