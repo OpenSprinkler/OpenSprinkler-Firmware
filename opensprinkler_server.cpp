@@ -3086,10 +3086,14 @@ void server_sensorprog_calc(OTF_PARAMS_DEF) {
 	ProgSensorAdjust_t progAdj;
 	memset(&progAdj, 0, sizeof(progAdj));
 	progAdj.type = type;	
+	
 	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("sensor"), true))
 		handle_return(HTML_DATA_MISSING);
-	Sensor_t *sensor = sensor_by_nr(strtoul(tmp_buffer, NULL, 0)); // Sensor nr
-
+	progAdj.sensor = strtoul(tmp_buffer, NULL, 0);
+	Sensor_t *sensor = sensor_by_nr(progAdj.sensor); // Sensor nr
+	if (!sensor)
+		handle_return(HTML_DATA_MISSING);
+	
 	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("factor1"), true))
 		handle_return(HTML_DATA_MISSING);
 	progAdj.factor1 = atof(tmp_buffer); // Factor 1
