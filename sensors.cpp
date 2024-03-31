@@ -1424,7 +1424,7 @@ int set_sensor_address(Sensor_t *sensor, byte new_address) {
 	return HTTP_RQT_NOT_RECEIVED;
 }
 
-double calc_linear(ProgSensorAdjust_t *p, Sensor_t *sensor) {
+double calc_linear(ProgSensorAdjust_t *p, double sensorData) {
 	
 //   min max  factor1 factor2
 //   10..90 -> 5..1 factor1 > factor2
@@ -1434,31 +1434,33 @@ double calc_linear(ProgSensorAdjust_t *p, Sensor_t *sensor) {
 //   10..90 -> 1..5 factor1 < factor2
 //    a   b    c  d
 //   (sensorData-a) / (b-a) * (d-c) + c
-				
-	double sensorData = sensor->last_data;
+
 	// Limit to min/max:
 	if (sensorData < p->min) sensorData = p->min;
 	if (sensorData > p->max) sensorData = p->max;
 
 	//Calculate:
+	double div = (p->max - p->min);
+	if (abs(div) < 0.00001) return 0;
+	
 	if (p->factor1 > p->factor2) { // invers scaling factor:
-		return (p->max - sensorData) / (p->max - p->min) * (p->factor1 - p->factor2) + p->factor2;
+		return (p->max - sensorData) / div * (p->factor1 - p->factor2) + p->factor2;
 	} else { // upscaling factor:
-		return (sensorData - p->min) / (p->max - p->min) * (p->factor2 - p->factor1) + p->factor1;
+		return (sensorData - p->min) / div * (p->factor2 - p->factor1) + p->factor1;
 	}
 }
 
-double calc_digital_min(ProgSensorAdjust_t *p, Sensor_t *sensor) {
-	return sensor->last_data <= p->min? p->factor1:p->factor2;
+double calc_digital_min(ProgSensorAdjust_t *p, double sensorData) {
+	return sensorData <= p->min? p->factor1:p->factor2;
 }
 
-double calc_digital_max(ProgSensorAdjust_t *p, Sensor_t *sensor) {
-	return sensor->last_data >= p->max? p->factor2:p->factor1;
+double calc_digital_max(ProgSensorAdjust_t *p, double sensorData) {
+	return sensorData >= p->max? p->factor2:p->factor1;
 }
 
-double calc_digital_minmax(ProgSensorAdjust_t *p, Sensor_t *sensor) {
-	if (sensor->last_data <= p->min) return p->factor1;
-	if (sensor->last_data >= p->max) return p->factor1;
+double calc_digital_minmax(ProgSensorAdjust_t *p, double sensorData) {
+	if (sensorData <= p->min) return p->factor1;
+	if (sensorData >= p->max) return p->factor1;
 	return p->factor2;
 }
 /**
@@ -1476,16 +1478,7 @@ double calc_sensor_watering(uint prog) {
 			Sensor_t *sensor = sensor_by_nr(p->sensor);
 			if (sensor && sensor->flags.enable && sensor->flags.data_ok) {
 
-				double res = 0;
-				switch(p->type) {
-					case PROG_NONE:        res = 1; break;
-					case PROG_LINEAR:      res = calc_linear(p, sensor); break;
-					case PROG_DIGITAL_MIN: res = calc_digital_min(p, sensor); break;
-					case PROG_DIGITAL_MAX: res = calc_digital_max(p, sensor); break;
-					case PROG_DIGITAL_MINMAX: res = calc_digital_minmax(p, sensor); break;
-					default:               res = 0; 
-				}
-
+				double res = calc_sensor_watering_int(p, sensor->last_data);
 				result = result * res;
 			}
 		}
@@ -1497,6 +1490,20 @@ double calc_sensor_watering(uint prog) {
 	if (result > 20.0) // Factor 20 is a huge value!
 		result = 20.0;
 	return result;
+}
+
+double calc_sensor_watering_int(ProgSensorAdjust_t *p, double sensorData) {
+	double res = 0;
+	if (!p) return res;
+	switch(p->type) {
+		case PROG_NONE:        res = 1; break;
+		case PROG_LINEAR:      res = calc_linear(p, sensorData); break;
+		case PROG_DIGITAL_MIN: res = calc_digital_min(p, sensorData); break;
+		case PROG_DIGITAL_MAX: res = calc_digital_max(p, sensorData); break;
+		case PROG_DIGITAL_MINMAX: res = calc_digital_minmax(p, sensorData); break;
+		default:               res = 0; 
+	}
+	return res;
 }
 
 /**
@@ -1517,9 +1524,9 @@ double calc_sensor_watering_by_nr(uint nr) {
 				double res = 0;
 				switch(p->type) {
 					case PROG_NONE:        res = 1; break;
-					case PROG_LINEAR:      res = calc_linear(p, sensor); break;
-					case PROG_DIGITAL_MIN: res = calc_digital_min(p, sensor); break;
-					case PROG_DIGITAL_MAX: res = calc_digital_max(p, sensor); break;
+					case PROG_LINEAR:      res = calc_linear(p, sensor->last_data); break;
+					case PROG_DIGITAL_MIN: res = calc_digital_min(p, sensor->last_data); break;
+					case PROG_DIGITAL_MAX: res = calc_digital_max(p, sensor->last_data); break;
 					default:               res = 0; 
 				}
 

@@ -278,6 +278,7 @@ ProgSensorAdjust_t *prog_adjust_by_nr(uint nr);
 ProgSensorAdjust_t *prog_adjust_by_idx(uint idx);
 double calc_sensor_watering(uint prog);
 double calc_sensor_watering_by_nr(uint nr);
+double calc_sensor_watering_int(ProgSensorAdjust_t *p, double sensorData);
 
 void GetSensorWeather();
 //PUSH Message to MQTT and others:

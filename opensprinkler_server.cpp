@@ -3052,6 +3052,15 @@ void server_sensorprog_calc(OTF_PARAMS_DEF) {
 	DEBUG_PRINTLN(F("server_sensorprog_calc"));
 	//uint nr or uint prog
 
+#if defined(ESP8266)
+	// as the log data can be large, we will use ESP8266's sendContent function to
+	// send multiple packets of data, instead of the standard way of using send().
+	rewind_ether_buffer();
+	print_header(OTF_PARAMS);
+#else
+	print_header();
+#endif
+
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("nr"), true)) {
 		uint nr = strtoul(tmp_buffer, NULL, 0); // Adjustment nr
 		double adj = calc_sensor_watering_by_nr(nr);
@@ -3066,7 +3075,64 @@ void server_sensorprog_calc(OTF_PARAMS_DEF) {
 		handle_return(HTML_OK);
 	}
 
-	handle_return(HTML_DATA_MISSING);
+	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("type"), true))
+		handle_return(HTML_DATA_MISSING);
+	uint type = strtoul(tmp_buffer, NULL, 0); // Adjustment type
+	if (type == 0) {
+		handle_return(HTML_DATA_MISSING);
+	}
+
+	//methods for visual calculation:
+	ProgSensorAdjust_t p;
+	memset(&p, 0, sizeof(p));
+	p.type = type;	
+	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("sensor"), true))
+		handle_return(HTML_DATA_MISSING);
+	Sensor_t *sensor = sensor_by_nr(strtoul(tmp_buffer, NULL, 0)); // Sensor nr
+
+	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("factor1"), true))
+		handle_return(HTML_DATA_MISSING);
+	p.factor1 = atof(tmp_buffer); // Factor 1
+
+	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("factor2"), true))
+		handle_return(HTML_DATA_MISSING);
+	p.factor2 = atof(tmp_buffer); // Factor 2
+
+	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("min"), true))
+		handle_return(HTML_DATA_MISSING);
+	p.min = atof(tmp_buffer); // Min value
+
+	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("max"), true))
+		handle_return(HTML_DATA_MISSING);
+	p.max = atof(tmp_buffer); // Max value
+
+	int diff = p.max-p.min;
+	int minEx = p.min - diff/2;
+	int maxEx = p.max + diff/2;
+
+	bfill.emit_p(PSTR("{\"adjustment\":{\"min\":$D,\"max\":$D,\"unit\":\"$S\","), minEx, maxEx, getSensorUnit(sensor));
+
+	int nvalues = max(11, maxEx-minEx+1);
+	double inVal[nvalues];
+	double outVal[nvalues];
+	for (int i = 0; i < nvalues; i++) {
+		inVal[i] = (double)(maxEx - minEx) * (double)i / (nvalues-1) + minEx;
+		outVal[i] = calc_sensor_watering_int(&p, inVal[i]);
+	}
+
+	bfill.emit_p(PSTR("\"inval\":["));
+	for (int i = 0; i < nvalues; i++) {
+		if(i > 0) bfill.emit_p(PSTR(","));
+		bfill.emit_p(PSTR("$E"), inVal[i]);
+	}
+	bfill.emit_p(PSTR("],\"outval\":["));
+	for (int i = 0; i < nvalues; i++) {
+		if(i > 0) bfill.emit_p(PSTR(","));
+		bfill.emit_p(PSTR("$E"), outVal[i]);
+	}
+	bfill.emit_p(PSTR("]}}"));
+	
+	handle_return(HTML_OK);
 }
 
 const int prog_types[] = {
