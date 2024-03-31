@@ -3083,32 +3083,32 @@ void server_sensorprog_calc(OTF_PARAMS_DEF) {
 	}
 
 	//methods for visual calculation:
-	ProgSensorAdjust_t p;
-	memset(&p, 0, sizeof(p));
-	p.type = type;	
+	ProgSensorAdjust_t progAdj;
+	memset(&progAdj, 0, sizeof(progAdj));
+	progAdj.type = type;	
 	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("sensor"), true))
 		handle_return(HTML_DATA_MISSING);
 	Sensor_t *sensor = sensor_by_nr(strtoul(tmp_buffer, NULL, 0)); // Sensor nr
 
 	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("factor1"), true))
 		handle_return(HTML_DATA_MISSING);
-	p.factor1 = atof(tmp_buffer); // Factor 1
+	progAdj.factor1 = atof(tmp_buffer); // Factor 1
 
 	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("factor2"), true))
 		handle_return(HTML_DATA_MISSING);
-	p.factor2 = atof(tmp_buffer); // Factor 2
+	progAdj.factor2 = atof(tmp_buffer); // Factor 2
 
 	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("min"), true))
 		handle_return(HTML_DATA_MISSING);
-	p.min = atof(tmp_buffer); // Min value
+	progAdj.min = atof(tmp_buffer); // Min value
 
 	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("max"), true))
 		handle_return(HTML_DATA_MISSING);
-	p.max = atof(tmp_buffer); // Max value
+	progAdj.max = atof(tmp_buffer); // Max value
 
-	int diff = p.max-p.min;
-	int minEx = p.min - diff/2;
-	int maxEx = p.max + diff/2;
+	int diff = progAdj.max-progAdj.min;
+	int minEx = progAdj.min - diff/2;
+	int maxEx = progAdj.max + diff/2;
 
 	bfill.emit_p(PSTR("{\"adjustment\":{\"min\":$D,\"max\":$D,\"unit\":\"$S\","), minEx, maxEx, getSensorUnit(sensor));
 
@@ -3117,7 +3117,7 @@ void server_sensorprog_calc(OTF_PARAMS_DEF) {
 	double outVal[nvalues];
 	for (int i = 0; i < nvalues; i++) {
 		inVal[i] = (double)(maxEx - minEx) * (double)i / (nvalues-1) + minEx;
-		outVal[i] = calc_sensor_watering_int(&p, inVal[i]);
+		outVal[i] = calc_sensor_watering_int(&progAdj, inVal[i]);
 	}
 
 	bfill.emit_p(PSTR("\"inval\":["));
