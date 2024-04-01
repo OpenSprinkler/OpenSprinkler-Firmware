@@ -2441,6 +2441,10 @@ void server_sensor_list(OTF_PARAMS_DEF) {
 	DEBUG_PRINT(F("server_count: "));
 	DEBUG_PRINTLN(sensor_count());
 
+	uint test = 0;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("test"), true))
+		test = strtoul(tmp_buffer, NULL, 0); // Sensor nr
+
 #if defined(ESP8266)
 	// as the log data can be large, we will use ESP8266's sendContent function to
 	// send multiple packets of data, instead of the standard way of using send().
@@ -2449,10 +2453,6 @@ void server_sensor_list(OTF_PARAMS_DEF) {
 #else
 	print_header();
 #endif
-
-	uint test = 0;
-	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("test"), true))
-		test = strtoul(tmp_buffer, NULL, 0); // Sensor nr
 
 	if (test) {
 		bfill.emit_p(PSTR("{\"test\":$D}"), test);
@@ -3052,15 +3052,6 @@ void server_sensorprog_calc(OTF_PARAMS_DEF) {
 	DEBUG_PRINTLN(F("server_sensorprog_calc"));
 	//uint nr or uint prog
 
-#if defined(ESP8266)
-	// as the log data can be large, we will use ESP8266's sendContent function to
-	// send multiple packets of data, instead of the standard way of using send().
-	rewind_ether_buffer();
-	print_header(OTF_PARAMS);
-#else
-	print_header();
-#endif
-
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("nr"), true)) {
 		uint nr = strtoul(tmp_buffer, NULL, 0); // Adjustment nr
 		double adj = calc_sensor_watering_by_nr(nr);
@@ -3113,6 +3104,15 @@ void server_sensorprog_calc(OTF_PARAMS_DEF) {
 	int diff = progAdj.max-progAdj.min;
 	int minEx = progAdj.min - diff/2;
 	int maxEx = progAdj.max + diff/2;
+
+#if defined(ESP8266)
+	// as the log data can be large, we will use ESP8266's sendContent function to
+	// send multiple packets of data, instead of the standard way of using send().
+	rewind_ether_buffer();
+	print_header(OTF_PARAMS);
+#else
+	print_header();
+#endif
 
 	bfill.emit_p(PSTR("{\"adjustment\":{\"min\":$D,\"max\":$D,\"unit\":\"$S\","), minEx, maxEx, getSensorUnit(sensor));
 
