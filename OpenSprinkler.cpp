@@ -499,73 +499,111 @@ byte OpenSprinkler::start_network() {
 #endif
 }
 
-byte OpenSprinkler::start_ether() {
-#if defined(ESP8266)
-	if(hw_rev<2) return 0;  // ethernet capability is only available when hw_rev>=2
-	eth.isW5500 = (hw_rev==2)?false:true; // os 3.2 uses enc28j60 and 3.3 uses w5500
+bool init_W5500() {
+	DEBUG_PRINTLN(F("detect existence of W5500"));
+	/* this is copied from w5500.cpp wizchip_sw_reset
+	 * perform a software reset and see if we get a correct response
+	 * without this, eth.begin will crash if W5500 is not connected
+	 * ideally wizchip_sw_reset should return a value but since it doesn't
+	 * we have to extract it code here
+	 * */
+	static const uint8_t AccessModeRead = (0x00 << 2);
+	static const uint8_t AccessModeWrite = (0x01 << 2);
+	static const uint8_t BlockSelectCReg = (0x00 << 3);
+
+	SPI.begin();
+	SPI.setBitOrder(MSBFIRST);
+	SPI.setDataMode(SPI_MODE0);
+	SPI.setFrequency(32000000);
+
+	pinMode(PIN_ETHER_CS, OUTPUT);
+	// ==> setMR(MR_RST)
+	digitalWrite(PIN_ETHER_CS, LOW);
+	SPI.transfer((0x00 & 0xFF00) >> 8);
+	SPI.transfer((0x00 & 0x00FF) >> 0);
+	SPI.transfer(BlockSelectCReg | AccessModeWrite);
+	SPI.transfer(0x80);
+	digitalWrite(PIN_ETHER_CS, HIGH);
+
+	// ==> ret = getMR()
+	uint8_t ret;
+	digitalWrite(PIN_ETHER_CS, LOW);
+	SPI.transfer((0x00 & 0xFF00) >> 8);
+	SPI.transfer((0x00 & 0x00FF) >> 0);
+	SPI.transfer(BlockSelectCReg | AccessModeRead);
+	ret = SPI.transfer(0);
+	digitalWrite(PIN_ETHER_CS, HIGH);
+
+	if(ret!=0) { // ret is expected to be 0
+		SPI.end();
+		return false;
+	}  
+		
+	eth.isW5500 = true;
+	DEBUG_PRINTLN(F("found W5500"));
+	return true;
+}
+
+bool init_ENC28J60() {
+	/* this is copied from enc28j60.cpp geterevid
+	 * check to see if the hardware revision number if expected
+	 * */
+	DEBUG_PRINTLN(F("detect existence of ENC28J60"));
+	#define MAADRX_BANK 0x03
+	#define EREVID 0x12
+	#define ECON1 0x1f
 
 	SPI.begin();
 	SPI.setBitOrder(MSBFIRST);
 	SPI.setDataMode(SPI_MODE0);
 	SPI.setFrequency(4000000);
 
-	if(eth.isW5500) {
-		DEBUG_PRINTLN(F("detect existence of W5500"));
-		/* this is copied from w5500.cpp wizchip_sw_reset
-		 * perform a software reset and see if we get a correct response
-		 * without this, eth.begin will crash if W5500 is not connected
-		 * ideally wizchip_sw_reset should return a value but since it doesn't
-		 * we have to extract it code here
-		 * */
-		static const uint8_t AccessModeRead = (0x00 << 2);
-		static const uint8_t AccessModeWrite = (0x01 << 2);
-		static const uint8_t BlockSelectCReg = (0x00 << 3);
-		pinMode(PIN_ETHER_CS, OUTPUT);
-		// ==> setMR(MR_RST)
-		digitalWrite(PIN_ETHER_CS, LOW);
-		SPI.transfer((0x00 & 0xFF00) >> 8);
-		SPI.transfer((0x00 & 0x00FF) >> 0);
-		SPI.transfer(BlockSelectCReg | AccessModeWrite);
-		SPI.transfer(0x80);
-		digitalWrite(PIN_ETHER_CS, HIGH);
+	// ==> setregbank(MAADRX_BANK);
+	pinMode(PIN_ETHER_CS, OUTPUT);
+	uint8_t r;
+	digitalWrite(PIN_ETHER_CS, LOW);
+	SPI.transfer(0x00 | (ECON1 & 0x1f));
+	r = SPI.transfer(0);
+	DEBUG_PRINT("ECON1=")
+	DEBUG_PRINTLN(r);
+	if (r == 2) {
+		SPI.end();
+		return false;
+	}
+	digitalWrite(PIN_ETHER_CS, HIGH);
 
-		// ==> ret = getMR()
-		uint8_t ret;
-		digitalWrite(PIN_ETHER_CS, LOW);
-		SPI.transfer((0x00 & 0xFF00) >> 8);
-		SPI.transfer((0x00 & 0x00FF) >> 0);
-		SPI.transfer(BlockSelectCReg | AccessModeRead);
-		ret = SPI.transfer(0);
-		digitalWrite(PIN_ETHER_CS, HIGH);
-		if(ret!=0) return 0; // ret is expected to be 0
+	digitalWrite(PIN_ETHER_CS, LOW);
+	SPI.transfer(0x40 | (ECON1 & 0x1f));
+	SPI.transfer((r & 0xfc) | (MAADRX_BANK & 0x03));
+	digitalWrite(PIN_ETHER_CS, HIGH);
+
+	// ==> r = readreg(EREVID);
+	digitalWrite(PIN_ETHER_CS, LOW);
+	SPI.transfer(0x00 | (EREVID & 0x1f));
+	r = SPI.transfer(0);
+	DEBUG_PRINTLN(r);
+	digitalWrite(PIN_ETHER_CS, HIGH);
+	if(r==0 || r==255) { // r is expected to be a non-255 revision number
+		SPI.end();
+		return false;
+	} 
+
+	eth.isW5500 = false;
+	DEBUG_PRINTLN(F("found ENC28J60"));
+	return true;
+}
+
+byte OpenSprinkler::start_ether() {
+#if defined(ESP8266)
+	if(hw_rev<2) return 0;  // ethernet capability is only available when hw_rev>=2
+	
+	// os 3.2 uses enc28j60 and 3.3 uses w5500
+	if (hw_rev==2) {
+		if (!init_ENC28J60() && !init_W5500())
+			return 0;
 	} else {
-		/* this is copied from enc28j60.cpp geterevid
-		 * check to see if the hardware revision number if expected
-		 * */
-		DEBUG_PRINTLN(F("detect existence of ENC28J60"));
-		#define MAADRX_BANK 0x03
-		#define EREVID 0x12
-		#define ECON1 0x1f
-
-		// ==> setregbank(MAADRX_BANK);
-		pinMode(PIN_ETHER_CS, OUTPUT);
-		uint8_t r;
-		digitalWrite(PIN_ETHER_CS, LOW);
-		SPI.transfer(0x00 | (ECON1 & 0x1f));
-		r = SPI.transfer(0);
-		digitalWrite(PIN_ETHER_CS, HIGH);
-
-		digitalWrite(PIN_ETHER_CS, LOW);
-		SPI.transfer(0x40 | (ECON1 & 0x1f));
-		SPI.transfer((r & 0xfc) | (MAADRX_BANK & 0x03));
-		digitalWrite(PIN_ETHER_CS, HIGH);
-
-		// ==> r = readreg(EREVID);
-		digitalWrite(PIN_ETHER_CS, LOW);
-		SPI.transfer(0x00 | (EREVID & 0x1f));
-		r = SPI.transfer(0);
-		digitalWrite(PIN_ETHER_CS, HIGH);
-		if(r==0 || r==255) return 0; // r is expected to be a non-255 revision number
+		if (!init_W5500())
+			return 0;
 	}
 
 	load_hardware_mac((uint8_t*)tmp_buffer, true);
@@ -581,7 +619,7 @@ byte OpenSprinkler::start_ether() {
 	lcd_print_line_clear_pgm(PSTR("Start wired link"), 1);
 	lcd_print_line_clear_pgm(eth.isW5500 ? PSTR("    (w5500)    ") : PSTR("   (enc28j60)   "), 2);
 	
-	ulong timeout = millis()+30000; // 30 seconds time out
+	ulong timeout = millis()+45000; // 45 seconds time out
 	while (!eth.connected()) {
 		DEBUG_PRINT(".");
 		delay(1000);

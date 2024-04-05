@@ -2437,9 +2437,9 @@ void server_sensor_list(OTF_PARAMS_DEF) {
 	char *p = get_buffer;
 #endif
 
-	DEBUG_PRINTLN(F("server_sensor_list"));
-	DEBUG_PRINT(F("server_count: "));
-	DEBUG_PRINTLN(sensor_count());
+	//DEBUG_PRINTLN(F("server_sensor_list"));
+	//DEBUG_PRINT(F("server_count: "));
+	//DEBUG_PRINTLN(sensor_count());
 
 	uint test = 0;
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("test"), true))
