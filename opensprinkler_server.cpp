@@ -2679,8 +2679,11 @@ void server_sensorlog_clear(OTF_PARAMS_DEF) {
 	char *p = get_buffer;
 #endif
 	int log = -1;
+	uint nr = 0;
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("log"), true)) // Filter log for sensor-nr
 		log = atoi(tmp_buffer);
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("nr"), true)) // Filter log for sensor-nr
+		nr = strtoul(tmp_buffer, NULL, 0);
 
 	DEBUG_PRINTLN(F("server_sensorlog_clear"));
 
@@ -2693,20 +2696,28 @@ void server_sensorlog_clear(OTF_PARAMS_DEF) {
 	print_header();
 #endif
 
-	ulong log_size = sensorlog_size(LOG_STD);
-	ulong log_sizeW = sensorlog_size(LOG_WEEK);
-	ulong log_sizeM = sensorlog_size(LOG_MONTH);
+	if (nr > 0) {
+		if (log == -1) {
+			sensorlog_clear_sensor(nr, LOG_STD);
+			sensorlog_clear_sensor(nr, LOG_WEEK);
+			sensorlog_clear_sensor(nr, LOG_MONTH);
+		} else {
+			sensorlog_clear_sensor(nr, log);
+		}
+	} else {
+		ulong log_size = sensorlog_size(LOG_STD);
+		ulong log_sizeW = sensorlog_size(LOG_WEEK);
+		ulong log_sizeM = sensorlog_size(LOG_MONTH);
 
-	if (log == -1) {
-		sensorlog_clear_all();
-		bfill.emit_p(PSTR("{\"deleted\":$L,\"deleted_week\":$L,\"deleted_month\":$L}"), log_size, log_sizeW, log_sizeM);
+		if (log == -1) {
+			sensorlog_clear_all();
+			bfill.emit_p(PSTR("{\"deleted\":$L,\"deleted_week\":$L,\"deleted_month\":$L}"), log_size, log_sizeW, log_sizeM);
+		}
+		else {
+			sensorlog_clear(log==LOG_STD, log==LOG_WEEK, log==LOG_MONTH);
+			bfill.emit_p(PSTR("{\"deleted\":$L}"), log==LOG_STD?log_size:log=LOG_WEEK?log_sizeW:log_sizeM);
+		}
 	}
-	else {
-		sensorlog_clear(log==LOG_STD, log==LOG_WEEK, log==LOG_MONTH);
-		bfill.emit_p(PSTR("{\"deleted\":$L}"), log==LOG_STD?log_size:log=LOG_WEEK?log_sizeW:log_sizeM);
-	}
-
-
 	handle_return(HTML_OK);
 }
 

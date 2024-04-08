@@ -450,6 +450,39 @@ void sensorlog_clear(bool std, bool week, bool month) {
 	}
 }
 
+ulong sensorlog_clear_sensor(uint sensorNr, uint8_t log) {
+	SensorLog_t sensorlog;
+	checkLogSwitch(log);
+	const char *flast = getlogfile2(log);
+	const char *fcur = getlogfile(log);
+	ulong size = file_size(flast) / SENSORLOG_STORE_SIZE;
+	ulong size2 = size+file_size(fcur) / SENSORLOG_STORE_SIZE;
+	const char *f;
+	ulong idxr = 0;
+	ulong n = 0;
+	while (idxr < size2) {
+		ulong idx = idxr;
+		if (idx >= size) {
+			idx -= size;
+			f = fcur;
+		} else {
+			f = flast;
+		}
+	
+		ulong result = file_read_block(f, &sensorlog, idx * SENSORLOG_STORE_SIZE, SENSORLOG_STORE_SIZE);
+		if (result == 0)
+			break;
+		if (sensorlog.nr == sensorNr) {
+			sensorlog.nr = 0;
+			file_write_block(f, &sensorlog, idx * SENSORLOG_STORE_SIZE, SENSORLOG_STORE_SIZE);
+			n++;
+		}
+		idxr++;
+	}
+	return n;
+}
+
+
 SensorLog_t *sensorlog_load(uint8_t log, ulong idx) {
 	SensorLog_t *sensorlog = new SensorLog_t;
 	return sensorlog_load(log, idx, sensorlog);
@@ -780,21 +813,13 @@ int read_sensor_adc(Sensor_t *sensor) {
 	if (sensor->id >= 8) return HTTP_RQT_NOT_RECEIVED;
 	//Init + Detect:
 
-	int port = sensor->id < 4? 72 : 73;
+	int port = sensor->id < 4? 0x48 : 0x49;
 	int id = sensor->id % 4;
 	sensor->flags.data_ok = false;
 
 	ADS1115 adc(port);
-	bool active = adc.begin();
-	if (active)
-		adc.setGain(1);
-	DEBUG_PRINT(F("adc sensor found="));
-	DEBUG_PRINTLN(active);
-
-	if (!active)
-		return HTTP_RQT_NOT_RECEIVED;
-
-
+	adc.begin();
+	adc.reset();
 	sensor->repeat_native += adc.readADC(id);
     if (++sensor->repeat_read < MAX_SENSOR_REPEAT_READ)
         return HTTP_RQT_NOT_RECEIVED;
