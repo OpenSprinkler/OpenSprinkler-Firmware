@@ -499,7 +499,7 @@ byte OpenSprinkler::start_network() {
 #endif
 }
 
-bool init_W5500() {
+bool init_W5500(boolean initSPI) {
 	DEBUG_PRINTLN(F("detect existence of W5500"));
 	/* this is copied from w5500.cpp wizchip_sw_reset
 	 * perform a software reset and see if we get a correct response
@@ -511,12 +511,15 @@ bool init_W5500() {
 	static const uint8_t AccessModeWrite = (0x01 << 2);
 	static const uint8_t BlockSelectCReg = (0x00 << 3);
 
-	SPI.begin();
-	SPI.setBitOrder(MSBFIRST);
-	SPI.setDataMode(SPI_MODE0);
-	SPI.setFrequency(32000000);
-
+	if (initSPI) {
+		SPI.begin();
+		SPI.setBitOrder(MSBFIRST);
+		SPI.setDataMode(SPI_MODE0);
+		SPI.setFrequency(32000000);
+	}
+	
 	pinMode(PIN_ETHER_CS, OUTPUT);
+	
 	// ==> setMR(MR_RST)
 	digitalWrite(PIN_ETHER_CS, LOW);
 	SPI.transfer((0x00 & 0xFF00) >> 8);
@@ -535,7 +538,6 @@ bool init_W5500() {
 	digitalWrite(PIN_ETHER_CS, HIGH);
 
 	if(ret!=0) { // ret is expected to be 0
-		SPI.end();
 		return false;
 	}  
 		
@@ -567,7 +569,6 @@ bool init_ENC28J60() {
 	DEBUG_PRINT("ECON1=")
 	DEBUG_PRINTLN(r);
 	if (r == 2) {
-		SPI.end();
 		return false;
 	}
 	digitalWrite(PIN_ETHER_CS, HIGH);
@@ -584,7 +585,6 @@ bool init_ENC28J60() {
 	DEBUG_PRINTLN(r);
 	digitalWrite(PIN_ETHER_CS, HIGH);
 	if(r==0 || r==255) { // r is expected to be a non-255 revision number
-		SPI.end();
 		return false;
 	} 
 
@@ -599,10 +599,10 @@ byte OpenSprinkler::start_ether() {
 	
 	// os 3.2 uses enc28j60 and 3.3 uses w5500
 	if (hw_rev==2) {
-		if (!init_ENC28J60() && !init_W5500())
+		if (!init_ENC28J60() && !init_W5500(false))
 			return 0;
 	} else {
-		if (!init_W5500())
+		if (!init_W5500(true))
 			return 0;
 	}
 
@@ -620,9 +620,11 @@ byte OpenSprinkler::start_ether() {
 	lcd_print_line_clear_pgm(eth.isW5500 ? PSTR("    (w5500)    ") : PSTR("   (enc28j60)   "), 2);
 	
 	ulong timeout = millis()+45000; // 45 seconds time out
+
 	while (!eth.connected()) {
 		DEBUG_PRINT(".");
 		delay(1000);
+		yield();
 		if(millis()>timeout) return 0;
 	}
 
