@@ -52,20 +52,8 @@ int read_sensor_ospi(Sensor_t *sensor) {
         DRIVER_ADS1115_LINK_DELAY_MS(&gs_handle, ads1115_interface_delay_ms);
         DRIVER_ADS1115_LINK_DEBUG_PRINT(&gs_handle, ads1115_interface_debug_print);
 
-        ads1115_address_t addr = ADS1115_ADDR_GND;
-        ads1115_channel_t channel = ADS1115_CHANNEL_AIN0_GND;
-        /* set channel */
-        switch(sensor->id) {
-                case 0: channel = ADS1115_CHANNEL_AIN0_GND; break;
-                case 1: channel = ADS1115_CHANNEL_AIN1_GND; break;
-                case 2: channel = ADS1115_CHANNEL_AIN2_GND; break;
-                case 3: channel = ADS1115_CHANNEL_AIN3_GND; break;
-                case 4: addr = ADS1115_ADDR_VCC; channel = ADS1115_CHANNEL_AIN0_GND; break;
-                case 5: addr = ADS1115_ADDR_VCC; channel = ADS1115_CHANNEL_AIN1_GND; break;
-                case 6: addr = ADS1115_ADDR_VCC; channel = ADS1115_CHANNEL_AIN2_GND; break;
-                case 7: addr = ADS1115_ADDR_VCC; channel = ADS1115_CHANNEL_AIN3_GND; break;
-                default: return HTTP_RQT_NOT_RECEIVED;
-        }
+        ads1115_address_t addr    = (ads1115_address_t)(ADS1115_ADDR_GND         + sensor->id / 4);
+        ads1115_channel_t channel = (ads1115_channel_t)(ADS1115_CHANNEL_AIN0_GND + sensor->id % 4);
 
         /* set addr pin */
         res = ads1115_set_addr_pin(&gs_handle, addr);

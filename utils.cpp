@@ -639,7 +639,7 @@ size_t freeMemory() {
 }
 #else
 
-long freeMemory() {
+size_t freeMemory() {
 	return -1;
 }
 #endif
