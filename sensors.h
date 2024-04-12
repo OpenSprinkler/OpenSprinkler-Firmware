@@ -243,7 +243,7 @@ uint sensor_count();
 boolean sensor_isgroup(Sensor_t *sensor);
 void sensor_update_groups();
 
-void read_all_sensors();
+void read_all_sensors(boolean online);
 
 Sensor_t *sensor_by_nr(uint nr);
 Sensor_t *sensor_by_idx(uint idx);

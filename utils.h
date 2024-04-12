@@ -58,6 +58,7 @@ int16_t water_time_decode_signed(byte i);
 void urlDecode(char *);
 void peel_http_header(char*);
 void strReplace(char *, char c, char r);
+size_t freeMemory();
 
 #define date_encode(m,d) ((m<<5)+d)
 #define MIN_ENCODED_DATE date_encode(1,1)

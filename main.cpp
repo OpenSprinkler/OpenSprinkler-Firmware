@@ -1045,8 +1045,7 @@ void do_loop()
 		}
 
 		// read analog sensors
-		if (curr_time && os.network_connected() && os.checkwt_success_lasttime) 
-			read_all_sensors();
+		read_all_sensors(curr_time && os.network_connected() && os.checkwt_success_lasttime);
 
 		static byte reboot_notification = 1;
 		if(reboot_notification) {

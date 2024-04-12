@@ -658,12 +658,14 @@ void calc_sensorlogs()
 
 	if (time >= next_month_calc) {
 
+		log_size = sensorlog_size(LOG_WEEK);
+		if (log_size <= 0) {
+			if (sensorlog)
+				free(sensorlog);
+			return;
+		}
 		if (!sensorlog)
 			sensorlog = (SensorLog_t*)malloc(sizeof(SensorLog_t)*BLOCKSIZE);
-		
-		log_size = sensorlog_size(LOG_WEEK);
-		if (log_size <= 0)
-			return;
 
 		DEBUG_PRINTLN(F("calc_sensorlogs MONTH start"));
 		ulong size = sensorlog_size(LOG_MONTH);
@@ -742,6 +744,7 @@ void push_message(Sensor_t *sensor) {
 	char* postval = tmp_buffer;
 
 	if (os.mqtt.enabled()) {
+		DEBUG_PRINTLN("push mqtt1");
 		os.sopt_load(SOPT_DEVICE_NAME, topic);
 		strncat_P(topic, PSTR("/analogsensor/"), sizeof(topic)-1);
 		strncat(topic, sensor->name, sizeof(topic)-1);
@@ -751,8 +754,10 @@ void push_message(Sensor_t *sensor) {
 		if (!os.mqtt.connected())
 			os.mqtt.reconnect();
 		os.mqtt.publish(topic, payload);
+		DEBUG_PRINTLN("push mqtt2");
 	}
 	if (os.iopts[IOPT_IFTTT_ENABLE]) {
+		DEBUG_PRINTLN("push ifttt");
 		strcpy_P(postval, PSTR("{\"value1\":\"On site ["));
 		os.sopt_load(SOPT_DEVICE_NAME, postval+strlen(postval));
 		strcat_P(postval, PSTR("], "));
@@ -772,13 +777,15 @@ void push_message(Sensor_t *sensor) {
 						SOPT_IFTTT_KEY, DEFAULT_IFTTT_URL, strlen(postval), postval);
 
 		os.send_http_request(DEFAULT_IFTTT_URL, 80, ether_buffer, sensor_remote_http_callback);
+		DEBUG_PRINTLN("push ifttt2");
 	}			
 }
 
-void read_all_sensors() {
+void read_all_sensors(boolean online) {
 	//DEBUG_PRINTLN(F("read_all_sensors"));
-	if (!sensors || os.status.network_fails>0 || os.iopts[IOPT_REMOTE_EXT_MODE]) return;
-
+	if (!sensors)
+		return;
+		
 	ulong time = os.now_tz();
 
 	if (time < os.powerup_lasttime+30) return; //wait 30s before first sensor read
@@ -787,18 +794,19 @@ void read_all_sensors() {
 
 	while (sensor) {
 		if (time >= sensor->last_read + sensor->read_interval || sensor->repeat_read) {
-			int result = read_sensor(sensor);
-			if (result == HTTP_RQT_SUCCESS) {
-				sensorlog_add(LOG_STD, sensor, time);
-				push_message(sensor);
-			} else if (result == HTTP_RQT_TIMEOUT) {
-				sensor->last_read = time - sensor->read_interval + 5;
+			if (online || sensor->ip == 0) {
+				int result = read_sensor(sensor);
+				if (result == HTTP_RQT_SUCCESS) {
+					sensorlog_add(LOG_STD, sensor, time);
+					push_message(sensor);
+				} else if (result == HTTP_RQT_TIMEOUT) {
+					sensor->last_read = time - sensor->read_interval + 5;
+				}
 			}
 		}
 		sensor = sensor->next;
 	}
 	sensor_update_groups();
-
 	calc_sensorlogs();
 }
 

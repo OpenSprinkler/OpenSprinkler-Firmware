@@ -30,6 +30,7 @@ extern OpenSprinkler os;
 	#if defined(ESP8266)
 		#include <FS.h>
 		#include <LittleFS.h>
+		#include <Esp.h>
 	#else
 		#include <avr/eeprom.h>
 		#include "SdFat.h"
@@ -628,5 +629,17 @@ void str2mac(const char *_str, byte mac[]) {
 		mac[count++] = hex2dec(hex);
 		yield();
 	}
+}
+#endif
+
+#ifdef ARDUINO
+
+size_t freeMemory() {
+	return ESP.getFreeHeap();
+}
+#else
+
+long freeMemory() {
+	return -1;
 }
 #endif

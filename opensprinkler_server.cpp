@@ -3030,8 +3030,9 @@ extern uint32_t ping_ok;
 
 	boolean ok = LittleFS.info(fsinfo);
 
-	bfill.emit_p(PSTR("{\"status\":$D,\"totalBytes\":$D,\"usedBytes\":$D,\"freeBytes\":$D,\"blockSize\":$D,\"pageSize\":$D,\"maxOpenFiles\":$D,\"maxPathLength\":$D,\"pingok\":$D,\"mqtt\":$D,\"ifttt\":$D}"),
+	bfill.emit_p(PSTR("{\"status\":$D,\"freeMemory\":$D,\"totalBytes\":$D,\"usedBytes\":$D,\"freeBytes\":$D,\"blockSize\":$D,\"pageSize\":$D,\"maxOpenFiles\":$D,\"maxPathLength\":$D,\"pingok\":$D,\"mqtt\":$D,\"ifttt\":$D}"),
 		ok,
+		freeMemory(),
 		fsinfo.totalBytes,
 		fsinfo.usedBytes,
 		fsinfo.totalBytes-fsinfo.usedBytes,
