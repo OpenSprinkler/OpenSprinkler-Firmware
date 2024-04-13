@@ -821,7 +821,7 @@ int read_sensor_adc(Sensor_t *sensor) {
 	if (sensor->id >= 8) return HTTP_RQT_NOT_RECEIVED;
 	//Init + Detect:
 
-	int port = sensor->id < 4? 0x48 : 0x49;
+	int port = 0x48 + sensor->id / 4;
 	int id = sensor->id % 4;
 	sensor->flags.data_ok = false;
 
