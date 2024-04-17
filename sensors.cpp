@@ -795,7 +795,7 @@ void read_all_sensors(boolean online) {
 	while (sensor) {
 		if (time >= sensor->last_read + sensor->read_interval || sensor->repeat_read) {
 			if (online || sensor->ip == 0) {
-				int result = read_sensor(sensor);
+				int result = read_sensor(sensor, time);
 				if (result == HTTP_RQT_SUCCESS) {
 					sensorlog_add(LOG_STD, sensor, time);
 					push_message(sensor);
@@ -815,28 +815,27 @@ void read_all_sensors(boolean online) {
 /**
  * Read ESP8296 ADS1115 sensors
 */
-int read_sensor_adc(Sensor_t *sensor) {
+int read_sensor_adc(Sensor_t *sensor, ulong time) {
 	DEBUG_PRINTLN(F("read_sensor_adc"));
 	if (!sensor || !sensor->flags.enable) return HTTP_RQT_NOT_RECEIVED;
-	if (sensor->id >= 8) return HTTP_RQT_NOT_RECEIVED;
+	if (sensor->id >= 16) return HTTP_RQT_NOT_RECEIVED;
 	//Init + Detect:
 
 	int port = 0x48 + sensor->id / 4;
 	int id = sensor->id % 4;
-	sensor->flags.data_ok = false;
 
 	ADS1115 adc(port);
 	adc.begin();
 	adc.reset();
 	sensor->repeat_native += adc.readADC(id);
-    if (++sensor->repeat_read < MAX_SENSOR_REPEAT_READ)
+    if (++sensor->repeat_read < MAX_SENSOR_REPEAT_READ && time < sensor->last_read + sensor->read_interval)
         return HTTP_RQT_NOT_RECEIVED;
 
-    uint64_t avgValue = sensor->repeat_native/MAX_SENSOR_REPEAT_READ;
+    uint64_t avgValue = sensor->repeat_native/sensor->repeat_read;
 
-    sensor->repeat_native = 0;
+    sensor->repeat_native = avgValue;
     sensor->repeat_data = 0;
-    sensor->repeat_read = 0;
+    sensor->repeat_read = 1; //read continously
 
 	sensor->last_native_data = avgValue;
 	sensor->last_data = adc.toVoltage(sensor->last_native_data);
@@ -898,6 +897,7 @@ int read_sensor_adc(Sensor_t *sensor) {
 	}
 
 	sensor->flags.data_ok = true;
+	sensor->last_read = time;
 
 	DEBUG_PRINT(F("adc sensor values: "));
 	DEBUG_PRINT(sensor->last_native_data);
@@ -1176,12 +1176,10 @@ int read_sensor_ip(Sensor_t *sensor) {
 /**
  * read a sensor
 */
-int read_sensor(Sensor_t *sensor) {
+int read_sensor(Sensor_t *sensor, ulong time) {
 
 	if (!sensor || !sensor->flags.enable)
 		return HTTP_RQT_NOT_RECEIVED;
-
-	ulong time = os.now_tz();
 
 	switch(sensor->type)
 	{
@@ -1206,8 +1204,7 @@ int read_sensor(Sensor_t *sensor) {
 		case SENSOR_USERDEF:
 			DEBUG_PRINT(F("Reading sensor "));
 			DEBUG_PRINTLN(sensor->name);
-			sensor->last_read = time;
-			return read_sensor_adc(sensor);
+			return read_sensor_adc(sensor, time);
 #endif
 #else
 #if defined ADS1115|PCF8591
@@ -1215,11 +1212,9 @@ int read_sensor(Sensor_t *sensor) {
 		case SENSOR_OSPI_ANALOG_P:
 		case SENSOR_OSPI_ANALOG_SMT50_MOIS:
 		case SENSOR_OSPI_ANALOG_SMT50_TEMP:
-			sensor->last_read = time;
-			return read_sensor_ospi(sensor);
+			return read_sensor_ospi(sensor, time);
 #endif
 		case SENSOR_REMOTE:
-			sensor->last_read = time;
 			return read_sensor_http(sensor);
 #endif
 		case SENSOR_MQTT:
@@ -1306,7 +1301,7 @@ void sensor_update_groups()
 					double value = 0;
 					int n = 0;
 					while (group) {
-						if (group->nr != nr && group->group == nr && group->flags.enable && group->flags.data_ok) {
+						if (group->nr != nr && group->group == nr && group->flags.enable) { // && group->flags.data_ok) {
 							switch (sensor->type) {
 								case SENSOR_GROUP_MIN:
 									if (n++ == 0)

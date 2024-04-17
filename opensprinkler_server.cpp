@@ -2362,13 +2362,16 @@ void server_sensor_readnow(OTF_PARAMS_DEF) {
 	bfill.emit_p(PSTR("{\"datas\":["));
 	uint count = sensor_count();
 	bool first = true;
+	ulong time = os.now_tz();
+
 	for (uint i = 0; i < count; i++) {
 
 		Sensor_t *sensor = sensor_by_idx(i);
 		if (!sensor || (nr != 0 && nr != sensor->nr))
 			continue;
 
-		int status = read_sensor(sensor);
+		sensor->last_read = time - sensor->read_interval - 1;
+		int status = read_sensor(sensor, time);
 
 		if (first) first = false; else bfill.emit_p(PSTR(","));
 

@@ -106,7 +106,7 @@ extern "C" {
 
 #define MIN_DISK_FREE                  8192   //8Kb min 
 
-#define MAX_SENSOR_REPEAT_READ          7 //read analog sensors 7x and calculate avg
+#define MAX_SENSOR_REPEAT_READ           32000 //max reads for calculating avg
 
 typedef struct SensorFlags {
 	uint     enable:1;  // enabled
@@ -140,7 +140,7 @@ typedef struct Sensor {
 	bool     mqtt_init:1;
 	bool     mqtt_push:1;
 	byte     unitid;
-	byte     repeat_read;
+	uint32_t repeat_read;
 	double   repeat_data;
 	uint64_t repeat_native;
 	ulong    last_read; //millis
@@ -248,7 +248,7 @@ void read_all_sensors(boolean online);
 Sensor_t *sensor_by_nr(uint nr);
 Sensor_t *sensor_by_idx(uint idx);
 
-int read_sensor(Sensor_t *sensor); //sensor value goes to last_native_data/last_data
+int read_sensor(Sensor_t *sensor, ulong time); //sensor value goes to last_native_data/last_data
 
 //Sensorlog API functions:
 #define LOG_STD   0

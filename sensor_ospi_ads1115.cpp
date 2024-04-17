@@ -35,10 +35,8 @@
 /**
 * Read the OSPi 1.6 onboard ADS1115 A2D
 **/
-int read_sensor_ospi(Sensor_t *sensor) {
+int read_sensor_ospi(Sensor_t *sensor, ulong time) {
         if (!sensor || !sensor->flags.enable) return HTTP_RQT_NOT_RECEIVED;
-
-        sensor->flags.data_ok = false;
 
         static ads1115_handle_t gs_handle; /**< ads1115 handle */
         uint8_t res;
@@ -104,18 +102,19 @@ int read_sensor_ospi(Sensor_t *sensor) {
 
         sensor->repeat_native += raw;
         sensor->repeat_data += v;
-        if (++sensor->repeat_read < MAX_SENSOR_REPEAT_READ)
+        if (++sensor->repeat_read < MAX_SENSOR_REPEAT_READ && time < sensor->last_read + sensor->read_interval)
                 return HTTP_RQT_NOT_RECEIVED;
 
-        raw = sensor->repeat_native/MAX_SENSOR_REPEAT_READ;
-        v = sensor->repeat_data/MAX_SENSOR_REPEAT_READ;
+        raw = sensor->repeat_native/sensor->repeat_read;
+        v = sensor->repeat_data/sensor->repeat_read;
 
-        sensor->repeat_native = 0;
-        sensor->repeat_data = 0;
-        sensor->repeat_read = 0;
+        sensor->repeat_native = raw;
+        sensor->repeat_data = v;
+        sensor->repeat_read = 1;
         
         sensor->last_native_data = raw;
         sensor->flags.data_ok = true;
+        sensor->last_read = time;
 
         //convert values:
         switch(sensor->type) {

@@ -32,7 +32,7 @@
  * @param[in] Sensor
  * @note      
  */
-int read_sensor_ospi(Sensor_t *sensor);
+int read_sensor_ospi(Sensor_t *sensor, ulong time);
 
 #endif // PCF8591
 
