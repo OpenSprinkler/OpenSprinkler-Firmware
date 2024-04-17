@@ -1222,9 +1222,9 @@ int read_sensor(Sensor_t *sensor, ulong time) {
 		case SENSOR_OSPI_ANALOG_SMT50_TEMP:
 			return read_sensor_ospi(sensor, time);
 #endif
+#endif
 		case SENSOR_REMOTE:
 			return read_sensor_http(sensor, time);
-#endif
 		case SENSOR_MQTT:
 			sensor->last_read = time;
 			return read_sensor_mqtt(sensor);
