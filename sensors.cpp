@@ -927,7 +927,7 @@ bool extract(char *s, char *buf, int maxlen) {
 	return true;
 }
 
-int read_sensor_http(Sensor_t *sensor) {
+int read_sensor_http(Sensor_t *sensor, ulong time) {
 #if defined(ESP8266)
     IPAddress _ip(sensor->ip);
 	byte ip[4] = {_ip[0], _ip[1], _ip[2], _ip[3]};
@@ -959,6 +959,8 @@ int read_sensor_http(Sensor_t *sensor) {
 		p = ether_buffer;
 		DEBUG_PRINTLN(p);
 
+		sensor->last_read = time;
+		
 		char buf[20];
 		char *s = strstr(p, "\"nativedata\":");
 		if (s && extract(s, buf, sizeof(buf))) {
@@ -978,6 +980,12 @@ int read_sensor_http(Sensor_t *sensor) {
 		if (s && extract(s, buf, sizeof(buf))) {
 			urlDecodeAndUnescape(buf);
 			strncpy(sensor->userdef_unit, buf, sizeof(sensor->userdef_unit)-1);
+		}
+		s = strstr(p, "\"last\":");
+		if (s && extract(s, buf, sizeof(buf))) {
+			sensor->last_read = strtoul(buf, NULL, 0);
+			if (sensor->last_read == 0)
+				sensor->flags.data_ok = false;
 		}
 	
 		return HTTP_RQT_SUCCESS;
@@ -1215,7 +1223,7 @@ int read_sensor(Sensor_t *sensor, ulong time) {
 			return read_sensor_ospi(sensor, time);
 #endif
 		case SENSOR_REMOTE:
-			return read_sensor_http(sensor);
+			return read_sensor_http(sensor, time);
 #endif
 		case SENSOR_MQTT:
 			sensor->last_read = time;
