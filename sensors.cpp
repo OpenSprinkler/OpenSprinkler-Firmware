@@ -20,6 +20,7 @@
  */
 
 #include <stdlib.h>
+#include <errno.h>
 #include "defines.h"
 #include "utils.h"
 #include "program.h"
