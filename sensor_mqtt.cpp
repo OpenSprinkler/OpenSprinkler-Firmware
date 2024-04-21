@@ -141,13 +141,18 @@ static void sensor_mqtt_callback(struct mosquitto *mosq, void *obj, const struct
 					buf[i] = 0;
 					DEBUG_PRINT("result: ");
 					DEBUG_PRINTLN(buf);	
-					sensor->last_data = atof(buf);
-					sensor->flags.data_ok = true;
-					sensor->last_read = now;
-                    DEBUG_PRINTLN("sensor_mqtt_callback2");
+					errno = 0;
+					char *e;
+					double value = strtod(buf, &e);
+					if (*e == 0 && errno == 0 && value != sensor->last_data) {
+						sensor->last_data = value;
+						sensor->flags.data_ok = true;
+						sensor->last_read = now;	
+                    	DEBUG_PRINTLN("sensor_mqtt_callback2");
     	
-        			sensorlog_add(LOG_STD, sensor, sensor->last_read);
-					sensor->mqtt_push = true;
+        				sensorlog_add(LOG_STD, sensor, sensor->last_read);
+						sensor->mqtt_push = true;
+					}
 				}
 			}
 		}

@@ -968,8 +968,15 @@ int read_sensor_http(Sensor_t *sensor, ulong time) {
 		}
 		s = strstr(p, "\"data\":");
 		if (s && extract(s, buf, sizeof(buf))) {
-			sensor->last_data = strtod(buf, NULL);
-			sensor->flags.data_ok = true;
+			char *e;
+			errno = 0;
+			double value = strtod(buf, &e);
+			if (*e == 0 && errno == 0 && value != sensor->last_data) {
+				sensor->last_data = value;
+				sensor->flags.data_ok = true;
+			} else {
+				return HTTP_RQT_NOT_RECEIVED;
+			}
 		}
 		s = strstr(p, "\"unitid\":");
 		if (s && extract(s, buf, sizeof(buf))) {
@@ -983,9 +990,12 @@ int read_sensor_http(Sensor_t *sensor, ulong time) {
 		}
 		s = strstr(p, "\"last\":");
 		if (s && extract(s, buf, sizeof(buf))) {
-			sensor->last_read = strtoul(buf, NULL, 0);
-			if (sensor->last_read == 0)
-				sensor->flags.data_ok = false;
+			ulong last = strtoul(buf, NULL, 0);
+			if (last == 0 || last == sensor->last_read) {
+				return HTTP_RQT_NOT_RECEIVED;
+			} else {
+				sensor->last_read = last;
+			}
 		}
 	
 		return HTTP_RQT_SUCCESS;
