@@ -972,7 +972,7 @@ int read_sensor_http(Sensor_t *sensor, ulong time) {
 			char *e;
 			errno = 0;
 			double value = strtod(buf, &e);
-			if (*e == 0 && errno == 0 && value != sensor->last_data) {
+			if (*e == 0 && errno == 0 && (value != sensor->last_data || !sensor->flags.data_ok || time-sensor->last_read > 6000)) {
 				sensor->last_data = value;
 				sensor->flags.data_ok = true;
 			} else {

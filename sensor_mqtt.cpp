@@ -144,7 +144,7 @@ static void sensor_mqtt_callback(struct mosquitto *mosq, void *obj, const struct
 					errno = 0;
 					char *e;
 					double value = strtod(buf, &e);
-					if (*e == 0 && errno == 0 && value != sensor->last_data) {
+					if (*e == 0 && errno == 0 && (value != sensor->last_data || !sensor->flags.data_ok || now-sensor->last_read > 6000)) {
 						sensor->last_data = value;
 						sensor->flags.data_ok = true;
 						sensor->last_read = now;	
