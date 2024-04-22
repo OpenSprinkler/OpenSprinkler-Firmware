@@ -2683,10 +2683,19 @@ void server_sensorlog_clear(OTF_PARAMS_DEF) {
 #endif
 	int log = -1;
 	uint nr = 0;
+	double under = 0;
+	bool use_under = false;
+	double over = 0;
+	bool use_over = false;
+
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("log"), true)) // Filter log for sensor-nr
 		log = atoi(tmp_buffer);
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("nr"), true)) // Filter log for sensor-nr
 		nr = strtoul(tmp_buffer, NULL, 0);
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("under"), true)) // values lower than 
+		use_under = sscanf(tmp_buffer, "%lf", &under) == 1;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("over"), true)) // values higher than 
+		use_over = sscanf(tmp_buffer, "%lf", &over) == 1;
 
 	DEBUG_PRINTLN(F("server_sensorlog_clear"));
 
@@ -2700,13 +2709,15 @@ void server_sensorlog_clear(OTF_PARAMS_DEF) {
 #endif
 
 	if (nr > 0) {
+		ulong n = 0;
 		if (log == -1) {
-			sensorlog_clear_sensor(nr, LOG_STD);
-			sensorlog_clear_sensor(nr, LOG_WEEK);
-			sensorlog_clear_sensor(nr, LOG_MONTH);
+			n += sensorlog_clear_sensor(nr, LOG_STD, use_under, under, use_over, over);
+			n += sensorlog_clear_sensor(nr, LOG_WEEK, use_under, under, use_over, over);
+			n += sensorlog_clear_sensor(nr, LOG_MONTH, use_under, under, use_over, over);
 		} else {
-			sensorlog_clear_sensor(nr, log);
+			n += sensorlog_clear_sensor(nr, log, use_under, under, use_over, over);
 		}
+		bfill.emit_p(PSTR("{\"deleted\":$L}"), n);
 	} else {
 		ulong log_size = sensorlog_size(LOG_STD);
 		ulong log_sizeW = sensorlog_size(LOG_WEEK);

@@ -19,7 +19,6 @@
  * along with this program.  If not, see
  * <http://www.gnu.org/licenses/>.
  */
-#include <errno.h>
 #include "sensor_mqtt.h"
 #include "sensors.h"
 #include "mqtt.h"
@@ -141,10 +140,10 @@ static void sensor_mqtt_callback(struct mosquitto *mosq, void *obj, const struct
 					buf[i] = 0;
 					DEBUG_PRINT("result: ");
 					DEBUG_PRINTLN(buf);	
-					errno = 0;
-					char *e;
-					double value = strtod(buf, &e);
-					if (*e == 0 && errno == 0 && (value != sensor->last_data || !sensor->flags.data_ok || now-sensor->last_read > 6000)) {
+
+					double value = -1;
+					int ok = sscanf(buf, "%lf", &value);
+					if (ok && (value != sensor->last_data || !sensor->flags.data_ok || now-sensor->last_read > 6000)) {
 						sensor->last_data = value;
 						sensor->flags.data_ok = true;
 						sensor->last_read = now;	

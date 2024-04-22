@@ -20,7 +20,6 @@
  */
 
 #include <stdlib.h>
-#include <errno.h>
 #include "defines.h"
 #include "utils.h"
 #include "program.h"
@@ -451,7 +450,7 @@ void sensorlog_clear(bool std, bool week, bool month) {
 	}
 }
 
-ulong sensorlog_clear_sensor(uint sensorNr, uint8_t log) {
+ulong sensorlog_clear_sensor(uint sensorNr, uint8_t log, bool use_under, double under, bool use_over, double over) {
 	SensorLog_t sensorlog;
 	checkLogSwitch(log);
 	const char *flast = getlogfile2(log);
@@ -474,9 +473,16 @@ ulong sensorlog_clear_sensor(uint sensorNr, uint8_t log) {
 		if (result == 0)
 			break;
 		if (sensorlog.nr == sensorNr) {
-			sensorlog.nr = 0;
-			file_write_block(f, &sensorlog, idx * SENSORLOG_STORE_SIZE, SENSORLOG_STORE_SIZE);
-			n++;
+			boolean found = true;
+			if (use_under && sensorlog.data > under)
+				found = false;
+			if (use_over && sensorlog.data < over)
+				found = false;
+			if (found) {
+				sensorlog.nr = 0;
+				file_write_block(f, &sensorlog, idx * SENSORLOG_STORE_SIZE, SENSORLOG_STORE_SIZE);
+				n++;
+			}
 		}
 		idxr++;
 	}
@@ -969,10 +975,9 @@ int read_sensor_http(Sensor_t *sensor, ulong time) {
 		}
 		s = strstr(p, "\"data\":");
 		if (s && extract(s, buf, sizeof(buf))) {
-			char *e;
-			errno = 0;
-			double value = strtod(buf, &e);
-			if (*e == 0 && errno == 0 && (value != sensor->last_data || !sensor->flags.data_ok || time-sensor->last_read > 6000)) {
+			double value = -1;
+			int ok = sscanf(buf, "%lf", &value);
+			if (ok && (value != sensor->last_data || !sensor->flags.data_ok || time-sensor->last_read > 6000)) {
 				sensor->last_data = value;
 				sensor->flags.data_ok = true;
 			} else {

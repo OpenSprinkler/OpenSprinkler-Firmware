@@ -258,7 +258,7 @@ bool sensorlog_add(uint8_t log, SensorLog_t *sensorlog);
 bool sensorlog_add(uint8_t log, Sensor_t *sensor, ulong time);
 void sensorlog_clear_all();
 void sensorlog_clear(bool std, bool week, bool month);
-ulong sensorlog_clear_sensor(uint sensorNr, uint8_t log);
+ulong sensorlog_clear_sensor(uint sensorNr, uint8_t log, bool use_under, double under, bool use_over, double over);
 SensorLog_t *sensorlog_load(uint8_t log, ulong pos);
 SensorLog_t *sensorlog_load(uint8_t log, ulong idx, SensorLog_t* sensorlog);
 int sensorlog_load2(uint8_t log, ulong idx, int count, SensorLog_t* sensorlog);
