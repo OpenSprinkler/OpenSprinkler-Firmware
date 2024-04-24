@@ -147,27 +147,15 @@ static void sensor_mqtt_callback(struct mosquitto *mosq, void *obj, const struct
 						sensor->last_data = value;
 						sensor->flags.data_ok = true;
 						sensor->last_read = now;	
-                    	DEBUG_PRINTLN("sensor_mqtt_callback2");
-    	
-        				sensorlog_add(LOG_STD, sensor, sensor->last_read);
 						sensor->mqtt_push = true;
+						sensor->repeat_read = 1; //This will call read_sensor_mqtt
+						DEBUG_PRINTLN("sensor_mqtt_callback2");
 					}
 				}
 			}
 		}
 		sensor = sensor->next;
 	}
-
-	//Now push the data out:
-	sensor = getSensors();
-	while (sensor) {
-		if (sensor->type == SENSOR_MQTT && sensor->mqtt_push) {
-			sensor->mqtt_push = false;
-			push_message(sensor);
-		}
-		sensor = sensor->next;
-	}
-
     DEBUG_PRINTLN("sensor_mqtt_callback3");
 }
 
@@ -175,7 +163,13 @@ int read_sensor_mqtt(Sensor_t *sensor) {
 	if (!os.mqtt.enabled() || !os.mqtt.connected()) {
 		sensor->flags.data_ok = false;
 		sensor->mqtt_init = false;
+	} else if (sensor->mqtt_push) {
+		DEBUG_PRINTLN("read_sensor_mqtt: push data");
+		sensor->mqtt_push = false;
+		sensor->repeat_read = 0;
+		return HTTP_RQT_SUCCESS; //Adds also data to the log + push data
 	} else {
+		sensor->repeat_read = 0;
         DEBUG_PRINT("read_sensor_mqtt1: ");
 		DEBUG_PRINTLN(sensor->name);
 		char *topic = SensorUrl_get(sensor->nr, SENSORURL_TYPE_TOPIC);
