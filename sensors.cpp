@@ -802,7 +802,7 @@ void read_all_sensors(boolean online) {
 
 	while (sensor) {
 		if (time >= sensor->last_read + sensor->read_interval || sensor->repeat_read) {
-			if (online || sensor->ip == 0) {
+			if (online || (sensor->ip == 0 && sensor->type != SENSOR_MQTT)/*  */) {
 				int result = read_sensor(sensor, time);
 				if (result == HTTP_RQT_SUCCESS) {
 					sensorlog_add(LOG_STD, sensor, time);
