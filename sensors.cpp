@@ -256,6 +256,7 @@ void sensor_load() {
 		if (!last) sensors = sensor;
 		else last->next = sensor;
 		last = sensor;
+		sensor->flags.data_ok = false;
 		sensor->next = NULL;
 		pos += SENSOR_STORE_SIZE;
 	}

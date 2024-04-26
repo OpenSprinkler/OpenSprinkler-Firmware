@@ -112,12 +112,6 @@ static void sensor_mqtt_callback(struct mosquitto *mosq, void *obj, const struct
 				char *p = (char*)payload;				
 				char *f = jsonFilter;
 
-				DEBUG_PRINT("payload: ");
-				DEBUG_PRINTLN(p);
-
-				DEBUG_PRINT("jsonfilter: ");
-				DEBUG_PRINTLN(jsonFilter);
-
 				while (f && p) {
 					f = strstr(jsonFilter, "|");
 					if (f) {
