@@ -38,6 +38,7 @@
 //remove unused functions: void write_to_file(const char *fname, const char *data, ulong size, ulong pos=0, bool trunc=true);
 //remove unused functions: void read_from_file(const char *fname, char *data, ulong maxsize=TMP_BUFFER_SIZE, int pos=0);
 void remove_file(const char *fname);
+bool rename_file(const char *fn_old, const char *fn_new);
 bool file_exists(const char *fname);
 
 ulong file_size(const char *fn);

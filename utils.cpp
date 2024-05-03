@@ -251,6 +251,17 @@ ulong file_size(const char *fn) {
 	return size;
 }
 
+bool rename_file(const char *fn_old, const char *fn_new) {
+#if defined(ESP8266)
+	return LittleFS.rename(fn_old, fn_new);
+#elif defined(ARDUINO)
+	SdFile file(fn_old, O_READ);
+	return file.rename(fn_new);
+#else
+	return rename(fn_old, fn_new) == 0;
+#endif
+}
+
 // file functions
 ulong file_read_block(const char *fn, void *dst, ulong pos, ulong len) {
 	ulong result = 0;

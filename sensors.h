@@ -43,6 +43,7 @@ extern "C" {
 
 //Files
 #define SENSOR_FILENAME       "sensor.dat"  // analog sensor filename
+#define SENSOR_FILENAME_BAK   "sensor.bak"  // analog sensor filename backup
 #define PROG_SENSOR_FILENAME  "progsensor.dat"  // sensor to program assign filename
 #define SENSORLOG_FILENAME1   "sensorlog.dat"   // analog sensor log filename
 #define SENSORLOG_FILENAME2   "sensorlog2.dat"  // analog sensor log filename2

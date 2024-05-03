@@ -39,6 +39,7 @@ byte findKeyVal (const char *str,char *strbuf, uint16_t maxlen,const char *key,b
 
 //All sensors:
 static Sensor_t *sensors = NULL;
+static time_t last_save_time = 0;
 
 //Sensor URLS:
 static SensorUrl_t * sensorUrls = NULL;
@@ -262,6 +263,7 @@ void sensor_load() {
 	}
 
 	SensorUrl_load();
+	last_save_time = os.now_tz();
 }
 
 /**
@@ -270,17 +272,21 @@ void sensor_load() {
  */
 void sensor_save() {
 	DEBUG_PRINTLN(F("sensor_save"));
-	if (file_exists(SENSOR_FILENAME))
-		remove_file(SENSOR_FILENAME);
+	if (file_exists(SENSOR_FILENAME_BAK))
+		remove_file(SENSOR_FILENAME_BAK);
 	
 	ulong pos = 0;
 	Sensor_t *sensor = sensors;
 	while (sensor) {
-		file_write_block(SENSOR_FILENAME, sensor, pos, SENSOR_STORE_SIZE);
+		file_write_block(SENSOR_FILENAME_BAK, sensor, pos, SENSOR_STORE_SIZE);
 		sensor = sensor->next;
 		pos += SENSOR_STORE_SIZE; 
 	}
 
+	if (file_exists(SENSOR_FILENAME))
+		remove_file(SENSOR_FILENAME);
+	rename_file(SENSOR_FILENAME_BAK, SENSOR_FILENAME);
+	last_save_time = os.now_tz();
 	DEBUG_PRINTLN(F("sensor_save2"));
 }
 
@@ -816,6 +822,8 @@ void read_all_sensors(boolean online) {
 	}
 	sensor_update_groups();
 	calc_sensorlogs();
+	if (time - last_save_time > 3600) //1h
+		sensor_save();
 }
 
 #if defined(ARDUINO)
