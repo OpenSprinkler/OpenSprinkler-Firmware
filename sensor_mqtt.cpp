@@ -115,15 +115,16 @@ static void sensor_mqtt_callback(struct mosquitto *mosq, void *obj, const struct
 				while (f && p) {
 					f = strstr(jsonFilter, "|");
 					if (f) {
-						p = strnlstr(p, jsonFilter, f-jsonFilter, (char*)payload+length-p);
+						p = strnlstr(p, jsonFilter, f-jsonFilter, (char*)payload-p+length);
 						jsonFilter = f+1;
 					} else {
 						p = strstr(p, jsonFilter);
 					}
 				}
 				if (p) {
+					p += strlen(jsonFilter);
 					char buf[30];
-					p = strpbrk(p, "0123456789.-+");
+					p = strpbrk(p, "0123456789.-+nullNULL");
 					uint i = 0;
 					while (p && i < sizeof(buf)) {
 						char ch = *p++;
@@ -135,9 +136,9 @@ static void sensor_mqtt_callback(struct mosquitto *mosq, void *obj, const struct
 					DEBUG_PRINT("result: ");
 					DEBUG_PRINTLN(buf);	
 
-					double value = -1;
+					double value = -9999;
 					int ok = sscanf(buf, "%lf", &value);
-					if (ok && (value != sensor->last_data || !sensor->flags.data_ok || now-sensor->last_read > 6000)) {
+					if (ok && value >= -1000 && value <= 1000 && (value != sensor->last_data || !sensor->flags.data_ok || now-sensor->last_read > 6000)) {
 						sensor->last_data = value;
 						sensor->flags.data_ok = true;
 						sensor->last_read = now;	
