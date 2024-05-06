@@ -268,6 +268,19 @@ enum {
 	NUM_SOPTS // total number of string options
 };
 
+#define BOOT_MENU_V2
+#if defined(BOOT_MENU_V2)
+
+enum {
+	BOOT_MENU_SETUP_OPTIONS=0,
+	BOOT_MENU_DEVICE_PW_RESET,
+  	BOOT_MENU_FACTORY_RESET,
+  	BOOT_MENU_INTERNAL_TEST,
+	BOOT_MENU_ITEMS // number of menu items, this is the 'Exit' menu item
+};
+  
+#endif
+
 /** Log Data Type */
 #define LOGDATA_STATION    0x00
 #define LOGDATA_SENSOR1    0x01
@@ -530,8 +543,8 @@ enum {
 #define BUTTON_FLAG_UP      0x20  // up flag
 
 // button timing values
-#define BUTTON_DELAY_MS        1  // short delay (milliseconds)
-#define BUTTON_HOLD_MS      1000  // long hold expiration time (milliseconds)
+#define BUTTON_DELAY_MS        5  // short delay (milliseconds)
+#define BUTTON_HOLD_MS      1500  // long hold expiration time (milliseconds)
 
 // button mode values
 #define BUTTON_WAIT_NONE       0  // do not wait, return value immediately

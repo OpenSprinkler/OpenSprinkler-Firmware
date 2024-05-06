@@ -56,7 +56,7 @@ void ESP32_listDir(const char * dirname, uint8_t levels){
             if(levels){
                 ESP32_listDir(file.path(), levels -1);
             }
-            Serial.print(" --- ");
+            Serial.println(" --- ");
         } else {
             Serial.print("  FILE: ");
             Serial.print(file.name());

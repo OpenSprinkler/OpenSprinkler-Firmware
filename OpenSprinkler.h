@@ -176,6 +176,20 @@ struct OTCConfig {
 	uint32_t port;
 };
 
+#if defined(BOOT_MENU_V2)
+
+typedef void(*pfunc)();
+struct MenuItem {
+  const char* name;
+  MenuItem* subMenu;
+  int subMenuSize;
+  int iopt_idx;
+  pfunc fn_name;
+  boolean needReboot;
+};
+
+#endif
+
 extern const char iopt_json_names[];
 extern const uint8_t iopt_max[];
 
@@ -239,6 +253,15 @@ public:
 	#if defined(ESP32)
 	static bool  lcd_dimmed;
 	#endif
+	
+	#if defined(USE_ROTARY_ENCODER)
+
+	volatile int encoderPos = 0;
+	volatile int lastEncoderPos = 0;
+	static const int encoderTable[] = {0, -1, 1, 0, 1, 0, 0, -1, -1, 0, 0, 1, 0, 1, -1, 0};
+
+	#endif
+
 	static ulong checkwt_lasttime;  // time when weather was checked
 	static ulong checkwt_success_lasttime; // time when weather check was successful
 	static ulong powerup_lasttime;  // time when controller is powered up most recently
@@ -293,6 +316,8 @@ public:
 	static String sopt_load(byte oid);
 	static void populate_master();
 	static byte password_verify(const char *pw);  // verify password
+	static void set_test_mode();
+	static void reset_password();
 
 	// -- controller operation
 	static void enable();   // enable controller operation
@@ -332,6 +357,12 @@ public:
 	static void lcd_print_screen(char c);  // print station bits of the board selected by display_board
 	static void lcd_print_version(byte v);  // print version number
 
+	#if defined(BOOT_MENU_V2)
+	//MenuItem* currentMainmenu = nullptr;
+	static void lcd_print_menu(const char* itemName);
+	static void ui_boot_menu(MenuItem* menuItems, int menuSize);
+	#endif
+
 	static String time2str(uint32_t t) {
 		uint16_t h = hour(t);
 		uint16_t m = minute(t);
@@ -355,6 +386,10 @@ public:
 
 	// -- UI functions --
 	static void ui_set_options(int oid);		// ui for setting options (oid-> starting option index)
+	#if defined(USE_ROTARY_ENCODER)
+	static void handleRotaryEncoderRotate();
+	#endif
+	
 	static void lcd_set_brightness(byte value=1);
 	static void lcd_set_contrast();
 

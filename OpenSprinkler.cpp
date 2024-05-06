@@ -56,6 +56,14 @@ byte OpenSprinkler::button_timeout;
 #if defined(ESP32)
 bool OpenSprinkler::lcd_dimmed = false;
 #endif
+#if defined(USE_ROTARY_ENCODER)
+volatile int OpenSprinkler::encoderPos = 0;
+volatile int OpenSprinkler::lastEncoderPos = 0;
+volatile bool OpenSprinkler::buttonPressed = false;
+
+byte OpenSprinkler::current_menu_item = 0;
+byte OpenSprinkler::current_submenu_item = 0;
+#endif
 ulong OpenSprinkler::checkwt_lasttime;
 ulong OpenSprinkler::checkwt_success_lasttime;
 ulong OpenSprinkler::powerup_lasttime;
@@ -82,16 +90,16 @@ extern void start_server_ap();
 #if defined(ESP8266) || defined(ESP32) 
 	
 	//DEBUG_PRINTLN(F("I2C Init with pins "));
-	//DEBUG_PRINT(DEBUG_TOSTRING(SDA));
+	//DEBUG_PRINT(DEBUG_TOSTRING(SDA_PIN));
 	//DEBUG_PRINT(" ");
 	//DEBUG_PRINT(SCL);
 	//DEBUG_PRINTLN(F(" with LCD @ "));
 	//DEBUG_PRINTLN(LCD_I2CADDR);
 	
 	#if defined(LCD_SH1106)
-	SH1106Display OpenSprinkler::lcd(LCD_I2CADDR, SDA, SCL);
+	SH1106Display OpenSprinkler::lcd(LCD_I2CADDR, SDA_PIN, SCL_PIN);
 	#else
-	SSD1306Display OpenSprinkler::lcd(LCD_I2CADDR, SDA, SCL);
+	SSD1306Display OpenSprinkler::lcd(LCD_I2CADDR, SDA_PIN, SCL_PIN);
 	#endif 
 	byte OpenSprinkler::state = OS_STATE_INITIAL;
 	byte OpenSprinkler::prev_station_bits[MAX_NUM_BOARDS];
@@ -421,6 +429,27 @@ const char *OpenSprinkler::sopts[] = {
 	DEFAULT_DEVICE_NAME,
 	DEFAULT_EMPTY_STRING, // SOPT_STA_BSSID_CHL
 };
+
+#if defined(BOOT_MENU_V2)
+
+// Submenu for first menu set
+MenuItem bootMenuSetup[] = {
+  {"Submenu Item 1.1", nullptr, 0, -1,nullptr,false},
+  {"Submenu Item 1.2", nullptr, 0, -1,nullptr,false},
+  {"Submenu Item 1.3", nullptr, 0, -1,nullptr,false},
+  {"<== Back ", nullptr, 0, -1,nullptr,false},
+};
+
+// First menu set
+MenuItem bootMenu[] = {
+  {" === Setup ===", bootMenuSetup, sizeof(bootMenuSetup) / sizeof(bootMenuSetup[0]), -1, nullptr, false},
+  {"Device PW Reset?", nullptr, 0, -1,nullptr,false},
+  {" Factory reset?", nullptr, 0, -1,OpenSprinkler::pre_factory_reset,true},
+  {" Internal test", nullptr, 0, -1,OpenSprinkler::set_test_mode,false},
+  {"  == Exit ==", nullptr, 0, -1,nullptr,false},
+};
+
+#endif
 
 /** Weekday strings (stored in PROGMEM to reduce RAM usage) */
 static const char days_str[] PROGMEM =
@@ -771,7 +800,7 @@ void OpenSprinkler::begin() {
 
 #if defined(ARDUINO)
 	#if defined(ESP32)
-	if(!Wire.begin(SDA,SCL)) { DEBUG_PRINTLN(F("Error initiating I2C")); }
+	if(!Wire.begin(SDA_PIN,SCL_PIN)) { DEBUG_PRINTLN(F("Error initiating I2C")); }
 	#ifdef ENABLE_DEBUG
 	scan_i2c();
 	#endif
@@ -916,14 +945,20 @@ void OpenSprinkler::begin() {
 		pinMode(PIN_BUTTON_2, INPUT_PULLUP);
 		pinMode(PIN_BUTTON_3, INPUT_PULLUP);
 	#else
+		DEBUG_PRINTLN(F("Rotary encoder enabled"));
 		PIN_BUTTON_1 = ROTARY_ENCODER_A_PIN;
 		PIN_BUTTON_2 = ROTARY_ENCODER_BUTTON_PIN;
 		PIN_BUTTON_3 = ROTARY_ENCODER_B_PIN;
-	
-		pinMode(PIN_BUTTON_1, INPUT);
-		pinMode(PIN_BUTTON_2, INPUT);
-		pinMode(PIN_BUTTON_3, INPUT);
+
+		pinMode(PIN_BUTTON_1, INPUT_PULLUP);
+		pinMode(PIN_BUTTON_2, INPUT_PULLUP);
+		pinMode(PIN_BUTTON_3, INPUT_PULLUP);
+
+		attachInterrupt(digitalPinToInterrupt(ROTARY_ENCODER_A_PIN), OpenSprinkler::handleEncoder, CHANGE);
+
 	#endif
+
+	/* TODO - interrupt driven button/rotary encoder */
 
 	/* detect expanders */
 	for(byte i=0;i<(MAX_NUM_BOARDS)/2;i++)
@@ -1047,7 +1082,7 @@ void OpenSprinkler::begin() {
 
 	lcd_start();
 
-	#if defined(ESP8266) || defined(ESP32)
+	#if defined(ESP8266) || defined(ESP32) // todo: we should remove this, until esp32 port has ethernet support
 		lcd.createChar(ICON_ETHER_CONNECTED, _iconimage_ether_connected);
 		lcd.createChar(ICON_ETHER_DISCONNECTED, _iconimage_ether_disconnected);
 	#else
@@ -1133,6 +1168,8 @@ void OpenSprinkler::begin() {
 	pinMode(PIN_BUTTON_1, INPUT_PULLUP);
 	pinMode(PIN_BUTTON_2, INPUT_PULLUP);
 	pinMode(PIN_BUTTON_3, INPUT_PULLUP);
+
+	// Rotary knob setup should happen here!
 
 	// detect and check RTC type
 	DEBUG_PRINT(F("Detecting RTC..."));
@@ -1825,6 +1862,19 @@ byte OpenSprinkler::password_verify(const char *pw) {
 	return (file_cmp_block(SOPTS_FILENAME, pw, SOPT_PASSWORD*MAX_SOPTS_SIZE)==0) ? 1 : 0;
 }
 
+#if defined(BOOT_MENU_V2)
+void OpenSprinkler::set_test_mode() {
+	wifi_testmode = 1;
+	#if defined(TESTMODE_SSID)
+	wifi_ssid = TESTMODE_SSID;
+	wifi_pass = TESTMODE_PASS;
+	#else
+	wifi_ssid = "ostest";
+	wifi_pass = "opendoor";
+	#endif
+}
+#endif
+
 // ==================
 // Schedule Functions
 // ==================
@@ -2361,11 +2411,14 @@ void OpenSprinkler::options_setup() {
 		attribs_load();
 	}
 
+	DEBUG_PRINTLN(F("Checking button state"));
+
 #if defined(ARDUINO)	// handle AVR buttons
 	byte button = button_read(BUTTON_WAIT_NONE);
 
+	#ifndef USE_ROTARY_ENCODER
 	switch(button & BUTTON_MASK) {
-
+	#ifndef BOOT_MENU_V2
 	case BUTTON_1:
 		// if BUTTON_1 is pressed during startup, go to 'reset all options'
 		ui_set_options(IOPT_RESET);
@@ -2374,32 +2427,38 @@ void OpenSprinkler::options_setup() {
 			reboot_dev(REBOOT_CAUSE_RESET);
 		}
 		break;
-
+	#endif
 	case BUTTON_2:
 	#if defined(ESP8266) || defined(ESP32)
-		// if BUTTON_2 is pressed during startup, go to Test OS mode
-		// only available for OS 3.0
-		lcd_print_line_clear_pgm(PSTR("===Test Mode==="), 0);
-		lcd_print_line_clear_pgm(PSTR("  B3:proceed"), 1);
-		do {
-			button = button_read(BUTTON_WAIT_NONE);
-		} while(!((button&BUTTON_MASK)==BUTTON_3 && (button&BUTTON_FLAG_DOWN)));
-		// set test mode parameters
+		#ifndef BOOT_MENU_V2
+			// if BUTTON_2 is pressed during startup, go to Test OS mode
+			// only available for OS 3.0
+			lcd_print_line_clear_pgm(PSTR("===Test Mode==="), 0);
+			lcd_print_line_clear_pgm(PSTR("  B3:proceed"), 1);
+			do {
+				button = button_read(BUTTON_WAIT_NONE);
+			} while(!((button&BUTTON_MASK)==BUTTON_3 && (button&BUTTON_FLAG_DOWN)));
+			// set test mode parameters
 
-		//iopts[IOPT_WIFI_MODE] = WIFI_MODE_STA;
-		wifi_testmode = 1;
-		#if defined(TESTMODE_SSID)
-		wifi_ssid = TESTMODE_SSID;
-		wifi_pass = TESTMODE_PASS;
+			//iopts[IOPT_WIFI_MODE] = WIFI_MODE_STA;
+			wifi_testmode = 1;
+			#if defined(TESTMODE_SSID)
+			wifi_ssid = TESTMODE_SSID;
+			wifi_pass = TESTMODE_PASS;
+			#else
+			wifi_ssid = "ostest";
+			wifi_pass = "opendoor";
+			#endif
+			button = 0;
 		#else
-		wifi_ssid = "ostest";
-		wifi_pass = "opendoor";
+			DEBUG_PRINTLN("Showing boot menu v2");
+			ui_boot_menu(bootMenu,BOOT_MENU_ITEMS);
+			button = 0; // will continue booting
 		#endif
-		button = 0;
 	#endif
 
 		break;
-
+	#ifndef BOOT_MENU_V2
 	case BUTTON_3:
 		// if BUTTON_3 is pressed during startup, enter Setup option mode
 		lcd_print_line_clear_pgm(PSTR("==Set Options=="), 0);
@@ -2416,8 +2475,26 @@ void OpenSprinkler::options_setup() {
 			reboot_dev(REBOOT_CAUSE_RESET);
 		}
 		break;
+	#endif
 	}
-
+	#else
+	// rotary encoder test
+	// 4 pages: setup options, device password reset, factory reset, internal test
+	// "on hold" will activate a function, normal click is "enter" or "hold for yes"
+	byte button = button_read(BUTTON_WAIT_NONE);
+	if ( (button & BUTTON_MASK) == BUTTON_2 ) {
+		button = 0;
+		ui_boot_menu(bootMenu, BOOT_MENU_ITEMS);	
+	}
+	
+	/*
+	
+	if (iopts[IOPT_RESET]) {
+		pre_factory_reset();
+		reboot_dev(REBOOT_CAUSE_RESET);
+	}
+	*/
+	#endif
 	// turn on LCD backlight and contrast
 	lcd_set_brightness();
 	lcd_set_contrast();
@@ -2891,6 +2968,7 @@ void OpenSprinkler::lcd_print_option(int i) {
 
 /** Button functions */
 /** wait for button */
+/* this is same for HW buttons and rotary encoder: only center button will'be used here */
 byte OpenSprinkler::button_read_busy(byte pin_butt, byte waitmode, byte butt, byte is_holding) {
 
 	int hold_time = 0;
@@ -2910,6 +2988,51 @@ byte OpenSprinkler::button_read_busy(byte pin_butt, byte waitmode, byte butt, by
 	return butt;
 
 }
+
+#if defined(USE_ROTARY_ENCODER)
+
+// interrupt driven encoder read
+void OpenSprinkler::handleRotaryEncoderRotate() {
+	static int lastEncoded = 0;
+  	static int encoderValue = 0;
+	
+	int MSB = digitalRead(ENCODER_PIN_A);
+  	int LSB = digitalRead(ENCODER_PIN_B);
+
+  	 int encoded = (MSB << 1) | LSB;
+	int sum = (lastEncoded << 2) | encoded;
+	int increment = encoderTable[sum & 0x0F];
+
+	encoderValue += increment;
+	encoderPos = encoderValue;
+	lastEncoded = encoded;
+}
+
+/** read button and returns button value 'OR'ed with flag bits */
+byte OpenSprinkler::button_read(byte waitmode)
+{
+	static byte old = BUTTON_NONE;
+	byte curr = BUTTON_NONE;
+	byte is_holding = (old&BUTTON_FLAG_HOLD);
+
+	delay(BUTTON_DELAY_MS);
+
+	if (digitalReadExt(PIN_BUTTON_2) == 0) {
+		curr = button_read_busy(PIN_BUTTON_2, waitmode, BUTTON_2, is_holding);
+	}
+
+	// set flags in return value
+	byte ret = curr;
+	if (!(old&BUTTON_MASK) && (curr&BUTTON_MASK))
+		ret |= BUTTON_FLAG_DOWN;
+	if ((old&BUTTON_MASK) && !(curr&BUTTON_MASK))
+		ret |= BUTTON_FLAG_UP;
+
+	old = curr;
+
+	return ret;
+}
+#else
 
 /** read button and returns button value 'OR'ed with flag bits */
 byte OpenSprinkler::button_read(byte waitmode)
@@ -2939,7 +3062,9 @@ byte OpenSprinkler::button_read(byte waitmode)
 
 	return ret;
 }
+#endif // if defined(USE_ROTARY_ENCODER)
 
+#ifndef BOOT_MENU_V2
 /** user interface for setting options during startup */
 void OpenSprinkler::ui_set_options(int oid)
 {
@@ -2964,7 +3089,7 @@ void OpenSprinkler::ui_set_options(int oid)
 					i==IOPT_HTTPPORT_0 || i==IOPT_HTTPPORT_1 ||
 					i==IOPT_PULSE_RATE_0 || i==IOPT_PULSE_RATE_1 ||
 					i==IOPT_WIFI_MODE) break; // ignore non-editable options
-			if (iopts[i] != 0) iopts[i] --;
+			if (iopts[i] != 0) iopts[i] --; 
 			break;
 
 		case BUTTON_3:
@@ -3004,6 +3129,142 @@ void OpenSprinkler::ui_set_options(int oid)
 	}
 	lcd.noBlink();
 }
+
+#else
+/** user interface for setting options during startup, using the new, paged menu */
+void OpenSprinkler::ui_boot_menu(MenuItem* menuItems, int menuSize)
+{
+	boolean finished = false;
+	
+	byte button;
+	int encoderDelta = 0;
+	int prevMenuItem = -1;
+	int currentMenuItem = 0;
+	void (*menu_f_p)();
+
+	/*
+	if ( currentMainmenu == nullptr ) {
+		currentMenumenu = menuItems;
+	}
+	*/
+
+	// rotary encoder is like 3 buttons: left: B1, button: B2, right: B3
+	while(!finished) {
+		#if defined(USE_ROTARY_ENODER)
+		encoderDelta = encoderPos - lastEncoderPos;
+		if ( encoderDelta != 0 ) {
+			if ( encoderDelta < 0 ) {
+				// CC rotate - BUTTON_1
+				button |= BUTTON_1;
+				button |= BUTTON_FLAG_UP;
+			} else {
+				// clockwise rotate - BUTTON_3
+				button |= BUTTON_3;
+				button |= BUTTON_FLAG_UP;
+			}
+
+		} else {
+			button = button_read(BUTTON_WAIT_HOLD);
+		}
+		#else
+		//DEBUG_PRINTLN("Button read");
+		button = button_read(BUTTON_WAIT_HOLD);
+		//DEBUG_PRINTLN(button);
+		#endif
+
+		switch (button & BUTTON_MASK) {
+		case BUTTON_1:
+			DEBUG_PRINTLN("Page-");
+			// step left
+			if ( currentMenuItem != 0 ) {
+				currentMenuItem --;
+			}
+			break;
+
+		case BUTTON_2:
+			DEBUG_PRINTLN("B2");
+			// enter
+			//if (!(button & BUTTON_FLAG_DOWN)) {
+			//	DEBUG_PRINTLN("Flag down");
+			//	break;
+			//}
+			if (button & BUTTON_FLAG_HOLD) {
+				DEBUG_PRINTLN("Long hold for item");
+				if ( currentMenuItem == menuSize ) {
+					// exit with long press
+					DEBUG_PRINTLN("Last menuitem, exiting");
+					finished = true;	
+				} else {
+					if ( menuItems[currentMenuItem].fn_name != nullptr ) {
+						DEBUG_PRINTLN("Calling defined function");
+						menu_f_p = menuItems[currentMenuItem].fn_name;
+						menu_f_p();
+					} else {
+						DEBUG_PRINTLN("Nothing set to do now");
+					}
+					// long press, save options
+					//	iopts_save();
+					//finished = true; // will exit only on exit or if reboot needed
+				}
+			} else if ( button & BUTTON_FLAG_UP ) {
+				DEBUG_PRINTLN("Should be short press");
+				if ( currentMenuItem == menuSize  ) {
+					DEBUG_PRINTLN("Last menuitem, exiting");
+					// exit
+					finished = true;
+				} else {
+					// submenu enter, if any
+					if ( menuItems[currentMenuItem].subMenu != nullptr ) {
+						// enter submenu 
+						ui_boot_menu(menuItems[currentMenuItem].subMenu, menuItems[currentMenuItem].subMenuSize);
+					}
+				}
+			} else {
+				DEBUG_PRINTLN("Unknown state");
+			}
+			break;
+
+		case BUTTON_3:
+			DEBUG_PRINTLN("Page+");
+			if ( currentMenuItem < menuSize ) currentMenuItem++;
+			break;
+		case BUTTON_NONE:
+			//DEBUG_PRINTLN("No button");
+			break;
+		}
+
+		// prevent flashing the screen
+		if ( currentMenuItem != prevMenuItem ) {
+			DEBUG_PRINT(F("Printing menu item "));
+			DEBUG_PRINTLN(currentMenuItem);
+			lcd_print_menu(menuItems[currentMenuItem].name);
+		}
+		prevMenuItem = currentMenuItem;
+		//DEBUG_PRINTLN(button&BUTTON_FLAG_DOWN);
+		//DEBUG_PRINTLN(button&BUTTON_FLAG_UP);
+		//DEBUG_PRINTLN(button&BUTTON_FLAG_HOLD);
+		//delay(50); // set to 350 for testing from 50
+	}
+
+	// if in mainmenu, than we should reboot!
+	//if ( currentMainmenu == menuItems &&  ) {
+	if ( menuItems[currentMenuItem].needReboot ) {
+		reboot_dev(REBOOT_CAUSE_RESET);
+	}
+
+	lcd.noBlink();
+}
+
+void OpenSprinkler::lcd_print_menu(const char* itemName) {
+
+	lcd.clear();
+  	lcd.setCursor(0, 0);
+  	lcd.println(itemName);
+  //lcd.display();
+
+}
+
+#endif
 
 /** Set LCD contrast (using PWM) */
 void OpenSprinkler::lcd_set_contrast() {
