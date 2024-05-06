@@ -37,7 +37,7 @@ typedef unsigned long ulong;
 														// if this number is different from the one stored in non-volatile memory
 														// a device reset will be automatically triggered
 
-#define OS_FW_MINOR      1  // Firmware minor version
+#define OS_FW_MINOR      3  // Firmware minor version
 
 /** Hardware version base numbers */
 #define OS_HW_VERSION_BASE   0x00 // OpenSprinkler
@@ -350,6 +350,7 @@ enum {
 	#define LADR_I2CADDR     0x23 // latch driver I2C address
 	#define EXP_I2CADDR_BASE 0x24 // base of expander I2C address
 	#define LCD_I2CADDR      0x3C // 128x64 OLED display I2C address
+	#define EEPROM_I2CADDR   0x50 // 24C02 EEPROM I2C address
 
 	#define PIN_CURR_SENSE    A0
 	#define PIN_FREE_LIST     {} // no free GPIO pin at the moment

@@ -581,13 +581,78 @@ byte OpenSprinkler::start_network() {
 }
 
 byte OpenSprinkler::start_ether() {
+<<<<<<< HEAD
 #if defined(ESP8266) // esp32 has no ethernet support now - todo
 	if(hw_rev<2) return 0;  // ethernet capability is only available after hw_rev 2
+=======
+#if defined(ESP8266)
+	if(hw_rev<2) return 0;  // ethernet capability is only available when hw_rev>=2
+	eth.isW5500 = (hw_rev==2)?false:true; // os 3.2 uses enc28j60 and 3.3 uses w5500
+>>>>>>> 613efae85660d8fbb5875980ea9675bff51e5902
 
 	SPI.begin();
 	SPI.setBitOrder(MSBFIRST);
 	SPI.setDataMode(SPI_MODE0);
 	SPI.setFrequency(4000000);
+
+	if(eth.isW5500) {
+		DEBUG_PRINTLN(F("detect existence of W5500"));
+		/* this is copied from w5500.cpp wizchip_sw_reset
+		 * perform a software reset and see if we get a correct response
+		 * without this, eth.begin will crash if W5500 is not connected
+		 * ideally wizchip_sw_reset should return a value but since it doesn't
+		 * we have to extract it code here
+		 * */
+		static const uint8_t AccessModeRead = (0x00 << 2);
+		static const uint8_t AccessModeWrite = (0x01 << 2);
+		static const uint8_t BlockSelectCReg = (0x00 << 3);
+		pinMode(PIN_ETHER_CS, OUTPUT);
+		// ==> setMR(MR_RST)
+		digitalWrite(PIN_ETHER_CS, LOW);
+		SPI.transfer((0x00 & 0xFF00) >> 8);
+		SPI.transfer((0x00 & 0x00FF) >> 0);
+		SPI.transfer(BlockSelectCReg | AccessModeWrite);
+		SPI.transfer(0x80);
+		digitalWrite(PIN_ETHER_CS, HIGH);
+
+		// ==> ret = getMR()
+		uint8_t ret;
+		digitalWrite(PIN_ETHER_CS, LOW);
+		SPI.transfer((0x00 & 0xFF00) >> 8);
+		SPI.transfer((0x00 & 0x00FF) >> 0);
+		SPI.transfer(BlockSelectCReg | AccessModeRead);
+		ret = SPI.transfer(0);
+		digitalWrite(PIN_ETHER_CS, HIGH);
+		if(ret!=0) return 0; // ret is expected to be 0
+	} else {
+		/* this is copied from enc28j60.cpp geterevid
+		 * check to see if the hardware revision number if expected
+		 * */
+		DEBUG_PRINTLN(F("detect existence of ENC28J60"));
+		#define MAADRX_BANK 0x03
+		#define EREVID 0x12
+		#define ECON1 0x1f
+
+		// ==> setregbank(MAADRX_BANK);
+		pinMode(PIN_ETHER_CS, OUTPUT);
+		uint8_t r;
+		digitalWrite(PIN_ETHER_CS, LOW);
+		SPI.transfer(0x00 | (ECON1 & 0x1f));
+		r = SPI.transfer(0);
+		digitalWrite(PIN_ETHER_CS, HIGH);
+
+		digitalWrite(PIN_ETHER_CS, LOW);
+		SPI.transfer(0x40 | (ECON1 & 0x1f));
+		SPI.transfer((r & 0xfc) | (MAADRX_BANK & 0x03));
+		digitalWrite(PIN_ETHER_CS, HIGH);
+
+		// ==> r = readreg(EREVID);
+		digitalWrite(PIN_ETHER_CS, LOW);
+		SPI.transfer(0x00 | (EREVID & 0x1f));
+		r = SPI.transfer(0);
+		digitalWrite(PIN_ETHER_CS, HIGH);
+		if(r==0 || r==255) return 0; // r is expected to be a non-255 revision number
+	}
 
 	load_hardware_mac((uint8_t*)tmp_buffer, true);
 	if (iopts[IOPT_USE_DHCP]==0) { // config static IP before calling eth.begin
@@ -600,7 +665,8 @@ byte OpenSprinkler::start_ether() {
 	eth.setDefault();
 	if(!eth.begin((uint8_t*)tmp_buffer))	return 0;
 	lcd_print_line_clear_pgm(PSTR("Start wired link"), 1);
-
+	lcd_print_line_clear_pgm(eth.isW5500 ? PSTR("    (w5500)    ") : PSTR("   (enc28j60)   "), 2);
+	
 	ulong timeout = millis()+30000; // 30 seconds time out
 	while (!eth.connected()) {
 		DEBUG_PRINT(".");
@@ -881,8 +947,12 @@ void OpenSprinkler::begin() {
 			PIN_SENSOR1 = V1_PIN_SENSOR1;
 			PIN_SENSOR2 = V1_PIN_SENSOR2;
 		} else {
-			// revision 2
-			hw_rev = 2;
+			// revision 2 and 3
+			if(detect_i2c(EEPROM_I2CADDR)) { // revision 3 has a I2C EEPROM
+				hw_rev = 3;
+			} else {
+				hw_rev = 2;
+			}
 			mainio->i2c_write(NXP_CONFIG_REG, V2_IO_CONFIG);
 			mainio->i2c_write(NXP_OUTPUT_REG, V2_IO_OUTPUT);
 
@@ -1029,9 +1099,11 @@ void OpenSprinkler::begin() {
 	nboards = 1;
 	nstations = nboards*8;
 
-	// set rf data pin
-	pinModeExt(PIN_RFTX, OUTPUT);
-	digitalWriteExt(PIN_RFTX, LOW);
+	// set rf data pin, unless it is not being used
+	if(PIN_RFTX != 255) {
+		pinModeExt(PIN_RFTX, OUTPUT);
+		digitalWriteExt(PIN_RFTX, LOW);
+	}
 
 	DEBUG_PRINTLN("Starting RFTX pins ");
   	DEBUG_PRINT("RFTX PIN: "); DEBUG_PRINTLN(PIN_RFTX);
@@ -1273,7 +1345,7 @@ void OpenSprinkler::latch_setzoneoutput_v2(byte sid, byte A, byte K) {
  *
  */
 void OpenSprinkler::latch_open(byte sid) {
-	if(hw_rev==2) {
+	if(hw_rev>=2) {
 		DEBUG_PRINTLN(F("latch_open_v2"));
 		latch_disable_alloutputs_v2(); // disable all output pins
 		latch_boost(); // generate boost voltage
@@ -1296,7 +1368,7 @@ void OpenSprinkler::latch_open(byte sid) {
 }
 
 void OpenSprinkler::latch_close(byte sid) {
-	if(hw_rev==2) {
+	if(hw_rev>=2) {
 		DEBUG_PRINTLN(F("latch_close_v2"));
 		latch_disable_alloutputs_v2(); // disable all output pins
 		latch_boost(); // generate boost voltage
@@ -1495,7 +1567,7 @@ void OpenSprinkler::apply_all_station_bits() {
 void OpenSprinkler::detect_binarysensor_status(ulong curr_time) {
 	// sensor_type: 0 if normally closed, 1 if normally open
 	if(iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_RAIN || iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_SOIL) {
-		if(hw_rev==2)	pinModeExt(PIN_SENSOR1, INPUT_PULLUP); // this seems necessary for OS 3.2
+		if(hw_rev>=2)	pinModeExt(PIN_SENSOR1, INPUT_PULLUP); // this seems necessary for OS 3.2
 		byte val = digitalReadExt(PIN_SENSOR1);
 		status.sensor1 = (val == iopts[IOPT_SENSOR1_OPTION]) ? 0 : 1;
 		if(status.sensor1) {
@@ -1526,7 +1598,7 @@ void OpenSprinkler::detect_binarysensor_status(ulong curr_time) {
 // if your ESP32 board has 2 sensors, then set PIN_SENOR2
 #if defined(ESP8266) || defined(PIN_SENSOR2)
 	if(iopts[IOPT_SENSOR2_TYPE]==SENSOR_TYPE_RAIN || iopts[IOPT_SENSOR2_TYPE]==SENSOR_TYPE_SOIL) {
-		if(hw_rev==2)	pinModeExt(PIN_SENSOR2, INPUT_PULLUP); // this seems necessary for OS 3.2
+		if(hw_rev>=2)	pinModeExt(PIN_SENSOR2, INPUT_PULLUP); // this seems necessary for OS 3.2
 		byte val = digitalReadExt(PIN_SENSOR2);
 		status.sensor2 = (val == iopts[IOPT_SENSOR2_OPTION]) ? 0 : 1;
 		if(status.sensor2) {
@@ -1561,7 +1633,7 @@ byte OpenSprinkler::detect_programswitch_status(ulong curr_time) {
 	byte ret = 0;
 	if(iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_PSWITCH) {
 		static byte sensor1_hist = 0;
-		if(hw_rev==2) pinModeExt(PIN_SENSOR1, INPUT_PULLUP); // this seems necessary for OS 3.2
+		if(hw_rev>=2) pinModeExt(PIN_SENSOR1, INPUT_PULLUP); // this seems necessary for OS 3.2
 		status.sensor1 = (digitalReadExt(PIN_SENSOR1) != iopts[IOPT_SENSOR1_OPTION]); // is switch activated?
 		sensor1_hist = (sensor1_hist<<1) | status.sensor1;
 		// basic noise filtering: only trigger if sensor matches pattern:
@@ -1573,7 +1645,7 @@ byte OpenSprinkler::detect_programswitch_status(ulong curr_time) {
 #if defined(ESP8266) || defined(PIN_SENSOR2)
 	if(iopts[IOPT_SENSOR2_TYPE]==SENSOR_TYPE_PSWITCH) {
 		static byte sensor2_hist = 0;
-		if(hw_rev==2) pinModeExt(PIN_SENSOR2, INPUT_PULLUP); // this seems necessary for OS 3.2
+		if(hw_rev>=2) pinModeExt(PIN_SENSOR2, INPUT_PULLUP); // this seems necessary for OS 3.2
 		status.sensor2 = (digitalReadExt(PIN_SENSOR2) != iopts[IOPT_SENSOR2_OPTION]); // is sensor activated?
 		sensor2_hist = (sensor2_hist<<1) | status.sensor2;
 		if((sensor2_hist&0b1111) == 0b0011) {
@@ -2014,6 +2086,9 @@ void send_rfsignal(ulong code, ulong len) {
 void OpenSprinkler::switch_rfstation(RFStationData *data, bool turnon) {
 	ulong on, off;
 	uint16_t length = parse_rfstation_code(data, &on, &off);
+
+	if(PIN_RFTX == 255) return; // ignore RF station if RF pin disabled
+
 #if defined(ARDUINO)
 	#if defined(ESP8266) || defined(ESP32)
 	rfswitch.enableTransmit(PIN_RFTX);

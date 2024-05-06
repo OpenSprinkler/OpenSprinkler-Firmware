@@ -43,12 +43,16 @@
 		#if defined(ESP8266)
 		
 		#include <ENC28J60lwIP.h>
+<<<<<<< HEAD
 		#elif defined(ESP32)
 		//#include <SPIFFS.h>
 		//#include <ArduinoWiFiServer.h>
 		//#include <ArduinoTcpHardware.h>
 		// #include <ESP32-ENC28J60.h> //this will load a different library by Tobozo
 		#endif
+=======
+		#include <W5500lwIP.h>
+>>>>>>> 613efae85660d8fbb5875980ea9675bff51e5902
 		#include <RCSwitch.h>
 		#include <OpenThingsFramework.h>
 		#include <DNSServer.h>
@@ -78,11 +82,44 @@
 	#if defined(ESP8266)
 	extern ESP8266WebServer *update_server;
 	extern OTF::OpenThingsFramework *otf;
+<<<<<<< HEAD
 	extern ENC28J60lwIP eth;
 	#elif defined(ESP32)
 	extern WebServer *update_server;
 	extern OTF::OpenThingsFramework *otf;
 	//extern ENC28J60Class eth; - no ethernet now
+=======
+	extern ENC28J60lwIP enc28j60;
+	extern Wiznet5500lwIP w5500;
+	struct lwipEth {
+		bool isW5500 = false;
+		inline boolean config(const IPAddress& local_ip, const IPAddress& arg1, const IPAddress& arg2, const IPAddress& arg3 = IPADDR_NONE, const IPAddress& dns2 = IPADDR_NONE) {
+			return (isW5500)?w5500.config(local_ip, arg1, arg2, arg3, dns2) : enc28j60.config(local_ip, arg1, arg2, arg3, dns2);
+		}
+		inline boolean begin(const uint8_t *macAddress = nullptr) {
+			return (isW5500)?w5500.begin(macAddress):enc28j60.begin(macAddress);
+		}
+		inline IPAddress localIP() {
+			return (isW5500)?w5500.localIP():enc28j60.localIP();
+		}
+		inline IPAddress subnetMask() {
+			return (isW5500)?w5500.subnetMask():enc28j60.subnetMask();
+		}
+		inline IPAddress gatewayIP() {
+			return (isW5500)?w5500.gatewayIP():enc28j60.gatewayIP();
+		}
+		inline void setDefault() {
+			(isW5500)?w5500.setDefault():enc28j60.setDefault();
+		}
+		inline bool connected() {
+			return (isW5500)?w5500.connected():enc28j60.connected();
+		}
+		inline wl_status_t status() {
+			return (isW5500)?w5500.status():enc28j60.status();
+		}
+	};
+	extern lwipEth eth;
+>>>>>>> 613efae85660d8fbb5875980ea9675bff51e5902
 	#else
 	extern EthernetServer *m_server;
 	#endif
