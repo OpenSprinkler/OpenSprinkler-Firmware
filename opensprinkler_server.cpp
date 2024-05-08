@@ -30,27 +30,32 @@
 // External variables defined in main ion file
 #if defined(ARDUINO)
 
-	#if defined(ESP8266) || defined(ESP32)
+	#if defined(ESP8266)
 
 		#include <FS.h>
 		#include <LittleFS.h>
 		#include "espconnect.h"
 		
-		#if defined(ESP8266)
 		extern ESP8266WebServer *update_server;
-<<<<<<< HEAD
-		extern ENC28J60lwIP eth;
-		#elif defined(ESP32)
-		extern WebServer *update_server;
-		// no ethernet support for now
-		#endif
-		extern OTF::OpenThingsFramework *otf;
-=======
 		extern OTF::OpenThingsFramework *otf;
 		extern ENC28J60lwIP enc28j60;
 		extern Wiznet5500lwIP w5500;
 		extern lwipEth eth;
->>>>>>> 613efae85660d8fbb5875980ea9675bff51e5902
+		#define OTF_PARAMS_DEF const OTF::Request &req,OTF::Response &res
+		#define OTF_PARAMS req,res
+		#define FKV_SOURCE req
+		#define handle_return(x) {if(x==HTML_OK) res.writeBodyChunk((char *)"%s",ether_buffer); else otf_send_result(req,res,x); return;}
+
+	#elif defined(ESP32)
+		#include <FS.h>
+		#include <LittleFS.h>
+		#include "espconnect.h"
+
+		extern WebServer *update_server;
+		
+		// no ethernet support for now
+
+		extern OTF::OpenThingsFramework *otf;
 		#define OTF_PARAMS_DEF const OTF::Request &req,OTF::Response &res
 		#define OTF_PARAMS req,res
 		#define FKV_SOURCE req

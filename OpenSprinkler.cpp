@@ -581,14 +581,9 @@ byte OpenSprinkler::start_network() {
 }
 
 byte OpenSprinkler::start_ether() {
-<<<<<<< HEAD
-#if defined(ESP8266) // esp32 has no ethernet support now - todo
-	if(hw_rev<2) return 0;  // ethernet capability is only available after hw_rev 2
-=======
 #if defined(ESP8266)
 	if(hw_rev<2) return 0;  // ethernet capability is only available when hw_rev>=2
 	eth.isW5500 = (hw_rev==2)?false:true; // os 3.2 uses enc28j60 and 3.3 uses w5500
->>>>>>> 613efae85660d8fbb5875980ea9675bff51e5902
 
 	SPI.begin();
 	SPI.setBitOrder(MSBFIRST);

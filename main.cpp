@@ -30,25 +30,25 @@
 #include "mqtt.h"
 
 #if defined(ARDUINO)
-	#if defined(ESP8266) || defined(ESP32)
-		#include <Arduino.h>
-		#if defined(ESP8266)
-		#include <ENC28J60lwIP.h>
+	#if defined(ESP8266)
 		ESP8266WebServer *update_server = NULL;
-		ENC28J60lwIP eth(PIN_ETHER_CS); // ENC28J60 lwip for wired Ether
-		#elif defined(ESP32)
-		//#include <ESP32-ENC28J60.h> // not used/implemented now
-		WebServer *update_server = NULL;
-		#endif
 		OTF::OpenThingsFramework *otf = NULL;
 		DNSServer *dns = NULL;
-<<<<<<< HEAD
 		
-=======
 		ENC28J60lwIP enc28j60(PIN_ETHER_CS); // ENC28J60 lwip for wired Ether
 		Wiznet5500lwIP w5500(PIN_ETHER_CS); // W5500 lwip for wired Ether
 		lwipEth eth;
->>>>>>> 613efae85660d8fbb5875980ea9675bff51e5902
+		bool useEth = false; // tracks whether we are using WiFi or wired Ether connection
+		static uint16_t led_blink_ms = LED_FAST_BLINK;
+	#elif defined(ESP32) // for ESP32 - keep separated
+		//#include <ESP32-ENC28J60.h> // not used/implemented now
+		WebServer *update_server = NULL;
+		OTF::OpenThingsFramework *otf = NULL;
+		DNSServer *dns = NULL;
+		
+		//ENC28J60lwIP enc28j60(PIN_ETHER_CS); // ENC28J60 lwip for wired Ether
+		//Wiznet5500lwIP w5500(PIN_ETHER_CS); // W5500 lwip for wired Ether
+		//lwipEth eth;
 		bool useEth = false; // tracks whether we are using WiFi or wired Ether connection
 		static uint16_t led_blink_ms = LED_FAST_BLINK;
 	#else
@@ -102,13 +102,10 @@ float flow_last_gpm=0;
 uint32_t reboot_timer = 0;
 
 void flow_poll() {
-<<<<<<< HEAD
-	#if defined(ESP8266) || defined(ESP32)
-	if(os.hw_rev == 2) pinModeExt(PIN_SENSOR1, INPUT_PULLUP); // this seems necessary for OS 3.2
-=======
 	#if defined(ESP8266)
 	if(os.hw_rev>=2) pinModeExt(PIN_SENSOR1, INPUT_PULLUP); // this seems necessary for OS 3.2
->>>>>>> 613efae85660d8fbb5875980ea9675bff51e5902
+	#elif defined(ESP32)
+	if(os.hw_rev == 2) pinModeExt(PIN_SENSOR1, INPUT_PULLUP); // this seems necessary for OS 3.2
 	#endif
 	byte curr_flow_state = digitalReadExt(PIN_SENSOR1);
 	if(!(prev_flow_state==HIGH && curr_flow_state==LOW)) { // only record on falling edge
@@ -701,13 +698,13 @@ void do_loop()
 	// The main control loop runs once every second
 	if (curr_time != last_time) {
 
-<<<<<<< HEAD
-		#if defined(ESP8266) || defined(ESP32)
-		if(os.hw_rev==2) {
-=======
 		#if defined(ESP8266)
 		if(os.hw_rev>=2) {
->>>>>>> 613efae85660d8fbb5875980ea9675bff51e5902
+			pinModeExt(PIN_SENSOR1, INPUT_PULLUP); // this seems necessary for OS 3.2
+			pinModeExt(PIN_SENSOR2, INPUT_PULLUP);
+		}
+		#elif defined(ESP32)
+		if(os.hw_rev==2) {
 			pinModeExt(PIN_SENSOR1, INPUT_PULLUP); // this seems necessary for OS 3.2
 			pinModeExt(PIN_SENSOR2, INPUT_PULLUP);
 		}

@@ -37,22 +37,22 @@
 	#include <SPI.h>
 	#include "I2CRTC.h"
 
-	#if defined(ESP8266) || defined(ESP32) // for ESP8266 and ESP32
+	#if defined(ESP8266) // for ESP8266
 		#include "FS.h"
 		#include <LittleFS.h>
-		#if defined(ESP8266)
 		
 		#include <ENC28J60lwIP.h>
-<<<<<<< HEAD
-		#elif defined(ESP32)
+		#include <W5500lwIP.h>
+	#elif defined(ESP32)
+		// we keep ESP32 separated for future PR merges
+		#include "FS.h"
+		#include <LittleFS.h>
+
 		//#include <SPIFFS.h>
 		//#include <ArduinoWiFiServer.h>
 		//#include <ArduinoTcpHardware.h>
 		// #include <ESP32-ENC28J60.h> //this will load a different library by Tobozo
-		#endif
-=======
-		#include <W5500lwIP.h>
->>>>>>> 613efae85660d8fbb5875980ea9675bff51e5902
+
 		#include <RCSwitch.h>
 		#include <OpenThingsFramework.h>
 		#include <DNSServer.h>
@@ -79,16 +79,14 @@
 #endif // end of headers
 
 #if defined(ARDUINO)
-	#if defined(ESP8266)
-	extern ESP8266WebServer *update_server;
-	extern OTF::OpenThingsFramework *otf;
-<<<<<<< HEAD
-	extern ENC28J60lwIP eth;
-	#elif defined(ESP32)
+	#if defined(ESP32)
 	extern WebServer *update_server;
 	extern OTF::OpenThingsFramework *otf;
 	//extern ENC28J60Class eth; - no ethernet now
-=======
+	// extern lwipEth eth;
+	#elif defined(ESP8266)
+	extern ESP8266WebServer *update_server;
+	extern OTF::OpenThingsFramework *otf;
 	extern ENC28J60lwIP enc28j60;
 	extern Wiznet5500lwIP w5500;
 	struct lwipEth {
@@ -119,7 +117,6 @@
 		}
 	};
 	extern lwipEth eth;
->>>>>>> 613efae85660d8fbb5875980ea9675bff51e5902
 	#else
 	extern EthernetServer *m_server;
 	#endif

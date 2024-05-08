@@ -1,0 +1,14 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"files.associations": {
+			"typeinfo": "cpp",
+			"system_error": "cpp"
+		},
+		"editor.guides.bracketPairs": true
+	}
+}
