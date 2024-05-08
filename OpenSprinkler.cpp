@@ -1171,6 +1171,7 @@ void OpenSprinkler::begin() {
 		lcd.print(F("Init file system"));
 		DEBUG_PRINT("Init file system... ");
 		lcd.setCursor(0,1);
+		lcd.print(F("Please wait..."));
 		#if defined(ESP8266)
 		if(!LittleFS.begin()) {
 		#elif defined(ESP32)
@@ -1212,6 +1213,9 @@ void OpenSprinkler::begin() {
 			//ESP32_readFile(IOPTS_FILENAME);
 		}
 		DEBUG_PRINTLN(F("Done."));
+		lcd.clear(0,0);
+		lcd.clear(0,1);
+		lcd.clear(0,2);
 
 		state = OS_STATE_INITIAL;
 
@@ -2571,7 +2575,12 @@ void OpenSprinkler::options_setup() {
 
 	if (!button) {
 		// flash screen
-		lcd_print_line_clear_pgm(PSTR("OpenSprinkler ESP32"),0);
+		lcd.setCursor(1, 0);
+		lcd_print_line_clear_pgm(PSTR("OpenSprinkler"),0);
+		#if defined(ESP32)
+		lcd.setCursor(0, 2);
+		lcd_print_line_clear_pgm(PSTR("ESP32 ver - V1pr"),2);
+		#endif
 		lcd.setCursor((hw_type==HW_TYPE_LATCH)?2:4, 1);
 		lcd_print_pgm(PSTR("v"));
 		byte hwv = iopts[IOPT_HW_VERSION];
@@ -2592,7 +2601,7 @@ void OpenSprinkler::options_setup() {
 		default:
 			lcd_print_pgm(PSTR(" AC"));
 		}
-		delay(1500);
+		delay(1500); // sleep, and print out FW version
 		#if defined(ARDUINO)
 		lcd.setCursor(2, 1);
 		lcd_print_pgm(PSTR("FW "));
@@ -2605,6 +2614,8 @@ void OpenSprinkler::options_setup() {
 		lcd.print(OS_FW_MINOR);
 		lcd.print(')');
 		delay(1000);
+		lcd.clear(0,1);
+		lcd.clear(0,2);
 		#endif
 	}
 #endif
@@ -2788,6 +2799,7 @@ void OpenSprinkler::lcd_print_time(time_t t)
 void OpenSprinkler::lcd_print_ip(const byte *ip, byte endian) {
 #if defined(ESP8266) || defined(ESP32)
 	lcd.clear(0, 1);
+	// lcd.clear(0, 2);
 #else
 	lcd.clear();
 #endif

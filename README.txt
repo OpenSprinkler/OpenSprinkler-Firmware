@@ -8,7 +8,7 @@ Work is based on JaCharer's work (https://github.com/JaCharer/OpenSprinkler-Firm
 **As of now - 2023.06.05 - Code is tested by some, runs on Wokwi simulator, but had to apply workaround after factory reset.**
 
 ** Before the merge of original master - 2024.05.06 - the 2.1.9 was working as reported by forum users, however it seemed that one of the sensors were faulty.
-** As of now - 2023.05.08 - the OpenSprinkler master's branch has been merged, so firmware version is 2.2.0 (3), code compiles, BUT NOT TESTED
+** As of now - 2023.05.08 - the OpenSprinkler master's branch has been merged, so firmware version is 2.2.0 (3), code compiles, my test device boots up nicely, connects to wifi nut no other functionality is tested yet
 
 ** Don't forget to change esp32.h according to your settings! It's set for my setup with ShiftRegister output and SH1106 LCD (instead of the default SSD1306) **
 
