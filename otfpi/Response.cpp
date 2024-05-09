@@ -1,3 +1,4 @@
+#if defined(OSPI)
 #include "Response.h"
 
 using namespace OTF;
@@ -72,3 +73,4 @@ void Response::flush() {
 
   reset();
 }
+#endif

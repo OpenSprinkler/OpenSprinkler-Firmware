@@ -1,3 +1,4 @@
+#if defined(OSPI)
 #include "OpenThingsFramework.h"
 #include "StringBuilder.h"
 
@@ -304,3 +305,4 @@ CLOUD_STATUS OpenThingsFramework::getCloudStatus() {
 unsigned long OpenThingsFramework::getTimeSinceLastCloudStatusChange() {
   return millis() - lastCloudStatusChangeTime;
 }
+#endif

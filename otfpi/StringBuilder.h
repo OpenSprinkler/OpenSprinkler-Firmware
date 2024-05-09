@@ -1,3 +1,4 @@
+#if defined(OSPI)
 #ifndef OTF_STRINGBUILDER_H
 #define OTF_STRINGBUILDER_H
 
@@ -59,4 +60,5 @@ namespace OTF {
   };
 }// namespace OTF
 
+#endif
 #endif

@@ -1,3 +1,4 @@
+#if defined(OSPI)
 /**
  * @file WebSocketsClient.cpp
  * @date 20.05.2015
@@ -999,3 +1000,5 @@ void WebSocketsClient::enableHeartbeat(uint32_t pingInterval, uint32_t pongTimeo
 void WebSocketsClient::disableHeartbeat() {
     _client.pingInterval = 0;
 }
+
+#endif

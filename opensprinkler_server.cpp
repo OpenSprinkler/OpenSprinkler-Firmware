@@ -328,7 +328,11 @@ String toHMS(ulong t) {
 
 void otf_send_result(OTF_PARAMS_DEF, byte code, const char *item = NULL) {
 	String json = F("{\"result\":");
+	#if defined(OSPI)
 	json += std::to_string(code);
+	#else
+	json += code;
+	#endif
 	if (!item) item = "";
 	json += F(",\"item\":\"");
 	json += item;

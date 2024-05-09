@@ -1,3 +1,4 @@
+#if defined(OSPI)
 #include "StringBuilder.h"
 #include <string.h>
 #include <cstdio>
@@ -72,3 +73,4 @@ void StringBuilder::append(const char *txt) {
   append(txt, strlen(txt));
 }
 
+#endif

@@ -1,3 +1,4 @@
+#if defined(OSPI)
 #ifndef OTF_OPENTHINGSFRAMEWORK_H
 #define OTF_OPENTHINGSFRAMEWORK_H
 
@@ -98,4 +99,5 @@ namespace OTF {
   };
 }// namespace OTF
 
+#endif
 #endif

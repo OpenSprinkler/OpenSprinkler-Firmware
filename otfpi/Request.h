@@ -1,3 +1,4 @@
+#if defined(OSPI)
 #ifndef OTF_REQUEST_H
 #define OTF_REQUEST_H
 
@@ -113,4 +114,5 @@ namespace OTF {
     bool isCloudRequest() const;
   };
 }// namespace OTF
+#endif
 #endif

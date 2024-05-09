@@ -1,3 +1,4 @@
+#if defined(OSPI)
 /**
  * @file WebSockets.h
  * @date 20.05.2015
@@ -229,3 +230,4 @@ class WebSockets {
 #define UNUSED(var) (void)(var)
 #endif
 #endif /* WEBSOCKETS_H_ */
+#endif

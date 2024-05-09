@@ -274,18 +274,17 @@ void sensor_save() {
 	DEBUG_PRINTLN(F("sensor_save"));
 	if (file_exists(SENSOR_FILENAME_BAK))
 		remove_file(SENSOR_FILENAME_BAK);
+	if (file_exists(SENSOR_FILENAME))
+		rename_file(SENSOR_FILENAME, SENSOR_FILENAME_BAK);
 	
 	ulong pos = 0;
 	Sensor_t *sensor = sensors;
 	while (sensor) {
-		file_write_block(SENSOR_FILENAME_BAK, sensor, pos, SENSOR_STORE_SIZE);
+		file_write_block(SENSOR_FILENAME, sensor, pos, SENSOR_STORE_SIZE);
 		sensor = sensor->next;
 		pos += SENSOR_STORE_SIZE; 
 	}
 
-	if (file_exists(SENSOR_FILENAME))
-		remove_file(SENSOR_FILENAME);
-	rename_file(SENSOR_FILENAME_BAK, SENSOR_FILENAME);
 	last_save_time = os.now_tz();
 	DEBUG_PRINTLN(F("sensor_save2"));
 }

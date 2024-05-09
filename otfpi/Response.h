@@ -1,3 +1,4 @@
+#if defined(OSPI)
 #ifndef OTF_RESPONSE_H
 #define OTF_RESPONSE_H
 
@@ -59,4 +60,5 @@ namespace OTF {
     void flush();
   };
 }// namespace OTF
+#endif
 #endif

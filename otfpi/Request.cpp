@@ -1,3 +1,4 @@
+#if defined(OSPI)
 #include "Request.h"
 #include <stdlib.h>
 #include <ctype.h>
@@ -300,3 +301,4 @@ size_t Request::getBodyLength() const { return bodyLength; }
 RequestType Request::getType() const { return requestType; }
 
 bool Request::isCloudRequest() const { return cloudRequest; }
+#endif

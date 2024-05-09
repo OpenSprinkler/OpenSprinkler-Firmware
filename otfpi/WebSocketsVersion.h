@@ -1,3 +1,4 @@
+#if defined(OSPI)
 /**
  * @file WebSocketsVersion.h
  * @date 01.05.2023
@@ -34,3 +35,4 @@
 #define WEBSOCKETS_VERSION_INT 2004001
 
 #endif /* WEBSOCKETSVERSION_H_ */
+#endif

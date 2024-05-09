@@ -1,3 +1,4 @@
+#if defined(OSPI)
 #include "LinuxLocalServer.h"
 
 using namespace OTF;
@@ -67,3 +68,4 @@ void LinuxLocalClient::flush() {
 void LinuxLocalClient::stop() {
 	client.stop();
 }
+#endif

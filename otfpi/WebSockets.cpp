@@ -1,3 +1,4 @@
+#if defined(OSPI)
 /**
  * @file WebSockets.cpp
  * @date 20.05.2015
@@ -727,3 +728,4 @@ void WebSockets::handleHBTimeout(WSclient_t * client) {
         }
     }
 }
+#endif

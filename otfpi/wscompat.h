@@ -1,3 +1,4 @@
+#if defined(OSPI)
 #ifndef _WS_COMPAT_H_
 #define _WS_COMPAT_H_
 
@@ -41,4 +42,5 @@ bool startsWith(const std::string *s, const std::string& test, int offset = 0);
 bool equalsIgnoreCase(const std::string& s1, const std::string& s2);
 bool equalsIgnoreCase(const std::string *s1, const std::string *s2);
 
+#endif
 #endif

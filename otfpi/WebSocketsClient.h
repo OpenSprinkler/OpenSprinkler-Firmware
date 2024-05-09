@@ -1,3 +1,4 @@
+#if defined(OSPI)
 /**
  * @file WebSocketsClient.h
  * @date 20.05.2015
@@ -171,3 +172,4 @@ class WebSocketsClient : protected WebSockets {
 };
 
 #endif /* WEBSOCKETSCLIENT_H_ */
+#endif

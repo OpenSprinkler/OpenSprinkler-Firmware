@@ -1,3 +1,4 @@
+#if defined(OSPI)
 #ifndef OTF_LINUXLOCALSERVER_H
 #define OTF_LINUXLOCALSERVER_H
 
@@ -38,4 +39,5 @@ namespace OTF {
   };
 }// namespace OTF
 
+#endif
 #endif

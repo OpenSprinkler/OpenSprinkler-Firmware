@@ -74,9 +74,9 @@ static unsigned long last_reconnect_attempt;
 
 #define MQTT_KEEPALIVE      60
 #define MQTT_DEFAULT_PORT   1883  // Default port for MQTT. Can be overwritten through App config
-#define MQTT_MAX_HOST_LEN   100    // Note: App is set to max 50 chars for broker name
-#define MQTT_MAX_USERNAME_LEN 50  // Note: App is set to max 32 chars for username
-#define MQTT_MAX_PASSWORD_LEN 100  // Note: App is set to max 32 chars for password
+#define MQTT_MAX_HOST_LEN   100    // Note: App is set to max 100 chars for broker name
+#define MQTT_MAX_USERNAME_LEN 50  // Note: App is set to max 50 chars for username
+#define MQTT_MAX_PASSWORD_LEN 100  // Note: App is set to max 100 chars for password
 #define MQTT_MAX_ID_LEN       16  // MQTT Client Id to uniquely reference this unit
 #define MQTT_RECONNECT_DELAY  120 // Minumum of 60 seconds between reconnect attempts
 
@@ -178,7 +178,7 @@ void OSMqtt::begin( const char * host, int port, const char * username, const ch
 	strncpy(_username, username, MQTT_MAX_USERNAME_LEN);
 	_username[MQTT_MAX_USERNAME_LEN] = 0;
 	strncpy(_password, password, MQTT_MAX_PASSWORD_LEN);
-	_username[MQTT_MAX_PASSWORD_LEN] = 0;
+	_password[MQTT_MAX_PASSWORD_LEN] = 0;
 	_enabled = enabled;
 
 	if (mqtt_client == NULL || os.status.network_fails > 0) return;

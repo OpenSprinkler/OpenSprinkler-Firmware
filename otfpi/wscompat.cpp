@@ -1,3 +1,4 @@
+#if defined(OSPI)
 #include "wscompat.h"
 #include <utils.h>
 
@@ -114,3 +115,4 @@ bool equalsIgnoreCase(const std::string *s1, const std::string *s2) {
 	return 1;
 
 }
+#endif
