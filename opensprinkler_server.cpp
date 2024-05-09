@@ -66,10 +66,19 @@
 	#include "etherport.h"
 
 	extern EthernetClient *m_client;
-	#define OTF_PARAMS_DEF
-	#define OTF_PARAMS
-	#define FKV_SOURCE p
-	#define handle_return(x) {return_code=x; return;}
+	#if defined(OSPI)
+		extern OTF::OpenThingsFramework *otf;
+		extern bool otf_callbacksInitialised;
+		#define OTF_PARAMS_DEF const OTF::Request &req,OTF::Response &res
+		#define OTF_PARAMS req,res
+		#define FKV_SOURCE req
+		#define handle_return(x) {if(x==HTML_OK) res.writeBodyChunk((char *)"%s",ether_buffer); else otf_send_result(req,res,x); return;}
+	#else
+		#define OTF_PARAMS_DEF
+		#define OTF_PARAMS
+		#define FKV_SOURCE p
+		#define handle_return(x) {return_code=x; return;}
+	#endif
 
 #endif
 
@@ -79,7 +88,7 @@ extern OpenSprinkler os;
 extern ProgramData pd;
 extern ulong flow_count;
 
-#if !defined(ESP8266)
+#if !defined(OTF_ENABLED)
 static byte return_code;
 static char* get_buffer = NULL;
 #endif
@@ -117,7 +126,7 @@ int available_ether_buffer() {
 #define HTML_UPLOAD_FAILED    0x40
 #define HTML_REDIRECT_HOME    0xFF
 
-#if !defined(ESP8266)
+#if !defined(OTF_ENABLED)
 static const char html200OK[] PROGMEM =
 	"HTTP/1.1 200 OK\r\n"
 ;
@@ -149,9 +158,13 @@ static const char htmlReturnHome[] PROGMEM =
 	"<script>window.location=\"/\";</script>\n"
 ;
 
-#if defined(ESP8266)
+#if defined(OTF_ENABLED)
 byte findKeyVal (const OTF::Request &req,char *strbuf, uint16_t maxlen,const char *key,bool key_in_pgm=false,uint8_t *keyfound=NULL) {
+	#if defined(ESP8266)
 	char* result = key_in_pgm?req.getQueryParameter((const __FlashStringHelper *)key):req.getQueryParameter(key);
+	#else
+	char* result = req.getQueryParameter(key);
+	#endif
 	if(result!=NULL) {
 		strncpy(strbuf, result, maxlen);
 		strbuf[maxlen-1]=0;
@@ -228,8 +241,18 @@ void rewind_ether_buffer() {
 	ether_buffer[0] = 0;
 }
 
+#if defined(OTF_ENABLED)
+boolean buffer_available() {
+	return bfill.position() < RESPONSE_BUFFER_SIZE/2;
+}
+#else
+boolean buffer_available() {
+	return available_ether_buffer() <=0;
+}
+#endif
+
 void send_packet(OTF_PARAMS_DEF) {
-#if defined(ESP8266)
+#if defined(OTF_ENABLED)
 	//DEBUG_PRINT(F("bfill position: "));
 	//DEBUG_PRINTLN(bfill.position());
 	if (!res.willFit(bfill.position())) {
@@ -237,8 +260,8 @@ void send_packet(OTF_PARAMS_DEF) {
 		DEBUG_PRINTLN(res.getLength());
 		res.flush();
 	}
-	//DEBUG_PRINT("res.writeBodyChunk: ");
-	//DEBUG_PRINTLN(strlen(ether_buffer));
+	DEBUG_PRINT("res.writeBodyChunk: ");
+	DEBUG_PRINTLN(strlen(ether_buffer));
 	res.writeBodyChunk((char *)"%s",ether_buffer);
 #else
 	m_client->write((const uint8_t *)ether_buffer, strlen(ether_buffer));
@@ -252,7 +275,7 @@ char dec2hexchar(byte dec) {
 	else return 'A'+(dec-10);
 }
 
-#if defined(ESP8266)
+#if defined(OTF_ENABLED)
 void print_header(OTF_PARAMS_DEF, bool isJson=true, int len=0) {
 	res.writeStatus(200, F("OK"));
 	res.writeHeader(F("Content-Type"), isJson?F("application/json"):F("text/html"));
@@ -268,7 +291,7 @@ void print_header(bool isJson=true)  {
 }
 #endif
 
-#if defined(ESP8266)
+#if defined(OTF_ENABLED)
 void print_header_download(OTF_PARAMS_DEF, int len=0) {
 	res.writeStatus(200, F("OK"));
 	res.writeHeader(F("Content-Type"), F("text/plain"));
@@ -287,11 +310,17 @@ void print_header_download()  {
 }
 #endif
 
-#if defined(ESP8266)
+#if defined(OTF_ENABLED)
 
+#if defined(ESP8266)
 String two_digits(uint8_t x) {
 	return String(x/10) + (x%10);
 }
+#elif defined(OSPI)
+String two_digits(uint8_t x) {
+	return std::to_string(x/10) + std::to_string(x%10);
+}
+#endif
 
 String toHMS(ulong t) {
 	return two_digits(t/3600)+":"+two_digits((t/60)%60)+":"+two_digits(t%60);
@@ -299,7 +328,7 @@ String toHMS(ulong t) {
 
 void otf_send_result(OTF_PARAMS_DEF, byte code, const char *item = NULL) {
 	String json = F("{\"result\":");
-	json += code;
+	json += std::to_string(code);
 	if (!item) item = "";
 	json += F(",\"item\":\"");
 	json += item;
@@ -308,7 +337,9 @@ void otf_send_result(OTF_PARAMS_DEF, byte code, const char *item = NULL) {
 	print_header(OTF_PARAMS, true, json.length());
 	res.writeBodyChunk((char *)"%s",json.c_str());
 }
+#endif
 
+#if defined(ESP8266)
 void update_server_send_result(byte code, const char* item = NULL) {
 	String json = F("{\"result\":");
 	json += code;
@@ -406,7 +437,7 @@ void on_ap_try_connect(OTF_PARAMS_DEF) {
 
 
 /** Check and verify password */
-#if defined(ESP8266)
+#if defined(OTF_ENABLED)
 boolean process_password(OTF_PARAMS_DEF, boolean fwv_on_fail=false)
 #else
 boolean check_password(char *p)
@@ -417,7 +448,7 @@ boolean check_password(char *p)
 #endif
 	if (os.iopts[IOPT_IGNORE_PASSWORD])  return true;
 
-#if !defined(ESP8266)
+#if !defined(OTF_ENABLED)
 	if (m_client && !p) {
 		p = get_buffer;
 	}
@@ -487,7 +518,7 @@ void server_json_stations_main(OTF_PARAMS_DEF) {
 		bfill.emit_p(PSTR("\"$S\""), tmp_buffer);
 		if(sid!=os.nstations-1)
 			bfill.emit_p(PSTR(","));
-		if (available_ether_buffer() <=0 ) {
+		if (!buffer_available() ) {
 			send_packet(OTF_PARAMS);
 		}
 	}
@@ -496,7 +527,7 @@ void server_json_stations_main(OTF_PARAMS_DEF) {
 
 /** Output stations data */
 void server_json_stations(OTF_PARAMS_DEF) {
-#if defined(ESP8266)
+#if defined(OTF_ENABLED)
 	if(!process_password(OTF_PARAMS)) return;
 	rewind_ether_buffer();
 	print_header(OTF_PARAMS);
@@ -511,7 +542,7 @@ void server_json_stations(OTF_PARAMS_DEF) {
 
 /** Output station special attribute */
 void server_json_station_special(OTF_PARAMS_DEF) {
-#if defined(ESP8266)
+#if defined(OTF_ENABLED)
 	if(!process_password(OTF_PARAMS)) return;
 	rewind_ether_buffer();
 	print_header(OTF_PARAMS);
@@ -532,7 +563,7 @@ void server_json_station_special(OTF_PARAMS_DEF) {
 			else {comma=1;}
 			bfill.emit_p(PSTR("\"$D\":{\"st\":$D,\"sd\":\"$S\"}"), sid, data->type, data->sped);
 		}
-		if (available_ether_buffer() <=0 ) {
+		if (!buffer_available() ) {
 			send_packet(OTF_PARAMS);
 		}
 	}
@@ -540,7 +571,7 @@ void server_json_station_special(OTF_PARAMS_DEF) {
 	handle_return(HTML_OK);
 }
 
-#if defined(ESP8266)
+#if defined(OTF_ENABLED)
 void server_change_board_attrib(const OTF::Request &req, char header, byte *attrib)
 #else
 void server_change_board_attrib(char *p, char header, byte *attrib)
@@ -557,7 +588,7 @@ void server_change_board_attrib(char *p, char header, byte *attrib)
 	}
 }
 
-#if defined(ESP8266)
+#if defined(OTF_ENABLED)
 void server_change_stations_attrib(const OTF::Request &req, char header, byte *attrib)
 #else
 void server_change_stations_attrib(char *p, char header, byte *attrib)
@@ -591,7 +622,7 @@ void server_change_stations_attrib(char *p, char header, byte *attrib)
  * g?: sequential group id
  */
 void server_change_stations(OTF_PARAMS_DEF) {
-#if defined(ESP8266)
+#if defined(OTF_ENABLED)
 	if(!process_password(OTF_PARAMS)) return;
 #else
 	char* p = get_buffer;
@@ -640,7 +671,7 @@ void server_change_stations(OTF_PARAMS_DEF) {
 					handle_return(HTML_DATA_OUTOFBOUND);
 				}
 			} else if (tmp_buffer[0] == STN_TYPE_HTTP || tmp_buffer[0] == STN_TYPE_HTTPS) {
-				#if !defined(ESP8266)
+				#if !defined(OTF_ENABLED)
 					urlDecode(tmp_buffer + 1);
 				#endif
 				if (strlen(tmp_buffer+1) > sizeof(HTTPStationData)) {
@@ -690,7 +721,7 @@ void manual_start_program(byte, byte);
  * uwt: use weather (i.e. watering percentage)
  */
 void server_manual_program(OTF_PARAMS_DEF) {
-#if defined(ESP8266)
+#if defined(OTF_ENABLED)
 	if(!process_password(OTF_PARAMS)) return;
 #else
 	char *p = get_buffer;
@@ -725,7 +756,7 @@ void server_manual_program(OTF_PARAMS_DEF) {
  * t:  station water time
  */
 void server_change_runonce(OTF_PARAMS_DEF) {
-#if defined(ESP8266)
+#if defined(OTF_ENABLED)
 	if(!process_password(OTF_PARAMS)) return;
 	if(!findKeyVal(FKV_SOURCE,tmp_buffer,TMP_BUFFER_SIZE, "t", false)) handle_return(HTML_DATA_MISSING);
 	char *pv = tmp_buffer+1;
@@ -787,7 +818,7 @@ void server_change_runonce(OTF_PARAMS_DEF) {
  * pid:program index (-1 will delete all programs)
  */
 void server_delete_program(OTF_PARAMS_DEF) {
-#if defined(ESP8266)
+#if defined(OTF_ENABLED)
 	if(!process_password(OTF_PARAMS)) return;
 #else
 	char *p = get_buffer;
@@ -815,7 +846,7 @@ void server_delete_program(OTF_PARAMS_DEF) {
  * pid: program index (must be 1 or larger, because we can't move up program 0)
 */
 void server_moveup_program(OTF_PARAMS_DEF) {
-#if defined(ESP8266)
+#if defined(OTF_ENABLED)
 	if(!process_password(OTF_PARAMS)) return;
 #else
 	char *p = get_buffer;
@@ -849,7 +880,7 @@ void server_moveup_program(OTF_PARAMS_DEF) {
 */
 const char _str_program[] PROGMEM = "Program ";
 void server_change_program(OTF_PARAMS_DEF) {
-#if defined(ESP8266)
+#if defined(OTF_ENABLED)
 	if(!process_password(OTF_PARAMS)) return;
 #else
 	char *p = get_buffer;
@@ -901,12 +932,12 @@ void server_change_program(OTF_PARAMS_DEF) {
 		}
 	}
 
-#if !defined(ESP8266)
+#if !defined(OTF_ENABLED)
 	// do a full string decoding
 	if(p) urlDecode(p);
 #endif
 
-#if defined(ESP8266)
+#if defined(OTF_ENABLED)
 	if(!findKeyVal(FKV_SOURCE,tmp_buffer,TMP_BUFFER_SIZE, "v",false)) handle_return(HTML_DATA_MISSING);
 	char *pv = tmp_buffer+1;
 #else
@@ -1044,7 +1075,7 @@ void server_json_options_main() {
 
 /** Output Options */
 void server_json_options(OTF_PARAMS_DEF) {
-#if defined(ESP8266)
+#if defined(OTF_ENABLED)
 	if(!process_password(OTF_PARAMS,true)) return;
 	rewind_ether_buffer();
 	print_header(OTF_PARAMS);
@@ -1089,7 +1120,7 @@ void server_json_programs_main(OTF_PARAMS_DEF) {
 		}
 		// push out a packet if available
 		// buffer size is getting small
-		if (available_ether_buffer() <= 0) {
+		if (!buffer_available()) {
 			send_packet(OTF_PARAMS);
 		}
 	}
@@ -1098,7 +1129,7 @@ void server_json_programs_main(OTF_PARAMS_DEF) {
 
 /** Output program data */
 void server_json_programs(OTF_PARAMS_DEF) {
-#if defined(ESP8266)
+#if defined(OTF_ENABLED)
 	if(!process_password(OTF_PARAMS)) return;
 	rewind_ether_buffer();
 	print_header(OTF_PARAMS);
@@ -1113,7 +1144,7 @@ void server_json_programs(OTF_PARAMS_DEF) {
 /** Output script url form */
 void server_view_scripturl(OTF_PARAMS_DEF) {
 	rewind_ether_buffer();
-#if defined(ESP8266)
+#if defined(OTF_ENABLED)
 	print_header(OTF_PARAMS,false,strlen(ether_buffer));
 #else
 	print_header(false);
@@ -1161,8 +1192,12 @@ void server_json_controller_main(OTF_PARAMS_DEF) {
 							os.pause_timer,
 							pd.nqueue);
 
-#if defined(ESP8266)
+#if defined(OTF_ENABLED)
+	#if defined(ESP8266)
 	bfill.emit_p(PSTR("\"RSSI\":$D,\"otc\":{$O},\"otcs\":$D,"), (int16_t)WiFi.RSSI(), SOPT_OTC_OPTS, otf->getCloudStatus());
+	#elif defined(OSPI)
+	bfill.emit_p(PSTR("\"RSSI\":$D,\"otc\":{$O},\"otcs\":$D,"), 0, SOPT_OTC_OPTS, otf->getCloudStatus());
+	#endif
 #endif
 
 	byte mac[6] = {0};
@@ -1205,7 +1240,7 @@ void server_json_controller_main(OTF_PARAMS_DEF) {
 	for(sid=0;sid<os.nstations;sid++) {
 		// if available ether buffer is getting small
 		// send out a packet
-		if(available_ether_buffer() <= 0) {
+		if(!buffer_available()) {
 			send_packet(OTF_PARAMS);
 		}
 		unsigned long rem = 0;
@@ -1237,7 +1272,7 @@ void server_json_controller_main(OTF_PARAMS_DEF) {
 
 /** Output controller variables in json */
 void server_json_controller(OTF_PARAMS_DEF) {
-#if defined(ESP8266)
+#if defined(OTF_ENABLED)
 	if(!process_password(OTF_PARAMS)) return;
 	rewind_ether_buffer();
 	print_header(OTF_PARAMS);
@@ -1254,7 +1289,7 @@ void server_json_controller(OTF_PARAMS_DEF) {
 void server_home(OTF_PARAMS_DEF)
 {
 	rewind_ether_buffer();
-#if defined(ESP8266)
+#if defined(OTF_ENABLED)
 	print_header(OTF_PARAMS,false,strlen(ether_buffer));
 #else
 	print_header(false);
@@ -1284,7 +1319,7 @@ void server_home(OTF_PARAMS_DEF)
  */
 void server_change_values(OTF_PARAMS_DEF)
 {
-#if defined(ESP8266)
+#if defined(OTF_ENABLED)
 	extern uint32_t reboot_timer;
 	if(!process_password(OTF_PARAMS)) return;
 #else
@@ -1301,7 +1336,7 @@ void server_change_values(OTF_PARAMS_DEF)
 #endif
 
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("rbt"), true) && atoi(tmp_buffer) > 0) {
-		#if defined(ESP8266)
+		#if defined(OTF_ENABLED) 
 			os.status.safe_reboot = 0;
 			reboot_timer = os.now_tz() + 1;
 			handle_return(HTML_SUCCESS);
@@ -1367,7 +1402,7 @@ void string_remove_space(char *src) {
  * jsp: Javascript path
  */
 void server_change_scripturl(OTF_PARAMS_DEF) {
-#if defined(ESP8266)
+#if defined(OTF_ENABLED)
 	if(!process_password(OTF_PARAMS)) return;
 #else
 	char *p = get_buffer;
@@ -1389,7 +1424,7 @@ void server_change_scripturl(OTF_PARAMS_DEF) {
 		string_remove_space(tmp_buffer);
 		os.sopt_save(SOPT_WEATHERURL, tmp_buffer);
 	}
-#if defined(ESP8266)
+#if defined(OTF_ENABLED)
 	rewind_ether_buffer();
 	print_header(OTF_PARAMS,false,strlen(ether_buffer));
 	bfill.emit_p(PSTR("$F"), htmlReturnHome);
@@ -1410,7 +1445,7 @@ void server_change_scripturl(OTF_PARAMS_DEF) {
  */
 void server_change_options(OTF_PARAMS_DEF)
 {
-#if defined(ESP8266)
+#if defined(OTF_ENABLED)
 	if(!process_password(OTF_PARAMS)) return;
 #else
 	char *p = get_buffer;
@@ -1570,7 +1605,7 @@ void server_change_password(OTF_PARAMS_DEF) {
 	return;
 #endif
 
-#if defined(ESP8266)
+#if defined(OTF_ENABLED) 
 	if(!process_password(OTF_PARAMS)) return;
 #else
 	char* p = get_buffer;
@@ -1602,7 +1637,7 @@ void server_json_status_main() {
 /** Output station status */
 void server_json_status(OTF_PARAMS_DEF)
 {
-#if defined(ESP8266)
+#if defined(OTF_ENABLED)
 	if(!process_password(OTF_PARAMS)) return;
 	rewind_ether_buffer();
 	print_header(OTF_PARAMS);
@@ -1626,7 +1661,7 @@ void server_json_status(OTF_PARAMS_DEF)
  * ssta: shift remaining stations
  */
 void server_change_manual(OTF_PARAMS_DEF) {
-#if defined(ESP8266)
+#if defined(OTF_ENABLED)
 	if(!process_password(OTF_PARAMS)) return;
 #else
 	char *p = get_buffer;
@@ -1725,7 +1760,7 @@ int file_fgets(File file, char* buf, int maxsize) {
  */
 void server_json_log(OTF_PARAMS_DEF) {
 
-#if defined(ESP8266)
+#if defined(OTF_ENABLED)
 	if(!process_password(OTF_PARAMS)) return;
 #else
 	char *p = get_buffer;
@@ -1760,7 +1795,7 @@ void server_json_log(OTF_PARAMS_DEF) {
 	if (findKeyVal(FKV_SOURCE, type, 4, PSTR("type"), true))
 		type_specified = true;
 
-#if defined(ESP8266)
+#if defined(OTF_ENABLED)
 	// as the log data can be large, we will use ESP8266's sendContent function to
 	// send multiple packets of data, instead of the standard way of using send().
 	rewind_ether_buffer();
@@ -1837,7 +1872,7 @@ void server_json_log(OTF_PARAMS_DEF) {
 			bfill.emit_p(PSTR("$S"), tmp_buffer);
 			// if the available ether buffer size is getting small
 			// push out a packet
-			if (available_ether_buffer() <= 0) {
+			if (!buffer_available()) {
 				send_packet(OTF_PARAMS);
 			}
 		}
@@ -1856,7 +1891,7 @@ void server_json_log(OTF_PARAMS_DEF) {
  * if day=all: delete all log files)
  */
 void server_delete_log(OTF_PARAMS_DEF) {
-#if defined(ESP8266)
+#if defined(OTF_ENABLED)
 	if(!process_password(OTF_PARAMS)) return;
 #else
 	char *p = get_buffer;
@@ -1875,7 +1910,7 @@ void server_delete_log(OTF_PARAMS_DEF) {
  * dur: duration (in units of seconds)
  */
 void server_pause_queue(OTF_PARAMS_DEF) {
-#if defined(ESP8266)
+#if defined(OTF_ENABLED)
 	if(!process_password(OTF_PARAMS)) return;
 #else
 	char *p = get_buffer;
@@ -1893,7 +1928,7 @@ void server_pause_queue(OTF_PARAMS_DEF) {
 
 /** Output all JSON data, including jc, jp, jo, js, jn */
 void server_json_all(OTF_PARAMS_DEF) {
-#if defined(ESP8266)
+#if defined(OTF_ENABLED)
 	if(!process_password(OTF_PARAMS,true)) return;
 	rewind_ether_buffer();
 	print_header(OTF_PARAMS);
@@ -1920,7 +1955,7 @@ void server_json_all(OTF_PARAMS_DEF) {
 
 #if defined(ARDUINO)
 
-#if !defined(ESP8266)
+#if !defined(ESP8266) 
 static int freeHeap () {
 	extern int __heap_start, *__brkval;
 	int v;
@@ -1929,7 +1964,7 @@ static int freeHeap () {
 #endif
 
 void server_json_debug(OTF_PARAMS_DEF) {
-#if defined(ESP8266)
+#if defined(OTF_ENABLED)
 	rewind_ether_buffer();
 	print_header(OTF_PARAMS);
 #else
@@ -2008,7 +2043,7 @@ char* urlDecodeAndUnescape(char *buf) {
  */
 void server_sensor_config_userdef(OTF_PARAMS_DEF)
 {
-#if defined(ESP8266)
+#if defined(OTF_ENABLED)
 	if(!process_password(OTF_PARAMS)) return;
 #else
 	char *p = get_buffer;
@@ -2058,7 +2093,7 @@ void server_sensor_config_userdef(OTF_PARAMS_DEF)
  */
 void server_sensorurl_get(OTF_PARAMS_DEF)
 {
-#if defined(ESP8266)
+#if defined(OTF_ENABLED)
 	if(!process_password(OTF_PARAMS)) return;
 #else
 	char *p = get_buffer;
@@ -2087,7 +2122,7 @@ void server_sensorurl_get(OTF_PARAMS_DEF)
  */
 void server_sensorurl_config(OTF_PARAMS_DEF)
 {
-#if defined(ESP8266)
+#if defined(OTF_ENABLED)
 	if(!process_password(OTF_PARAMS)) return;
 #else
 	char *p = get_buffer;
@@ -2123,7 +2158,7 @@ void server_sensorurl_config(OTF_PARAMS_DEF)
  */
 void server_sensor_config(OTF_PARAMS_DEF)
 {
-#if defined(ESP8266)
+#if defined(OTF_ENABLED)
 	if(!process_password(OTF_PARAMS)) return;
 #else
 	char *p = get_buffer;
@@ -2260,7 +2295,7 @@ void server_sensor_config(OTF_PARAMS_DEF)
  * {"nr":1,"id":1}
  */
 void server_set_sensor_address(OTF_PARAMS_DEF) {
-#if defined(ESP8266)
+#if defined(OTF_ENABLED)
 	if(!process_password(OTF_PARAMS)) return;
 #else
 	char *p = get_buffer;
@@ -2287,7 +2322,7 @@ void server_set_sensor_address(OTF_PARAMS_DEF) {
  *
  */
 void server_sensor_get(OTF_PARAMS_DEF) {
-#if defined(ESP8266)
+#if defined(OTF_ENABLED)
 	if(!process_password(OTF_PARAMS)) return;
 #else
 	char *p = get_buffer;
@@ -2299,7 +2334,7 @@ void server_sensor_get(OTF_PARAMS_DEF) {
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("nr"), true))
 		nr = strtoul(tmp_buffer, NULL, 0); // Sensor nr
 
-#if defined(ESP8266)
+#if defined(OTF_ENABLED)
 	// as the log data can be large, we will use ESP8266's sendContent function to
 	// send multiple packets of data, instead of the standard way of using send().
 	rewind_ether_buffer();
@@ -2338,7 +2373,7 @@ void server_sensor_get(OTF_PARAMS_DEF) {
  *
  */
 void server_sensor_readnow(OTF_PARAMS_DEF) {
-#if defined(ESP8266)
+#if defined(OTF_ENABLED)
 	if(!process_password(OTF_PARAMS)) return;
 #else
 	char *p = get_buffer;
@@ -2350,7 +2385,7 @@ void server_sensor_readnow(OTF_PARAMS_DEF) {
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("nr"), true))
 		nr = strtoul(tmp_buffer, NULL, 0); // Sensor nr
 
-#if defined(ESP8266)
+#if defined(OTF_ENABLED)
 	// as the log data can be large, we will use ESP8266's sendContent function to
 	// send multiple packets of data, instead of the standard way of using send().
 	rewind_ether_buffer();
@@ -2434,7 +2469,7 @@ void sensorconfig_json(OTF_PARAMS_DEF) {
  *
  */
 void server_sensor_list(OTF_PARAMS_DEF) {
-#if defined(ESP8266)
+#if defined(OTF_ENABLED)
 	if(!process_password(OTF_PARAMS)) return;
 #else
 	char *p = get_buffer;
@@ -2448,7 +2483,7 @@ void server_sensor_list(OTF_PARAMS_DEF) {
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("test"), true))
 		test = strtoul(tmp_buffer, NULL, 0); // Sensor nr
 
-#if defined(ESP8266)
+#if defined(OTF_ENABLED)
 	// as the log data can be large, we will use ESP8266's sendContent function to
 	// send multiple packets of data, instead of the standard way of using send().
 	rewind_ether_buffer();
@@ -2476,7 +2511,7 @@ void server_sensor_list(OTF_PARAMS_DEF) {
  *
  */
 void server_sensorlog_list(OTF_PARAMS_DEF) {
-#if defined(ESP8266)
+#if defined(OTF_ENABLED)
 	if(!process_password(OTF_PARAMS)) return;
 #else
 	char *p = get_buffer;
@@ -2534,7 +2569,7 @@ void server_sensorlog_list(OTF_PARAMS_DEF) {
 		shortcsv = csv == 2;
 	}
 
-#if defined(ESP8266)
+#if defined(OTF_ENABLED)
 	// as the log data can be large, we will use ESP8266's sendContent function to
 	// send multiple packets of data, instead of the standard way of using send().
 	rewind_ether_buffer();
@@ -2647,7 +2682,7 @@ void server_sensorlog_list(OTF_PARAMS_DEF) {
 			}
 			// if available ether buffer is getting small
 			// send out a packet
-			if (available_ether_buffer() <=0 ) {
+			if (!buffer_available() ) {
 				send_packet(OTF_PARAMS);
 			}
 			if (++count >= maxResults) {
@@ -2676,7 +2711,7 @@ void server_sensorlog_list(OTF_PARAMS_DEF) {
  *
  */
 void server_sensorlog_clear(OTF_PARAMS_DEF) {
-#if defined(ESP8266)
+#if defined(OTF_ENABLED)
 	if(!process_password(OTF_PARAMS)) return;
 #else
 	char *p = get_buffer;
@@ -2699,7 +2734,7 @@ void server_sensorlog_clear(OTF_PARAMS_DEF) {
 
 	DEBUG_PRINTLN(F("server_sensorlog_clear"));
 
-#if defined(ESP8266)
+#if defined(OTF_ENABLED)
 	// as the log data can be large, we will use ESP8266's sendContent function to
 	// send multiple packets of data, instead of the standard way of using send().
 	rewind_ether_buffer();
@@ -2740,7 +2775,7 @@ void server_sensorlog_clear(OTF_PARAMS_DEF) {
  * define a program adjustment
 */
 void server_sensorprog_config(OTF_PARAMS_DEF) {
-#if defined(ESP8266)
+#if defined(OTF_ENABLED)
 	if(!process_password(OTF_PARAMS)) return;
 #else
 	char *p = get_buffer;
@@ -2824,7 +2859,7 @@ void progconfig_json() {
  * define a program adjustment
 */
 void server_sensorprog_list(OTF_PARAMS_DEF) {
-#if defined(ESP8266)
+#if defined(OTF_ENABLED)
 	if(!process_password(OTF_PARAMS)) return;
 #else
 	char *p = get_buffer;
@@ -2845,7 +2880,7 @@ void server_sensorprog_list(OTF_PARAMS_DEF) {
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("sensor"), true))
 		 sensor_nr = strtoul(tmp_buffer, NULL, 0);
 
-#if defined(ESP8266)
+#if defined(OTF_ENABLED)
 	// as the log data can be large, we will use ESP8266's sendContent function to
 	// send multiple packets of data, instead of the standard way of using send().
 	rewind_ether_buffer();
@@ -2981,7 +3016,7 @@ const char* sensor_names[] = {
  * List supported sensor types
  **/
 void server_sensor_types(OTF_PARAMS_DEF) {
-#if defined(ESP8266)
+#if defined(OTF_ENABLED)
 	if(!process_password(OTF_PARAMS)) return;
 #else
 	char *p = get_buffer;
@@ -2989,7 +3024,7 @@ void server_sensor_types(OTF_PARAMS_DEF) {
 
 	DEBUG_PRINTLN(F("server_sensor_types"));
 
-#if defined(ESP8266)
+#if defined(OTF_ENABLED)
 	// as the log data can be large, we will use ESP8266's sendContent function to
 	// send multiple packets of data, instead of the standard way of using send().
 	rewind_ether_buffer();
@@ -3019,7 +3054,7 @@ void server_sensor_types(OTF_PARAMS_DEF) {
  * system resources status
  **/
 void server_usage(OTF_PARAMS_DEF) {
-#if defined(ESP8266)
+#if defined(OTF_ENABLED)
 	if(!process_password(OTF_PARAMS)) return;
 #else
 	char *p = get_buffer;
@@ -3027,7 +3062,7 @@ void server_usage(OTF_PARAMS_DEF) {
 
 	DEBUG_PRINTLN(F("server_usage"));
 
-#if defined(ESP8266)
+#if defined(OTF_ENABLED)
 	// as the log data can be large, we will use ESP8266's sendContent function to
 	// send multiple packets of data, instead of the standard way of using send().
 	rewind_ether_buffer();
@@ -3069,7 +3104,7 @@ extern uint32_t ping_ok;
  * Program calc
  **/
 void server_sensorprog_calc(OTF_PARAMS_DEF) {
-#if defined(ESP8266)
+#if defined(OTF_ENABLED)
 	if(!process_password(OTF_PARAMS)) return;
 #else
 	char *p = get_buffer;
@@ -3131,7 +3166,7 @@ void server_sensorprog_calc(OTF_PARAMS_DEF) {
 	int minEx = progAdj.min - diff/2;
 	int maxEx = progAdj.max + diff/2;
 
-#if defined(ESP8266)
+#if defined(OTF_ENABLED)
 	// as the log data can be large, we will use ESP8266's sendContent function to
 	// send multiple packets of data, instead of the standard way of using send().
 	rewind_ether_buffer();
@@ -3186,7 +3221,7 @@ const char* prog_names[] = {
  * List supported adjustment types
  */
 void server_sensorprog_types(OTF_PARAMS_DEF) {
-#if defined(ESP8266)
+#if defined(OTF_ENABLED)
 	if(!process_password(OTF_PARAMS)) return;
 #else
 	char *p = get_buffer;
@@ -3194,7 +3229,7 @@ void server_sensorprog_types(OTF_PARAMS_DEF) {
 
 	DEBUG_PRINTLN(F("server_sensorprog_types"));
 
-#if defined(ESP8266)
+#if defined(OTF_ENABLED)
 	// as the log data can be large, we will use ESP8266's sendContent function to
 	// send multiple packets of data, instead of the standard way of using send().
 	rewind_ether_buffer();
@@ -3225,7 +3260,7 @@ void server_sensorprog_types(OTF_PARAMS_DEF) {
  *
  */
 void server_sensorconfig_backup(OTF_PARAMS_DEF) {
-#if defined(ESP8266)
+#if defined(OTF_ENABLED)
 	if(!process_password(OTF_PARAMS)) return;
 #else
 	char *p = get_buffer;
@@ -3241,7 +3276,7 @@ void server_sensorconfig_backup(OTF_PARAMS_DEF) {
 	}
 
 
-#if defined(ESP8266)
+#if defined(OTF_ENABLED)
 	// as the log data can be large, we will use ESP8266's sendContent function to
 	// send multiple packets of data, instead of the standard way of using send().
 	rewind_ether_buffer();
@@ -3439,25 +3474,7 @@ void on_sta_upload() {
 void on_ap_upload() { on_sta_upload(); }
 
 void start_server_client() {
-	if(!otf) return;
-
-	if (!otf_callbacksInitialised) {
-		otf->on("/", server_home);  // handle home page
-		otf->on("/index.html", server_home);
-		otf->on("/update", on_sta_update, OTF::HTTP_GET); // handle firmware update
-		update_server->on("/update", HTTP_POST, on_sta_upload_fin, on_sta_upload);
-
-		// set up all other handlers
-		char uri[4];
-		uri[0]='/';
-		uri[3]=0;
-		for(byte i=0;i<sizeof(urls)/sizeof(URLHandler);i++) {
-			uri[1]=pgm_read_byte(_url_keys+2*i);
-			uri[2]=pgm_read_byte(_url_keys+2*i+1);
-			otf->on(uri, urls[i]);
-		}    
-		otf_callbacksInitialised = true;
-	}
+	start_otf();
 	update_server->begin();
 }
 
@@ -3496,7 +3513,33 @@ void start_server_ap() {
 
 #endif
 
-#if !defined(ESP8266)
+#if defined(OTF_ENABLED)
+void start_otf() {
+	if(!otf) return;
+
+	if (!otf_callbacksInitialised) {
+		otf->on("/", server_home);  // handle home page
+		otf->on("/index.html", server_home);
+		#if defined(ESP8266)
+		otf->on("/update", on_sta_update, OTF::HTTP_GET); // handle firmware update
+		update_server->on("/update", HTTP_POST, on_sta_upload_fin, on_sta_upload);
+		#endif
+
+		// set up all other handlers
+		char uri[4];
+		uri[0]='/';
+		uri[3]=0;
+		for(byte i=0;i<sizeof(urls)/sizeof(URLHandler);i++) {
+			uri[1]=pgm_read_byte(_url_keys+2*i);
+			uri[2]=pgm_read_byte(_url_keys+2*i+1);
+			otf->on(uri, urls[i]);
+		}    
+		otf_callbacksInitialised = true;
+	}
+}
+#endif
+
+#if !defined(OTF_ENABLED)
 // This funtion is only used for non-ESP8266 platforms
 void handle_web_request(char *p) {
 	rewind_ether_buffer();

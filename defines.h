@@ -37,7 +37,7 @@ typedef unsigned long ulong;
 														// if this number is different from the one stored in non-volatile memory
 														// a device reset will be automatically triggered
 
-#define OS_FW_MINOR      154  // Firmware minor version
+#define OS_FW_MINOR      160  // Firmware minor version
 
 /** Hardware version base numbers */
 #define OS_HW_VERSION_BASE   0x00 // OpenSprinkler
@@ -463,12 +463,14 @@ enum {
 		#define DEBUG_BEGIN(x)   {Serial.begin(x);}
 		#define DEBUG_PRINT(x)   {Serial.print(x);}
 		#define DEBUG_PRINTLN(x) {Serial.println(x);}
+		#define DEBUG_PRINTF(msg, ...)    {Serial.printf(msg, ##__VA_ARGS__);}
 	#else
 		#include <stdio.h>
 		#define DEBUG_BEGIN(x)          {}  /** Serial debug functions */
 		inline  void DEBUG_PRINT(int x) {printf("%d", x);}
 		inline  void DEBUG_PRINT(const char*s) {printf("%s", s);}
 		#define DEBUG_PRINTLN(x)        {DEBUG_PRINT(x);printf("\n");}
+		#define DEBUG_PRINTF(msg, ...)    {printf(msg, ##__VA_ARGS__);}
 	#endif
 
 #else

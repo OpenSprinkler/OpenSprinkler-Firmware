@@ -53,8 +53,14 @@
 	#endif
 	unsigned long getNtpTime();
 #else // header and defs for RPI/BBB
+	#if defined(OSPI)
+	OTF::OpenThingsFramework *otf = NULL;
+	bool otf_callbacksInitialised = false;
+	#elif
 	EthernetServer *m_server = 0;
 	EthernetClient *m_client = 0;
+	#endif
+	
 #endif
 
 void reset_all_stations();
@@ -433,7 +439,7 @@ void reboot_in(uint32_t ms) {
 	}
 }
 bool check_enc28j60();
-#else
+#elif !defined(OSPI)
 void handle_web_request(char *p);
 #endif
 
@@ -597,6 +603,9 @@ void do_loop()
 	ui_state_machine();
 
 #else // Process Ethernet packets for RPI/BBB
+	#if defined(OSPI)
+	if (otf) otf->loop();
+	#elif
 	EthernetClient client = m_server->available();
 	if (client) {
 		while(true) {
@@ -616,6 +625,8 @@ void do_loop()
 			}
 		}
 	}
+	#endif
+
 #endif	// Process Ethernet packets
 
 	// Start up MQTT when we have a network connection

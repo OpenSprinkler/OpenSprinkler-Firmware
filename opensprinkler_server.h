@@ -28,6 +28,10 @@
 #include <stdarg.h>
 #endif
 
+#if defined(ESP8266) || defined(OSPI)
+#define OTF_ENABLED
+#endif
+
 char dec2hexchar(byte dec);
 
 class BufferFiller {
@@ -98,5 +102,7 @@ public:
 };
 
 char* urlDecodeAndUnescape(char *buf);
-
+#if defined(OTF_ENABLED)
+void start_otf();
+#endif
 #endif // _OPENSPRINKLER_SERVER_H

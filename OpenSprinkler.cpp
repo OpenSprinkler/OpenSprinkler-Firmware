@@ -95,6 +95,7 @@ extern ProgramData pd;
 #else
 	#if defined(OSPI)
 		byte OpenSprinkler::pin_sr_data = PIN_SR_DATA;
+		OTCConfig OpenSprinkler::otc;
 	#endif
 	// todo future: LCD define for Linux-based systems
 #endif
@@ -706,18 +707,40 @@ void OpenSprinkler::reboot_dev(uint8_t cause) {
 
 /** Initialize network with the given mac address and http port */
 byte OpenSprinkler::start_network() {
-	unsigned int port = (unsigned int)(iopts[IOPT_HTTPPORT_1]<<8) + (unsigned int)iopts[IOPT_HTTPPORT_0];
+	unsigned int httpport = (unsigned int)(iopts[IOPT_HTTPPORT_1]<<8) + (unsigned int)iopts[IOPT_HTTPPORT_0];
 #if defined(DEMO)
 #if defined(HTTP_PORT)
-	port = HTTP_PORT;
+	httpport = HTTP_PORT;
 #else
-	port = 80;
+	httpport = 80;
 #endif
 #endif
-	if(m_server) { delete m_server; m_server = 0; }
+	#if defined(OSPI)
+	DEBUG_PRINT("OTF config: ");
+	DEBUG_PRINTLN(otc.en);
+	DEBUG_PRINT(otc.server.c_str());
+	DEBUG_PRINT(":");
+	DEBUG_PRINTLN(otc.port);
+	DEBUG_PRINT("local port: ");
+	DEBUG_PRINTLN(httpport);
+	DEBUG_PRINT("token: ");
+	DEBUG_PRINTLN(otc.token.c_str());
 
+	if (otc.en>0 && otc.token.length()>=32) {
+		otf = new OTF::OpenThingsFramework(httpport, otc.server, otc.port, otc.token, false, ether_buffer, ETHER_BUFFER_SIZE);
+		DEBUG_PRINTLN(F("Started OTF with remote connection"));
+	} else {
+		otf = new OTF::OpenThingsFramework(httpport, ether_buffer, ETHER_BUFFER_SIZE);
+		DEBUG_PRINTLN(F("Started OTF with just local connection"));
+	}
+	start_otf();
+	DEBUG_PRINTLN(F("Started OTF OSPi Connector"));
+	return true;
+	#else
+	if(m_server) { delete m_server; m_server = 0; }
 	m_server = new EthernetServer(port);
 	return m_server->begin();
+	#endif
 }
 
 bool OpenSprinkler::network_connected(void) {
@@ -739,7 +762,9 @@ bool OpenSprinkler::load_hardware_mac(byte* mac, bool wired) {
 	mac[4] = 0x31;
 	mac[5] = iopts[IOPT_DEVICE_ID];
 
+	#if !defined(OSPI)
 	if (m_server == NULL) return true;
+	#endif
 
 	if ((fd = socket(AF_INET, SOCK_DGRAM, 0)) == 0) return true;
 
@@ -2327,7 +2352,7 @@ void OpenSprinkler::factory_reset() {
 #define xstr(s) str(s)
 
 /** Parse OTC configuration */
-#if defined(ESP8266)
+#if defined(ESP8266) || defined(OSPI)
 void OpenSprinkler::parse_otc_config() {
 	char server[MAX_SOPTS_SIZE+1] = {0};
 	char token[MAX_SOPTS_SIZE+1] = {0};
@@ -2380,6 +2405,9 @@ void OpenSprinkler::options_setup() {
 				}
 			}
 		}
+		parse_otc_config();
+		#endif
+		#if defined(OSPI)
 		parse_otc_config();
 		#endif
 		attribs_load();

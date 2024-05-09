@@ -33,6 +33,8 @@ if [ "$?" -eq 0 ]; then
 fi
 	
 g++ -g -o OpenSprinkler -DOSPI $ADS1115 $PCF8591 $USEGPIO -std=c++14 \
+	-I./ -I./otfpi -I./otfpi/libsha1 -I./otfpi/libb64 \
+	./otfpi/*.cpp ./otfpi/libsha1/libsha1.c ./otfpi/libb64/cencode.c \
 	main.cpp OpenSprinkler.cpp program.cpp opensprinkler_server.cpp \
 	utils.cpp weather.cpp gpio.cpp etherport.cpp mqtt.cpp sensor*.cpp \
 	$ADS1115FILES $PCF8591FILES \

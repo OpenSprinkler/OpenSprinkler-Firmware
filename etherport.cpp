@@ -33,6 +33,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/ioctl.h>
+#include <sys/poll.h>
 #include <netinet/in.h>
 #include <string.h>
 #include <errno.h>
@@ -44,6 +45,7 @@
 #include<openssl/pem.h>
 #include<openssl/x509.h>
 #include<openssl/x509_vfy.h>
+#include "utils.h"
 
 EthernetServer::EthernetServer(uint16_t port)
 		: m_port(port), m_sock(0)
@@ -102,24 +104,21 @@ bool EthernetServer::begin()
 //	 If it succeeds it will return an EthernetClient.
 EthernetClient EthernetServer::available()
 {
-	fd_set sock_set;
-	FD_ZERO(&sock_set);
-	FD_SET(m_sock, &sock_set);
-	struct timeval timeout;
-	timeout.tv_sec = 0;
-	timeout.tv_usec = 50 * 1000; // 50ms
+	struct pollfd fds;
+	memset(&fds, 0, sizeof(fds));
+	fds.fd = m_sock;
+	fds.events = POLLIN;
+	int timeout = 50;
 
-	select(m_sock + 1, &sock_set, NULL, NULL, &timeout);
-	if (FD_ISSET(m_sock, &sock_set))
+	int rc = poll(&fds, 1, timeout);
+	if (rc > 0)
 	{
 		int client_sock = 0;
-		struct sockaddr_in6 cli_addr;
-		unsigned int clilen = sizeof(cli_addr);
-		if ((client_sock = accept(m_sock, (struct sockaddr *) &cli_addr, &clilen)) <= 0)
-			return EthernetClient(0);
+		if ((client_sock = accept(m_sock, NULL, NULL)) <= 0)
+			return EthernetClient();
 		return EthernetClient(client_sock);
 	}
-	return EthernetClient(0);
+	return EthernetClient();
 }
 
 EthernetClient::EthernetClient()
@@ -134,7 +133,7 @@ EthernetClient::EthernetClient(int sock)
 
 EthernetClient::~EthernetClient()
 {
-	stop();
+	if (tmpbuf) free(tmpbuf);
 }
 
 int EthernetClient::connect(uint8_t ip[4], uint16_t port)
@@ -186,23 +185,95 @@ EthernetClient::operator bool()
 //	and return 0;
 int EthernetClient::read(uint8_t *buf, size_t size)
 {
-	fd_set sock_set;
-	FD_ZERO(&sock_set);
-	FD_SET(m_sock, &sock_set);
-	struct timeval timeout;
-	timeout.tv_sec = 3;
-	timeout.tv_usec = 0;
-
-	select(m_sock + 1, &sock_set, NULL, NULL, &timeout);
-	if (FD_ISSET(m_sock, &sock_set))
-	{
-		int retval = ::read(m_sock, buf, size);
-		if (retval <= 0) // socket closed
-			m_connected = false;
-		return retval;
+	if (tmpbufidx < tmpbufsize) {
+		size_t tmpsize = tmpbufsize-tmpbufidx;
+		if (tmpsize > size)
+			tmpsize = size;
+		memcpy(buf, &tmpbuf[tmpbufidx], tmpsize);
+		tmpbufidx += tmpsize;
+		return tmpsize;
 	}
-	m_connected = false;
+
+	struct pollfd fds;
+	memset(&fds, 0, sizeof(fds));
+	fds.fd = m_sock;
+	fds.events = POLLIN;
+	int timeout = 3000;
+
+	int rc = poll(&fds, 1, timeout);
+	if (rc > 0)
+	{
+		rc = recv(m_sock, buf, size, 0);
+		if (errno == EWOULDBLOCK)
+			return 0;
+
+		if (rc <= 0) // socket closed
+			m_connected = false;
+		return rc;
+	}
+	if (rc < 0)
+		m_connected = false;
 	return 0;
+}
+
+int EthernetClient::timedRead() {
+	if (!tmpbuf) tmpbuf = (uint8_t*)malloc(TMPBUF);
+	if (tmpbufidx < tmpbufsize)
+		return tmpbuf[tmpbufidx++];
+		
+	tmpbufidx = 0;
+	tmpbufsize = read(tmpbuf, TMPBUF);
+	
+	if (tmpbufsize <= 0)
+		return -1;
+		
+	return tmpbuf[tmpbufidx++];
+}
+
+size_t EthernetClient::readBytesUntil(char terminator, char *buffer, size_t length) {
+	size_t n = 0;
+	int c = timedRead();
+  	while (c >= 0 && c != terminator && length>0)
+  	{
+		buffer[n] = (char)c;
+		length--;
+		n++;
+		c = timedRead();
+	}
+	return n;
+}
+
+std::string EthernetClient::readStringUntil(char terminator) {
+
+  String ret;
+  int c = timedRead();
+  while (c >= 0 && c != terminator)
+  {
+    ret += (char)c;
+    c = timedRead();
+  }
+  return ret;
+}
+
+void EthernetClient::flush() {
+	//for compatibility only
+}
+
+bool EthernetClient::available() {
+	if (tmpbufidx < tmpbufsize)
+		return true;
+
+	if (!m_connected)
+		return false;
+
+	struct pollfd fds;
+	memset(&fds, 0, sizeof(fds));
+	fds.fd = m_sock;
+	fds.events = POLLIN;
+	int timeout = 50;
+
+	int rc = poll(&fds, 1, timeout);
+	return rc > 0;
 }
 
 size_t EthernetClient::write(const uint8_t *buf, size_t size)

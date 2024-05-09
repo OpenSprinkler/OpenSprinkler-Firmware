@@ -62,6 +62,10 @@
 	#include <netdb.h>
 	#include <sys/stat.h>
 	#include "etherport.h"
+	#if defined(OSPI)
+	#include "OpenThingsFramework.h"
+	extern OTF::OpenThingsFramework *otf;
+	#endif
 #endif // end of headers
 
 #if defined(ARDUINO)
@@ -414,6 +418,11 @@ private:
 	static byte prev_station_bits[];
 	#endif
 #endif // LCD functions
+
+#if defined(OSPI)
+	static OTCConfig otc;
+	static void parse_otc_config();
+#endif
 	static byte engage_booster;
 };
 

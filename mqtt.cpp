@@ -50,11 +50,9 @@
 #if defined(ENABLE_DEBUG)
 	#if defined(ARDUINO)
 		#include "TimeLib.h"
-		#define DEBUG_PRINTF(msg, ...)    {Serial.printf(msg, ##__VA_ARGS__);}
 		#define DEBUG_TIMESTAMP(msg, ...) {time_t t = os.now_tz(); Serial.printf("%02d-%02d-%02d %02d:%02d:%02d - ", year(t), month(t), day(t), hour(t), minute(t), second(t));}
 	#else
 		#include <sys/time.h>
-		#define DEBUG_PRINTF(msg, ...)    {printf(msg, ##__VA_ARGS__);}
 		#define DEBUG_TIMESTAMP()         {char tstr[21]; time_t t = time(NULL); struct tm *tm = localtime(&t); strftime(tstr, 21, "%y-%m-%d %H:%M:%S - ", tm);printf("%s", tstr);}
 	#endif
 	#define DEBUG_LOGF(msg, ...)        {DEBUG_TIMESTAMP(); DEBUG_PRINTF(msg, ##__VA_ARGS__);}
@@ -76,9 +74,9 @@ static unsigned long last_reconnect_attempt;
 
 #define MQTT_KEEPALIVE      60
 #define MQTT_DEFAULT_PORT   1883  // Default port for MQTT. Can be overwritten through App config
-#define MQTT_MAX_HOST_LEN   50    // Note: App is set to max 50 chars for broker name
-#define MQTT_MAX_USERNAME_LEN 32  // Note: App is set to max 32 chars for username
-#define MQTT_MAX_PASSWORD_LEN 32  // Note: App is set to max 32 chars for password
+#define MQTT_MAX_HOST_LEN   100    // Note: App is set to max 50 chars for broker name
+#define MQTT_MAX_USERNAME_LEN 50  // Note: App is set to max 32 chars for username
+#define MQTT_MAX_PASSWORD_LEN 100  // Note: App is set to max 32 chars for password
 #define MQTT_MAX_ID_LEN       16  // MQTT Client Id to uniquely reference this unit
 #define MQTT_RECONNECT_DELAY  120 // Minumum of 60 seconds between reconnect attempts
 

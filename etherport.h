@@ -32,11 +32,14 @@
 #include <stdio.h>
 #include <inttypes.h>
 #include <ctype.h>
-#include<openssl/ssl.h>
+#include <openssl/ssl.h>
+#include <defines.h>
 
 #ifdef __APPLE__
 #define MSG_NOSIGNAL SO_NOSIGPIPE
 #endif
+
+#define TMPBUF 1024*8
 
 class EthernetServer;
 
@@ -49,14 +52,24 @@ public:
 	bool connected();
 	void stop();
 	int read(uint8_t *buf, size_t size);
+	int readBytes(char *buf, size_t size) { return read((uint8_t*)buf, size); };
+	int timedRead();
+	size_t readBytesUntil(char terminator, char *buffer, size_t length);
+	std::string readStringUntil(char value);
 	size_t write(const uint8_t *buf, size_t size);
 	operator bool();
 	int GetSocket()
 	{
 		return m_sock;
 	}
+	void flush();
+	bool available();
+	
 private:
-	int m_sock;
+	uint8_t *tmpbuf = NULL;
+	int tmpbufsize = 0;
+	int tmpbufidx = 0;
+	int m_sock = 0;
 	bool m_connected;
 	friend class EthernetServer;
 };
