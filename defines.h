@@ -478,6 +478,7 @@ enum {
 	#define DEBUG_BEGIN(x)   {}
 	#define DEBUG_PRINT(x)   {}
 	#define DEBUG_PRINTLN(x) {}
+	#define DEBUG_PRINTF(x)  {}
 
 #endif
 
