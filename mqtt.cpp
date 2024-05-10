@@ -60,7 +60,6 @@
 	static unsigned long _lastMillis = 0; // Holds the timestamp associated with the last call to DEBUG_DURATION()
 	inline unsigned long DEBUG_DURATION() {unsigned long dur = millis() - _lastMillis; _lastMillis = millis(); return dur;}
 #else
-	#define DEBUG_PRINTF(msg, ...)  {}
 	#define DEBUG_LOGF(msg, ...)    {}
 	#define DEBUG_DURATION()        {}
 #endif
