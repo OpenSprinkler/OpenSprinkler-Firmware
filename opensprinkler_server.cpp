@@ -243,11 +243,11 @@ void rewind_ether_buffer() {
 
 #if defined(OTF_ENABLED)
 boolean buffer_available() {
-	return bfill.position() < RESPONSE_BUFFER_SIZE/2;
+	return bfill.position() < RESPONSE_BUFFER_SIZE/2 && available_ether_buffer() > 0;
 }
 #else
 boolean buffer_available() {
-	return available_ether_buffer() <=0;
+	return available_ether_buffer() > 0;
 }
 #endif
 
