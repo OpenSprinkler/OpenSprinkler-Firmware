@@ -26,6 +26,7 @@
 #include "opensprinkler_server.h"
 #include "weather.h"
 #include "mqtt.h"
+#include "main.h"
 
 // External variables defined in main ion file
 #if defined(ARDUINO)
@@ -83,18 +84,6 @@ static char* get_buffer = NULL;
 #endif
 
 BufferFiller bfill;
-
-void schedule_all_stations(ulong curr_time);
-void turn_off_station(byte sid, ulong curr_time, byte shift=0);
-void process_dynamic_events(ulong curr_time);
-void check_network(time_t curr_time);
-void check_weather(time_t curr_time);
-void perform_ntp_sync(time_t curr_time);
-void log_statistics(time_t curr_time);
-void delete_log(char *name);
-void reset_all_stations_immediate();
-void reset_all_stations();
-void make_logfile_name(char *name);
 
 /* Check available space (number of bytes) in the Ethernet buffer */
 int available_ether_buffer() {
@@ -1106,7 +1095,7 @@ function rst_wsp() {document.getElementById('wsp').value='$S';}</script>)"),
 
 void server_json_controller_main(OTF_PARAMS_DEF) {
 	byte bid, sid;
-	ulong curr_time = os.now_tz();
+	time_t curr_time = os.now_tz();
 	bfill.emit_p(PSTR("\"devt\":$L,\"nbrd\":$D,\"en\":$D,\"sn1\":$D,\"sn2\":$D,\"rd\":$D,\"rdst\":$L,"
 										"\"sunrise\":$D,\"sunset\":$D,\"eip\":$L,\"lwc\":$L,\"lswc\":$L,"
 										"\"lupt\":$L,\"lrbtc\":$D,\"lrun\":[$D,$D,$D,$L],\"pq\":$D,\"pt\":$L,\"nq\":$D,"),
@@ -1495,8 +1484,10 @@ void server_change_options(OTF_PARAMS_DEF)
 
 	// if not using NTP and manually setting time
 	if (!os.iopts[IOPT_USE_NTP] && findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("ttt"), true)) {
+#if defined(ARDUINO)
 		unsigned long t;
 		t = strtoul(tmp_buffer, NULL, 0);
+#endif
 		// before chaging time, reset all stations to avoid messing up with timing
 		reset_all_stations_immediate();
 #if defined(ARDUINO)

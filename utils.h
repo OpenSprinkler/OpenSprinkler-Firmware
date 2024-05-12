@@ -70,7 +70,8 @@ void str2mac(const char *_str, byte mac[]);
 #if defined(ARDUINO)
 
 #else // Arduino compatible functions for RPI/BBB
-	char* get_runtime_path();
+	const char* get_data_dir();
+	void set_data_dir(const char *new_data_dir);
 	char* get_filename_fullpath(const char *filename);
 	void delay(ulong ms);
 	void delayMicroseconds(ulong us);

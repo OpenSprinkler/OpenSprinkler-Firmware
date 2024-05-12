@@ -23,6 +23,7 @@
 
 #include <limits.h>
 #include "program.h"
+#include "main.h"
 
 #if !defined(SECS_PER_DAY)
 #define SECS_PER_MIN  (60UL)
@@ -36,7 +37,7 @@ byte ProgramData::nqueue = 0;
 RuntimeQueueStruct ProgramData::queue[RUNTIME_QUEUE_SIZE];
 byte ProgramData::station_qid[MAX_NUM_STATIONS];
 LogStruct ProgramData::lastrun;
-ulong ProgramData::last_seq_stop_times[NUM_SEQ_GROUPS];
+time_t ProgramData::last_seq_stop_times[NUM_SEQ_GROUPS];
 
 extern char tmp_buffer[];
 
@@ -136,11 +137,9 @@ void ProgramData::toggle_pause(ulong delay) {
 	os.status.pause_state = !os.status.pause_state;
 }
 
-void turn_off_station(byte sid, ulong curr_time, byte shift=0);
-
 void ProgramData::set_pause() {
 	RuntimeQueueStruct *q = queue;
-	ulong curr_t = os.now_tz();
+	time_t curr_t = os.now_tz();
 
 	for (; q < queue + nqueue; q++) {
 

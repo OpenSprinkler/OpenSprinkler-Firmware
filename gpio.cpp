@@ -221,6 +221,7 @@ static byte GPIOExport(int pin) {
 	return 1;
 }
 
+#if 0
 /** Unexport gpio pin */
 static byte GPIOUnexport(int pin) {
 	char buffer[BUFFER_MAX];
@@ -237,11 +238,12 @@ static byte GPIOUnexport(int pin) {
 	close(fd);
 	return 1;
 }
+#endif
 
 /** Set interrupt edge mode */
 static byte GPIOSetEdge(int pin, const char *edge) {
 	char path[BUFFER_MAX];
-	int fd, len;
+	int fd;
 
 	snprintf(path, BUFFER_MAX, "/sys/class/gpio/gpio%d/edge", pin);
 
@@ -413,7 +415,6 @@ void attachInterrupt(int pin, const char* mode, void (*isr)(void)) {
 
 	char path[BUFFER_MAX];
 	snprintf(path, BUFFER_MAX, "/sys/class/gpio/gpio%d/value", pin);
-	int fd;
 
 	// open gpio file
 	if(sysFds[pin]==-1) {
