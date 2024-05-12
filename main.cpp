@@ -1,4 +1,4 @@
-/* OpenSprinkler Unified (AVR/RPI/BBB/LINUX) Firmware
+/* OpenSprinkler Unified (AVR/RPI/BBB/LINUX/ESP) Firmware
  * Copyright (C) 2015 by Ray Wang (ray@opensprinkler.com)
  *
  * Main loop
@@ -30,15 +30,21 @@
 #include "mqtt.h"
 
 #if defined(ARDUINO)
-	#if defined(ESP8266)
-		ESP8266WebServer *update_server = NULL;
+	#if IS_ESP
 		OTF::OpenThingsFramework *otf = NULL;
 		DNSServer *dns = NULL;
-		ENC28J60lwIP enc28j60(PIN_ETHER_CS); // ENC28J60 lwip for wired Ether
-		Wiznet5500lwIP w5500(PIN_ETHER_CS); // W5500 lwip for wired Ether
-		lwipEth eth;
 		bool useEth = false; // tracks whether we are using WiFi or wired Ether connection
 		static uint16_t led_blink_ms = LED_FAST_BLINK;
+		
+		#if defined(ESP8266)
+			ESP8266WebServer *update_server = NULL;
+			ENC28J60lwIP enc28j60(PIN_ETHER_CS); // ENC28J60 lwip for wired Ether
+			Wiznet5500lwIP w5500(PIN_ETHER_CS); // W5500 lwip for wired Ether
+			lwipEth eth;
+		#else
+			WebServer *update_server = NULL;
+		#endif
+
 	#else
 		EthernetServer *m_server = NULL;
 		EthernetClient *m_client = NULL;
@@ -90,7 +96,7 @@ float flow_last_gpm=0;
 uint32_t reboot_timer = 0;
 
 void flow_poll() {
-	#if defined(ESP8266)
+	#if defined(ESP8266) //? do we need to do this for ESP32?
 	if(os.hw_rev>=2) pinModeExt(PIN_SENSOR1, INPUT_PULLUP); // this seems necessary for OS 3.2
 	#endif
 	byte curr_flow_state = digitalReadExt(PIN_SENSOR1);
@@ -145,7 +151,7 @@ void ui_state_machine() {
 	if(millis() - last_usm <= UI_STATE_MACHINE_INTERVAL) { return; }
 	last_usm = millis();
 
-#if defined(ESP8266)
+#if IS_ESP
 	// process screen led
 	static ulong led_toggle_timeout = 0;
 	if(led_blink_ms) {
@@ -185,6 +191,8 @@ void ui_state_machine() {
 					#if defined(ESP8266)
 					if (useEth) { os.lcd.print(eth.gatewayIP()); }
 					else { os.lcd.print(WiFi.gatewayIP()); }
+					#elif defined(ESP32)
+					{ os.lcd.print(WiFi.gatewayIP()); }
 					#else
 					{ os.lcd.print(Ethernet.gatewayIP()); }
 					#endif
@@ -201,6 +209,8 @@ void ui_state_machine() {
 				#if defined(ESP8266)
 				if (useEth) { os.lcd.print(eth.localIP()); }
 				else { os.lcd.print(WiFi.localIP()); }
+				#elif defined(ESP32)
+				{ os.lcd.print(WiFi.localIP()); }
 				#else
 				{ os.lcd.print(Ethernet.localIP()); }
 				#endif
@@ -246,7 +256,7 @@ void ui_state_machine() {
 					os.lcd.print(os.last_reboot_cause);
 					ui_state = UI_STATE_DISP_IP;
 				} else if(digitalReadExt(PIN_BUTTON_2)==0) {  // if B2 is pressed while holding B3, reset to AP and reboot
-					#if defined(ESP8266)
+					#if IS_ESP
 					if(!ui_confirm(PSTR("Reset to AP?"))) {ui_state = UI_STATE_DEFAULT; break;}
 					os.reset_to_ap();
 					#endif
@@ -296,7 +306,7 @@ void ui_state_machine() {
 // ======================
 void do_setup() {
 	/* Clear WDT reset flag. */
-#if defined(ESP8266)
+#if IS_ESP
 	WiFi.persistent(false);
 	led_blink_ms = LED_FAST_BLINK;
 #else
@@ -316,7 +326,7 @@ void do_setup() {
 	os.lcd_print_time(os.now_tz());  // display time to LCD
 	os.powerup_lasttime = os.now_tz();
 
-#if !defined(ESP8266)
+#if IS_OS23 // for OS 2.3
 	// enable WDT
 	/* In order to change WDE or the prescaler, we need to
 	 * set WDCE (This will allow updates for 4 clock cycles).
@@ -353,7 +363,7 @@ void do_setup() {
 // Arduino software reset function
 void(* sysReset) (void) = 0;
 
-#if !defined(ESP8266)
+#if IS_OS23 // for OS 2.3
 volatile byte wdt_timeout = 0;
 /** WDT interrupt service routine */
 ISR(WDT_vect)
@@ -374,8 +384,9 @@ void do_setup() {
 	os.begin();          // OpenSprinkler init
 	os.options_setup();  // Setup options
 
+	DEBUG_PRINTLN("A");
 	pd.init();           // ProgramData init
-
+	DEBUG_PRINTLN("B");
 	if (os.start_network()) {  // initialize network
 		DEBUG_PRINTLN("network established.");
 		os.status.network_fails = 0;
@@ -383,15 +394,18 @@ void do_setup() {
 		DEBUG_PRINTLN("network failed.");
 		os.status.network_fails = 1;
 	}
+	DEBUG_PRINTLN("C");
 	os.status.req_network = 0;
 
+	DEBUG_PRINTLN("D");
 	// because at reboot we don't know if special stations
 	// are in OFF state, here we explicitly turn them off
 	for(byte sid=0;sid<os.nstations;sid++) {
 		os.switch_special_station(sid, 0);
 	}
-
+	DEBUG_PRINTLN("E");
 	os.mqtt.init();
+	DEBUG_PRINTLN("F");
 	os.status.req_mqtt_restart = true;
 }
 #endif
@@ -408,7 +422,7 @@ bool process_special_program_command(const char*, uint32_t curr_time);
 void perform_ntp_sync();
 void delete_log(char *name);
 
-#if defined(ESP8266)
+#if IS_ESP
 bool delete_log_oldest();
 void start_server_ap();
 void start_server_client();
@@ -417,7 +431,8 @@ void reboot_in(uint32_t ms) {
 	if(os.state != OS_STATE_WAIT_REBOOT) {
 		os.state = OS_STATE_WAIT_REBOOT;
 		DEBUG_PRINTLN(F("Prepare to restart..."));
-		reboot_ticker.once_ms(ms, ESP.restart);
+		// TODO: reboot_ticker.once_ms(ms, ESP.restart);
+		ESP.restart();
 	}
 }
 #else
@@ -449,7 +464,7 @@ void do_loop()
 
 	// ====== Process Ethernet packets ======
 #if defined(ARDUINO)	// Process Ethernet packets for Arduino
-	#if defined(ESP8266)
+	#if IS_ESP
 	static ulong connecting_timeout;
 	switch(os.state) {
 	case OS_STATE_INITIAL:
@@ -461,7 +476,7 @@ void do_loop()
 			start_server_client();
 			os.state = OS_STATE_CONNECTED;
 			connecting_timeout = 0;
-		} else if(os.get_wifi_mode()==WIFI_MODE_AP) {
+		} else if(os.get_wifi_mode()==OS_WIFI_MODE_AP) {
 			start_server_ap();
 			dns->setErrorReplyCode(DNSReplyCode::NoError);
 			dns->start(53, "*", WiFi.softAPIP());
@@ -520,12 +535,12 @@ void do_loop()
 		break;
 
 	case OS_STATE_CONNECTED:
-		if(os.get_wifi_mode() == WIFI_MODE_AP) {
+		if(os.get_wifi_mode() == OS_WIFI_MODE_AP) {
 			dns->processNextRequest();
 			update_server->handleClient();
 			otf->loop();
 			connecting_timeout = 0;
-			if(os.get_wifi_mode()==WIFI_MODE_STA) {
+			if(os.get_wifi_mode()==OS_WIFI_MODE_STA) {
 				// already in STA mode, waiting to reboot
 				break;
 			}
@@ -538,6 +553,7 @@ void do_loop()
 			if(useEth || WiFi.status() == WL_CONNECTED) {
 				update_server->handleClient();
 				otf->loop();
+				delay(500);
 				connecting_timeout = 0;
 			} else {
 				// todo: better handling of WiFi disconnection
@@ -621,6 +637,8 @@ void do_loop()
 			pinModeExt(PIN_SENSOR1, INPUT_PULLUP); // this seems necessary for OS 3.2
 			pinModeExt(PIN_SENSOR2, INPUT_PULLUP);
 		}
+		#elif defined(ESP32)
+			// TODO: init sensor pins
 		#endif
 
 		last_time = curr_time;
@@ -1021,9 +1039,9 @@ void check_weather() {
 	if (os.status.network_fails>0 || os.iopts[IOPT_REMOTE_EXT_MODE]) return;
 	if (os.status.program_busy) return;
 
-#if defined(ESP8266)
+#if IS_ESP
 	if (!useEth) { // todo: what about useEth==true?
-		if (os.get_wifi_mode()!=WIFI_MODE_STA || WiFi.status()!=WL_CONNECTED || os.state!=OS_STATE_CONNECTED) return;
+		if (os.get_wifi_mode()!=OS_WIFI_MODE_STA || WiFi.status()!=WL_CONNECTED || os.state!=OS_STATE_CONNECTED) return;
 	}
 #endif
 
@@ -1531,6 +1549,8 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 						byte ip[4] = {_ip[0], _ip[1], _ip[2], _ip[3]};
 						ip2string(postval, ip);
 					}
+					#elif defined(ESP32)
+						// TODO: get IP
 					#else
 						ip2string(postval, &(Ethernet.localIP()[0]));
 					#endif
@@ -1575,10 +1595,8 @@ char LOG_PREFIX[] = "./logs/";
  * Log files will be named /logs/xxxxx.txt
  */
 void make_logfile_name(char *name) {
-#if defined(ARDUINO)
-	#if !defined(ESP8266)
+#if IS_OS23 // for OS 2.3
 	sd.chdir("/");
-	#endif
 #endif
 	strcpy(tmp_buffer+TMP_BUFFER_SIZE-10, name); // hack: we do this because name is from tmp_buffer too
 	strcpy(tmp_buffer, LOG_PREFIX);
@@ -1613,9 +1631,10 @@ void write_log(byte type, ulong curr_time) {
 	// and move file pointer to the end
 #if defined(ARDUINO) // prepare log folder for Arduino
 
-	#if defined(ESP8266)
+	#if IS_ESP
 	File file = LittleFS.open(tmp_buffer, "r+");
 	if(!file) {
+		#if defined(ESP8266)  // todo: ESP32 is missing FSInfo
 		FSInfo fs_info;
 		LittleFS.info(fs_info);
 		// check if we are getting close to run out of space, and delete some oldest files
@@ -1623,6 +1642,7 @@ void write_log(byte type, ulong curr_time) {
 			// delete the oldest 7 files (1 week of log)
 			for(byte i=0;i<7;i++)	delete_log_oldest();
 		}
+		#endif
 		file = LittleFS.open(tmp_buffer, "w");
 		if(!file) return;
 	}
@@ -1712,7 +1732,7 @@ void write_log(byte type, ulong curr_time) {
 	strcat_P(tmp_buffer, PSTR("]\r\n"));
 
 #if defined(ARDUINO)
-	#if defined(ESP8266)
+	#if IS_ESP
 	file.write((const uint8_t*)tmp_buffer, strlen(tmp_buffer));
 	#else
 	file.write(tmp_buffer);
@@ -1724,8 +1744,9 @@ void write_log(byte type, ulong curr_time) {
 #endif
 }
 
-#if defined(ESP8266)
+#if IS_ESP
 bool delete_log_oldest() {
+	#if defined(ESP8266)
 	Dir dir = LittleFS.openDir(LOG_PREFIX);
 	time_t oldest_t = ULONG_MAX;
 	String oldest_fn;
@@ -1744,6 +1765,9 @@ bool delete_log_oldest() {
 	} else {
 		return false;
 	}
+	#else // todo: ESP32 is missing Dir
+	return false;
+	#endif
 }
 #endif
 
@@ -1754,6 +1778,7 @@ void delete_log(char *name) {
 	if (!os.iopts[IOPT_ENABLE_LOGGING]) return;
 #if defined(ARDUINO)
 
+	#if IS_ESP
 	#if defined(ESP8266)
 	if (strncmp(name, "all", 3) == 0) {
 		// delete all log files
@@ -1767,6 +1792,8 @@ void delete_log(char *name) {
 		if(!LittleFS.exists(tmp_buffer)) return;
 		LittleFS.remove(tmp_buffer);
 	}
+	#else	// todo: ESP32 is missing Dir
+	#endif
 	#else
 	if (strncmp(name, "all", 3) == 0) {
 		// delete the log folder
@@ -1802,7 +1829,7 @@ void delete_log(char *name) {
  * If not, it re-initializes Ethernet controller.
  */
 void check_network() {
-#if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
+#if IS_OS23
 	// do not perform network checking if the controller has just started, or if a program is running
 	if (os.status.program_busy) {return;}
 

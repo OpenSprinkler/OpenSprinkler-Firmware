@@ -1,31 +1,49 @@
 #ifndef SSD1306_DISPLAY_H
 #define SSD1306_DISPLAY_H
 
-#if defined(ESP8266)
+#if defined(ESP8266) || defined(ESP32)
 
-#include <SSD1306.h>
+#if defined(ESP8266)
+	#include <SSD1306.h>
+#else
+	#include <SH1106.h>
+#endif
+
 #include "font.h"
 #include "images.h"
 
 #define LCD_STD 0  // Standard LCD
 #define LCD_I2C 1
 
-class SSD1306Display : public SSD1306{
+#if defined(ESP8266)
+class SSD1306Display : public SSD1306{  // OS3.x use SSD1306
+#else
+class SSD1306Display : public SH1106{   // OS4.x use SH1106
+#endif
+
 public:
+#if defined(ESP8266)
 	SSD1306Display(uint8_t _addr, uint8_t _sda, uint8_t _scl) : SSD1306(_addr, _sda, _scl) {
+#else
+	SSD1306Display(uint8_t _addr, uint8_t _sda, uint8_t _scl) : SH1106(_addr, _sda, _scl) {
+#endif
 		cx = 0;
 		cy = 0;
 		for(byte i=0;i<NUM_CUSTOM_ICONS;i++) custom_chars[i]=NULL;
 	}
 	void begin() {
-		Wire.setClock(400000L); // lower clock to 400kHz
+		//Wire.setClock(400000L); // lower clock to 400kHz
 		flipScreenVertically();
 		setFont(Monospaced_plain_13);
 		fontWidth = 8;
 		fontHeight = 16;
 	}
 	void clear() {
+#if defined(ESP8266)
 		SSD1306::clear();
+#else
+		SH1106::clear();
+#endif
 	}
 	void clear(int start, int end) {
 		setColor(BLACK);

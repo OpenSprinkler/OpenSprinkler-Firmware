@@ -1,4 +1,4 @@
-/* OpenSprinkler Unified (AVR/RPI/BBB/LINUX/ESP8266) Firmware
+/* OpenSprinkler Unified (AVR/RPI/BBB/LINUX/ESP) Firmware
  * Copyright (C) 2015 by Ray Wang (ray@opensprinkler.com)
  *
  * OpenSprinkler macro defines and hardware pin assignments
@@ -24,7 +24,7 @@
 #ifndef _DEFINES_H
 #define _DEFINES_H
 
-//#define ENABLE_DEBUG  // enable serial debug
+#define ENABLE_DEBUG  // enable serial debug
 
 typedef unsigned char byte;
 typedef unsigned long ulong;
@@ -36,7 +36,7 @@ typedef unsigned long ulong;
 														// if this number is different from the one stored in non-volatile memory
 														// a device reset will be automatically triggered
 
-#define OS_FW_MINOR      3  // Firmware minor version
+#define OS_FW_MINOR      4  // Firmware minor version
 
 /** Hardware version base numbers */
 #define OS_HW_VERSION_BASE   0x00 // OpenSprinkler
@@ -51,19 +51,28 @@ typedef unsigned long ulong;
 #define HW_TYPE_UNKNOWN      0xFF
 
 /** Data file names */
-#define IOPTS_FILENAME        "iopts.dat"   // integer options data file
-#define SOPTS_FILENAME        "sopts.dat"   // string options data file
-#define STATIONS_FILENAME     "stns.dat"    // stations data file
-#define NVCON_FILENAME        "nvcon.dat"   // non-volatile controller data file, see OpenSprinkler.h --> struct NVConData
-#define PROG_FILENAME         "prog.dat"    // program data file
-#define DONE_FILENAME         "done.dat"    // used to indicate the completion of all files
+#if defined(ESP32)	// LittleFS on ESP32 requires / at the beginning
+	#define IOPTS_FILENAME        "/iopts.dat"   // integer options data file
+	#define SOPTS_FILENAME        "/sopts.dat"   // string options data file
+	#define STATIONS_FILENAME     "/stns.dat"    // stations data file
+	#define NVCON_FILENAME        "/nvcon.dat"   // non-volatile controller data file, see OpenSprinkler.h --> struct NVConData
+	#define PROG_FILENAME         "/prog.dat"    // program data file
+	#define DONE_FILENAME         "/done.dat"    // used to indicate the completion of all files
+#else
+	#define IOPTS_FILENAME        "iopts.dat"   // integer options data file
+	#define SOPTS_FILENAME        "sopts.dat"   // string options data file
+	#define STATIONS_FILENAME     "stns.dat"    // stations data file
+	#define NVCON_FILENAME        "nvcon.dat"   // non-volatile controller data file, see OpenSprinkler.h --> struct NVConData
+	#define PROG_FILENAME         "prog.dat"    // program data file
+	#define DONE_FILENAME         "done.dat"    // used to indicate the completion of all files
+#endif
 
 /** Station macro defines */
 #define STN_TYPE_STANDARD    0x00 // standard solenoid station
-#define STN_TYPE_RF          0x01	// Radio Frequency (RF) station
-#define STN_TYPE_REMOTE      0x02	// Remote OpenSprinkler station
-#define STN_TYPE_GPIO        0x03	// direct GPIO station
-#define STN_TYPE_HTTP        0x04	// HTTP station
+#define STN_TYPE_RF          0x01 // Radio Frequency (RF) station
+#define STN_TYPE_REMOTE      0x02 // Remote OpenSprinkler station
+#define STN_TYPE_GPIO        0x03 // direct GPIO station
+#define STN_TYPE_HTTP        0x04 // HTTP station
 #define STN_TYPE_OTHER       0xFF
 
 /** Notification macro defines */
@@ -79,10 +88,10 @@ typedef unsigned long ulong;
 
 /** HTTP request macro defines */
 #define HTTP_RQT_SUCCESS       0
-#define HTTP_RQT_NOT_RECEIVED  1
-#define HTTP_RQT_CONNECT_ERR   2
-#define HTTP_RQT_TIMEOUT       3
-#define HTTP_RQT_EMPTY_RETURN  4
+#define HTTP_RQT_NOT_RECEIVED -1
+#define HTTP_RQT_CONNECT_ERR  -2
+#define HTTP_RQT_TIMEOUT      -3
+#define HTTP_RQT_EMPTY_RETURN -4
 
 /** Sensor macro defines */
 #define SENSOR_TYPE_NONE    0x00
@@ -111,8 +120,8 @@ typedef unsigned long ulong;
 
 
 /** WiFi defines */
-#define WIFI_MODE_AP       0xA9
-#define WIFI_MODE_STA      0x2A
+#define OS_WIFI_MODE_AP       0xA9
+#define OS_WIFI_MODE_STA      0x2A
 
 #define OS_STATE_INITIAL        0
 #define OS_STATE_CONNECTING     1
@@ -173,8 +182,8 @@ enum {
 };
 
 // Sequential Groups
-#define NUM_SEQ_GROUPS		4
-#define PARALLEL_GROUP_ID	255
+#define NUM_SEQ_GROUPS    4
+#define PARALLEL_GROUP_ID 255
 
 /** Macro define of each option
   * Refer to OpenSprinkler.cpp for details on each option
@@ -274,8 +283,11 @@ enum {
 
 #undef OS_HW_VERSION
 
+#define IS_ESP (defined(ESP8266)||defined(ESP32))
+#define IS_OS23 (defined(__AVR_ATmega1284P__)||defined(__AVR_ATmega1284__))
+
 /** Hardware defines */
-#if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__) // for OS 2.3
+#if IS_OS23 // for OS 2.3
 
 	#define OS_HW_VERSION   (OS_HW_VERSION_BASE+23)
 	#define PIN_FREE_LIST   {2,10,12,13,14,15,18,19}  // Free GPIO pins
@@ -322,6 +334,40 @@ enum {
 	#define digitalReadExt    digitalRead
 	#define digitalWriteExt   digitalWrite
 
+#elif defined(ESP32)   // for ESP32
+
+	#define OS_HW_VERSION    (OS_HW_VERSION_BASE+40)
+	#define PIN_HWVER_SENSE  6    // hardware version sensing
+	#define ACDR_REFADC      0    // ac driver reference adc value (for hardware version detection)
+	#define DCDR_REFADC      1024 // dc driver reference adc value
+	#define LADR_REFADC      2048 // latch driver reference adc value
+	#define PIN_ZONE_BASE    10
+	#define EXP_I2CADDR_BASE 0x24 // base of expander I2C address
+	#define LCD_I2CADDR      0x3C // 128x64 OLED display I2C address
+	#define PIN_CURR_SENSE   5    // current sensing pin
+	#define PIN_FREE_LIST    {}   // TODO: list free gpio pins
+	#define ETHER_BUFFER_SIZE   4096
+	#define PIN_ETHER_CS     34
+	#define PIN_ETHER_IRQ    33
+	#define PIN_ETHER_RESET  -1
+	#define PIN_BUTTON_1     0
+	#define PIN_BUTTON_2     19
+	#define PIN_BUTTON_3     20
+	#define PIN_RFTX         45
+	#define PIN_BOOST        255 // 39 or 40
+	#define PIN_BOOST_EN     255
+	#define PIN_SHIFTREG_CS  38
+	#define PIN_LATCH_COMA   21
+	#define PIN_LATCH_COMK   18
+	#define PIN_SENSOR_BASE  1    // digital/analog sensor first pin
+	#define NUM_SENSORS      4
+	#define PIN_SENSOR1      1 // TODO: these need to be removed after restructuring sensors
+	#define PIN_SENSOR2      2 // sensor 2
+	
+	#define pinModeExt        pinMode
+	#define digitalReadExt    digitalRead
+	#define digitalWriteExt   digitalWrite
+	
 #elif defined(ESP8266) // for ESP8266
 
 	#define OS_HW_VERSION    (OS_HW_VERSION_BASE+30)

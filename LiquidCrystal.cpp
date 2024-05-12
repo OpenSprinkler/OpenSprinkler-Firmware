@@ -1,4 +1,4 @@
-#if defined(ARDUINO) && !defined(ESP8266)
+#if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__) // for OS 2.3
 
 #include "LiquidCrystal.h"
 #include <inttypes.h>

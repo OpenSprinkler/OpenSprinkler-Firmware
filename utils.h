@@ -1,4 +1,4 @@
-/* OpenSprinkler Unified (AVR/RPI/BBB/LINUX) Firmware
+/* OpenSprinkler Unified (AVR/RPI/BBB/LINUX/ESP) Firmware
  * Copyright (C) 2015 by Ray Wang (ray@opensprinkler.com)
  *
  * Utility functions header file
@@ -60,7 +60,7 @@ void strReplace(char *, char c, char r);
 #define MIN_ENCODED_DATE date_encode(1,1)
 #define MAX_ENCODED_DATE date_encode(12, 31)
 bool isValidDate(uint16_t date);
-#if defined(ESP8266)
+#if IS_ESP
 byte hex2dec(const char *hex);
 bool isHex(char c);
 bool isValidMAC(const char *_mac);

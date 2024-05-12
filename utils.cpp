@@ -1,4 +1,4 @@
-/* OpenSprinkler Unified (AVR/RPI/BBB/LINUX) Firmware
+/* OpenSprinkler Unified (AVR/RPI/BBB/LINUX/ESP) Firmware
  * Copyright (C) 2015 by Ray Wang (ray@opensprinkler.com)
  *
  * Utility functions
@@ -27,7 +27,7 @@ extern OpenSprinkler os;
 
 #if defined(ARDUINO)  // Arduino
 
-	#if defined(ESP8266)
+	#if IS_ESP
 		#include <FS.h>
 		#include <LittleFS.h>
 	#else
@@ -172,7 +172,7 @@ unsigned int detect_rpi_rev() {
 
 
 void remove_file(const char *fn) {
-#if defined(ESP8266)
+#if IS_ESP
 
 	if(!LittleFS.exists(fn)) return;
 	LittleFS.remove(fn);
@@ -191,7 +191,7 @@ void remove_file(const char *fn) {
 }
 
 bool file_exists(const char *fn) {
-#if defined(ESP8266)
+#if IS_ESP
 
 	return LittleFS.exists(fn);
 
@@ -212,7 +212,7 @@ bool file_exists(const char *fn) {
 
 // file functions
 void file_read_block(const char *fn, void *dst, ulong pos, ulong len) {
-#if defined(ESP8266)
+#if IS_ESP
 
 	// do not use File.readBytes or readBytesUntil because it's very slow
 	File f = LittleFS.open(fn, "r");
@@ -245,7 +245,7 @@ void file_read_block(const char *fn, void *dst, ulong pos, ulong len) {
 }
 
 void file_write_block(const char *fn, const void *src, ulong pos, ulong len) {
-#if defined(ESP8266)
+#if IS_ESP
 
 	File f = LittleFS.open(fn, "r+");
 	if(!f) f = LittleFS.open(fn, "w");
@@ -255,7 +255,7 @@ void file_write_block(const char *fn, const void *src, ulong pos, ulong len) {
 		f.close();
 	}
 
-#elif defined(ARDUINO)
+#elif IS_OS23
 
 	sd.chdir("/");
 	SdFile file;
@@ -285,7 +285,7 @@ void file_copy_block(const char *fn, ulong from, ulong to, ulong len, void *tmp)
 	// assume tmp buffer is provided and is larger than len
 	// todo future: if tmp buffer is not provided, do byte-to-byte copy
 	if(tmp==NULL) { return; }
-#if defined(ESP8266)
+#if IS_ESP
 
 	File f = LittleFS.open(fn, "r+");
 	if(!f) return;
@@ -323,7 +323,7 @@ void file_copy_block(const char *fn, ulong from, ulong to, ulong len, void *tmp)
 
 // compare a block of content
 byte file_cmp_block(const char *fn, const char *buf, ulong pos) {
-#if defined(ESP8266)
+#if IS_ESP
 
 	File f = LittleFS.open(fn, "r");
 	if(f) {
@@ -502,7 +502,7 @@ bool isValidDate(uint16_t date) {
 	return isValidDate(month, day);
 }
 
-#if defined(ESP8266)
+#if IS_ESP
 byte hex2dec(const char *hex) {
 	return strtol(hex, NULL, 16);
 }

@@ -1,4 +1,4 @@
-/* OpenSprinkler Unified (AVR/RPI/BBB/LINUX) Firmware
+/* OpenSprinkler Unified (AVR/RPI/BBB/LINUX/ESP) Firmware
  * Copyright (C) 2015 by Ray Wang (ray@opensprinkler.com)
  *
  * GPIO header file
@@ -26,7 +26,7 @@
 
 #if defined(ARDUINO)
 
-#if defined(ESP8266)
+#if defined(ESP8266) || defined(ESP32)
 
 #include "Arduino.h"
 
@@ -109,11 +109,13 @@ private:
 	uint8_t inputmask = 0;	// mask bits for input pins
 };
 
+#if defined(ESP8266)
 void pinModeExt(byte pin, byte mode);
 void digitalWriteExt(byte pin, byte value);
 byte digitalReadExt(byte pin);
+#endif
 
-#endif	// ESP8266
+#endif	// ESP8266 or ESP32
 
 #else
 

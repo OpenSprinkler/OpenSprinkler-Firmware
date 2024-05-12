@@ -1,4 +1,4 @@
-/* OpenSprinkler Unified (AVR/RPI/BBB/LINUX) Firmware
+/* OpenSprinkler Unified (AVR/RPI/BBB/LINUX/ESP) Firmware
  * Copyright (C) 2014 by Ray Wang (ray@opensprinkler.com)
  *
  * GPIO functions
@@ -25,7 +25,7 @@
 
 #if defined(ARDUINO)
 
-#if defined(ESP8266)
+#if defined(ESP8266) || defined(ESP32)
 
 #include <Wire.h>
 #include "defines.h"
@@ -78,12 +78,14 @@ void PCA9555::i2c_write(uint8_t reg, uint16_t v){
 }
 
 void PCA9555::shift_out(uint8_t plat, uint8_t pclk, uint8_t pdat, uint8_t v) {
+#if defined(ESP8266) // OS 3.0 uses pins defined on IO expander to operate shift register
 	if(plat<IOEXP_PIN || pclk<IOEXP_PIN || pdat<IOEXP_PIN)
 		return; // the definition of each pin must be offset by IOEXP_PIN to begin with
 
 	plat-=IOEXP_PIN;
 	pclk-=IOEXP_PIN;
 	pdat-=IOEXP_PIN;
+#endif
 
 	uint16_t output = i2c_read(NXP_OUTPUT_REG); // keep a copy of the current output registers
 
@@ -144,6 +146,7 @@ void PCF8574::i2c_write(uint8_t reg, uint16_t v) {
 
 extern OpenSprinkler os;
 
+#if defined(ESP8266)
 void pinModeExt(byte pin, byte mode) {
 	if(pin==255) return;
 	if(pin>=IOEXP_PIN) {
@@ -173,6 +176,8 @@ byte digitalReadExt(byte pin) {
 		return digitalRead(pin);
 	}
 }
+#endif
+
 #endif
 
 #elif defined(OSPI) || defined(OSBO)

@@ -1,4 +1,4 @@
-/* OpenSprinkler Unified (AVR/RPI/BBB/LINUX/ESP8266) Firmware
+/* OpenSprinkler Unified (AVR/RPI/BBB/LINUX/ESP) Firmware
  * Copyright (C) 2015 by Ray Wang (ray@opensprinkler.com)
  *
  * OpenSprinkler library header file
@@ -42,6 +42,17 @@
 		#include <LittleFS.h>
 		#include <ENC28J60lwIP.h>
 		#include <W5500lwIP.h>
+		#include <RCSwitch.h>
+		#include <OpenThingsFramework.h>
+		#include <DNSServer.h>
+		#include <Ticker.h>
+		#include "SSD1306Display.h"
+		#include "espconnect.h"
+	#elif defined(ESP32) // for ESP32
+		#include <FS.h>
+		#include <LittleFS.h>
+		#include <ETH.h>
+		#include <SPI.h>
 		#include <RCSwitch.h>
 		#include <OpenThingsFramework.h>
 		#include <DNSServer.h>
@@ -97,6 +108,9 @@
 		}
 	};
 	extern lwipEth eth;
+	#elif defined(ESP32)
+	extern WebServer *update_server;
+	extern OTF::OpenThingsFramework *otf;
 	#else
 	extern EthernetServer *m_server;
 	#endif
@@ -197,7 +211,7 @@ class OpenSprinkler {
 public:
 
 	// data members
-#if defined(ESP8266)
+#if IS_ESP
 	static SSD1306Display lcd;  // 128x64 OLED display
 #elif defined(ARDUINO)
 	static LiquidCrystal lcd;   // 16x2 character LCD
@@ -326,7 +340,7 @@ public:
 	static int8_t send_http_request(char* server_with_port, char* p, void(*callback)(char*)=NULL, uint16_t timeout=5000);
 	// -- LCD functions
 #if defined(ARDUINO) // LCD functions for Arduino
-	#if defined(ESP8266)
+	#if IS_ESP
 	static void lcd_print_pgm(PGM_P str); // ESP8266 does not allow PGM_P followed by PROGMEM
 	static void lcd_print_line_clear_pgm(PGM_P str, byte line);
 	#else
@@ -365,7 +379,7 @@ public:
 	static void lcd_set_brightness(byte value=1);
 	static void lcd_set_contrast();
 
-	#if defined(ESP8266)
+	#if IS_ESP
 	static OTCConfig otc;
 	static IOEXP *mainio, *drio;
 	static IOEXP *expanders[];
@@ -374,7 +388,7 @@ public:
 	static void flash_screen();
 	static void toggle_screen_led();
 	static void set_screen_led(byte status);
-	static byte get_wifi_mode() { if (useEth) return WIFI_MODE_STA; else return wifi_testmode ? WIFI_MODE_STA : iopts[IOPT_WIFI_MODE];}
+	static byte get_wifi_mode() { if (useEth) return OS_WIFI_MODE_STA; else return wifi_testmode ? OS_WIFI_MODE_STA : iopts[IOPT_WIFI_MODE];}
 	static byte wifi_testmode;
 	static String wifi_ssid, wifi_pass;
 	static byte wifi_bssid[6], wifi_channel;
@@ -390,7 +404,7 @@ private:
 	static void lcd_start();
 	static byte button_read_busy(byte pin_butt, byte waitmode, byte butt, byte is_holding);
 
-	#if defined(ESP8266)
+	#if IS_ESP
 	static void parse_otc_config();
 	static void latch_boost();
 	static void latch_open(byte sid);

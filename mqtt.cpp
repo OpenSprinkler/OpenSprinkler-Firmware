@@ -1,4 +1,4 @@
-/* OpenSprinkler Unified (AVR/RPI/BBB/LINUX/ESP8266) Firmware
+/* OpenSprinkler Unified (AVR/RPI/BBB/LINUX/ESP) Firmware
  * Copyright (C) 2015 by Ray Wang (ray@opensprinkler.com)
  *
  * OpenSprinkler library
@@ -25,6 +25,8 @@
 	#include <Arduino.h>
 	#if defined(ESP8266)
 		#include <ESP8266WiFi.h>
+	#elif defined(ESP32)
+		#include <WiFi.h>
 	#else
 		#include <Ethernet.h>
 	#endif
@@ -101,7 +103,7 @@ void OSMqtt::init(void) {
 
 #if defined(ARDUINO)
 	uint8_t mac[6] = {0};
-	#if defined(ESP8266)
+	#if IS_ESP
 	os.load_hardware_mac(mac, useEth);
 	#else
 	os.load_hardware_mac(mac, true);
@@ -216,7 +218,7 @@ void OSMqtt::loop(void) {
 /**************************** ARDUINO ********************************************/
 #if defined(ARDUINO)
 
-	#if defined(ESP8266)
+	#if IS_ESP
 		WiFiClient wifiClient;
 	#else
 		EthernetClient ethClient;
@@ -227,7 +229,7 @@ int OSMqtt::_init(void) {
 
     if (mqtt_client) { delete mqtt_client; mqtt_client = 0; }
 
-	#if defined(ESP8266)
+	#if IS_ESP
 		client = &wifiClient;
 	#else
 		client = &ethClient;

@@ -17,7 +17,7 @@
  * along with this program.  If not, see
  * <http://www.gnu.org/licenses/>.
  */
-#if defined(ESP8266)
+#if defined(ESP8266) || defined(ESP32)
 
 #include "espconnect.h"
 

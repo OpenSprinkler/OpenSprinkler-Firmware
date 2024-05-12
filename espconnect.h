@@ -18,13 +18,19 @@
  * <http://www.gnu.org/licenses/>.
  */
 
-#if defined(ESP8266)
+#if defined(ESP8266) || defined(ESP32)
 
 #ifndef _ESP_CONNECT_H
 #define _ESP_CONNECT_H
 
-#include <ESP8266WiFi.h>
-#include <ESP8266WebServer.h>
+#if defined(ESP8266)
+	#include <ESP8266WiFi.h>
+	#include <ESP8266WebServer.h>
+#else
+	#include <WiFi.h>
+	#include <WebServer.h>
+#endif
+
 #include <WiFiUdp.h>
 #include "time.h"
 #include "defines.h"
