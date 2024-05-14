@@ -840,8 +840,8 @@ int read_sensor_adc(Sensor_t *sensor, ulong time) {
 	int id = sensor->id % 4;
 
 	ADS1115 adc(port);
-	adc.begin();
-	adc.reset();
+	if (!adc.begin()) 
+		return HTTP_RQT_NOT_RECEIVED;
 	sensor->repeat_native += adc.readADC(id);
     if (++sensor->repeat_read < MAX_SENSOR_REPEAT_READ && time < sensor->last_read + sensor->read_interval)
         return HTTP_RQT_NOT_RECEIVED;
