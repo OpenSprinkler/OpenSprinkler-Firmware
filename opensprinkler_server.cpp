@@ -260,8 +260,8 @@ void send_packet(OTF_PARAMS_DEF) {
 		DEBUG_PRINTLN(res.getLength());
 		res.flush();
 	}
-	DEBUG_PRINT("res.writeBodyChunk: ");
-	DEBUG_PRINTLN(strlen(ether_buffer));
+	//DEBUG_PRINT("res.writeBodyChunk: ");
+	//DEBUG_PRINTLN(strlen(ether_buffer));
 	res.writeBodyChunk((char *)"%s",ether_buffer);
 #else
 	m_client->write((const uint8_t *)ether_buffer, strlen(ether_buffer));
@@ -1210,16 +1210,19 @@ void server_json_controller_main(OTF_PARAMS_DEF) {
 #else
 	os.load_hardware_mac(mac, true);
 #endif
+	char mqtt_opt[MAX_SOPTS_SIZE*2];
+	os.sopt_load(SOPT_MQTT_OPTS, mqtt_opt);
+	os.sopt_load(SOPT_MQTT_OPTS2, mqtt_opt+MAX_SOPTS_SIZE);
 
 	bfill.emit_p(PSTR("\"mac\":\"$X:$X:$X:$X:$X:$X\","), mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 
-	bfill.emit_p(PSTR("\"loc\":\"$O\",\"jsp\":\"$O\",\"wsp\":\"$O\",\"wto\":{$O},\"ifkey\":\"$O\",\"mqtt\":{$O},\"wtdata\":$S,\"wterr\":$D,\"dname\":\"$O\","),
+	bfill.emit_p(PSTR("\"loc\":\"$O\",\"jsp\":\"$O\",\"wsp\":\"$O\",\"wto\":{$O},\"ifkey\":\"$O\",\"mqtt\":{$S},\"wtdata\":$S,\"wterr\":$D,\"dname\":\"$O\","),
 							 SOPT_LOCATION,
 							 SOPT_JAVASCRIPTURL,
 							 SOPT_WEATHERURL,
 							 SOPT_WEATHER_OPTS,
 							 SOPT_IFTTT_KEY,
-							 SOPT_MQTT_OPTS,
+							 mqtt_opt,
 							 strlen(wt_rawData)==0?"{}":wt_rawData,
 							 wt_errCode,
 							 SOPT_DEVICE_NAME);
@@ -1547,10 +1550,12 @@ void server_change_options(OTF_PARAMS_DEF)
 	if(findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("mqtt"), true, &keyfound)) {
 		urlDecode(tmp_buffer);
 		os.sopt_save(SOPT_MQTT_OPTS, tmp_buffer);
+		os.sopt_save(SOPT_MQTT_OPTS2, tmp_buffer+MAX_SOPTS_SIZE);
 		os.status.req_mqtt_restart = true;
 	} else if (keyfound) {
 		tmp_buffer[0]=0;
 		os.sopt_save(SOPT_MQTT_OPTS, tmp_buffer);
+		os.sopt_save(SOPT_MQTT_OPTS2, tmp_buffer+MAX_SOPTS_SIZE);
 		os.status.req_mqtt_restart = true;
 	}
 

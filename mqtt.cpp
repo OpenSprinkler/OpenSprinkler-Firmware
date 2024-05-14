@@ -156,6 +156,8 @@ void OSMqtt::begin(void) {
 	// JSON configuration settings in the form of {"en":0|1,"host":"server_name|IP address","port":1883,user:"",pass:""}
 	char *config = tmp_buffer;
 	os.sopt_load(SOPT_MQTT_OPTS, config);
+	os.sopt_load(SOPT_MQTT_OPTS2, config+MAX_SOPTS_SIZE);
+	//DEBUG_PRINTLN(config);
 	if (*config != 0) {
 		sscanf(
 			config,
@@ -163,6 +165,8 @@ void OSMqtt::begin(void) {
 			&enabled, host, &port, username, password
 			);
 	}
+
+	DEBUG_PRINTF("host: %s port: %d username: %s password: %s ", host, port, username, password);
 
 	begin(host, port, username, password, (bool)enabled);
 }
@@ -261,11 +265,6 @@ int OSMqtt::_init(void) {
 	mqtt_client = new PubSubClient(*client);
 	mqtt_client->setKeepAlive(MQTT_KEEPALIVE);
 	mqtt_client->setBufferSize(2048); //Most LORA Pakets are bigger!
-
-	if (mqtt_client == NULL) {
-		DEBUG_LOGF("MQTT Init: Failed to initialise client\r\n");
-		return MQTT_ERROR;
-	}
 
 	return MQTT_SUCCESS;
 }

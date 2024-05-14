@@ -24,8 +24,8 @@
 #ifndef _DEFINES_H
 #define _DEFINES_H
 
-//#define ENABLE_DEBUG  // enable serial debug
-//#define SERIAL_DEBUG
+#define ENABLE_DEBUG  // enable serial debug
+#define SERIAL_DEBUG
 
 typedef unsigned char byte;
 typedef unsigned long ulong;
@@ -37,7 +37,7 @@ typedef unsigned long ulong;
 														// if this number is different from the one stored in non-volatile memory
 														// a device reset will be automatically triggered
 
-#define OS_FW_MINOR      161  // Firmware minor version
+#define OS_FW_MINOR      162  // Firmware minor version
 
 /** Hardware version base numbers */
 #define OS_HW_VERSION_BASE   0x00 // OpenSprinkler
@@ -262,6 +262,7 @@ enum {
 	SOPT_OTC_OPTS,
 	SOPT_DEVICE_NAME,
 	SOPT_STA_BSSID_CHL, // wifi extra info: bssid and channel
+	SOPT_MQTT_OPTS2, // MQTT Extra if url+user+pass > 160
 	NUM_SOPTS // total number of string options
 };
 

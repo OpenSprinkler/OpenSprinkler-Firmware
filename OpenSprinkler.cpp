@@ -400,6 +400,7 @@ const char *OpenSprinkler::sopts[] = {
 	DEFAULT_EMPTY_STRING, // SOPT_OTC_OPTS
 	DEFAULT_DEVICE_NAME,
 	DEFAULT_EMPTY_STRING, // SOPT_STA_BSSID_CHL
+	DEFAULT_EMPTY_STRING, // SOPT_MQTT_OPTS2
 };
 
 /** Weekday strings (stored in PROGMEM to reduce RAM usage) */
@@ -443,7 +444,7 @@ bool OpenSprinkler::load_hardware_mac(byte* buffer, bool wired) {
 	if (detect_i2c(MAC_CTRL_ID)==false)	return false;
 
 	Wire.beginTransmission(MAC_CTRL_ID);
-	Wire.write(0xFA); // The address of the register we want
+	Wire.res.writebody(0xFA); // The address of the register we want
 	Wire.endTransmission(); // Send the data
 	if(Wire.requestFrom(MAC_CTRL_ID, 6) != 6) return false;	// if not enough data, return false
 	for(byte ret=0;ret<6;ret++) {
