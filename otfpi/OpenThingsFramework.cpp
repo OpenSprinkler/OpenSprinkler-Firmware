@@ -1,6 +1,7 @@
 #if defined(OSPI)
 #include "OpenThingsFramework.h"
 #include "StringBuilder.h"
+#include "defines.h"
 
 // The timeout for reading and parsing incoming requests.
 #define WIFI_CONNECTION_TIMEOUT 1500

@@ -150,6 +150,12 @@ int EthernetClient::connect(uint8_t ip[4], uint16_t port)
 		DEBUG_PRINTLN("error connecting to server");
 		return 0;
 	}
+	struct timeval timeout;
+	timeout.tv_sec = 10;
+	timeout.tv_usec = 0;
+	setsockopt (m_sock, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+	setsockopt (m_sock, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout));
+
 	m_connected = true;
 	return 1;
 }
