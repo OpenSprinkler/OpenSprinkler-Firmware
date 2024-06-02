@@ -36,7 +36,7 @@ typedef unsigned long ulong;
 														// if this number is different from the one stored in non-volatile memory
 														// a device reset will be automatically triggered
 
-#define OS_FW_MINOR      4  // Firmware minor version
+#define OS_FW_MINOR      5  // Firmware minor version
 
 /** Hardware version base numbers */
 #define OS_HW_VERSION_BASE   0x00 // OpenSprinkler
@@ -64,6 +64,7 @@ typedef unsigned long ulong;
 #define STN_TYPE_REMOTE      0x02	// Remote OpenSprinkler station
 #define STN_TYPE_GPIO        0x03	// direct GPIO station
 #define STN_TYPE_HTTP        0x04	// HTTP station
+#define STN_TYPE_HTTPS       0x05	// HTTPS station
 #define STN_TYPE_OTHER       0xFF
 
 /** Notification macro defines */
@@ -461,12 +462,14 @@ enum {
 		#define DEBUG_BEGIN(x)   {Serial.begin(x);}
 		#define DEBUG_PRINT(x)   {Serial.print(x);}
 		#define DEBUG_PRINTLN(x) {Serial.println(x);}
+		#define DEBUG_PRINTF(msg, ...)    {Serial.printf(msg, ##__VA_ARGS__);}
 	#else
 		#include <stdio.h>
 		#define DEBUG_BEGIN(x)          {}  /** Serial debug functions */
 		inline  void DEBUG_PRINT(int x) {printf("%d", x);}
 		inline  void DEBUG_PRINT(const char*s) {printf("%s", s);}
 		#define DEBUG_PRINTLN(x)        {DEBUG_PRINT(x);printf("\n");}
+		#define DEBUG_PRINTF(msg, ...)    {printf(msg, ##__VA_ARGS__);}
 	#endif
 
 #else
@@ -474,6 +477,7 @@ enum {
 	#define DEBUG_BEGIN(x)   {}
 	#define DEBUG_PRINT(x)   {}
 	#define DEBUG_PRINTLN(x) {}
+	#define DEBUG_PRINTF(x, ...)  {}
 
 #endif
 
@@ -490,6 +494,7 @@ enum {
 	#define PSTR(x)      x
 	#define F(x)         x
 	#define strcat_P     strcat
+	#define strncat_P     strncat
 	#define strcpy_P     strcpy
 	#define sprintf_P    sprintf
 	#include<string>
