@@ -19,8 +19,8 @@ class I2CRTC
 	// user-accessible "public" interface
 	public:
 	I2CRTC();
-	static time_t get();
-	static void set(time_t t);
+	static tm_t get();
+	static void set(tm_t t);
 	static void read(tmElements_t &tm);
 	static void write(tmElements_t &tm);
 	static bool detect();

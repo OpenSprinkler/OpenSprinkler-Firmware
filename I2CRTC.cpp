@@ -58,14 +58,14 @@ bool I2CRTC::detect()
 }
 
 // PUBLIC FUNCTIONS
-time_t I2CRTC::get() // Aquire data from buffer and convert to time_t
+tm_t I2CRTC::get() // Aquire data from buffer and convert to tm_t
 {
 	tmElements_t tm;
 	read(tm);
 	return(makeTime(tm));
 }
 
-void I2CRTC::set(time_t t)
+void I2CRTC::set(tm_t t)
 {
 	tmElements_t tm;
 	breakTime(t, tm);

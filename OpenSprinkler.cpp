@@ -41,21 +41,21 @@ byte OpenSprinkler::station_bits[MAX_NUM_BOARDS];
 byte OpenSprinkler::engage_booster;
 uint16_t OpenSprinkler::baseline_current;
 
-time_t OpenSprinkler::sensor1_on_timer;
-time_t OpenSprinkler::sensor1_off_timer;
-time_t OpenSprinkler::sensor1_active_lasttime;
-time_t OpenSprinkler::sensor2_on_timer;
-time_t OpenSprinkler::sensor2_off_timer;
-time_t OpenSprinkler::sensor2_active_lasttime;
-time_t OpenSprinkler::raindelay_on_lasttime;
+tm_t OpenSprinkler::sensor1_on_timer;
+tm_t OpenSprinkler::sensor1_off_timer;
+tm_t OpenSprinkler::sensor1_active_lasttime;
+tm_t OpenSprinkler::sensor2_on_timer;
+tm_t OpenSprinkler::sensor2_off_timer;
+tm_t OpenSprinkler::sensor2_active_lasttime;
+tm_t OpenSprinkler::raindelay_on_lasttime;
 ulong  OpenSprinkler::pause_timer;
 
 ulong   OpenSprinkler::flowcount_log_start;
 ulong   OpenSprinkler::flowcount_rt;
 byte    OpenSprinkler::button_timeout;
-time_t  OpenSprinkler::checkwt_lasttime;
-time_t  OpenSprinkler::checkwt_success_lasttime;
-time_t  OpenSprinkler::powerup_lasttime;
+tm_t  OpenSprinkler::checkwt_lasttime;
+tm_t  OpenSprinkler::checkwt_success_lasttime;
+tm_t  OpenSprinkler::powerup_lasttime;
 uint8_t OpenSprinkler::last_reboot_cause = REBOOT_CAUSE_NONE;
 byte    OpenSprinkler::weather_update_flag;
 
@@ -412,7 +412,7 @@ static const char days_str[] PROGMEM =
 	"Sun\0";
 
 /** Calculate local time (UTC time plus time zone offset) */
-time_t OpenSprinkler::now_tz() {
+tm_t OpenSprinkler::now_tz() {
 	return now()+(int32_t)3600/4*(int32_t)(iopts[IOPT_TIMEZONE]-48);
 }
 
@@ -1286,7 +1286,7 @@ void OpenSprinkler::apply_all_station_bits() {
 		// we refresh the station that's next in line
 		static byte next_sid_to_refresh = MAX_NUM_STATIONS>>1;
 		static byte lastnow = 0;
-		time_t curr_time = now_tz();
+		tm_t curr_time = now_tz();
 		byte _now = (curr_time & 0xFF);
 		if (lastnow != _now) {  // perform this no more than once per second
 			lastnow = _now;
@@ -1311,7 +1311,7 @@ void OpenSprinkler::apply_all_station_bits() {
 }
 
 /** Read rain sensor status */
-void OpenSprinkler::detect_binarysensor_status(time_t curr_time) {
+void OpenSprinkler::detect_binarysensor_status(tm_t curr_time) {
 	// sensor_type: 0 if normally closed, 1 if normally open
 	if(iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_RAIN || iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_SOIL) {
 		if(hw_rev>=2)	pinModeExt(PIN_SENSOR1, INPUT_PULLUP); // this seems necessary for OS 3.2
@@ -1375,7 +1375,7 @@ void OpenSprinkler::detect_binarysensor_status(time_t curr_time) {
 }
 
 /** Return program switch status */
-byte OpenSprinkler::detect_programswitch_status(time_t curr_time) {
+byte OpenSprinkler::detect_programswitch_status(tm_t curr_time) {
 	byte ret = 0;
 	if(iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_PSWITCH) {
 		static byte sensor1_hist = 0;
@@ -2444,7 +2444,7 @@ void OpenSprinkler::lcd_print_2digit(int v)
 }
 
 /** print time to a given line */
-void OpenSprinkler::lcd_print_time(time_t t)
+void OpenSprinkler::lcd_print_time(tm_t t)
 {
 #if defined(ESP8266)
 	lcd.setAutoDisplay(false);

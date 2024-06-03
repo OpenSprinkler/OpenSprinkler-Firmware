@@ -1095,7 +1095,7 @@ function rst_wsp() {document.getElementById('wsp').value='$S';}</script>)"),
 
 void server_json_controller_main(OTF_PARAMS_DEF) {
 	byte bid, sid;
-	time_t curr_time = os.now_tz();
+	tm_t curr_time = os.now_tz();
 	bfill.emit_p(PSTR("\"devt\":$L,\"nbrd\":$D,\"en\":$D,\"sn1\":$D,\"sn2\":$D,\"rd\":$D,\"rdst\":$L,"
 										"\"sunrise\":$D,\"sunset\":$D,\"eip\":$L,\"lwc\":$L,\"lswc\":$L,"
 										"\"lupt\":$L,\"lrbtc\":$D,\"lrun\":[$D,$D,$D,$L],\"pq\":$D,\"pt\":$L,\"nq\":$D,"),

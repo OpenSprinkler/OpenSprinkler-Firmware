@@ -103,12 +103,12 @@ public:
 	char name[PROGRAM_NAME_SIZE];
 
 	int16_t daterange[2] = {MIN_ENCODED_DATE, MAX_ENCODED_DATE}; // date range: start date, end date
-	byte check_match(time_t t);
+	byte check_match(tm_t t);
 	int16_t starttime_decode(int16_t t);
 
 protected:
 
-	byte check_day_match(time_t t);
+	byte check_day_match(tm_t t);
 
 };
 
@@ -116,11 +116,11 @@ extern OpenSprinkler os;
 
 class RuntimeQueueStruct {
 public:
-	time_t   st;  // start time
+	tm_t   st;  // start time
 	uint16_t dur; // water time
 	byte  sid;
 	byte  pid;
-	time_t   deque_time; // deque time, which can be larger than st+dur to allow positive master off adjustment time
+	tm_t   deque_time; // deque time, which can be larger than st+dur to allow positive master off adjustment time
 };
 
 class ProgramData {
@@ -130,7 +130,7 @@ public:
 	static byte station_qid[];  // this array stores the queue element index for each scheduled station
 	static byte nprograms;  // number of programs
 	static LogStruct lastrun;
-	static time_t last_seq_stop_times[]; // the last stop time of a sequential station (for each sequential group respectively)
+	static tm_t last_seq_stop_times[]; // the last stop time of a sequential station (for each sequential group respectively)
 
 	static void toggle_pause(ulong delay);
 	static void set_pause();

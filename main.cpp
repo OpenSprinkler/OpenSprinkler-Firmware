@@ -430,7 +430,7 @@ void do_loop()
 		}
 	}
 
-	static time_t last_time = 0;
+	static tm_t last_time = 0;
 	static ulong last_minute = 0;
 
 	byte bid, sid, s, pid, qid, gid, bitvalue;
@@ -438,7 +438,7 @@ void do_loop()
 
 	os.status.mas = os.iopts[IOPT_MASTER_STATION];
 	os.status.mas2= os.iopts[IOPT_MASTER_STATION_2];
-	time_t curr_time = os.now_tz();
+	tm_t curr_time = os.now_tz();
 
 	// ====== Process Ethernet packets ======
 #if defined(ARDUINO)	// Process Ethernet packets for Arduino
@@ -832,7 +832,7 @@ void do_loop()
 
 			// check through runtime queue, calculate the last stop time of sequential stations
 			memset(pd.last_seq_stop_times, 0, sizeof(ulong)*NUM_SEQ_GROUPS);
-			time_t sst;
+			tm_t sst;
 			byte re=os.iopts[IOPT_REMOTE_EXT_MODE];
 			q = pd.queue;
 			for(;q<pd.queue+pd.nqueue;q++) {
@@ -1020,7 +1020,7 @@ void check_weather() {
 	}
 #endif
 
-	time_t ntz = os.now_tz();
+	tm_t ntz = os.now_tz();
 	if (os.checkwt_success_lasttime && (ntz > os.checkwt_success_lasttime + CHECK_WEATHER_SUCCESS_TIMEOUT)) {
 		// if last successful weather call timestamp is more than allowed threshold
 		// and if the selected adjustment method is not one of the manual methods
@@ -1057,9 +1057,9 @@ void turn_on_station(byte sid, ulong duration) {
 }
 
 // after removing element q, update remaining stations in its group
-void handle_shift_remaining_stations(RuntimeQueueStruct* q, byte gid, time_t curr_time) {
+void handle_shift_remaining_stations(RuntimeQueueStruct* q, byte gid, tm_t curr_time) {
 	RuntimeQueueStruct *s = pd.queue;
-	time_t q_end_time = q->st + q->dur;
+	tm_t q_end_time = q->st + q->dur;
 	ulong remainder = 0;
 
 	if (q_end_time > curr_time) { // remainder is non-zero
@@ -1087,7 +1087,7 @@ void handle_shift_remaining_stations(RuntimeQueueStruct* q, byte gid, time_t cur
  * writes a log record and determines if
  * the station should be removed from the queue
  */
-void turn_off_station(byte sid, time_t curr_time, byte shift) {
+void turn_off_station(byte sid, tm_t curr_time, byte shift) {
 
 	byte qid = pd.station_qid[sid];
 	// ignore request if trying to turn off a zone that's not even in the queue
@@ -1156,7 +1156,7 @@ void turn_off_station(byte sid, time_t curr_time, byte shift) {
  * such as rain delay, rain sensing
  * and turn off stations accordingly
  */
-void process_dynamic_events(time_t curr_time) {
+void process_dynamic_events(tm_t curr_time) {
 	// check if rain is detected
 	bool sn1 = false;
 	bool sn2 = false;
@@ -1205,7 +1205,7 @@ void process_dynamic_events(time_t curr_time) {
  * this function determines the appropriate start and dequeue times
  * of stations bound to master stations with on and off adjustments
  */
-void handle_master_adjustments(time_t curr_time, RuntimeQueueStruct *q) {
+void handle_master_adjustments(tm_t curr_time, RuntimeQueueStruct *q) {
 
 	int16_t start_adj = 0;
 	int16_t dequeue_adj = 0;
@@ -1237,7 +1237,7 @@ void handle_master_adjustments(time_t curr_time, RuntimeQueueStruct *q) {
  * This function loops through the queue
  * and schedules the start time of each station
  */
-void schedule_all_stations(time_t curr_time) {
+void schedule_all_stations(tm_t curr_time) {
 	ulong con_start_time = curr_time + 1;   // concurrent start time
 	// if the queue is paused, make sure the start time is after the scheduled pause ends
 	if (os.status.pause_state) {
@@ -1594,7 +1594,7 @@ static const char log_type_names[] PROGMEM =
 	"cu\0";
 
 /** write run record to log on SD card */
-void write_log(byte type, time_t curr_time) {
+void write_log(byte type, tm_t curr_time) {
 
 	if (!os.iopts[IOPT_ENABLE_LOGGING]) return;
 
@@ -1720,10 +1720,10 @@ void write_log(byte type, time_t curr_time) {
 #if defined(ESP8266)
 bool delete_log_oldest() {
 	Dir dir = LittleFS.openDir(LOG_PREFIX);
-	time_t oldest_t = ULONG_MAX;
+	tm_t oldest_t = ULONG_MAX;
 	String oldest_fn;
 	while (dir.next()) {
-		time_t t = dir.fileCreationTime();
+		tm_t t = dir.fileCreationTime();
 		if(t<oldest_t) {
 			oldest_t = t;
 			oldest_fn = dir.fileName();
