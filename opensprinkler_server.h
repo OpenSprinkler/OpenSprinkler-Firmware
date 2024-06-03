@@ -64,7 +64,11 @@ public:
 			case 'L':
 				//ltoa(va_arg(ap, long), (char*) ptr, 10);
 				//ultoa(va_arg(ap, long), (char*) ptr, 10); // ray
-				sprintf((char*) ptr, "%" PRIu32, va_arg(ap, long));
+				#if defined(OSPI)
+					sprintf((char*) ptr, "%" PRIu32, va_arg(ap, long));
+				#else
+					sprintf((char*) ptr, "%lu", va_arg(ap, long));
+				#endif	
 				break;
 			case 'S':
 				strcpy((char*) ptr, va_arg(ap, const char*));
