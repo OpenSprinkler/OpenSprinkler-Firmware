@@ -581,25 +581,26 @@ byte OpenSprinkler::start_ether() {
 	lcd_print_line_clear_pgm(PSTR("Start wired link"), 1);
 	lcd_print_line_clear_pgm(eth.isW5500 ? PSTR("    (w5500)    ") : PSTR("   (enc28j60)   "), 2);
 	
-	ulong timeout = millis()+30000; // 30 seconds time out
-	while (!eth.connected()) {
+	ulong timeout = millis()+60000; // 60 seconds time out
+	while (!eth.connected() && millis()<timeout) {
 		DEBUG_PRINT(".");
 		delay(1000);
-		if(millis()>timeout) return 0;
 	}
+	// if wired connection is not done at this point, return directly
+	if(eth.connected()) {
+		DEBUG_PRINTLN();
+		DEBUG_PRINT("eth.ip:");
+		DEBUG_PRINTLN(eth.localIP());
+		DEBUG_PRINT("eth.dns:");
+		DEBUG_PRINTLN(WiFi.dnsIP());
 
-	DEBUG_PRINTLN();
-	DEBUG_PRINT("eth.ip:");
-	DEBUG_PRINTLN(eth.localIP());
-	DEBUG_PRINT("eth.dns:");
-	DEBUG_PRINTLN(WiFi.dnsIP());
-
-	if (iopts[IOPT_USE_DHCP]) {
-		memcpy(iopts+IOPT_STATIC_IP1, &(eth.localIP()[0]), 4);
-		memcpy(iopts+IOPT_GATEWAY_IP1, &(eth.gatewayIP()[0]),4);
-		memcpy(iopts+IOPT_DNS_IP1, &(WiFi.dnsIP()[0]), 4); // todo: lwip need dns ip
-		memcpy(iopts+IOPT_SUBNET_MASK1, &(eth.subnetMask()[0]), 4);
-		iopts_save();
+		if (iopts[IOPT_USE_DHCP]) {
+			memcpy(iopts+IOPT_STATIC_IP1, &(eth.localIP()[0]), 4);
+			memcpy(iopts+IOPT_GATEWAY_IP1, &(eth.gatewayIP()[0]),4);
+			memcpy(iopts+IOPT_DNS_IP1, &(WiFi.dnsIP()[0]), 4); // todo: lwip need dns ip
+			memcpy(iopts+IOPT_SUBNET_MASK1, &(eth.subnetMask()[0]), 4);
+			iopts_save();
+		}
 	}
 
 	return 1;
@@ -632,7 +633,8 @@ byte OpenSprinkler::start_ether() {
 
 bool OpenSprinkler::network_connected(void) {
 #if defined (ESP8266)
-	if(useEth) return true; // todo: lwip currently does not have a way to check link status
+	if(useEth)
+		return eth.connected();
 	else
 		return (get_wifi_mode()==WIFI_MODE_STA && WiFi.status()==WL_CONNECTED && state==OS_STATE_CONNECTED);
 #else
