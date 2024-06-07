@@ -402,6 +402,7 @@ bool sensorlog_add(uint8_t log, SensorLog_t *sensorlog) {
 bool sensorlog_add(uint8_t log, Sensor_t *sensor, ulong time) {
 	if (sensor->flags.data_ok && sensor->flags.log && time > 1000) {
 		SensorLog_t sensorlog;
+		memset(&sensorlog, 0, sizeof(SensorLog_t));
 		sensorlog.nr = sensor->nr;
 		sensorlog.time = time;
 		sensorlog.native_data = sensor->last_native_data;
@@ -1988,7 +1989,7 @@ void SensorUrl_load() {
 		memset(sensorUrl, 0, sizeof(SensorUrl_t));
 		if (file_read_block (SENSORURL_FILENAME, sensorUrl, pos, SENSORURL_STORE_SIZE) < SENSORURL_STORE_SIZE)
 		{
-			free(sensorUrl);
+			delete sensorUrl;
 			break;
 		}
 		sensorUrl->urlstr = (char*)malloc(sensorUrl->length+1);
@@ -2036,7 +2037,7 @@ bool SensorUrl_delete(uint nr, uint type) {
 			sensor_mqtt_unsubscribe(nr, type, sensorUrl->urlstr);
 
 			free(sensorUrl->urlstr);
-			free(sensorUrl);
+			delete sensorUrl;
 			SensorUrl_save();
 			return true;
 		}

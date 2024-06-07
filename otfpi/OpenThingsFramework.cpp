@@ -148,7 +148,7 @@ void OpenThingsFramework::localServerLoop() {
         bodyBuffer = new char[contentLength];
         size_t bodyLength = 0;
         timeout = millis()+WIFI_CONNECTION_TIMEOUT;
-        while (localClient->dataAvailable() && millis()<timeout) {
+        while (localClient->dataAvailable() && millis()<timeout && contentLength > bodyLength) {
           size_t read = localClient->readBytes(&bodyBuffer[bodyLength], min((int) (contentLength - bodyLength), 1024));
           bodyLength += read;
         }
