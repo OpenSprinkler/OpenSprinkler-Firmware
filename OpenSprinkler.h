@@ -336,6 +336,12 @@ public:
 	static void lcd_print_mac(const byte *mac);  // print mac
 	static void lcd_print_screen(char c);  // print station bits of the board selected by display_board
 	static void lcd_print_version(byte v);  // print version number
+
+	#if defined(USE_SSD1306)
+	static void flash_screen();
+	static void toggle_screen_led();
+	static void set_screen_led(byte status);
+	#endif
 #endif
 
 #if defined(ARDUINO) // LCD functions for Arduino
@@ -379,9 +385,6 @@ public:
 	static IOEXP *expanders[];
 	static RCSwitch rfswitch;
 	static void detect_expanders();
-	static void flash_screen();
-	static void toggle_screen_led();
-	static void set_screen_led(byte status);
 	static byte get_wifi_mode() { if (useEth) return WIFI_MODE_STA; else return wifi_testmode ? WIFI_MODE_STA : iopts[IOPT_WIFI_MODE];}
 	static byte wifi_testmode;
 	static String wifi_ssid, wifi_pass;
