@@ -408,19 +408,19 @@ static char ui_anim_chars[3] = {'.', 'o', 'O'};
 static byte ui_state = UI_STATE_DEFAULT;
 static byte ui_state_runprog = 0;
 
-bool ui_confirm(PGM_P str) {
-	os.lcd_print_line_clear_pgm(str, 0);
-	os.lcd_print_line_clear_pgm(PSTR("(B1:No, B3:Yes)"), 1);
-	byte button;
-	ulong start = millis();
-	do {
-		button = os.button_read(BUTTON_WAIT_NONE);
-		if((button&BUTTON_MASK)==BUTTON_3 && (button&BUTTON_FLAG_DOWN)) return true;
-		if((button&BUTTON_MASK)==BUTTON_1 && (button&BUTTON_FLAG_DOWN)) return false;
-		delay(10);
-	} while(millis() - start < 2500);
-	return false;
-}
+// bool ui_confirm(PGM_P str) {
+// 	os.lcd_print_line_clear_pgm(str, 0);
+// 	os.lcd_print_line_clear_pgm(PSTR("(B1:No, B3:Yes)"), 1);
+// 	byte button;
+// 	ulong start = millis();
+// 	do {
+// 		button = os.button_read(BUTTON_WAIT_NONE);
+// 		if((button&BUTTON_MASK)==BUTTON_3 && (button&BUTTON_FLAG_DOWN)) return true;
+// 		if((button&BUTTON_MASK)==BUTTON_1 && (button&BUTTON_FLAG_DOWN)) return false;
+// 		delay(10);
+// 	} while(millis() - start < 2500);
+// 	return false;
+// }
 
 void ui_state_machine() {
 
