@@ -74,8 +74,13 @@ extern char tmp_buffer[];
 extern char ether_buffer[];
 extern ProgramData pd;
 
-#if defined(ESP8266)
+#if defined(USE_SSD1306)
 	SSD1306Display OpenSprinkler::lcd(0x3c, SDA, SCL);
+#elif defined(USE_LCD)
+	LiquidCrystal OpenSprinkler::lcd;
+#endif
+
+#if defined(ESP8266)
 	byte OpenSprinkler::state = OS_STATE_INITIAL;
 	byte OpenSprinkler::prev_station_bits[MAX_NUM_BOARDS];
 	IOEXP* OpenSprinkler::expanders[MAX_NUM_BOARDS/2];
@@ -90,13 +95,11 @@ extern ProgramData pd;
 	byte OpenSprinkler::wifi_channel=255;
 	byte OpenSprinkler::wifi_testmode = 0;
 #elif defined(ARDUINO)
-	LiquidCrystal OpenSprinkler::lcd;
 	extern SdFat sd;
 #else
 	#if defined(OSPI)
 		byte OpenSprinkler::pin_sr_data = PIN_SR_DATA;
 	#endif
-	// todo future: LCD define for Linux-based systems
 #endif
 
 /** Option json names (stored in PROGMEM to reduce RAM usage) */
@@ -738,12 +741,12 @@ void OpenSprinkler::update_dev() {
 /** Initialize LCD */
 void OpenSprinkler::lcd_start() {
 
-#if defined(ESP8266)
+#if defined(USE_SSD1306)
 	// initialize SSD1306
 	lcd.init();
 	lcd.begin();
 	flash_screen();
-#else
+#elif defined(USE_LCD)
 	// initialize 16x2 character LCD
 	// turn on lcd
 	lcd.init(1, PIN_LCD_RS, 255, PIN_LCD_EN, PIN_LCD_D4, PIN_LCD_D5, PIN_LCD_D6, PIN_LCD_D7, 0,0,0,0);
@@ -976,27 +979,28 @@ void OpenSprinkler::begin() {
 		baseline_current = 0;
 
 	#endif
-
+#endif
+#if defined(USE_DISPLAY)
 	lcd_start();
 
-	#if defined(ESP8266)
+	#if defined(USE_SSD1306)
 		lcd.createChar(ICON_ETHER_CONNECTED, _iconimage_ether_connected);
 		lcd.createChar(ICON_ETHER_DISCONNECTED, _iconimage_ether_disconnected);
-	#else
+		lcd.createChar(ICON_WIFI_CONNECTED, _iconimage_wifi_connected);
+		lcd.createChar(ICON_WIFI_DISCONNECTED, _iconimage_wifi_disconnected);
+	#elif defined(USE_LCD)
 		lcd.createChar(ICON_ETHER_CONNECTED, _iconimage_connected);
 		lcd.createChar(ICON_ETHER_DISCONNECTED, _iconimage_disconnected);
 	#endif
+
 	lcd.createChar(ICON_REMOTEXT, _iconimage_remotext);
 	lcd.createChar(ICON_RAINDELAY, _iconimage_raindelay);
 	lcd.createChar(ICON_RAIN, _iconimage_rain);
 	lcd.createChar(ICON_SOIL, _iconimage_soil);
+#endif
 
+#if defined(ARDUINO)
 	#if defined(ESP8266)
-
-		/* create custom characters */
-		lcd.createChar(ICON_WIFI_CONNECTED, _iconimage_wifi_connected);
-		lcd.createChar(ICON_WIFI_DISCONNECTED, _iconimage_wifi_disconnected);
-
 		lcd.setCursor(0,0);
 		lcd.print(F("Init file system"));
 		lcd.setCursor(0,1);
@@ -2445,21 +2449,45 @@ void OpenSprinkler::lcd_print_2digit(int v)
 /** print time to a given line */
 void OpenSprinkler::lcd_print_time(time_t t)
 {
-#if defined(ESP8266)
+#if defined(USE_SSD1306)
 	lcd.setAutoDisplay(false);
 #endif
 	lcd.setCursor(0, 0);
 	lcd_print_2digit(hour(t));
+	
+	#if defined(ARDUINO)
 	lcd_print_pgm(PSTR(":"));
+	#else
+	lcd.print(':');
+	#endif
+
 	lcd_print_2digit(minute(t));
+
+	#if defined(ARDUINO)
 	lcd_print_pgm(PSTR("  "));
+	#else
+	lcd.print('  ');
+	#endif
+
 	// each weekday string has 3 characters + ending 0
 	lcd_print_pgm(days_str+4*weekday_today());
+
+	#if defined(ARDUINO)
 	lcd_print_pgm(PSTR(" "));
+	#else
+	lcd.print(' ');
+	#endif
+
 	lcd_print_2digit(month(t));
+
+	#if defined(ARDUINO)
 	lcd_print_pgm(PSTR("-"));
+	#else
+	lcd.print('-');
+	#endif
+
 	lcd_print_2digit(day(t));
-#if defined(ESP8266)
+#if defined(USE_SSD1306)
 	lcd.display();
 	lcd.setAutoDisplay(true);
 #endif
@@ -2467,15 +2495,22 @@ void OpenSprinkler::lcd_print_time(time_t t)
 
 /** print ip address */
 void OpenSprinkler::lcd_print_ip(const byte *ip, byte endian) {
-#if defined(ESP8266)
+#if defined(USE_SSD1306)
 	lcd.clear(0, 1);
-#else
+#elif defined(USE_LCD)
 	lcd.clear();
 #endif
 	lcd.setCursor(0, 0);
 	for (byte i=0; i<4; i++) {
 		lcd.print(endian ? (int)ip[3-i] : (int)ip[i]);
-		if(i<3) lcd_print_pgm(PSTR("."));
+		
+		if(i<3) {
+			#if defined(ARDUINO)
+			lcd_print_pgm(PSTR("."));
+			#else
+			lcd.print('.');
+			#endif
+		}
 	}
 }
 
@@ -2483,21 +2518,36 @@ void OpenSprinkler::lcd_print_ip(const byte *ip, byte endian) {
 void OpenSprinkler::lcd_print_mac(const byte *mac) {
 	lcd.setCursor(0, 0);
 	for(byte i=0; i<6; i++) {
-		if(i)  lcd_print_pgm(PSTR("-"));
+		if(i) {
+			#if defined(ARDUINO)
+			lcd_print_pgm(PSTR("-"));
+			#else
+			lcd.print('-');
+			#endif
+		}
+
 		lcd.print((mac[i]>>4), HEX);
 		lcd.print((mac[i]&0x0F), HEX);
 		if(i==4) lcd.setCursor(0, 1);
 	}
 	if(useEth) {
+		#if defined(ARDUINO)
 		lcd_print_pgm(PSTR(" (Ether MAC)"));
+		#else
+		lcd.print(F(" (Ether MAC)"));
+		#endif
 	} else {
+		#if defined(ARDUINO)
 		lcd_print_pgm(PSTR(" (WiFi MAC)"));
+		#else
+		lcd.print(F(" (WiFi MAC)"));
+		#endif
 	}
 }
 
 /** print station bits */
 void OpenSprinkler::lcd_print_screen(char c) {
-#if defined(ESP8266)
+#if defined(USE_SSD1306)
 	lcd.setAutoDisplay(false); // reduce screen drawing time by turning off display() when drawing individual characters
 #endif
 	lcd.setCursor(0, 1);
@@ -2609,7 +2659,7 @@ void OpenSprinkler::lcd_print_screen(char c) {
 		}
 	}
 #endif
-#if defined(ESP8266)
+#if defined(USE_SSD1306)
 	lcd.display();
 	lcd.setAutoDisplay(true);
 #endif
