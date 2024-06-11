@@ -1,5 +1,23 @@
 #!/bin/bash
 
+function download_wiringpi {
+	echo "Downloading WiringPi..."
+	if [ $(arch) == "aarch64" ]; then
+		wget https://github.com/WiringPi/WiringPi/releases/download/3.6/wiringpi_3.6_arm64.deb -O wiringpi.deb
+	else
+		wget https://github.com/WiringPi/WiringPi/releases/download/3.6/wiringpi_3.6_armhf.deb -O wiringpi.deb
+	fi
+
+	if [ $? -ne 0 ]; then
+		echo "Failed to download WiringPi"
+		exit 1
+	fi
+
+	echo "Installing WiringPi..."
+	dpkg -i wiringpi.deb
+	rm wiringpi.deb
+}
+
 while getopts ":s" opt; do
   case $opt in
     s)
@@ -12,7 +30,11 @@ echo "Building OpenSprinkler..."
 
 if [ "$1" == "demo" ]; then
 	echo "Installing required libraries..."
+	
+	dpkg -i wiringpi_3.6_arm64.deb
+	rm wiringpi_3.6_arm64.deb
 	apt-get install -y libmosquitto-dev
+	download_wiringpi
 	echo "Compiling demo firmware..."
 	g++ -o OpenSprinkler -DDEMO -std=c++14 main.cpp OpenSprinkler.cpp program.cpp opensprinkler_server.cpp utils.cpp weather.cpp gpio.cpp etherport.cpp mqtt.cpp SSD1306Display.cpp -lpthread -lmosquitto -lwiringPi
 elif [ "$1" == "osbo" ]; then
@@ -28,6 +50,7 @@ else
 	apt-get install -y libi2c-dev
 	apt-get install -y libssl-dev
 	apt-get install -y libgpiod-dev
+	download_wiringpi
 	if ! command -v raspi-gpio &> /dev/null
 	then
 		echo "Command raspi-gpio is required and is not installed"
