@@ -197,9 +197,19 @@ class SSD1306Display {
     }
   }
 
-  void print(int i) { print(sprintf("%d", i)); }
-  void print(float f) { print(sprintf("%f", f)); }
-  void print(int i, int base) { print(sprintf("%d", i, base)); }
+  void print(int i) { 
+    char buf[10];
+    print(sprintf(buf, "%d", i));
+  }
+  void print(float f) { 
+    char buf[100];
+    print(sprintf(buf, "%f", f));
+  }
+
+  void print(int i, int base) { 
+    char buf[10];
+    print(sprintf(buf, "%d", i, base)); 
+  }
 
   uint8_t type() { return LCD_I2C; }
   void noBlink() { /*no support*/ }
