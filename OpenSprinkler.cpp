@@ -1694,8 +1694,9 @@ byte OpenSprinkler::weekday_today() {
 	ulong wd = now_tz() / 86400L;
 	return (wd+3) % 7;	// Jan 1, 1970 is a Thursday
 #else
-	return 0;
-	// todo future: is this function needed for RPI/BBB?
+	time_t t = time(NULL);
+	struct tm *tm = localtime(&t);
+	return (tm->tm_wday+6) % 7;
 #endif
 }
 
@@ -2440,11 +2441,48 @@ void OpenSprinkler::lcd_print_line_clear_pgm(PGM_P PROGMEM str, byte line) {
 	}
 	for(; (16-cnt) >= 0; cnt ++) lcd_print_pgm(PSTR(" "));
 }
-
 #else
+
+void OpenSprinkler::lcd_print_line_clear_pgm(const char *str, uint8_t line) {
+	lcd.setCursor(0, line);
+	uint8_t c;
+	int8_t cnt = 0;
+	while((c=*str++)!= '\0') {
+		lcd.print((char)c);
+		cnt++;
+	}
+	for(; (16-cnt) >= 0; cnt ++) lcd.print(' ');
+}
+
 #define PGSTR(s) s
 #define lcd_print_pgm(str) lcd.print(str)
-// #define lcd_print_line_clear_pgm(PGM_P PROGMEM str, byte line) lcd.print(str)
+#define useEth 0
+#define HEX 16
+
+int hour(time_t ct) {
+	struct tm *ti = gmtime(&ct);
+	return ti->tm_hour;
+}
+
+int minute(time_t ct) {
+	struct tm *ti = gmtime(&ct);
+	return ti->tm_min;
+}
+
+int second(time_t ct) {
+	struct tm *ti = gmtime(&ct);
+	return ti->tm_sec;
+}
+
+int day(time_t ct) {
+	struct tm *ti = gmtime(&ct);
+	return ti->tm_mday;
+}
+
+int month(time_t ct) {
+	struct tm *ti = gmtime(&ct);
+	return ti->tm_mon+1;
+}
 #endif
 
 void OpenSprinkler::lcd_print_2digit(int v)
@@ -2459,6 +2497,7 @@ void OpenSprinkler::lcd_print_time(time_t t)
 #if defined(USE_SSD1306)
 	lcd.setAutoDisplay(false);
 #endif
+//TODO: Time
 	lcd.setCursor(0, 0);
 	lcd_print_2digit(hour(t));
 	
@@ -2899,6 +2938,11 @@ void OpenSprinkler::lcd_set_brightness(byte value) {
 	}
 #endif
 }
+
+#else
+void OpenSprinkler::lcd_set_contrast() {}
+void OpenSprinkler::lcd_set_brightness(byte value) {}
+
 #endif  // end of LCD and button functions
 
 #if defined(USE_SSD1306)

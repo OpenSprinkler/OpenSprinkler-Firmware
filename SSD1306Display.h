@@ -84,6 +84,7 @@ class SSD1306Display : public SSD1306 {
 #include <stdint.h>
 #include <string.h>
 #include <wiringPiI2C.h>
+#include <cstdio>
 
 #include "font.h"
 #include "images.h"
@@ -198,17 +199,47 @@ class SSD1306Display {
   }
 
   void print(int i) { 
-    char buf[10];
-    print(sprintf(buf, "%d", i));
+    char buf[100];
+    snprintf(buf, 100, "%d", i);
+    print((const char *)buf);
+  }
+
+  void print(unsigned int i) { 
+    char buf[100];
+    snprintf(buf, 100, "%u", i);
+    print((const char *)buf);
   }
   void print(float f) { 
     char buf[100];
-    print(sprintf(buf, "%f", f));
+    snprintf(buf, 100, "%f", f);
+    print((const char *)buf);
   }
 
+  #define DEC 10
+  #define HEX 16
+  #define OCT 8
+  #define BIN 2
+
   void print(int i, int base) { 
-    char buf[10];
-    print(sprintf(buf, "%d", i, base)); 
+    char buf[100];
+    switch (base) {
+      case DEC:
+        snprintf(buf, 100, "%d", i);
+        break;
+      case HEX:
+        snprintf(buf, 100, "%x", i);
+        break;
+      case OCT:
+        snprintf(buf, 100, "%o", i);
+        break;
+      case BIN:
+        snprintf(buf, 100, "%b", i);
+        break;
+      default:
+        snprintf(buf, 100, "%d", i);
+        break;
+    }
+    print((const char *)buf);
   }
 
   uint8_t type() { return LCD_I2C; }

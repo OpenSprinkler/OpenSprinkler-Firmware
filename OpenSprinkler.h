@@ -336,6 +336,8 @@ public:
 	static void lcd_print_mac(const byte *mac);  // print mac
 	static void lcd_print_screen(char c);  // print station bits of the board selected by display_board
 	static void lcd_print_version(byte v);  // print version number
+	static void lcd_set_brightness(byte value=1);
+	static void lcd_set_contrast();
 
 	#if defined(USE_SSD1306)
 	static void flash_screen();
@@ -376,8 +378,6 @@ public:
 
 	// -- UI functions --
 	static void ui_set_options(int oid);		// ui for setting options (oid-> starting option index)
-	static void lcd_set_brightness(byte value=1);
-	static void lcd_set_contrast();
 
 	#if defined(ESP8266)
 	static OTCConfig otc;
@@ -395,6 +395,8 @@ public:
 	static byte state;
 	#endif
 
+#else
+static void lcd_print_line_clear_pgm(const char *str, byte line);
 #endif // LCD functions for Arduino
 
 private:
