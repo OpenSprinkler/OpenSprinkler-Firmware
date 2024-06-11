@@ -142,7 +142,7 @@ class SSD1306Display {
     }
   }
 
-  #define DISPLAY_CHUNK_SIZE 16
+  #define DISPLAY_CHUNK_SIZE 32
 
   void display() {
     // sendCommand(COLUMNADDR);
@@ -178,7 +178,7 @@ class SSD1306Display {
     uint8_t *frame_ptr = frame;
     while (frameSize > 0) {
       int chunkSize = frameSize > DISPLAY_CHUNK_SIZE ? DISPLAY_CHUNK_SIZE : frameSize;
-      wiringPiI2CWriteBlockData(i2cd, 0x40, frame_ptr, chunkSize);
+      chunkSize = wiringPiI2CWriteBlockData(i2cd, 0x40, frame_ptr, chunkSize);
       frame_ptr += chunkSize;
       frameSize -= chunkSize;
     }
