@@ -168,9 +168,11 @@ class SSD1306Display {
     wiringPiI2CWriteReg8(i2cd, 0x00, 0x22);  // Page Address
     wiringPiI2CWriteReg8(i2cd, 0x00, 0x00);  // Page Start Address
 
-    for (int i = 0; i < 1024; i++) {
-      wiringPiI2CWriteReg8(i2cd, 0x40, frame[i]);
-    }
+    // for (int i = 0; i < 1024; i++) {
+    //   wiringPiI2CWriteReg8(i2cd, 0x40, frame[i]);
+    // }
+
+    wiringPiI2CWriteBlockData(i2cd, 0x40, frame, sizeof(frame);
 
 
     // unsigned char page_command[3];
