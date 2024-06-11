@@ -2922,7 +2922,7 @@ void OpenSprinkler::lcd_set_brightness(byte value) {
 }
 #endif  // end of LCD and button functions
 
-#if defined(ESP8266)
+#if defined(SSD1306)
 #include "images.h"
 void OpenSprinkler::flash_screen() {
 	lcd.setCursor(0, -1);
@@ -2947,6 +2947,10 @@ void OpenSprinkler::set_screen_led(byte status) {
 	lcd.display();
 	lcd.setColor(WHITE);
 }
+
+#endif
+
+#if defined(ESP8266)
 
 void OpenSprinkler::reset_to_ap() {
 	iopts[IOPT_WIFI_MODE] = WIFI_MODE_AP;
