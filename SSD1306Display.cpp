@@ -2,6 +2,8 @@
 
 #elif defined(OSPI)
 
+#include "SSD1306Display.h"
+
 unsigned char init_command[] = {
 #if 0
     // OLED_CMD_SET_HORI_ADDR_MODE
