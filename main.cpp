@@ -968,7 +968,7 @@ void do_loop()
 		// activate/deactivate valves
 		os.apply_all_station_bits();
 
-#if defined(ARDUINO)
+#if defined(HAS_DISPLAY)
 		// process LCD display
 		if (!ui_state) { os.lcd_print_screen(ui_anim_chars[(unsigned long)curr_time%3]); }
 
