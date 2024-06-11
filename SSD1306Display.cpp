@@ -19,4 +19,12 @@ unsigned char init_command[] = {
 #endif
 };
 
+void init_display(int i2cd) {
+  int i;
+    for (i = 0; i < sizeof(init_command); i++) {
+      unsigned int control = 0x00;  // Co = 0, D/C = 0
+      wiringPiI2CWriteReg8(i2cd, control, init_command[i]);
+    }
+}
+
 #endif

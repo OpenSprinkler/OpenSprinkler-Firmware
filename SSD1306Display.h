@@ -94,7 +94,7 @@ class SSD1306Display : public SSD1306 {
 #define BLACK 0
 #define WHITE 1
 
-extern unsigned char init_command[];
+extern void init_display( int i2cd );
 
 // Header Values
 #define JUMPTABLE_BYTES 4
@@ -122,11 +122,7 @@ class SSD1306Display {
     }
 
     i2cd = wiringPiI2CSetup(_addr);
-    int i;
-    for (i = 0; i < sizeof(init_command); i++) {
-      unsigned int control = 0x00;  // Co = 0, D/C = 0
-      wiringPiI2CWriteReg8(i2cd, control, init_command[i]);
-    }
+    init_display(i2cd);
   }
 
   void init() {}  // Dummy function to match ESP8266
@@ -225,6 +221,10 @@ class SSD1306Display {
         }
       }
     }
+  }
+
+  void drawXbm(int x, int y, int w, int h, const uint8_t *data) {
+    drawXbm(x, y, w, h, (const char *)data);
   }
 
   void fillCircle(int x0, int y0, int r) {
