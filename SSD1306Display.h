@@ -94,7 +94,7 @@ class SSD1306Display : public SSD1306 {
 #define BLACK 0
 #define WHITE 1
 
-inline unsigned char init_command[] = {
+extern unsigned char init_command[] = {
 #if 0
     // OLED_CMD_SET_HORI_ADDR_MODE
     0xAE, 0xA8, 0x3F, 0xD3, 0x00, 0x40, 0xA1, 0xC8,

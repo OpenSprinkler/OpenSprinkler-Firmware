@@ -14,12 +14,12 @@ if [ "$1" == "demo" ]; then
 	echo "Installing required libraries..."
 	apt-get install -y libmosquitto-dev
 	echo "Compiling demo firmware..."
-	g++ -o OpenSprinkler -DDEMO -std=c++14 main.cpp OpenSprinkler.cpp program.cpp opensprinkler_server.cpp utils.cpp weather.cpp gpio.cpp etherport.cpp mqtt.cpp -lpthread -lmosquitto -lwiringPi
+	g++ -o OpenSprinkler -DDEMO -std=c++14 main.cpp OpenSprinkler.cpp program.cpp opensprinkler_server.cpp utils.cpp weather.cpp gpio.cpp etherport.cpp mqtt.cpp SSD1306Display.cpp -lpthread -lmosquitto -lwiringPi
 elif [ "$1" == "osbo" ]; then
 	echo "Installing required libraries..."
 	apt-get install -y libmosquitto-dev
 	echo "Compiling osbo firmware..."
-	g++ -o OpenSprinkler -DOSBO -std=c++14 main.cpp OpenSprinkler.cpp program.cpp opensprinkler_server.cpp utils.cpp weather.cpp gpio.cpp etherport.cpp mqtt.cpp -lpthread -lmosquitto
+	g++ -o OpenSprinkler -DOSBO -std=c++14 main.cpp OpenSprinkler.cpp program.cpp opensprinkler_server.cpp utils.cpp weather.cpp gpio.cpp etherport.cpp mqtt.cpp SSD1306Display.cpp -lpthread -lmosquitto
 else
 	echo "Installing required libraries..."
 	apt-get update
@@ -45,7 +45,7 @@ else
 	fi
 
 	echo "Compiling ospi firmware..."
-	g++ -o OpenSprinkler -DOSPI $USEGPIO -std=c++14 main.cpp OpenSprinkler.cpp program.cpp opensprinkler_server.cpp utils.cpp weather.cpp gpio.cpp etherport.cpp mqtt.cpp -lpthread -lmosquitto -lwiringPi $GPIOLIB
+	g++ -o OpenSprinkler -DOSPI $USEGPIO -std=c++14 main.cpp OpenSprinkler.cpp program.cpp opensprinkler_server.cpp utils.cpp weather.cpp gpio.cpp etherport.cpp mqtt.cpp SSD1306Display.cpp -lpthread -lmosquitto -lwiringPi $GPIOLIB
 fi
 
 if [ ! "$SILENT" = true ] && [ -f OpenSprinkler.launch ] && [ ! -f /etc/init.d/OpenSprinkler.sh ]; then

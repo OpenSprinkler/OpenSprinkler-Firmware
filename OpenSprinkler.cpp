@@ -2922,7 +2922,7 @@ void OpenSprinkler::lcd_set_brightness(byte value) {
 }
 #endif  // end of LCD and button functions
 
-#if defined(SSD1306)
+#if defined(USE_SSD1306)
 #include "images.h"
 void OpenSprinkler::flash_screen() {
 	lcd.setCursor(0, -1);
