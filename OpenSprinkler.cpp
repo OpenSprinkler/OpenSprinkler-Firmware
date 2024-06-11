@@ -2442,7 +2442,7 @@ void OpenSprinkler::lcd_print_line_clear_pgm(PGM_P PROGMEM str, byte line) {
 }
 
 #else
-#define lcd_print_pgm(PGM_P PROGMEM str) lcd.print(str)
+#define lcd_print_pgm(PGM_P str) lcd.print(str)
 // #define lcd_print_line_clear_pgm(PGM_P PROGMEM str, byte line) lcd.print(str)
 #endif
 
