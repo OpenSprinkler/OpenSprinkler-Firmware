@@ -968,10 +968,9 @@ void do_loop()
 		// activate/deactivate valves
 		os.apply_all_station_bits();
 
-#if defined(HAS_DISPLAY)
+#if defined(USE_DISPLAY)
 		// process LCD display
 		if (!ui_state) { os.lcd_print_screen(ui_anim_chars[(unsigned long)curr_time%3]); }
-
 #endif
 
 		// handle reboot request
