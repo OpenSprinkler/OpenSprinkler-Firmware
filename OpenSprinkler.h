@@ -46,7 +46,6 @@
 		#include <OpenThingsFramework.h>
 		#include <DNSServer.h>
 		#include <Ticker.h>
-		#include "SSD1306Display.h"
 		#include "espconnect.h"
 	#else // for AVR
 		#include <SdFat.h>
@@ -62,6 +61,14 @@
 	#include <sys/stat.h>
 	#include "etherport.h"
 #endif // end of headers
+
+#if defined(USE_LCD)
+	#include "LiquidCrystal.h"
+#endif
+
+#if defined(USE_SSD1306)
+	#include "SSD1306Display.h"
+#endif
 
 #if defined(ARDUINO)
 	#if defined(ESP8266)
@@ -197,12 +204,10 @@ class OpenSprinkler {
 public:
 
 	// data members
-#if defined(ESP8266)
+#if defined(USE_SSD1306)
 	static SSD1306Display lcd;  // 128x64 OLED display
-#elif defined(ARDUINO)
+#elif defined(USE_LCD)
 	static LiquidCrystal lcd;   // 16x2 character LCD
-#else
-	// todo: LCD define for RPI/BBB
 #endif
 
 #if defined(OSPI)
@@ -325,6 +330,14 @@ public:
 	static int8_t send_http_request(const char* server, uint16_t port, char* p, void(*callback)(char*)=NULL, uint16_t timeout=5000);
 	static int8_t send_http_request(char* server_with_port, char* p, void(*callback)(char*)=NULL, uint16_t timeout=5000);
 	// -- LCD functions
+#if defined(USE_DISPLAY)
+	static void lcd_print_time(time_t t);  // print current time
+	static void lcd_print_ip(const byte *ip, byte endian);  // print ip
+	static void lcd_print_mac(const byte *mac);  // print mac
+	static void lcd_print_screen(char c);  // print station bits of the board selected by display_board
+	static void lcd_print_version(byte v);  // print version number
+#endif
+
 #if defined(ARDUINO) // LCD functions for Arduino
 	#if defined(ESP8266)
 	static void lcd_print_pgm(PGM_P str); // ESP8266 does not allow PGM_P followed by PROGMEM
@@ -333,11 +346,6 @@ public:
 	static void lcd_print_pgm(PGM_P PROGMEM str);  // print a program memory string
 	static void lcd_print_line_clear_pgm(PGM_P PROGMEM str, byte line);
 	#endif
-	static void lcd_print_time(time_t t);  // print current time
-	static void lcd_print_ip(const byte *ip, byte endian);  // print ip
-	static void lcd_print_mac(const byte *mac);  // print mac
-	static void lcd_print_screen(char c);  // print station bits of the board selected by display_board
-	static void lcd_print_version(byte v);  // print version number
 
 	static String time2str(uint32_t t) {
 		uint16_t h = hour(t);
@@ -384,10 +392,16 @@ public:
 	static byte state;
 	#endif
 
+#endif // LCD functions for Arduino
+
 private:
+#if defined(USE_DISPLAY)
 	static void lcd_print_option(int i);  // print an option to the lcd
 	static void lcd_print_2digit(int v);  // print a integer in 2 digits
 	static void lcd_start();
+#endif
+
+#if defined(ARDUINO) // LCD functions
 	static byte button_read_busy(byte pin_butt, byte waitmode, byte butt, byte is_holding);
 
 	#if defined(ESP8266)
