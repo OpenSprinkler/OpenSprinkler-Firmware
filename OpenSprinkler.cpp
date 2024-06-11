@@ -737,7 +737,7 @@ void OpenSprinkler::update_dev() {
 }
 #endif // end network init functions
 
-#if defined(ARDUINO)
+#if defined(USE_DISPLAY)
 /** Initialize LCD */
 void OpenSprinkler::lcd_start() {
 
