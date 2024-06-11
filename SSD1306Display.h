@@ -142,45 +142,16 @@ class SSD1306Display {
     }
   }
 
-  #define DISPLAY_CHUNK_SIZE 32
-
   void display() {
+    wiringPiI2CWriteReg8(i2cd, 0x00, 0x21);  // Column Address
+    wiringPiI2CWriteReg8(i2cd, 0x00, 0x00);  // Column Start Address
+    wiringPiI2CWriteReg8(i2cd, 0x00, 0x7F);  // Column End Address
 
-    // wiringPiI2CWriteReg8(i2cd, 0x00, 0x21);  // Column Address
-    // wiringPiI2CWriteReg8(i2cd, 0x00, 0x00);  // Column Start Address
-    // wiringPiI2CWriteReg8(i2cd, 0x00, 0x7F);  // Column End Address
+    wiringPiI2CWriteReg8(i2cd, 0x00, 0x22);  // Page Address
+    wiringPiI2CWriteReg8(i2cd, 0x00, 0x00);  // Page Start Address
 
-    // wiringPiI2CWriteReg8(i2cd, 0x00, 0x22);  // Page Address
-    // wiringPiI2CWriteReg8(i2cd, 0x00, 0x00);  // Page Start Address
-
-    // // for (int i = 0; i < 1024; i++) {
-    // //   wiringPiI2CWriteReg8(i2cd, 0x40, frame[i]);
-    // // }
-
-    // int frameSize = sizeof(frame);
-    // uint8_t *frame_ptr = frame;
-    // while (frameSize > 0) {
-    //   int chunkSize = frameSize > DISPLAY_CHUNK_SIZE ? DISPLAY_CHUNK_SIZE : frameSize;
-    //   chunkSize = wiringPiI2CWriteBlockData(i2cd, 0x40, frame_ptr, chunkSize);
-    //   frame_ptr += chunkSize;
-    //   frameSize -= chunkSize;
-    // }
-
-
-    unsigned char page_command[3];
-
-    for (int _page = 0; _page < 8; _page++) {
-      page_command[0] = 0x00;
-      page_command[1] = 0x10;
-      page_command[2] = 0xB0 + _page;
-
-      for (int i = 0; i < sizeof(page_command); i++) {
-        wiringPiI2CWriteReg8(i2cd, 0x00, page_command[i]);
-      }
-
-      for (int col = 0; col < 128; col++) {
-        wiringPiI2CWriteReg8(i2cd, 0x40, frame[_page * 128 + col]);
-      }
+    for (int i = 0; i < 1024; i++) {
+      wiringPiI2CWriteReg8(i2cd, 0x40, frame[i]);
     }
   }
 
