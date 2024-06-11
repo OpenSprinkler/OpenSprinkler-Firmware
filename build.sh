@@ -18,6 +18,12 @@ function download_wiringpi {
 	rm wiringpi.deb
 }
 
+function enable_i2c {
+	sudo raspi-config nonint do_i2c 1
+	sudo dtparam i2c_baudrate=400000
+	sudo modprobe i2c-dev
+}
+
 while getopts ":s" opt; do
   case $opt in
     s)
