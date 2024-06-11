@@ -94,22 +94,7 @@ class SSD1306Display : public SSD1306 {
 #define BLACK 0
 #define WHITE 1
 
-extern unsigned char init_command[] = {
-#if 0
-    // OLED_CMD_SET_HORI_ADDR_MODE
-    0xAE, 0xA8, 0x3F, 0xD3, 0x00, 0x40, 0xA1, 0xC8,
-    0xD5, 0x80, 0xDA, 0x12, 0x81, 0xFF,
-    0xA4, 0xDB, 0x40, 0x20, 0x00, 0x00, 0x10, 0x8D,
-    0x14, 0x2E, 0xA6, 0xAF
-#endif
-
-#if 1
-    // OLED_CMD_SET_PAGE_ADDR_MODE
-    0xAE, 0xA8, 0x3F, 0xD3, 0x00, 0x40, 0xA1, 0xC8, 0xD5,
-    0x80, 0xDA, 0x12, 0x81, 0xFF, 0xA4, 0xDB, 0x40, 0x20,
-    0x02, 0x00, 0x10, 0x8D, 0x14, 0x2E, 0xA6, 0xAF
-#endif
-};
+extern unsigned char init_command[];
 
 // Header Values
 #define JUMPTABLE_BYTES 4
@@ -232,11 +217,21 @@ class SSD1306Display {
   }
   void noBacklight() { /*no support*/ }
   void backlight() { /*no support*/ }
-  void drawXbm(int x, int y, int w, int h, const char *data) {
+  void drawXbm(int x, int y, int w, int h, const uint8_t *data) {
     for (int i = 0; i < w; i++) {
       for (int j = 0; j < h; j++) {
         if (data[i + (j / 8) * w] & (1 << (j % 8))) {
           drawPixel(x + i, y + j);
+        }
+      }
+    }
+  }
+
+  void fillCircle(int x0, int y0, int r) {
+    for (int y = -r; y <= r; y++) {
+      for (int x = -r; x <= r; x++) {
+        if (x * x + y * y <= r * r) {
+          drawPixel(x0 + x, y0 + y);
         }
       }
     }
