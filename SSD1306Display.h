@@ -143,21 +143,51 @@ class SSD1306Display {
   }
 
   void display() {
-    unsigned char page_command[3];
+    // sendCommand(COLUMNADDR);
+    // sendCommand(x_offset);
+    // sendCommand(x_offset + (this->width() - 1));
 
-    for (int _page = 0; _page < 8; _page++) {
-      page_command[0] = 0x00;
-      page_command[1] = 0x10;
-      page_command[2] = 0xB0 + _page;
+    // sendCommand(PAGEADDR);
+    // sendCommand(0x0);
 
-      for (int i = 0; i < sizeof(page_command); i++) {
-        wiringPiI2CWriteReg8(i2cd, 0x00, page_command[i]);
-      }
+    // for (uint16_t i=0; i < displayBufferSize; i++) {
+    //   _wire->beginTransmission(this->_address);
+    //   _wire->write(0x40);
+    //   for (uint8_t x = 0; x < 16; x++) {
+    //     _wire->write(buffer[i]);
+    //     i++;
+    //   }
+    //   i--;
+    //   _wire->endTransmission();
+    // }
 
-      for (int col = 0; col < 128; col++) {
-        wiringPiI2CWriteReg8(i2cd, 0x40, frame[_page * 128 + col]);
-      }
+    wiringPiI2CWriteReg8(i2cd, 0x00, 0x21);  // Column Address
+    wiringPiI2CWriteReg8(i2cd, 0x00, 0x00);  // Column Start Address
+    wiringPiI2CWriteReg8(i2cd, 0x00, 0x7F);  // Column End Address
+
+    wiringPiI2CWriteReg8(i2cd, 0x00, 0x22);  // Page Address
+    wiringPiI2CWriteReg8(i2cd, 0x00, 0x00);  // Page Start Address
+
+    for (int i = 0; i < 1024; i++) {
+      wiringPiI2CWriteReg8(i2cd, 0x40, frame[i]);
     }
+
+
+    // unsigned char page_command[3];
+
+    // for (int _page = 0; _page < 8; _page++) {
+    //   page_command[0] = 0x00;
+    //   page_command[1] = 0x10;
+    //   page_command[2] = 0xB0 + _page;
+
+    //   for (int i = 0; i < sizeof(page_command); i++) {
+    //     wiringPiI2CWriteReg8(i2cd, 0x00, page_command[i]);
+    //   }
+
+    //   for (int col = 0; col < 128; col++) {
+    //     wiringPiI2CWriteReg8(i2cd, 0x40, frame[_page * 128 + col]);
+    //   }
+    // }
   }
 
   void clear() {
