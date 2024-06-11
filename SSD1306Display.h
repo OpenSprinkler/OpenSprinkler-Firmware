@@ -213,11 +213,20 @@ class SSD1306Display {
   }
   void noBacklight() { /*no support*/ }
   void backlight() { /*no support*/ }
-  void drawXbm(int x, int y, int w, int h, const char *data) {
-    for (int i = 0; i < w; i++) {
-      for (int j = 0; j < h; j++) {
-        if (data[i + (j / 8) * w] & (1 << (j % 8))) {
-          drawPixel(x + i, y + j);
+  void drawXbm(int x, int y, int w, int h, const char *xbm) {
+    int xbmWidth = (w + 7) / 8;
+    uint8_t data = 0;
+    
+    for (int i = 0; i < h; i++) {
+      for (int j = 0; j < w; j++) {
+        if (j & 7) {
+          data >>= 1;
+        } else {
+          data = xbm[(i * xbmWidth) + (j / 8)];
+        }
+        
+        if (data & 0x01) {
+          drawPixel(x + j, y + i);
         }
       }
     }
