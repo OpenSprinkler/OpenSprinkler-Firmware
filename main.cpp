@@ -970,7 +970,7 @@ void do_loop()
 
 #if defined(USE_DISPLAY)
 		// process LCD display
-		// if (!ui_state) { os.lcd_print_screen(ui_anim_chars[(unsigned long)curr_time%3]); }
+		if (!ui_state) { os.lcd_print_screen(ui_anim_chars[(unsigned long)curr_time%3]); }
 #endif
 
 		// handle reboot request

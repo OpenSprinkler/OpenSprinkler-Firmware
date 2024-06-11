@@ -2411,6 +2411,7 @@ void OpenSprinkler::raindelay_stop() {
 }
 
 /** LCD and button functions */
+#if defined(USE_DISPLAY)
 #if defined(ARDUINO)		// AVR LCD and button functions
 /** print a program memory string */
 #if defined(ESP8266)
@@ -2440,6 +2441,11 @@ void OpenSprinkler::lcd_print_line_clear_pgm(PGM_P PROGMEM str, byte line) {
 	for(; (16-cnt) >= 0; cnt ++) lcd_print_pgm(PSTR(" "));
 }
 
+#else
+#define lcd_print_pgm(PGM_P PROGMEM str) lcd.print(str)
+// #define lcd_print_line_clear_pgm(PGM_P PROGMEM str, byte line) lcd.print(str)
+#endif
+
 void OpenSprinkler::lcd_print_2digit(int v)
 {
 	lcd.print((int)(v/10));
@@ -2455,36 +2461,20 @@ void OpenSprinkler::lcd_print_time(time_t t)
 	lcd.setCursor(0, 0);
 	lcd_print_2digit(hour(t));
 	
-	#if defined(ARDUINO)
 	lcd_print_pgm(PSTR(":"));
-	#else
-	lcd.print(':');
-	#endif
 
 	lcd_print_2digit(minute(t));
 
-	#if defined(ARDUINO)
 	lcd_print_pgm(PSTR("  "));
-	#else
-	lcd.print('  ');
-	#endif
 
 	// each weekday string has 3 characters + ending 0
 	lcd_print_pgm(days_str+4*weekday_today());
 
-	#if defined(ARDUINO)
 	lcd_print_pgm(PSTR(" "));
-	#else
-	lcd.print(' ');
-	#endif
 
 	lcd_print_2digit(month(t));
 
-	#if defined(ARDUINO)
 	lcd_print_pgm(PSTR("-"));
-	#else
-	lcd.print('-');
-	#endif
 
 	lcd_print_2digit(day(t));
 #if defined(USE_SSD1306)
@@ -2505,11 +2495,7 @@ void OpenSprinkler::lcd_print_ip(const byte *ip, byte endian) {
 		lcd.print(endian ? (int)ip[3-i] : (int)ip[i]);
 		
 		if(i<3) {
-			#if defined(ARDUINO)
 			lcd_print_pgm(PSTR("."));
-			#else
-			lcd.print('.');
-			#endif
 		}
 	}
 }
@@ -2519,11 +2505,7 @@ void OpenSprinkler::lcd_print_mac(const byte *mac) {
 	lcd.setCursor(0, 0);
 	for(byte i=0; i<6; i++) {
 		if(i) {
-			#if defined(ARDUINO)
 			lcd_print_pgm(PSTR("-"));
-			#else
-			lcd.print('-');
-			#endif
 		}
 
 		lcd.print((mac[i]>>4), HEX);
@@ -2531,17 +2513,9 @@ void OpenSprinkler::lcd_print_mac(const byte *mac) {
 		if(i==4) lcd.setCursor(0, 1);
 	}
 	if(useEth) {
-		#if defined(ARDUINO)
 		lcd_print_pgm(PSTR(" (Ether MAC)"));
-		#else
-		lcd.print(F(" (Ether MAC)"));
-		#endif
 	} else {
-		#if defined(ARDUINO)
 		lcd_print_pgm(PSTR(" (WiFi MAC)"));
-		#else
-		lcd.print(F(" (WiFi MAC)"));
-		#endif
 	}
 }
 
@@ -2761,6 +2735,10 @@ void OpenSprinkler::lcd_print_option(int i) {
 		lcd_print_pgm(PSTR(" sec"));
 
 }
+
+#endif
+
+#if defined(ARDUINO)
 
 /** Button functions */
 /** wait for button */
