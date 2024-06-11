@@ -172,7 +172,7 @@ class SSD1306Display {
     //   wiringPiI2CWriteReg8(i2cd, 0x40, frame[i]);
     // }
 
-    uint frameSize = sizeof(frame);
+    int frameSize = sizeof(frame);
     uint8_t *frame_ptr = frame;
     while (frameSize > 0) {
       int chunkSize = frameSize > 255 ? 255 : frameSize;
