@@ -322,6 +322,8 @@ enum {
 	#define digitalReadExt    digitalRead
 	#define digitalWriteExt   digitalWrite
 
+	#define USE_DISPLAY
+	#define USE_LCD
 #elif defined(ESP8266) // for ESP8266
 
 	#define OS_HW_VERSION    (OS_HW_VERSION_BASE+30)
@@ -404,6 +406,9 @@ enum {
 	#define V2_PIN_SENSOR1       3  // sensor 1
 	#define V2_PIN_SENSOR2       10 // sensor 2
 
+	#define USE_DISPLAY
+	#define USE_SSD1306
+
 #elif defined(OSPI) // for OSPi
 
 	#define OS_HW_VERSION    OSPI_HW_VERSION_BASE
@@ -421,6 +426,9 @@ enum {
 
 	#define PIN_FREE_LIST       {5,6,7,8,9,10,11,12,13,16,18,19,20,21,23,24,25,26}  // free GPIO pins
 	#define ETHER_BUFFER_SIZE   16384
+
+	#define USE_DISPLAY
+	#define USE_SSD1306
 
 #elif defined(OSBO) // for OSBo
 

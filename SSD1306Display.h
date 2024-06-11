@@ -80,8 +80,7 @@ class SSD1306Display : public SSD1306 {
   PGM_P custom_chars[NUM_CUSTOM_ICONS];
 };
 
-// #elif defined(OSPI)
-#else
+#elif defined(OSPI)
 #include <stdint.h>
 #include <string.h>
 #include <wiringPiI2C.h>
