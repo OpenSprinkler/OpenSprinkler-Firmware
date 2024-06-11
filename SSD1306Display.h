@@ -217,7 +217,7 @@ class SSD1306Display {
   }
   void noBacklight() { /*no support*/ }
   void backlight() { /*no support*/ }
-  void drawXbm(int x, int y, int w, int h, const uint8_t *data) {
+  void drawXbm(int x, int y, int w, int h, const char *data) {
     for (int i = 0; i < w; i++) {
       for (int j = 0; j < h; j++) {
         if (data[i + (j / 8) * w] & (1 << (j % 8))) {
