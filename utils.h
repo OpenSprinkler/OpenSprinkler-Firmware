@@ -31,6 +31,10 @@
 	#include <limits.h>
 	#include <sys/time.h>
 	#include <bcm2835.h>
+	#include <arpa/inet.h>
+	#include <sys/socket.h>
+	#include <ifaddrs.h>
+	#include <net/route.h>
 #endif
 #include "defines.h"
 
@@ -80,6 +84,15 @@ void str2mac(const char *_str, byte mac[]);
 	#if defined(OSPI)
 	unsigned int detect_rpi_rev();
 	char* get_runtime_path();
+
+	struct route_t {
+		char iface[16];
+		in_addr_t gateway;
+		in_addr_t destination;
+	};
+
+	route_t get_route();
+	in_addr_t get_ip_address(char *iface);
 	#endif
 
 #endif

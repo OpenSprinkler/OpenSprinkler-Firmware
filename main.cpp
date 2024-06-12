@@ -186,11 +186,19 @@ void ui_state_machine() {
 					#endif
 					os.lcd.clear(0, 1);
 					os.lcd.setCursor(0, 0);
+					#if defined(Arduino)
 					#if defined(ESP8266)
 					if (useEth) { os.lcd.print(eth.gatewayIP()); }
 					else { os.lcd.print(WiFi.gatewayIP()); }
 					#else
 					{ os.lcd.print(Ethernet.gatewayIP()); }
+					#endif
+					#else
+					route_t route = get_route();
+					char str[INET_ADDRSTRLEN];
+
+					inet_ntop(AF_INET, &(route.gateway), str, INET_ADDRSTRLEN);
+					os.lcd.print(str);
 					#endif
 					os.lcd.setCursor(0, 1);
 					os.lcd_print_pgm(PSTR("(gwip)"));
@@ -209,11 +217,20 @@ void ui_state_machine() {
 				#endif
 				os.lcd.clear(0, 1);
 				os.lcd.setCursor(0, 0);
+				#if defined(Arduino)
 				#if defined(ESP8266)
 				if (useEth) { os.lcd.print(eth.localIP()); }
 				else { os.lcd.print(WiFi.localIP()); }
 				#else
 				{ os.lcd.print(Ethernet.localIP()); }
+				#endif
+				#else
+				route_t route = get_route();
+				char str[INET_ADDRSTRLEN];
+				in_addr_t ip = get_ip_address(route.iface);
+
+				inet_ntop(AF_INET, &ip, str, INET_ADDRSTRLEN);
+				os.lcd.print(str);
 				#endif
 				os.lcd.setCursor(0, 1);
 				os.lcd_print_pgm(PSTR(":"));

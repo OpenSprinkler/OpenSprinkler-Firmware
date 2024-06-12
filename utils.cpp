@@ -155,6 +155,56 @@ unsigned int detect_rpi_rev() {
 	}
 	return rev;
 }
+
+route_t get_route() {
+	route_t route;
+	char iface[16];
+	unsigned long dst, gw;
+	unsigned int flags, refcnt, use, metric, mask, mtu, window, irtt;
+
+	FILE *filp;
+	char buf[512];
+	char term;
+	filp = fopen("/proc/net/route", "r");
+	if(filp) {
+		while(fgets(buf, sizeof(buf), filp) != NULL) {
+			if(sscanf(buf, "%s %lx %lx %X %d %d %d %lx %d %d %d", iface, &dst, &gw, &flags, &refcnt, &use, &metric, &mask, &mtu, &window, &irtt) == 11) {
+				if(flags & RTF_UP) {
+					if(dst==0) {
+						strcpy(route.iface, iface);
+						route.gateway = gw;
+						route.destination = dst;
+					}
+				}
+			}
+		}
+		fclose(filp);
+	}
+	return route;
+}
+
+in_addr_t get_ip_address(char *iface) {
+	struct ifaddrs *ifaddr; 
+	struct ifaddrs *ifa;
+	in_addr_t ip = 0;
+	if(getifaddrs(&ifaddr) == -1) {
+		return 0;
+	}
+
+	ifa = ifaddr;
+
+	while(ifa) {
+		if(ifa->ifa_addr && ifa->ifa_addr->sa_family == AF_INET) {
+			if(strcmp(ifa->ifa_name, iface)==0) {
+				ip = ((struct sockaddr_in *)ifa->ifa_addr)->sin_addr.s_addr;
+				break;
+			}
+		}
+		ifa = ifa->ifa_next;
+	}
+	freeifaddrs(ifaddr);
+	return ip;
+}
 #endif
 
 #endif
