@@ -128,7 +128,7 @@ class SSD1306Display : public SSD1306 {
   int begin() {
     if (!OLEDSetBufferPtr(128, 64, frame, sizeof(frame))) return -1;
 
-    const uint16_t I2C_Speed = BCM2835_I2C_CLOCK_DIVIDER_626; //  bcm2835I2CClockDivider enum , see readme.
+    const uint16_t I2C_Speed = BCM2835_I2C_CLOCK_DIVIDER_148;
     const uint8_t I2C_Address = 0x3C;
     bool I2C_debug = false;
 
