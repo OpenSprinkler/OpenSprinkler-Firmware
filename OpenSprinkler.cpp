@@ -2894,6 +2894,9 @@ void OpenSprinkler::ui_set_options(int oid)
 	lcd.noBlink();
 }
 
+#else
+#endif  // end of LCD and button functions
+
 /** Set LCD contrast (using PWM) */
 void OpenSprinkler::lcd_set_contrast() {
 #ifdef PIN_LCD_CONTRAST
@@ -2928,7 +2931,7 @@ void OpenSprinkler::lcd_set_brightness(byte value) {
 		}
 	}
 
-#elif defined(ESP8266)
+#elif defined(USE_SSD1306)
 	if (value) {lcd.displayOn();lcd.setBrightness(255); }
 	else {
 		if(iopts[IOPT_LCD_DIMMING]==0) lcd.displayOff();
@@ -2937,11 +2940,7 @@ void OpenSprinkler::lcd_set_brightness(byte value) {
 #endif
 }
 
-#else
-void OpenSprinkler::lcd_set_contrast() {}
-void OpenSprinkler::lcd_set_brightness(byte value) {}
 
-#endif  // end of LCD and button functions
 
 #if defined(USE_SSD1306)
 #include "images.h"
