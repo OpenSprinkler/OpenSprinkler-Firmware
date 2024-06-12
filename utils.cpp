@@ -38,7 +38,7 @@ extern OpenSprinkler os;
 
 #else // RPI/BBB
 
-static char* get_runtime_path() {
+char* get_runtime_path() {
 	static char path[PATH_MAX];
 	static byte query = 1;
 

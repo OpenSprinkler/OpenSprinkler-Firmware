@@ -81,6 +81,7 @@ void str2mac(const char *_str, byte mac[]);
 	void initialiseEpoch();
 	#if defined(OSPI)
 	unsigned int detect_rpi_rev();
+	char* get_runtime_path();
 	#endif
 
 #endif
