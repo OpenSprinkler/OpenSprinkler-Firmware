@@ -60,6 +60,7 @@
 	#include <netdb.h>
 	#include <sys/stat.h>
 	#include "etherport.h"
+	#include "rpitime.h"
 #endif // end of headers
 
 #if defined(USE_LCD)
@@ -110,6 +111,7 @@
 	extern bool useEth;
 #else
 	extern EthernetServer *m_server;
+	extern bool useEth;
 #endif
 
 /** Non-volatile data structure */
@@ -344,16 +346,6 @@ public:
 	static void toggle_screen_led();
 	static void set_screen_led(byte status);
 	#endif
-#endif
-
-#if defined(ARDUINO) // LCD functions for Arduino
-	#if defined(ESP8266)
-	static void lcd_print_pgm(PGM_P str); // ESP8266 does not allow PGM_P followed by PROGMEM
-	static void lcd_print_line_clear_pgm(PGM_P str, byte line);
-	#else
-	static void lcd_print_pgm(PGM_P PROGMEM str);  // print a program memory string
-	static void lcd_print_line_clear_pgm(PGM_P PROGMEM str, byte line);
-	#endif
 
 	static String time2str(uint32_t t) {
 		uint16_t h = hour(t);
@@ -378,6 +370,16 @@ public:
 
 	// -- UI functions --
 	static void ui_set_options(int oid);		// ui for setting options (oid-> starting option index)
+#endif
+
+#if defined(ARDUINO) // LCD functions for Arduino
+	#if defined(ESP8266)
+	static void lcd_print_pgm(PGM_P str); // ESP8266 does not allow PGM_P followed by PROGMEM
+	static void lcd_print_line_clear_pgm(PGM_P str, byte line);
+	#else
+	static void lcd_print_pgm(PGM_P PROGMEM str);  // print a program memory string
+	static void lcd_print_line_clear_pgm(PGM_P PROGMEM str, byte line);
+	#endif
 
 	#if defined(ESP8266)
 	static OTCConfig otc;
@@ -396,6 +398,7 @@ public:
 	#endif
 
 #else
+static void lcd_print_pgm(const char *str);
 static void lcd_print_line_clear_pgm(const char *str, byte line);
 #endif // LCD functions for Arduino
 
@@ -404,11 +407,10 @@ private:
 	static void lcd_print_option(int i);  // print an option to the lcd
 	static void lcd_print_2digit(int v);  // print a integer in 2 digits
 	static void lcd_start();
+	static byte button_read_busy(byte pin_butt, byte waitmode, byte butt, byte is_holding);
 #endif
 
 #if defined(ARDUINO) // LCD functions
-	static byte button_read_busy(byte pin_butt, byte waitmode, byte butt, byte is_holding);
-
 	#if defined(ESP8266)
 	static void parse_otc_config();
 	static void latch_boost();

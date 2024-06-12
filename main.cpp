@@ -49,6 +49,7 @@
 #else // header and defs for RPI/BBB
 	EthernetServer *m_server = 0;
 	EthernetClient *m_client = 0;
+	bool useEth = false;
 #endif
 
 #if defined(USE_SSD1306)
@@ -113,7 +114,6 @@ void flow_poll() {
 	/* End of RAH implementation of flow sensor */
 }
 
-#if defined(ARDUINO)
 // ====== UI defines ======
 static char ui_anim_chars[3] = {'.', 'o', 'O'};
 
@@ -140,14 +140,13 @@ bool ui_confirm(PGM_P str) {
 }
 
 void ui_state_machine() {
-
 	// to avoid ui_state_machine taking too much computation time
 	// we run it only every UI_STATE_MACHINE_INTERVAL ms
 	static uint32_t last_usm = 0;
 	if(millis() - last_usm <= UI_STATE_MACHINE_INTERVAL) { return; }
 	last_usm = millis();
 
-#if defined(ESP8266)
+#if defined(USE_SSD1306)
 	// process screen led
 	static ulong led_toggle_timeout = 0;
 	if(led_blink_ms) {
@@ -184,11 +183,15 @@ void ui_state_machine() {
 				} else if (digitalReadExt(PIN_BUTTON_2)==0) { // if B2 is pressed while holding B1, display gateway IP
 					os.lcd.clear(0, 1);
 					os.lcd.setCursor(0, 0);
+					#if defined(Arduino)
 					#if defined(ESP8266)
 					if (useEth) { os.lcd.print(eth.gatewayIP()); }
 					else { os.lcd.print(WiFi.gatewayIP()); }
 					#else
 					{ os.lcd.print(Ethernet.gatewayIP()); }
+					#endif
+					#else
+					os.lcd.print("xxx.xxx.xxx.xxx");
 					#endif
 					os.lcd.setCursor(0, 1);
 					os.lcd_print_pgm(PSTR("(gwip)"));
@@ -200,11 +203,15 @@ void ui_state_machine() {
 			} else {  // clicking B1: display device IP and port
 				os.lcd.clear(0, 1);
 				os.lcd.setCursor(0, 0);
+				#if defined(Arduino)
 				#if defined(ESP8266)
 				if (useEth) { os.lcd.print(eth.localIP()); }
 				else { os.lcd.print(WiFi.localIP()); }
 				#else
 				{ os.lcd.print(Ethernet.localIP()); }
+				#endif
+				#else
+				os.lcd.print("xxx.xxx.xxx.xxx");
 				#endif
 				os.lcd.setCursor(0, 1);
 				os.lcd_print_pgm(PSTR(":"));
@@ -293,9 +300,11 @@ void ui_state_machine() {
 	}
 }
 
+
 // ======================
 // Setup Function
 // ======================
+#if defined(ARDUINO)
 void do_setup() {
 	/* Clear WDT reset flag. */
 #if defined(ESP8266)
@@ -395,49 +404,6 @@ void do_setup() {
 
 	os.mqtt.init();
 	os.status.req_mqtt_restart = true;
-}
-
-// ====== UI defines ======
-static char ui_anim_chars[3] = {'.', 'o', 'O'};
-
-#define UI_STATE_DEFAULT   0
-#define UI_STATE_DISP_IP   1
-#define UI_STATE_DISP_GW   2
-#define UI_STATE_RUNPROG   3
-
-static byte ui_state = UI_STATE_DEFAULT;
-static byte ui_state_runprog = 0;
-
-// bool ui_confirm(PGM_P str) {
-// 	os.lcd_print_line_clear_pgm(str, 0);
-// 	os.lcd_print_line_clear_pgm(PSTR("(B1:No, B3:Yes)"), 1);
-// 	byte button;
-// 	ulong start = millis();
-// 	do {
-// 		button = os.button_read(BUTTON_WAIT_NONE);
-// 		if((button&BUTTON_MASK)==BUTTON_3 && (button&BUTTON_FLAG_DOWN)) return true;
-// 		if((button&BUTTON_MASK)==BUTTON_1 && (button&BUTTON_FLAG_DOWN)) return false;
-// 		delay(10);
-// 	} while(millis() - start < 2500);
-// 	return false;
-// }
-
-void ui_state_machine() {
-
-	// to avoid ui_state_machine taking too much computation time
-	// we run it only every UI_STATE_MACHINE_INTERVAL ms
-	static uint32_t last_usm = 0;
-	if(millis() - last_usm <= UI_STATE_MACHINE_INTERVAL) { return; }
-	last_usm = millis();
-
-	// process screen led
-	static ulong led_toggle_timeout = 0;
-	if(led_blink_ms) {
-		if(millis()>led_toggle_timeout) {
-			os.toggle_screen_led();
-			led_toggle_timeout = millis() + led_blink_ms;
-		}
-	}
 }
 
 #endif

@@ -2441,8 +2441,14 @@ void OpenSprinkler::lcd_print_line_clear_pgm(PGM_P PROGMEM str, byte line) {
 	}
 	for(; (16-cnt) >= 0; cnt ++) lcd_print_pgm(PSTR(" "));
 }
-#else
 
+#else
+void OpenSprinkler::lcd_print_pgm(const char *str) {
+	uint8_t c;
+	while((c=*str++)!= '\0') {
+		lcd.print((char)c);
+	}
+}
 void OpenSprinkler::lcd_print_line_clear_pgm(const char *str, uint8_t line) {
 	lcd.setCursor(0, line);
 	uint8_t c;
@@ -2455,34 +2461,6 @@ void OpenSprinkler::lcd_print_line_clear_pgm(const char *str, uint8_t line) {
 }
 
 #define PGSTR(s) s
-#define lcd_print_pgm(str) lcd.print(str)
-#define useEth 0
-#define HEX 16
-
-int hour(time_t ct) {
-	struct tm *ti = gmtime(&ct);
-	return ti->tm_hour;
-}
-
-int minute(time_t ct) {
-	struct tm *ti = gmtime(&ct);
-	return ti->tm_min;
-}
-
-int second(time_t ct) {
-	struct tm *ti = gmtime(&ct);
-	return ti->tm_sec;
-}
-
-int day(time_t ct) {
-	struct tm *ti = gmtime(&ct);
-	return ti->tm_mday;
-}
-
-int month(time_t ct) {
-	struct tm *ti = gmtime(&ct);
-	return ti->tm_mon+1;
-}
 #endif
 
 void OpenSprinkler::lcd_print_2digit(int v)
@@ -2497,7 +2475,6 @@ void OpenSprinkler::lcd_print_time(time_t t)
 #if defined(USE_SSD1306)
 	lcd.setAutoDisplay(false);
 #endif
-//TODO: Time
 	lcd.setCursor(0, 0);
 	lcd_print_2digit(hour(t));
 	
@@ -2778,8 +2755,6 @@ void OpenSprinkler::lcd_print_option(int i) {
 
 #endif
 
-#if defined(ARDUINO)
-
 /** Button functions */
 /** wait for button */
 byte OpenSprinkler::button_read_busy(byte pin_butt, byte waitmode, byte butt, byte is_holding) {
@@ -2830,6 +2805,8 @@ byte OpenSprinkler::button_read(byte waitmode)
 
 	return ret;
 }
+
+#if defined(ARDUINO)
 
 /** user interface for setting options during startup */
 void OpenSprinkler::ui_set_options(int oid)
