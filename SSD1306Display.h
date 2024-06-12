@@ -83,8 +83,10 @@ class SSD1306Display : public SSD1306 {
 #elif defined(OSPI)
 #include <stdint.h>
 #include <string.h>
-#include <wiringPiI2C.h>
+
+#include <bcm2835.h>
 #include <cstdio>
+#include "SSD1306_OLED.hpp"
 
 #include "font.h"
 #include "images.h"
@@ -94,8 +96,6 @@ class SSD1306Display : public SSD1306 {
 
 #define BLACK 0
 #define WHITE 1
-
-extern void init_display( int i2cd );
 
 // Header Values
 #define JUMPTABLE_BYTES 4
@@ -110,9 +110,9 @@ extern void init_display( int i2cd );
 #define FIRST_CHAR_POS 2
 #define CHAR_NUM_POS 3
 
-class SSD1306Display {
+class SSD1306Display : public SSD1306 {
  public:
-  SSD1306Display(uint8_t _addr, uint8_t _sda, uint8_t _scl) {
+  SSD1306Display(uint8_t _addr, uint8_t _sda, uint8_t _scl) : SSD1306(128, 64) {
     cx = 0;
     cy = 0;
     for (uint8_t i = 0; i < NUM_CUSTOM_ICONS; i++) custom_chars[i] = 0;
@@ -120,48 +120,47 @@ class SSD1306Display {
     int b;
     for (b = 0; b < 1024; b++) {
       frame[b] = 0x00;
-    }
-
-    i2cd = wiringPiI2CSetup(_addr);
-    init_display(i2cd);
+    }  
   }
 
   void init() {}  // Dummy function to match ESP8266
-  void begin() {
-    flipScreenVertically();
+  
+  int begin() {
+    if (!OLEDSetBufferPtr(128, 64, frame, sizeof(frame))) return -1;
+
+    const uint16_t I2C_Speed = BCM2835_I2C_CLOCK_DIVIDER_626; //  bcm2835I2CClockDivider enum , see readme.
+    const uint8_t I2C_Address = 0x3C;
+    bool I2C_debug = false;
+
+    // Check if Bcm28235 lib installed and print version.
+    if (!bcm2835_init()) {
+      printf("Error 1201: init bcm2835 library , Is it installed ?\r\n");
+      return -1;
+    }
+
+    // Turn on I2C bus (optionally it may already be on)
+    if (!OLED_I2C_ON()) {
+      printf("Error 1202: bcm2835_i2c_begin :Cannot start I2C, Running as root?\n");
+      bcm2835_close(); // Close the library
+      return -1;
+    }
+
+    OLEDbegin(I2C_Speed, I2C_Address, I2C_debug); // initialize the OLED
     setFont(Monospaced_plain_13);
     fontWidth = 8;
     fontHeight = 16;
+
+    return 0;
   }
 
   void setFont(const uint8_t *f) { font = (uint8_t *)f; }
 
-  void flipScreenVertically() {
-    unsigned char command[3] = {0x00, 0x20, 0x00};
-    for (int i = 0; i < sizeof(command); i++) {
-      wiringPiI2CWriteReg8(i2cd, 0x00, command[i]);
-    }
-  }
-
   void display() {
-    wiringPiI2CWriteReg8(i2cd, 0x00, 0x21);  // Column Address
-    wiringPiI2CWriteReg8(i2cd, 0x00, 0x00);  // Column Start Address
-    wiringPiI2CWriteReg8(i2cd, 0x00, 0x7F);  // Column End Address
-
-    wiringPiI2CWriteReg8(i2cd, 0x00, 0x22);  // Page Address
-    wiringPiI2CWriteReg8(i2cd, 0x00, 0x00);  // Page Start Address
-
-    for (int i = 0; i < 1024; i++) {
-      wiringPiI2CWriteReg8(i2cd, 0x40, frame[i]);
-    }
+    OLEDupdate();
   }
 
   void clear() {
-    int b;
-    for (b = 0; b < 1024; b++) {
-      frame[b] = 0x00;
-    }
-
+    OLEDclearBuffer();
     display();
   }
 
@@ -353,7 +352,7 @@ class SSD1306Display {
     }
   }
 
-  uint8_t write(uint8_t c) {
+  size_t write(uint8_t c) {
     setColor(BLACK);
     fillRect(cx, cy, fontWidth, fontHeight);
     setColor(WHITE);
