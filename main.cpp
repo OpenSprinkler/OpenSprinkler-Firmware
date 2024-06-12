@@ -53,7 +53,11 @@
 #endif
 
 #if defined(USE_SSD1306)
+	#if defined(ESP8266)
 	static uint16_t led_blink_ms = LED_FAST_BLINK;
+	#else
+	static uint16_t led_blink_ms = 0;
+	#endif
 #endif
 
 void push_message(int type, uint32_t lval=0, float fval=0.f, const char* sval=NULL);
