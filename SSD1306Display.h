@@ -192,10 +192,11 @@ class SSD1306Display {
   }
 
   void print(const char *s) {
-    while (*s) {
-      write(*s);
-      s++;
-    }
+    write(s);
+  }
+
+  void print(char s) {
+    write(s);
   }
 
   void print(int i) { 
@@ -370,10 +371,13 @@ class SSD1306Display {
 
   uint8_t write(const char *s) {
     uint8_t nc = strlen(s);
+    bool temp_auto_display = auto_display;
+    auto_display = false;
     setColor(BLACK);
     fillRect(cx, cy, fontWidth * nc, fontHeight);
     setColor(WHITE);
     drawString(cx, cy, s);
+    auto_display = temp_auto_display;
     cx += fontWidth * nc;
     if (auto_display) display();  // todo: not very efficient
     return nc;

@@ -899,6 +899,12 @@ void OpenSprinkler::begin() {
 
 #endif
 
+#if defined(OSPI)
+pinModeExt(PIN_BUTTON_1, INPUT_PULLUP);
+pinModeExt(PIN_BUTTON_2, INPUT_PULLUP);
+pinModeExt(PIN_BUTTON_3, INPUT_PULLUP);
+#endif
+
 	// Reset all stations
 	clear_all_station_bits();
 	apply_all_station_bits();
@@ -2444,20 +2450,21 @@ void OpenSprinkler::lcd_print_line_clear_pgm(PGM_P PROGMEM str, byte line) {
 
 #else
 void OpenSprinkler::lcd_print_pgm(const char *str) {
-	uint8_t c;
-	while((c=*str++)!= '\0') {
-		lcd.print((char)c);
-	}
+	lcd.print(str);
 }
 void OpenSprinkler::lcd_print_line_clear_pgm(const char *str, uint8_t line) {
-	lcd.setCursor(0, line);
+	char buf[16];
 	uint8_t c;
 	int8_t cnt = 0;
-	while((c=*str++)!= '\0') {
-		lcd.print((char)c);
+	while((c=*str++)!= '\0' && cnt<16) {
+		buf[cnt] = c;
 		cnt++;
 	}
-	for(; (16-cnt) >= 0; cnt ++) lcd.print(' ');
+
+	for(int i=cnt; i<16; i++) buf[i] = ' ';
+
+	lcd.setCursor(0, line);
+	lcd.print(buf);
 }
 
 #define PGSTR(s) s
@@ -2504,6 +2511,7 @@ void OpenSprinkler::lcd_print_time(time_t t)
 void OpenSprinkler::lcd_print_ip(const byte *ip, byte endian) {
 #if defined(USE_SSD1306)
 	lcd.clear(0, 1);
+	lcd.setAutoDisplay(false);
 #elif defined(USE_LCD)
 	lcd.clear();
 #endif
@@ -2515,10 +2523,18 @@ void OpenSprinkler::lcd_print_ip(const byte *ip, byte endian) {
 			lcd_print_pgm(PSTR("."));
 		}
 	}
+
+	#if defined(USE_SSD1306)
+		lcd.display();
+		lcd.setAutoDisplay(true);
+	#endif
 }
 
 /** print mac address */
 void OpenSprinkler::lcd_print_mac(const byte *mac) {
+	#if defined(USE_SSD1306)
+		lcd.setAutoDisplay(false); // reduce screen drawing time by turning off display() when drawing individual characters
+	#endif
 	lcd.setCursor(0, 0);
 	for(byte i=0; i<6; i++) {
 		if(i) {
@@ -2534,6 +2550,11 @@ void OpenSprinkler::lcd_print_mac(const byte *mac) {
 	} else {
 		lcd_print_pgm(PSTR(" (WiFi MAC)"));
 	}
+
+	#if defined(USE_SSD1306)
+		lcd.display();
+		lcd.setAutoDisplay(true);
+	#endif
 }
 
 /** print station bits */

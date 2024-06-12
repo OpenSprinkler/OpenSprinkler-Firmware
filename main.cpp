@@ -181,6 +181,9 @@ void ui_state_machine() {
 					if(!ui_confirm(PSTR("Start 2s test?"))) {ui_state = UI_STATE_DEFAULT; break;}
 					manual_start_program(255, 0);
 				} else if (digitalReadExt(PIN_BUTTON_2)==0) { // if B2 is pressed while holding B1, display gateway IP
+					#if defined(USE_SSD1306)
+						os.lcd.setAutoDisplay(false);
+					#endif
 					os.lcd.clear(0, 1);
 					os.lcd.setCursor(0, 0);
 					#if defined(Arduino)
@@ -196,11 +199,18 @@ void ui_state_machine() {
 					os.lcd.setCursor(0, 1);
 					os.lcd_print_pgm(PSTR("(gwip)"));
 					ui_state = UI_STATE_DISP_IP;
+					#if defined(USE_SSD1306)
+						os.lcd.display();
+						os.lcd.setAutoDisplay(true);
+					#endif
 				} else {  // if no other button is clicked, stop all zones
 					if(!ui_confirm(PSTR("Stop all zones?"))) {ui_state = UI_STATE_DEFAULT; break;}
 					reset_all_stations();
 				}
 			} else {  // clicking B1: display device IP and port
+				#if defined(USE_SSD1306)
+					os.lcd.setAutoDisplay(false);
+				#endif
 				os.lcd.clear(0, 1);
 				os.lcd.setCursor(0, 0);
 				#if defined(Arduino)
@@ -219,6 +229,10 @@ void ui_state_machine() {
 				os.lcd.print(httpport);
 				os.lcd_print_pgm(PSTR(" (ip:port)"));
 				ui_state = UI_STATE_DISP_IP;
+				#if defined(USE_SSD1306)
+					os.lcd.display();
+					os.lcd.setAutoDisplay(true);
+				#endif
 			}
 			break;
 		case BUTTON_2:
