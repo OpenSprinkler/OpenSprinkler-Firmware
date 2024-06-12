@@ -59,7 +59,19 @@ echo "Building OpenSprinkler..."
 if [ "$1" == "demo" ]; then
 	echo "Installing required libraries..."
 	apt-get install -y libmosquitto-dev
-	download_wiringpi
+
+	if [ ! -f /usr/lib/libwiringPi.so ]; then
+		download_wiringpi
+	fi
+
+	if [ ! -f /usr/local/lib/libbcm2835.a ]; then
+		install_bcm2835
+	fi
+
+	if [ ! -f /usr/lib/libSSD1306_OLED_RPI.so ]; then
+		install_SSD1306_OLED_RPI
+	fi
+
 	echo "Compiling demo firmware..."
 	g++ -o OpenSprinkler -DDEMO -std=c++14 main.cpp OpenSprinkler.cpp program.cpp opensprinkler_server.cpp utils.cpp weather.cpp gpio.cpp etherport.cpp mqtt.cpp -lpthread -lmosquitto -lgpiod -lbcm2835 -lrt -lSSD1306_OLED_RPI
 elif [ "$1" == "osbo" ]; then
@@ -70,16 +82,16 @@ elif [ "$1" == "osbo" ]; then
 else
 	echo "Installing required libraries..."
 	apt-get update
-	apt-get install -y libmosquitto-dev
-	apt-get install -y raspi-gpio
-	apt-get install -y libi2c-dev
-	apt-get install -y libssl-dev
-	apt-get install -y libgpiod-dev
-	download_wiringpi
+	apt-get install -y libmosquitto-dev raspi-gpio libi2c-dev libssl-dev libgpiod-dev
+
 	if ! command -v raspi-gpio &> /dev/null
 	then
 		echo "Command raspi-gpio is required and is not installed"
 		exit 0
+	fi
+
+	if [ ! -f /usr/lib/libwiringPi.so ]; then
+		download_wiringpi
 	fi
 
 	if [ ! -f /usr/local/lib/libbcm2835.a ]; then
