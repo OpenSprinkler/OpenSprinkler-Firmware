@@ -168,6 +168,14 @@ class SSD1306Display : public SSD1306 {
     OLEDContrast(brightness);
   }
 
+  void displayOn() {
+    OLEDEnable(1);
+  }
+
+  void displayOff() {
+    OLEDEnable(0);
+  }
+
   void setColor(uint8_t color) { this->color = color; }
 
   void drawPixel(uint8_t x, uint8_t y) {
