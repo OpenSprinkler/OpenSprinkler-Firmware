@@ -265,6 +265,14 @@ void EthernetClient::flush() {
 	//for compatibility only
 }
 
+void EthernetClient::setTimeout(int msec) {
+	struct timeval timeout;
+	timeout.tv_sec =  (msec / 1000);
+	timeout.tv_usec = (msec % 1000) * 1000;
+	setsockopt (m_sock, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+	setsockopt (m_sock, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout));
+}
+
 bool EthernetClient::available() {
 	if (tmpbufidx < tmpbufsize)
 		return true;

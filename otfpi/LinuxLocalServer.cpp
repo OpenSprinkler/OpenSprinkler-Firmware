@@ -58,7 +58,7 @@ void LinuxLocalClient::print(const char *data) {
 }*/
 
 void LinuxLocalClient::setTimeout(int timeout) {
-  //client.setTimeout(timeout);
+  client.setTimeout(timeout);
 }
 
 void LinuxLocalClient::flush() {

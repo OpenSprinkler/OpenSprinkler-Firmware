@@ -32,7 +32,7 @@ else
 	source build2.sh
 fi
 
-if [ ! "$SILENT" = true ] && [ -f OpenSprinkler.launch ] && [ ! -f /etc/init.d/OpenSprinkler.sh ]; then
+if [ ! "$SILENT" = true ] && [ -f OpenSprinkler.launch ] && [ ! -f /etc/systemd/system/OpenSprinkler.service ]; then
 
 	read -p "Do you want to start OpenSprinkler on startup? " -n 1 -r
 	echo

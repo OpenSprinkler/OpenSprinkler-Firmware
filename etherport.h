@@ -64,7 +64,7 @@ public:
 	}
 	void flush();
 	bool available();
-	
+	void setTimeout(int msec);
 private:
 	uint8_t *tmpbuf = NULL;
 	int tmpbufsize = 0;
