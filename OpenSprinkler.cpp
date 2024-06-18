@@ -1948,7 +1948,7 @@ void remote_http_callback(char* buffer) {
 */
 }
 
-int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char* p, void(*callback)(char*), uint16_t timeout) {
+int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char* p, void(*callback)(char*), uint16_t timeout, int ntries) {
 
 #if defined(ARDUINO)
 
@@ -1961,7 +1961,6 @@ int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char*
 		client = &etherClient;
 	#endif
 
-	#define HTTP_CONNECT_NTRIES 3
 	byte tries = 0;
 	do {
 		DEBUG_PRINT(server);
@@ -1973,9 +1972,9 @@ int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char*
 
 		if(client->connect(server, port)==1) break;
 		tries++;
-	} while(tries<HTTP_CONNECT_NTRIES);
+	} while(tries<ntries);
 
-	if(tries==HTTP_CONNECT_NTRIES) {
+	if(tries==ntries) {
 		DEBUG_PRINTLN(F("failed."));
 		client->stop();
 		return HTTP_RQT_CONNECT_ERR;
@@ -2049,7 +2048,7 @@ int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char*
 	return HTTP_RQT_SUCCESS;
 }
 
-int8_t OpenSprinkler::send_https_request(const char* server, uint16_t port, char* p, void(*callback)(char*), uint16_t timeout) {
+int8_t OpenSprinkler::send_https_request(const char* server, uint16_t port, char* p, void(*callback)(char*), uint16_t timeout, int ntries) {
 
 #if defined(ARDUINO)
 
@@ -2067,7 +2066,6 @@ int8_t OpenSprinkler::send_https_request(const char* server, uint16_t port, char
 
 	#endif
 
-	#define HTTP_CONNECT_NTRIES 3
 	byte tries = 0;
 	do {
 		DEBUG_PRINT(server);
@@ -2079,9 +2077,9 @@ int8_t OpenSprinkler::send_https_request(const char* server, uint16_t port, char
 
 		if(client->connect(server, port)==1) break;
 		tries++;
-	} while(tries<HTTP_CONNECT_NTRIES);
+	} while(tries<ntries);
 
-	if(tries==HTTP_CONNECT_NTRIES) {
+	if(tries==ntries) {
 		DEBUG_PRINTLN(F("failed."));
 		client->stop();
 		return HTTP_RQT_CONNECT_ERR;
@@ -2156,7 +2154,7 @@ int8_t OpenSprinkler::send_https_request(const char* server, uint16_t port, char
 	return HTTP_RQT_SUCCESS;
 }
 
-int8_t OpenSprinkler::send_http_request(uint32_t ip4, uint16_t port, char* p, void(*callback)(char*), uint16_t timeout) {
+int8_t OpenSprinkler::send_http_request(uint32_t ip4, uint16_t port, char* p, void(*callback)(char*), uint16_t timeout, int ntries) {
 	char server[20];
 	byte ip[4];
 	ip[0] = ip4>>24;
@@ -2164,10 +2162,10 @@ int8_t OpenSprinkler::send_http_request(uint32_t ip4, uint16_t port, char* p, vo
 	ip[2] = (ip4>>8)&0xff;
 	ip[3] = ip4&0xff;
 	sprintf(server, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
-	return send_http_request(server, port, p, callback, timeout);
+	return send_http_request(server, port, p, callback, timeout, ntries);
 }
 
-int8_t OpenSprinkler::send_https_request(uint32_t ip4, uint16_t port, char* p, void(*callback)(char*), uint16_t timeout) {
+int8_t OpenSprinkler::send_https_request(uint32_t ip4, uint16_t port, char* p, void(*callback)(char*), uint16_t timeout, int ntries) {
 	char server[20];
 	byte ip[4];
 	ip[0] = ip4>>24;
@@ -2175,19 +2173,19 @@ int8_t OpenSprinkler::send_https_request(uint32_t ip4, uint16_t port, char* p, v
 	ip[2] = (ip4>>8)&0xff;
 	ip[3] = ip4&0xff;
 	sprintf(server, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
-	return send_https_request(server, port, p, callback, timeout);
+	return send_https_request(server, port, p, callback, timeout, ntries);
 }
 
-int8_t OpenSprinkler::send_http_request(char* server_with_port, char* p, void(*callback)(char*), uint16_t timeout) {
+int8_t OpenSprinkler::send_http_request(char* server_with_port, char* p, void(*callback)(char*), uint16_t timeout, int ntries) {
 	char * server = strtok(server_with_port, ":");
 	char * port = strtok(NULL, ":");
-	return send_http_request(server, (port==NULL)?80:atoi(port), p, callback, timeout);
+	return send_http_request(server, (port==NULL)?80:atoi(port), p, callback, timeout, ntries);
 }
 
-int8_t OpenSprinkler::send_https_request(char* server_with_port, char* p, void(*callback)(char*), uint16_t timeout) {
+int8_t OpenSprinkler::send_https_request(char* server_with_port, char* p, void(*callback)(char*), uint16_t timeout, int ntries) {
 	char * server = strtok(server_with_port, ":");
 	char * port = strtok(NULL, ":");
-	return send_https_request(server, (port==NULL)?80:atoi(port), p, callback, timeout);
+	return send_https_request(server, (port==NULL)?80:atoi(port), p, callback, timeout, ntries);
 }
 
 /** Switch remote station

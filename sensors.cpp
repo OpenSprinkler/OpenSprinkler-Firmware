@@ -804,7 +804,10 @@ void read_all_sensors(boolean online) {
 
 	if (time < os.powerup_lasttime+30) return; //wait 30s before first sensor read
 
-	Sensor_t *sensor = sensors;
+	//When we run out of time, skip some sensors and continue on next loop
+	static Sensor_t *sensor = NULL;
+	if (sensor == NULL)
+		sensor = sensors;
 
 	while (sensor) {
 		if (time >= sensor->last_read + sensor->read_interval || sensor->repeat_read) {
@@ -814,7 +817,20 @@ void read_all_sensors(boolean online) {
 					sensorlog_add(LOG_STD, sensor, time);
 					push_message(sensor);
 				} else if (result == HTTP_RQT_TIMEOUT) {
-					sensor->last_read = time - sensor->read_interval + 5;
+					//delay next read on timeout:
+					sensor->last_read = time + max((uint)60,sensor->read_interval);
+					sensor->repeat_read = 0;
+					DEBUG_PRINTF("Delayed1: %s", sensor->name);
+				} else if (result == HTTP_RQT_CONNECT_ERR) {
+					//delay next read on error:
+					sensor->last_read = time + max((uint)60,sensor->read_interval);
+					sensor->repeat_read = 0;
+					DEBUG_PRINTF("Delayed2: %s", sensor->name);
+				}
+				ulong passed = os.now_tz() - time;
+				if (passed > MAX_SENSOR_READ_TIME) {
+					sensor = sensor->next;	
+					break;
 				}
 			}
 		}
@@ -970,7 +986,8 @@ int read_sensor_http(Sensor_t *sensor, ulong time) {
 	char server[20];
 	sprintf(server, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
 
-	if (os.send_http_request(server, sensor->port, p) == HTTP_RQT_SUCCESS) {
+	int res = os.send_http_request(server, sensor->port, p, 2000, 1); //timeout=2000, tries=1
+	if (res == HTTP_RQT_SUCCESS) {
 		DEBUG_PRINTLN("Send Ok");
 		p = ether_buffer;
 		DEBUG_PRINTLN(p);
@@ -1015,7 +1032,7 @@ int read_sensor_http(Sensor_t *sensor, ulong time) {
 	
 		return HTTP_RQT_SUCCESS;
 	}
-	return HTTP_RQT_EMPTY_RETURN;
+	return res;
 }
 
 /**
@@ -1933,7 +1950,7 @@ void GetSensorWeather() {
 	DEBUG_PRINTLN(F("GetSensorWeather"));
 	DEBUG_PRINTLN(ether_buffer);
 
-	int ret = os.send_http_request(host, ether_buffer, NULL);
+	int ret = os.send_http_request(host, ether_buffer, NULL, 2000, 1); //timeout=2000, ntries=1
 	if(ret == HTTP_RQT_SUCCESS) {
 		last_weather_time = time;
 		DEBUG_PRINTLN(ether_buffer);

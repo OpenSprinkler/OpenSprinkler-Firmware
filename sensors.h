@@ -107,7 +107,8 @@ extern "C" {
 
 #define MIN_DISK_FREE                  8192   //8Kb min 
 
-#define MAX_SENSOR_REPEAT_READ           32000 //max reads for calculating avg
+#define MAX_SENSOR_REPEAT_READ        32000 //max reads for calculating avg
+#define MAX_SENSOR_READ_TIME              1 // second for reading sensors
 
 typedef struct SensorFlags {
 	uint     enable:1;  // enabled
