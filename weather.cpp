@@ -27,6 +27,7 @@
 #include "opensprinkler_server.h"
 #include "weather.h"
 #include "main.h"
+#include "TimeLib.h"
 
 extern OpenSprinkler os; // OpenSprinkler object
 extern char tmp_buffer[];

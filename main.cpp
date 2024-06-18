@@ -23,6 +23,7 @@
 
 #include <limits.h>
 
+#include "TimeLib.h"
 #include "OpenSprinkler.h"
 #include "program.h"
 #include "weather.h"

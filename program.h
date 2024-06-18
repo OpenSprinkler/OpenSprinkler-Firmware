@@ -31,6 +31,7 @@
 #define RUNTIME_QUEUE_SIZE  MAX_NUM_STATIONS
 #define PROGRAMSTRUCT_SIZE  sizeof(ProgramStruct)
 #include "OpenSprinkler.h"
+#include "TimeLib.h"
 
 /** Log data structure */
 struct LogStruct {

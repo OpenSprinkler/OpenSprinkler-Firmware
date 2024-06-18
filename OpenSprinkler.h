@@ -25,6 +25,7 @@
 #ifndef _OPENSPRINKLER_H
 #define _OPENSPRINKLER_H
 
+#include "TimeLib.h"
 #include "defines.h"
 #include "utils.h"
 #include "gpio.h"

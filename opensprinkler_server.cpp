@@ -21,6 +21,7 @@
  * <http://www.gnu.org/licenses/>.
  */
 
+#include "TimeLib.h"
 #include "OpenSprinkler.h"
 #include "program.h"
 #include "opensprinkler_server.h"

@@ -22,6 +22,7 @@
  */
 
 #include "utils.h"
+#include "TimeLib.h"
 #include "OpenSprinkler.h"
 extern OpenSprinkler os;
 
