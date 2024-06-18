@@ -986,7 +986,7 @@ int read_sensor_http(Sensor_t *sensor, ulong time) {
 	char server[20];
 	sprintf(server, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
 
-	int res = os.send_http_request(server, sensor->port, p, 2000, 1); //timeout=2000, tries=1
+	int res = os.send_http_request(server, sensor->port, p, NULL, 2000, 1); //timeout=2000, tries=1
 	if (res == HTTP_RQT_SUCCESS) {
 		DEBUG_PRINTLN("Send Ok");
 		p = ether_buffer;
