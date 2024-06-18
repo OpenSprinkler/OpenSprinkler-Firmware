@@ -12,17 +12,10 @@
 #define _Time_h
 
 #include <inttypes.h>
+#include "types.h"
 #ifndef __AVR__
 #include <sys/types.h> // for __time_t_defined, but avr libc lacks sys/types.h
 #endif
-
-
-#if defined(ARDUINO)
-	typedef unsigned long tm_t;
-#else
-	typedef time_t tm_t;
-#endif
-
 
 // This ugly hack allows us to define C++ overloaded functions, when included
 // from within an extern "C", as newlib's sys/stat.h does.	Actually it is
@@ -60,8 +53,8 @@ typedef struct	{
 #define  tmYearToY2k(Y)			 ((Y) - 30)		 // offset is from 2000
 #define  y2kYearToTm(Y)			 ((Y) + 30)
 
-typedef tm_t(*getExternalTime)();
-//typedef void	(*setExternalTime)(const tm_t); // not used in this version
+typedef time_os_t(*getExternalTime)();
+//typedef void	(*setExternalTime)(const time_os_t); // not used in this version
 
 
 /*==============================================================================*/
@@ -90,7 +83,7 @@ typedef tm_t(*getExternalTime)();
 #define nextSunday(_time_) ( previousSunday(_time_)+SECS_PER_WEEK)					// time at the end of the week for the given time
 
 
-/* Useful Macros for converting elapsed time to a tm_t */
+/* Useful Macros for converting elapsed time to a time_os_t */
 #define minutesToTime_t ((M)) ( (M) * SECS_PER_MIN)
 #define hoursToTime_t		((H)) ( (H) * SECS_PER_HOUR)
 #define daysToTime_t		((D)) ( (D) * SECS_PER_DAY) // fixed on Jul 22 2011
@@ -99,28 +92,28 @@ typedef tm_t(*getExternalTime)();
 /*============================================================================*/
 /*	time and date functions		*/
 int			hour();						 // the hour now
-int			hour(tm_t t);		 // the hour for the given time
+int			hour(time_os_t t);		 // the hour for the given time
 int			hourFormat12();		 // the hour now in 12 hour format
-int			hourFormat12(tm_t t); // the hour for the given time in 12 hour format
+int			hourFormat12(time_os_t t); // the hour for the given time in 12 hour format
 uint8_t isAM();						 // returns true if time now is AM
-uint8_t isAM(tm_t t);		 // returns true the given time is AM
+uint8_t isAM(time_os_t t);		 // returns true the given time is AM
 uint8_t isPM();						 // returns true if time now is PM
-uint8_t isPM(tm_t t);		 // returns true the given time is PM
+uint8_t isPM(time_os_t t);		 // returns true the given time is PM
 int			minute();					 // the minute now
-int			minute(tm_t t);  // the minute for the given time
+int			minute(time_os_t t);  // the minute for the given time
 int			second();					 // the second now
-int			second(tm_t t);  // the second for the given time
+int			second(time_os_t t);  // the second for the given time
 int			day();						 // the day now
-int			day(tm_t t);		 // the day for the given time
+int			day(time_os_t t);		 // the day for the given time
 int			weekday();				 // the weekday now (Sunday is day 1)
-int			weekday(tm_t t); // the weekday for the given time
+int			weekday(time_os_t t); // the weekday for the given time
 int			month();					 // the month now  (Jan is month 1)
-int			month(tm_t t);	 // the month for the given time
+int			month(time_os_t t);	 // the month for the given time
 int			year();						 // the full four digit year: (2009, 2010 etc)
-int			year(tm_t t);		 // the year for the given time
+int			year(time_os_t t);		 // the year for the given time
 
-tm_t now();							 // return the current time as seconds since Jan 1 1970
-void		setTime(tm_t t);
+time_os_t now();							 // return the current time as seconds since Jan 1 1970
+void		setTime(time_os_t t);
 void		setTime(int hr,int min,int sec,int day, int month, int yr);
 void		adjustTime(long adjustment);
 
@@ -134,11 +127,11 @@ char* dayShortStr(uint8_t day);
 /* time sync functions	*/
 timeStatus_t timeStatus(); // indicates if time has been set and recently synchronized
 void		setSyncProvider( getExternalTime getTimeFunction); // identify the external time provider
-void		setSyncInterval(tm_t interval); // set the number of seconds between re-sync
+void		setSyncInterval(time_os_t interval); // set the number of seconds between re-sync
 
 /* low level functions to convert to and from system time											*/
-void breakTime(tm_t time, tmElements_t &tm);	// break tm_t into elements
-tm_t makeTime(tmElements_t &tm);	// convert time elements into tm_t
+void breakTime(time_os_t time, tmElements_t &tm);	// break time_os_t into elements
+time_os_t makeTime(tmElements_t &tm);	// convert time elements into time_os_t
 
 } // extern "C++"
 #endif // __cplusplus
