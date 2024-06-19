@@ -25,6 +25,7 @@
 #ifndef _OPENSPRINKLER_H
 #define _OPENSPRINKLER_H
 
+#include "types.h"
 #include "defines.h"
 #include "utils.h"
 #include "gpio.h"
@@ -234,21 +235,21 @@ public:
 	static byte masters[NUM_MASTER_ZONES][NUM_MASTER_OPTS];
 
 	// variables for time keeping
-	static time_t sensor1_on_timer;  // time when sensor1 is detected on last time
-	static time_t sensor1_off_timer; // time when sensor1 is detected off last time
-	static time_t sensor1_active_lasttime; // most recent time sensor1 is activated
-	static time_t sensor2_on_timer;  // time when sensor2 is detected on last time
-	static time_t sensor2_off_timer; // time when sensor2 is detected off last time
-	static time_t sensor2_active_lasttime; // most recent time sensor1 is activated
-	static time_t raindelay_on_lasttime;  // time when the most recent rain delay started
+	static time_os_t sensor1_on_timer;  // time when sensor1 is detected on last time
+	static time_os_t sensor1_off_timer; // time when sensor1 is detected off last time
+	static time_os_t sensor1_active_lasttime; // most recent time sensor1 is activated
+	static time_os_t sensor2_on_timer;  // time when sensor2 is detected on last time
+	static time_os_t sensor2_off_timer; // time when sensor2 is detected off last time
+	static time_os_t sensor2_active_lasttime; // most recent time sensor1 is activated
+	static time_os_t raindelay_on_lasttime;  // time when the most recent rain delay started
 	static ulong pause_timer; // count down timer in paused state
 	static ulong flowcount_rt;     // flow count (for computing real-time flow rate)
 	static ulong flowcount_log_start; // starting flow count (for logging)
 
 	static byte  button_timeout;    // button timeout
-	static time_t checkwt_lasttime;  // time when weather was checked
-	static time_t checkwt_success_lasttime; // time when weather check was successful
-	static time_t powerup_lasttime;  // time when controller is powered up most recently
+	static time_os_t checkwt_lasttime;  // time when weather was checked
+	static time_os_t checkwt_success_lasttime; // time when weather check was successful
+	static time_os_t powerup_lasttime;  // time when controller is powered up most recently
 	static uint8_t last_reboot_cause;  // last reboot cause
 	static byte  weather_update_flag;
 	// member functions
@@ -260,7 +261,7 @@ public:
 	static byte start_ether();  // initialize ethernet with the given mac and port
 	static bool network_connected();  // check if the network is up
 	static bool load_hardware_mac(byte* buffer, bool wired=false);  // read hardware mac address
-	static time_t now_tz();
+	static time_os_t now_tz();
 	// -- station names and attributes
 	static void get_station_data(byte sid, StationData* data); // get station data
 	static void set_station_data(byte sid, StationData* data); // set station data
@@ -306,8 +307,8 @@ public:
 	static void disable();  // disable controller operation, all stations will be closed immediately
 	static void raindelay_start();  // start raindelay
 	static void raindelay_stop();   // stop rain delay
-	static void detect_binarysensor_status(time_t curr_time);// update binary (rain, soil) sensor status
-	static byte detect_programswitch_status(time_t curr_time); // get program switch status
+	static void detect_binarysensor_status(time_os_t curr_time);// update binary (rain, soil) sensor status
+	static byte detect_programswitch_status(time_os_t curr_time); // get program switch status
 	static void sensor_resetall();
 
 	static uint16_t read_current(); // read current sensing value
@@ -333,7 +334,7 @@ public:
 	static void lcd_print_pgm(PGM_P PROGMEM str);  // print a program memory string
 	static void lcd_print_line_clear_pgm(PGM_P PROGMEM str, byte line);
 	#endif
-	static void lcd_print_time(time_t t);  // print current time
+	static void lcd_print_time(time_os_t t);  // print current time
 	static void lcd_print_ip(const byte *ip, byte endian);  // print ip
 	static void lcd_print_mac(const byte *mac);  // print mac
 	static void lcd_print_screen(char c);  // print station bits of the board selected by display_board

@@ -22,6 +22,7 @@
  */
 
 #include "utils.h"
+#include "types.h"
 #include "OpenSprinkler.h"
 extern OpenSprinkler os;
 
@@ -90,7 +91,7 @@ void delay(ulong howLong)
 {
 	struct timespec sleeper, dummy ;
 
-	sleeper.tv_sec  = (time_t)(howLong / 1000) ;
+	sleeper.tv_sec  = (time_os_t)(howLong / 1000) ;
 	sleeper.tv_nsec = (long)(howLong % 1000) * 1000000 ;
 
 	nanosleep (&sleeper, &dummy) ;

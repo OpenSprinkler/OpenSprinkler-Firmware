@@ -37,7 +37,7 @@ byte ProgramData::nqueue = 0;
 RuntimeQueueStruct ProgramData::queue[RUNTIME_QUEUE_SIZE];
 byte ProgramData::station_qid[MAX_NUM_STATIONS];
 LogStruct ProgramData::lastrun;
-time_t ProgramData::last_seq_stop_times[NUM_SEQ_GROUPS];
+time_os_t ProgramData::last_seq_stop_times[NUM_SEQ_GROUPS];
 
 extern char tmp_buffer[];
 
@@ -139,7 +139,7 @@ void ProgramData::toggle_pause(ulong delay) {
 
 void ProgramData::set_pause() {
 	RuntimeQueueStruct *q = queue;
-	time_t curr_t = os.now_tz();
+	time_os_t curr_t = os.now_tz();
 
 	for (; q < queue + nqueue; q++) {
 
@@ -225,14 +225,14 @@ int16_t ProgramStruct::starttime_decode(int16_t t) {
 }
 
 /** Check if a given time matches the program's start day */
-byte ProgramStruct::check_day_match(time_t t) {
+byte ProgramStruct::check_day_match(time_os_t t) {
 
 #if defined(ARDUINO)  // get current time from Arduino
 	byte weekday_t = weekday(t);  // weekday ranges from [0,6] within Sunday being 1
 	byte day_t = day(t);
 	byte month_t = month(t);
 #else // get current time from RPI/BBB
-	time_t ct = t;
+	time_os_t ct = t;
 	struct tm *ti = gmtime(&ct);
 	byte weekday_t = (ti->tm_wday+1)%7;  // tm_wday ranges from [0,6] with Sunday being 0
 	byte day_t = ti->tm_mday;
@@ -294,7 +294,7 @@ byte ProgramStruct::check_day_match(time_t t) {
 // Check if a given time matches program's start time
 // this also checks for programs that started the previous
 // day and ran over night
-byte ProgramStruct::check_match(time_t t) {
+byte ProgramStruct::check_match(time_os_t t) {
 
 	// check program enable status
 	if (!enabled) return 0;
