@@ -41,6 +41,7 @@
 #endif
 
 #include "OpenSprinkler.h"
+#include "types.h"
 #include "mqtt.h"
 
 // Debug routines to help identify any blocking of the event loop for an extended period
@@ -48,19 +49,16 @@
 #if defined(ENABLE_DEBUG)
 	#if defined(ARDUINO)
 		#include "TimeLib.h"
-		#define DEBUG_PRINTF(msg, ...)    {Serial.printf(msg, ##__VA_ARGS__);}
-		#define DEBUG_TIMESTAMP(msg, ...) {time_t t = os.now_tz(); Serial.printf("%02d-%02d-%02d %02d:%02d:%02d - ", year(t), month(t), day(t), hour(t), minute(t), second(t));}
+		#define DEBUG_TIMESTAMP(msg, ...) {time_os_t t = os.now_tz(); Serial.printf("%02d-%02d-%02d %02d:%02d:%02d - ", year(t), month(t), day(t), hour(t), minute(t), second(t));}
 	#else
 		#include <sys/time.h>
-		#define DEBUG_PRINTF(msg, ...)    {printf(msg, ##__VA_ARGS__);}
-		#define DEBUG_TIMESTAMP()         {char tstr[21]; time_t t = time(NULL); struct tm *tm = localtime(&t); strftime(tstr, 21, "%y-%m-%d %H:%M:%S - ", tm);printf("%s", tstr);}
+		#define DEBUG_TIMESTAMP()         {char tstr[21]; time_os_t t = time(NULL); struct tm *tm = localtime(&t); strftime(tstr, 21, "%y-%m-%d %H:%M:%S - ", tm);printf("%s", tstr);}
 	#endif
 	#define DEBUG_LOGF(msg, ...)        {DEBUG_TIMESTAMP(); DEBUG_PRINTF(msg, ##__VA_ARGS__);}
 
 	static unsigned long _lastMillis = 0; // Holds the timestamp associated with the last call to DEBUG_DURATION()
 	inline unsigned long DEBUG_DURATION() {unsigned long dur = millis() - _lastMillis; _lastMillis = millis(); return dur;}
 #else
-	#define DEBUG_PRINTF(msg, ...)  {}
 	#define DEBUG_LOGF(msg, ...)    {}
 	#define DEBUG_DURATION()        {}
 #endif
