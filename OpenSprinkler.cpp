@@ -1037,7 +1037,7 @@ void OpenSprinkler::begin() {
 	RTC.detect();
 
 #else
-	DEBUG_PRINTLN(get_runtime_path());
+	//DEBUG_PRINTLN(get_runtime_path());
 #endif
 }
 
