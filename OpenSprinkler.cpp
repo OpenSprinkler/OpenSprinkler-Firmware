@@ -41,21 +41,21 @@ byte OpenSprinkler::station_bits[MAX_NUM_BOARDS];
 byte OpenSprinkler::engage_booster;
 uint16_t OpenSprinkler::baseline_current;
 
-time_t OpenSprinkler::sensor1_on_timer;
-time_t OpenSprinkler::sensor1_off_timer;
-time_t OpenSprinkler::sensor1_active_lasttime;
-time_t OpenSprinkler::sensor2_on_timer;
-time_t OpenSprinkler::sensor2_off_timer;
-time_t OpenSprinkler::sensor2_active_lasttime;
-time_t OpenSprinkler::raindelay_on_lasttime;
+time_os_t OpenSprinkler::sensor1_on_timer;
+time_os_t OpenSprinkler::sensor1_off_timer;
+time_os_t OpenSprinkler::sensor1_active_lasttime;
+time_os_t OpenSprinkler::sensor2_on_timer;
+time_os_t OpenSprinkler::sensor2_off_timer;
+time_os_t OpenSprinkler::sensor2_active_lasttime;
+time_os_t OpenSprinkler::raindelay_on_lasttime;
 ulong  OpenSprinkler::pause_timer;
 
 ulong   OpenSprinkler::flowcount_log_start;
 ulong   OpenSprinkler::flowcount_rt;
 byte    OpenSprinkler::button_timeout;
-time_t  OpenSprinkler::checkwt_lasttime;
-time_t  OpenSprinkler::checkwt_success_lasttime;
-time_t  OpenSprinkler::powerup_lasttime;
+time_os_t  OpenSprinkler::checkwt_lasttime;
+time_os_t  OpenSprinkler::checkwt_success_lasttime;
+time_os_t  OpenSprinkler::powerup_lasttime;
 uint8_t OpenSprinkler::last_reboot_cause = REBOOT_CAUSE_NONE;
 byte    OpenSprinkler::weather_update_flag;
 
@@ -415,7 +415,7 @@ static const char days_str[] PROGMEM =
 	"Sun\0";
 
 /** Calculate local time (UTC time plus time zone offset) */
-time_t OpenSprinkler::now_tz() {
+time_os_t OpenSprinkler::now_tz() {
 	return now()+(int32_t)3600/4*(int32_t)(iopts[IOPT_TIMEZONE]-48);
 }
 
@@ -467,6 +467,7 @@ byte OpenSprinkler::start_network() {
 
 	if (start_ether()) {
 		useEth = true;
+		WiFi.mode(WIFI_OFF);
 	} else {
 		useEth = false;
 	}
@@ -583,25 +584,26 @@ byte OpenSprinkler::start_ether() {
 	lcd_print_line_clear_pgm(PSTR("Start wired link"), 1);
 	lcd_print_line_clear_pgm(eth.isW5500 ? PSTR("    (w5500)    ") : PSTR("   (enc28j60)   "), 2);
 	
-	ulong timeout = millis()+30000; // 30 seconds time out
-	while (!eth.connected()) {
+	ulong timeout = millis()+60000; // 60 seconds time out
+	while (!eth.connected() && millis()<timeout) {
 		DEBUG_PRINT(".");
 		delay(1000);
-		if(millis()>timeout) return 0;
 	}
+	// if wired connection is not done at this point, return directly
+	if(eth.connected()) {
+		DEBUG_PRINTLN();
+		DEBUG_PRINT("eth.ip:");
+		DEBUG_PRINTLN(eth.localIP());
+		DEBUG_PRINT("eth.dns:");
+		DEBUG_PRINTLN(WiFi.dnsIP());
 
-	DEBUG_PRINTLN();
-	DEBUG_PRINT("eth.ip:");
-	DEBUG_PRINTLN(eth.localIP());
-	DEBUG_PRINT("eth.dns:");
-	DEBUG_PRINTLN(WiFi.dnsIP());
-
-	if (iopts[IOPT_USE_DHCP]) {
-		memcpy(iopts+IOPT_STATIC_IP1, &(eth.localIP()[0]), 4);
-		memcpy(iopts+IOPT_GATEWAY_IP1, &(eth.gatewayIP()[0]),4);
-		memcpy(iopts+IOPT_DNS_IP1, &(WiFi.dnsIP()[0]), 4); // todo: lwip need dns ip
-		memcpy(iopts+IOPT_SUBNET_MASK1, &(eth.subnetMask()[0]), 4);
-		iopts_save();
+		if (iopts[IOPT_USE_DHCP]) {
+			memcpy(iopts+IOPT_STATIC_IP1, &(eth.localIP()[0]), 4);
+			memcpy(iopts+IOPT_GATEWAY_IP1, &(eth.gatewayIP()[0]),4);
+			memcpy(iopts+IOPT_DNS_IP1, &(WiFi.dnsIP()[0]), 4); // todo: lwip need dns ip
+			memcpy(iopts+IOPT_SUBNET_MASK1, &(eth.subnetMask()[0]), 4);
+			iopts_save();
+		}
 	}
 
 	return 1;
@@ -634,7 +636,8 @@ byte OpenSprinkler::start_ether() {
 
 bool OpenSprinkler::network_connected(void) {
 #if defined (ESP8266)
-	if(useEth) return true; // todo: lwip currently does not have a way to check link status
+	if(useEth)
+		return eth.connected();
 	else
 		return (get_wifi_mode()==WIFI_MODE_STA && WiFi.status()==WL_CONNECTED && state==OS_STATE_CONNECTED);
 #else
@@ -1044,7 +1047,7 @@ pinModeExt(PIN_BUTTON_3, INPUT_PULLUP);
 	RTC.detect();
 
 #else
-	DEBUG_PRINTLN(get_runtime_path());
+	//DEBUG_PRINTLN(get_runtime_path());
 #endif
 }
 
@@ -1295,7 +1298,7 @@ void OpenSprinkler::apply_all_station_bits() {
 		// we refresh the station that's next in line
 		static byte next_sid_to_refresh = MAX_NUM_STATIONS>>1;
 		static byte lastnow = 0;
-		time_t curr_time = now_tz();
+		time_os_t curr_time = now_tz();
 		byte _now = (curr_time & 0xFF);
 		if (lastnow != _now) {  // perform this no more than once per second
 			lastnow = _now;
@@ -1320,7 +1323,7 @@ void OpenSprinkler::apply_all_station_bits() {
 }
 
 /** Read rain sensor status */
-void OpenSprinkler::detect_binarysensor_status(time_t curr_time) {
+void OpenSprinkler::detect_binarysensor_status(time_os_t curr_time) {
 	// sensor_type: 0 if normally closed, 1 if normally open
 	if(iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_RAIN || iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_SOIL) {
 		if(hw_rev>=2)	pinModeExt(PIN_SENSOR1, INPUT_PULLUP); // this seems necessary for OS 3.2
@@ -1384,7 +1387,7 @@ void OpenSprinkler::detect_binarysensor_status(time_t curr_time) {
 }
 
 /** Return program switch status */
-byte OpenSprinkler::detect_programswitch_status(time_t curr_time) {
+byte OpenSprinkler::detect_programswitch_status(time_os_t curr_time) {
 	byte ret = 0;
 	if(iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_PSWITCH) {
 		static byte sensor1_hist = 0;
@@ -2477,7 +2480,7 @@ void OpenSprinkler::lcd_print_2digit(int v)
 }
 
 /** print time to a given line */
-void OpenSprinkler::lcd_print_time(time_t t)
+void OpenSprinkler::lcd_print_time(time_os_t t)
 {
 #if defined(USE_SSD1306)
 	lcd.setAutoDisplay(false);
