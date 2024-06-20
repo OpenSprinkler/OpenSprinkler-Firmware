@@ -178,6 +178,9 @@ void EthernetClient::stop()
 		close(m_sock);
 		m_sock = 0;
 		m_connected = false;
+		tmpbufidx = tmpbufsize = 0;
+		free(tmpbuf);
+		tmpbuf = NULL;
 	}
 }
 
@@ -229,6 +232,7 @@ int EthernetClient::timedRead() {
 		return tmpbuf[tmpbufidx++];
 		
 	tmpbufidx = 0;
+	tmpbufsize = 0;
 	tmpbufsize = read(tmpbuf, TMPBUF);
 	
 	if (tmpbufsize <= 0)

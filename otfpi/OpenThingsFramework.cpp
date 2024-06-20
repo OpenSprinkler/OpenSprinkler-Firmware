@@ -127,7 +127,7 @@ void OpenThingsFramework::localServerLoop() {
   // Make sure that the headers were fully read into the buffer.
   if (strncmp_P(&buffer[length - 4], (char *) F("\r\n\r\n"), 4) != 0) {
     DEBUG_PRINTLN(F("The request headers were not fully read into the buffer."));
-    localClient->print(F("HTTP/1.1 413 Request too large\r\n\r\nThe request was too large"));
+    localClient->print(F("HTTP/1.1 413 Request too large\r\n\r\nThe request was incomplete"));
     return;
   }
 
