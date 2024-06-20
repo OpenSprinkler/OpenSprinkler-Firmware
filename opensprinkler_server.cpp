@@ -46,7 +46,7 @@
 		#define OTF_PARAMS_DEF const OTF::Request &req,OTF::Response &res
 		#define OTF_PARAMS req,res
 		#define FKV_SOURCE req
-		#define handle_return(x) {if(x==HTML_OK) res.writeBodyChunk((char *)"%s",ether_buffer); else otf_send_result(req,res,x); return;}
+		#define handle_return(x) {if(x==HTML_OK) res.writeBodyData(ether_buffer, strlen(ether_buffer)); else otf_send_result(req,res,x); return;}
 
 	#else
 
@@ -218,7 +218,7 @@ void rewind_ether_buffer() {
 
 void send_packet(OTF_PARAMS_DEF) {
 #if defined(ESP8266)
-	res.writeBodyChunk((char *)"%s",ether_buffer);
+	res.writeBodyData(ether_buffer, strlen(ether_buffer));
 #else
 	m_client->write((const uint8_t *)ether_buffer, strlen(ether_buffer));
 #endif
