@@ -1,7 +1,8 @@
 [Unit]
 Description=OpenSprinkler
 Documentation=https://github.com/OpenSprinkler
-After=network.target
+Requires=multi-user.target network.target network-online.target
+After=multi-user.target network.target network-online.target
 
 [Service]
 Type=exec
@@ -13,7 +14,8 @@ StandardOutput=null
 #StandardOutput=syslog
 #SyslogIdentifier=opensprinkler
 StandardError=journal
-Restart=always
+Restart=on-failure
+RestartSec=5s
 
 [Install]
 WantedBy=multi-user.target
