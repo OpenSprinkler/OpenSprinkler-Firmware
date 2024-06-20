@@ -1,6 +1,6 @@
 # Based heavily on the docker build action from immich (https://github.com/immich-app/immich/)
 
-name: Docker
+name: Build CI and Release
 
 on:
   workflow_dispatch:
@@ -20,21 +20,23 @@ jobs:
     name: Build PlatformIO
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/cache@v3
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
         with:
           path: |
             ~/.cache/pip
             ~/.platformio/.cache
           key: ${{ runner.os }}-pio
-      - uses: actions/setup-python@v4
-        with:
-          python-version: '3.11'
+      # - uses: actions/setup-python@v5
+      #   with:
+      #     python-version: '3.13'
+      - name: Install python
+        run: sudo apt-get install python3 python3-pip
       - name: Install PlatformIO Core
         run: pip install --upgrade platformio
 
       - name: Build PlatformIO Project
-        run: pio run --environment d1_mini 
+        run: pio run --environment d1_mini
 
       - name: Move and rename firmware
         run: mv .pio/build/d1_mini/firmware.bin ./firmware_os_esp8266.bin
@@ -45,9 +47,8 @@ jobs:
           name: firmware
           path: ./firmware_os_esp8266.bin
   build-docker:
-    name: Build and Push
+    name: Build Docker
     runs-on: ubuntu-latest
-    needs: [build-pio, build-ospi]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -58,13 +59,24 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - id: lower-repo
+        name: Repository to lowercase
+        run: |
+          REPO=${{ github.event.repository.name }}
+          echo "repository=${REPO@L}" >> $GITHUB_OUTPUT
+
+      - id: lower-owner
+        name: Owner to lowercase
+        run: |
+          echo "owner=${GITHUB_REPOSITORY_OWNER@L}" >> $GITHUB_OUTPUT
+
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
         # Skip when PR from a fork
         if: ${{ !github.event.pull_request.head.repo.fork }}
         with:
           registry: ghcr.io
-          username: ${{ env.ACT && github.actor || github.repository_owner }}
+          username: ${{ env.ACT && github.actor || steps.lower-owner.outputs.owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Determine build cache output
@@ -74,31 +86,47 @@ jobs:
             # Essentially just ignore the cache output (PR can't write to registry cache)
             echo "cache-to=type=local,dest=/tmp/discard,ignore-error=true" >> $GITHUB_OUTPUT
           else
-            echo "cache-to=type=registry,mode=max,ref=ghcr.io/${{ github.repository_owner }}/mkrcx-build-cache:${{ github.repository }}" >> $GITHUB_OUTPUT
+            echo "cache-to=type=registry,mode=max,ref=ghcr.io/${{ steps.lower-owner.outputs.owner }}/opensprinkler-build-cache:ospi" >> $GITHUB_OUTPUT
           fi
 
+      - name: Generate docker image tags
+        id: metadata
+        uses: docker/metadata-action@v5
+        with:
+          flavor: |
+            latest=auto
+          images: |
+            name=ghcr.io/${{ steps.lower-owner.outputs.owner }}/${{ steps.lower-repo.outputs.repository }}
+          tags: |
+            # Tag with branch name
+            type=ref,event=branch
+            # Tag with pr-number
+            type=ref,event=pr
+            # Tag with git tag on release
+            type=ref,event=tag
+            type=raw,value=release,enable=${{ github.event_name == 'release' }}
+
       - name: Build and push image
-        uses: docker/build-push-action@v5.1.0
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: ./Dockerfile
           platforms: linux/amd64,linux/arm/v7,linux/arm64
           # Skip pushing when PR from a fork
-          push: ${{ !github.event.pull_request.head.repo.fork }}
-          output: type=docker,dest=./output.tar
-          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/mkrcx-build-cache:${{ github.repository }}
+          push: false
+          outputs: type=oci,dest=./image.tar
+          cache-from: type=registry,ref=ghcr.io/${{ steps.lower-owner.outputs.owner }}/opensprinkler-build-cache:ospi
           cache-to: ${{ steps.cache-target.outputs.cache-to }}
 
       - name: Upload image
         uses: actions/upload-artifact@v4
         with:
           name: docker-image
-          path: ./output.tar
-          expire-in: 1h
+          path: ./image.tar
   release-pio:
     name: Release PlatformIO
     runs-on: ubuntu-latest
-    needs: [ build-pio build-docker ]
+    needs: [build-pio, build-docker]
     if: ${{ github.event_name == 'release' }}
     steps:
       - name: Download firmware
@@ -115,56 +143,58 @@ jobs:
   release-docker:
     name: Release Docker
     runs-on: ubuntu-latest
-    needs: [ build-pio build-docker ]
+    needs: [build-pio, build-docker]
+    if: ${{ !github.event.pull_request.head.repo.fork }}
     steps:
-        - name: Download docker image
-          uses: actions/download-artifact@v4
-          with:
-            name: docker-image
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
 
-        - name: Login to GitHub Container Registry
-          uses: docker/login-action@v3
-          # Skip when PR from a fork
-          if: ${{ !github.event.pull_request.head.repo.fork }}
-          with:
-            registry: ghcr.io
-            username: ${{ env.ACT && github.actor || github.repository_owner }}
-            password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-        - name: Login to GitHub Container Registry
-          uses: docker/login-action@v3
-          # Skip when PR from a fork
-          if: ${{ !github.event.pull_request.head.repo.fork }}
-          with:
-            registry: ghcr.io
-            username: ${{ env.ACT && github.actor || github.repository_owner }}
-            password: ${{ secrets.GITHUB_TOKEN }}
+      - id: lower-repo
+        name: Repository to lowercase
+        run: |
+          REPO=${{ github.event.repository.name }}
+          echo "repository=${REPO@L}" >> $GITHUB_OUTPUT
 
-        - name: Generate docker image tags
-          id: metadata
-          uses: docker/metadata-action@v5
-          with:
-            flavor: |
-              latest=auto
-            images: |
-              name=ghcr.io/${{ github.repository_owner }}/${{ github.repository }}
-            tags: |
-              # Tag with branch name
-              type=ref,event=branch
-              # Tag with pr-number
-              type=ref,event=pr
-              # Tag with git tag on release
-              type=ref,event=tag
-              type=raw,value=release,enable=${{ github.event_name == 'release' }}
+      - id: lower-owner
+        name: Owner to lowercase
+        run: |
+          echo "owner=${GITHUB_REPOSITORY_OWNER@L}" >> $GITHUB_OUTPUT
 
-        - name: Load image
-          run: docker load -i ./docker-image/output.tar
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        # Skip when PR from a fork
+        if: ${{ !github.event.pull_request.head.repo.fork }}
+        with:
+          registry: ghcr.io
+          username: ${{ env.ACT && github.actor || steps.lower-owner.outputs.owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-        - name: Build and push
-          uses: docker/build-push-action@v6
-          with:
-            platforms: linux/amd64,linux/arm/v7,linux/arm64
-            # Skip pushing when PR from a fork
-            push: ${{ !github.event.pull_request.head.repo.fork }}
-            tags: ${{ steps.metadata.outputs.tags }}
-            labels: ${{ steps.metadata.outputs.labels }}
+      - name: Generate docker image tags
+        id: metadata
+        uses: docker/metadata-action@v5
+        with:
+          flavor: |
+            latest=auto
+          images: |
+            name=ghcr.io/${{ steps.lower-owner.outputs.owner }}/${{ steps.lower-repo.outputs.repository }}
+          tags: |
+            # Tag with branch name
+            type=ref,event=branch
+            # Tag with pr-number
+            type=ref,event=pr
+            # Tag with git tag on release
+            type=ref,event=tag
+            type=raw,value=release,enable=${{ github.event_name == 'release' }}
+
+      - name: Push image
+        uses: docker/build-push-action@v6
+        with:
+          platforms: linux/amd64,linux/arm/v7,linux/arm64
+          # Skip pushing when PR from a fork
+          push: true
+          cache-from: type=registry,ref=ghcr.io/${{ steps.lower-owner.outputs.owner }}/opensprinkler-build-cache:ospi
+          tags: ${{ steps.metadata.outputs.tags }}
+          labels: ${{ steps.metadata.outputs.labels }}
