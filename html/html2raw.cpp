@@ -26,7 +26,11 @@ int main(int argc, char* argv[])
   if(!lp) {file_error(LIST_FNAME); return 0;}
 
   FILE *hp = fopen(H_FNAME, "wb");
-  if(!hp) {file_error(H_FNAME); return 0;}
+  if(!hp) {
+    file_error(H_FNAME); 
+    fclose(lp);
+    return 0;
+  }
 
   char hfname[100];
   char hsname[100];
