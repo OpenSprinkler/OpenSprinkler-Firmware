@@ -106,8 +106,7 @@ void OpenThingsFramework::localServerLoop() {
   while (localClient->dataAvailable() && millis() < timeout) {
     if (length >= (size_t)headerBufferSize) {
       localClient->print(F("HTTP/1.1 413 Request too large\r\n\r\nThe request was too large"));
-      // Get a new client to indicate that the previous client is no longer needed.
-      localClient = localServer.acceptClient();
+      wait_to = 0;
       DEBUG_PRINTLN("incoming localServer request - 1");
       return;
     }
@@ -125,9 +124,11 @@ void OpenThingsFramework::localServerLoop() {
   DEBUG_PRINTF((char *) F("Request: %s\n"), (char *) buffer);
 
   // Make sure that the headers were fully read into the buffer.
-  if (strncmp_P(&buffer[length - 4], (char *) F("\r\n\r\n"), 4) != 0) {
+  if (length < 5 || strncmp_P(&buffer[length - 4], (char *) F("\r\n\r\n"), 4) != 0) {
     DEBUG_PRINTLN(F("The request headers were not fully read into the buffer."));
     localClient->print(F("HTTP/1.1 413 Request too large\r\n\r\nThe request was incomplete"));
+    wait_to = 0;
+    DEBUG_PRINTLN("incoming localServer request - 2");
     return;
   }
 
