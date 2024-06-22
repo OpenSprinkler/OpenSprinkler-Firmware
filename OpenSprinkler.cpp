@@ -2055,6 +2055,15 @@ int8_t OpenSprinkler::send_https_request(const char* server, uint16_t port, char
 	Client *client;
 	#if defined(ESP8266)
 		WiFiClientSecure wifiClient;
+		wifiClient.setInsecure();
+		//https://github.com/esp8266/Arduino/blob/master/libraries/ESP8266WiFi/examples/BearSSL_MaxFragmentLength/BearSSL_MaxFragmentLength.ino
+  		bool mfln = wifiClient.probeMaxFragmentLength(server, port, 512);
+  		DEBUG_PRINTF("MFLN supported: %s\n", mfln ? "yes" : "no");
+  		if (mfln) {
+			wifiClient.setBufferSizes(512, 512); 
+		} else {
+			wifiClient.setBufferSizes(2048, 2048);
+		}
 		client = &wifiClient;
 	#else
 		// Choose the analog pin to get semi-random data from for SSL
@@ -2065,6 +2074,11 @@ int8_t OpenSprinkler::send_https_request(const char* server, uint16_t port, char
 		SSLClient *client = new SSLClient(base_client, TAs, (size_t)TAs_NUM, rand_pin);
 
 	#endif
+
+	if (os.status.req_ntpsync) {
+		DEBUG_PRINTLN("HTTPS failed: time not synched");
+		return HTTP_RQT_CONNECT_ERR;
+	}
 
 	byte tries = 0;
 	do {
@@ -2080,6 +2094,10 @@ int8_t OpenSprinkler::send_https_request(const char* server, uint16_t port, char
 	} while(tries<ntries);
 
 	if(tries==ntries) {
+		#if defined(ESP8266)
+		DEBUG_PRINT(F("LastSSLError: "));
+		DEBUG_PRINTLN(wifiClient.getLastSSLError());
+		#endif
 		DEBUG_PRINTLN(F("failed."));
 		client->stop();
 		return HTTP_RQT_CONNECT_ERR;
