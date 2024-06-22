@@ -24,8 +24,8 @@
 #ifndef _DEFINES_H
 #define _DEFINES_H
 
-#define ENABLE_DEBUG  // enable serial debug
-#define SERIAL_DEBUG
+//#define ENABLE_DEBUG  // enable serial debug
+//#define SERIAL_DEBUG
 
 typedef unsigned char byte;
 typedef unsigned long ulong;
