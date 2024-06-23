@@ -47,7 +47,6 @@
 		#include <OpenThingsFramework.h>
 		#include <DNSServer.h>
 		#include <Ticker.h>
-		#include "SSD1306Display.h"
 		#include "espconnect.h"
 	#else // for AVR
 		#include <SdFat.h>
@@ -62,7 +61,16 @@
 	#include <netdb.h>
 	#include <sys/stat.h>
 	#include "etherport.h"
+	#include "rpitime.h"
 #endif // end of headers
+
+#if defined(USE_LCD)
+	#include "LiquidCrystal.h"
+#endif
+
+#if defined(USE_SSD1306)
+	#include "SSD1306Display.h"
+#endif
 
 #if defined(ARDUINO)
 	#if defined(ESP8266)
@@ -104,6 +112,7 @@
 	extern bool useEth;
 #else
 	extern EthernetServer *m_server;
+	extern bool useEth;
 #endif
 
 /** Non-volatile data structure */
@@ -198,12 +207,10 @@ class OpenSprinkler {
 public:
 
 	// data members
-#if defined(ESP8266)
+#if defined(USE_SSD1306)
 	static SSD1306Display lcd;  // 128x64 OLED display
-#elif defined(ARDUINO)
+#elif defined(USE_LCD)
 	static LiquidCrystal lcd;   // 16x2 character LCD
-#else
-	// todo: LCD define for RPI/BBB
 #endif
 
 #if defined(OSPI)
@@ -326,19 +333,20 @@ public:
 	static int8_t send_http_request(const char* server, uint16_t port, char* p, void(*callback)(char*)=NULL, uint16_t timeout=5000);
 	static int8_t send_http_request(char* server_with_port, char* p, void(*callback)(char*)=NULL, uint16_t timeout=5000);
 	// -- LCD functions
-#if defined(ARDUINO) // LCD functions for Arduino
-	#if defined(ESP8266)
-	static void lcd_print_pgm(PGM_P str); // ESP8266 does not allow PGM_P followed by PROGMEM
-	static void lcd_print_line_clear_pgm(PGM_P str, byte line);
-	#else
-	static void lcd_print_pgm(PGM_P PROGMEM str);  // print a program memory string
-	static void lcd_print_line_clear_pgm(PGM_P PROGMEM str, byte line);
-	#endif
+#if defined(USE_DISPLAY)
 	static void lcd_print_time(time_os_t t);  // print current time
 	static void lcd_print_ip(const byte *ip, byte endian);  // print ip
 	static void lcd_print_mac(const byte *mac);  // print mac
 	static void lcd_print_screen(char c);  // print station bits of the board selected by display_board
 	static void lcd_print_version(byte v);  // print version number
+	static void lcd_set_brightness(byte value=1);
+	static void lcd_set_contrast();
+
+	#if defined(USE_SSD1306)
+	static void flash_screen();
+	static void toggle_screen_led();
+	static void set_screen_led(byte status);
+	#endif
 
 	static String time2str(uint32_t t) {
 		uint16_t h = hour(t);
@@ -363,8 +371,16 @@ public:
 
 	// -- UI functions --
 	static void ui_set_options(int oid);		// ui for setting options (oid-> starting option index)
-	static void lcd_set_brightness(byte value=1);
-	static void lcd_set_contrast();
+#endif
+
+#if defined(ARDUINO) // LCD functions for Arduino
+	#if defined(ESP8266)
+	static void lcd_print_pgm(PGM_P str); // ESP8266 does not allow PGM_P followed by PROGMEM
+	static void lcd_print_line_clear_pgm(PGM_P str, byte line);
+	#else
+	static void lcd_print_pgm(PGM_P PROGMEM str);  // print a program memory string
+	static void lcd_print_line_clear_pgm(PGM_P PROGMEM str, byte line);
+	#endif
 
 	#if defined(ESP8266)
 	static OTCConfig otc;
@@ -372,9 +388,6 @@ public:
 	static IOEXP *expanders[];
 	static RCSwitch rfswitch;
 	static void detect_expanders();
-	static void flash_screen();
-	static void toggle_screen_led();
-	static void set_screen_led(byte status);
 	static byte get_wifi_mode() { if (useEth) return WIFI_MODE_STA; else return wifi_testmode ? WIFI_MODE_STA : iopts[IOPT_WIFI_MODE];}
 	static byte wifi_testmode;
 	static String wifi_ssid, wifi_pass;
@@ -385,12 +398,20 @@ public:
 	static byte state;
 	#endif
 
+#else
+static void lcd_print_pgm(const char *str);
+static void lcd_print_line_clear_pgm(const char *str, byte line);
+#endif // LCD functions for Arduino
+
 private:
+#if defined(USE_DISPLAY)
 	static void lcd_print_option(int i);  // print an option to the lcd
 	static void lcd_print_2digit(int v);  // print a integer in 2 digits
 	static void lcd_start();
 	static byte button_read_busy(byte pin_butt, byte waitmode, byte butt, byte is_holding);
+#endif
 
+#if defined(ARDUINO) // LCD functions
 	#if defined(ESP8266)
 	static void parse_otc_config();
 	static void latch_boost();

@@ -188,6 +188,7 @@ byte digitalReadExt(byte pin) {
 #include <string.h>
 #include <poll.h>
 #include <pthread.h>
+#include <wiringPi.h>
 
 #define BUFFER_MAX 64
 #define GPIO_MAX	 64

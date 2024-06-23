@@ -32,7 +32,11 @@ enum {
 #endif
 
 
-#if defined(ESP8266)
+#if defined(USE_SSD1306)
+
+#if not defined(ARDUINO)
+#define PROGMEM
+#endif
 
 #define WiFi_Logo_width 60
 #define WiFi_Logo_height 36
@@ -137,7 +141,7 @@ const char _iconimage_pswitch[] PROGMEM = {
 
 */
 
-#elif defined(ARDUINO)
+#elif defined(USE_LCD)
 
 const char _iconimage_connected[] PROGMEM = {
 	B00000,
@@ -232,9 +236,7 @@ const char _iconimage_pswitch[] PROGMEM = {
 
 */
 
-#else
-
 #endif
 
-#endif
 
+#endif

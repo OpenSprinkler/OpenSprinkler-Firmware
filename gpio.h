@@ -126,13 +126,13 @@ byte digitalReadExt(byte pin);
 #define INPUT  1
 
 #if defined(OSPI)
+#include <bcm2835.h>
 #define INPUT_PULLUP 2
 #else
 #define INPUT_PULLUP INPUT
-#endif
-
 #define HIGH   1
 #define LOW    0
+#endif
 
 void pinMode(int pin, byte mode);
 void digitalWrite(int pin, byte value);
