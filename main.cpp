@@ -1553,7 +1553,7 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 						ip2string(postval, ip);
 					}
 					#elif defined(ESP32)
-						// TODO: get IP
+						ip2string(postval, &(WiFi.localIP()[0]));
 					#else
 						ip2string(postval, &(Ethernet.localIP()[0]));
 					#endif
