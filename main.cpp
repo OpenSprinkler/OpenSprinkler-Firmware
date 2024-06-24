@@ -1637,15 +1637,18 @@ void write_log(byte type, ulong curr_time) {
 	#if IS_ESP
 	File file = LittleFS.open(tmp_buffer, "r+");
 	if(!file) {
-		#if defined(ESP8266)  // todo: ESP32 is missing FSInfo
+		#if defined(ESP8266)
 		FSInfo fs_info;
 		LittleFS.info(fs_info);
 		// check if we are getting close to run out of space, and delete some oldest files
 		if(fs_info.totalBytes < fs_info.usedBytes + fs_info.blockSize * 4) {
+		#else
+		#define LITTLEFS_BLOCK_SIZE 4096
+		if (LittleFS.totalBytes() < LittleFS.usedBytes() + LITTLEFS_BLOCK_SIZE * 4) {
+		#endif
 			// delete the oldest 7 files (1 week of log)
 			for(byte i=0;i<7;i++)	delete_log_oldest();
 		}
-		#endif
 		file = LittleFS.open(tmp_buffer, "w");
 		if(!file) return;
 	}
