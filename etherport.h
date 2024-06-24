@@ -27,11 +27,14 @@
 
 #if defined(ARDUINO)
 
-#else // headers for RPI/BBB
+#else // headers for RPI/BBB/Linux
 
 #include <stdio.h>
 #include <inttypes.h>
 #include <ctype.h>
+#include <netdb.h>
+#include <openssl/ssl.h>
+#include "defines.h"
 
 #ifdef __APPLE__
 #define MSG_NOSIGNAL SO_NOSIGPIPE
@@ -44,7 +47,28 @@ public:
 	EthernetClient();
 	EthernetClient(int sock);
 	~EthernetClient();
-	int connect(uint8_t ip[4], uint16_t port);
+	int connect(const char *server, uint16_t port);
+	bool connected();
+	void stop();
+	int read(uint8_t *buf, size_t size);
+	size_t write(const uint8_t *buf, size_t size);
+	operator bool();
+	int GetSocket()
+	{
+		return m_sock;
+	}
+private:
+	int m_sock = 0;
+	bool m_connected;
+	friend class EthernetServer;
+};
+
+class EthernetClientSsl : EthernetClient {
+public:
+	EthernetClientSsl();
+	EthernetClientSsl(int sock);
+	~EthernetClientSsl();
+	int connect(const char *server, uint16_t port);
 	bool connected();
 	void stop();
 	int read(uint8_t *buf, size_t size);
@@ -56,6 +80,7 @@ public:
 	}
 private:
 	int m_sock;
+	SSL* ssl;
 	bool m_connected;
 	friend class EthernetServer;
 };

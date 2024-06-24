@@ -13,13 +13,15 @@ echo "Building OpenSprinkler..."
 if [ "$1" == "demo" ]; then
 	echo "Installing required libraries..."
 	apt-get install -y libmosquitto-dev
+	apt-get install -y libssl-dev
 	echo "Compiling demo firmware..."
-	g++ -o OpenSprinkler -DDEMO -std=c++14 main.cpp OpenSprinkler.cpp program.cpp opensprinkler_server.cpp utils.cpp weather.cpp gpio.cpp etherport.cpp mqtt.cpp -lpthread -lmosquitto
+	g++ -o OpenSprinkler -DDEMO -std=c++14 main.cpp OpenSprinkler.cpp program.cpp opensprinkler_server.cpp utils.cpp weather.cpp gpio.cpp etherport.cpp mqtt.cpp -lpthread -lmosquitto -l crypto -lssl
 elif [ "$1" == "osbo" ]; then
 	echo "Installing required libraries..."
 	apt-get install -y libmosquitto-dev
+	apt-get install -y libssl-dev
 	echo "Compiling osbo firmware..."
-	g++ -o OpenSprinkler -DOSBO -std=c++14 main.cpp OpenSprinkler.cpp program.cpp opensprinkler_server.cpp utils.cpp weather.cpp gpio.cpp etherport.cpp mqtt.cpp -lpthread -lmosquitto
+	g++ -o OpenSprinkler -DOSBO -std=c++14 main.cpp OpenSprinkler.cpp program.cpp opensprinkler_server.cpp utils.cpp weather.cpp gpio.cpp etherport.cpp mqtt.cpp -lpthread -lmosquitto -l crypto -lssl
 else
 	echo "Installing required libraries..."
 	apt-get update

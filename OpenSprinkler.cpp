@@ -1882,24 +1882,21 @@ int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char*
 	Client *client = NULL;
 	#if defined(ESP8266)
 		if(usessl) {
-			static WiFiClientSecure _c;
-			_c.setInsecure();
-  		bool mfln = _c.probeMaxFragmentLength(server, port, 512);
+			WiFiClientSecure *_c = new WiFiClientSecure();
+			_c->setInsecure();
+  		bool mfln = _c->probeMaxFragmentLength(server, port, 512);
   		DEBUG_PRINTF("MFLN supported: %s\n", mfln ? "yes" : "no");
   		if (mfln) {
-				_c.setBufferSizes(512, 512); 
+				_c->setBufferSizes(512, 512); 
 			} else {
-				_c.setBufferSizes(2048, 2048);
+				_c->setBufferSizes(2048, 2048);
 			}
-			client = &_c;
+			client = _c;
 		} else {
-			static WiFiClient _c;
-			//client = new WiFiClient();
-			client = &_c;
+			client = new WiFiClient();
 		}
 	#else
-		EthernetClient etherClient;
-		client = &etherClient;
+		client = new EthernetClient();
 	#endif
 
 	#define HTTP_CONNECT_NTRIES 3
@@ -1919,21 +1916,25 @@ int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char*
 	if(tries==HTTP_CONNECT_NTRIES) {
 		DEBUG_PRINTLN(F("failed."));
 		client->stop();
+		delete client;
 		return HTTP_RQT_CONNECT_ERR;
 	}
 #else
+	EthernetClient *client = NULL;
+	
+	if (usessl) {
+		client = new EthernetClientSsl();
+	} else {
+		client = new EthernetClient();
+	}
 
-	EthernetClient etherClient;
-	EthernetClient *client = &etherClient;
-	struct hostent *host;
 	DEBUG_PRINT(server);
 	DEBUG_PRINT(":");
 	DEBUG_PRINTLN(port);
-	host = gethostbyname(server);
-	if (!host) { return HTTP_RQT_CONNECT_ERR; }
-	if(!client->connect((uint8_t*)host->h_addr, port)) {
+	if(!client->connect(server, port)) {
 		DEBUG_PRINT(F("failed."));
 		client->stop();
+		delete client;
 		return HTTP_RQT_CONNECT_ERR;
 	}
 
@@ -1985,7 +1986,7 @@ int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char*
 #endif
 	ether_buffer[pos]=0; // properly end buffer with 0
 	client->stop();
-	//delete client;
+	delete client;
 	if(strlen(ether_buffer)==0) return HTTP_RQT_EMPTY_RETURN;
 	if(callback) callback(ether_buffer);
 	return HTTP_RQT_SUCCESS;
