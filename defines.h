@@ -24,7 +24,7 @@
 #ifndef _DEFINES_H
 #define _DEFINES_H
 
-//#define ENABLE_DEBUG  // enable serial debug
+#define ENABLE_DEBUG  // enable serial debug
 
 typedef unsigned char byte;
 typedef unsigned long ulong;
@@ -36,7 +36,7 @@ typedef unsigned long ulong;
 														// if this number is different from the one stored in non-volatile memory
 														// a device reset will be automatically triggered
 
-#define OS_FW_MINOR      5  // Firmware minor version
+#define OS_FW_MINOR      6  // Firmware minor version
 
 /** Hardware version base numbers */
 #define OS_HW_VERSION_BASE   0x00 // OpenSprinkler
@@ -61,10 +61,11 @@ typedef unsigned long ulong;
 /** Station macro defines */
 #define STN_TYPE_STANDARD    0x00 // standard solenoid station
 #define STN_TYPE_RF          0x01	// Radio Frequency (RF) station
-#define STN_TYPE_REMOTE      0x02	// Remote OpenSprinkler station
+#define STN_TYPE_REMOTE_IP   0x02	// Remote OpenSprinkler station (by IP)
 #define STN_TYPE_GPIO        0x03	// direct GPIO station
 #define STN_TYPE_HTTP        0x04	// HTTP station
 #define STN_TYPE_HTTPS       0x05	// HTTPS station
+#define STN_TYPE_REMOTE_OTC  0x06 // Remote OpenSprinkler station (by OTC)
 #define STN_TYPE_OTHER       0xFF
 
 /** Notification macro defines */
@@ -144,8 +145,11 @@ typedef unsigned long ulong;
 #define DEFAULT_JAVASCRIPT_URL    "https://ui.opensprinkler.com/js"
 #define DEFAULT_WEATHER_URL       "weather.opensprinkler.com"
 #define DEFAULT_IFTTT_URL         "maker.ifttt.com"
-#define DEFAULT_OTC_SERVER        "ws.cloud.openthings.io"
-#define DEFAULT_OTC_PORT          80
+#define DEFAULT_OTC_SERVER_DEV     "ws.cloud.openthings.io"
+#define DEFAULT_OTC_PORT_DEV       80
+#define DEFAULT_OTC_SERVER_APP    "cloud.openthings.io"
+#define DEFAULT_OTC_PORT_APP       443
+#define DEFAULT_OTC_TOKEN_LENGTH   32
 #define DEFAULT_DEVICE_NAME       "My OpenSprinkler"
 #define DEFAULT_EMPTY_STRING      ""
 

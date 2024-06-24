@@ -469,7 +469,7 @@ byte OpenSprinkler::start_network() {
 		useEth = false;
 	}
 
-	if((useEth || get_wifi_mode()==WIFI_MODE_STA) && otc.en>0 && otc.token.length()>=32) {
+	if((useEth || get_wifi_mode()==WIFI_MODE_STA) && otc.en>0 && otc.token.length()>=DEFAULT_OTC_TOKEN_LENGTH) {
 		otf = new OTF::OpenThingsFramework(httpport, otc.server, otc.port, otc.token, false, ether_buffer, ETHER_BUFFER_SIZE);
 		DEBUG_PRINTLN(F("Started OTF with remote connection"));
 	} else {
@@ -1714,8 +1714,12 @@ void OpenSprinkler::switch_special_station(byte sid, byte value, uint16_t dur) {
 			switch_rfstation((RFStationData *)pdata->sped, value);
 			break;
 
-		case STN_TYPE_REMOTE:
-			switch_remotestation((RemoteStationData *)pdata->sped, value, dur);
+		case STN_TYPE_REMOTE_IP:
+			switch_remotestation((RemoteIPStationData *)pdata->sped, value, dur);
+			break;
+
+		case STN_TYPE_REMOTE_OTC:
+			switch_remotestation((RemoteOTCStationData *)pdata->sped, value, dur);
 			break;
 
 		case STN_TYPE_GPIO:
@@ -1723,8 +1727,13 @@ void OpenSprinkler::switch_special_station(byte sid, byte value, uint16_t dur) {
 			break;
 
 		case STN_TYPE_HTTP:
-			switch_httpstation((HTTPStationData *)pdata->sped, value);
+			switch_httpstation((HTTPStationData *)pdata->sped, value, false);
 			break;
+
+		case STN_TYPE_HTTPS:
+			switch_httpstation((HTTPStationData *)pdata->sped, value, true);
+			break;
+
 		}
 	}
 }
@@ -1861,19 +1870,33 @@ void OpenSprinkler::switch_gpiostation(GPIOStationData *data, bool turnon) {
 
 /** Callback function for switching remote station */
 void remote_http_callback(char* buffer) {
-/*
+
 	DEBUG_PRINTLN(buffer);
-*/
+
 }
 
-int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char* p, void(*callback)(char*), uint16_t timeout) {
+int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char* p, void(*callback)(char*), bool usessl, uint16_t timeout) {
 
 #if defined(ARDUINO)
 
-	Client *client;
+	Client *client = NULL;
 	#if defined(ESP8266)
-		WiFiClient wifiClient;
-		client = &wifiClient;
+		if(usessl) {
+			static WiFiClientSecure _c;
+			_c.setInsecure();
+  		bool mfln = _c.probeMaxFragmentLength(server, port, 512);
+  		DEBUG_PRINTF("MFLN supported: %s\n", mfln ? "yes" : "no");
+  		if (mfln) {
+				_c.setBufferSizes(512, 512); 
+			} else {
+				_c.setBufferSizes(2048, 2048);
+			}
+			client = &_c;
+		} else {
+			static WiFiClient _c;
+			//client = new WiFiClient();
+			client = &_c;
+		}
 	#else
 		EthernetClient etherClient;
 		client = &etherClient;
@@ -1962,12 +1985,13 @@ int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char*
 #endif
 	ether_buffer[pos]=0; // properly end buffer with 0
 	client->stop();
+	//delete client;
 	if(strlen(ether_buffer)==0) return HTTP_RQT_EMPTY_RETURN;
 	if(callback) callback(ether_buffer);
 	return HTTP_RQT_SUCCESS;
 }
 
-int8_t OpenSprinkler::send_http_request(uint32_t ip4, uint16_t port, char* p, void(*callback)(char*), uint16_t timeout) {
+int8_t OpenSprinkler::send_http_request(uint32_t ip4, uint16_t port, char* p, void(*callback)(char*), bool usessl, uint16_t timeout) {
 	char server[20];
 	byte ip[4];
 	ip[0] = ip4>>24;
@@ -1975,25 +1999,25 @@ int8_t OpenSprinkler::send_http_request(uint32_t ip4, uint16_t port, char* p, vo
 	ip[2] = (ip4>>8)&0xff;
 	ip[3] = ip4&0xff;
 	sprintf(server, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
-	return send_http_request(server, port, p, callback, timeout);
+	return send_http_request(server, port, p, callback, usessl, timeout);
 }
 
-int8_t OpenSprinkler::send_http_request(char* server_with_port, char* p, void(*callback)(char*), uint16_t timeout) {
+int8_t OpenSprinkler::send_http_request(char* server_with_port, char* p, void(*callback)(char*), bool usessl, uint16_t timeout) {
 	char * server = strtok(server_with_port, ":");
 	char * port = strtok(NULL, ":");
-	return send_http_request(server, (port==NULL)?80:atoi(port), p, callback, timeout);
+	return send_http_request(server, (port==NULL)?80:atoi(port), p, callback, usessl, timeout);
 }
 
-/** Switch remote station
+/** Switch remote IP station
  * This function takes a remote station code,
  * parses it into remote IP, port, station index,
  * and makes a HTTP GET request.
  * The remote controller is assumed to have the same
  * password as the main controller
  */
-void OpenSprinkler::switch_remotestation(RemoteStationData *data, bool turnon, uint16_t dur) {
-	RemoteStationData copy;
-	memcpy((char*)&copy, (char*)data, sizeof(RemoteStationData));
+void OpenSprinkler::switch_remotestation(RemoteIPStationData *data, bool turnon, uint16_t dur) {
+	RemoteIPStationData copy;
+	memcpy((char*)&copy, (char*)data, sizeof(RemoteIPStationData));
 
 	uint32_t ip4 = hex2ulong(copy.ip, sizeof(copy.ip));
 	uint16_t port = (uint16_t)hex2ulong(copy.port, sizeof(copy.port));
@@ -2004,8 +2028,6 @@ void OpenSprinkler::switch_remotestation(RemoteStationData *data, bool turnon, u
 	ip[2] = (ip4>>8)&0xff;
 	ip[3] = ip4&0xff;
 
-	// use tmp_buffer starting at a later location
-	// because remote station data is loaded at the beginning
 	char *p = tmp_buffer;
 	BufferFiller bf = p;
 	// if turning on the zone and duration is defined, give duration as the timer value
@@ -2032,11 +2054,48 @@ void OpenSprinkler::switch_remotestation(RemoteStationData *data, bool turnon, u
 	send_http_request(server, port, p, remote_http_callback);
 }
 
-/** Switch http station
- * This function takes an http station code,
+/** Switch remote OTC station
+ * This function takes a remote station code,
+ * parses it into OTC token and station index,
+ * and makes a HTTPS GET request.
+ * The remote controller is assumed to have the same
+ * password as the main controller
+ */
+void OpenSprinkler::switch_remotestation(RemoteOTCStationData *data, bool turnon, uint16_t dur) {
+	RemoteOTCStationData copy;
+	memcpy((char*)&copy, (char*)data, sizeof(RemoteOTCStationData));
+	copy.token[sizeof(copy.token)-1] = 0; // ensure the string ends properly
+	DEBUG_PRINTLN((char*)copy.token);
+	DEBUG_PRINTLN((int)hex2ulong(copy.sid, sizeof(copy.sid)));
+	char *p = tmp_buffer;
+	BufferFiller bf = p;
+	// if turning on the zone and duration is defined, give duration as the timer value
+	// otherwise:
+	//   if autorefresh is defined, we give a fixed duration each time, and auto refresh will renew it periodically
+	//   if no auto refresh, we will give the maximum allowed duration, and station will be turned off when off command is sent
+	uint16_t timer = 0;
+	if(turnon) {
+		if(dur>0) {
+			timer = dur;
+		} else {
+			timer = iopts[IOPT_SPE_AUTO_REFRESH]?4*MAX_NUM_STATIONS:64800;
+		}
+	}
+	bf.emit_p(PSTR("GET /forward/v1/$S/cm?pw=$O&sid=$D&en=$D&t=$D"),
+						copy.token,
+						SOPT_PASSWORD,
+						(int)hex2ulong(copy.sid, sizeof(copy.sid)),
+						turnon, timer);
+	bf.emit_p(PSTR(" HTTP/1.0\r\nHOST: $S\r\n\r\n"), DEFAULT_OTC_SERVER_APP);
+
+	send_http_request(DEFAULT_OTC_SERVER_APP, DEFAULT_OTC_PORT_APP, p, remote_http_callback, true);
+}
+
+/** Switch http(s) station
+ * This function takes an http(s) station code,
  * parses it into a server name and two HTTP GET requests.
  */
-void OpenSprinkler::switch_httpstation(HTTPStationData *data, bool turnon) {
+void OpenSprinkler::switch_httpstation(HTTPStationData *data, bool turnon, bool usessl) {
 
 	HTTPStationData copy;
 	// make a copy of the HTTP station data and work with it
@@ -2054,7 +2113,7 @@ void OpenSprinkler::switch_httpstation(HTTPStationData *data, bool turnon) {
 
 	bf.emit_p(PSTR("GET /$S HTTP/1.0\r\nHOST: $S\r\n\r\n"), cmd, server);
 
-	send_http_request(server, atoi(port), p, remote_http_callback);
+	send_http_request(server, atoi(port), p, remote_http_callback, usessl);
 }
 
 /** Prepare factory reset */
@@ -2138,7 +2197,7 @@ void OpenSprinkler::factory_reset() {
 void OpenSprinkler::parse_otc_config() {
 	char server[MAX_SOPTS_SIZE+1] = {0};
 	char token[MAX_SOPTS_SIZE+1] = {0};
-	int port = DEFAULT_OTC_PORT;
+	int port = DEFAULT_OTC_PORT_DEV;
 	int en = 0;
 
 	char *config = tmp_buffer;
@@ -2152,7 +2211,7 @@ void OpenSprinkler::parse_otc_config() {
 	otc.en = en;
 	otc.token = String(token);
 	otc.server = String(server);
-	otc.port = 80;
+	otc.port = port;
 }
 #endif
 

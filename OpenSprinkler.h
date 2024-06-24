@@ -144,10 +144,16 @@ struct RFStationData {
 	byte timing[4];
 };
 
-/** Remote station data structures - Must fit in STATION_SPECIAL_DATA_SIZE */
-struct RemoteStationData {
+/** Remote IP station data structures - Must fit in STATION_SPECIAL_DATA_SIZE */
+struct RemoteIPStationData {
 	byte ip[8];
 	byte port[4];
+	byte sid[2];
+};
+
+/** Remote OTC station data structures - Must fit in STATION_SPECIAL_DATA_SIZE */
+struct RemoteOTCStationData {
+	byte token[DEFAULT_OTC_TOKEN_LENGTH+1];
 	byte sid[2];
 };
 
@@ -283,10 +289,11 @@ public:
 	static void attribs_load(); // load and repackage attrib bits (backward compatibility)
 	static uint16_t parse_rfstation_code(RFStationData *data, ulong *on, ulong *off); // parse rf code into on/off/time sections
 	static void switch_rfstation(RFStationData *data, bool turnon);  // switch rf station
-	static void switch_remotestation(RemoteStationData *data, bool turnon, uint16_t dur=0); // switch remote station
+	static void switch_remotestation(RemoteIPStationData *data, bool turnon, uint16_t dur=0); // switch remote IP station
+	static void switch_remotestation(RemoteOTCStationData *data, bool turnon, uint16_t dur=0); // switch remote OTC station
 	static void switch_gpiostation(GPIOStationData *data, bool turnon); // switch gpio station
-	static void switch_httpstation(HTTPStationData *data, bool turnon); // switch http station
-
+	static void switch_httpstation(HTTPStationData *data, bool turnon, bool usessl=false); // switch http station
+	
 	// -- options and data storeage
 	static void nvdata_load();
 	static void nvdata_save();
@@ -322,9 +329,10 @@ public:
 	static void clear_all_station_bits(); // clear all station bits
 	static void apply_all_station_bits(); // apply all station bits (activate/deactive values)
 
-	static int8_t send_http_request(uint32_t ip4, uint16_t port, char* p, void(*callback)(char*)=NULL, uint16_t timeout=5000);
-	static int8_t send_http_request(const char* server, uint16_t port, char* p, void(*callback)(char*)=NULL, uint16_t timeout=5000);
-	static int8_t send_http_request(char* server_with_port, char* p, void(*callback)(char*)=NULL, uint16_t timeout=5000);
+	static int8_t send_http_request(uint32_t ip4, uint16_t port, char* p, void(*callback)(char*)=NULL, bool usessl=false, uint16_t timeout=5000);
+	static int8_t send_http_request(const char* server, uint16_t port, char* p, void(*callback)(char*)=NULL, bool usessl=false, uint16_t timeout=5000);
+	static int8_t send_http_request(char* server_with_port, char* p, void(*callback)(char*)=NULL, bool usessl=false, uint16_t timeout=5000);
+
 	// -- LCD functions
 #if defined(ARDUINO) // LCD functions for Arduino
 	#if defined(ESP8266)
