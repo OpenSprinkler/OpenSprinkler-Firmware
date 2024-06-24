@@ -2536,6 +2536,7 @@ void OpenSprinkler::lcd_print_time(time_t t)
 void OpenSprinkler::lcd_print_ip(const byte *ip, byte endian) {
 #if IS_ESP
 	lcd.clear(0, 1);
+	lcd.setAutoDisplay(false);
 #else
 	lcd.clear();
 #endif
@@ -2544,10 +2545,18 @@ void OpenSprinkler::lcd_print_ip(const byte *ip, byte endian) {
 		lcd.print(endian ? (int)ip[3-i] : (int)ip[i]);
 		if(i<3) lcd_print_pgm(PSTR("."));
 	}
+
+#if IS_ESP
+	lcd.display();
+	lcd.setAutoDisplay(true);
+#endif
 }
 
 /** print mac address */
 void OpenSprinkler::lcd_print_mac(const byte *mac) {
+#if IS_ESP
+	lcd.setAutoDisplay(false);
+#endif
 	lcd.setCursor(0, 0);
 	for(byte i=0; i<6; i++) {
 		if(i)  lcd_print_pgm(PSTR("-"));
@@ -2560,6 +2569,10 @@ void OpenSprinkler::lcd_print_mac(const byte *mac) {
 	} else {
 		lcd_print_pgm(PSTR(" (WiFi MAC)"));
 	}
+#if IS_ESP
+	lcd.display();
+	lcd.setAutoDisplay(true);
+#endif
 }
 
 /** print station bits */
@@ -2680,6 +2693,7 @@ void OpenSprinkler::lcd_print_screen(char c) {
 		}
 	}
 #endif
+
 #if IS_ESP
 	lcd.display();
 	lcd.setAutoDisplay(true);
