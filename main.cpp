@@ -1771,8 +1771,29 @@ bool delete_log_oldest() {
 	} else {
 		return false;
 	}
-	#else // todo: ESP32 is missing Dir
-	return false;
+	#else
+	File dir = LittleFS.open(LOG_PREFIX);
+	if (!dir.isDirectory()) return false;
+	File oldest_file;
+	time_t oldest_t = ULONG_MAX;
+	while (File file = dir.openNextFile()) {
+		time_t t = file.getLastWrite();
+		if(t<oldest_t) {
+			oldest_t = t;
+			oldest_file = file;
+		}
+		file.close();
+	}
+
+	if(oldest_file) {
+		DEBUG_PRINT(F("deleting "))
+		DEBUG_PRINTLN(oldest_file.name());
+		oldest_file.close();
+		LittleFS.remove(oldest_file.name());
+		return true;
+	} else {
+		return false;
+	}
 	#endif
 }
 #endif
