@@ -20,7 +20,7 @@
  * along with this program.  If not, see
  * <http://www.gnu.org/licenses/>.
  */
-
+#define _WS_CONFIG_NO_SSL
 #include <limits.h>
 
 #include "OpenSprinkler.h"
@@ -28,6 +28,7 @@
 #include "weather.h"
 #include "opensprinkler_server.h"
 #include "mqtt.h"
+#include <ArduinoOTA.h>
 
 #if defined(ARDUINO)
 	#if IS_ESP
@@ -535,6 +536,8 @@ void do_loop()
 		break;
 
 	case OS_STATE_CONNECTED:
+		ArduinoOTA.begin();
+		ArduinoOTA.handle();
 		if(os.get_wifi_mode() == OS_WIFI_MODE_AP) {
 			dns->processNextRequest();
 			update_server->handleClient();
