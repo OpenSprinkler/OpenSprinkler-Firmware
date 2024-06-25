@@ -2219,7 +2219,7 @@ void OpenSprinkler::parse_otc_config() {
 	otc.en = en;
 	otc.token = String(token);
 	otc.server = String(server);
-	otc.port = 80;
+	otc.port = port;
 }
 #endif
 
