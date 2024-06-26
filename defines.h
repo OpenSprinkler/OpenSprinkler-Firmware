@@ -234,7 +234,7 @@ enum {
 	IOPT_DNS_IP3,
 	IOPT_DNS_IP4,
 	IOPT_SPE_AUTO_REFRESH,
-	IOPT_IFTTT_ENABLE,
+	IOPT_NOTIF_ENABLE,
 	IOPT_SENSOR1_TYPE,
 	IOPT_SENSOR1_OPTION,
 	IOPT_SENSOR2_TYPE,
@@ -265,6 +265,7 @@ enum {
 	SOPT_OTC_OPTS,
 	SOPT_DEVICE_NAME,
 	SOPT_STA_BSSID_CHL, // wifi extra info: bssid and channel
+	SOPT_EMAIL_OPTS,
 	NUM_SOPTS // total number of string options
 };
 

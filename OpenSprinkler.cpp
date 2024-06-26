@@ -154,7 +154,7 @@ const char iopt_json_names[] PROGMEM =
 	"dns3\0"
 	"dns4\0"
 	"sar\0\0"
-	"ife\0\0"
+	"nfe\0\0"
 	"sn1t\0"
 	"sn1o\0"
 	"sn2t\0"
@@ -224,7 +224,7 @@ const char iopt_prompts[] PROGMEM =
 	"DNS server.ip3: "
 	"DNS server.ip4: "
 	"Special Refresh?"
-	"IFTTT Enable:   "
+	"Notif Enable:   "
 	"Sensor 1 type:  "
 	"Normally open?  "
 	"Sensor 2 type:  "
@@ -368,7 +368,7 @@ byte OpenSprinkler::iopts[] = {
 	8,
 	8,
 	0,  // special station auto refresh
-	0,  // ifttt enable bits
+	0,  // notif enable bits
 	0,  // sensor 1 type (see SENSOR_TYPE macro defines)
 	1,  // sensor 1 option. 0: normally closed; 1: normally open.	default 1.
 	0,  // sensor 2 type
@@ -399,6 +399,7 @@ const char *OpenSprinkler::sopts[] = {
 	DEFAULT_EMPTY_STRING, // SOPT_OTC_OPTS
 	DEFAULT_DEVICE_NAME,
 	DEFAULT_EMPTY_STRING, // SOPT_STA_BSSID_CHL
+	DEFAULT_EMPTY_STRING, // SOPT_EMAIL_OPTS
 };
 
 /** Weekday strings (stored in PROGMEM to reduce RAM usage) */
