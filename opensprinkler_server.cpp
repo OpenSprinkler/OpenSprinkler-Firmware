@@ -586,9 +586,9 @@ void server_change_stations(OTF_PARAMS_DEF) {
 			tmp_buffer[0]-='0';
 			tmp_buffer[STATION_SPECIAL_DATA_SIZE] = 0;
 
-			// only process GPIO and HTTP stations for OS 2.3, above, and OSPi
+			DEBUG_PRINTF("%d\n", tmp_buffer[0]);
 			if(tmp_buffer[0] == STN_TYPE_GPIO) {
-				// check that pin does not clash with OSPi pins
+				// check that pin does not clash with free pins
 				byte gpio = (tmp_buffer[1] - '0') * 10 + tmp_buffer[2] - '0';
 				byte activeState = tmp_buffer[3] - '0';
 
@@ -600,10 +600,12 @@ void server_change_stations(OTF_PARAMS_DEF) {
 				if (!found || activeState > 1) {
 					handle_return(HTML_DATA_OUTOFBOUND);
 				}
-			} else if (tmp_buffer[0] == STN_TYPE_HTTP || tmp_buffer[0] == STN_TYPE_HTTPS) {
+			} else if ((tmp_buffer[0] == STN_TYPE_HTTP) || (tmp_buffer[0] == STN_TYPE_HTTPS) || (tmp_buffer[0] == STN_TYPE_REMOTE_OTC)) {
+				DEBUG_PRINTLN(tmp_buffer+1);
 				#if !defined(ESP8266)
 					urlDecode(tmp_buffer + 1);
 				#endif
+				DEBUG_PRINTLN(tmp_buffer+1);
 				if (strlen(tmp_buffer+1) > sizeof(HTTPStationData)) {
 					handle_return(HTML_DATA_OUTOFBOUND);
 				}

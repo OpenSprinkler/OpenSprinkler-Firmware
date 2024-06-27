@@ -1883,24 +1883,21 @@ int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char*
 	Client *client = NULL;
 	#if defined(ESP8266)
 		if(usessl) {
-			static WiFiClientSecure _c;
-			_c.setInsecure();
-  		bool mfln = _c.probeMaxFragmentLength(server, port, 512);
+			WiFiClientSecure *_c = new WiFiClientSecure();
+			_c->setInsecure();
+  		bool mfln = _c->probeMaxFragmentLength(server, port, 512);
   		DEBUG_PRINTF("MFLN supported: %s\n", mfln ? "yes" : "no");
   		if (mfln) {
-				_c.setBufferSizes(512, 512); 
+				_c->setBufferSizes(512, 512); 
 			} else {
-				_c.setBufferSizes(2048, 2048);
+				_c->setBufferSizes(2048, 2048);
 			}
-			client = &_c;
+			client = _c;
 		} else {
-			static WiFiClient _c;
-			//client = new WiFiClient();
-			client = &_c;
+			client = new WiFiClient();
 		}
 	#else
-		EthernetClient etherClient;
-		client = &etherClient;
+		client = new EthernetClient();
 	#endif
 
 	#define HTTP_CONNECT_NTRIES 3
@@ -1920,21 +1917,25 @@ int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char*
 	if(tries==HTTP_CONNECT_NTRIES) {
 		DEBUG_PRINTLN(F("failed."));
 		client->stop();
+		delete client;
 		return HTTP_RQT_CONNECT_ERR;
 	}
 #else
+	EthernetClient *client = NULL;
+	
+	if (usessl) {
+		client = new EthernetClientSsl();
+	} else {
+		client = new EthernetClient();
+	}
 
-	EthernetClient etherClient;
-	EthernetClient *client = &etherClient;
-	struct hostent *host;
 	DEBUG_PRINT(server);
 	DEBUG_PRINT(":");
 	DEBUG_PRINTLN(port);
-	host = gethostbyname(server);
-	if (!host) { return HTTP_RQT_CONNECT_ERR; }
-	if(!client->connect((uint8_t*)host->h_addr, port)) {
+	if(!client->connect(server, port)) {
 		DEBUG_PRINT(F("failed."));
 		client->stop();
+		delete client;
 		return HTTP_RQT_CONNECT_ERR;
 	}
 
@@ -1945,7 +1946,7 @@ int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char*
 	if(client->connected()) {
 		client->write((uint8_t *)p, len);
 	} else {
-		DEBUG_PRINTLN(F("clint no longer connected"));
+		DEBUG_PRINTLN(F("client no longer connected"));
 	}
 	memset(ether_buffer, 0, ETHER_BUFFER_SIZE);
 	uint32_t stoptime = millis()+timeout;
@@ -1973,20 +1974,22 @@ int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char*
 		}
 	}
 #else
-	while(client->connected()) {
+	/*while(client->connected()) {
 		int len=client->read((uint8_t *)ether_buffer+pos, ETHER_BUFFER_SIZE);
-		if (len<=0) continue;
+		if (len==0) continue;
 		pos+=len;
 		if(millis()>stoptime) {
 			DEBUG_PRINTLN(F("host timeout occured"));
 			//return HTTP_RQT_TIMEOUT; // instead of returning with timeout, we'll work with data received so far
 			break;
 		}
-	}
+	}*/
+	int n = client->read((uint8_t *)ether_buffer+pos, ETHER_BUFFER_SIZE);
+	pos+=n;
 #endif
 	ether_buffer[pos]=0; // properly end buffer with 0
 	client->stop();
-	//delete client;
+	delete client;
 	if(strlen(ether_buffer)==0) return HTTP_RQT_EMPTY_RETURN;
 	if(callback) callback(ether_buffer);
 	return HTTP_RQT_SUCCESS;
@@ -2066,8 +2069,6 @@ void OpenSprinkler::switch_remotestation(RemoteOTCStationData *data, bool turnon
 	RemoteOTCStationData copy;
 	memcpy((char*)&copy, (char*)data, sizeof(RemoteOTCStationData));
 	copy.token[sizeof(copy.token)-1] = 0; // ensure the string ends properly
-	DEBUG_PRINTLN((char*)copy.token);
-	DEBUG_PRINTLN((int)hex2ulong(copy.sid, sizeof(copy.sid)));
 	char *p = tmp_buffer;
 	BufferFiller bf = p;
 	// if turning on the zone and duration is defined, give duration as the timer value
@@ -2087,9 +2088,9 @@ void OpenSprinkler::switch_remotestation(RemoteOTCStationData *data, bool turnon
 						SOPT_PASSWORD,
 						(int)hex2ulong(copy.sid, sizeof(copy.sid)),
 						turnon, timer);
-	bf.emit_p(PSTR(" HTTP/1.0\r\nHOST: $S\r\n\r\n"), DEFAULT_OTC_SERVER_APP);
+	bf.emit_p(PSTR(" HTTP/1.0\r\nHOST: $S\r\nConnection:close\r\n\r\n"), DEFAULT_OTC_SERVER_APP);
 
-	send_http_request(DEFAULT_OTC_SERVER_APP, DEFAULT_OTC_PORT_APP, p, remote_http_callback, true);
+	int x = send_http_request(DEFAULT_OTC_SERVER_APP, DEFAULT_OTC_PORT_APP, p, remote_http_callback, true);
 }
 
 /** Switch http(s) station
