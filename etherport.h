@@ -47,42 +47,34 @@ public:
 	EthernetClient();
 	EthernetClient(int sock);
 	~EthernetClient();
-	int connect(const char *server, uint16_t port);
-	bool connected();
-	void stop();
-	int read(uint8_t *buf, size_t size);
-	size_t write(const uint8_t *buf, size_t size);
-	operator bool();
-	int GetSocket()
-	{
+	virtual int connect(const char *server, uint16_t port);
+	virtual bool connected();
+	virtual void stop();
+	virtual int read(uint8_t *buf, size_t size);
+	virtual size_t write(const uint8_t *buf, size_t size);
+	virtual operator bool();
+	virtual int GetSocket() {
 		return m_sock;
 	}
-private:
+protected:
 	int m_sock = 0;
 	bool m_connected;
 	friend class EthernetServer;
 };
 
-class EthernetClientSsl : EthernetClient {
+class EthernetClientSsl : public EthernetClient {
 public:
 	EthernetClientSsl();
 	EthernetClientSsl(int sock);
 	~EthernetClientSsl();
-	int connect(const char *server, uint16_t port);
-	bool connected();
-	void stop();
-	int read(uint8_t *buf, size_t size);
-	size_t write(const uint8_t *buf, size_t size);
-	operator bool();
-	int GetSocket()
-	{
-		return m_sock;
-	}
-private:
-	int m_sock;
+	virtual int connect(const char *server, uint16_t port);
+	virtual bool connected();
+	virtual void stop();
+	virtual int read(uint8_t *buf, size_t size);
+	virtual size_t write(const uint8_t *buf, size_t size);
+	virtual operator bool();
+protected:
 	SSL* ssl;
-	bool m_connected;
-	friend class EthernetServer;
 };
 
 class EthernetServer {
@@ -90,8 +82,8 @@ public:
 	EthernetServer(uint16_t port);
 	~EthernetServer();
 
-	bool begin();
-	EthernetClient available();
+	virtual bool begin();
+	virtual EthernetClient available();
 private:
 	uint16_t m_port;
 	int m_sock;

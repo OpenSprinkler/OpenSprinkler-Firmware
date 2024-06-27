@@ -1945,7 +1945,7 @@ int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char*
 	if(client->connected()) {
 		client->write((uint8_t *)p, len);
 	} else {
-		DEBUG_PRINTLN(F("clint no longer connected"));
+		DEBUG_PRINTLN(F("client no longer connected"));
 	}
 	memset(ether_buffer, 0, ETHER_BUFFER_SIZE);
 	uint32_t stoptime = millis()+timeout;
@@ -1973,16 +1973,18 @@ int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char*
 		}
 	}
 #else
-	while(client->connected()) {
+	/*while(client->connected()) {
 		int len=client->read((uint8_t *)ether_buffer+pos, ETHER_BUFFER_SIZE);
-		if (len<=0) continue;
+		if (len==0) continue;
 		pos+=len;
 		if(millis()>stoptime) {
 			DEBUG_PRINTLN(F("host timeout occured"));
 			//return HTTP_RQT_TIMEOUT; // instead of returning with timeout, we'll work with data received so far
 			break;
 		}
-	}
+	}*/
+	int n = client->read((uint8_t *)ether_buffer+pos, ETHER_BUFFER_SIZE);
+	pos+=n;
 #endif
 	ether_buffer[pos]=0; // properly end buffer with 0
 	client->stop();
@@ -2066,8 +2068,6 @@ void OpenSprinkler::switch_remotestation(RemoteOTCStationData *data, bool turnon
 	RemoteOTCStationData copy;
 	memcpy((char*)&copy, (char*)data, sizeof(RemoteOTCStationData));
 	copy.token[sizeof(copy.token)-1] = 0; // ensure the string ends properly
-	DEBUG_PRINTLN((char*)copy.token);
-	DEBUG_PRINTLN((int)hex2ulong(copy.sid, sizeof(copy.sid)));
 	char *p = tmp_buffer;
 	BufferFiller bf = p;
 	// if turning on the zone and duration is defined, give duration as the timer value
@@ -2087,9 +2087,9 @@ void OpenSprinkler::switch_remotestation(RemoteOTCStationData *data, bool turnon
 						SOPT_PASSWORD,
 						(int)hex2ulong(copy.sid, sizeof(copy.sid)),
 						turnon, timer);
-	bf.emit_p(PSTR(" HTTP/1.0\r\nHOST: $S\r\n\r\n"), DEFAULT_OTC_SERVER_APP);
+	bf.emit_p(PSTR(" HTTP/1.0\r\nHOST: $S\r\nConnection:close\r\n\r\n"), DEFAULT_OTC_SERVER_APP);
 
-	send_http_request(DEFAULT_OTC_SERVER_APP, DEFAULT_OTC_PORT_APP, p, remote_http_callback, true);
+	int x = send_http_request(DEFAULT_OTC_SERVER_APP, DEFAULT_OTC_PORT_APP, p, remote_http_callback, true);
 }
 
 /** Switch http(s) station

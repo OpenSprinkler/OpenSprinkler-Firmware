@@ -228,14 +228,15 @@ size_t EthernetClient::write(const uint8_t *buf, size_t size)
 /**
  * SSL Client
 */
+static SSL_CTX* ctx = NULL;
 
 EthernetClientSsl::EthernetClientSsl()
-		: m_sock(0), m_connected(false)
+		: EthernetClient()
 {
 }
 
 EthernetClientSsl::EthernetClientSsl(int sock)
-		: m_sock(sock), m_connected(true)
+		: EthernetClient(sock)
 {
 }
 
@@ -243,10 +244,6 @@ EthernetClientSsl::~EthernetClientSsl()
 {
 	stop();
 }
-
-static bool sslInit;
-//static BIO* certbio;
-static SSL_CTX* ctx;
 
 /**
  * https://github.com/angstyloop/c-web/blob/main/openssl-fetch-example.c
@@ -256,18 +253,14 @@ int EthernetClientSsl::connect(const char* server, uint16_t port)
 	if (m_sock)
 		return 0;
 
-	struct hostent *host = gethostbyname(server);
-	if (!host) {
-		DEBUG_PRINTLN("Error: DNS look up failed\n");
-		return 0;
-	}
-
+	static bool sslInit = false;
 	if (!sslInit) {
 		OpenSSL_add_all_algorithms();
 		//ERR_load_BIO_strings();
 		ERR_load_crypto_strings();
 		SSL_load_error_strings();	
 		//BIO* certbio = BIO_new(BIO_s_file());
+		//BIO* outbio = BIO_new_fp(stdout, BIO_NOCLOSE);
 		if (SSL_library_init() < 0)	{
 			DEBUG_PRINTLN("Error: could not initialize the OpenSSL library.\n");
 			return 0;
@@ -278,30 +271,36 @@ int EthernetClientSsl::connect(const char* server, uint16_t port)
 			DEBUG_PRINTLN("Error: unable to create SSL context.\n");
 			return 0;
 		}
-		SSL_CTX_set_options(ctx, SSL_OP_NO_SSLv2|SSL_OP_NO_SSLv3);
+		SSL_CTX_set_options(ctx, SSL_OP_NO_SSLv2);
 		SSL_CTX_set_verify(ctx, SSL_VERIFY_NONE, NULL); //Accept all certs
 		sslInit = true;
 	}
 
-  // Create a new SSL session. This does not connect the socket.
-  ssl = SSL_new(ctx);
+	struct hostent *host = gethostbyname(server);
+	if (!host) {
+		DEBUG_PRINTLN("Error: DNS look up failed\n");
+		return 0;
+	}
+	// Create a new SSL session. This does not connect the socket.
+	ssl = SSL_new(ctx);
 
 	struct sockaddr_in sin = {0};
 	sin.sin_family = AF_INET;
 	sin.sin_port = htons(port);
-	sin.sin_addr.s_addr = *(uint32_t*) (host->h_addr);
+	sin.sin_addr.s_addr = *(long*) (host->h_addr);
 	m_sock = socket(AF_INET, SOCK_STREAM, 0);
-	if (::connect(m_sock, (struct sockaddr *) &sin, sizeof(sin)) < 0)
+	if (::connect(m_sock, (struct sockaddr *) &sin, sizeof(struct sockaddr)) < 0)
 	{
 		DEBUG_PRINTLN("Error: connecting to the server failed");
 		return 0;
 	}
 	SSL_set_fd(ssl, m_sock);
 	SSL_set_tlsext_host_name(ssl, server);	// set correct host name
+
 	if (SSL_connect(ssl) < 1) {
 		close(m_sock);
 		m_sock = 0;
-			DEBUG_PRINTLN("Error: Could not build an SSL session");
+		DEBUG_PRINTLN("Error: Could not build an SSL session");
 		return 0;
 	}
 	m_connected = true;
@@ -342,27 +341,20 @@ EthernetClientSsl::operator bool()
 //	and return 0;
 int EthernetClientSsl::read(uint8_t *buf, size_t size)
 {
-	fd_set sock_set;
-	FD_ZERO(&sock_set);
-	FD_SET(m_sock, &sock_set);
-	struct timeval timeout;
-	timeout.tv_sec = 3;
-	timeout.tv_usec = 0;
-
-	//select(m_sock + 1, &sock_set, NULL, NULL, &timeout);
-	//if (FD_ISSET(m_sock, &sock_set))
-	size_t pending = SSL_pending(ssl);
-	if (pending > 0)
-	{
-		if (size > pending)
-			size = pending;
-		int retval = SSL_read(ssl, buf, size);
-		if (retval <= 0) // socket closed
-			m_connected = false;
-		return retval;
+	/*int retval = SSL_read(ssl, buf, size);
+	if (retval < 0) // socket closed
+		m_connected = false;
+	return retval;*/
+	int n=0;
+	for (;;) {
+			if ((n = SSL_read(ssl, buf, size)) < 0) {
+					DEBUG_PRINTLN("ERROR reading from socket.");
+					break;
+			}
+			if (!n) break;
+			printf("%s", buf);
 	}
-	m_connected = false;
-	return 0;
+	return n;
 }
 
 size_t EthernetClientSsl::write(const uint8_t *buf, size_t size)
