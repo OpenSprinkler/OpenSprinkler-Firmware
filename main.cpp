@@ -30,7 +30,14 @@
 #include "opensprinkler_server.h"
 #include "mqtt.h"
 #include "main.h"
-#include "EmailSender.h"
+#if defined(ARUDINO)
+	#include "EmailSender.h"
+#else
+	#include "smtp.h"
+	#define MAIL_CONNECTION_SECURITY SMTP_SECURITY_TLS
+	#define MAIL_FLAGS (SMTP_DEBUG | SMTP_NO_CERT_VERIFY)
+	#define MAIL_AUTH SMTP_AUTH_PLAIN
+#endif
 
 #define str(s) #s
 #define xstr(s) str(s)
@@ -449,12 +456,14 @@ void do_loop()
 	time_os_t curr_time = os.now_tz();
 
 	//handle delayed reboot notification until wifi connection
-	if(delayed){
-		if(WiFi.status() == WL_CONNECTED){
-			push_message(NOTIFY_REBOOT);
-			delayed = false;
+	#if defined(ARDUINO)
+		if(delayed){
+			if(WiFi.status() == WL_CONNECTED){
+				push_message(NOTIFY_REBOOT);
+				delayed = false;
+			}
 		}
-	}
+	#endif
 
 	// ====== Process Ethernet packets ======
 #if defined(ARDUINO)	// Process Ethernet packets for Arduino
@@ -1403,9 +1412,19 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 			&enabled, host, &port, username, password, recipient
 			);
 	}
+
 	//assign email variables necessary
-	EMailSender emailSend(username, password);
-	EMailSender::EMailMessage message;
+	#if defined(ARDUINO)
+		EMailSender emailSend(username, password);
+		EMailSender::EMailMessage message;
+	#else
+		struct smtp *smtp;
+		int rc;
+		struct {
+			String subject;
+			String message;
+		}message;
+	#endif
 
 	//check if ifttt key exists
 	bool ifttt_enabled;
@@ -1441,8 +1460,10 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 		strcpy_P(postval, PSTR("On site ["));
 		os.sopt_load(SOPT_DEVICE_NAME, postval+strlen(postval));
 		strcat_P(postval, PSTR("], "));
-		emailSend.setSMTPServer(strdup(host));
-		emailSend.setSMTPPort(port);
+		#if defined(ARDUINO)
+			emailSend.setSMTPServer(strdup(host));
+			emailSend.setSMTPPort(port);
+		#endif
 	}
 
 	switch(type) {
@@ -1590,10 +1611,12 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 			break;
 
 		case NOTIFY_REBOOT:
-			if(!delayed){
-				delayed = true;
-				return;
-			}
+			#if defined(ARUDINO)
+				if(!delayed){
+					delayed = true;
+					return;
+				}
+			#endif
 
 			if (os.mqtt.enabled()) {
 				strcpy_P(topic, PSTR("opensprinkler/system"));
@@ -1649,11 +1672,28 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 	}
 
 	if(email_enabled){
-		EMailSender::Response resp = emailSend.send(recipient, message);
-		// DEBUG_PRINTLN(F("Sending Status:"));
-		// DEBUG_PRINTLN(resp.status);
-		// DEBUG_PRINTLN(resp.code);
-		// DEBUG_PRINTLN(resp.desc);
+		#if defined(ARDUINO)
+			EMailSender::Response resp = emailSend.send(recipient, message);
+			// DEBUG_PRINTLN(F("Sending Status:"));
+			// DEBUG_PRINTLN(resp.status);
+			// DEBUG_PRINTLN(resp.code);
+			// DEBUG_PRINTLN(resp.desc);
+		#else
+			char piSubject[message.subject.length() + 1];
+			char piMessage[message.message.length() + 1];
+			String sPort = to_string(port);
+			char piPort[sPort.length() + 1];
+			strcpy(piSubject, message.subject.c_str());
+			strcpy(piMessage, message.message.c_str());
+			strcpy(piPort, sPort.c_str());
+			rc = smtp_open(host, piPort, MAIL_CONNECTION_SECURITY, MAIL_FLAGS, NULL, &smtp);
+			rc = smtp_auth(smtp, MAIL_AUTH, username, password);
+			rc = smtp_address_add(smtp, SMTP_ADDRESS_FROM, username, "OpenSprinkler");
+			rc = smtp_address_add(smtp, SMTP_ADDRESS_TO, recipient, "User");
+			rc = smtp_header_add(smtp, "Subject", piSubject);
+			rc = smtp_mail(smtp, piMessage);
+			rc = smtp_close(smtp);
+		#endif
 	}
 }
 
