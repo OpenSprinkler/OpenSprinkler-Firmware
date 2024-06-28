@@ -1137,17 +1137,20 @@ void server_json_controller_main(OTF_PARAMS_DEF) {
 
 	bfill.emit_p(PSTR("\"mac\":\"$X:$X:$X:$X:$X:$X\","), mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 
-	bfill.emit_p(PSTR("\"loc\":\"$O\",\"jsp\":\"$O\",\"wsp\":\"$O\",\"wto\":{$O},\"ifkey\":\"$O\",\"mqtt\":{$O},\"email\":{$O},\"wtdata\":$S,\"wterr\":$D,\"dname\":\"$O\","),
+	bfill.emit_p(PSTR("\"loc\":\"$O\",\"jsp\":\"$O\",\"wsp\":\"$O\",\"wto\":{$O},\"ifkey\":\"$O\",\"mqtt\":{$O},\"wtdata\":$S,\"wterr\":$D,\"dname\":\"$O\","),
 							 SOPT_LOCATION,
 							 SOPT_JAVASCRIPTURL,
 							 SOPT_WEATHERURL,
 							 SOPT_WEATHER_OPTS,
 							 SOPT_IFTTT_KEY,
-							 SOPT_MQTT_OPTS,
 							 SOPT_EMAIL_OPTS,
 							 strlen(wt_rawData)==0?"{}":wt_rawData,
 							 wt_errCode,
 							 SOPT_DEVICE_NAME);
+
+#if !(defined(__AVR_ATmega1284__)||defined(__AVR_ATmega1284P__))
+	bfill.emit_p(PSTR("\"email\":{$O},"), SOPT_MQTT_OPTS);
+#endif
 
 #if defined(ARDUINO)
 	if(os.status.has_curr_sense) {

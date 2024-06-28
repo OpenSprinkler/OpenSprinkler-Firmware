@@ -14,6 +14,10 @@
 #ifndef SMTP_H
 #define SMTP_H
 
+#define MAIL_CONNECTION_SECURITY SMTP_SECURITY_TLS
+#define MAIL_FLAGS (smtp_flag)(SMTP_NO_CERT_VERIFY)
+#define MAIL_AUTH SMTP_AUTH_PLAIN
+
 #include <sys/types.h>
 #include <stddef.h>
 #include <stdio.h>

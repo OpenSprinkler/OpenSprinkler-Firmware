@@ -30,15 +30,8 @@
 #include "opensprinkler_server.h"
 #include "mqtt.h"
 #include "main.h"
-#include "EmailSender.h"
+#include "EMailSender.h"
 #include "smtp.h"
-
-#if defined(ARDUINO)
-#else
-	#define MAIL_CONNECTION_SECURITY SMTP_SECURITY_TLS
-	#define MAIL_FLAGS (smtp_flag)(SMTP_NO_CERT_VERIFY)
-	#define MAIL_AUTH SMTP_AUTH_PLAIN
-#endif
 
 #define str(s) #s
 #define xstr(s) str(s)

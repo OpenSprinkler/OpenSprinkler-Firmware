@@ -154,7 +154,7 @@ const char iopt_json_names[] PROGMEM =
 	"dns3\0"
 	"dns4\0"
 	"sar\0\0"
-	"nfe\0\0"
+	"ife\0\0"
 	"sn1t\0"
 	"sn1o\0"
 	"sn2t\0"

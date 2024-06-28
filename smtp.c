@@ -23,6 +23,7 @@
  */
 
 #if defined(ARDUINO)
+
 #else
 
 #if defined(_WIN32) || defined(WIN32)
