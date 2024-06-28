@@ -49,6 +49,7 @@
 		#include <Ticker.h>
 		#include "SSD1306Display.h"
 		#include "espconnect.h"
+		#include "EMailSender.h"
 	#else // for AVR
 		#include <SdFat.h>
 		#include <Ethernet.h>
@@ -62,6 +63,7 @@
 	#include <netdb.h>
 	#include <sys/stat.h>
 	#include "etherport.h"
+	#include "smtp.h"
 #endif // end of headers
 
 #if defined(ARDUINO)
