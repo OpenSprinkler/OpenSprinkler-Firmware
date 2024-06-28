@@ -1,3 +1,5 @@
+#if defined(ARDUINO)
+#else
 /**
  * @file
  * @brief SMTP client library.
@@ -633,3 +635,4 @@ struct str_getdelimfd{
 
 #endif /* SMTP_H */
 
+#endif

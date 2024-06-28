@@ -22,6 +22,9 @@
  * </a>.
  */
 
+#if defined(ARDUINO)
+#else
+
 #if defined(_WIN32) || defined(WIN32)
 # define SMTP_IS_WINDOWS
 #endif /* SMTP_IS_WINDOWS */
@@ -385,7 +388,7 @@ smtp_str_getdelimfd_read(struct str_getdelimfd *const gdfd,
   struct smtp *smtp;
   long bytes_read;
 
-  smtp = gdfd->user_data;
+  smtp = (struct smtp*)(gdfd->user_data);
 
   if(smtp_str_getdelimfd_read_timeout(smtp) != SMTP_STATUS_OK){
     return -1;
@@ -468,7 +471,7 @@ smtp_str_getdelimfd_set_line_and_buf(struct str_getdelimfd *const gdfd,
   if(smtp_si_add_size_t(copy_len, 1, &copy_len_inc) ||
      smtp_si_add_size_t((size_t)gdfd->_buf, copy_len_inc, NULL) ||
      smtp_si_sub_size_t(gdfd->_buf_len, copy_len, &nbytes_to_shift) ||
-     (gdfd->line = calloc(1, copy_len_inc)) == NULL){
+     (gdfd->line = (char*)(calloc(1, copy_len_inc))) == NULL){
     return -1;
   }
   memcpy(gdfd->line, gdfd->_buf, copy_len);
@@ -560,7 +563,7 @@ smtp_str_getdelimfd(struct str_getdelimfd *const gdfd){
                             &buf_sz_new)){
         return smtp_str_getdelimfd_throw_error(gdfd);
       }
-      buf_new = realloc(gdfd->_buf, buf_sz_new);
+      buf_new = (char*)(realloc(gdfd->_buf, buf_sz_new));
       if(buf_new == NULL){
         return smtp_str_getdelimfd_throw_error(gdfd);
       }
@@ -657,7 +660,7 @@ smtp_strdup(const char *s){
     dup = NULL;
     errno = ENOMEM;
   }
-  else if((dup = malloc(dup_len)) != NULL){
+  else if((dup = (char*)(malloc(dup_len))) != NULL){
     memcpy(dup, s, dup_len);
   }
   return dup;
@@ -731,7 +734,7 @@ smtp_str_replace(const char *const search,
         /* snew_sz += snew_sz + slen + replace_len + 1 */
         if(smtp_si_add_size_t(snew_sz_dup, slen_inc, &snew_sz) ||
            smtp_si_add_size_t(snew_sz, replace_len, &snew_sz) ||
-           (stmp = realloc(snew, snew_sz)) == NULL){
+           (stmp = (char*)(realloc(snew, snew_sz))) == NULL){
           free(snew);
           return NULL;
         }
@@ -746,7 +749,7 @@ smtp_str_replace(const char *const search,
         /* snew_sz += snew_sz + slen + snew_len + 1 */
         if(smtp_si_add_size_t(snew_sz_dup, slen, &snew_sz) ||
            smtp_si_add_size_t(snew_sz, snew_len_inc, &snew_sz) ||
-           (stmp = realloc(snew, snew_sz)) == NULL){
+           (stmp = (char*)(realloc(snew, snew_sz))) == NULL){
           free(snew);
           return NULL;
         }
@@ -845,7 +848,7 @@ smtp_base64_encode(const char *const buf,
     return NULL;
   }
   b64_sz = (4 * buflen / 3) + 1 + 2 + 1;
-  if((b64 = calloc(1, b64_sz)) == NULL){
+  if((b64 = (char*)(calloc(1, b64_sz))) == NULL){
     return NULL;
   }
 
@@ -998,7 +1001,7 @@ smtp_base64_decode(const char *const buf,
   }
 
   if(smtp_si_add_size_t(buf_len, 1, &buf_len_inc) ||
-     (b64_decode = calloc(1, buf_len_inc)) == NULL){
+     (b64_decode = (unsigned char*)(calloc(1, buf_len_inc))) == NULL){
     return SIZE_MAX;
   }
 
@@ -1042,7 +1045,7 @@ smtp_bin2hex(const unsigned char *const s,
      smtp_si_add_size_t(alloc_sz, 1, &alloc_sz)){
     return NULL;
   }
-  if((snew = malloc(alloc_sz)) == NULL){
+  if((snew = (char*)(malloc(alloc_sz))) == NULL){
     return NULL;
   }
 
@@ -1276,7 +1279,7 @@ smtp_fold_whitespace(const char *const s,
     if(smtp_si_add_size_t(bufsz, ws_offset, &bufsz) ||
        smtp_si_add_size_t(bufsz, end_slen, &bufsz) ||
        smtp_si_add_size_t(bufsz, 1, &bufsz) ||
-       (buf_new = realloc(buf, bufsz)) == NULL){
+       (buf_new = (char*)(realloc(buf, bufsz))) == NULL){
       free(buf);
       return NULL;
     }
@@ -1343,7 +1346,7 @@ smtp_chunk_split(const char *const s,
      smtp_si_add_size_t(bodylen, 1, &bodylen_inc) ||
      smtp_si_mul_size_t(endlen_inc, bodylen / chunklen + 1, &snewlen) ||
      smtp_si_add_size_t(snewlen, bodylen_inc, &snewlen) ||
-     (snew = calloc(1, snewlen)) == NULL){
+     (snew = (char*)(calloc(1, snewlen))) == NULL){
     return NULL;
   }
 
@@ -1401,7 +1404,7 @@ smtp_ffile_get_contents(FILE *stream,
 
   do{
     if(smtp_si_add_size_t(bufsz, BUFSZ_INCREMENT, &bufsz_inc) ||
-       (new_buf = realloc(read_buf, bufsz_inc)) == NULL){
+       (new_buf = (char*)(realloc(read_buf, bufsz_inc))) == NULL){
       free(read_buf);
       return NULL;
     }
@@ -1676,7 +1679,7 @@ smtp_puts_terminate(struct smtp *const smtp,
 
   slen = strlen(s);
   if(smtp_si_add_size_t(slen, 3, &allocsz) ||
-     (line = malloc(allocsz)) == NULL){
+     (line = (char*)(malloc(allocsz))) == NULL){
     return smtp_status_code_set(smtp, SMTP_STATUS_NOMEM);
   }
   concat = smtp_stpcpy(line, s);
@@ -1908,7 +1911,7 @@ smtp_auth_plain(struct smtp *const smtp,
   /* login_len = 1 + user_len + 1 + pass_len */
   if(smtp_si_add_size_t(user_len, pass_len, &login_len) ||
      smtp_si_add_size_t(login_len, 2, &login_len) ||
-     (login_str = malloc(login_len)) == NULL){
+     (login_str = (char*)(malloc(login_len))) == NULL){
     return -1;
   }
   login_str[0] = '\0';
@@ -1926,7 +1929,7 @@ smtp_auth_plain(struct smtp *const smtp,
   /* (3) */
   login_b64_len = strlen(login_b64);
   if(smtp_si_add_size_t(login_b64_len, 14, &login_b64_len) ||
-     (login_send = malloc(login_b64_len)) == NULL){
+     (login_send = (char*)(malloc(login_b64_len))) == NULL){
     free(login_b64);
     return -1;
   }
@@ -1980,7 +1983,7 @@ smtp_auth_login(struct smtp *const smtp,
   /* (2) */
   b64_user_len = strlen(b64_user);
   if(smtp_si_add_size_t(b64_user_len, 14, &b64_user_len) ||
-     (login_str = malloc(b64_user_len)) == NULL){
+     (login_str = (char*)(malloc(b64_user_len))) == NULL){
     free(b64_user);
     return -1;
   }
@@ -2098,7 +2101,7 @@ smtp_auth_cram_md5(struct smtp *const smtp,
   /* auth_concat_len = user_len + 1 + challenge_hex_len + 1 */
   if(smtp_si_add_size_t(user_len, challenge_hex_len, &auth_concat_len) ||
      smtp_si_add_size_t(auth_concat_len, 2, &auth_concat_len) ||
-     (auth_concat = malloc(auth_concat_len)) == NULL){
+     (auth_concat = (char*)(malloc(auth_concat_len))) == NULL){
     free(challenge_hex);
     return -1;
   }
@@ -2335,8 +2338,8 @@ smtp_header_cmp_key(const void *const v1,
   const char *key;
   const struct smtp_header *header2;
 
-  key = v1;
-  header2 = v2;
+  key = (char*)(v1);
+  header2 = (smtp_header*)(v2);
   return strcmp(key, header2->key);
 }
 
@@ -2421,7 +2424,7 @@ smtp_print_mime_header_and_body(struct smtp *const smtp,
   if(smtp_si_add_size_t(data_double_dot_len,
                         MIME_TEXT_BUFSZ,
                         &data_double_dot_len) ||
-     (data_header_and_body = malloc(data_double_dot_len)) == NULL){
+     (data_header_and_body = (char*)(malloc(data_double_dot_len))) == NULL){
     return smtp_status_code_set(smtp, SMTP_STATUS_NOMEM);
   }
 
@@ -2481,7 +2484,7 @@ smtp_print_mime_attachment(struct smtp *const smtp,
      smtp_si_add_size_t(bufsz,
                         SMTP_MIME_BOUNDARY_LEN + MIME_TEXT_BUFSZ,
                         &bufsz) ||
-     (mime_attach_text = malloc(bufsz)) == NULL){
+     (mime_attach_text = (char*)(malloc(bufsz))) == NULL){
     return smtp_status_code_set(smtp, SMTP_STATUS_NOMEM);
   }
 
@@ -2640,7 +2643,7 @@ smtp_print_header(struct smtp *const smtp,
   /* concat_len = key_len + 2 + value_len + 1 */
   if(smtp_si_add_size_t(key_len, value_len, &concat_len) ||
      smtp_si_add_size_t(concat_len, 3, &concat_len) ||
-     (header_concat = malloc(concat_len)) == NULL){
+     (header_concat = (char*)(malloc(concat_len))) == NULL){
     return smtp_status_code_set(smtp, SMTP_STATUS_NOMEM);
   }
   concat = smtp_stpcpy(header_concat, header->key);
@@ -2705,8 +2708,8 @@ smtp_append_address_to_header(struct smtp *const smtp,
       if(smtp_si_add_size_t(header_value_sz, name_slen, &header_value_sz) ||
          smtp_si_add_size_t(header_value_sz, email_slen, &header_value_sz) ||
          smtp_si_add_size_t(header_value_sz, 3 + 3 + 1 + 1, &header_value_sz)||
-         (header_value_new = realloc(header_value,
-                                     header_value_sz)) == NULL){
+         (header_value_new = (char*)(realloc(header_value,
+                                     header_value_sz))) == NULL){
         free(header_value);
         return smtp_status_code_set(smtp, SMTP_STATUS_NOMEM);
       }
@@ -2764,7 +2767,7 @@ smtp_mail_envelope_header(struct smtp *const smtp,
 
   /* bufsz = 14 + email_len + SMTPUTF8_LEN + 1 */
   if(smtp_si_add_size_t(email_len, SMTPUTF8_LEN + 14 + 1, &bufsz) ||
-     (envelope_address = malloc(bufsz)) == NULL){
+     (envelope_address = (char*)(malloc(bufsz))) == NULL){
     return smtp_status_code_set(smtp, SMTP_STATUS_NOMEM);
   }
 
@@ -2804,8 +2807,8 @@ smtp_header_cmp(const void *v1,
   const struct smtp_header *header1;
   const struct smtp_header *header2;
 
-  header1 = v1;
-  header2 = v2;
+  header1 = (smtp_header*)(v1);
+  header2 = (smtp_header*)(v2);
   return strcmp(header1->key, header2->key);
 }
 
@@ -2992,7 +2995,7 @@ smtp_open(const char *const server,
           struct smtp **smtp){
   struct smtp *snew;
 
-  if((snew = calloc(1, sizeof(**smtp))) == NULL){
+  if((snew = (struct smtp*)(calloc(1, sizeof(**smtp)))) == NULL){
     *smtp = &g_smtp_error;
     return smtp_status_code_get(*smtp);
   }
@@ -3295,10 +3298,10 @@ smtp_header_add(struct smtp *const smtp,
   }
 
   if(smtp_si_add_size_t(smtp->num_headers, 1, &num_headers_inc) ||
-     (new_header_list = smtp_reallocarray(
+     (new_header_list = (smtp_header*)(smtp_reallocarray(
                           smtp->header_list,
                           num_headers_inc,
-                          sizeof(*smtp->header_list))) == NULL){
+                          sizeof(*smtp->header_list)))) == NULL){
     return smtp_status_code_set(smtp, SMTP_STATUS_NOMEM);
   }
   smtp->header_list = new_header_list;
@@ -3368,9 +3371,9 @@ smtp_address_add(struct smtp *const smtp,
     return smtp_status_code_set(smtp, SMTP_STATUS_NOMEM);
   }
 
-  new_address_list = smtp_reallocarray(smtp->address_list,
+  new_address_list = (smtp_address*)(smtp_reallocarray(smtp->address_list,
                                        num_address_inc,
-                                       sizeof(*new_address_list));
+                                       sizeof(*new_address_list)));
   if(new_address_list == NULL){
     return smtp_status_code_set(smtp, SMTP_STATUS_NOMEM);
   }
@@ -3477,21 +3480,21 @@ smtp_attachment_add_mem(struct smtp *const smtp,
   }
 
   if(datasz == SIZE_MAX){
-    datasz = strlen(data);
+    datasz = strlen((char*)(data));
   }
 
   if(smtp_si_add_size_t(smtp->num_attachment, 1, &num_attachment_inc) ||
-     (new_attachment_list = smtp_reallocarray(
+     (new_attachment_list = (smtp_attachment*)(smtp_reallocarray(
                               smtp->attachment_list,
                               num_attachment_inc,
-                              sizeof(*new_attachment_list))) == NULL){
+                              sizeof(*new_attachment_list)))) == NULL){
     return smtp_status_code_set(smtp, SMTP_STATUS_NOMEM);
   }
   smtp->attachment_list = new_attachment_list;
   new_attachment = &new_attachment_list[smtp->num_attachment];
 
   new_attachment->name = smtp_strdup(name);
-  b64_encode = smtp_base64_encode(data, datasz);
+  b64_encode = smtp_base64_encode((char*)(data), datasz);
   if(new_attachment->name == NULL || b64_encode == NULL){
     free(new_attachment->name);
     free(b64_encode);
@@ -3526,3 +3529,4 @@ smtp_attachment_clear_all(struct smtp *const smtp){
   smtp->num_attachment = 0;
 }
 
+#endif

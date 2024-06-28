@@ -30,12 +30,13 @@
 #include "opensprinkler_server.h"
 #include "mqtt.h"
 #include "main.h"
-#if defined(ARUDINO)
-	#include "EmailSender.h"
+#include "EmailSender.h"
+#include "smtp.h"
+
+#if defined(ARDUINO)
 #else
-	#include "smtp.h"
 	#define MAIL_CONNECTION_SECURITY SMTP_SECURITY_TLS
-	#define MAIL_FLAGS (SMTP_DEBUG | SMTP_NO_CERT_VERIFY)
+	#define MAIL_FLAGS (smtp_flag)(SMTP_NO_CERT_VERIFY)
 	#define MAIL_AUTH SMTP_AUTH_PLAIN
 #endif
 
@@ -1611,7 +1612,7 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 			break;
 
 		case NOTIFY_REBOOT:
-			#if defined(ARUDINO)
+			#if defined(ARDUINO)
 				if(!delayed){
 					delayed = true;
 					return;
