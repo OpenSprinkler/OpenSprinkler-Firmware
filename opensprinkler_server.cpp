@@ -1143,13 +1143,13 @@ void server_json_controller_main(OTF_PARAMS_DEF) {
 							 SOPT_WEATHERURL,
 							 SOPT_WEATHER_OPTS,
 							 SOPT_IFTTT_KEY,
-							 SOPT_EMAIL_OPTS,
+							 SOPT_MQTT_OPTS,
 							 strlen(wt_rawData)==0?"{}":wt_rawData,
 							 wt_errCode,
 							 SOPT_DEVICE_NAME);
 
 #if !(defined(__AVR_ATmega1284__)||defined(__AVR_ATmega1284P__))
-	bfill.emit_p(PSTR("\"email\":{$O},"), SOPT_MQTT_OPTS);
+	bfill.emit_p(PSTR("\"email\":{$O},"), SOPT_EMAIL_OPTS);
 #endif
 
 #if defined(ARDUINO)

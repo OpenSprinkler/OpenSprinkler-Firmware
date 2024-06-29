@@ -1379,15 +1379,15 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 	char* postval = tmp_buffer;
 	uint32_t volume;
 
-	//check if ifttt key exists and also if the enable bit is set
+	// check if ifttt key exists and also if the enable bit is set
 	bool ifttt_enabled;
-	if(strlen(os.sopts[SOPT_IFTTT_KEY]) != 0){
+	if(strlen(os.sopts[SOPT_IFTTT_KEY]) == 0) {
 		ifttt_enabled = false;
-	}else{
+	} else {
 		ifttt_enabled = os.iopts[IOPT_NOTIF_ENABLE]&type;
 	}
 
-	//define email variables
+	// define email variables
 	char email_host[32 + 1] = {0};
 	char email_username[32 + 1] = {0};
 	char email_password[32 + 1] = {0};
@@ -1395,9 +1395,9 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 	int  email_port = 465;
 	int  email_en = 0;
 
-	//pull email variables
+	// parse email variables
 	#if defined(__AVR_ATmega1284__) | defined(__AVR_ATmega1284P__)
-		// AVR doesn't support email, so no need to pull
+		// AVR doesn't support email, so no need to parse
 	#else
 		os.sopt_load(SOPT_EMAIL_OPTS, postval);
 		if (*postval != 0) {
@@ -1426,15 +1426,19 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 		email_enabled = os.iopts[IOPT_NOTIF_ENABLE]&type;
 	}
 
-	// check if this type of event is enabled for push notification
+	// if none if enabled, return here
 	if (!ifttt_enabled && !os.mqtt.enabled() && !email_enabled)
 		return;
 
 	if (ifttt_enabled || email_enabled) {
-		// todo: modify the format for email
 		strcpy_P(postval, PSTR("{\"value1\":\"On site ["));
-		os.sopt_load(SOPT_DEVICE_NAME, postval+strlen(postval));
+		os.sopt_load(SOPT_DEVICE_NAME, topic);
+		strcat(postval+strlen(postval), topic);
 		strcat_P(postval, PSTR("], "));
+		if(email_enabled) {		
+			strcat(topic, " ");
+			email_message.subject = topic; // prefix the email subject with device name
+		}
 	}
 
 	if (os.mqtt.enabled()) {
@@ -1473,10 +1477,7 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 				if(os.iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_FLOW) {
 					sprintf_P(postval+strlen(postval), PSTR(" Flow rate: %d.%02d"), (int)flow_last_gpm, (int)(flow_last_gpm*100)%100);
 				}
-			}
-			if (email_enabled) {
-				email_message.subject = "Station Off";
-				email_message.message = postval;
+				if(email_enabled) { email_message.subject += PSTR("station event"); }
 			}
 			break;
 
@@ -1492,10 +1493,7 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 					if(lval<pd.nprograms) strcat(postval, prog.name);
 				}
 				sprintf_P(postval+strlen(postval), PSTR(" with %d%% water level."), (int)fval);
-			}
-			if (email_enabled) {
-				email_message.subject = "Program Scheduled";
-				email_message.message = postval;
+				if(email_enabled) { email_message.subject += PSTR("program event"); }
 			}
 			break;
 
@@ -1508,10 +1506,7 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 			if (ifttt_enabled || email_enabled) {
 				strcat_P(postval, PSTR("sensor 1 "));
 				strcat_P(postval, ((int)fval)?PSTR("activated."):PSTR("de-activated."));
-			}
-			if (email_enabled) {
-				email_message.subject = "Sensor 1 Notification";
-				email_message.message = postval;
+				if(email_enabled) { email_message.subject += PSTR("sensor 1 event"); }
 			}
 			break;
 
@@ -1524,10 +1519,7 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 			if (ifttt_enabled || email_enabled) {
 				strcat_P(postval, PSTR("sensor 2 "));
 				strcat_P(postval, ((int)fval)?PSTR("activated."):PSTR("de-activated."));
-			}
-			if (email_enabled) {
-				email_message.subject = "Sensor 2 Notification";
-				email_message.message = postval;
+				if(email_enabled) { email_message.subject += PSTR("sensor 2 event"); }
 			}
 			break;
 
@@ -1540,10 +1532,7 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 			if (ifttt_enabled || email_enabled) {
 				strcat_P(postval, PSTR("rain delay "));
 				strcat_P(postval, ((int)fval)?PSTR("activated."):PSTR("de-activated."));
-			}
-			if (email_enabled) {
-				email_message.subject = "Rain Delay";
-				email_message.message = postval;
+				if(email_enabled) { email_message.subject += PSTR("rain delay event"); }
 			}
 			break;
 
@@ -1558,10 +1547,7 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 			}
 			if (ifttt_enabled || email_enabled) {
 				sprintf_P(postval+strlen(postval), PSTR("Flow count: %u, volume: %d.%02d"), lval, (int)volume/100, (int)volume%100);
-			}
-			if (email_enabled) {
-				email_message.subject = "Flow Sensor Notification";
-				email_message.message = postval;
+				if(email_enabled) { email_message.subject += PSTR("flow sensor event"); }
 			}
 			break;
 
@@ -1579,10 +1565,7 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 				if(fval>=0) {
 					sprintf_P(postval+strlen(postval), PSTR("water level updated: %d%%."), (int)fval);
 				}
-			}
-			if (email_enabled) {
-				email_message.subject = "Weather Update";
-				email_message.message = postval;
+				if(email_enabled) { email_message.subject += PSTR("weather update event"); }
 			}
 			break;
 
@@ -1612,12 +1595,9 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 					//strcat(postval, ":");
 					//itoa(_port, postval+strlen(postval), 10);
 				#else
-					strcat_P(postval, PSTR("process restarted."));
+					strcat_P(postval, PSTR("controller process restarted."));
 				#endif
-			}
-			if (email_enabled) {
-				email_message.subject = "Reboot Notification";
-				email_message.message = postval;
+				if(email_enabled) { email_message.subject += PSTR("reboot event"); }
 			}
 			break;
 	}
@@ -1628,7 +1608,6 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 	if (ifttt_enabled) {
 		strcat_P(postval, PSTR("\"}"));
 
-		//char postBuffer[1500];
 		BufferFiller bf = ether_buffer;
 		bf.emit_p(PSTR("POST /trigger/sprinkler/with/key/$O HTTP/1.0\r\n"
 						"Host: $S\r\n"
@@ -1641,6 +1620,7 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 	}
 
 	if(email_enabled){
+		email_message.message = strchr(postval, 'O'); // ad-hoc: remove the value1 part from the ifttt message
 		#if defined(ARDUINO)
 			#if defined(ESP8266)
 				EMailSender emailSend(email_username, email_password);
@@ -1654,20 +1634,14 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 			#endif
 		#else
 			struct smtp *smtp = NULL;
-			char piSubject[email_message.subject.length() + 1];
-			char piMessage[email_message.message.length() + 1];
-			String sPort = to_string(email_port);
-			char piPort[sPort.length() + 1];
-			strcpy(piSubject, email_message.subject.c_str());
-			strcpy(piMessage, email_message.message.c_str());
-			strcpy(piPort, sPort.c_str());
+			String email_port_str = to_string(email_port);
 			// todo: check error?
-			rc = smtp_open(email_host, piPort, SMTP_SECURITY_TLS, SMTP_NO_CERT_VERIFY, NULL, &smtp);
+			rc = smtp_open(email_host, email_port_str.c_str(), SMTP_SECURITY_TLS, SMTP_NO_CERT_VERIFY, NULL, &smtp);
 			rc = smtp_auth(smtp, SMTP_AUTH_PLAIN, email_username, email_password);
 			rc = smtp_address_add(smtp, SMTP_ADDRESS_FROM, email_username, "OpenSprinkler");
 			rc = smtp_address_add(smtp, SMTP_ADDRESS_TO, email_recipient, "User");
-			rc = smtp_header_add(smtp, "Subject", piSubject);
-			rc = smtp_mail(smtp, piMessage);
+			rc = smtp_header_add(smtp, "Subject", email_message.subject.c_str());
+			rc = smtp_mail(smtp, email_message.message.c_str());
 			rc = smtp_close(smtp);
 		#endif
 	}
