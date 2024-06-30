@@ -2472,6 +2472,33 @@ void sensorconfig_json(OTF_PARAMS_DEF) {
 	}
 }
 
+//detected Analog Sensor Boards:
+#define ASB_BOARD1   0x01
+#define ASB_BOARD2   0x02
+#define OSPI_PCF8591 0x04
+#define OSPI_ADS1115 0x08
+
+static byte asb_detected_boards = 0; //bit 1=0x48+0x49 bit 2=0x4A+0x4B
+
+void detect_asb_board() {
+	//detect analog sensor board, 0x48+0x49=Board1, 0x4A+0x4B=Board2
+#if defined(ESP8266)
+	if (detect_i2c(ASB_BOARD_ADDR1a) && detect_i2c(ASB_BOARD_ADDR1b)) asb_detected_boards |= ASB_BOARD1;
+	if (detect_i2c(ASB_BOARD_ADDR2a) && detect_i2c(ASB_BOARD_ADDR2b)) asb_detected_boards |= ASB_BOARD2;
+#endif
+
+// Old, pre OSPi 1.43 analog inputs:
+#if defined(PCF8591)
+	asb_detected_boards |= OSPI_PCF8591;
+#endif
+
+// New OSPi 1.6 analog inputs:
+#if defined(ADS1115)
+	asb_detected_boards |= OSPI_ADS1115;
+#endif
+}
+
+
 /**
  * sl
  * @brief Lists all sensors
@@ -2502,10 +2529,12 @@ void server_sensor_list(OTF_PARAMS_DEF) {
 #endif
 
 	if (test) {
-		bfill.emit_p(PSTR("{\"test\":$D}"), test);
+		bfill.emit_p(PSTR("{\"test\":$D,"), test);
+		bfill.emit_p(PSTR("\"detected\":$D}"), asb_detected_boards);
 	} else {
 		int count = sensor_count();
 		bfill.emit_p(PSTR("{\"count\":$D,"), count);
+		bfill.emit_p(PSTR("\"detected\":$D,"), asb_detected_boards);
 		bfill.emit_p(PSTR("\"sensors\":["));
 		sensorconfig_json(OTF_PARAMS);
 		bfill.emit_p(PSTR("]"));
@@ -2938,7 +2967,7 @@ void server_sensorprog_list(OTF_PARAMS_DEF) {
 	handle_return(HTML_OK);
 }
 
-const int sensor_types[] = {
+static const int sensor_types[] = {
 	SENSOR_SMT100_MODBUS_RTU_MOIS,
 	SENSOR_SMT100_MODBUS_RTU_TEMP,
 
@@ -2979,23 +3008,23 @@ const int sensor_types[] = {
 	SENSOR_GROUP_SUM,
 };
 
-const char* sensor_names[] = {
+static const char* sensor_names[] = {
 	"Truebner SMT100 RS485 Modbus RTU over TCP, moisture mode",
 	"Truebner SMT100 RS485 Modbus RTU over TCP, temperature mode",
 #if defined(ARDUINO)
  #if defined(ESP8266)
-	"OpenSprinkler analog extension board 2xADS1x15 x8 - voltage mode 0..4V",
-	"OpenSprinkler analog extension board 2xADS1x15 x8 - 0..3.3V to 0..100%",
-	"OpenSprinkler analog extension board 2xADS1x15 x8 - SMT50 moisture mode",
-	"OpenSprinkler analog extension board 2xADS1x15 x8 - SMT50 temperature mode",
-	"OpenSprinkler analog extension board 2xADS1x15 x8 - SMT100-analog moisture mode",
-	"OpenSprinkler analog extension board 2xADS1x15 x8 - SMT100-analog temperature mode",
+	"ASB - voltage mode 0..4V",
+	"ASB - 0..3.3V to 0..100%",
+	"ASB - SMT50 moisture mode",
+	"ASB - SMT50 temperature mode",
+	"ASB - SMT100-analog moisture mode",
+	"ASB - SMT100-analog temperature mode",
 
-	"OpenSprinkler analog extension board 2xADS1x15 x8 - Vegetronix VH400",
-	"OpenSprinkler analog extension board 2xADS1x15 x8 - Vegetronix THERM200",
-	"OpenSprinkler analog extension board 2xADS1x15 x8 - Vegetronix AquaPlumb",
+	"ASB - Vegetronix VH400",
+	"ASB - Vegetronix THERM200",
+	"ASB - Vegetronix AquaPlumb",
 
-	"OpenSprinkler analog extension board 2xADS1x15 x8 - user defined sensor",
+	"ASB - user defined sensor",
  #endif
 #else
 #if defined ADS1115||PCF8591
@@ -3042,10 +3071,16 @@ void server_sensor_types(OTF_PARAMS_DEF) {
 	print_header();
 #endif
 
-	bfill.emit_p(PSTR("{\"count\":$D,\"sensorTypes\":["), sizeof(sensor_types)/sizeof(int));
+	int count = sizeof(sensor_types)/sizeof(int);
+	boolean use_asb = asb_detected_boards > 0;
+	if (!use_asb) count -= 10;
+
+	bfill.emit_p(PSTR("{\"count\":$D,\"sensorTypes\":["), count);
 
 	for (uint i = 0; i < sizeof(sensor_types)/sizeof(int); i++)
 	{
+		if (!use_asb && i >= SENSOR_ANALOG_EXTENSION_BOARD && i <= SENSOR_USERDEF)
+			continue;
 		if (i > 0)
 			bfill.emit_p(PSTR(","));
 		byte unitid = getSensorUnitId(sensor_types[i]);

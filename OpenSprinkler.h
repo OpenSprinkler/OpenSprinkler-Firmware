@@ -109,6 +109,7 @@
 	extern EthernetServer *m_server;
 	#endif
 	extern bool useEth;
+	bool detect_i2c(int addr);
 #else
 	extern EthernetServer *m_server;
 #endif

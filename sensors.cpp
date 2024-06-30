@@ -97,6 +97,7 @@ uint16_t CRC16 (byte buf[], int len) {
  * init sensor api and load data
  */
 void sensor_api_init() {
+	detect_asb_board();
 	sensor_load();
 	prog_adjust_load();
 	sensor_mqtt_init();
@@ -853,7 +854,7 @@ int read_sensor_adc(Sensor_t *sensor, ulong time) {
 	if (sensor->id >= 16) return HTTP_RQT_NOT_RECEIVED;
 	//Init + Detect:
 
-	int port = 0x48 + sensor->id / 4;
+	int port = ASB_BOARD_ADDR1a + sensor->id / 4;
 	int id = sensor->id % 4;
 
 	ADS1115 adc(port);
