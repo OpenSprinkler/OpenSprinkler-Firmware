@@ -33,6 +33,7 @@ private:
     static char _password[];
     static bool _enabled;
     static char _topic[];
+    static bool _subscribed;
 
     // Following routines are platform specific versions of the public interface
     static int _init(void);

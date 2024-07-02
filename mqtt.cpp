@@ -97,6 +97,7 @@ char OSMqtt::_password[MQTT_MAX_PASSWORD_LEN + 1] = {0};  // password to connect
 int OSMqtt::_port = MQTT_DEFAULT_PORT;  // Port of the broker (default 1883)
 bool OSMqtt::_enabled = false;          // Flag indicating whether MQTT is enabled
 char OSMqtt::_topic[MQTT_MAX_TOPIC_LEN + 1] = {0}; // topic to subscribe to for commands
+bool OSMqtt::_subscribed = false;		//Flag indicating if command topic has been subscribed to
 
 //******************************** HELPER FUNCTIONS ********************************// 
 
@@ -395,6 +396,7 @@ void OSMqtt::begin(void) {
 	char password[MQTT_MAX_PASSWORD_LEN + 1] = {0};
 	int port = MQTT_DEFAULT_PORT;
 	int enabled = 0;
+	_subscribed = false;
 
 	// JSON configuration settings in the form of {"en":0|1,"host":"server_name|IP address","port":1883,user:"",pass:""}
 	char *config = tmp_buffer;
@@ -467,6 +469,7 @@ void OSMqtt::subscribe(void){
 		return;
 	}
 
+	_subscribed = true;
 	_subscribe();
 }
 // Regularly call the loop function to ensure "keep alive" messages are sent to the broker and to reconnect if needed.
@@ -480,6 +483,10 @@ void OSMqtt::loop(void) {
 		DEBUG_LOGF("MQTT Loop: Reconnecting\r\n");
 		_connect();
 		last_reconnect_attempt = millis();
+	}
+
+	if(!_subscribed){
+		subscribe();
 	}
 
 #if defined(ENABLE_DEBUG)
@@ -726,7 +733,7 @@ int OSMqtt::_publish(const char *topic, const char *payload) {
 void piCallback(struct mosquitto *mosq, void *obj, const struct mosquitto_message *message){
 	DEBUG_LOGF("Callback\r\n");
 	char *topic = message->topic;
-	void *payload = message->payload;
+	char *payload = (char*)(message->payload);
 	char msg[message->payloadlen + 1];
 	for (unsigned int i=0;i<message->payloadlen;i++) {
 		msg[i] = (char)payload[i];
@@ -754,7 +761,7 @@ void piCallback(struct mosquitto *mosq, void *obj, const struct mosquitto_messag
 }
 
 int OSMQtt::_subscribe(void) {
-	mosquitto_message_callback_set(mqtt_client, piCallback)
+	mosquitto_message_callback_set(mqtt_client, piCallback);
 	int rc = mosquitto_subscribe(mqtt_client, NULL, _topic, 0);
 	if (rc != MOSQ_ERR_SUCCESS) {
 		DEBUG_LOGF("MQTT Subscribe: Failed (%s)\r\n", mosquitto_strerror(rc));
