@@ -604,6 +604,7 @@ void do_loop()
 		DEBUG_PRINTLN(F("req_mqtt_restart"));
 		os.mqtt.begin();
 		os.status.req_mqtt_restart = false;
+		os.mqtt.subscribe();
 	}
 	os.mqtt.loop();
 
