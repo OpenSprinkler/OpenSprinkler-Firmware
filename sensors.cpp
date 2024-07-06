@@ -41,6 +41,9 @@ byte findKeyVal (const char *str,char *strbuf, uint16_t maxlen,const char *key,b
 static Sensor_t *sensors = NULL;
 static time_t last_save_time = 0;
 
+//Boards:
+static byte asb_detected_boards = 0; //bit 1=0x48+0x49 bit 2=0x4A+0x4B
+
 //Sensor URLS:
 static SensorUrl_t * sensorUrls = NULL;
 
@@ -93,6 +96,28 @@ uint16_t CRC16 (byte buf[], int len) {
   	return crc;  
 } // End: CRC16
 
+
+void detect_asb_board() {
+	//detect analog sensor board, 0x48+0x49=Board1, 0x4A+0x4B=Board2
+#if defined(ESP8266)
+	if (detect_i2c(ASB_BOARD_ADDR1a) && detect_i2c(ASB_BOARD_ADDR1b)) asb_detected_boards |= ASB_BOARD1;
+	if (detect_i2c(ASB_BOARD_ADDR2a) && detect_i2c(ASB_BOARD_ADDR2b)) asb_detected_boards |= ASB_BOARD2;
+#endif
+
+// Old, pre OSPi 1.43 analog inputs:
+#if defined(PCF8591)
+	asb_detected_boards |= OSPI_PCF8591;
+#endif
+
+// New OSPi 1.6 analog inputs:
+#if defined(ADS1115)
+	asb_detected_boards |= OSPI_ADS1115;
+#endif
+}
+
+byte get_asb_detected_boards() {
+	return asb_detected_boards;
+}
 /*
  * init sensor api and load data
  */
@@ -853,6 +878,11 @@ int read_sensor_adc(Sensor_t *sensor, ulong time) {
 	if (!sensor || !sensor->flags.enable) return HTTP_RQT_NOT_RECEIVED;
 	if (sensor->id >= 16) return HTTP_RQT_NOT_RECEIVED;
 	//Init + Detect:
+
+	if (sensor->id < 8 && ((asb_detected_boards & ASB_BOARD1) == 0))
+		return HTTP_RQT_NOT_RECEIVED;
+	if (sensor->id >= 8 && sensor->id < 16 && ((asb_detected_boards & ASB_BOARD2) == 0))
+		return HTTP_RQT_NOT_RECEIVED;
 
 	int port = ASB_BOARD_ADDR1a + sensor->id / 4;
 	int id = sensor->id % 4;

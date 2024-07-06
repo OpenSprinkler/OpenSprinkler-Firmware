@@ -110,6 +110,13 @@ extern "C" {
 #define MAX_SENSOR_REPEAT_READ        32000 //max reads for calculating avg
 #define MAX_SENSOR_READ_TIME              1 // second for reading sensors
 
+//detected Analog Sensor Boards:
+#define ASB_BOARD1   0x01
+#define ASB_BOARD2   0x02
+#define OSPI_PCF8591 0x04
+#define OSPI_ADS1115 0x08
+
+
 typedef struct SensorFlags {
 	uint     enable:1;  // enabled
 	uint     log:1;     // log data enabled
@@ -226,6 +233,7 @@ typedef struct SensorUrl {
 #define ASB_BOARD_ADDR2b 0x4B
 
 void sensor_api_init();
+byte get_asb_detected_boards();
 
 Sensor_t* getSensors();
 const char* getSensorUnit(int unitid);
@@ -298,6 +306,8 @@ void SensorUrl_save();
 bool SensorUrl_delete(uint nr, uint type);
 bool SensorUrl_add(uint nr, uint type, const char *urlstr);
 char *SensorUrl_get(uint nr, uint type);
+
+void detect_asb_board();
 
 #if defined(ESP8266)
 ulong diskFree();

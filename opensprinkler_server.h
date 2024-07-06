@@ -33,7 +33,6 @@
 #endif
 
 char dec2hexchar(byte dec);
-void detect_asb_board();
 
 class BufferFiller {
 	char *start; //!< Pointer to start of buffer
