@@ -2944,8 +2944,7 @@ static const int sensor_types[] = {
 	SENSOR_SMT100_MODBUS_RTU_MOIS,
 	SENSOR_SMT100_MODBUS_RTU_TEMP,
 
-#if defined(ARDUINO)
- #if defined(ESP8266)
+#if defined(ESP8266)
 	SENSOR_ANALOG_EXTENSION_BOARD,
 	SENSOR_ANALOG_EXTENSION_BOARD_P,
 	SENSOR_SMT50_MOIS,
@@ -2956,15 +2955,12 @@ static const int sensor_types[] = {
 	SENSOR_THERM200,
 	SENSOR_AQUAPLUMB,
 	SENSOR_USERDEF,
- #endif
-#else
-
+#endif
 #if defined ADS1115||PCF8591
 	SENSOR_OSPI_ANALOG,
 	SENSOR_OSPI_ANALOG_P,
 	SENSOR_OSPI_ANALOG_SMT50_MOIS,
 	SENSOR_OSPI_ANALOG_SMT50_TEMP,
-#endif
 #endif
 	SENSOR_MQTT,
 	SENSOR_REMOTE,
@@ -2984,7 +2980,6 @@ static const int sensor_types[] = {
 static const char* sensor_names[] = {
 	"Truebner SMT100 RS485 Modbus RTU over TCP, moisture mode",
 	"Truebner SMT100 RS485 Modbus RTU over TCP, temperature mode",
-#if defined(ARDUINO)
  #if defined(ESP8266)
 	"ASB - voltage mode 0..4V",
 	"ASB - 0..3.3V to 0..100%",
@@ -2998,14 +2993,12 @@ static const char* sensor_names[] = {
 	"ASB - Vegetronix AquaPlumb",
 
 	"ASB - user defined sensor",
- #endif
-#else
+#endif
 #if defined ADS1115||PCF8591
 	"OSPi analog input - voltage mode 0..3.3V",
 	"OSPi analog input - 0.3.3V to 0..100%",
 	"OSPi analog input - SMT50 moisture mode",
 	"OSPi analog input - SMT50 temperature mode",
-#endif
 #endif
 	"MQTT subscription",
 	"Remote opensprinkler sensor",
