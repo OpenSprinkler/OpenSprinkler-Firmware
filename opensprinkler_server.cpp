@@ -954,6 +954,9 @@ void server_json_options_main() {
 			v=water_time_decode_signed(v);
 		}
 
+		if (oid==IOPT_STATION_STAGGER)
+			v<<=2;
+
 		#if defined(ARDUINO)
 		if (oid==IOPT_BOOST_TIME) {
 			if (os.hw_type==HW_TYPE_AC || os.hw_type==HW_TYPE_UNKNOWN) continue;
@@ -1417,6 +1420,9 @@ void server_change_options(OTF_PARAMS_DEF)
 			} // encode station delay time
 			if(oid==IOPT_BOOST_TIME) {
 				 v>>=2;
+			}
+			if(oid==IOPT_STATION_STAGGER) {
+				v>>=2;
 			}
 			if (v>=0 && v<=max_value) {
 				os.iopts[oid] = v;

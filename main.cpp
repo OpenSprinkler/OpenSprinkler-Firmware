@@ -1281,7 +1281,7 @@ void schedule_all_stations(time_os_t curr_time) {
 			// otherwise, concurrent scheduling
 			q->st = con_start_time;
 			// stagger concurrent stations by 1 second
-			con_start_time++;
+			con_start_time++; // consider removing this as we now have a station stagger option
 		}
 
 		handle_master_adjustments(curr_time, q);

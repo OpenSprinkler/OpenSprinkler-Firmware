@@ -247,7 +247,7 @@ const char iopt_prompts[] PROGMEM =
 	"Subnet mask2:   "
 	"Subnet mask3:   "
 	"Subnet mask4:   "
-	"Station stagger?"
+	"Stn stagger (ms)"
 	"Force wired?    "
 	"Reserved 1      "
 	"Reserved 2      "
@@ -326,7 +326,7 @@ const byte iopt_max[] PROGMEM = {
 	255,
 	255,
 	255,
-	1,
+	255,
 	1,
 	255,
 	255,
@@ -411,7 +411,7 @@ byte OpenSprinkler::iopts[] = {
 	255,// subnet mask 2
 	255,// subnet mask 3
 	0,
-	1,  // station stagger
+	50,  // station stagger
 	1,  // force wired connection
 	0,  // reserved 1
 	0,  // reserved 2
@@ -1267,15 +1267,77 @@ void OpenSprinkler::apply_all_station_bits() {
 			engage_booster = 0;
 		}
 
+		// Use station stagger delay for AC controllers when opening or closing multiple zones simultaneously
+		do {
+			if(!(hw_type==HW_TYPE_AC && iopts[IOPT_STATION_STAGGER]>0)) break;
+			// step 1: check if station bits has changed at all
+			if(memcmp(station_bits, prev_station_bits, nboards)==0) break;
+			// step 2: count the number of bits that has changed, and see if it's more than 2
+			byte count = 0;
+			byte s, b;
+			for(b=0;b<nboards;b++) {
+				count += __builtin_popcount(station_bits[b] ^ prev_station_bits[b]);
+			}
+			if(count<3) break;
+			// step 3: more than 2 zones are chaging state, stagger them
+			uint16_t stagger = iopts[IOPT_STATION_STAGGER]<<2; // multiply by 4
+			// step 4: handle main controller
+			uint16_t sb = station_bits[0];
+			uint16_t psb = prev_station_bits[0];
+			uint16_t mask;
+			if(sb!=psb) {
+				for(s=0;s<8;s++) {
+					mask = 1<<s;
+					if((psb&mask)!=(sb&mask)) {
+						psb = (psb&(~mask)) | (sb&mask);
+						if(drio->type==IOEXP_TYPE_9555) {
+							/* revision >= 1 uses PCA9555 with active high logic */
+							uint16_t reg = drio->i2c_read(NXP_OUTPUT_REG);  // read current output reg value
+							reg = (reg&0xFF00) | psb; // output channels are the low 8-bit
+							drio->i2c_write(NXP_OUTPUT_REG, reg); // write value to register
+						} else if(drio->type==IOEXP_TYPE_8574) {
+							drio->i2c_write(NXP_OUTPUT_REG, ~psb); /* revision 0 uses PCF8574 with active low logic, so all bits must be flipped */
+						}
+						delay(stagger);
+					}
+				}
+			}
+			// assert psb == sb
+			prev_station_bits[0] = sb;
+
+			// step 5: handle expander
+			for(b=0;b<(nboards/2);b++) {
+				sb = station_bits[b*2+2]<<8 + station_bits[b*2+1];	// each expander has 16 zones
+				psb = prev_station_bits[b*2+2]<<8 + prev_station_bits[b*2+1];
+				if(sb!=psb) {
+					for(s=0;s<16;s++) {
+						mask = 1<<s;
+						if((psb&mask)!=(sb&mask)) {
+							psb = (psb&(~mask)) | (sb&mask);
+							if(expanders[b]->type==IOEXP_TYPE_9555) {
+								expanders[b]->i2c_write(NXP_OUTPUT_REG, psb);
+							} else {
+								expanders[b]->i2c_write(NXP_OUTPUT_REG, ~psb);
+							}
+							delay(stagger);
+						}
+					}
+				}
+				// assert psb == sb
+				prev_station_bits[b*2+1] = station_bits[b*2+1];
+				prev_station_bits[b*2+2] = station_bits[b*2+2];
+			}
+		} while(0);
+
 		// Handle driver board (on main controller)
-		if(drio->type==IOEXP_TYPE_8574) {
-			/* revision 0 uses PCF8574 with active low logic, so all bits must be flipped */
-			drio->i2c_write(NXP_OUTPUT_REG, ~station_bits[0]);
-		} else if(drio->type==IOEXP_TYPE_9555) {
-			/* revision 1 uses PCA9555 with active high logic */
+		if(drio->type==IOEXP_TYPE_9555) {
+			/* revision >= 1 uses PCA9555 with active high logic */
 			uint16_t reg = drio->i2c_read(NXP_OUTPUT_REG);  // read current output reg value
 			reg = (reg&0xFF00) | station_bits[0]; // output channels are the low 8-bit
 			drio->i2c_write(NXP_OUTPUT_REG, reg); // write value to register
+		} else if(drio->type==IOEXP_TYPE_8574) {
+			/* revision 0 uses PCF8574 with active low logic, so all bits must be flipped */
+			drio->i2c_write(NXP_OUTPUT_REG, ~station_bits[0]);
 		}
 
 		// Handle expansion boards
@@ -1289,6 +1351,7 @@ void OpenSprinkler::apply_all_station_bits() {
 			}
 		}
 	}
+
 #else
 	digitalWrite(PIN_SR_LATCH, LOW);
 	byte bid, s, sbits;
