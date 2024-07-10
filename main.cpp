@@ -1387,12 +1387,18 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 		ifttt_enabled = os.iopts[IOPT_NOTIF_ENABLE]&type;
 	}
 
+#define MAX_EMAIL_HOST_LEN	64
+#define MAX_EMAIL_USER_LEN	64
+#define MAX_EMAIL_PASS_LEN	64
+#define MAX_EMAIL_RECP_LEN	64
+#define DEFAULT_EMAIL_PORT	465
+
 	// define email variables
-	char email_host[32 + 1] = {0};
-	char email_username[32 + 1] = {0};
-	char email_password[32 + 1] = {0};
-	char email_recipient[32 + 1] = {0};
-	int  email_port = 465;
+	char email_host[MAX_EMAIL_HOST_LEN + 1] = {0};
+	char email_username[MAX_EMAIL_HOST_LEN + 1] = {0};
+	char email_password[MAX_EMAIL_HOST_LEN + 1] = {0};
+	char email_recipient[MAX_EMAIL_HOST_LEN + 1] = {0};
+	int  email_port = DEFAULT_EMAIL_PORT;
 	int  email_en = 0;
 
 	// parse email variables
@@ -1403,7 +1409,7 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 		if (*postval != 0) {
 			sscanf(
 				postval,
-				"\"en\":%d,\"host\":\"%" xstr(32) "[^\"]\",\"port\":%d,\"user\":\"%" xstr(32) "[^\"]\",\"pass\":\"%" xstr(32) "[^\"]\",\"recipient\":\"%" xstr(32) "[^\"]\"",
+				"\"en\":%d,\"host\":\"%" xstr(MAX_EMAIL_HOST_LEN) "[^\"]\",\"port\":%d,\"user\":\"%" xstr(MAX_EMAIL_USER_LEN) "[^\"]\",\"pass\":\"%" xstr(MAX_EMAIL_PASS_LEN) "[^\"]\",\"recipient\":\"%" xstr(MAX_EMAIL_RECP_LEN) "[^\"]\"",
 				&email_en, email_host, &email_port, email_username, email_password, email_recipient
 				);
 		}
