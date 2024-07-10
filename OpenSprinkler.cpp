@@ -2018,18 +2018,9 @@ int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char*
 		}
 	}
 #else
-	/*while(client->connected()) {
-		int len=client->read((uint8_t *)ether_buffer+pos, ETHER_BUFFER_SIZE);
-		if (len==0) continue;
-		pos+=len;
-		if(millis()>stoptime) {
-			DEBUG_PRINTLN(F("host timeout occured"));
-			//return HTTP_RQT_TIMEOUT; // instead of returning with timeout, we'll work with data received so far
-			break;
-		}
-	}*/
-	int n = client->read((uint8_t *)ether_buffer+pos, ETHER_BUFFER_SIZE);
-	pos+=n;
+	len = client->read((uint8_t *)ether_buffer+pos, ETHER_BUFFER_SIZE);
+	pos += len;
+
 #endif
 	ether_buffer[pos]=0; // properly end buffer with 0
 	client->stop();

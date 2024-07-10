@@ -339,27 +339,30 @@ EthernetClientSsl::operator bool()
 //	This function will block until either data is received OR a timeout happens.
 //	If an error occurs or a timeout happens, we set the disconnect flag on the socket
 //	and return 0;
-int EthernetClientSsl::read(uint8_t *buf, size_t size)
-{
-	/*int retval = SSL_read(ssl, buf, size);
-	if (retval < 0) // socket closed
+int EthernetClientSsl::read(uint8_t *buf, size_t size) {
+	fd_set readfds;
+	struct timeval timeout;
+	int sel_rc;
+
+	FD_ZERO(&readfds);
+	FD_SET(m_sock, &readfds);
+	timeout.tv_sec  = 5;
+	timeout.tv_usec = 0;
+	sel_rc = select(m_sock + 1, &readfds, NULL, NULL, &timeout);
+	if(sel_rc < 1) {
 		m_connected = false;
-	return retval;*/
-	int n=0;
-	for (;;) {
-			if ((n = SSL_read(ssl, buf, size)) < 0) {
-					DEBUG_PRINTLN("ERROR reading from socket.");
-					break;
-			}
-			if (!n) break;
-			printf("%s", buf);
+		return 0;
 	}
-	return n;
+	size_t readsize;
+	int n = SSL_read_ex(ssl, buf, size, &readsize);
+	if(n<=0) {
+		m_connected = false;
+		return 0;
+	}
+	return readsize;
 }
 
-size_t EthernetClientSsl::write(const uint8_t *buf, size_t size)
-{
+size_t EthernetClientSsl::write(const uint8_t *buf, size_t size) {
 	return SSL_write(ssl, buf, size);
-	//return ::send(m_sock, buf, size, MSG_NOSIGNAL);
 }
 #endif
