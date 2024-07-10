@@ -620,15 +620,20 @@ byte OpenSprinkler::start_ether() {
 	eth.setDefault();
 	if(!eth.begin((uint8_t*)tmp_buffer))	return 0;
 	lcd_print_line_clear_pgm(PSTR("Start wired link"), 1);
-	lcd_print_line_clear_pgm(eth.isW5500 ? PSTR("    (w5500)    ") : PSTR("   (enc28j60)   "), 2);
+	lcd_print_line_clear_pgm(eth.isW5500 ? PSTR("  [w5500]    ") : PSTR(" [enc28j60]  "), 2);
 	
 	ulong timeout = millis()+60000; // 60 seconds time out
+	byte timecount = 1;
 	while (!eth.connected() && millis()<timeout) {
 		DEBUG_PRINT(".");
+		lcd.setCursor(13, 2);
+		lcd.print(timecount);
 		delay(1000);
+		timecount++;
 	}
-	// if wired connection is not done at this point, return directly
+	lcd_print_line_clear_pgm(PSTR(""), 2);
 	if(eth.connected()) {
+		// if wired connection is successful at this point, copy the network ips to config
 		DEBUG_PRINTLN();
 		DEBUG_PRINT("eth.ip:");
 		DEBUG_PRINTLN(eth.localIP());
@@ -642,9 +647,11 @@ byte OpenSprinkler::start_ether() {
 			memcpy(iopts+IOPT_SUBNET_MASK1, &(eth.subnetMask()[0]), 4);
 			iopts_save();
 		}
+		return 1;
+	} else {
+		// if wired connection has failed at this point, return depending on whether the user wants to force wired
+		return (iopts[IOPT_FORCE_WIRED] ? 1 : 0);
 	}
-
-	return 1;
 
 #else
 	Ethernet.init(PIN_ETHER_CS);  // make sure to call this before any Ethernet calls
