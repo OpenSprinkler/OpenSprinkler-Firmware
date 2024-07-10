@@ -167,6 +167,16 @@ const char iopt_json_names[] PROGMEM =
 	"subn2"
 	"subn3"
 	"subn4"
+	"sstag"
+	"fwire"
+	"resv1"
+	"resv2"
+	"resv3"
+	"resv4"
+	"resv5"
+	"resv6"
+	"resv7"
+	"resv8"
 	"wimod"
 	"reset"
 	;
@@ -237,6 +247,16 @@ const char iopt_prompts[] PROGMEM =
 	"Subnet mask2:   "
 	"Subnet mask3:   "
 	"Subnet mask4:   "
+	"Station stagger?"
+	"Force wired?    "
+	"Reserved 1      "
+	"Reserved 2      "
+	"Reserved 3      "
+	"Reserved 4      "
+	"Reserved 5      "
+	"Reserved 6      "
+	"Reserved 7      "
+	"Reserved 8      "
 	"WiFi mode?      "
 	"Factory reset?  ";
 
@@ -297,6 +317,16 @@ const byte iopt_max[] PROGMEM = {
 	255,
 	1,
 	255,
+	1,
+	255,
+	255,
+	255,
+	255,
+	255,
+	255,
+	255,
+	255,
+	1,
 	1,
 	255,
 	255,
@@ -381,6 +411,16 @@ byte OpenSprinkler::iopts[] = {
 	255,// subnet mask 2
 	255,// subnet mask 3
 	0,
+	1,  // station stagger
+	1,  // force wired connection
+	0,  // reserved 1
+	0,  // reserved 2
+	0,  // reserved 3
+	0,  // reserved 4
+	0,  // reserved 5
+	0,  // reserved 6
+	0,  // reserved 7
+	0,  // reserved 8
 	WIFI_MODE_AP, // wifi mode
 	0   // reset
 };

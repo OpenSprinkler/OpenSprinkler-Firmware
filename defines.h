@@ -29,14 +29,14 @@
 typedef unsigned char byte;
 typedef unsigned long ulong;
 
-#define TMP_BUFFER_SIZE      255   // scratch buffer size
+#define TMP_BUFFER_SIZE      320   // scratch buffer size
 
 /** Firmware version, hardware version, and maximal values */
-#define OS_FW_VERSION  220  // Firmware version: 220 means 2.2.0
+#define OS_FW_VERSION  221  // Firmware version: 220 means 2.2.0
 														// if this number is different from the one stored in non-volatile memory
 														// a device reset will be automatically triggered
 
-#define OS_FW_MINOR      6  // Firmware minor version
+#define OS_FW_MINOR      0  // Firmware minor version
 
 /** Hardware version base numbers */
 #define OS_HW_VERSION_BASE   0x00 // OpenSprinkler
@@ -135,7 +135,7 @@ typedef unsigned long ulong;
 #define MAX_NUM_BOARDS    (1+MAX_EXT_BOARDS)  // maximum number of 8-zone boards including expanders
 #define MAX_NUM_STATIONS  (MAX_NUM_BOARDS*8)  // maximum number of stations
 #define STATION_NAME_SIZE 32    // maximum number of characters in each station name
-#define MAX_SOPTS_SIZE    160   // maximum string option size
+#define MAX_SOPTS_SIZE    320   // maximum string option size
 
 #define STATION_SPECIAL_DATA_SIZE  (TMP_BUFFER_SIZE - STATION_NAME_SIZE - 12)
 
@@ -247,6 +247,16 @@ enum {
 	IOPT_SUBNET_MASK2,
 	IOPT_SUBNET_MASK3,
 	IOPT_SUBNET_MASK4,
+	IOPT_STATION_STAGGER,
+	IOPT_FORCE_WIRED,
+	IOPT_RESERVE_1,
+	IOPT_RESERVE_2,
+	IOPT_RESERVE_3,
+	IOPT_RESERVE_4,
+	IOPT_RESERVE_5,
+	IOPT_RESERVE_6,
+	IOPT_RESERVE_7,
+	IOPT_RESERVE_8,
 	IOPT_WIFI_MODE, //ro
 	IOPT_RESET,     //ro
 	NUM_IOPTS // total number of integer options
