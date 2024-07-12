@@ -2214,7 +2214,6 @@ void handle_web_request(char *p) {
     
 	if(com[0]==' ' || com[0]==0) {
 		server_home(OTF_PARAMS);  // home page handler
-		send_packet(OTF_PARAMS);
         res.end();
 		m_client->stop();
 	} else {
@@ -2284,7 +2283,6 @@ void handle_web_request(char *p) {
 			print_header(OTF_PARAMS);
 			bfill.emit_p(PSTR("{\"result\":$D}"), HTML_PAGE_NOT_FOUND);
 		}
-		// send_packet(OTF_PARAMS);
         res.end();
 		m_client->stop();
 	}
