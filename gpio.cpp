@@ -30,7 +30,7 @@
 #include <Wire.h>
 #include "defines.h"
 
-byte IOEXP::detectType(uint8_t address) {
+unsigned char IOEXP::detectType(uint8_t address) {
 	Wire.beginTransmission(address);
 	if(Wire.endTransmission()!=0) return IOEXP_TYPE_NONEXIST; // this I2C address does not exist
 
@@ -92,7 +92,7 @@ void PCA9555::shift_out(uint8_t plat, uint8_t pclk, uint8_t pdat, uint8_t v) {
 	for(uint8_t s=0;s<8;s++) {
 		output &= ~(1<<pclk); i2c_write(NXP_OUTPUT_REG, output); // set clock low
 
-		if(v & ((byte)1<<(7-s))) {
+		if(v & ((unsigned char)1<<(7-s))) {
 			output |= (1<<pdat);
 		} else {
 			output &= ~(1<<pdat);
@@ -144,7 +144,7 @@ void PCF8574::i2c_write(uint8_t reg, uint16_t v) {
 
 extern OpenSprinkler os;
 
-void pinModeExt(byte pin, byte mode) {
+void pinModeExt(unsigned char pin, unsigned char mode) {
 	if(pin==255) return;
 	if(pin>=IOEXP_PIN) {
 		os.mainio->pinMode(pin-IOEXP_PIN, mode);
@@ -153,7 +153,7 @@ void pinModeExt(byte pin, byte mode) {
 	}
 }
 
-void digitalWriteExt(byte pin, byte value) {
+void digitalWriteExt(unsigned char pin, unsigned char value) {
 	if(pin==255) return;
 	if(pin>=IOEXP_PIN) {
 
@@ -163,7 +163,7 @@ void digitalWriteExt(byte pin, byte value) {
 	}
 }
 
-byte digitalReadExt(byte pin) {
+unsigned char digitalReadExt(unsigned char pin) {
 	if(pin==255) return HIGH;
 	if(pin>=IOEXP_PIN) {
 		return os.mainio->digitalRead(pin-IOEXP_PIN);
@@ -207,7 +207,7 @@ static volatile int		 pinPass = -1 ;
 static pthread_mutex_t pinMutex ;
 
 /** Export gpio pin */
-static byte GPIOExport(int pin) {
+static unsigned char GPIOExport(int pin) {
 	char buffer[BUFFER_MAX];
 	int fd, len;
 
@@ -225,7 +225,7 @@ static byte GPIOExport(int pin) {
 
 #if 0
 /** Unexport gpio pin */
-static byte GPIOUnexport(int pin) {
+static unsigned char GPIOUnexport(int pin) {
 	char buffer[BUFFER_MAX];
 	int fd, len;
 
@@ -243,7 +243,7 @@ static byte GPIOUnexport(int pin) {
 #endif
 
 /** Set interrupt edge mode */
-static byte GPIOSetEdge(int pin, const char *edge) {
+static unsigned char GPIOSetEdge(int pin, const char *edge) {
 	char path[BUFFER_MAX];
 	int fd;
 
@@ -260,7 +260,7 @@ static byte GPIOSetEdge(int pin, const char *edge) {
 }
 
 /** Set pin mode, in or out */
-void pinMode(int pin, byte mode) {
+void pinMode(int pin, unsigned char mode) {
 	static const char dir_str[]  = "in\0out";
 
 	char path[BUFFER_MAX];
@@ -316,7 +316,7 @@ void gpio_fd_close(int fd) {
 }
 
 /** Read digital value */
-byte digitalRead(int pin) {
+unsigned char digitalRead(int pin) {
 	char value_str[3];
 
 	int fd = gpio_fd_open(pin, O_RDONLY);
@@ -334,7 +334,7 @@ byte digitalRead(int pin) {
 }
 
 /** Write digital value given file descriptor */
-void gpio_write(int fd, byte value) {
+void gpio_write(int fd, unsigned char value) {
 	static const char value_str[] = "01";
 
 	if (1 != write(fd, &value_str[LOW==value?0:1], 1)) {
@@ -343,7 +343,7 @@ void gpio_write(int fd, byte value) {
 }
 
 /** Write digital value */
-void digitalWrite(int pin, byte value) {
+void digitalWrite(int pin, unsigned char value) {
 	int fd = gpio_fd_open(pin);
 	if (fd < 0) {
 		return;
@@ -517,7 +517,7 @@ int assert_gpiod_line(int pin) {
 }
 
 /** Set pin mode, in or out */
-void pinMode(int pin, byte mode) {
+void pinMode(int pin, unsigned char mode) {
 	if( assert_gpiod_line(pin) ) { return; }
 	switch(mode) {
 		case INPUT:
@@ -538,7 +538,7 @@ void pinMode(int pin, byte mode) {
 }
 
 /** Read digital value */
-byte digitalRead(int pin) {
+unsigned char digitalRead(int pin) {
 	if( !gpio_lines[pin] ) {
 		DEBUG_PRINT("tried to read uninitialized pin ");
 		DEBUG_PRINTLN(pin);
@@ -554,7 +554,7 @@ byte digitalRead(int pin) {
 }
 
 /** Write digital value */
-void digitalWrite(int pin, byte value) {
+void digitalWrite(int pin, unsigned char value) {
 	if( !gpio_lines[pin] ) {
 		DEBUG_PRINT("tried to write uninitialized pin ");
 		DEBUG_PRINTLN(pin);
@@ -570,7 +570,7 @@ void digitalWrite(int pin, byte value) {
 }
 
 void attachInterrupt(int pin, const char* mode, void (*isr)(void)) {}
-void gpio_write(int fd, byte value) {}
+void gpio_write(int fd, unsigned char value) {}
 int gpio_fd_open(int pin, int mode) {return 0;}
 void gpio_fd_close(int fd) {}
 
@@ -578,12 +578,12 @@ void gpio_fd_close(int fd) {}
 
 #else
 
-void pinMode(int pin, byte mode) {}
-void digitalWrite(int pin, byte value) {}
-byte digitalRead(int pin) {return 0;}
+void pinMode(int pin, unsigned char mode) {}
+void digitalWrite(int pin, unsigned char value) {}
+unsigned char digitalRead(int pin) {return 0;}
 void attachInterrupt(int pin, const char* mode, void (*isr)(void)) {}
 int gpio_fd_open(int pin, int mode) {return 0;}
 void gpio_fd_close(int fd) {}
-void gpio_write(int fd, byte value) {}
+void gpio_write(int fd, unsigned char value) {}
 
 #endif

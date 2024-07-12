@@ -32,8 +32,8 @@
 
 String scan_network();
 void start_network_ap(const char *ssid, const char *pass);
-void start_network_sta(const char *ssid, const char *pass, int32_t channel=0, const byte *mac=NULL);
-void start_network_sta_with_ap(const char *ssid, const char *pass, int32_t channel=0, const byte *mac=NULL);
+void start_network_sta(const char *ssid, const char *pass, int32_t channel=0, const unsigned char *mac=NULL);
+void start_network_sta_with_ap(const char *ssid, const char *pass, int32_t channel=0, const unsigned char *mac=NULL);
 #endif
 
 #endif

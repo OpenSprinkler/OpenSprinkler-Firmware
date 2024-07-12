@@ -250,7 +250,7 @@ int OSMqtt::_connect(void) {
 	mqtt_client->setServer(_host, _port);
 	boolean state;
 	#define MQTT_CONNECT_NTRIES 3
-	byte tries = 0;
+	unsigned char tries = 0;
 	do {
 		DEBUG_PRINT(F("mqtt: "));
 		DEBUG_PRINTLN(_host);

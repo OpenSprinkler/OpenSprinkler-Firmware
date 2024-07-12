@@ -26,7 +26,7 @@
 
 //#define ENABLE_DEBUG  // enable serial debug
 
-typedef unsigned char byte;
+// typedef unsigned char unsigned char;
 typedef unsigned long ulong;
 
 #define TMP_BUFFER_SIZE      255   // scratch buffer size
@@ -342,19 +342,19 @@ enum {
 	#define PIN_ETHER_CS       16 // Ethernet CS (chip select pin) is 16 on OS 3.2 and above
 
 	/* To accommodate different OS30 versions, we use software defines pins */
-	extern byte PIN_BUTTON_1;
-	extern byte PIN_BUTTON_2;
-	extern byte PIN_BUTTON_3;
-	extern byte PIN_RFRX;
-	extern byte PIN_RFTX;
-	extern byte PIN_BOOST;
-	extern byte PIN_BOOST_EN;
-	extern byte PIN_LATCH_COM;
-	extern byte PIN_LATCH_COMA;
-	extern byte PIN_LATCH_COMK;
-	extern byte PIN_SENSOR1;
-	extern byte PIN_SENSOR2;
-	extern byte PIN_IOEXP_INT;
+	extern unsigned char PIN_BUTTON_1;
+	extern unsigned char PIN_BUTTON_2;
+	extern unsigned char PIN_BUTTON_3;
+	extern unsigned char PIN_RFRX;
+	extern unsigned char PIN_RFTX;
+	extern unsigned char PIN_BOOST;
+	extern unsigned char PIN_BOOST_EN;
+	extern unsigned char PIN_LATCH_COM;
+	extern unsigned char PIN_LATCH_COMA;
+	extern unsigned char PIN_LATCH_COMK;
+	extern unsigned char PIN_SENSOR1;
+	extern unsigned char PIN_SENSOR2;
+	extern unsigned char PIN_IOEXP_INT;
 
 	/* Original OS30 pin defines */
 	//#define V0_MAIN_INPUTMASK 0b00001010 // main input pin mask

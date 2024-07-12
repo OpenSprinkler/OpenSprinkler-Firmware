@@ -35,7 +35,7 @@ typedef enum {
 
 typedef enum {
 		tmSecond, tmMinute, tmHour, tmWday, tmDay,tmMonth, tmYear, tmNbrFields
-} tmByteFields;
+} tmunsigned charFields;
 
 typedef struct	{
 	uint8_t Second;
