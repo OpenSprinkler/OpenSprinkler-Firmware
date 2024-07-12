@@ -1618,7 +1618,7 @@ void write_log(unsigned char type, time_os_t curr_time) {
 		FSInfo fs_info;
 		LittleFS.info(fs_info);
 		// check if we are getting close to run out of space, and delete some oldest files
-		if(fs_info.totalunsigned chars < fs_info.usedunsigned chars + fs_info.blockSize * 4) {
+		if(fs_info.totalBytes < fs_info.usedBytes + fs_info.blockSize * 4) {
 			// delete the oldest 7 files (1 week of log)
 			for(unsigned char i=0;i<7;i++)	delete_log_oldest();
 		}

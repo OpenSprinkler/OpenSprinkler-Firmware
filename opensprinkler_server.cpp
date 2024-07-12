@@ -251,10 +251,10 @@ void print_header(bool isJson=true)  {
 #endif
 
 #if defined(ESP8266) || defined(OSPI)
+#if defined(OSPI)
 string two_digits(uint8_t x) {
 	return std::to_string(x);
 }
-#if defined(OSPI)
 #else
 String two_digits(uint8_t x) {
 	return String(x/10) + (x%10);
@@ -1925,7 +1925,7 @@ void server_json_debug(OTF_PARAMS_DEF) {
 	(uint16_t)ESP.getFreeHeap());
 	FSInfo fs_info;
 	LittleFS.info(fs_info);
-	bfill.emit_p(PSTR(",\"flash\":$D,\"used\":$D,"), fs_info.totalunsigned chars, fs_info.usedunsigned chars);
+	bfill.emit_p(PSTR(",\"flash\":$D,\"used\":$D,"), fs_info.totalBytes, fs_info.usedBytes);
 	if(useEth) {
 		bfill.emit_p(PSTR("\"isW5500\":$D}"), eth.isW5500);
 	} else {

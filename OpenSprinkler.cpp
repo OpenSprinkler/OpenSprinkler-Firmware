@@ -1942,11 +1942,11 @@ int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char*
 	// so this loop is going to take longer than it should be
 	// todo: can consider using HTTPClient for ESP8266
 	while(true) {
-		int nunsigned chars = client->available();
-		if(nunsigned chars>0) {
-			if(pos+nunsigned chars>ETHER_BUFFER_SIZE) nunsigned chars=ETHER_BUFFER_SIZE-pos; // cannot read more than buffer size
-			client->read((uint8_t*)ether_buffer+pos, nunsigned chars);
-			pos+=nunsigned chars;
+		int nbytes = client->available();
+		if(nbytes>0) {
+			if(pos+nbytes>ETHER_BUFFER_SIZE) nbytes=ETHER_BUFFER_SIZE-pos; // cannot read more than buffer size
+			client->read((uint8_t*)ether_buffer+pos, nbytes);
+			pos+=nbytes;
 		}
 		if(millis()>stoptime) {
 			DEBUG_PRINTLN(F("host timeout occured"));
