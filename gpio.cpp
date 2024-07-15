@@ -472,7 +472,8 @@ void attachInterrupt(int pin, const char* mode, void (*isr)(void)) {
 #define GPIO_MAX	 64
 
 // GPIO interfaces
-const char *gpio_chipname = "gpiochip0";
+const char *gpio_chipname_pi_n = "gpiochip0";
+const char *gpio_chipname_pi_5 = "gpiochip0";
 const char *gpio_consumer = "opensprinkler";
 
 struct gpiod_chip *chip = NULL;
@@ -485,16 +486,72 @@ struct gpiod_line* gpio_lines[] = {
 	NULL, NULL, NULL, NULL, NULL,
 };
 
+bool prefix(const char *pre, const char *str) {
+    return strncmp(pre, str, strlen(pre)) == 0;
+}
+
+
 int assert_gpiod_chip() {
 	if( !chip ) {
-		chip = gpiod_chip_open_by_name(gpio_chipname);
-		if( !chip ) {
-			DEBUG_PRINTLN("failed to open gpio chip");
-			return -1;
-		} else {
-			DEBUG_PRINTLN("gpio chip opened");
-			return 0;
-		}
+        const char *chip_name = NULL;
+
+        FILE *file = fopen("/proc/device-tree/compatible", "rb");
+        if (file != NULL) {
+            char buffer[100];
+
+            int total = fread(buffer, 1, sizeof(buffer), file);
+
+            if (prefix("raspberrypi", buffer)) {
+                const char *cpu_buf = buffer;
+                size_t index = 0;
+
+                // model and cpu is seperated by a null byte
+                while (index < (total - 1) && cpu_buf[index]) {
+                    index += 1;
+                }
+
+                cpu_buf += index + 1;  
+                
+                if (!strcmp("brcm,bcm2712", cpu_buf)) {
+                    // Pi 5
+                    chip_name = "pinctrl-rp1";
+                } else if (!strcmp("brcm,bcm2711", cpu_buf)) {
+                    // Pi 4
+                    chip_name = "pinctrl-bcm2711";
+                } else if (!strcmp("brcm,bcm2837", cpu_buf)
+                || !strcmp("brcm,bcm2836", cpu_buf)
+                || !strcmp("brcm,bcm2835", cpu_buf)) {
+                    // Pi 0-3
+                    chip_name = "pinctrl-bcm2835";
+                }
+            }
+        }
+
+        
+
+        if (chip_name) {
+            gpiod_chip_iter *iter = gpiod_chip_iter_new();
+            gpiod_chip *tmp_chip = NULL;
+            while (tmp_chip = gpiod_chip_iter_next(iter)) {
+                if (!strcmp(gpiod_chip_label(tmp_chip), chip_name)) {
+                    chip = tmp_chip;
+                    gpiod_chip_iter_free_noclose(iter);
+                    DEBUG_PRINTLN("found and opened chip for device");
+                    return 0;
+                }
+            }
+
+            gpiod_chip_iter_free(iter);
+        } else {
+            chip = gpiod_chip_open_by_name("gpiochip0");
+            if (chip) {
+                DEBUG_PRINTLN("opened gpiochip0");
+                return 0;
+            }
+        }
+
+        DEBUG_PRINTLN("failed to find and open gpio chip");
+        return -1;
 	}
 	return 0;
 }
