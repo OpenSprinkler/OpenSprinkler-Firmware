@@ -472,8 +472,6 @@ void attachInterrupt(int pin, const char* mode, void (*isr)(void)) {
 #define GPIO_MAX	 64
 
 // GPIO interfaces
-const char *gpio_chipname_pi_n = "gpiochip0";
-const char *gpio_chipname_pi_5 = "gpiochip0";
 const char *gpio_consumer = "opensprinkler";
 
 struct gpiod_chip *chip = NULL;
@@ -489,7 +487,6 @@ struct gpiod_line* gpio_lines[] = {
 bool prefix(const char *pre, const char *str) {
     return strncmp(pre, str, strlen(pre)) == 0;
 }
-
 
 int assert_gpiod_chip() {
 	if( !chip ) {
