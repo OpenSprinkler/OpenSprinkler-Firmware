@@ -327,6 +327,7 @@ public:
 	static byte weekday_today();  // returns index of today's weekday (Monday is 0)
 
 	static byte set_station_bit(byte sid, byte value, uint16_t dur=0); // set station bit of one station (sid->station index, value->0/1)
+	static byte get_station_bit(byte sid); // get station bit of one station (sid->station index)
 	static void switch_special_station(byte sid, byte value, uint16_t dur=0); // swtich special station
 	static void clear_all_station_bits(); // clear all station bits
 	static void apply_all_station_bits(); // apply all station bits (activate/deactive values)

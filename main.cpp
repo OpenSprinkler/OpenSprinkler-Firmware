@@ -905,6 +905,11 @@ void do_loop()
 						}
 					}
 				}
+		
+				if(os.get_station_bit(mas_id - 1) == 0 && masbit == 1){
+					push_message(NOTIFY_STATION_ON, mas_id - 1, 0);
+				}
+				
 				os.set_station_bit(mas_id - 1, masbit);
 			}
 		}
@@ -1457,7 +1462,12 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 
 			if (os.mqtt.enabled()) {
 				sprintf_P(topic, PSTR("opensprinkler/station/%d"), lval);
-				sprintf_P(payload, PSTR("{\"state\":1,\"duration\":%d}"), (int)fval);
+				sprintf_P(topic, PSTR("opensprinkler/station/%d"), lval);
+				if((int)fval == 0){
+					sprintf_P(payload, PSTR("{\"state\":1}"));
+				}else{
+					sprintf_P(payload, PSTR("{\"state\":1,\"duration\":%d}"), (int)fval);
+				}
 			}
 
 			// todo: add IFTTT and email support for this event as well.
@@ -1468,17 +1478,30 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 
 			if (os.mqtt.enabled()) {
 				sprintf_P(topic, PSTR("opensprinkler/station/%d"), lval);
-				if (os.iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_FLOW) {
-					sprintf_P(payload, PSTR("{\"state\":0,\"duration\":%d,\"flow\":%d.%02d}"), (int)fval, (int)flow_last_gpm, (int)(flow_last_gpm*100)%100);
-				} else {
-					sprintf_P(payload, PSTR("{\"state\":0,\"duration\":%d}"), (int)fval);
+				if((int)fval == 0){
+					if (os.iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_FLOW) {
+						sprintf_P(payload, PSTR("{\"state\":0,\"flow\":%d.%02d}"), (int)flow_last_gpm, (int)(flow_last_gpm*100)%100);
+					} else {
+						sprintf_P(payload, PSTR("{\"state\":0}"));
+					}
+				}else{
+					if (os.iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_FLOW) {
+						sprintf_P(payload, PSTR("{\"state\":0,\"duration\":%d,\"flow\":%d.%02d}"), (int)fval, (int)flow_last_gpm, (int)(flow_last_gpm*100)%100);
+					} else {
+						sprintf_P(payload, PSTR("{\"state\":0,\"duration\":%d}"), (int)fval);
 				}
+				}
+				
 			}
 			if (ifttt_enabled || email_enabled) {
 				strcat_P(postval, PSTR("Station ["));
 				os.get_station_name(lval, postval+strlen(postval));
-				strcat_P(postval, PSTR("] closed. It ran for "));
-				sprintf_P(postval+strlen(postval), PSTR(" %d minutes %d seconds."), (int)fval/60, (int)fval%60);
+				if((int)fval == 0){
+					strcat_P(postval, PSTR("] closed."));
+				}else{
+					strcat_P(postval, PSTR("] closed. It ran for "));
+					sprintf_P(postval+strlen(postval), PSTR(" %d minutes %d seconds."), (int)fval/60, (int)fval%60);
+				}
 
 				if(os.iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_FLOW) {
 					sprintf_P(postval+strlen(postval), PSTR(" Flow rate: %d.%02d"), (int)flow_last_gpm, (int)(flow_last_gpm*100)%100);

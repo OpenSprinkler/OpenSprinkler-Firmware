@@ -1813,6 +1813,13 @@ byte OpenSprinkler::set_station_bit(byte sid, byte value, uint16_t dur) {
 	return 0;
 }
 
+byte OpenSprinkler::get_station_bit(byte sid) {
+	byte *data = station_bits+(sid>>3); // pointer to the station byte
+	byte mask = (byte)1<<(sid&0x07); // mask
+	if ((*data)&mask) return 1;
+	else return 0;
+}
+
 /** Clear all station bits */
 void OpenSprinkler::clear_all_station_bits() {
 	byte sid;
