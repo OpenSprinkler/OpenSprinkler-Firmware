@@ -364,7 +364,7 @@ unsigned char OpenSprinkler::iopts[] = {
 	100,// this and next byte define flow pulse rate (100x)
 	0,  // default is 1.00 (100)
 	0,  // set as remote extension
-	8,  // this and the next three byte define the custom dns server ip
+	8,  // this and the next three bytes define the custom dns server ip
 	8,
 	8,
 	8,
@@ -429,7 +429,7 @@ bool detect_i2c(int addr) {
 bool OpenSprinkler::load_hardware_mac(unsigned char* buffer, bool wired) {
 #if defined(ESP8266)
 	WiFi.macAddress((unsigned char*)buffer);
-	// if requesting wired Ethernet MAC, flip the last unsigned char to create a modified MAC
+	// if requesting wired Ethernet MAC, flip the last byte to create a modified MAC
 	if(wired) buffer[5] = ~buffer[5];
 	return true;
 #else
