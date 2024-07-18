@@ -26,7 +26,7 @@
 #include "gpio.h"
 #include "testmode.h"
 #include "program.h"
-#include <ArduinoJson.hpp>
+#include "ArduinoJson.hpp"
 
 /** Declare static data members */
 OSMqtt OpenSprinkler::mqtt;

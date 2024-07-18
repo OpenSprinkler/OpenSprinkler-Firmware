@@ -46,7 +46,7 @@
 #include "program.h"
 #include "types.h"
 #include "mqtt.h"
-#include <ArduinoJson.hpp>
+#include "ArduinoJson.hpp"
 
 // Debug routines to help identify any blocking of the event loop for an extended period
 

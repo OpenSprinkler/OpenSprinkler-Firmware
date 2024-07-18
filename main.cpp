@@ -1490,6 +1490,10 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 
 		case NOTIFY_WEATHER_UPDATE:
 
+			if (os.mqtt.enabled()) {
+				strcpy_P(topic, PSTR("weather"));
+				sprintf_P(payload, PSTR("{\"water level\":%d}"), (int)fval);
+			}
 			if (ifttt_enabled) {
 				if(lval>0) {
 					strcat_P(postval, PSTR("external IP updated: "));
