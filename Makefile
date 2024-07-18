@@ -2,7 +2,7 @@ CXX=g++
 # -std=gnu++17
 CXXFLAGS=-std=gnu++14 -DOSPI -Wall -Iexternal/TinyWebsockets/tiny_websockets_lib/include -Iexternal/OpenThings-Framework-Firmware-Library/
 LD=$(CXX)
-LIBS=pthread mosquitto
+LIBS=pthread mosquitto ssl crypto
 LDFLAGS=$(addprefix -l,$(LIBS))
 BINARY=OpenSprinkler
 SOURCES=main.cpp OpenSprinkler.cpp program.cpp opensprinkler_server.cpp utils.cpp weather.cpp gpio.cpp etherport.cpp mqtt.cpp $(wildcard external/TinyWebsockets/tiny_websockets_lib/src/*.cpp) $(wildcard external/OpenThings-Framework-Firmware-Library/*.cpp)
