@@ -121,7 +121,6 @@ uint16_t parseListData(char **p) {
 
 //finding a key value pair
 bool findKeyVal(char *str, char *strbuf, uint16_t maxlen, const char *key, const char stop){
-	DEBUG_LOGF("Finding Key Val\r\n");
 	bool found = false;
 	uint16_t i = 0;
 	if(str == NULL || strbuf == NULL || key == NULL){return false;}
@@ -164,20 +163,18 @@ bool findKeyVal(char *str, char *strbuf, uint16_t maxlen, const char *key, const
 
 //ensure command incudes correct password
 boolean checkPassword(char* pw) {
-	DEBUG_LOGF("Checking Password.\r\n");
 	if (os.iopts[IOPT_IGNORE_PASSWORD])  return true;
 
 	char *pass = tmp_buffer;
 	if(findKeyVal(pw, pass, TMP_BUFFER_SIZE, "pw", '=')){
-		DEBUG_LOGF("Verifying found password.\r\n");
 		urlDecode(pass);
 		if (os.password_verify(pass)) return true;
 	}else{
-		DEBUG_LOGF("Password not found.\r\n");
+		DEBUG_LOGF("Device password not found.\r\n");
 		return false;
 	}
 
-	DEBUG_LOGF("Password Failed.\r\n");
+	DEBUG_LOGF("Device password verification Failed.\r\n");
 	return false;
 }
 
@@ -204,13 +201,11 @@ void changeValues(char *message){
 	}
 
 	if(findKeyVal(message, tmp_buffer, TMP_BUFFER_SIZE, "en", '=')){
-		DEBUG_LOGF("Enabling\r\n");
 		if (tmp_buffer[0]=='1' && !os.status.enabled) os.enable();
 		else if (tmp_buffer[0]=='0' && os.status.enabled) os.disable();
 	}
 
 	if(findKeyVal(message, tmp_buffer, TMP_BUFFER_SIZE, "rd", '=')){
-		DEBUG_LOGF("Setting rain delay\r\n");
 		int rd = atoi(tmp_buffer);
 		if(rd>0){
 			os.nvdata.rd_stop_time = os.now_tz() + (unsigned long) rd * 3600;
@@ -364,7 +359,6 @@ void runOnceProgram(char *message){
 void OSMqtt::init(void) {
 	DEBUG_LOGF("MQTT Init\r\n");
 
-#if defined(ARDUINO)
 	uint8_t mac[6] = {0};
 	#if defined(ESP8266)
 	os.load_hardware_mac(mac, useEth);
@@ -373,7 +367,6 @@ void OSMqtt::init(void) {
 	#endif
 	snprintf(_id, MQTT_MAX_ID_LEN, "OS-%02X%02X%02X%02X%02X%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 	_id[MQTT_MAX_ID_LEN] = 0;
-#endif
 
 	_init();
 };
@@ -408,7 +401,7 @@ void OSMqtt::begin(void) {
 		// Test the parsing otherwise parse
 		if (error) {
 				DEBUG_PRINT(F("mqtt: deserializeJson() failed: "));
-				DEBUG_PRINTLN(error.f_str());
+				DEBUG_PRINTLN(error.c_str());
 		} else {
 				_enabled = (bool)doc["en"];
 				const char *host_val = doc["host"];
@@ -474,15 +467,12 @@ void OSMqtt::publish(const char *topic, const char *payload) {
 void OSMqtt::subscribe(void){
 	if(_sub_topic[0] == 0) { _done_subscribed = true; return; }
 
-	DEBUG_LOGF("MQTT Subscribe: %s\r\n", _sub_topic);
-
 	if (mqtt_client == NULL || !_enabled || os.status.network_fails > 0) return;
 
 	if (!_connected()) {
-		DEBUG_LOGF("MQTT Subscribe: Not connected\r\n");
 		return;
 	}
-
+	DEBUG_LOGF("MQTT Subscribe: %s\r\n", _sub_topic);
 	_done_subscribed = true;
 	_subscribe();
 }
@@ -671,7 +661,7 @@ static void _mqtt_connection_cb(struct mosquitto *mqtt_client, void *obj, int re
 
 	::_connected = true;
 	
-	String aval_topic(_pub_topic);
+	String avail_topic(OSMqtt::get_pub_topic());
 	avail_topic += "/";
 	avail_topic += MQTT_AVAILABILITY_TOPIC;
 
@@ -712,9 +702,10 @@ int OSMqtt::_init(void) {
 	mosquitto_connect_callback_set(mqtt_client, _mqtt_connection_cb);
 	mosquitto_disconnect_callback_set(mqtt_client, _mqtt_disconnection_cb);
 	mosquitto_log_callback_set(mqtt_client, _mqtt_log_cb);
-	String aval_topic(_pub_topic);
+	String avail_topic(_id);
 	avail_topic += "/";
 	avail_topic += MQTT_AVAILABILITY_TOPIC;
+	DEBUG_LOGF("%s\n", avail_topic.c_str());
 	mosquitto_will_set(mqtt_client, avail_topic.c_str(), strlen(MQTT_OFFLINE_PAYLOAD), MQTT_OFFLINE_PAYLOAD, 0, true);
 
 	return MQTT_SUCCESS;
@@ -752,7 +743,7 @@ bool OSMqtt::_connected(void) { return ::_connected; }
 int OSMqtt::_publish(const char *topic, const char *payload) {
 	String total_topic(_pub_topic); // concatenate root topic with specific topic
 	total_topic += "/";
-	total_opic += topic;
+	total_topic += topic;
 	int rc = mosquitto_publish(mqtt_client, NULL, total_topic.c_str(), strlen(payload), payload, 0, false);
 	if (rc != MOSQ_ERR_SUCCESS) {
 		DEBUG_LOGF("MQTT Publish: Failed (%s)\r\n", mosquitto_strerror(rc));

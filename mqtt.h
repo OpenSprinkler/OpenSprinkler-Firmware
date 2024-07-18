@@ -53,6 +53,8 @@ public:
     static void publish(const char *topic, const char *payload);
     static void subscribe();
     static void loop(void);
+    static char* get_pub_topic() { return _pub_topic; }
+    static char* get_sub_topic() { return _sub_topic; }
 };
 
 #endif	// _MQTT_H
