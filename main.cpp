@@ -31,6 +31,12 @@
 #include "mqtt.h"
 #include "main.h"
 
+#if defined(ARDUINO)
+#include <Arduino.h>
+#endif
+
+#include "ArduinoJson.hpp"
+
 #define str(s) #s
 #define xstr(s) str(s)
 
@@ -1382,7 +1388,6 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 #define MAX_EMAIL_PASS_LEN	64
 #define MAX_EMAIL_RECP_LEN	64
 #define DEFAULT_EMAIL_PORT	465
-#include "ArduinoJson.hpp"
 
 	// define email variables
 	char email_host[MAX_EMAIL_HOST_LEN + 1] = {0};
@@ -1401,7 +1406,7 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
             // Add the wrapping curly braces to the string
             postval = tmp_buffer;
             postval[0] = '{';
-            int len = strlen(config);
+            int len = strlen(postval);
             postval[len] = '}';
             postval[len+1] = 0;
 
@@ -1422,7 +1427,7 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
                     const char *password_val = doc["pass"];
                     if(password_val) strncpy(email_password, password_val, MAX_EMAIL_PASS_LEN);
                     const char *recipient_val = doc["recipient"];
-                    if(pubt_val) strncpy(email_recipient, recipient_val, MAX_EMAIL_RECP_LEN);
+                    if(recipient_val) strncpy(email_recipient, recipient_val, MAX_EMAIL_RECP_LEN);
             }
 		}
 	#endif

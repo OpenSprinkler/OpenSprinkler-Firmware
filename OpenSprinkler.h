@@ -149,7 +149,7 @@ struct RFStationData {
 };
 
 /** Remote station data structures - Must fit in STATION_SPECIAL_DATA_SIZE */
-struct RemoteStationData {
+struct RemoteIPStationData {
 	unsigned char ip[8];
 	unsigned char port[4];
 	unsigned char sid[2];
