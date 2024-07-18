@@ -41,9 +41,9 @@ else
 	fi
 
 	echo "Compiling ospi firmware..."
-    ws=$(ls TinyWebsockets/tiny_websockets_lib/src/*.cpp)
-    otf=$(ls OpenThings-Framework-Firmware-Library/*.cpp)
-	g++ -o OpenSprinkler -DOSPI $USEGPIO -std=c++14 main.cpp OpenSprinkler.cpp program.cpp opensprinkler_server.cpp utils.cpp weather.cpp gpio.cpp mqtt.cpp -ITinyWebsockets/tiny_websockets_lib/include $ws -IOpenThings-Framework-Firmware-Library/ $otf -lpthread -lmosquitto -lssl -lcrypto $GPIOLIB
+    ws=$(ls external/TinyWebsockets/tiny_websockets_lib/src/*.cpp)
+    otf=$(ls external/OpenThings-Framework-Firmware-Library/*.cpp)
+	g++ -o OpenSprinkler -DOSPI $USEGPIO -std=c++14 main.cpp OpenSprinkler.cpp program.cpp opensprinkler_server.cpp utils.cpp weather.cpp gpio.cpp mqtt.cpp -Iexternal/TinyWebsockets/tiny_websockets_lib/include $ws -Iexternal/OpenThings-Framework-Firmware-Library/ $otf -lpthread -lmosquitto -lssl -lcrypto $GPIOLIB
 fi
 
 if [ ! "$SILENT" = true ] && [ -f OpenSprinkler.launch ] && [ ! -f /etc/init.d/OpenSprinkler.sh ]; then
