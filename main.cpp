@@ -50,8 +50,6 @@
 	unsigned long getNtpTime();
 #else // header and defs for RPI/BBB
     OTF::OpenThingsFramework *otf = NULL;
-	EthernetServer *m_server = 0;
-	EthernetClient *m_client = 0;
 #endif
 
 void push_message(int type, uint32_t lval=0, float fval=0.f, const char* sval=NULL);
@@ -582,25 +580,6 @@ void do_loop()
 	ui_state_machine();
 
 #else // Process Ethernet packets for RPI/BBB
-	EthernetClient client = m_server->available();
-	if (client) {
-		while(true) {
-			int len = client.read((uint8_t*) ether_buffer, ETHER_BUFFER_SIZE);
-			if (len <=0) {
-				if(!client.connected()) {
-					break;
-				} else {
-					continue;
-				}
-			} else {
-				m_client = &client;
-				ether_buffer[len] = 0;  // put a zero at the end of the packet
-				handle_web_request(ether_buffer);
-				m_client = 0;
-				break;
-			}
-		}
-	}
     if(otf) otf->loop();
 #endif	// Process Ethernet packets
 

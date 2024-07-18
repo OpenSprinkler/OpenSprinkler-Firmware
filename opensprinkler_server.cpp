@@ -65,7 +65,6 @@
 	#include <stdlib.h>
 	#include "etherport.h"
 
-	extern EthernetClient *m_client;
     extern OTF::OpenThingsFramework *otf;
     #define OTF_PARAMS_DEF const OTF::Request &req,OTF::Response &res
     #define OTF_PARAMS req,res
@@ -2171,7 +2170,7 @@ void start_server_ap() {
 
 #endif
 
-#if !defined(ESP8266)
+#if defined(OSPI)
 void initalize_otf() {
 	if(!otf) return;
 	static bool callback_initialized = false;
@@ -2192,33 +2191,25 @@ void initalize_otf() {
 		callback_initialized = true;
 	}
 }
+#endif
 
-// This funtion is only used for non-ESP8266 platforms
+#if !defined(ESP8266) && !defined(OSPI)
+// This funtion is only used for non-OTF platforms
 void handle_web_request(char *p) {
-    OTF::Request req = OTF::Request(p, strlen(p), false);
-    OTF::Response res = OTF::Response();
-    res.enableStream([](const char *buffer, size_t length, bool first_message) -> void {
-        m_client->write((const uint8_t *) buffer, length);
-    }, []() -> void {
-        m_client->flush();
-    }, []() -> void {
-        m_client->flush();
-    });
-
-    rewind_ether_buffer();
+	rewind_ether_buffer();
 
 	// assume this is a GET request
 	// GET /xx?xxxx
 	char *com = p+5;
 	char *dat = com+3;
-    
-	if(com[0]==' ' || com[0]==0) {
-		server_home(OTF_PARAMS);  // home page handler
-        res.end();
+
+	if(com[0]==' ') {
+		server_home();  // home page handler
+		send_packet();
 		m_client->stop();
 	} else {
 		// server funtion handlers
-		unsigned char i;
+		byte i;
 		for(i=0;i<sizeof(urls)/sizeof(URLHandler);i++) {
 			if(pgm_read_byte(_url_keys+2*i)==com[0]
 			 &&pgm_read_byte(_url_keys+2*i+1)==com[1]) {
@@ -2228,23 +2219,23 @@ void handle_web_request(char *p) {
 
 				if (com[0]=='s' && com[1]=='u') { // for /su do not require password
 					get_buffer = dat;
-					(urls[i])(OTF_PARAMS);
+					(urls[i])();
 					ret = return_code;
 				} else if ((com[0]=='j' && com[1]=='o') ||
 									 (com[0]=='j' && com[1]=='a'))  { // for /jo and /ja we output fwv if password fails
 					if(check_password(dat)==false) {
-						print_header(OTF_PARAMS);
+						print_header();
 						bfill.emit_p(PSTR("{\"$F\":$D}"),
 									 iopt_json_names+0, os.iopts[0]);
 						ret = HTML_OK;
 					} else {
 						get_buffer = dat;
-						(urls[i])(OTF_PARAMS);
+						(urls[i])();
 						ret = return_code;
 					}
 				} else if (com[0]=='d' && com[1]=='b') {
 					get_buffer = dat;
-					(urls[i])(OTF_PARAMS);
+					(urls[i])();
 					ret = return_code;
 				} else {
 					// first check password
@@ -2252,26 +2243,24 @@ void handle_web_request(char *p) {
 						ret = HTML_UNAUTHORIZED;
 					} else {
 						get_buffer = dat;
-						(urls[i])(OTF_PARAMS);
+						(urls[i])();
 						ret = return_code;
 					}
 				}
 				if (ret == -1) {
-					if (m_client) {
-                        res.end();
+					if (m_client)
 						m_client->stop();
-                    }
 					return;
 				}
 				switch(ret) {
 				case HTML_OK:
 					break;
 				case HTML_REDIRECT_HOME:
-					print_header(OTF_PARAMS, false);
+					print_header(false);
 					bfill.emit_p(PSTR("$F"), htmlReturnHome);
 					break;
 				default:
-					print_header(OTF_PARAMS);
+					print_header();
 					bfill.emit_p(PSTR("{\"result\":$D}"), ret);
 				}
 				break;
@@ -2280,10 +2269,10 @@ void handle_web_request(char *p) {
 
 		if(i==sizeof(urls)/sizeof(URLHandler)) {
 			// no server funtion found
-			print_header(OTF_PARAMS);
+			print_header();
 			bfill.emit_p(PSTR("{\"result\":$D}"), HTML_PAGE_NOT_FOUND);
 		}
-        res.end();
+		send_packet();
 		m_client->stop();
 	}
 }

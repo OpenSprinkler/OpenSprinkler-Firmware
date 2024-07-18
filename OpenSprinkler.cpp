@@ -677,19 +677,15 @@ unsigned char OpenSprinkler::start_network() {
 	port = 80;
 #endif
 #endif
-	if(m_server) { delete m_server; m_server = 0; }
-
-	m_server = new EthernetServer(port);
-
     if(otc.en>0 && otc.token.length()>=32) {
-		otf = new OTF::OpenThingsFramework(90, otc.server.c_str(), otc.port, otc.token.c_str(), false, ether_buffer, ETHER_BUFFER_SIZE);
+		otf = new OTF::OpenThingsFramework(port, otc.server.c_str(), otc.port, otc.token.c_str(), false, ether_buffer, ETHER_BUFFER_SIZE);
 		DEBUG_PRINTLN(F("Started OTF with remote connection"));
 	} else {
-		otf = new OTF::OpenThingsFramework(90, ether_buffer, ETHER_BUFFER_SIZE);
+		otf = new OTF::OpenThingsFramework(port, ether_buffer, ETHER_BUFFER_SIZE);
 		DEBUG_PRINTLN(F("Started OTF with just local connection"));
 	}
 
-    return m_server->begin();
+    return 1;
 }
 
 bool OpenSprinkler::network_connected(void) {
