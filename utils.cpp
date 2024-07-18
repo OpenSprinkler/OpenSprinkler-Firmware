@@ -41,7 +41,7 @@ extern OpenSprinkler os;
 
 static char* get_runtime_path() {
 	static char path[PATH_MAX];
-	static byte query = 1;
+	static unsigned char query = 1;
 
 	#ifdef __APPLE__
 		strcpy(path, "./");
@@ -139,16 +139,16 @@ void initialiseEpoch()
 	epochMicro = (uint64_t)tv.tv_sec * (uint64_t)1000000 + (uint64_t)(tv.tv_usec) ;
 }
 
-ulong millis (void)
-{
-	struct timeval tv ;
-	uint64_t now ;
+// ulong millis (void)
+// {
+// 	struct timeval tv ;
+// 	uint64_t now ;
 
-	gettimeofday (&tv, NULL) ;
-	now  = (uint64_t)tv.tv_sec * (uint64_t)1000 + (uint64_t)(tv.tv_usec / 1000) ;
+// 	gettimeofday (&tv, NULL) ;
+// 	now  = (uint64_t)tv.tv_sec * (uint64_t)1000 + (uint64_t)(tv.tv_usec / 1000) ;
 
-	return (ulong)(now - epochMilli) ;
-}
+// 	return (ulong)(now - epochMilli) ;
+// }
 
 ulong micros (void)
 {
@@ -232,11 +232,11 @@ bool file_exists(const char *fn) {
 void file_read_block(const char *fn, void *dst, ulong pos, ulong len) {
 #if defined(ESP8266)
 
-	// do not use File.readBytes or readBytesUntil because it's very slow
+	// do not use File.read_byte or read_byteUntil because it's very slow
 	File f = LittleFS.open(fn, "r");
 	if(f) {
 		f.seek(pos, SeekSet);
-		f.read((byte*)dst, len);
+		f.read((unsigned char*)dst, len);
 		f.close();
 	}
 
@@ -269,7 +269,7 @@ void file_write_block(const char *fn, const void *src, ulong pos, ulong len) {
 	if(!f) f = LittleFS.open(fn, "w");
 	if(f) {
 		f.seek(pos, SeekSet);
-		f.write((byte*)src, len);
+		f.write((unsigned char*)src, len);
 		f.close();
 	}
 
@@ -301,16 +301,16 @@ void file_write_block(const char *fn, const void *src, ulong pos, ulong len) {
 
 void file_copy_block(const char *fn, ulong from, ulong to, ulong len, void *tmp) {
 	// assume tmp buffer is provided and is larger than len
-	// todo future: if tmp buffer is not provided, do byte-to-byte copy
+	// todo future: if tmp buffer is not provided, do unsigned char-to-unsigned char copy
 	if(tmp==NULL) { return; }
 #if defined(ESP8266)
 
 	File f = LittleFS.open(fn, "r+");
 	if(!f) return;
 	f.seek(from, SeekSet);
-	f.read((byte*)tmp, len);
+	f.read((unsigned char*)tmp, len);
 	f.seek(to, SeekSet);
-	f.write((byte*)tmp, len);
+	f.write((unsigned char*)tmp, len);
 	f.close();
 
 #elif defined(ARDUINO)
@@ -340,7 +340,7 @@ void file_copy_block(const char *fn, ulong from, ulong to, ulong len, void *tmp)
 }
 
 // compare a block of content
-byte file_cmp_block(const char *fn, const char *buf, ulong pos) {
+unsigned char file_cmp_block(const char *fn, const char *buf, ulong pos) {
 #if defined(ESP8266)
 
 	File f = LittleFS.open(fn, "r");
@@ -388,19 +388,19 @@ byte file_cmp_block(const char *fn, const char *buf, ulong pos) {
 	return 1;
 }
 
-byte file_read_byte(const char *fn, ulong pos) {
-	byte v = 0;
+unsigned char file_read_byte(const char *fn, ulong pos) {
+	unsigned char v = 0;
 	file_read_block(fn, &v, pos, 1);
 	return v;
 }
 
-void file_write_byte(const char *fn, ulong pos, byte v) {
+void file_write_byte(const char *fn, ulong pos, unsigned char v) {
 	file_write_block(fn, &v, pos, 1);
 }
 
 // copy n-character string from program memory with ending 0
 void strncpy_P0(char* dest, const char* src, int n) {
-	byte i;
+	unsigned char i;
 	for(i=0;i<n;i++) {
 		*dest=pgm_read_byte(src++);
 		dest++;
@@ -425,7 +425,7 @@ ulong water_time_resolve(uint16_t v) {
 
 // encode a 16-bit signed water time (-600 to 600)
 // to unsigned byte (0 to 240)
-byte water_time_encode_signed(int16_t i) {
+unsigned char water_time_encode_signed(int16_t i) {
 	i=(i>600)?600:i;
 	i=(i<-600)?-600:i;
 	return (i+600)/5;
@@ -433,7 +433,7 @@ byte water_time_encode_signed(int16_t i) {
 
 // decode a 8-bit unsigned byte (0 to 240)
 // to a 16-bit signed water time (-600 to 600)
-int16_t water_time_decode_signed(byte i) {
+int16_t water_time_decode_signed(unsigned char i) {
 	i=(i>240)?240:i;
 	return ((int16_t)i-120)*5;
 }
@@ -498,14 +498,14 @@ void peel_http_header(char* buffer) { // remove the HTTP header
 }
 
 void strReplace(char *str, char c, char r) {
-	for(byte i=0;i<strlen(str);i++) {
+	for(unsigned char i=0;i<strlen(str);i++) {
 		if(str[i]==c) str[i]=r;
 	}
 }
 
-static const byte month_days[] = {31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+static const unsigned char month_days[] = {31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
 
-bool isValidDate(byte m, byte d) {
+bool isValidDate(unsigned char m, unsigned char d) {
 	if(m<1 || m>12) return false;
 	if(d<1 || d>month_days[m-1]) return false;
 	return true;
@@ -515,13 +515,13 @@ bool isValidDate(uint16_t date) {
 	if (date < MIN_ENCODED_DATE || date > MAX_ENCODED_DATE) {
 		return false;
 	}
-	byte month = date >> 5;
-	byte day = date & 31;
+	unsigned char month = date >> 5;
+	unsigned char day = date & 31;
 	return isValidDate(month, day);
 }
 
 #if defined(ESP8266)
-byte hex2dec(const char *hex) {
+unsigned char hex2dec(const char *hex) {
 	return strtol(hex, NULL, 16);
 }
 
@@ -536,7 +536,7 @@ bool isValidMAC(const char *_mac) {
 	char mac[18], *hex;
 	strncpy(mac, _mac, 18);
 	mac[17] = 0;
-	byte count = 0;
+	unsigned char count = 0;
 	hex = strtok(mac, ":");
 	if(strlen(hex)!=2) return false;
 	if(!isHex(hex[0]) || !isHex(hex[1])) return false;
@@ -553,11 +553,11 @@ bool isValidMAC(const char *_mac) {
 	else return true;
 }
 
-void str2mac(const char *_str, byte mac[]) {
+void str2mac(const char *_str, unsigned char mac[]) {
 	char str[18], *hex;
 	strncpy(str, _str, 18);
 	str[17] = 0;
-	byte count=0;
+	unsigned char count=0;
 	hex = strtok(str, ":");
 	mac[count] = hex2dec(hex);
 	count++;
