@@ -36,7 +36,7 @@ void GetWeather();
 
 extern char wt_rawData[];
 extern int wt_errCode;
-extern byte wt_monthly[];
+extern unsigned char wt_monthly[];
 void load_wt_monthly(char* wto);
 void apply_monthly_adjustment(time_os_t curr_time);
 #endif  // _WEATHER_H

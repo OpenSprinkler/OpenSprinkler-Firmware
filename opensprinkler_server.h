@@ -28,7 +28,7 @@
 #include <stdarg.h>
 #endif
 
-char dec2hexchar(byte dec);
+char dec2hexchar(unsigned char dec);
 
 class BufferFiller {
 	char *start; //!< Pointer to start of buffer

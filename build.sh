@@ -25,11 +25,7 @@ elif [ "$1" == "osbo" ]; then
 else
 	echo "Installing required libraries..."
 	apt-get update
-	apt-get install -y libmosquitto-dev
-	apt-get install -y raspi-gpio
-	apt-get install -y libi2c-dev
-	apt-get install -y libssl-dev
-	apt-get install -y libgpiod-dev
+	apt-get install -y libmosquitto-dev raspi-gpio libi2c-dev libssl-dev libgpiod-dev
 	if ! command -v raspi-gpio &> /dev/null
 	then
 		echo "Command raspi-gpio is required and is not installed"
@@ -47,7 +43,9 @@ else
 	fi
 
 	echo "Compiling ospi firmware..."
-	g++ -o OpenSprinkler -DOSPI $USEGPIO -DSMTP_OPENSLL -std=c++14 main.cpp OpenSprinkler.cpp program.cpp opensprinkler_server.cpp utils.cpp weather.cpp gpio.cpp etherport.cpp mqtt.cpp smtp.c -lpthread -lmosquitto -lssl -lcrypto $GPIOLIB
+    ws=$(ls external/TinyWebsockets/tiny_websockets_lib/src/*.cpp)
+    otf=$(ls external/OpenThings-Framework-Firmware-Library/*.cpp)
+	g++ -o OpenSprinkler -DOSPI $USEGPIO -DSMTP_OPENSSL -std=c++14 main.cpp OpenSprinkler.cpp program.cpp opensprinkler_server.cpp utils.cpp weather.cpp gpio.cpp mqtt.cpp smtp.c -Iexternal/TinyWebsockets/tiny_websockets_lib/include $ws -Iexternal/OpenThings-Framework-Firmware-Library/ $otf -lpthread -lmosquitto -lssl -lcrypto $GPIOLIB
 fi
 
 if [ ! "$SILENT" = true ] && [ -f OpenSprinkler.launch ] && [ ! -f /etc/init.d/OpenSprinkler.sh ]; then

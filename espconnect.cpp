@@ -24,7 +24,7 @@
 String scan_network() {
 	WiFi.mode(WIFI_STA);
 	WiFi.disconnect();
-	byte n = WiFi.scanNetworks();
+	unsigned char n = WiFi.scanNetworks();
 	String json;
 	if (n>40) n = 40; // limit to 40 ssids max
 	// maintain old format of wireless network JSON for mobile app compat
@@ -57,13 +57,13 @@ void start_network_ap(const char *ssid, const char *pass) {
 	WiFi.disconnect();	// disconnect from router
 }
 
-void start_network_sta_with_ap(const char *ssid, const char *pass, int32_t channel, const byte *bssid) {
+void start_network_sta_with_ap(const char *ssid, const char *pass, int32_t channel, const unsigned char *bssid) {
 	if(!ssid || !pass) return;
 	if(WiFi.getMode()!=WIFI_AP_STA) WiFi.mode(WIFI_AP_STA);
 	WiFi.begin(ssid, pass, channel, bssid);
 }
 
-void start_network_sta(const char *ssid, const char *pass, int32_t channel, const byte *bssid) {
+void start_network_sta(const char *ssid, const char *pass, int32_t channel, const unsigned char *bssid) {
 	if(!ssid || !pass) return;
 	if(WiFi.getMode()!=WIFI_STA) WiFi.mode(WIFI_STA);
 	WiFi.begin(ssid, pass, channel, bssid);
