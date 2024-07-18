@@ -59,7 +59,7 @@ time_os_t  OpenSprinkler::powerup_lasttime;
 uint8_t OpenSprinkler::last_reboot_cause = REBOOT_CAUSE_NONE;
 unsigned char    OpenSprinkler::weather_update_flag;
 
-// todo future: the following attribute unsigned chars are for backward compatibility
+// todo future: the following attribute bytes are for backward compatibility
 unsigned char OpenSprinkler::attrib_mas[MAX_NUM_BOARDS];
 unsigned char OpenSprinkler::attrib_igs[MAX_NUM_BOARDS];
 unsigned char OpenSprinkler::attrib_mas2[MAX_NUM_BOARDS];
@@ -319,19 +319,19 @@ unsigned char OpenSprinkler::iopts[] = {
 	28, // default time zone: GMT-5
 	1,  // 0: disable NTP sync, 1: enable NTP sync
 	1,  // 0: use static ip, 1: use dhcp
-	0,  // this and next 3 unsigned chars define static ip
+	0,  // this and next 3 bytes define static ip
 	0,
 	0,
 	0,
-	0,  // this and next 3 unsigned chars define static gateway ip
+	0,  // this and next 3 bytes define static gateway ip
 	0,
 	0,
 	0,
 #if defined(ARDUINO)  // on AVR, the default HTTP port is 80
-	80, // this and next unsigned char define http port number
+	80, // this and next byte define http port number
 	0,
 #else // on RPI/BBB/LINUX, the default HTTP port is 8080
-	144,// this and next unsigned char define http port number
+	144,// this and next byte define http port number
 	31,
 #endif
 	OS_HW_VERSION,
@@ -352,7 +352,7 @@ unsigned char OpenSprinkler::iopts[] = {
 	15, // lcd dimming
 	80, // boost time (only valid to DC and LATCH type)
 	0,  // weather algorithm (0 means not using weather algorithm)
-	0,  // this and the next three unsigned chars define the ntp server ip
+	0,  // this and the next three bytes define the ntp server ip
 	0,
 	0,
 	0,
@@ -361,10 +361,10 @@ unsigned char OpenSprinkler::iopts[] = {
 	120,// master2 on adjusted time
 	120,// master2 off adjusted time
 	OS_FW_MINOR, // firmware minor version
-	100,// this and next unsigned char define flow pulse rate (100x)
+	100,// this and next byte define flow pulse rate (100x)
 	0,  // default is 1.00 (100)
 	0,  // set as remote extension
-	8,  // this and the next three unsigned chars define the custom dns server ip
+	8,  // this and the next three byte define the custom dns server ip
 	8,
 	8,
 	8,
@@ -1640,14 +1640,14 @@ void OpenSprinkler::attribs_save() {
 			// only write if content has changed: this is important for LittleFS as otherwise the overhead is too large
 			file_read_block(STATIONS_FILENAME, &at0, (uint32_t)sid*sizeof(StationData)+offsetof(StationData, attrib), sizeof(StationAttrib));
 			if(memcmp(&at,&at0,sizeof(StationAttrib))!=0) {
-				file_write_block(STATIONS_FILENAME, &at, (uint32_t)sid*sizeof(StationData)+offsetof(StationData, attrib), sizeof(StationAttrib)); // attribte bits are 1 unsigned char long
+				file_write_block(STATIONS_FILENAME, &at, (uint32_t)sid*sizeof(StationData)+offsetof(StationData, attrib), sizeof(StationAttrib)); // attribte bits are 1 byte long
 			}
 			if(attrib_spe[bid]>>s==0) {
 				// if station special bit is 0, make sure to write type STANDARD
 				// only write if content has changed
 				file_read_block(STATIONS_FILENAME, &ty0, (uint32_t)sid*sizeof(StationData)+offsetof(StationData, type), 1);
 				if(ty!=ty0) {
-					file_write_block(STATIONS_FILENAME, &ty, (uint32_t)sid*sizeof(StationData)+offsetof(StationData, type), 1); // attribte bits are 1 unsigned char long
+					file_write_block(STATIONS_FILENAME, &ty, (uint32_t)sid*sizeof(StationData)+offsetof(StationData, type), 1); // attribte bits are 1 byte long
 				}
 			}
 		}
@@ -1745,7 +1745,7 @@ void OpenSprinkler::switch_special_station(unsigned char sid, unsigned char valu
  * (which results in physical actions of opening/closing valves).
  */
 unsigned char OpenSprinkler::set_station_bit(unsigned char sid, unsigned char value, uint16_t dur) {
-	unsigned char *data = station_bits+(sid>>3);  // pointer to the station unsigned char
+	unsigned char *data = station_bits+(sid>>3);  // pointer to the station byte
 	unsigned char mask = (unsigned char)1<<(sid&0x07); // mask
 	if (value) {
 		if((*data)&mask) return 0;  // if bit is already set, return no change
@@ -1854,9 +1854,9 @@ void OpenSprinkler::switch_rfstation(RFStationData *data, bool turnon) {
 }
 
 /** Switch GPIO station
- * Special data for GPIO Station is three unsigned chars of ascii decimal (not hex)
- * First two unsigned chars are zero padded GPIO pin number.
- * Third unsigned char is either 0 or 1 for active low (GND) or high (+5V) relays
+ * Special data for GPIO Station is three bytes of ascii decimal (not hex)
+ * First two bytes are zero padded GPIO pin number.
+ * Third byte is either 0 or 1 for active low (GND) or high (+5V) relays
  */
 void OpenSprinkler::switch_gpiostation(GPIOStationData *data, bool turnon) {
 	unsigned char gpio = (data->pin[0] - '0') * 10 + (data->pin[1] - '0');

@@ -86,7 +86,7 @@ static char* get_buffer = NULL;
 
 BufferFiller bfill;
 
-/* Check available space (number of unsigned chars) in the Ethernet buffer */
+/* Check available space (number of bytes) in the Ethernet buffer */
 int available_ether_buffer() {
 	return ETHER_BUFFER_SIZE - (int)bfill.position();
 }
@@ -1973,7 +1973,7 @@ void server_fill_files(OTF_PARAMS_DEF) {
 		file.close();
 		DEBUG_PRINTLN(F(" done. "));
 		LittleFS.info(fs_info);
-		DEBUG_PRINTLN(fs_info.usedunsigned chars);
+		DEBUG_PRINTLN(fs_info.usedbytes);
 	}
 	handle_return(HTML_SUCCESS);
 }
@@ -2364,7 +2364,7 @@ ulong getNtpTime() {
 		packetBuffer[1] = 0;  // Stratum, or type of clock
 		packetBuffer[2] = 6;  // Polling Interval
 		packetBuffer[3] = 0xEC;  // Peer Clock Precision
-		// 8 unsigned chars of zero for Root Delay & Root Dispersion
+		// 8 bytes of zero for Root Delay & Root Dispersion
 		packetBuffer[12] = 49;
 		packetBuffer[13] = 0x4E;
 		packetBuffer[14] = 49;

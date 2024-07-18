@@ -128,8 +128,8 @@ struct StationAttrib {  // station attributes
 	unsigned char igpu:1; // todo: ignore pause
 
 	unsigned char gid;    // sequential group id
-	unsigned char reserved[2]; // reserved unsigned chars for the future
-}; // total is 4 unsigned chars so far
+	unsigned char reserved[2]; // reserved bytes for the future
+}; // total is 4 bytes so far
 
 /** Station data structure */
 struct StationData {
@@ -223,9 +223,9 @@ public:
 
 	static unsigned char iopts[]; // integer options
 	static const char*sopts[]; // string options
-	static unsigned char station_bits[];     // station activation bits. each unsigned char corresponds to a board (8 stations)
-																	// first unsigned char-> master controller, second unsigned char-> ext. board 1, and so on
-	// todo future: the following attribute unsigned chars are for backward compatibility
+	static unsigned char station_bits[];     // station activation bits. each byte corresponds to a board (8 stations)
+																	// first byte-> master controller, second byte-> ext. board 1, and so on
+	// todo future: the following attribute bytes are for backward compatibility
 	static unsigned char attrib_mas[];
 	static unsigned char attrib_igs[];
 	static unsigned char attrib_mas2[];
