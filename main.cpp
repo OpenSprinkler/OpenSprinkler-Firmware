@@ -607,6 +607,7 @@ void do_loop()
 		DEBUG_PRINTLN(F("req_mqtt_restart"));
 		os.mqtt.begin();
 		os.status.req_mqtt_restart = false;
+		os.mqtt.subscribe();
 	}
 	os.mqtt.loop();
 
@@ -906,7 +907,7 @@ void do_loop()
 					}
 				}
 		
-				if(os.get_station_bit(mas_id - 1) == 0 && masbit == 1){
+				if(os.get_station_bit(mas_id - 1) == 0 && masbit == 1){ // notify master on event
 					push_message(NOTIFY_STATION_ON, mas_id - 1, 0);
 				}
 				
@@ -1379,8 +1380,8 @@ void ip2string(char* str, byte ip[4]) {
 }
 
 void push_message(int type, uint32_t lval, float fval, const char* sval) {
-	static char topic[TMP_BUFFER_SIZE];
-	static char payload[TMP_BUFFER_SIZE];
+	char topic[TMP_BUFFER_SIZE];
+	char payload[TMP_BUFFER_SIZE];
 	char* postval = tmp_buffer;
 	uint32_t volume;
 
@@ -1461,10 +1462,9 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 		case  NOTIFY_STATION_ON:
 
 			if (os.mqtt.enabled()) {
-				sprintf_P(topic, PSTR("opensprinkler/station/%d"), lval);
-				sprintf_P(topic, PSTR("opensprinkler/station/%d"), lval);
+				sprintf_P(topic, PSTR("station/%d"), lval);
 				if((int)fval == 0){
-					sprintf_P(payload, PSTR("{\"state\":1}"));
+					sprintf_P(payload, PSTR("{\"state\":1}"));  // master on event does not have duration attached to it
 				}else{
 					sprintf_P(payload, PSTR("{\"state\":1,\"duration\":%d}"), (int)fval);
 				}
@@ -1477,21 +1477,12 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 		case NOTIFY_STATION_OFF:
 
 			if (os.mqtt.enabled()) {
-				sprintf_P(topic, PSTR("opensprinkler/station/%d"), lval);
-				if((int)fval == 0){
-					if (os.iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_FLOW) {
-						sprintf_P(payload, PSTR("{\"state\":0,\"flow\":%d.%02d}"), (int)flow_last_gpm, (int)(flow_last_gpm*100)%100);
-					} else {
-						sprintf_P(payload, PSTR("{\"state\":0}"));
-					}
-				}else{
-					if (os.iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_FLOW) {
-						sprintf_P(payload, PSTR("{\"state\":0,\"duration\":%d,\"flow\":%d.%02d}"), (int)fval, (int)flow_last_gpm, (int)(flow_last_gpm*100)%100);
-					} else {
-						sprintf_P(payload, PSTR("{\"state\":0,\"duration\":%d}"), (int)fval);
+				sprintf_P(topic, PSTR("station/%d"), lval);
+				if (os.iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_FLOW) {
+					sprintf_P(payload, PSTR("{\"state\":0,\"duration\":%d,\"flow\":%d.%02d}"), (int)fval, (int)flow_last_gpm, (int)(flow_last_gpm*100)%100);
+				} else {
+					sprintf_P(payload, PSTR("{\"state\":0,\"duration\":%d}"), (int)fval);
 				}
-				}
-				
 			}
 			if (ifttt_enabled || email_enabled) {
 				strcat_P(postval, PSTR("Station ["));
@@ -1529,7 +1520,7 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 		case NOTIFY_SENSOR1:
 
 			if (os.mqtt.enabled()) {
-				strcpy_P(topic, PSTR("opensprinkler/sensor1"));
+				strcpy_P(topic, PSTR("sensor1"));
 				sprintf_P(payload, PSTR("{\"state\":%d}"), (int)fval);
 			}
 			if (ifttt_enabled || email_enabled) {
@@ -1542,7 +1533,7 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 		case NOTIFY_SENSOR2:
 
 			if (os.mqtt.enabled()) {
-				strcpy_P(topic, PSTR("opensprinkler/sensor2"));
+				strcpy_P(topic, PSTR("sensor2"));
 				sprintf_P(payload, PSTR("{\"state\":%d}"), (int)fval);
 			}
 			if (ifttt_enabled || email_enabled) {
@@ -1555,7 +1546,7 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 		case NOTIFY_RAINDELAY:
 
 			if (os.mqtt.enabled()) {
-				strcpy_P(topic, PSTR("opensprinkler/raindelay"));
+				strcpy_P(topic, PSTR("raindelay"));
 				sprintf_P(payload, PSTR("{\"state\":%d}"), (int)fval);
 			}
 			if (ifttt_enabled || email_enabled) {
@@ -1571,7 +1562,7 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 			volume = (volume<<8)+os.iopts[IOPT_PULSE_RATE_0];
 			volume = lval*volume;
 			if (os.mqtt.enabled()) {
-				strcpy_P(topic, PSTR("opensprinkler/sensor/flow"));
+				strcpy_P(topic, PSTR("sensor/flow"));
 				sprintf_P(payload, PSTR("{\"count\":%u,\"volume\":%d.%02d}"), lval, (int)volume/100, (int)volume%100);
 			}
 			if (ifttt_enabled || email_enabled) {
@@ -1582,6 +1573,10 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 
 		case NOTIFY_WEATHER_UPDATE:
 
+			if (os.mqtt.enabled()) {
+				strcpy_P(topic, PSTR("weather"));
+				sprintf_P(payload, PSTR("{\"water level\":%d}"), (int)fval);
+			}
 			if (ifttt_enabled || email_enabled) {
 				if(lval>0) {
 					strcat_P(postval, PSTR("external IP updated: "));
@@ -1600,7 +1595,7 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 
 		case NOTIFY_REBOOT:
 			if (os.mqtt.enabled()) {
-				strcpy_P(topic, PSTR("opensprinkler/system"));
+				strcpy_P(topic, PSTR("system"));
 				strcpy_P(payload, PSTR("{\"state\":\"started\"}"));
 			}
 			if (ifttt_enabled || email_enabled) {

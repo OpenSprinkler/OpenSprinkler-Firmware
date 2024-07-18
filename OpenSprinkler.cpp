@@ -26,6 +26,7 @@
 #include "gpio.h"
 #include "testmode.h"
 #include "program.h"
+#include "ArduinoJson.hpp"
 
 /** Declare static data members */
 OSMqtt OpenSprinkler::mqtt;
@@ -2244,14 +2245,36 @@ void OpenSprinkler::parse_otc_config() {
 	int port = DEFAULT_OTC_PORT_DEV;
 	int en = 0;
 
-	char *config = tmp_buffer;
+	char *config = tmp_buffer + 1;
 	sopt_load(SOPT_OTC_OPTS, config);
 	if (*config != 0) {
-		sscanf(config, "\"en\":%d,\"token\":\"%" xstr(MAX_SOPTS_SIZE) "[^\"]\",\"server\":\"%" xstr(MAX_SOPTS_SIZE) "[^\"]\",\"port\":%d",
-			&en, token, server, &port);
+        // Add the wrapping curly braces to the string
+		config = tmp_buffer;
+		config[0] = '{';
+		int len = strlen(config);
+		config[len] = '}';
+		config[len+1] = 0;
+
+		ArduinoJson::JsonDocument doc;
+		ArduinoJson::DeserializationError error = ArduinoJson::deserializeJson(doc, config);
+
+		// Test the parsing otherwise parse
+		if (error) {
+				DEBUG_PRINT(F("otf: deserializeJson() failed: "));
+				DEBUG_PRINTLN(error.f_str());
+		} else {
+				en = doc["en"];
+				const char *token_val = doc["token"];
+				if(token_val) strncpy(token, token_val, MAX_SOPTS_SIZE);
+				const char *server_val = doc["server"];
+				if(server_val) strncpy(server, server_val, MAX_SOPTS_SIZE);
+				port = doc["port"];
+		}
+
 		token[MAX_SOPTS_SIZE] = 0;
 		server[MAX_SOPTS_SIZE] = 0;
 	}
+    
 	otc.en = en;
 	otc.token = String(token);
 	otc.server = String(server);
