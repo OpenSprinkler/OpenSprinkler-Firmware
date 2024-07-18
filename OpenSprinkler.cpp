@@ -707,8 +707,6 @@ bool OpenSprinkler::load_hardware_mac(unsigned char* mac, bool wired) {
 	mac[4] = 0x31;
 	mac[5] = iopts[IOPT_DEVICE_ID];
 
-	if (m_server == NULL) return true;
-
 	if ((fd = socket(AF_INET, SOCK_DGRAM, 0)) == 0) return true;
 
 	// Returns the mac address of the first interface if multiple active
