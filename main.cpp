@@ -1382,7 +1382,7 @@ void ip2string(char* str, byte ip[4]) {
 void push_message(int type, uint32_t lval, float fval, const char* sval) {
 	char topic[TMP_BUFFER_SIZE];
 	char payload[TMP_BUFFER_SIZE];
-	char* postval = tmp_buffer;
+	char* postval = tmp_buffer+1;
 	uint32_t volume;
 
 	// check if ifttt key exists and also if the enable bit is set
@@ -1398,6 +1398,7 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 #define MAX_EMAIL_PASS_LEN	64
 #define MAX_EMAIL_RECP_LEN	64
 #define DEFAULT_EMAIL_PORT	465
+#include "ArduinoJson.hpp"
 
 	// define email variables
 	char email_host[MAX_EMAIL_HOST_LEN + 1] = {0};
@@ -1413,11 +1414,32 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 	#else
 		os.sopt_load(SOPT_EMAIL_OPTS, postval);
 		if (*postval != 0) {
-			sscanf(
-				postval,
-				"\"en\":%d,\"host\":\"%" xstr(MAX_EMAIL_HOST_LEN) "[^\"]\",\"port\":%d,\"user\":\"%" xstr(MAX_EMAIL_USER_LEN) "[^\"]\",\"pass\":\"%" xstr(MAX_EMAIL_PASS_LEN) "[^\"]\",\"recipient\":\"%" xstr(MAX_EMAIL_RECP_LEN) "[^\"]\"",
-				&email_en, email_host, &email_port, email_username, email_password, email_recipient
-				);
+            // Add the wrapping curly braces to the string
+            postval = tmp_buffer;
+            postval[0] = '{';
+            int len = strlen(config);
+            postval[len] = '}';
+            postval[len+1] = 0;
+
+            ArduinoJson::JsonDocument doc;
+            ArduinoJson::DeserializationError error = ArduinoJson::deserializeJson(doc, postval);
+
+            // Test the parsing otherwise parse
+            if (error) {
+                    DEBUG_PRINT(F("mqtt: deserializeJson() failed: "));
+                    DEBUG_PRINTLN(error.c_str());
+            } else {
+                    email_en = (bool)doc["en"];
+                    const char *host_val = doc["host"];
+                    if(host_val) strncpy(email_host, host_val, MAX_EMAIL_HOST_LEN);
+                    email_port = doc["port"];
+                    const char *username_val = doc["user"];
+                    if(username_val) strncpy(email_username, username_val, MAX_EMAIL_USER_LEN);
+                    const char *password_val = doc["pass"];
+                    if(password_val) strncpy(email_password, password_val, MAX_EMAIL_PASS_LEN);
+                    const char *recipient_val = doc["recipient"];
+                    if(pubt_val) strncpy(email_recipient, recipient_val, MAX_EMAIL_RECP_LEN);
+            }
 		}
 	#endif
 
