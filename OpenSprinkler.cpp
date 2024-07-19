@@ -2238,9 +2238,6 @@ void OpenSprinkler::factory_reset() {
 	file_write_byte(DONE_FILENAME, 0, 1);
 }
 
-#define str(s) #s
-#define xstr(s) str(s)
-
 /** Parse OTC configuration */
 void OpenSprinkler::parse_otc_config() {
 	char server[MAX_SOPTS_SIZE+1] = {0};

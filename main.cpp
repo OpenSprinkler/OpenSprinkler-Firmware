@@ -37,9 +37,6 @@
 
 #include "ArduinoJson.hpp"
 
-#define str(s) #s
-#define xstr(s) str(s)
-
 #if defined(ARDUINO)
 	#if defined(ESP8266)
 		ESP8266WebServer *update_server = NULL;

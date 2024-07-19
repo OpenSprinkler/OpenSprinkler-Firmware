@@ -67,9 +67,6 @@
 	#define DEBUG_DURATION()        {}
 #endif
 
-#define str(s) #s
-#define xstr(s) str(s)
-
 extern OpenSprinkler os;
 extern ProgramData pd;
 extern char tmp_buffer[];
@@ -102,62 +99,8 @@ bool OSMqtt::_done_subscribed = false;		//Flag indicating if command topic has b
 
 //******************************** HELPER FUNCTIONS ********************************// 
 
-//parsing a comma seperated value list
-uint16_t parseListData(char **p) {
-	char* pv;
-	int i=0;
-	tmp_buffer[i]=0;
-	// copy to tmp_buffer until a non-number is encountered
-	for(pv=(*p);pv<(*p)+10;pv++) {
-		if ((*pv)=='-' || (*pv)=='+' || ((*pv)>='0'&&(*pv)<='9'))
-			tmp_buffer[i++] = (*pv);
-		else
-			break;
-	}
-	tmp_buffer[i]=0;
-	*p = pv+1;
-	return (uint16_t)atol(tmp_buffer);
-}
-
-//finding a key value pair
-bool findKeyVal(char *str, char *strbuf, uint16_t maxlen, const char *key, const char stop){
-	bool found = false;
-	uint16_t i = 0;
-	if(str == NULL || strbuf == NULL || key == NULL){return false;}
-	const char *kp = key;
-	while(*str && *str!= ' ' && *str!= '\n' && !found){
-		if (*str == *kp){
-			kp++;
-			if(*kp == '\0'){
-				str++;
-				kp = key;
-				if(*str == stop){
-					found=true;
-				}
-			}
-		} else {
-			kp = key;
-		}
-		str++;
-	}
-	if(found){
-		while(*str &&  *str!=' ' && *str!='\n' && *str!='&' && i<maxlen-1){
-			*strbuf=*str;
-			i++;
-			str++;
-			strbuf++;
-		}
-		if (!(*str) || *str == ' ' || *str == '\n' || *str == '&') {
-			*strbuf = '\0';
-		} else {
-			found = 0;	// Ignore partial values i.e. value length is larger than maxlen
-			i = 0;
-		}
-		return true;
-	}else{
-		return false;
-	}
-}
+extern uint16_t parse_listdata(char **p);
+extern unsigned char findKeyVal (const char *str,char *strbuf, uint16_t maxlen,const char *key,bool key_in_pgm=false,uint8_t *keyfound=NULL);
 
 //****************************** COMMAND ACTIONS ******************************//
 
@@ -165,10 +108,9 @@ bool findKeyVal(char *str, char *strbuf, uint16_t maxlen, const char *key, const
 boolean checkPassword(char* pw) {
 	if (os.iopts[IOPT_IGNORE_PASSWORD])  return true;
 
-	char *pass = tmp_buffer;
-	if(findKeyVal(pw, pass, TMP_BUFFER_SIZE, "pw", '=')){
-		urlDecode(pass);
-		if (os.password_verify(pass)) return true;
+	if(findKeyVal(pw, tmp_buffer, TMP_BUFFER_SIZE, PSTR("pw"), true)){
+		urlDecode(tmp_buffer);
+		if (os.password_verify(tmp_buffer)) return true;
 	}else{
 		DEBUG_LOGF("Device password not found.\r\n");
 		return false;
@@ -185,12 +127,12 @@ void changeValues(char *message){
 		extern uint32_t reboot_timer;
 	#endif
 
-	if(findKeyVal(message, tmp_buffer, TMP_BUFFER_SIZE, "rsn", '=')){
+	if(findKeyVal(message, tmp_buffer, TMP_BUFFER_SIZE, PSTR("rsn"), true)){
 		DEBUG_LOGF("Resetting all stations\r\n");
 		reset_all_stations();
 	}
 
-	if(findKeyVal(message, tmp_buffer, TMP_BUFFER_SIZE, "rbt", '=')){
+	if(findKeyVal(message, tmp_buffer, TMP_BUFFER_SIZE, PSTR("rbt"), true)){
 		DEBUG_LOGF("Rebooting\r\n");
 		#if defined(ESP8266)
 			os.status.safe_reboot = 0;
@@ -200,12 +142,12 @@ void changeValues(char *message){
 		#endif
 	}
 
-	if(findKeyVal(message, tmp_buffer, TMP_BUFFER_SIZE, "en", '=')){
+	if(findKeyVal(message, tmp_buffer, TMP_BUFFER_SIZE, PSTR("en"), true)){
 		if (tmp_buffer[0]=='1' && !os.status.enabled) os.enable();
 		else if (tmp_buffer[0]=='0' && os.status.enabled) os.disable();
 	}
 
-	if(findKeyVal(message, tmp_buffer, TMP_BUFFER_SIZE, "rd", '=')){
+	if(findKeyVal(message, tmp_buffer, TMP_BUFFER_SIZE, PSTR("rd"), true)){
 		int rd = atoi(tmp_buffer);
 		if(rd>0){
 			os.nvdata.rd_stop_time = os.now_tz() + (unsigned long) rd * 3600;
@@ -219,7 +161,7 @@ void changeValues(char *message){
 //handles /cm command
 void manualRun(char *message){
 	int sid = -1;
-	if(findKeyVal(message, tmp_buffer, TMP_BUFFER_SIZE, "sid", '=')){
+	if(findKeyVal(message, tmp_buffer, TMP_BUFFER_SIZE, PSTR("sid"), true)){
 		sid = atoi(tmp_buffer);
 		if(sid < 0 || sid >= os.nstations){
 			DEBUG_LOGF("Invalid station ID.\r\n");
@@ -230,8 +172,8 @@ void manualRun(char *message){
 		return;
 	}
 
-	byte en = 0;
-	if(findKeyVal(message, tmp_buffer, TMP_BUFFER_SIZE, "en", '=')){
+	unsigned char en = 0;
+	if(findKeyVal(message, tmp_buffer, TMP_BUFFER_SIZE, PSTR("en"), true)){
 		en = atoi(tmp_buffer);
 	}else{
 		DEBUG_LOGF("No enable bit found.\r\n");
@@ -241,7 +183,7 @@ void manualRun(char *message){
 	uint16_t timer = 0;
 	unsigned long curr_time = os.now_tz();
 	if(en){
-		if(findKeyVal(message, tmp_buffer, TMP_BUFFER_SIZE, "t", '=')){
+		if(findKeyVal(message, tmp_buffer, TMP_BUFFER_SIZE, PSTR("t"), true)){
 			timer = (uint16_t)atol(tmp_buffer);
 			if(timer==0 || timer>64800){
 				DEBUG_LOGF("Time out of bounds.\r\n");
@@ -252,7 +194,7 @@ void manualRun(char *message){
 				return;
 			}
 			RuntimeQueueStruct *q = NULL;
-			byte sqi = pd.station_qid[sid];
+			unsigned char sqi = pd.station_qid[sid];
 			//check if station has schedule
 			if(sqi!=0xFF){
 				q = pd.queue+sqi;
@@ -275,8 +217,8 @@ void manualRun(char *message){
 			return;
 		}
 	}else{
-		byte ssta = 0;
-		if(findKeyVal(message, tmp_buffer, TMP_BUFFER_SIZE, "ssta",'=')){
+		unsigned char ssta = 0;
+		if(findKeyVal(message, tmp_buffer, TMP_BUFFER_SIZE, PSTR("ssta"), true)){
 			ssta = atoi(tmp_buffer);
 		}
 		RuntimeQueueStruct *q = pd.queue + pd.station_qid[sid];
@@ -287,9 +229,9 @@ void manualRun(char *message){
 }
 
 //handles /mp command
-void manual_start_program(byte, byte);
+void manual_start_program(unsigned char, unsigned char);
 void programStart(char *message){
-	if(!findKeyVal(message, tmp_buffer, TMP_BUFFER_SIZE, "pid",'=')){
+	if(!findKeyVal(message, tmp_buffer, TMP_BUFFER_SIZE, PSTR("pid"), true)){
 		DEBUG_LOGF("Program ID missing.\r\n")
 		return;
 	}
@@ -298,8 +240,8 @@ void programStart(char *message){
 		DEBUG_LOGF("Program ID out of bounds.\r\n");
 	}
 
-	byte uwt = 0;
-	if(findKeyVal(message, tmp_buffer, TMP_BUFFER_SIZE, "uwt",'=')){
+	unsigned char uwt = 0;
+	if(findKeyVal(message, tmp_buffer, TMP_BUFFER_SIZE, PSTR("uwt"), true)){
 		if(tmp_buffer[0]=='1') uwt = 1;
 	}
 
@@ -327,11 +269,11 @@ void runOnceProgram(char *message){
 
 	reset_all_stations_immediate();
 
-	byte sid, bid, s;
+	unsigned char sid, bid, s;
 	uint16_t dur;
 	boolean match_found = false;
 	for(sid = 0; sid < os.nstations; sid++){
-		dur = parseListData(&pv);
+		dur = parse_listdata(&pv);
 		bid = sid >> 3;
 		s = sid&0x07;
 
@@ -593,17 +535,13 @@ int OSMqtt::_publish(const char *topic, const char *payload) {
 	return MQTT_SUCCESS;
 }
 
-void callback(const char *topic, byte *payload, unsigned int length) {
-	DEBUG_LOGF("Callback\r\n");
-	char message[length + 1];
-	for (unsigned int i=0;i<length;i++) {
-		message[i] = (char)payload[i];
-  	}
+void subscribe_callback(const char *topic, unsigned char *payload, unsigned int length) {
+	DEBUG_LOGF("Subscribe Callback\r\n");
+	char* message = (char*)payload;
 
 	if(!checkPassword(message)){
 		return;
 	}
-	DEBUG_LOGF("Password Passed\r\n");
 
 	if(message[0]=='c'){
 		if(message[1]=='v'){
@@ -616,13 +554,13 @@ void callback(const char *topic, byte *payload, unsigned int length) {
 	}else if(message[0]=='m' && message[1]=='p'){
 		programStart(message);
 	}else{
-		DEBUG_LOGF("Invalid request\r\n");
+		DEBUG_LOGF("Unsupported mqtt subscribe request\r\n");
 		return;
 	}
 }
 
 int OSMqtt::_subscribe(void){
-	mqtt_client->setCallback(callback);
+	mqtt_client->setCallback(subscribe_callback);
 	if (!mqtt_client->subscribe(_sub_topic)) {
 		DEBUG_LOGF("MQTT Subscribe: Failed (%d)\r\n", mqtt_client->state());
 		return MQTT_ERROR;
