@@ -690,19 +690,14 @@ int OSMqtt::_publish(const char *topic, const char *payload) {
 	return MQTT_SUCCESS;
 }
 
-void piCallback(struct mosquitto *mosq, void *obj, const struct mosquitto_message *message){
+void subscribe_callback(struct mosquitto *mosq, void *obj, const struct mosquitto_message *message){
 	DEBUG_LOGF("Callback\r\n");
 	char *topic = message->topic;
-	char *payload = (char*)(message->payload);
-	char msg[message->payloadlen + 1];
-	for (unsigned int i=0;i<message->payloadlen;i++) {
-		msg[i] = (char)payload[i];
-  	}
+	char *msg = (char*)(message->payload);
 
 	if(!checkPassword(msg)){
 		return;
 	}
-	DEBUG_LOGF("Password Passed\r\n");
 
 	if(msg[0]=='c'){
 		if(msg[1]=='v'){
@@ -721,7 +716,7 @@ void piCallback(struct mosquitto *mosq, void *obj, const struct mosquitto_messag
 }
 
 int OSMqtt::_subscribe(void) {
-	mosquitto_message_callback_set(mqtt_client, piCallback);
+	mosquitto_message_callback_set(mqtt_client, subscribe_callback);
 	int rc = mosquitto_subscribe(mqtt_client, NULL, _sub_topic, 0);
 	if (rc != MOSQ_ERR_SUCCESS) {
 		DEBUG_LOGF("MQTT Subscribe: Failed (%s)\r\n", mosquitto_strerror(rc));
