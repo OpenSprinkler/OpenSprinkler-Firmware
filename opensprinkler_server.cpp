@@ -49,7 +49,6 @@
 		#define handle_return(x) {if(x==HTML_OK) res.writeBodyData(ether_buffer, strlen(ether_buffer)); else otf_send_result(req,res,x); return;}
 
 	#else
-
 		#include "SdFat.h"
 		extern SdFat sd;
 		extern EthernetClient *m_client;
@@ -136,7 +135,7 @@ static const char htmlReturnHome[] PROGMEM =
 	"<script>window.location=\"/\";</script>\n"
 ;
 
-#if defined(ESP8266) || defined(OSPI)
+#if defined(USE_OTF)
 unsigned char findKeyVal (const OTF::Request &req,char *strbuf, uint16_t maxlen,const char *key,bool key_in_pgm=false,uint8_t *keyfound=NULL) {
     #if defined(ARDUINO)
 	char* result = key_in_pgm ? req.getQueryParameter((const __FlashStringHelper *)key) : req.getQueryParameter(key);
@@ -220,7 +219,7 @@ void rewind_ether_buffer() {
 }
 
 void send_packet(OTF_PARAMS_DEF) {
-#if defined(ESP8266) || defined(OSPI)
+#if defined(USE_OTF)
 	res.writeBodyData(ether_buffer, strlen(ether_buffer));
 #else
 	m_client->write((const uint8_t *)ether_buffer, strlen(ether_buffer));
@@ -233,7 +232,7 @@ char dec2hexchar(unsigned char dec) {
 	else return 'A'+(dec-10);
 }
 
-#if defined(ESP8266) || defined(OSPI)
+#if defined(USE_OTF)
 void print_header(OTF_PARAMS_DEF, bool isJson=true, int len=0) {
 	res.writeStatus(200, F("OK"));
 	res.writeHeader(F("Content-Type"), isJson?F("application/json"):F("text/html"));
@@ -249,8 +248,8 @@ void print_header(bool isJson=true)  {
 }
 #endif
 
-#if defined(ESP8266) || defined(OSPI)
-#if defined(OSPI)
+#if defined(USE_OTF)
+#if !defined(ARDUINO)
 string two_digits(uint8_t x) {
 	return std::to_string(x);
 }
@@ -379,7 +378,7 @@ void on_ap_try_connect(OTF_PARAMS_DEF) {
 
 
 /** Check and verify password */
-#if defined(ESP8266) || defined(OSPI)
+#if defined(USE_OTF)
 boolean check_password(char *p) {
     return true;
 }
@@ -393,7 +392,7 @@ boolean check_password(char *p)
 #endif
 	if (os.iopts[IOPT_IGNORE_PASSWORD])  return true;
 
-#if !defined(ESP8266) && !defined(OSPI)
+#if !defined(USE_OTF)
 	if (m_client && !p) {
 		p = get_buffer;
 	}
@@ -472,7 +471,7 @@ void server_json_stations_main(OTF_PARAMS_DEF) {
 
 /** Output stations data */
 void server_json_stations(OTF_PARAMS_DEF) {
-#if defined(ESP8266) || defined(OSPI)
+#if defined(USE_OTF)
 	if(!process_password(OTF_PARAMS)) return;
 	rewind_ether_buffer();
 	print_header(OTF_PARAMS);
@@ -487,7 +486,7 @@ void server_json_stations(OTF_PARAMS_DEF) {
 
 /** Output station special attribute */
 void server_json_station_special(OTF_PARAMS_DEF) {
-#if defined(ESP8266) || defined(OSPI)
+#if defined(USE_OTF)
 	if(!process_password(OTF_PARAMS)) return;
 	rewind_ether_buffer();
 	print_header(OTF_PARAMS);
@@ -516,7 +515,7 @@ void server_json_station_special(OTF_PARAMS_DEF) {
 	handle_return(HTML_OK);
 }
 
-#if defined(ESP8266) || defined(OSPI)
+#if defined(USE_OTF)
 void server_change_board_attrib(const OTF::Request &req, char header, unsigned char *attrib)
 #else
 void server_change_board_attrib(char *p, char header, unsigned char *attrib)
@@ -533,7 +532,7 @@ void server_change_board_attrib(char *p, char header, unsigned char *attrib)
 	}
 }
 
-#if defined(ESP8266) || defined(OSPI)
+#if defined(USE_OTF)
 void server_change_stations_attrib(const OTF::Request &req, char header, unsigned char *attrib)
 #else
 void server_change_stations_attrib(char *p, char header, unsigned char *attrib)
@@ -1021,7 +1020,7 @@ void server_json_options_main() {
 
 /** Output Options */
 void server_json_options(OTF_PARAMS_DEF) {
-#if defined(ESP8266) || defined(OSPI)
+#if defined(USE_OTF)
 	if(!process_password(OTF_PARAMS,true)) return;
 	rewind_ether_buffer();
 	print_header(OTF_PARAMS);
@@ -1075,7 +1074,7 @@ void server_json_programs_main(OTF_PARAMS_DEF) {
 
 /** Output program data */
 void server_json_programs(OTF_PARAMS_DEF) {
-#if defined(ESP8266) || defined(OSPI)
+#if defined(USE_OTF)
 	if(!process_password(OTF_PARAMS)) return;
 	rewind_ether_buffer();
 	print_header(OTF_PARAMS);
@@ -1090,7 +1089,7 @@ void server_json_programs(OTF_PARAMS_DEF) {
 /** Output script url form */
 void server_view_scripturl(OTF_PARAMS_DEF) {
 	rewind_ether_buffer();
-#if defined(ESP8266) || defined(OSPI)
+#if defined(USE_OTF)
 	print_header(OTF_PARAMS,false,strlen(ether_buffer));
 #else
 	print_header(false);
@@ -1222,7 +1221,7 @@ bfill.emit_p(PSTR("\"otc\":{$O},\"otcs\":$D,"), SOPT_OTC_OPTS, otf->getCloudStat
 
 /** Output controller variables in json */
 void server_json_controller(OTF_PARAMS_DEF) {
-#if defined(ESP8266) || defined(OSPI)
+#if defined(USE_OTF)
 	if(!process_password(OTF_PARAMS)) return;
 	rewind_ether_buffer();
 	print_header(OTF_PARAMS);
@@ -1239,7 +1238,7 @@ void server_json_controller(OTF_PARAMS_DEF) {
 void server_home(OTF_PARAMS_DEF)
 {
 	rewind_ether_buffer();
-#if defined(ESP8266) || defined(OSPI)
+#if defined(USE_OTF)
 	print_header(OTF_PARAMS,false,strlen(ether_buffer));
 #else
 	print_header(false);
@@ -1269,7 +1268,7 @@ void server_home(OTF_PARAMS_DEF)
  */
 void server_change_values(OTF_PARAMS_DEF)
 {
-#if defined(ESP8266) || defined(OSPI)
+#if defined(USE_OTF)
 	extern uint32_t reboot_timer;
 	if(!process_password(OTF_PARAMS)) return;
 #else
@@ -1286,7 +1285,7 @@ void server_change_values(OTF_PARAMS_DEF)
 #endif
 
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("rbt"), true) && atoi(tmp_buffer) > 0) {
-		#if defined(ESP8266) || defined(OSPI)
+		#if defined(USE_OTF)
 			os.status.safe_reboot = 0;
 			reboot_timer = os.now_tz() + 1;
 			handle_return(HTML_SUCCESS);
@@ -1598,7 +1597,7 @@ void server_json_status_main() {
 /** Output station status */
 void server_json_status(OTF_PARAMS_DEF)
 {
-#if defined(ESP8266) || defined(OSPI)
+#if defined(USE_OTF)
 	if(!process_password(OTF_PARAMS)) return;
 	rewind_ether_buffer();
 	print_header(OTF_PARAMS);
@@ -1756,7 +1755,7 @@ void server_json_log(OTF_PARAMS_DEF) {
 	if (findKeyVal(FKV_SOURCE, type, 4, PSTR("type"), true))
 		type_specified = true;
 
-#if defined(ESP8266) || defined(OSPI)
+#if defined(USE_OTF)
 	// as the log data can be large, we will use ESP8266's sendContent function to
 	// send multiple packets of data, instead of the standard way of using send().
 	rewind_ether_buffer();
@@ -1889,7 +1888,7 @@ void server_pause_queue(OTF_PARAMS_DEF) {
 
 /** Output all JSON data, including jc, jp, jo, js, jn */
 void server_json_all(OTF_PARAMS_DEF) {
-#if defined(ESP8266) || defined(OSPI)
+#if defined(USE_OTF)
 	if(!process_password(OTF_PARAMS,true)) return;
 	rewind_ether_buffer();
 	print_header(OTF_PARAMS);
@@ -1925,7 +1924,7 @@ static int freeHeap () {
 #endif
 
 void server_json_debug(OTF_PARAMS_DEF) {
-#if defined(ESP8266) || defined(OSPI)
+#if defined(USE_OTF)
 	rewind_ether_buffer();
 	print_header(OTF_PARAMS);
 #else
@@ -2182,7 +2181,7 @@ void start_server_ap() {
 
 #endif
 
-#if defined(OSPI)
+#if defined(USE_OTF) && !defined(ARDUINO)
 void initalize_otf() {
 	if(!otf) return;
 	static bool callback_initialized = false;
@@ -2205,7 +2204,7 @@ void initalize_otf() {
 }
 #endif
 
-#if !defined(ESP8266) && !defined(OSPI)
+#if !defined(USE_OTF)
 // This funtion is only used for non-OTF platforms
 void handle_web_request(char *p) {
 	rewind_ether_buffer();

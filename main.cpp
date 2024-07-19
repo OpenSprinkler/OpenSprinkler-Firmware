@@ -2003,7 +2003,7 @@ static void perform_ntp_sync() {
 
 #if !defined(ARDUINO) // main function for RPI/BBB
 int main(int argc, char *argv[]) {
-    printf("Starting OpenSprinklerPi\n");
+    printf("Starting OpenSprinkler\n");
 
   int opt;
   while(-1 != (opt = getopt(argc, argv, "d:"))) {

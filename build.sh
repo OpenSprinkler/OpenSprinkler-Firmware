@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 
 while getopts ":s" opt; do
   case $opt in
@@ -10,18 +11,32 @@ while getopts ":s" opt; do
 done
 echo "Building OpenSprinkler..."
 
+#Git update submodules
+
+if git submodule status | grep --quiet '^-'; then
+    echo "A git submodule is not initialized."
+    git submodule update --recursive --init
+else
+    echo "Updating submodules."
+    git submodule update --recursive
+fi
+
 if [ "$1" == "demo" ]; then
 	echo "Installing required libraries..."
-	apt-get install -y libmosquitto-dev
-	apt-get install -y libssl-dev
+	apt-get install -y libmosquitto-dev libssl-dev
 	echo "Compiling demo firmware..."
-	g++ -o OpenSprinkler -DDEMO -DSMTP_OPENSSL -std=c++14 main.cpp OpenSprinkler.cpp program.cpp opensprinkler_server.cpp utils.cpp weather.cpp gpio.cpp etherport.cpp mqtt.cpp smtp.c -lpthread -lmosquitto -l crypto -lssl
+
+    ws=$(ls external/TinyWebsockets/tiny_websockets_lib/src/*.cpp)
+    otf=$(ls external/OpenThings-Framework-Firmware-Library/*.cpp)
+    g++ -o OpenSprinkler -DDEMO -DSMTP_OPENSSL -std=c++14 main.cpp OpenSprinkler.cpp program.cpp opensprinkler_server.cpp utils.cpp weather.cpp gpio.cpp mqtt.cpp smtp.c -Iexternal/TinyWebsockets/tiny_websockets_lib/include $ws -Iexternal/OpenThings-Framework-Firmware-Library/ $otf -lpthread -lmosquitto -lssl -lcrypto
 elif [ "$1" == "osbo" ]; then
 	echo "Installing required libraries..."
-	apt-get install -y libmosquitto-dev
-	apt-get install -y libssl-dev
+	apt-get install -y libmosquitto-dev libssl-dev
 	echo "Compiling osbo firmware..."
-	g++ -o OpenSprinkler -DOSBO -DSMTP_OPENSSL -std=c++14 main.cpp OpenSprinkler.cpp program.cpp opensprinkler_server.cpp utils.cpp weather.cpp gpio.cpp etherport.cpp mqtt.cpp smtp.c -lpthread -lmosquitto -l crypto -lssl
+
+    ws=$(ls external/TinyWebsockets/tiny_websockets_lib/src/*.cpp)
+    otf=$(ls external/OpenThings-Framework-Firmware-Library/*.cpp)
+	g++ -o OpenSprinkler -DOSBO -DSMTP_OPENSSL -std=c++14 main.cpp OpenSprinkler.cpp program.cpp opensprinkler_server.cpp utils.cpp weather.cpp gpio.cpp mqtt.cpp smtp.c -Iexternal/TinyWebsockets/tiny_websockets_lib/include $ws -Iexternal/OpenThings-Framework-Firmware-Library/ $otf -lpthread -lmosquitto -lssl -lcrypto
 else
 	echo "Installing required libraries..."
 	apt-get update
