@@ -2261,7 +2261,7 @@ void OpenSprinkler::parse_otc_config() {
 		// Test the parsing otherwise parse
 		if (error) {
 				DEBUG_PRINT(F("otf: deserializeJson() failed: "));
-				DEBUG_PRINTLN(error.f_str());
+				DEBUG_PRINTLN(error.c_str());
 		} else {
 				en = doc["en"];
 				const char *token_val = doc["token"];
