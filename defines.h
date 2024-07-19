@@ -404,6 +404,8 @@ enum {
 	#define V2_PIN_SENSOR1       3  // sensor 1
 	#define V2_PIN_SENSOR2       10 // sensor 2
 
+    #define USE_OTF
+
 #elif defined(OSPI) // for OSPi
 
 	#define OS_HW_VERSION    OSPI_HW_VERSION_BASE
@@ -422,6 +424,8 @@ enum {
 	#define PIN_FREE_LIST       {5,6,7,8,9,10,11,12,13,16,18,19,20,21,23,24,25,26}  // free GPIO pins
 	#define ETHER_BUFFER_SIZE   16384
 
+    #define USE_OTF
+
 #elif defined(OSBO) // for OSBo
 
 	#define OS_HW_VERSION    OSBO_HW_VERSION_BASE
@@ -436,6 +440,8 @@ enum {
 
 	#define PIN_FREE_LIST     {38,39,34,35,45,44,26,47,27,65,63,62,37,36,33,32,61,86,88,87,89,76,77,74,72,73,70,71}
 	#define ETHER_BUFFER_SIZE   16384
+
+    #define USE_OTF
 
 #else // for demo / simulation
 	// use fake hardware pins
@@ -453,6 +459,8 @@ enum {
 	#define PIN_RFTX        0
 	#define PIN_FREE_LIST  {}
 	#define ETHER_BUFFER_SIZE   16384
+
+    #define USE_OTF
 #endif
 
 #if defined(ENABLE_DEBUG) /** Serial debug functions */
