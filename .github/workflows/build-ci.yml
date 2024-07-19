@@ -51,6 +51,18 @@ jobs:
         with:
           name: firmware
           path: ./firmware_os_esp8266.bin
+  build-demo:
+    name: Build Demo
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Build Script
+        run: sudo ./build.sh -s demo
+
   build-docker:
     name: Build Docker
     runs-on: ubuntu-latest

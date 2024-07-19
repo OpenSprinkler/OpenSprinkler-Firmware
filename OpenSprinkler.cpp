@@ -95,8 +95,8 @@ extern ProgramData pd;
 #else
 	#if defined(OSPI)
 		unsigned char OpenSprinkler::pin_sr_data = PIN_SR_DATA;
-        OTCConfig OpenSprinkler::otc;
 	#endif
+    OTCConfig OpenSprinkler::otc;
 	// todo future: LCD define for Linux-based systems
 #endif
 
