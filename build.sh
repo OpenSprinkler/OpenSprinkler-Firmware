@@ -10,16 +10,25 @@ while getopts ":s" opt; do
 done
 echo "Building OpenSprinkler..."
 
+#Git update submodules
+git submodule update --recursive
+
 if [ "$1" == "demo" ]; then
 	echo "Installing required libraries..."
-	apt-get install -y libmosquitto-dev
+	apt-get install -y libmosquitto-dev libssl-dev
 	echo "Compiling demo firmware..."
-	g++ -o OpenSprinkler -DDEMO -std=c++14 main.cpp OpenSprinkler.cpp program.cpp opensprinkler_server.cpp utils.cpp weather.cpp gpio.cpp etherport.cpp mqtt.cpp -lpthread -lmosquitto
+
+    ws=$(ls external/TinyWebsockets/tiny_websockets_lib/src/*.cpp)
+    otf=$(ls external/OpenThings-Framework-Firmware-Library/*.cpp)
+    g++ -o OpenSprinkler -DDEMO -std=c++14 main.cpp OpenSprinkler.cpp program.cpp opensprinkler_server.cpp utils.cpp weather.cpp gpio.cpp mqtt.cpp -Iexternal/TinyWebsockets/tiny_websockets_lib/include $ws -Iexternal/OpenThings-Framework-Firmware-Library/ $otf -lpthread -lmosquitto -lssl -lcrypto
 elif [ "$1" == "osbo" ]; then
 	echo "Installing required libraries..."
-	apt-get install -y libmosquitto-dev
+	apt-get install -y libmosquitto-dev libssl-dev
 	echo "Compiling osbo firmware..."
-	g++ -o OpenSprinkler -DOSBO -std=c++14 main.cpp OpenSprinkler.cpp program.cpp opensprinkler_server.cpp utils.cpp weather.cpp gpio.cpp etherport.cpp mqtt.cpp -lpthread -lmosquitto
+
+    ws=$(ls external/TinyWebsockets/tiny_websockets_lib/src/*.cpp)
+    otf=$(ls external/OpenThings-Framework-Firmware-Library/*.cpp)
+	g++ -o OpenSprinkler -DOSBO -std=c++14 main.cpp OpenSprinkler.cpp program.cpp opensprinkler_server.cpp utils.cpp weather.cpp gpio.cpp mqtt.cpp -Iexternal/TinyWebsockets/tiny_websockets_lib/include $ws -Iexternal/OpenThings-Framework-Firmware-Library/ $otf -lpthread -lmosquitto -lssl -lcrypto
 else
 	echo "Installing required libraries..."
 	apt-get update
