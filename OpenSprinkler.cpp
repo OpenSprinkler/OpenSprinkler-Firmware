@@ -621,7 +621,7 @@ unsigned char OpenSprinkler::start_ether() {
 	lcd_print_line_clear_pgm(eth.isW5500 ? PSTR("  [w5500]    ") : PSTR(" [enc28j60]  "), 2);
 	
 	ulong timeout = millis()+60000; // 60 seconds time out
-	byte timecount = 1;
+	unsigned char timecount = 1;
 	while (!eth.connected() && millis()<timeout) {
 		DEBUG_PRINT(".");
 		lcd.setCursor(13, 2);
@@ -1818,9 +1818,9 @@ unsigned char OpenSprinkler::set_station_bit(unsigned char sid, unsigned char va
 	return 0;
 }
 
-byte OpenSprinkler::get_station_bit(byte sid) {
-	byte *data = station_bits+(sid>>3); // pointer to the station byte
-	byte mask = (byte)1<<(sid&0x07); // mask
+unsigned char OpenSprinkler::get_station_bit(unsigned char sid) {
+	unsigned char *data = station_bits+(sid>>3); // pointer to the station byte
+	unsigned char mask = (unsigned char)1<<(sid&0x07); // mask
 	if ((*data)&mask) return 1;
 	else return 0;
 }

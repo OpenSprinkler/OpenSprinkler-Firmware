@@ -2220,7 +2220,7 @@ void handle_web_request(char *p) {
 		m_client->stop();
 	} else {
 		// server funtion handlers
-		byte i;
+		unsigned char i;
 		for(i=0;i<sizeof(urls)/sizeof(URLHandler);i++) {
 			if(pgm_read_byte(_url_keys+2*i)==com[0]
 			 &&pgm_read_byte(_url_keys+2*i+1)==com[1]) {
