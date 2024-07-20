@@ -55,7 +55,7 @@
 	#endif
 	unsigned long getNtpTime();
 #else // header and defs for RPI/BBB
-    OTF::OpenThingsFramework *otf = NULL;
+	OTF::OpenThingsFramework *otf = NULL;
 #endif
 
 void push_message(int type, uint32_t lval=0, float fval=0.f, const char* sval=NULL);
@@ -400,7 +400,7 @@ void do_setup() {
 	os.mqtt.init();
 	os.status.req_mqtt_restart = true;
 
-    initalize_otf();
+	initalize_otf();
 }
 #endif
 
@@ -586,7 +586,7 @@ void do_loop()
 	ui_state_machine();
 
 #else // Process Ethernet packets for RPI/BBB
-    if(otf) otf->loop();
+	if(otf) otf->loop();
 #endif	// Process Ethernet packets
 
 	// Start up MQTT when we have a network connection
@@ -1400,32 +1400,32 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 	#else
 		os.sopt_load(SOPT_EMAIL_OPTS, postval);
 		if (*postval != 0) {
-            // Add the wrapping curly braces to the string
-            postval = tmp_buffer;
-            postval[0] = '{';
-            int len = strlen(postval);
-            postval[len] = '}';
-            postval[len+1] = 0;
+			// Add the wrapping curly braces to the string
+			postval = tmp_buffer;
+			postval[0] = '{';
+			int len = strlen(postval);
+			postval[len] = '}';
+			postval[len+1] = 0;
 
-            ArduinoJson::JsonDocument doc;
-            ArduinoJson::DeserializationError error = ArduinoJson::deserializeJson(doc, postval);
+			ArduinoJson::JsonDocument doc;
+			ArduinoJson::DeserializationError error = ArduinoJson::deserializeJson(doc, postval);
 
-            // Test the parsing otherwise parse
-            if (error) {
-                    DEBUG_PRINT(F("mqtt: deserializeJson() failed: "));
-                    DEBUG_PRINTLN(error.c_str());
-            } else {
-                    email_en = (bool)doc["en"];
-                    const char *host_val = doc["host"];
-                    if(host_val) strncpy(email_host, host_val, MAX_EMAIL_HOST_LEN);
-                    email_port = doc["port"];
-                    const char *username_val = doc["user"];
-                    if(username_val) strncpy(email_username, username_val, MAX_EMAIL_USER_LEN);
-                    const char *password_val = doc["pass"];
-                    if(password_val) strncpy(email_password, password_val, MAX_EMAIL_PASS_LEN);
-                    const char *recipient_val = doc["recipient"];
-                    if(recipient_val) strncpy(email_recipient, recipient_val, MAX_EMAIL_RECP_LEN);
-            }
+			// Test the parsing otherwise parse
+			if (error) {
+				DEBUG_PRINT(F("mqtt: deserializeJson() failed: "));
+				DEBUG_PRINTLN(error.c_str());
+			} else {
+				email_en = (bool)doc["en"];
+				const char *host_val = doc["host"];
+				if(host_val) strncpy(email_host, host_val, MAX_EMAIL_HOST_LEN);
+				email_port = doc["port"];
+				const char *username_val = doc["user"];
+				if(username_val) strncpy(email_username, username_val, MAX_EMAIL_USER_LEN);
+				const char *password_val = doc["pass"];
+				if(password_val) strncpy(email_password, password_val, MAX_EMAIL_PASS_LEN);
+				const char *recipient_val = doc["recipient"];
+				if(recipient_val) strncpy(email_recipient, recipient_val, MAX_EMAIL_RECP_LEN);
+			}
 		}
 	#endif
 
@@ -2003,19 +2003,19 @@ static void perform_ntp_sync() {
 
 #if !defined(ARDUINO) // main function for RPI/BBB
 int main(int argc, char *argv[]) {
-    printf("Starting OpenSprinkler\n");
+	printf("Starting OpenSprinkler\n");
 
-  int opt;
-  while(-1 != (opt = getopt(argc, argv, "d:"))) {
-    switch(opt) {
-    case 'd':
-      set_data_dir(optarg);
-      break;
-    default:
-      // ignore options we don't understand
-      break;
-    }
-  }
+	int opt;
+	while(-1 != (opt = getopt(argc, argv, "d:"))) {
+		switch(opt) {
+		case 'd':
+			set_data_dir(optarg);
+			break;
+		default:
+			// ignore options we don't understand
+			break;
+		}
+	}
 
   do_setup();
 

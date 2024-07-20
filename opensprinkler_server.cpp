@@ -64,11 +64,11 @@
 	#include <stdlib.h>
 	#include "etherport.h"
 
-    extern OTF::OpenThingsFramework *otf;
-    #define OTF_PARAMS_DEF const OTF::Request &req,OTF::Response &res
-    #define OTF_PARAMS req,res
-    #define FKV_SOURCE req
-    #define handle_return(x) {if(x==HTML_OK) res.writeBodyData(ether_buffer, strlen(ether_buffer)); else otf_send_result(req,res,x); return;}
+	extern OTF::OpenThingsFramework *otf;
+	#define OTF_PARAMS_DEF const OTF::Request &req,OTF::Response &res
+	#define OTF_PARAMS req,res
+	#define FKV_SOURCE req
+	#define handle_return(x) {if(x==HTML_OK) res.writeBodyData(ether_buffer, strlen(ether_buffer)); else otf_send_result(req,res,x); return;}
 #endif
 
 extern char ether_buffer[];
@@ -137,11 +137,11 @@ static const char htmlReturnHome[] PROGMEM =
 
 #if defined(USE_OTF)
 unsigned char findKeyVal (const OTF::Request &req,char *strbuf, uint16_t maxlen,const char *key,bool key_in_pgm=false,uint8_t *keyfound=NULL) {
-    #if defined(ARDUINO)
+#if defined(ARDUINO)
 	char* result = key_in_pgm ? req.getQueryParameter((const __FlashStringHelper *)key) : req.getQueryParameter(key);
-    #else
-    char* result = req.getQueryParameter(key);
-    #endif
+#else
+	char* result = req.getQueryParameter(key);
+#endif
 	if(result!=NULL) {
 		strncpy(strbuf, result, maxlen);
 		strbuf[maxlen-1]=0;
@@ -265,11 +265,11 @@ String toHMS(ulong t) {
 
 void otf_send_result(OTF_PARAMS_DEF, unsigned char code, const char *item = NULL) {
 	String json = F("{\"result\":");
-    #if defined(ARDUINO)
-    json += code;
-    #else
+#if defined(ARDUINO)
+	json += code;
+#else
 	json += std::to_string(code);
-    #endif
+#endif
 	if (!item) item = "";
 	json += F(",\"item\":\"");
 	json += item;
@@ -380,7 +380,7 @@ void on_ap_try_connect(OTF_PARAMS_DEF) {
 /** Check and verify password */
 #if defined(USE_OTF)
 boolean check_password(char *p) {
-    return true;
+	return true;
 }
 boolean process_password(OTF_PARAMS_DEF, boolean fwv_on_fail=false)
 #else
@@ -1138,11 +1138,11 @@ void server_json_controller_main(OTF_PARAMS_DEF) {
 							pd.nqueue);
 
 #if defined(ESP8266)
-	bfill.emit_p(PSTR("\"RSSI\":$D,\"otc\":{$O},\"otcs\":$D,"), (int16_t)WiFi.RSSI(), SOPT_OTC_OPTS, otf->getCloudStatus());
+	bfill.emit_p(PSTR("\"RSSI\":$D,"), (int16_t)WiFi.RSSI());
 #endif
 
-#if defined(OSPI)
-bfill.emit_p(PSTR("\"otc\":{$O},\"otcs\":$D,"), SOPT_OTC_OPTS, otf->getCloudStatus());
+#if defined(USE_OTF)
+	bfill.emit_p(PSTR("\"otc\":{$O},\"otcs\":$D,"), SOPT_OTC_OPTS, otf->getCloudStatus());
 #endif
 
 	unsigned char mac[6] = {0};

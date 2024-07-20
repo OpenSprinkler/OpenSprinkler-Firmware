@@ -62,7 +62,7 @@
 	#include <unistd.h>
 	#include <netdb.h>
 	#include <sys/stat.h>
-    #include "OpenThingsFramework.h"
+	#include "OpenThingsFramework.h"
 	#include "etherport.h"
 	#include "smtp.h"
 #endif // end of headers
@@ -107,7 +107,7 @@
 	extern bool useEth;
 #else
 	extern EthernetServer *m_server;
-    extern OTF::OpenThingsFramework *otf;
+	extern OTF::OpenThingsFramework *otf;
 #endif
 
 /** Non-volatile data structure */
@@ -419,7 +419,7 @@ private:
 	static unsigned char engage_booster;
 
 private:
-    static void parse_otc_config();
+	static void parse_otc_config();
 };
 
 #endif  // _OPENSPRINKLER_H

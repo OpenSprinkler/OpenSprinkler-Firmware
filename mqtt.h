@@ -45,7 +45,7 @@ private:
     static int _subscribe(void);
     static int _loop(void);
     static const char * _state_string(int state);
-public:
+    public:
     static void init(void);
     static void init(const char * id);
     static void begin(void);

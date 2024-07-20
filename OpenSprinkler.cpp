@@ -83,7 +83,6 @@ extern ProgramData pd;
 	IOEXP* OpenSprinkler::mainio; // main controller IO expander object
 	IOEXP* OpenSprinkler::drio; // driver board IO expander object
 	RCSwitch OpenSprinkler::rfswitch;
-	OTCConfig OpenSprinkler::otc;
 
 	String OpenSprinkler::wifi_ssid="";
 	String OpenSprinkler::wifi_pass="";
@@ -97,8 +96,11 @@ extern ProgramData pd;
 	#if defined(OSPI)
 		unsigned char OpenSprinkler::pin_sr_data = PIN_SR_DATA;
 	#endif
-    OTCConfig OpenSprinkler::otc;
 	// todo future: LCD define for Linux-based systems
+#endif
+
+#if defined(USE_OTF)
+	OTCConfig OpenSprinkler::otc;
 #endif
 
 /** Option json names (stored in PROGMEM to reduce RAM usage) */
@@ -722,7 +724,7 @@ unsigned char OpenSprinkler::start_network() {
 	port = 80;
 #endif
 #endif
-    if(otc.en>0 && otc.token.length()>=32) {
+	if(otc.en>0 && otc.token.length()>=DEFAULT_OTC_TOKEN_LENGTH) {
 		otf = new OTF::OpenThingsFramework(port, otc.server.c_str(), otc.port, otc.token.c_str(), false, ether_buffer, ETHER_BUFFER_SIZE);
 		DEBUG_PRINTLN(F("Started OTF with remote connection"));
 	} else {
@@ -730,7 +732,7 @@ unsigned char OpenSprinkler::start_network() {
 		DEBUG_PRINTLN(F("Started OTF with just local connection"));
 	}
 
-    return 1;
+	return 1;
 }
 
 bool OpenSprinkler::network_connected(void) {
@@ -2248,7 +2250,7 @@ void OpenSprinkler::parse_otc_config() {
 	char *config = tmp_buffer + 1;
 	sopt_load(SOPT_OTC_OPTS, config);
 	if (*config != 0) {
-        // Add the wrapping curly braces to the string
+		// Add the wrapping curly braces to the string
 		config = tmp_buffer;
 		config[0] = '{';
 		int len = strlen(config);
@@ -2274,7 +2276,7 @@ void OpenSprinkler::parse_otc_config() {
 		token[MAX_SOPTS_SIZE] = 0;
 		server[MAX_SOPTS_SIZE] = 0;
 	}
-    
+
 	otc.en = en;
 	otc.token = String(token);
 	otc.server = String(server);
@@ -2312,7 +2314,7 @@ void OpenSprinkler::options_setup() {
 				}
 			}
 		}
-        #endif
+		#endif
 		parse_otc_config();
 		attribs_load();
 	}

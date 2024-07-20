@@ -470,7 +470,7 @@ void OSMqtt::loop(void) {
 int OSMqtt::_init(void) {
 	Client * client = NULL;
 
-    if (mqtt_client) { delete mqtt_client; mqtt_client = 0; }
+	if (mqtt_client) { delete mqtt_client; mqtt_client = 0; }
 
 	#if defined(ESP8266)
 		client = &wifiClient;
