@@ -1293,11 +1293,11 @@ int read_sensor_ip(Sensor_t *sensor) {
     case SENSOR_SMT100_MOIS:
     case SENSOR_SMT100_TEMP:
     case SENSOR_SMT100_PMTY:
-      // uint32_t stoptime = millis() + SENSOR_READ_TIMEOUT;
+      uint32_t stoptime = millis() + SENSOR_READ_TIMEOUT;
 #if defined(ESP8266)
       while (true) {
         if (client->available()) break;
-        // if (millis() >= stoptime)
+        if (millis() >= stoptime)
         {
           client->stop();
           DEBUG_PRINT(F("Sensor "));
