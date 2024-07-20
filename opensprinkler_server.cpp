@@ -2754,7 +2754,7 @@ void server_sensorlog_clear(OTF_PARAMS_DEF) {
 	print_header();
 #endif
 
-	if (nr > 0) {
+	if (nr > 0 || use_under || use_over) {
 		ulong n = 0;
 		if (log == -1) {
 			n += sensorlog_clear_sensor(nr, LOG_STD, use_under, under, use_over, over);
@@ -2941,8 +2941,9 @@ void server_sensorprog_list(OTF_PARAMS_DEF) {
 }
 
 static const int sensor_types[] = {
-	SENSOR_SMT100_MODBUS_RTU_MOIS,
-	SENSOR_SMT100_MODBUS_RTU_TEMP,
+	SENSOR_SMT100_MOIS,
+	SENSOR_SMT100_TEMP,
+	SENSOR_SMT100_PMTY,
 
 #if defined(ESP8266)
 	SENSOR_ANALOG_EXTENSION_BOARD,
@@ -2978,8 +2979,9 @@ static const int sensor_types[] = {
 };
 
 static const char* sensor_names[] = {
-	"Truebner SMT100 RS485 Modbus RTU over TCP, moisture mode",
-	"Truebner SMT100 RS485 Modbus RTU over TCP, temperature mode",
+	"Truebner SMT100 RS485 Modbus, moisture mode",
+	"Truebner SMT100 RS485 Modbus, temperature mode",
+	"Truebner SMT100 RS485 Modbus, permittivity mode",
  #if defined(ESP8266)
 	"ASB - voltage mode 0..4V",
 	"ASB - 0..3.3V to 0..100%",
