@@ -40,7 +40,6 @@
 #if defined(ARDUINO)
 	#if defined(ESP8266)
 		ESP8266WebServer *update_server = NULL;
-		OTF::OpenThingsFramework *otf = NULL;
 		DNSServer *dns = NULL;
 		ENC28J60lwIP enc28j60(PIN_ETHER_CS); // ENC28J60 lwip for wired Ether
 		Wiznet5500lwIP w5500(PIN_ETHER_CS); // W5500 lwip for wired Ether
@@ -55,6 +54,10 @@
 	#endif
 	unsigned long getNtpTime();
 #else // header and defs for RPI/BBB
+
+#endif
+
+#if defined(USE_OTF)
 	OTF::OpenThingsFramework *otf = NULL;
 #endif
 
@@ -321,7 +324,7 @@ void do_setup() {
 	os.lcd_print_time(os.now_tz());  // display time to LCD
 	os.powerup_lasttime = os.now_tz();
 
-#if !defined(ESP8266)
+#if defined(OS_AVR)
 	// enable WDT
 	/* In order to change WDE or the prescaler, we need to
 	 * set WDCE (This will allow updates for 4 clock cycles).
@@ -358,7 +361,7 @@ void do_setup() {
 // Arduino software reset function
 void(* sysReset) (void) = 0;
 
-#if !defined(ESP8266)
+#if defined(OS_AVR)
 volatile unsigned char wdt_timeout = 0;
 /** WDT interrupt service routine */
 ISR(WDT_vect)

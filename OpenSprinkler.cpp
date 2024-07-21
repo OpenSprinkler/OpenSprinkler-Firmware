@@ -1854,7 +1854,7 @@ void transmit_rfbit(ulong lenH, ulong lenL) {
 		delayMicroseconds(lenL);
 	#endif
 #else
-	gpio_write(rf_gpio_fd, 1);
+	gpio_write(rf_gpio_fd, 1);	// TODO: fix this or it won't work on Raspbian bookworm
 	delayMicrosecondsHard(lenH);
 	gpio_write(rf_gpio_fd, 0);
 	delayMicrosecondsHard(lenL);

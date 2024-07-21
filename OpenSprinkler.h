@@ -101,11 +101,11 @@
 	};
 	extern lwipEth eth;
 	#else
-	//extern EthernetServer *m_server;
+		// AVR specific
 	#endif
 	extern bool useEth;
 #else
-	//extern EthernetServer *m_server;
+	// OSPI/Linux specific
 #endif
 
 #if defined(USE_OTF)
