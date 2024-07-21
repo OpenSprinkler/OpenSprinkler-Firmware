@@ -2972,7 +2972,7 @@ void OpenSprinkler::lcd_set_contrast() {
 /** Set LCD brightness (using PWM) */
 void OpenSprinkler::lcd_set_brightness(unsigned char value) {
 #if defined(PIN_LCD_BACKLIGHT)
-	#if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
+	#if defined(OS_AVR)
 	if (lcd.type()==LCD_I2C) {
 		if (value) lcd.backlight();
 		else {

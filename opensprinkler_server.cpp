@@ -30,6 +30,10 @@
 #include "main.h"
 
 // External variables defined in main ion file
+#if defined(USE_OTF)
+
+#endif
+
 #if defined(ARDUINO)
 
 	#if defined(ESP8266)
@@ -825,7 +829,7 @@ void server_moveup_program(OTF_PARAMS_DEF) {
 */
 const char _str_program[] PROGMEM = "Program ";
 void server_change_program(OTF_PARAMS_DEF) {
-#if defined(ESP8266)
+#if defined(USE_OTF)
 	if(!process_password(OTF_PARAMS)) return;
 #else
 	char *p = get_buffer;
@@ -881,11 +885,11 @@ void server_change_program(OTF_PARAMS_DEF) {
 	}
 
 #if !defined(ESP8266)
-	// do a full string decoding
+	// do a full string decoding: ESP8266 does the decoding automatically so we only need to do it on non-ESP8266
 	if(p) urlDecode(p);
 #endif
 
-#if defined(ESP8266)
+#if defined(USE_OTF)
 	if(!findKeyVal(FKV_SOURCE,tmp_buffer,TMP_BUFFER_SIZE, "v",false)) handle_return(HTML_DATA_MISSING);
 	char *pv = tmp_buffer+1;
 #else
@@ -950,7 +954,8 @@ void server_json_options_main() {
 				(oid>=IOPT_STATIC_IP1	&& oid<=IOPT_STATIC_IP4) ||
 				(oid>=IOPT_GATEWAY_IP1 && oid<=IOPT_GATEWAY_IP4) ||
 				(oid>=IOPT_DNS_IP1 && oid<=IOPT_DNS_IP4) ||
-				(oid>=IOPT_SUBNET_MASK1 && oid<=IOPT_SUBNET_MASK4))
+				(oid>=IOPT_SUBNET_MASK1 && oid<=IOPT_SUBNET_MASK4) ||
+				(oid==IOPT_FORCE_WIRED))
 				continue;
 		#endif
 
@@ -1165,7 +1170,7 @@ void server_json_controller_main(OTF_PARAMS_DEF) {
 							 wt_errCode,
 							 SOPT_DEVICE_NAME);
 
-#if !(defined(__AVR_ATmega1284__)||defined(__AVR_ATmega1284P__))
+#if defined(SUPPORT_EMAIl)
 	bfill.emit_p(PSTR("\"email\":{$O},"), SOPT_EMAIL_OPTS);
 #endif
 

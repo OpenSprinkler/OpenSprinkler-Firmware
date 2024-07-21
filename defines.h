@@ -152,8 +152,12 @@ typedef unsigned long ulong;
 #define DEFAULT_DEVICE_NAME       "My OpenSprinkler"
 #define DEFAULT_EMPTY_STRING      ""
 
-#if !(defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)) // OTF is enabled for all non-AVR platforms
+#if (defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__))
+	#define OS_AVR
+#else  // all non-AVR platforms support OTF, EMAIL and HTTPS
 	#define USE_OTF
+	#define SUPPORT_EMAIL
+	#define SUPPORT_HTTPS
 #endif
 
 /* Weather Adjustment Methods */
@@ -293,7 +297,7 @@ enum {
 #undef OS_HW_VERSION
 
 /** Hardware defines */
-#if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__) // for OS 2.3
+#if defined(OS_AVR) // for OS 2.3
 
 	#define OS_HW_VERSION   (OS_HW_VERSION_BASE+23)
 	#define PIN_FREE_LIST   {2,10,12,13,14,15,18,19}  // Free GPIO pins

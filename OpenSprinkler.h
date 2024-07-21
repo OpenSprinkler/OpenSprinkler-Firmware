@@ -70,7 +70,6 @@
 #if defined(ARDUINO)
 	#if defined(ESP8266)
 	extern ESP8266WebServer *update_server;
-	extern OTF::OpenThingsFramework *otf;
 	extern ENC28J60lwIP enc28j60;
 	extern Wiznet5500lwIP w5500;
 	struct lwipEth {
@@ -102,12 +101,17 @@
 	};
 	extern lwipEth eth;
 	#else
-	extern EthernetServer *m_server;
+	//extern EthernetServer *m_server;
 	#endif
 	extern bool useEth;
 #else
-	extern EthernetServer *m_server;
+	//extern EthernetServer *m_server;
+#endif
+
+#if defined(USE_OTF)
 	extern OTF::OpenThingsFramework *otf;
+#else
+	extern EthernetServer *m_server;
 #endif
 
 /** Non-volatile data structure */
@@ -338,7 +342,10 @@ public:
 	static int8_t send_http_request(const char* server, uint16_t port, char* p, void(*callback)(char*)=NULL, bool usessl=false, uint16_t timeout=5000);
 	static int8_t send_http_request(char* server_with_port, char* p, void(*callback)(char*)=NULL, bool usessl=false, uint16_t timeout=5000);
 	
+	#if defined(USE_OTF)
 	static OTCConfig otc;
+	#endif
+
 	// -- LCD functions
 #if defined(ARDUINO) // LCD functions for Arduino
 	#if defined(ESP8266)
@@ -418,8 +425,9 @@ private:
 #endif // LCD functions
 	static unsigned char engage_booster;
 
-private:
+	#if defined(USE_OTF)
 	static void parse_otc_config();
+	#endif
 };
 
 #endif  // _OPENSPRINKLER_H

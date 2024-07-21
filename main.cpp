@@ -1395,9 +1395,7 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 	int  email_en = 0;
 
 	// parse email variables
-	#if defined(__AVR_ATmega1284__) | defined(__AVR_ATmega1284P__)
-		// AVR doesn't support email, so no need to parse
-	#else
+	#if defined(SUPPORT_EMAIl)
 		os.sopt_load(SOPT_EMAIL_OPTS, postval);
 		if (*postval != 0) {
 			// Add the wrapping curly braces to the string
@@ -1919,7 +1917,7 @@ void delete_log(char *name) {
  * If not, it re-initializes Ethernet controller.
  */
 static void check_network() {
-#if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
+#if defined(OS_AVR)
 	// do not perform network checking if the controller has just started, or if a program is running
 	if (os.status.program_busy) {return;}
 
