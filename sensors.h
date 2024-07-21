@@ -310,6 +310,11 @@ int sensorlog_load2(uint8_t log, ulong idx, int count, SensorLog_t *sensorlog);
 ulong sensorlog_filesize(uint8_t log);
 ulong sensorlog_size(uint8_t log);
 ulong findLogPosition(uint8_t log, ulong after);
+const char *getlogfile(uint8_t log);
+const char *getlogfile2(uint8_t log);
+void checkLogSwitch(uint8_t log);
+void checkLogSwitchAfterWrite(uint8_t log);
+
 
 // Set Sensor Address for SMT100:
 int set_sensor_address(Sensor_t *sensor, uint8_t new_address);

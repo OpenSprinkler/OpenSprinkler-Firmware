@@ -77,7 +77,7 @@ const char *sensor_unitNames[]{
     //  10=Level %
     //  11=DK
 };
-byte logFileSwitch[3] = {0, 0, 0};  // 0=use smaller File, 1=LOG1, 2=LOG2
+uint8_t logFileSwitch[3] = {0, 0, 0};  // 0=use smaller File, 1=LOG1, 2=LOG2
 
 // Weather
 time_t last_weather_time = 0;
@@ -131,6 +131,24 @@ void detect_asb_board() {
 #endif
   DEBUG_PRINT("ASB DETECT=");
   DEBUG_PRINTLN(asb_detected_boards);
+
+  for (int log = 0; log <= 2; log++) {
+    checkLogSwitch(log);
+#if defined(ENABLE_DEBUG)
+    DEBUG_PRINT("log=");
+    DEBUG_PRINTLN(log);
+    const char *f1 = getlogfile(log);
+    DEBUG_PRINT("logfile1=");
+    DEBUG_PRINTLN(f1);
+    DEBUG_PRINT("size1=");
+    DEBUG_PRINTLN(file_size(f1));
+    const char *f2 = getlogfile2(log);
+    DEBUG_PRINT("logfile2=");
+    DEBUG_PRINTLN(f2);
+    DEBUG_PRINT("size2=");
+    DEBUG_PRINTLN(file_size(f2));
+#endif
+  }
 }
 
 byte get_asb_detected_boards() { return asb_detected_boards; }
@@ -370,14 +388,14 @@ Sensor_t *sensor_by_idx(uint idx) {
  * @return const char*
  */
 const char *getlogfile(uint8_t log) {
-  bool sw = logFileSwitch[log];
+  uint8_t sw = logFileSwitch[log];
   switch (log) {
     case 0:
-      return sw ? SENSORLOG_FILENAME1 : SENSORLOG_FILENAME2;
+      return sw < 2 ? SENSORLOG_FILENAME1 : SENSORLOG_FILENAME2;
     case 1:
-      return sw ? SENSORLOG_FILENAME_WEEK1 : SENSORLOG_FILENAME_WEEK2;
+      return sw < 2 ? SENSORLOG_FILENAME_WEEK1 : SENSORLOG_FILENAME_WEEK2;
     case 2:
-      return sw ? SENSORLOG_FILENAME_MONTH1 : SENSORLOG_FILENAME_MONTH2;
+      return sw < 2 ? SENSORLOG_FILENAME_MONTH1 : SENSORLOG_FILENAME_MONTH2;
   }
   return "";
 }
@@ -389,14 +407,14 @@ const char *getlogfile(uint8_t log) {
  * @return const char*
  */
 const char *getlogfile2(uint8_t log) {
-  bool sw = logFileSwitch[log];
+  uint8_t sw = logFileSwitch[log];
   switch (log) {
     case 0:
-      return sw ? SENSORLOG_FILENAME2 : SENSORLOG_FILENAME1;
+      return sw < 2 ? SENSORLOG_FILENAME2 : SENSORLOG_FILENAME1;
     case 1:
-      return sw ? SENSORLOG_FILENAME_WEEK2 : SENSORLOG_FILENAME_WEEK1;
+      return sw < 2 ? SENSORLOG_FILENAME_WEEK2 : SENSORLOG_FILENAME_WEEK1;
     case 2:
-      return sw ? SENSORLOG_FILENAME_MONTH2 : SENSORLOG_FILENAME_MONTH1;
+      return sw < 2 ? SENSORLOG_FILENAME_MONTH2 : SENSORLOG_FILENAME_MONTH1;
   }
   return "";
 }
