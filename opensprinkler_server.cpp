@@ -1918,8 +1918,6 @@ static int freeHeap () {
 }
 #endif
 
-#endif
-
 void server_json_debug(OTF_PARAMS_DEF) {
 #if defined(USE_OTF)
 	rewind_ether_buffer();
@@ -1962,6 +1960,7 @@ void server_json_debug(OTF_PARAMS_DEF) {
 #endif
 	handle_return(HTML_OK);
 }
+#endif
 
 /*
 // fill ESP8266 flash with some dummy files
@@ -2046,8 +2045,8 @@ URLHandler urls[] = {
 	server_change_scripturl,// cu
 	server_json_all,        // ja
 	server_pause_queue,     // pq
-	server_json_debug,      // db
 #if defined(ARDUINO)
+	server_json_debug,      // db
 	//server_fill_files,
 #endif
 };
