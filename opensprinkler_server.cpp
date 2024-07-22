@@ -1917,6 +1917,11 @@ static int freeHeap () {
 	return (int) &v - (__brkval == 0 ? (int) &__heap_start : (int) __brkval);
 }
 #endif
+#else
+static int freeHeap() {
+    return mallinfo2().fordblks;
+}
+#endif
 
 void server_json_debug(OTF_PARAMS_DEF) {
 #if defined(USE_OTF)
@@ -1960,7 +1965,6 @@ void server_json_debug(OTF_PARAMS_DEF) {
 #endif
 	handle_return(HTML_OK);
 }
-#endif
 
 /*
 // fill ESP8266 flash with some dummy files
@@ -2015,8 +2019,8 @@ const char _url_keys[] PROGMEM =
 	"cu"
 	"ja"
 	"pq"
+    "db"
 #if defined(ARDUINO)
-  "db"
 	//"ff"
 #endif
 	;
@@ -2045,8 +2049,8 @@ URLHandler urls[] = {
 	server_change_scripturl,// cu
 	server_json_all,        // ja
 	server_pause_queue,     // pq
-#if defined(ARDUINO)
 	server_json_debug,      // db
+#if defined(ARDUINO)
 	//server_fill_files,
 #endif
 };
