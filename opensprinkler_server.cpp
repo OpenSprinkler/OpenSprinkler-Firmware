@@ -1160,7 +1160,7 @@ void server_json_controller_main(OTF_PARAMS_DEF) {
 							 wt_errCode,
 							 SOPT_DEVICE_NAME);
 
-#if defined(SUPPORT_EMAIl)
+#if defined(SUPPORT_EMAIL)
 	bfill.emit_p(PSTR("\"email\":{$O},"), SOPT_EMAIL_OPTS);
 #endif
 
