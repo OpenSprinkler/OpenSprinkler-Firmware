@@ -2241,6 +2241,7 @@ void OpenSprinkler::factory_reset() {
 }
 
 /** Parse OTC configuration */
+#if defined(USE_OTF)
 void OpenSprinkler::parse_otc_config() {
 	char server[MAX_SOPTS_SIZE+1] = {0};
 	char token[MAX_SOPTS_SIZE+1] = {0};
@@ -2282,6 +2283,7 @@ void OpenSprinkler::parse_otc_config() {
 	otc.server = String(server);
 	otc.port = port;
 }
+#endif
 
 /** Setup function for options */
 void OpenSprinkler::options_setup() {
@@ -2315,7 +2317,10 @@ void OpenSprinkler::options_setup() {
 			}
 		}
 		#endif
+		#if defined(USE_OTF)
 		parse_otc_config();
+		#endif
+
 		attribs_load();
 	}
 

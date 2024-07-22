@@ -1,7 +1,7 @@
 #ifndef LIQUID_CRYSTAL_DUAL_H
 #define LIQUID_CRYSTAL_DUAL_H
 
-#if defined(OS_AVR)
+#if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
 
 #include <inttypes.h>
 #include <Print.h>
