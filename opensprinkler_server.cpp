@@ -1918,6 +1918,8 @@ static int freeHeap () {
 }
 #endif
 
+#endif
+
 void server_json_debug(OTF_PARAMS_DEF) {
 #if defined(USE_OTF)
 	rewind_ether_buffer();
@@ -1960,7 +1962,6 @@ void server_json_debug(OTF_PARAMS_DEF) {
 #endif
 	handle_return(HTML_OK);
 }
-#endif
 
 /*
 // fill ESP8266 flash with some dummy files
