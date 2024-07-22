@@ -2045,8 +2045,8 @@ URLHandler urls[] = {
 	server_change_scripturl,// cu
 	server_json_all,        // ja
 	server_pause_queue,     // pq
-#if defined(ARDUINO)
 	server_json_debug,      // db
+#if defined(ARDUINO)
 	//server_fill_files,
 #endif
 };
