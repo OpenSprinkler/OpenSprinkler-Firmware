@@ -1398,7 +1398,7 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 	int  email_en = 0;
 
 	// parse email variables
-	#if defined(SUPPORT_EMAIl)
+	#if defined(SUPPORT_EMAIL)
 		os.sopt_load(SOPT_EMAIL_OPTS, postval);
 		if (*postval != 0) {
 			// Add the wrapping curly braces to the string
