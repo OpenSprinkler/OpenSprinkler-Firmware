@@ -238,6 +238,7 @@ void programStart(char *message){
 	int pid = atoi(tmp_buffer);
 	if(pid < 0 || pid >= pd.nprograms){
 		DEBUG_LOGF("Program ID out of bounds.\r\n");
+		return;
 	}
 
 	unsigned char uwt = 0;
@@ -537,8 +538,8 @@ int OSMqtt::_publish(const char *topic, const char *payload) {
 
 void subscribe_callback(const char *topic, unsigned char *payload, unsigned int length) {
 	DEBUG_LOGF("Subscribe Callback\r\n");
+	payload[length] = 0; // properly end the message
 	char* message = (char*)payload;
-
 	if(!checkPassword(message)){
 		return;
 	}
