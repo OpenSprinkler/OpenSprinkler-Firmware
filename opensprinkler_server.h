@@ -26,6 +26,7 @@
 
 #if !defined(ARDUINO)
 #include <stdarg.h>
+#include <malloc.h>
 #endif
 
 char dec2hexchar(unsigned char dec);
