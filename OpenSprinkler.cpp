@@ -2289,7 +2289,7 @@ void OpenSprinkler::parse_otc_config() {
 void OpenSprinkler::options_setup() {
 
 	// Check reset conditions:
-	if (file_read_byte(IOPTS_FILENAME, IOPT_FW_VERSION)<OS_FW_VERSION ||  // fw version is invalid (<219)
+	if (file_read_byte(IOPTS_FILENAME, IOPT_FW_VERSION)!=OS_FW_VERSION ||  // fw major version has changed
 			!file_exists(DONE_FILENAME)) {  // done file doesn't exist
 
 		factory_reset();
