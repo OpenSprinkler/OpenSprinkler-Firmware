@@ -1124,10 +1124,11 @@ int read_sensor_i2c(Sensor_t *sensor) {
 
   DEBUG_PRINTLN(F("read_sensor_i2c: check-ok"));
 
+  uint8_t type = sensor->type == SENSOR_SMT100_TEMP   ? 0x00
+                 : sensor->type == SENSOR_SMT100_MOIS ? 0x01
+                                                      : 0x02;
+
   if (sensor->repeat_read == 0 || sensor->repeat_read == 1000) {
-    uint8_t type = sensor->type == SENSOR_SMT100_TEMP   ? 0x00
-                   : sensor->type == SENSOR_SMT100_MOIS ? 0x01
-                                                        : 0x02;
     Wire.beginTransmission(RS485_TRUEBNER_ADDR);
     Wire.write((uint8_t)sensor->id);
     Wire.write(type);
@@ -1141,25 +1142,13 @@ int read_sensor_i2c(Sensor_t *sensor) {
     // delay(500);
   }
 
-  if (Wire.requestFrom((uint8_t)RS485_TRUEBNER_ADDR, (size_t)3, true)) {
+  if (Wire.requestFrom((uint8_t)RS485_TRUEBNER_ADDR, (size_t)4, true)) {
     // read the incoming bytes:
     uint8_t addr = Wire.read();
+    uint8_t reg = Wire.read();
     uint8_t low_byte = Wire.read();
     uint8_t high_byte = Wire.read();
-    if (addr == sensor->id) {
-      // BUG FIX: Double read
-      if (sensor->repeat_read == 1) {
-        sensor->repeat_read++;
-        uint8_t type = sensor->type == SENSOR_SMT100_TEMP   ? 0x00
-                       : sensor->type == SENSOR_SMT100_MOIS ? 0x01
-                                                            : 0x02;
-        Wire.beginTransmission(RS485_TRUEBNER_ADDR);
-        Wire.write((uint8_t)sensor->id);
-        Wire.write(type);
-        Wire.endTransmission();
-        return HTTP_RQT_NOT_RECEIVED;
-      }
-
+    if (addr == sensor->id && reg == type) {
       uint16_t data = (high_byte << 8) | low_byte;
       DEBUG_PRINTF("read_sensor_i2c: result: %d - %d (%d %d)\n", sensor->id,
                    data, low_byte, high_byte);
@@ -1315,8 +1304,7 @@ int read_sensor_ip(Sensor_t *sensor) {
 #if defined(ESP8266)
       while (true) {
         if (client->available()) break;
-        if (millis() >= stoptime)
-        {
+        if (millis() >= stoptime) {
           client->stop();
           DEBUG_PRINT(F("Sensor "));
           DEBUG_PRINT(sensor->nr);
