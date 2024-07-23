@@ -1,6 +1,7 @@
 CXX=g++
 # -std=gnu++17
-CXXFLAGS=-std=gnu++14 -DOSPI -Wall -Iexternal/TinyWebsockets/tiny_websockets_lib/include -Iexternal/OpenThings-Framework-Firmware-Library/
+VERSION=OSPI
+CXXFLAGS=-std=gnu++14 -Wall -Iexternal/TinyWebsockets/tiny_websockets_lib/include -Iexternal/OpenThings-Framework-Firmware-Library/
 LD=$(CXX)
 LIBS=pthread mosquitto ssl crypto
 LDFLAGS=$(addprefix -l,$(LIBS))
@@ -13,7 +14,7 @@ OBJECTS=$(SOURCES:.cpp=.o)
 all: $(BINARY)
 
 %.o: %.cpp $(HEADERS)
-	$(CXX) -c -o "$@" $(CXXFLAGS) "$<"
+	$(CXX) -c -o "$@" -D$(VERSION) $(CXXFLAGS) "$<"
 
 $(BINARY): $(OBJECTS)
 	$(CXX) -o $(BINARY) $(OBJECTS) $(LDFLAGS)
