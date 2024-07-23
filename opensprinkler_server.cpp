@@ -536,7 +536,7 @@ void server_change_stations_attrib(char *p, char header, unsigned char *attrib)
 	for(bid=0;bid<os.nboards;bid++) {
 		for(s=0;s<8;s++) {
 			sid=bid*8+s;
-			snprintf(tbuf2+1, 3, "%d", bid);
+			snprintf(tbuf2+1, 3, "%d", sid);
 			if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, tbuf2)) {
 				attrib[sid] = atoi(tmp_buffer);
 			}
