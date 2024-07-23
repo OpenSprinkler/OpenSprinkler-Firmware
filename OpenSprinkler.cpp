@@ -452,6 +452,14 @@ static const char days_str[] PROGMEM =
 	"Sat\0"
 	"Sun\0";
 
+
+#if !defined(ARDUINO)
+static inline int32_t now() {
+    time_t rawtime;
+    time(&rawtime);
+    return rawtime;
+}
+#endif
 /** Calculate local time (UTC time plus time zone offset) */
 time_os_t OpenSprinkler::now_tz() {
 	return now()+(int32_t)3600/4*(int32_t)(iopts[IOPT_TIMEZONE]-48);
@@ -783,7 +791,7 @@ void OpenSprinkler::reboot_dev(uint8_t cause) {
 /** Launch update script */
 void OpenSprinkler::update_dev() {
 	char cmd[1000];
-	sprintf(cmd, "cd %s && ./updater.sh", get_data_dir());
+	snprintf(cmd, 1000, "cd %s && ./updater.sh", get_data_dir());
 	system(cmd);
 }
 #endif // end network init functions
@@ -2051,7 +2059,7 @@ int8_t OpenSprinkler::send_http_request(uint32_t ip4, uint16_t port, char* p, vo
 	ip[1] = (ip4>>16)&0xff;
 	ip[2] = (ip4>>8)&0xff;
 	ip[3] = ip4&0xff;
-	sprintf(server, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
+	snprintf(server, 20, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
 	return send_http_request(server, port, p, callback, usessl, timeout);
 }
 
@@ -2082,7 +2090,7 @@ void OpenSprinkler::switch_remotestation(RemoteIPStationData *data, bool turnon,
 	ip[3] = ip4&0xff;
 
 	char *p = tmp_buffer;
-	BufferFiller bf = p;
+    BufferFiller bf = BufferFiller(p, TMP_BUFFER_SIZE*2);
 	// if turning on the zone and duration is defined, give duration as the timer value
 	// otherwise:
 	//   if autorefresh is defined, we give a fixed duration each time, and auto refresh will renew it periodically
@@ -2103,7 +2111,7 @@ void OpenSprinkler::switch_remotestation(RemoteIPStationData *data, bool turnon,
 						ip[0],ip[1],ip[2],ip[3]);
 
 	char server[20];
-	sprintf(server, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
+	snprintf(server, 20, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
 	send_http_request(server, port, p, remote_http_callback);
 }
 
@@ -2119,7 +2127,7 @@ void OpenSprinkler::switch_remotestation(RemoteOTCStationData *data, bool turnon
 	memcpy((char*)&copy, (char*)data, sizeof(RemoteOTCStationData));
 	copy.token[sizeof(copy.token)-1] = 0; // ensure the string ends properly
 	char *p = tmp_buffer;
-	BufferFiller bf = p;
+	BufferFiller bf = BufferFiller(p, TMP_BUFFER_SIZE*2);
 	// if turning on the zone and duration is defined, give duration as the timer value
 	// otherwise:
 	//   if autorefresh is defined, we give a fixed duration each time, and auto refresh will renew it periodically
@@ -2158,7 +2166,7 @@ void OpenSprinkler::switch_httpstation(HTTPStationData *data, bool turnon, bool 
 	char * cmd = turnon ? on_cmd : off_cmd;
 
 	char *p = tmp_buffer;
-	BufferFiller bf = p;
+	BufferFiller bf = BufferFiller(p, TMP_BUFFER_SIZE*2);
 
 	if(cmd==NULL || server==NULL) return; // proceed only if cmd and server are valid
 

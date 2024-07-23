@@ -509,16 +509,13 @@ enum {
 	#include <stdlib.h>
 	#include <string.h>
 	#include <stddef.h>
-	inline void itoa(int v,char *s,int b)   {sprintf(s,"%d",v);}
-	inline void ultoa(unsigned long v,char *s,int b) {sprintf(s,"%lu",v);}
-	#define now()       time(0)
 	#define pgm_read_byte(x) *(x)
 	#define PSTR(x)      x
 	#define F(x)         x
 	#define strcat_P     strcat
 	#define strncat_P     strncat
 	#define strcpy_P     strcpy
-	#define sprintf_P    sprintf
+	#define snprintf_P    snprintf
 	#include<string>
 	#define String       string
 	using namespace std;

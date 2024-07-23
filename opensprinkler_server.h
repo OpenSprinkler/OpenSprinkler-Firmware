@@ -26,7 +26,7 @@
 
 #if !defined(ARDUINO)
 #include <stdarg.h>
-#include <malloc.h>
+#include <unistd.h>
 #endif
 
 char dec2hexchar(unsigned char dec);
@@ -34,9 +34,18 @@ char dec2hexchar(unsigned char dec);
 class BufferFiller {
 	char *start; //!< Pointer to start of buffer
 	char *ptr; //!< Pointer to cursor position
+    size_t len;
 public:
 	BufferFiller () {}
-	BufferFiller (char *buf) : start (buf), ptr (buf) {}
+	BufferFiller (char *buf, size_t buffer_len) {
+        start = buf;
+        ptr = buf;
+        len = buffer_len;
+    }
+
+    char* buffer () const { return start; }
+    size_t length () const { return len; }
+	unsigned int position () const { return ptr - start; }
 
 	void emit_p(PGM_P fmt, ...) {
 		va_list ap;
@@ -52,11 +61,12 @@ public:
 			c = pgm_read_byte(fmt++);
 			switch (c) {
 			case 'D':
-				itoa(va_arg(ap, int), (char*) ptr, 10);  // ray
+				// itoa(va_arg(ap, int), (char*) ptr, 10);  // ray
+                snprintf((char*) ptr, len - position(),  "%d", va_arg(ap, int));
 				break;
 			case 'L':
-				ultoa(va_arg(ap, uint32_t), (char*) ptr, 10);
-				//sprintf((char*) ptr, "%lu", va_arg(ap, uint32_t));
+				// ultoa(va_arg(ap, uint32_t), (char*) ptr, 10);
+				snprintf((char*) ptr, len - position(), "%lu", (unsigned long) va_arg(ap, uint32_t));
 				break;
 			case 'S':
 				strcpy((char*) ptr, va_arg(ap, const char*));
@@ -88,9 +98,6 @@ public:
 		*(ptr)=0;
 		va_end(ap);
 	}
-
-	char* buffer () const { return start; }
-	unsigned int position () const { return ptr - start; }
 };
 
 

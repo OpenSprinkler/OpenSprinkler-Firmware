@@ -2340,7 +2340,7 @@ smtp_header_cmp_key(const void *const v1,
   const struct smtp_header *header2;
 
   key = (char*)(v1);
-  header2 = (smtp_header*)(v2);
+  header2 = (struct smtp_header*)(v2);
   return strcmp(key, header2->key);
 }
 
@@ -2808,8 +2808,8 @@ smtp_header_cmp(const void *v1,
   const struct smtp_header *header1;
   const struct smtp_header *header2;
 
-  header1 = (smtp_header*)(v1);
-  header2 = (smtp_header*)(v2);
+  header1 = (struct smtp_header*)(v1);
+  header2 = (struct smtp_header*)(v2);
   return strcmp(header1->key, header2->key);
 }
 
@@ -3299,7 +3299,7 @@ smtp_header_add(struct smtp *const smtp,
   }
 
   if(smtp_si_add_size_t(smtp->num_headers, 1, &num_headers_inc) ||
-     (new_header_list = (smtp_header*)(smtp_reallocarray(
+     (new_header_list = (struct smtp_header*)(smtp_reallocarray(
                           smtp->header_list,
                           num_headers_inc,
                           sizeof(*smtp->header_list)))) == NULL){
@@ -3372,7 +3372,7 @@ smtp_address_add(struct smtp *const smtp,
     return smtp_status_code_set(smtp, SMTP_STATUS_NOMEM);
   }
 
-  new_address_list = (smtp_address*)(smtp_reallocarray(smtp->address_list,
+  new_address_list = (struct smtp_address*)(smtp_reallocarray(smtp->address_list,
                                        num_address_inc,
                                        sizeof(*new_address_list)));
   if(new_address_list == NULL){
@@ -3485,7 +3485,7 @@ smtp_attachment_add_mem(struct smtp *const smtp,
   }
 
   if(smtp_si_add_size_t(smtp->num_attachment, 1, &num_attachment_inc) ||
-     (new_attachment_list = (smtp_attachment*)(smtp_reallocarray(
+     (new_attachment_list = (struct smtp_attachment*)(smtp_reallocarray(
                               smtp->attachment_list,
                               num_attachment_inc,
                               sizeof(*new_attachment_list)))) == NULL){
