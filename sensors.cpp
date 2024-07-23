@@ -1119,6 +1119,9 @@ int read_sensor_i2c(Sensor_t *sensor) {
     sensor->repeat_read = 1000;
     DEBUG_PRINT(F("cant' read, allocated by sensor "));
     DEBUG_PRINTLN(i2c_rs485_allocated);
+    Sensor_t *t = sensor_by_nr(i2c_rs485_allocated);
+    if (!t || !t->flags.enable)
+      i2c_rs485_allocated = 0; //breakout
     return HTTP_RQT_NOT_RECEIVED;
   }
 
@@ -1665,6 +1668,9 @@ int set_sensor_address_i2c(Sensor_t *sensor, uint8_t new_address) {
   if (i2c_rs485_allocated > 0) {
     DEBUG_PRINT(F("sensor currently allocated by "));
     DEBUG_PRINTLN(i2c_rs485_allocated);
+    Sensor_t *t = sensor_by_nr(i2c_rs485_allocated);
+    if (!t || !t->flags.enable)
+      i2c_rs485_allocated = 0; //breakout
     return HTTP_RQT_NOT_RECEIVED;
   }
 
