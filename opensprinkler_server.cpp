@@ -3175,8 +3175,12 @@ void server_sensorprog_calc(OTF_PARAMS_DEF) {
 		handle_return(HTML_DATA_MISSING);
 	progAdj.max = atof(tmp_buffer); // Max value
 
+	byte unitId = getSensorUnitId(sensor);
+
 	int diff = progAdj.max-progAdj.min;
 	int minEx = progAdj.min - diff/2;
+	if (minEx < 0 && (unitId == UNIT_PERCENT || (unitId >= UNIT_VOLT && unitId < UNIT_USERDEF)))
+		minEx = 0;
 	int maxEx = progAdj.max + diff/2;
 
 #if defined(OTF_ENABLED)
