@@ -855,7 +855,7 @@ void server_change_program(OTF_PARAMS_DEF) {
 		strncpy(prog.name, tmp_buffer, PROGRAM_NAME_SIZE);
 	} else {
 		strcpy_P(prog.name, _str_program);
-        snprintf(prog.name+8, 32-8, "%d", (pid==-1)? (pd.nprograms+1): (pid+1));
+        snprintf(prog.name+8, PROGRAM_NAME_SIZE - 8, "%d", (pid==-1)? (pd.nprograms+1): (pid+1));
 	}
 
 	// parse program start date and end date
