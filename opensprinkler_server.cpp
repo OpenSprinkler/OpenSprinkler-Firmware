@@ -3092,7 +3092,7 @@ extern uint32_t ping_ok;
 
 	boolean ok = LittleFS.info(fsinfo);
 
-	bfill.emit_p(PSTR("{\"status\":$D,\"freeMemory\":$D,\"totalBytes\":$D,\"usedBytes\":$D,\"freeBytes\":$D,\"blockSize\":$D,\"pageSize\":$D,\"maxOpenFiles\":$D,\"maxPathLength\":$D,\"pingok\":$D,\"mqtt\":$D,\"ifttt\":$D}"),
+	bfill.emit_p(PSTR("{\"status\":$D,\"freeMemory\":$D,\"totalBytes\":$D,\"usedBytes\":$D,\"freeBytes\":$D,\"blockSize\":$D,\"pageSize\":$D,\"maxOpenFiles\":$D,\"maxPathLength\":$D,\"pingok\":$D,\"mqtt\":$D,\"ifttt\":$D"),
 		ok,
 		freeMemory(),
 		fsinfo.totalBytes,
@@ -3105,10 +3105,23 @@ extern uint32_t ping_ok;
 		ping_ok,
 		os.mqtt.connected(),
 		os.iopts[IOPT_IFTTT_ENABLE]);
+
 #else
-	bfill.emit_p(PSTR("{\"status\":$D,\"mqtt\":$D,\"ifttt\":$D}"), 1, os.mqtt.connected(), os.iopts[IOPT_IFTTT_ENABLE]);
+	bfill.emit_p(PSTR("{\"status\":$D,\"mqtt\":$D,\"ifttt\":$D"), 1, os.mqtt.connected(), os.iopts[IOPT_IFTTT_ENABLE]);
 
 #endif
+
+	bfill.emit_p(PSTR(",\"logfiles\":{\"l01\":$D,\"l02\":$D,\"l11\":$D,\"l12\":$D,\"l21\":$D,\"l22\":$D}"), 
+		file_size(SENSORLOG_FILENAME1) / sizeof(SensorLog_t),
+		file_size(SENSORLOG_FILENAME2) / sizeof(SensorLog_t),
+		file_size(SENSORLOG_FILENAME_WEEK1) / sizeof(SensorLog_t),
+		file_size(SENSORLOG_FILENAME_WEEK2) / sizeof(SensorLog_t),
+		file_size(SENSORLOG_FILENAME_MONTH1) / sizeof(SensorLog_t),
+		file_size(SENSORLOG_FILENAME_MONTH2) / sizeof(SensorLog_t));
+
+	bfill.emit_p(PSTR("}"));
+
+
 	handle_return(HTML_OK);
 }
 

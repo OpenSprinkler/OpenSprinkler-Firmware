@@ -390,11 +390,11 @@ Sensor_t *sensor_by_idx(uint idx) {
 const char *getlogfile(uint8_t log) {
   uint8_t sw = logFileSwitch[log];
   switch (log) {
-    case 0:
+    case LOG_STD:
       return sw < 2 ? SENSORLOG_FILENAME1 : SENSORLOG_FILENAME2;
-    case 1:
+    case LOG_WEEK:
       return sw < 2 ? SENSORLOG_FILENAME_WEEK1 : SENSORLOG_FILENAME_WEEK2;
-    case 2:
+    case LOG_MONTH:
       return sw < 2 ? SENSORLOG_FILENAME_MONTH1 : SENSORLOG_FILENAME_MONTH2;
   }
   return "";

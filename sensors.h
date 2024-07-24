@@ -295,8 +295,8 @@ int read_sensor(Sensor_t *sensor,
                 ulong time);  // sensor value goes to last_native_data/last_data
 
 // Sensorlog API functions:
-#define LOG_STD 0
-#define LOG_WEEK 1
+#define LOG_STD   0
+#define LOG_WEEK  1
 #define LOG_MONTH 2
 bool sensorlog_add(uint8_t log, SensorLog_t *sensorlog);
 bool sensorlog_add(uint8_t log, Sensor_t *sensor, ulong time);
