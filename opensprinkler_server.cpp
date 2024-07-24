@@ -3205,7 +3205,8 @@ void server_sensorprog_calc(OTF_PARAMS_DEF) {
 	print_header();
 #endif
 
-	bfill.emit_p(PSTR("{\"adjustment\":{\"min\":$D,\"max\":$D,\"unit\":\"$S\","), minEx, maxEx, getSensorUnit(sensor));
+	bfill.emit_p(PSTR("{\"adjustment\":{\"min\":$D,\"max\":$D,\"current\":$E,\"adjust\":$E,\"unit\":\"$S\","), minEx, maxEx, 
+		sensor->last_data, calc_sensor_watering_int(&progAdj, sensor->last_data), getSensorUnit(sensor));
 
 	int nvalues = max(11, maxEx-minEx+1);
 	double inVal[nvalues];
