@@ -910,6 +910,15 @@ void server_change_program(OTF_PARAMS_DEF) {
 	*(char*)(&prog) = parse_listdata(&pv);
 	prog.days[0]= parse_listdata(&pv);
 	prog.days[1]= parse_listdata(&pv);
+	
+	if (prog.type == PROGRAM_TYPE_INTERVAL) {
+		if (prog.days[1] == 0) handle_return(HTML_DATA_OUTOFBOUND)
+		else if (prog.days[1] >= 1) {
+			// process interval day remainder (relative-> absolute)
+			pd.drem_to_absolute(prog.days);
+		}
+	}
+
 	// parse start times
 	pv++; // this should be a '['
 	for (i=0;i<MAX_NUM_STARTTIMES;i++) {
@@ -928,11 +937,6 @@ void server_change_program(OTF_PARAMS_DEF) {
 	// i should be equal to os.nstations at this point
 	for(;i<MAX_NUM_STATIONS;i++) {
 		prog.durations[i] = 0;		 // clear unused field
-	}
-
-	// process interval day remainder (relative-> absolute)
-	if (prog.type == PROGRAM_TYPE_INTERVAL && prog.days[1] >= 1) {
-		pd.drem_to_absolute(prog.days);
 	}
 
 	if (pid==-1) {
