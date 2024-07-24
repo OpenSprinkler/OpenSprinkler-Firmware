@@ -2285,6 +2285,7 @@ void handle_web_request(char *p) {
 // othewise, using UDP is much faster for NTP sync
 ulong getNtpTime() {
 	static bool configured = false;
+	static char customAddress[16];
 	if(!configured) {
 		unsigned char ntpip[4] = {
 		os.iopts[IOPT_NTP_IP1],
@@ -2297,7 +2298,9 @@ ulong getNtpTime() {
 		} else {
 			DEBUG_PRINTLN(F("using custom time server"));
 			String ntp = IPAddress(ntpip[0],ntpip[1],ntpip[2],ntpip[3]).toString();
-			configTime(0, 0, ntp.c_str(), "time.google.com", "time.nist.gov");
+			strncpy(customAddress, ntp.c_str(), sizeof customAddress);
+			customAddress[sizeof customAddress - 1] = 0;
+			configTime(0, 0, customAddress, "time.google.com", "time.nist.gov");
 		}
 		configured = true;
 	}
