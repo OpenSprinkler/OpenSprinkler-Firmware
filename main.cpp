@@ -1523,7 +1523,7 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 					if(lval<pd.nprograms) strcat(postval, prog.name);
 				}
 				size_t len = strlen(postval);
-                snprintf_P(postval + len, TMP_BUFFER_SIZE*2 - 1 - len, PSTR(" with %d%% water level."), (int)fval);
+				snprintf_P(postval + len, TMP_BUFFER_SIZE*2 - 1 - len, PSTR(" with %d%% water level."), (int)fval);
 				if(email_enabled) { email_message.subject += PSTR("program event"); }
 			}
 			break;
@@ -1578,7 +1578,7 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 			}
 			if (ifttt_enabled || email_enabled) {
 				size_t len = strlen(postval);
-                snprintf_P(postval + len, TMP_BUFFER_SIZE*2 - 1 - len, PSTR("Flow count: %u, volume: %d.%02d"), lval, (int)volume/100, (int)volume%100);
+				snprintf_P(postval + len, TMP_BUFFER_SIZE*2 - 1 - len, PSTR("Flow count: %u, volume: %d.%02d"), lval, (int)volume/100, (int)volume%100);
 				if(email_enabled) { email_message.subject += PSTR("flow sensor event"); }
 			}
 			break;
@@ -1599,7 +1599,7 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 					ip2string(postval, TMP_BUFFER_SIZE*2 - 1, ip);
 				}
 				if(fval>=0) {
-                    size_t len = strlen(postval);
+					size_t len = strlen(postval);
 					snprintf_P(postval + len, TMP_BUFFER_SIZE*2 - 1 - len, PSTR("water level updated: %d%%."), (int)fval);
 				}
 				if(email_enabled) { email_message.subject += PSTR("weather update event"); }
@@ -1730,7 +1730,7 @@ void write_log(unsigned char type, time_os_t curr_time) {
 	if (!os.iopts[IOPT_ENABLE_LOGGING]) return;
 
 	// file name will be logs/xxxxx.tx where xxxxx is the day in epoch time
-    snprintf(tmp_buffer, TMP_BUFFER_SIZE*2, "%lu", curr_time / 86400);
+	snprintf (tmp_buffer, TMP_BUFFER_SIZE*2, "%lu", curr_time / 86400);
 	make_logfile_name(tmp_buffer);
 
 	// Step 1: open file if exists, or create new otherwise,
@@ -1787,15 +1787,15 @@ void write_log(unsigned char type, time_os_t curr_time) {
 	strcpy_P(tmp_buffer, PSTR("["));
 
 	if(type == LOGDATA_STATION) {
-        size_t size = strlen(tmp_buffer);
-        snprintf(tmp_buffer + size, TMP_BUFFER_SIZE*2 - size , "%d", pd.lastrun.program);
+		size_t size = strlen(tmp_buffer);
+		snprintf(tmp_buffer + size, TMP_BUFFER_SIZE*2 - size , "%d", pd.lastrun.program);
 		strcat_P(tmp_buffer, PSTR(","));
-        size = strlen(tmp_buffer);
-        snprintf(tmp_buffer + size, TMP_BUFFER_SIZE*2 - size , "%d", pd.lastrun.station);
+		size = strlen(tmp_buffer);
+		snprintf(tmp_buffer + size, TMP_BUFFER_SIZE*2 - size , "%d", pd.lastrun.station);
 		strcat_P(tmp_buffer, PSTR(","));
 		// duration is unsigned integer
 		size = strlen(tmp_buffer);
-        snprintf(tmp_buffer + size, TMP_BUFFER_SIZE*2 - size , "%lu", (ulong)pd.lastrun.duration);
+		snprintf(tmp_buffer + size, TMP_BUFFER_SIZE*2 - size , "%lu", (ulong)pd.lastrun.duration);
 
 	} else {
 		ulong lvalue=0;
@@ -1803,8 +1803,8 @@ void write_log(unsigned char type, time_os_t curr_time) {
 			lvalue = (flow_count>os.flowcount_log_start)?(flow_count-os.flowcount_log_start):0;
 		}
 
-        size_t size = strlen(tmp_buffer);
-        snprintf(tmp_buffer + size, TMP_BUFFER_SIZE*2 - size , "%lu", lvalue);
+		size_t size = strlen(tmp_buffer);
+		snprintf(tmp_buffer + size, TMP_BUFFER_SIZE*2 - size , "%lu", lvalue);
 		strcat_P(tmp_buffer, PSTR(",\""));
 		strcat_P(tmp_buffer, log_type_names+type*3);
 		strcat_P(tmp_buffer, PSTR("\","));
@@ -1827,18 +1827,18 @@ void write_log(unsigned char type, time_os_t curr_time) {
 				break;
 		}
 		size = strlen(tmp_buffer);
-        snprintf(tmp_buffer + size, TMP_BUFFER_SIZE*2 - size , "%lu", lvalue);
+		snprintf(tmp_buffer + size, TMP_BUFFER_SIZE*2 - size , "%lu", lvalue);
 	}
 	strcat_P(tmp_buffer, PSTR(","));
 	size_t size = strlen(tmp_buffer);
-    snprintf(tmp_buffer + size, TMP_BUFFER_SIZE*2 - size , "%lu", curr_time);
+	snprintf(tmp_buffer + size, TMP_BUFFER_SIZE*2 - size , "%lu", curr_time);
 	if((os.iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_FLOW) && (type==LOGDATA_STATION)) {
 		// RAH implementation of flow sensor
 		strcat_P(tmp_buffer, PSTR(","));
 		#if defined(ARDUINO)
 		dtostrf(flow_last_gpm,5,2,tmp_buffer+strlen(tmp_buffer));
 		#else
-        size_t len = strlen(tmp_buffer);
+		size_t len = strlen(tmp_buffer);
 		snprintf(tmp_buffer + len, TMP_BUFFER_SIZE*2 - len, "%5.2f", flow_last_gpm);
 		#endif
 	}

@@ -517,7 +517,7 @@ void server_change_board_attrib(char *p, char header, unsigned char *attrib)
 	unsigned char bid;
 	tbuf2[0]=header;
 	for(bid=0;bid<os.nboards;bid++) {
-        snprintf(tbuf2+1, 3, "%d", bid);
+		snprintf(tbuf2+1, 3, "%d", bid);
 		if(findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, tbuf2)) {
 			attrib[bid] = atoi(tmp_buffer);
 		}
@@ -855,7 +855,7 @@ void server_change_program(OTF_PARAMS_DEF) {
 		strncpy(prog.name, tmp_buffer, PROGRAM_NAME_SIZE);
 	} else {
 		strcpy_P(prog.name, _str_program);
-        snprintf(prog.name+8, PROGRAM_NAME_SIZE - 8, "%d", (pid==-1)? (pd.nprograms+1): (pid+1));
+		snprintf(prog.name+8, PROGRAM_NAME_SIZE - 8, "%d", (pid==-1)? (pd.nprograms+1): (pid+1));
 	}
 
 	// parse program start date and end date
@@ -1767,7 +1767,7 @@ void server_json_log(OTF_PARAMS_DEF) {
 
 	bool comma = 0;
 	for(unsigned int i=start;i<=end;i++) {
-        snprintf(tmp_buffer, TMP_BUFFER_SIZE*2 , "%d", i);
+		snprintf(tmp_buffer, TMP_BUFFER_SIZE*2 , "%d", i);
 		make_logfile_name(tmp_buffer);
 
 #if defined(ESP8266)
@@ -1977,7 +1977,7 @@ void server_fill_files(OTF_PARAMS_DEF) {
 	ether_buffer[75] = 0;
 	FSInfo fs_info;
 	for(int index=1;index<64;index++) {
-        snprintf(tmp_buffer, TMP_BUFFER_SIZE*2 , "%d", index);
+		snprintf(tmp_buffer, TMP_BUFFER_SIZE*2 , "%d", index);
 		make_logfile_name(tmp_buffer);
 		DEBUG_PRINT(F("creating "));
 		DEBUG_PRINT(tmp_buffer);

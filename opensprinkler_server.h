@@ -62,7 +62,7 @@ public:
 			switch (c) {
 			case 'D':
 				// itoa(va_arg(ap, int), (char*) ptr, 10);  // ray
-                snprintf((char*) ptr, len - position(),  "%d", va_arg(ap, int));
+				snprintf((char*) ptr, len - position(),  "%d", va_arg(ap, int));
 				break;
 			case 'L':
 				// ultoa(va_arg(ap, uint32_t), (char*) ptr, 10);
