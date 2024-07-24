@@ -30,7 +30,7 @@
 #include <Wire.h>
 #include "defines.h"
 
-byte IOEXP::detectType(uint8_t address) {
+unsigned char IOEXP::detectType(uint8_t address) {
 	Wire.beginTransmission(address);
 	if(Wire.endTransmission()!=0) return IOEXP_TYPE_NONEXIST; // this I2C address does not exist
 
@@ -92,7 +92,7 @@ void PCA9555::shift_out(uint8_t plat, uint8_t pclk, uint8_t pdat, uint8_t v) {
 	for(uint8_t s=0;s<8;s++) {
 		output &= ~(1<<pclk); i2c_write(NXP_OUTPUT_REG, output); // set clock low
 
-		if(v & ((byte)1<<(7-s))) {
+		if(v & ((unsigned char)1<<(7-s))) {
 			output |= (1<<pdat);
 		} else {
 			output &= ~(1<<pdat);
@@ -144,7 +144,7 @@ void PCF8574::i2c_write(uint8_t reg, uint16_t v) {
 
 extern OpenSprinkler os;
 
-void pinModeExt(byte pin, byte mode) {
+void pinModeExt(unsigned char pin, unsigned char mode) {
 	if(pin==255) return;
 	if(pin>=IOEXP_PIN) {
 		os.mainio->pinMode(pin-IOEXP_PIN, mode);
@@ -153,7 +153,7 @@ void pinModeExt(byte pin, byte mode) {
 	}
 }
 
-void digitalWriteExt(byte pin, byte value) {
+void digitalWriteExt(unsigned char pin, unsigned char value) {
 	if(pin==255) return;
 	if(pin>=IOEXP_PIN) {
 
@@ -163,7 +163,7 @@ void digitalWriteExt(byte pin, byte value) {
 	}
 }
 
-byte digitalReadExt(byte pin) {
+unsigned char digitalReadExt(unsigned char pin) {
 	if(pin==255) return HIGH;
 	if(pin>=IOEXP_PIN) {
 		return os.mainio->digitalRead(pin-IOEXP_PIN);
@@ -176,6 +176,8 @@ byte digitalReadExt(byte pin) {
 #endif
 
 #elif defined(OSPI) || defined(OSBO)
+
+#if !defined(LIBGPIOD)	// use classic sysfs
 
 #include <sys/types.h>
 #include <sys/ioctl.h>
@@ -205,7 +207,7 @@ static volatile int		 pinPass = -1 ;
 static pthread_mutex_t pinMutex ;
 
 /** Export gpio pin */
-static byte GPIOExport(int pin) {
+static unsigned char GPIOExport(int pin) {
 	char buffer[BUFFER_MAX];
 	int fd, len;
 
@@ -221,8 +223,9 @@ static byte GPIOExport(int pin) {
 	return 1;
 }
 
+#if 0
 /** Unexport gpio pin */
-static byte GPIOUnexport(int pin) {
+static unsigned char GPIOUnexport(int pin) {
 	char buffer[BUFFER_MAX];
 	int fd, len;
 
@@ -237,11 +240,12 @@ static byte GPIOUnexport(int pin) {
 	close(fd);
 	return 1;
 }
+#endif
 
 /** Set interrupt edge mode */
-static byte GPIOSetEdge(int pin, const char *edge) {
+static unsigned char GPIOSetEdge(int pin, const char *edge) {
 	char path[BUFFER_MAX];
-	int fd, len;
+	int fd;
 
 	snprintf(path, BUFFER_MAX, "/sys/class/gpio/gpio%d/edge", pin);
 
@@ -256,7 +260,7 @@ static byte GPIOSetEdge(int pin, const char *edge) {
 }
 
 /** Set pin mode, in or out */
-void pinMode(int pin, byte mode) {
+void pinMode(int pin, unsigned char mode) {
 	static const char dir_str[]  = "in\0out";
 
 	char path[BUFFER_MAX];
@@ -312,7 +316,7 @@ void gpio_fd_close(int fd) {
 }
 
 /** Read digital value */
-byte digitalRead(int pin) {
+unsigned char digitalRead(int pin) {
 	char value_str[3];
 
 	int fd = gpio_fd_open(pin, O_RDONLY);
@@ -330,7 +334,7 @@ byte digitalRead(int pin) {
 }
 
 /** Write digital value given file descriptor */
-void gpio_write(int fd, byte value) {
+void gpio_write(int fd, unsigned char value) {
 	static const char value_str[] = "01";
 
 	if (1 != write(fd, &value_str[LOW==value?0:1], 1)) {
@@ -339,7 +343,7 @@ void gpio_write(int fd, byte value) {
 }
 
 /** Write digital value */
-void digitalWrite(int pin, byte value) {
+void digitalWrite(int pin, unsigned char value) {
 	int fd = gpio_fd_open(pin);
 	if (fd < 0) {
 		return;
@@ -413,7 +417,6 @@ void attachInterrupt(int pin, const char* mode, void (*isr)(void)) {
 
 	char path[BUFFER_MAX];
 	snprintf(path, BUFFER_MAX, "/sys/class/gpio/gpio%d/value", pin);
-	int fd;
 
 	// open gpio file
 	if(sysFds[pin]==-1) {
@@ -441,14 +444,200 @@ void attachInterrupt(int pin, const char* mode, void (*isr)(void)) {
 			delay(1) ;
 	pthread_mutex_unlock (&pinMutex) ;
 }
+#else // use GPIOD
+
+/**
+ * NEW GPIO Implementation for Raspberry Pi OS 12 (bookworm)
+ *
+ * Thanks to Jason Balonso
+ *  https://github.com/jbalonso/
+ *
+ *
+*/
+
+#include <sys/types.h>
+#include <sys/ioctl.h>
+#include <fcntl.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+#include <poll.h>
+#include <pthread.h>
+#include <gpiod.h>
+
+#include "utils.h"
+
+#define BUFFER_MAX 64
+#define GPIO_MAX	 64
+
+// GPIO interfaces
+const char *gpio_consumer = "opensprinkler";
+
+struct gpiod_chip *chip = NULL;
+struct gpiod_line* gpio_lines[] = {
+	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL, NULL,
+};
+
+bool prefix(const char *pre, const char *str) {
+    return strncmp(pre, str, strlen(pre)) == 0;
+}
+
+int assert_gpiod_chip() {
+	if( !chip ) {
+        const char *chip_name = NULL;
+
+        FILE *file = fopen("/proc/device-tree/compatible", "rb");
+        if (file != NULL) {
+            char buffer[100];
+
+            int total = fread(buffer, 1, sizeof(buffer), file);
+
+            if (prefix("raspberrypi", buffer)) {
+                const char *cpu_buf = buffer;
+                size_t index = 0;
+
+                // model and cpu is seperated by a null byte
+                while (index < (total - 1) && cpu_buf[index]) {
+                    index += 1;
+                }
+
+                cpu_buf += index + 1;  
+                
+                if (!strcmp("brcm,bcm2712", cpu_buf)) {
+                    // Pi 5
+                    chip_name = "pinctrl-rp1";
+                } else if (!strcmp("brcm,bcm2711", cpu_buf)) {
+                    // Pi 4
+                    chip_name = "pinctrl-bcm2711";
+                } else if (!strcmp("brcm,bcm2837", cpu_buf)
+                || !strcmp("brcm,bcm2836", cpu_buf)
+                || !strcmp("brcm,bcm2835", cpu_buf)) {
+                    // Pi 0-3
+                    chip_name = "pinctrl-bcm2835";
+                }
+            }
+        }
+
+        
+
+        if (chip_name) {
+            gpiod_chip_iter *iter = gpiod_chip_iter_new();
+            gpiod_chip *tmp_chip = NULL;
+            while (tmp_chip = gpiod_chip_iter_next(iter)) {
+                if (!strcmp(gpiod_chip_label(tmp_chip), chip_name)) {
+                    chip = tmp_chip;
+                    gpiod_chip_iter_free_noclose(iter);
+                    DEBUG_PRINTLN("found and opened chip for device");
+                    return 0;
+                }
+            }
+
+            gpiod_chip_iter_free(iter);
+        } else {
+            chip = gpiod_chip_open_by_name("gpiochip0");
+            if (chip) {
+                DEBUG_PRINTLN("opened gpiochip0");
+                return 0;
+            }
+        }
+
+        DEBUG_PRINTLN("failed to find and open gpio chip");
+        return -1;
+	}
+	return 0;
+}
+
+int assert_gpiod_line(int pin) {
+	if( !gpio_lines[pin] ) {
+		if( assert_gpiod_chip() ) { return -1; }
+		gpio_lines[pin] = gpiod_chip_get_line(chip, pin);
+		if( !gpio_lines[pin] ) {
+			DEBUG_PRINT("failed to open gpio line ");
+			DEBUG_PRINTLN(pin);
+			return -1;
+		} else {
+			DEBUG_PRINT("opened gpio line ");
+			DEBUG_PRINT(pin);
+			return 0;
+		}
+	}
+	return 0;
+}
+
+/** Set pin mode, in or out */
+void pinMode(int pin, unsigned char mode) {
+	if( assert_gpiod_line(pin) ) { return; }
+	switch(mode) {
+		case INPUT:
+			gpiod_line_request_input(gpio_lines[pin], gpio_consumer);
+			break;
+		case INPUT_PULLUP:
+			gpiod_line_request_input_flags(gpio_lines[pin], gpio_consumer, GPIOD_LINE_REQUEST_FLAG_BIAS_PULL_UP);
+			break;
+		case OUTPUT:
+			gpiod_line_request_output(gpio_lines[pin], gpio_consumer, LOW);
+			break;
+		default:
+			DEBUG_PRINTLN("invalid pin direction");
+			break;
+	}
+
+	return;
+}
+
+/** Read digital value */
+unsigned char digitalRead(int pin) {
+	if( !gpio_lines[pin] ) {
+		DEBUG_PRINT("tried to read uninitialized pin ");
+		DEBUG_PRINTLN(pin);
+		return 0;
+	}
+	int val = gpiod_line_get_value(gpio_lines[pin]);
+	if( val < 0 ) {
+		DEBUG_PRINT("failed to read value on pin ");
+		DEBUG_PRINTLN(pin);
+		return 0;
+	}
+	return val;
+}
+
+/** Write digital value */
+void digitalWrite(int pin, unsigned char value) {
+	if( !gpio_lines[pin] ) {
+		DEBUG_PRINT("tried to write uninitialized pin ");
+		DEBUG_PRINTLN(pin);
+		return;
+	}
+
+	int res;
+	res = gpiod_line_set_value(gpio_lines[pin], value);
+	if( res ) {
+		DEBUG_PRINT("failed to write value on pin ");
+		DEBUG_PRINTLN(pin);
+	}
+}
+
+void attachInterrupt(int pin, const char* mode, void (*isr)(void)) {}
+void gpio_write(int fd, unsigned char value) {}
+int gpio_fd_open(int pin, int mode) {return 0;}
+void gpio_fd_close(int fd) {}
+
+#endif
+
 #else
 
-void pinMode(int pin, byte mode) {}
-void digitalWrite(int pin, byte value) {}
-byte digitalRead(int pin) {return 0;}
+void pinMode(int pin, unsigned char mode) {}
+void digitalWrite(int pin, unsigned char value) {}
+unsigned char digitalRead(int pin) {return 0;}
 void attachInterrupt(int pin, const char* mode, void (*isr)(void)) {}
 int gpio_fd_open(int pin, int mode) {return 0;}
 void gpio_fd_close(int fd) {}
-void gpio_write(int fd, byte value) {}
+void gpio_write(int fd, unsigned char value) {}
 
 #endif

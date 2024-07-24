@@ -41,6 +41,7 @@
 #endif
 
 #include "OpenSprinkler.h"
+#include "types.h"
 #include "mqtt.h"
 
 // Debug routines to help identify any blocking of the event loop for an extended period
@@ -48,19 +49,16 @@
 #if defined(ENABLE_DEBUG)
 	#if defined(ARDUINO)
 		#include "TimeLib.h"
-		#define DEBUG_PRINTF(msg, ...)    {Serial.printf(msg, ##__VA_ARGS__);}
-		#define DEBUG_TIMESTAMP(msg, ...) {time_t t = os.now_tz(); Serial.printf("%02d-%02d-%02d %02d:%02d:%02d - ", year(t), month(t), day(t), hour(t), minute(t), second(t));}
+		#define DEBUG_TIMESTAMP(msg, ...) {time_os_t t = os.now_tz(); Serial.printf("%02d-%02d-%02d %02d:%02d:%02d - ", year(t), month(t), day(t), hour(t), minute(t), second(t));}
 	#else
 		#include <sys/time.h>
-		#define DEBUG_PRINTF(msg, ...)    {printf(msg, ##__VA_ARGS__);}
-		#define DEBUG_TIMESTAMP()         {char tstr[21]; time_t t = time(NULL); struct tm *tm = localtime(&t); strftime(tstr, 21, "%y-%m-%d %H:%M:%S - ", tm);printf("%s", tstr);}
+		#define DEBUG_TIMESTAMP()         {char tstr[21]; time_os_t t = time(NULL); struct tm *tm = localtime(&t); strftime(tstr, 21, "%y-%m-%d %H:%M:%S - ", tm);printf("%s", tstr);}
 	#endif
 	#define DEBUG_LOGF(msg, ...)        {DEBUG_TIMESTAMP(); DEBUG_PRINTF(msg, ##__VA_ARGS__);}
 
 	static unsigned long _lastMillis = 0; // Holds the timestamp associated with the last call to DEBUG_DURATION()
 	inline unsigned long DEBUG_DURATION() {unsigned long dur = millis() - _lastMillis; _lastMillis = millis(); return dur;}
 #else
-	#define DEBUG_PRINTF(msg, ...)  {}
 	#define DEBUG_LOGF(msg, ...)    {}
 	#define DEBUG_DURATION()        {}
 #endif
@@ -71,7 +69,7 @@
 extern OpenSprinkler os;
 extern char tmp_buffer[];
 
-#define MQTT_KEEPALIVE      60
+#define OS_MQTT_KEEPALIVE      60
 #define MQTT_DEFAULT_PORT   1883  // Default port for MQTT. Can be overwritten through App config
 #define MQTT_MAX_HOST_LEN   50    // Note: App is set to max 50 chars for broker name
 #define MQTT_MAX_USERNAME_LEN 32  // Note: App is set to max 32 chars for username
@@ -195,7 +193,11 @@ void OSMqtt::loop(void) {
 		last_reconnect_attempt = millis();
 	}
 
+#if defined(ENABLE_DEBUG)
 	int state = _loop();
+#else
+	(void) _loop();
+#endif
 
 #if defined(ENABLE_DEBUG)
 	// Print a diagnostic message whenever the MQTT state changes
@@ -234,7 +236,7 @@ int OSMqtt::_init(void) {
 	#endif
 
 	mqtt_client = new PubSubClient(*client);
-	mqtt_client->setKeepAlive(MQTT_KEEPALIVE);
+	mqtt_client->setKeepAlive(OS_MQTT_KEEPALIVE);
 
 	if (mqtt_client == NULL) {
 		DEBUG_LOGF("MQTT Init: Failed to initialise client\r\n");
@@ -248,7 +250,7 @@ int OSMqtt::_connect(void) {
 	mqtt_client->setServer(_host, _port);
 	boolean state;
 	#define MQTT_CONNECT_NTRIES 3
-	byte tries = 0;
+	unsigned char tries = 0;
 	do {
 		DEBUG_PRINT(F("mqtt: "));
 		DEBUG_PRINTLN(_host);
@@ -366,7 +368,7 @@ int OSMqtt::_connect(void) {
 			return MQTT_ERROR;
 		}
 	}
-	rc = mosquitto_connect(mqtt_client, _host, _port, MQTT_KEEPALIVE);
+	rc = mosquitto_connect(mqtt_client, _host, _port, OS_MQTT_KEEPALIVE);
 	if (rc != MOSQ_ERR_SUCCESS) {
 		DEBUG_LOGF("MQTT Connect: Connection Failed (%s)\r\n", mosquitto_strerror(rc));
 		return MQTT_ERROR;

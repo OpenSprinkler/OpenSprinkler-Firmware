@@ -23,18 +23,22 @@
 
 #include <limits.h>
 
+#include "types.h"
 #include "OpenSprinkler.h"
 #include "program.h"
 #include "weather.h"
 #include "opensprinkler_server.h"
 #include "mqtt.h"
+#include "main.h"
 
 #if defined(ARDUINO)
 	#if defined(ESP8266)
 		ESP8266WebServer *update_server = NULL;
 		OTF::OpenThingsFramework *otf = NULL;
 		DNSServer *dns = NULL;
-		ENC28J60lwIP eth(PIN_ETHER_CS); // ENC28J60 lwip for wired Ether
+		ENC28J60lwIP enc28j60(PIN_ETHER_CS); // ENC28J60 lwip for wired Ether
+		Wiznet5500lwIP w5500(PIN_ETHER_CS); // W5500 lwip for wired Ether
+		lwipEth eth;
 		bool useEth = false; // tracks whether we are using WiFi or wired Ether connection
 		static uint16_t led_blink_ms = LED_FAST_BLINK;
 	#else
@@ -45,14 +49,11 @@
 	#endif
 	unsigned long getNtpTime();
 #else // header and defs for RPI/BBB
-	EthernetServer *m_server = 0;
-	EthernetClient *m_client = 0;
+    OTF::OpenThingsFramework *otf = NULL;
 #endif
 
-void reset_all_stations();
-void reset_all_stations_immediate();
 void push_message(int type, uint32_t lval=0, float fval=0.f, const char* sval=NULL);
-void manual_start_program(byte, byte);
+void manual_start_program(unsigned char, unsigned char);
 void remote_http_callback(char*);
 
 // Small variations have been added to the timing values below
@@ -82,16 +83,16 @@ ProgramData pd;   // ProgramdData object
  * flow_last_gpm - last flow rate measured (averaged over flow_gallons) from last valve stopped (used to write to log file). */
 ulong flow_begin, flow_start, flow_stop, flow_gallons;
 ulong flow_count = 0;
-byte prev_flow_state = HIGH;
+unsigned char prev_flow_state = HIGH;
 float flow_last_gpm=0;
 
 uint32_t reboot_timer = 0;
 
 void flow_poll() {
 	#if defined(ESP8266)
-	if(os.hw_rev == 2) pinModeExt(PIN_SENSOR1, INPUT_PULLUP); // this seems necessary for OS 3.2
+	if(os.hw_rev>=2) pinModeExt(PIN_SENSOR1, INPUT_PULLUP); // this seems necessary for OS 3.2
 	#endif
-	byte curr_flow_state = digitalReadExt(PIN_SENSOR1);
+	unsigned char curr_flow_state = digitalReadExt(PIN_SENSOR1);
 	if(!(prev_flow_state==HIGH && curr_flow_state==LOW)) { // only record on falling edge
 		prev_flow_state = curr_flow_state;
 		return;
@@ -118,13 +119,13 @@ static char ui_anim_chars[3] = {'.', 'o', 'O'};
 #define UI_STATE_DISP_GW   2
 #define UI_STATE_RUNPROG   3
 
-static byte ui_state = UI_STATE_DEFAULT;
-static byte ui_state_runprog = 0;
+static unsigned char ui_state = UI_STATE_DEFAULT;
+static unsigned char ui_state_runprog = 0;
 
 bool ui_confirm(PGM_P str) {
 	os.lcd_print_line_clear_pgm(str, 0);
 	os.lcd_print_line_clear_pgm(PSTR("(B1:No, B3:Yes)"), 1);
-	byte button;
+	unsigned char button;
 	ulong start = millis();
 	do {
 		button = os.button_read(BUTTON_WAIT_NONE);
@@ -160,7 +161,7 @@ void ui_state_machine() {
 	}
 
 	// read button, if something is pressed, wait till release
-	byte button = os.button_read(BUTTON_WAIT_HOLD);
+	unsigned char button = os.button_read(BUTTON_WAIT_HOLD);
 
 	if (button & BUTTON_FLAG_DOWN) {  // repond only to button down events
 		os.button_timeout = LCD_BACKLIGHT_TIMEOUT;
@@ -213,7 +214,7 @@ void ui_state_machine() {
 		case BUTTON_2:
 			if (button & BUTTON_FLAG_HOLD) {  // holding B2
 				if (digitalReadExt(PIN_BUTTON_1)==0) { // if B1 is pressed while holding B2, display external IP
-					os.lcd_print_ip((byte*)(&os.nvdata.external_ip), 1);
+					os.lcd_print_ip((unsigned char*)(&os.nvdata.external_ip), 1);
 					os.lcd.setCursor(0, 1);
 					os.lcd_print_pgm(PSTR("(eip)"));
 					ui_state = UI_STATE_DISP_IP;
@@ -229,7 +230,7 @@ void ui_state_machine() {
 				}
 			} else {  // clicking B2: display MAC
 				os.lcd.clear(0, 1);
-				byte mac[6];
+				unsigned char mac[6];
 				os.load_hardware_mac(mac, useEth);
 				os.lcd_print_mac(mac);
 				ui_state = UI_STATE_DISP_GW;
@@ -341,7 +342,7 @@ void do_setup() {
 
 	// because at reboot we don't know if special stations
 	// are in OFF state, here we explicitly turn them off
-	for(byte sid=0;sid<os.nstations;sid++) {
+	for(unsigned char sid=0;sid<os.nstations;sid++) {
 		os.switch_special_station(sid, 0);
 	}
 
@@ -352,7 +353,7 @@ void do_setup() {
 void(* sysReset) (void) = 0;
 
 #if !defined(ESP8266)
-volatile byte wdt_timeout = 0;
+volatile unsigned char wdt_timeout = 0;
 /** WDT interrupt service routine */
 ISR(WDT_vect)
 {
@@ -366,6 +367,7 @@ ISR(WDT_vect)
 #endif
 
 #else
+void initalize_otf();
 
 void do_setup() {
 	initialiseEpoch();   // initialize time reference for millis() and micros()
@@ -385,26 +387,22 @@ void do_setup() {
 
 	// because at reboot we don't know if special stations
 	// are in OFF state, here we explicitly turn them off
-	for(byte sid=0;sid<os.nstations;sid++) {
+	for(unsigned char sid=0;sid<os.nstations;sid++) {
 		os.switch_special_station(sid, 0);
 	}
 
 	os.mqtt.init();
 	os.status.req_mqtt_restart = true;
+
+    initalize_otf();
 }
 #endif
 
-void write_log(byte type, ulong curr_time);
-void schedule_all_stations(ulong curr_time);
-void turn_on_station(byte sid, ulong duration);
-void turn_off_station(byte sid, ulong curr_time, byte shift=0);
-void handle_expired_station(byte sid, ulong curr_time);
-void process_dynamic_events(ulong curr_time);
-void check_network();
+void turn_on_station(unsigned char sid, ulong duration);
+static void check_network();
 void check_weather();
-bool process_special_program_command(const char*, uint32_t curr_time);
-void perform_ntp_sync();
-void delete_log(char *name);
+static bool process_special_program_command(const char*, uint32_t curr_time);
+static void perform_ntp_sync();
 
 #if defined(ESP8266)
 bool delete_log_oldest();
@@ -435,15 +433,15 @@ void do_loop()
 		}
 	}
 
-	static ulong last_time = 0;
+	static time_os_t last_time = 0;
 	static ulong last_minute = 0;
 
-	byte bid, sid, s, pid, qid, gid, bitvalue;
+	unsigned char bid, sid, s, pid, qid, gid, bitvalue;
 	ProgramStruct prog;
 
 	os.status.mas = os.iopts[IOPT_MASTER_STATION];
 	os.status.mas2= os.iopts[IOPT_MASTER_STATION_2];
-	time_t curr_time = os.now_tz();
+	time_os_t curr_time = os.now_tz();
 
 	// ====== Process Ethernet packets ======
 #if defined(ARDUINO)	// Process Ethernet packets for Arduino
@@ -582,25 +580,7 @@ void do_loop()
 	ui_state_machine();
 
 #else // Process Ethernet packets for RPI/BBB
-	EthernetClient client = m_server->available();
-	if (client) {
-		while(true) {
-			int len = client.read((uint8_t*) ether_buffer, ETHER_BUFFER_SIZE);
-			if (len <=0) {
-				if(!client.connected()) {
-					break;
-				} else {
-					continue;
-				}
-			} else {
-				m_client = &client;
-				ether_buffer[len] = 0;  // put a zero at the end of the packet
-				handle_web_request(ether_buffer);
-				m_client = 0;
-				break;
-			}
-		}
-	}
+    if(otf) otf->loop();
 #endif	// Process Ethernet packets
 
 	// Start up MQTT when we have a network connection
@@ -615,7 +595,7 @@ void do_loop()
 	if (curr_time != last_time) {
 
 		#if defined(ESP8266)
-		if(os.hw_rev==2) {
+		if(os.hw_rev>=2) {
 			pinModeExt(PIN_SENSOR1, INPUT_PULLUP); // this seems necessary for OS 3.2
 			pinModeExt(PIN_SENSOR2, INPUT_PULLUP);
 		}
@@ -683,7 +663,7 @@ void do_loop()
 		os.old_status.sensor2_active = os.status.sensor2_active;
 
 		// ===== Check program switch status =====
-		byte pswitch = os.detect_programswitch_status(curr_time);
+		unsigned char pswitch = os.detect_programswitch_status(curr_time);
 		if(pswitch > 0) {
 			reset_all_stations_immediate(); // immediately stop all stations
 		}
@@ -727,7 +707,7 @@ void do_loop()
 							ulong water_time = water_time_resolve(prog.durations[sid]);
 							// if the program is set to use weather scaling
 							if (prog.use_weather) {
-								byte wl = os.iopts[IOPT_WATER_PERCENTAGE];
+								unsigned char wl = os.iopts[IOPT_WATER_PERCENTAGE];
 								water_time = water_time * wl / 100;
 								if (wl < 20 && water_time < 10) // if water_percentage is less than 20% and water_time is less than 10 seconds
 																								// do not water
@@ -784,7 +764,7 @@ void do_loop()
 			qid=0;
 			for(;q<pd.queue+pd.nqueue;q++,qid++) {
 				sid=q->sid;
-				byte sqi=pd.station_qid[sid];
+				unsigned char sqi=pd.station_qid[sid];
 				// skip if station is already assigned a queue element
 				// and that queue element has an earlier start time
 				if(sqi<255 && pd.queue[sqi].st<q->st) continue;
@@ -795,7 +775,7 @@ void do_loop()
 			for(bid=0;bid<os.nboards; bid++) {
 				bitvalue = os.station_bits[bid];
 				for(s=0;s<8;s++) {
-					byte sid = bid*8+s;
+					unsigned char sid = bid*8+s;
 
 					// skip master stations and any station that's not in the queue
 					if (os.status.mas == sid+1) continue;
@@ -837,8 +817,8 @@ void do_loop()
 
 			// check through runtime queue, calculate the last stop time of sequential stations
 			memset(pd.last_seq_stop_times, 0, sizeof(ulong)*NUM_SEQ_GROUPS);
-			ulong sst;
-			byte re=os.iopts[IOPT_REMOTE_EXT_MODE];
+			time_os_t sst;
+			unsigned char re=os.iopts[IOPT_REMOTE_EXT_MODE];
 			q = pd.queue;
 			for(;q<pd.queue+pd.nqueue;q++) {
 				sid = q->sid;
@@ -879,15 +859,15 @@ void do_loop()
 		}//if_some_program_is_running
 
 		// handle master
-		for (byte mas = MASTER_1; mas < NUM_MASTER_ZONES; mas++) {
+		for (unsigned char mas = MASTER_1; mas < NUM_MASTER_ZONES; mas++) {
 
-			byte mas_id = os.masters[mas][MASOPT_SID];
+			unsigned char mas_id = os.masters[mas][MASOPT_SID];
 
 			if (mas_id) { // if this master station is set
 				int16_t mas_on_adj = os.get_on_adj(mas);
 				int16_t mas_off_adj = os.get_off_adj(mas);
 
-				byte masbit = 0;
+				unsigned char masbit = 0;
 
 				for(sid = 0; sid < os.nstations; sid++) {
 					// skip if this is the master station
@@ -981,7 +961,7 @@ void do_loop()
 			push_message(NOTIFY_WEATHER_UPDATE, 0, os.iopts[IOPT_WATER_PERCENTAGE]);
 			os.weather_update_flag = 0;
 		}
-		static byte reboot_notification = 1;
+		static unsigned char reboot_notification = 1;
 		if(reboot_notification) {
 			reboot_notification = 0;
 			push_message(NOTIFY_REBOOT);
@@ -994,7 +974,7 @@ void do_loop()
 }
 
 /** Check and process special program command */
-bool process_special_program_command(const char* pname, uint32_t curr_time) {
+static bool process_special_program_command(const char* pname, uint32_t curr_time) {
 	if(pname[0]==':') {	// special command start with :
 		if(strncmp(pname, ":>reboot_now", 12) == 0) {
 			os.status.safe_reboot = 0; // reboot regardless of program status
@@ -1025,14 +1005,14 @@ void check_weather() {
 	}
 #endif
 
-	ulong ntz = os.now_tz();
+	time_os_t ntz = os.now_tz();
 	if (os.checkwt_success_lasttime && (ntz > os.checkwt_success_lasttime + CHECK_WEATHER_SUCCESS_TIMEOUT)) {
 		// if last successful weather call timestamp is more than allowed threshold
 		// and if the selected adjustment method is not one of the manual methods
 		// reset watering percentage to 100
 		// todo: the firmware currently needs to be explicitly aware of which adjustment methods, this is not ideal
 		os.checkwt_success_lasttime = 0;
-		byte method = os.iopts[IOPT_USE_WEATHER];
+		unsigned char method = os.iopts[IOPT_USE_WEATHER];
 		if(!(method==WEATHER_METHOD_MANUAL || method==WEATHER_METHOD_AUTORAINDELY || method==WEATHER_METHOD_MONTHLY)) {
 			os.iopts[IOPT_WATER_PERCENTAGE] = 100; // reset watering percentage to 100%
 			wt_rawData[0] = 0; 		// reset wt_rawData and errCode
@@ -1052,7 +1032,7 @@ void check_weather() {
 /** Turn on a station
  * This function turns on a scheduled station
  */
-void turn_on_station(byte sid, ulong duration) {
+void turn_on_station(unsigned char sid, ulong duration) {
 	// RAH implementation of flow sensor
 	flow_start=0;
 
@@ -1062,9 +1042,9 @@ void turn_on_station(byte sid, ulong duration) {
 }
 
 // after removing element q, update remaining stations in its group
-void handle_shift_remaining_stations(RuntimeQueueStruct* q, byte gid, ulong curr_time) {
+void handle_shift_remaining_stations(RuntimeQueueStruct* q, unsigned char gid, time_os_t curr_time) {
 	RuntimeQueueStruct *s = pd.queue;
-	ulong q_end_time = q->st + q->dur;
+	time_os_t q_end_time = q->st + q->dur;
 	ulong remainder = 0;
 
 	if (q_end_time > curr_time) { // remainder is non-zero
@@ -1092,17 +1072,17 @@ void handle_shift_remaining_stations(RuntimeQueueStruct* q, byte gid, ulong curr
  * writes a log record and determines if
  * the station should be removed from the queue
  */
-void turn_off_station(byte sid, ulong curr_time, byte shift) {
+void turn_off_station(unsigned char sid, time_os_t curr_time, unsigned char shift) {
 
-	byte qid = pd.station_qid[sid];
+	unsigned char qid = pd.station_qid[sid];
 	// ignore request if trying to turn off a zone that's not even in the queue
 	if (qid >= pd.nqueue)  {
 		return;
 	}
 	RuntimeQueueStruct *q = pd.queue + qid;
-	byte force_dequeue = 0;
-	byte station_bit = os.is_running(sid);
-	byte gid = os.get_station_gid(q->sid);
+	unsigned char force_dequeue = 0;
+	unsigned char station_bit = os.is_running(sid);
+	unsigned char gid = os.get_station_gid(q->sid);
 
 	if (shift && os.is_sequential_station(sid) && !os.iopts[IOPT_REMOTE_EXT_MODE]) {
 		handle_shift_remaining_stations(q, gid, curr_time);
@@ -1161,7 +1141,7 @@ void turn_off_station(byte sid, ulong curr_time, byte shift) {
  * such as rain delay, rain sensing
  * and turn off stations accordingly
  */
-void process_dynamic_events(ulong curr_time) {
+void process_dynamic_events(time_os_t curr_time) {
 	// check if rain is detected
 	bool sn1 = false;
 	bool sn2 = false;
@@ -1177,7 +1157,7 @@ void process_dynamic_events(ulong curr_time) {
 		sn2 = true;
 
 	// todo: handle sensor 2
-	byte sid, s, bid, qid, igs, igs2, igrd;
+	unsigned char sid, s, bid, qid, igs, igs2, igrd;
 	for(bid=0;bid<os.nboards;bid++) {
 		igs = os.attrib_igs[bid];
 		igs2= os.attrib_igs2[bid];
@@ -1210,14 +1190,14 @@ void process_dynamic_events(ulong curr_time) {
  * this function determines the appropriate start and dequeue times
  * of stations bound to master stations with on and off adjustments
  */
-void handle_master_adjustments(ulong curr_time, RuntimeQueueStruct *q) {
+void handle_master_adjustments(time_os_t curr_time, RuntimeQueueStruct *q) {
 
 	int16_t start_adj = 0;
 	int16_t dequeue_adj = 0;
 
-	for (byte mas = MASTER_1; mas < NUM_MASTER_ZONES; mas++) {
+	for (unsigned char mas = MASTER_1; mas < NUM_MASTER_ZONES; mas++) {
 
-		byte masid = os.masters[mas][MASOPT_SID];
+		unsigned char masid = os.masters[mas][MASOPT_SID];
 
 		if (masid && os.bound_to_master(q->sid, mas)) {
 
@@ -1242,7 +1222,7 @@ void handle_master_adjustments(ulong curr_time, RuntimeQueueStruct *q) {
  * This function loops through the queue
  * and schedules the start time of each station
  */
-void schedule_all_stations(ulong curr_time) {
+void schedule_all_stations(time_os_t curr_time) {
 	ulong con_start_time = curr_time + 1;   // concurrent start time
 	// if the queue is paused, make sure the start time is after the scheduled pause ends
 	if (os.status.pause_state) {
@@ -1250,7 +1230,7 @@ void schedule_all_stations(ulong curr_time) {
 	}
 	int16_t station_delay = water_time_decode_signed(os.iopts[IOPT_STATION_DELAY_TIME]);
 	ulong seq_start_times[NUM_SEQ_GROUPS];  // sequential start times
-	for(byte i=0;i<NUM_SEQ_GROUPS;i++) {
+	for(unsigned char i=0;i<NUM_SEQ_GROUPS;i++) {
 		seq_start_times[i] = con_start_time;
 		// if the sequential queue already has stations running
 		if (pd.last_seq_stop_times[i] > curr_time) {
@@ -1258,8 +1238,8 @@ void schedule_all_stations(ulong curr_time) {
 		}
 	}
 	RuntimeQueueStruct *q = pd.queue;
-	byte re = os.iopts[IOPT_REMOTE_EXT_MODE];
-	byte gid;
+	unsigned char re = os.iopts[IOPT_REMOTE_EXT_MODE];
+	unsigned char gid;
 
 	// go through runtime queue and calculate start time of each station
 	for(;q<pd.queue+pd.nqueue;q++) {
@@ -1323,12 +1303,12 @@ void reset_all_stations() {
  * If pid==255, this is a short test program (2 second per station)
  * If pid > 0. run program pid-1
  */
-void manual_start_program(byte pid, byte uwt) {
+void manual_start_program(unsigned char pid, unsigned char uwt) {
 	boolean match_found = false;
 	reset_all_stations_immediate();
 	ProgramStruct prog;
 	ulong dur;
-	byte sid, bid, s;
+	unsigned char sid, bid, s;
 	if ((pid>0)&&(pid<255)) {
 		pd.read(pid-1, &prog);
 		push_message(NOTIFY_PROGRAM_SCHED, pid-1, uwt?os.iopts[IOPT_WATER_PERCENTAGE]:100, "");
@@ -1365,7 +1345,7 @@ void manual_start_program(byte pid, byte uwt) {
 // ==========================================
 // ====== PUSH NOTIFICATION FUNCTIONS =======
 // ==========================================
-void ip2string(char* str, byte ip[4]) {
+void ip2string(char* str, unsigned char ip[4]) {
 	sprintf_P(str+strlen(str), PSTR("%d.%d.%d.%d"), ip[0], ip[1], ip[2], ip[3]);
 }
 
@@ -1401,7 +1381,7 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 			}
 
 			// todo: add IFTTT support for this event as well.
-			// currently no support due to the number of events exceeds 8 so need to use more than 1 byte
+			// currently no support due to the number of events exceeds 8 so need to use more than 1 unsigned char
 			break;
 
 		case NOTIFY_STATION_OFF:
@@ -1496,10 +1476,10 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 			if (ifttt_enabled) {
 				if(lval>0) {
 					strcat_P(postval, PSTR("external IP updated: "));
-					byte ip[4] = {(byte)((lval>>24)&0xFF),
-									(byte)((lval>>16)&0xFF),
-									(byte)((lval>>8)&0xFF),
-									(byte)(lval&0xFF)};
+					unsigned char ip[4] = {(unsigned char)((lval>>24)&0xFF),
+									(unsigned char)((lval>>16)&0xFF),
+									(unsigned char)((lval>>8)&0xFF),
+									(unsigned char)(lval&0xFF)};
 					ip2string(postval, ip);
 				}
 				if(fval>=0) {
@@ -1526,7 +1506,7 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 						} else {
 							_ip = WiFi.localIP();
 						}
-						byte ip[4] = {_ip[0], _ip[1], _ip[2], _ip[3]};
+						unsigned char ip[4] = {_ip[0], _ip[1], _ip[2], _ip[3]};
 						ip2string(postval, ip);
 					}
 					#else
@@ -1599,7 +1579,7 @@ static const char log_type_names[] PROGMEM =
 	"cu\0";
 
 /** write run record to log on SD card */
-void write_log(byte type, ulong curr_time) {
+void write_log(unsigned char type, time_os_t curr_time) {
 
 	if (!os.iopts[IOPT_ENABLE_LOGGING]) return;
 
@@ -1619,7 +1599,7 @@ void write_log(byte type, ulong curr_time) {
 		// check if we are getting close to run out of space, and delete some oldest files
 		if(fs_info.totalBytes < fs_info.usedBytes + fs_info.blockSize * 4) {
 			// delete the oldest 7 files (1 week of log)
-			for(byte i=0;i<7;i++)	delete_log_oldest();
+			for(unsigned char i=0;i<7;i++)	delete_log_oldest();
 		}
 		file = LittleFS.open(tmp_buffer, "w");
 		if(!file) return;
@@ -1725,10 +1705,10 @@ void write_log(byte type, ulong curr_time) {
 #if defined(ESP8266)
 bool delete_log_oldest() {
 	Dir dir = LittleFS.openDir(LOG_PREFIX);
-	time_t oldest_t = ULONG_MAX;
+	time_os_t oldest_t = ULONG_MAX;
 	String oldest_fn;
 	while (dir.next()) {
-		time_t t = dir.fileCreationTime();
+		time_os_t t = dir.fileCreationTime();
 		if(t<oldest_t) {
 			oldest_t = t;
 			oldest_fn = dir.fileName();
@@ -1799,7 +1779,7 @@ void delete_log(char *name) {
  * to check if it's still online.
  * If not, it re-initializes Ethernet controller.
  */
-void check_network() {
+static void check_network() {
 #if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
 	// do not perform network checking if the controller has just started, or if a program is running
 	if (os.status.program_busy) {return;}
@@ -1849,7 +1829,7 @@ void check_network() {
 }
 
 /** Perform NTP sync */
-void perform_ntp_sync() {
+static void perform_ntp_sync() {
 #if defined(ARDUINO)
 	// do not perform ntp if this option is disabled, or if a program is currently running
 	if (!os.iopts[IOPT_USE_NTP] || os.status.program_busy) return;
@@ -1884,7 +1864,21 @@ void perform_ntp_sync() {
 
 #if !defined(ARDUINO) // main function for RPI/BBB
 int main(int argc, char *argv[]) {
-	do_setup();
+    printf("Starting OpenSprinkler\n");
+
+  int opt;
+  while(-1 != (opt = getopt(argc, argv, "d:"))) {
+    switch(opt) {
+    case 'd':
+      set_data_dir(optarg);
+      break;
+    default:
+      // ignore options we don't understand
+      break;
+    }
+  }
+
+  do_setup();
 
 	while(true) {
 		do_loop();

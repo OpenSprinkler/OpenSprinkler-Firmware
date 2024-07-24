@@ -26,7 +26,6 @@
 
 //#define ENABLE_DEBUG  // enable serial debug
 
-typedef unsigned char byte;
 typedef unsigned long ulong;
 
 #define TMP_BUFFER_SIZE      255   // scratch buffer size
@@ -36,7 +35,7 @@ typedef unsigned long ulong;
 														// if this number is different from the one stored in non-volatile memory
 														// a device reset will be automatically triggered
 
-#define OS_FW_MINOR      2  // Firmware minor version
+#define OS_FW_MINOR      5  // Firmware minor version
 
 /** Hardware version base numbers */
 #define OS_HW_VERSION_BASE   0x00 // OpenSprinkler
@@ -64,6 +63,7 @@ typedef unsigned long ulong;
 #define STN_TYPE_REMOTE      0x02	// Remote OpenSprinkler station
 #define STN_TYPE_GPIO        0x03	// direct GPIO station
 #define STN_TYPE_HTTP        0x04	// HTTP station
+#define STN_TYPE_HTTPS       0x05	// HTTPS station
 #define STN_TYPE_OTHER       0xFF
 
 /** Notification macro defines */
@@ -332,6 +332,7 @@ enum {
 	#define LADR_I2CADDR     0x23 // latch driver I2C address
 	#define EXP_I2CADDR_BASE 0x24 // base of expander I2C address
 	#define LCD_I2CADDR      0x3C // 128x64 OLED display I2C address
+	#define EEPROM_I2CADDR   0x50 // 24C02 EEPROM I2C address
 
 	#define PIN_CURR_SENSE    A0
 	#define PIN_FREE_LIST     {} // no free GPIO pin at the moment
@@ -340,19 +341,19 @@ enum {
 	#define PIN_ETHER_CS       16 // Ethernet CS (chip select pin) is 16 on OS 3.2 and above
 
 	/* To accommodate different OS30 versions, we use software defines pins */
-	extern byte PIN_BUTTON_1;
-	extern byte PIN_BUTTON_2;
-	extern byte PIN_BUTTON_3;
-	extern byte PIN_RFRX;
-	extern byte PIN_RFTX;
-	extern byte PIN_BOOST;
-	extern byte PIN_BOOST_EN;
-	extern byte PIN_LATCH_COM;
-	extern byte PIN_LATCH_COMA;
-	extern byte PIN_LATCH_COMK;
-	extern byte PIN_SENSOR1;
-	extern byte PIN_SENSOR2;
-	extern byte PIN_IOEXP_INT;
+	extern unsigned char PIN_BUTTON_1;
+	extern unsigned char PIN_BUTTON_2;
+	extern unsigned char PIN_BUTTON_3;
+	extern unsigned char PIN_RFRX;
+	extern unsigned char PIN_RFTX;
+	extern unsigned char PIN_BOOST;
+	extern unsigned char PIN_BOOST_EN;
+	extern unsigned char PIN_LATCH_COM;
+	extern unsigned char PIN_LATCH_COMA;
+	extern unsigned char PIN_LATCH_COMK;
+	extern unsigned char PIN_SENSOR1;
+	extern unsigned char PIN_SENSOR2;
+	extern unsigned char PIN_IOEXP_INT;
 
 	/* Original OS30 pin defines */
 	//#define V0_MAIN_INPUTMASK 0b00001010 // main input pin mask
@@ -403,6 +404,8 @@ enum {
 	#define V2_PIN_SENSOR1       3  // sensor 1
 	#define V2_PIN_SENSOR2       10 // sensor 2
 
+    #define USE_OTF
+
 #elif defined(OSPI) // for OSPi
 
 	#define OS_HW_VERSION    OSPI_HW_VERSION_BASE
@@ -421,6 +424,8 @@ enum {
 	#define PIN_FREE_LIST       {5,6,7,8,9,10,11,12,13,16,18,19,20,21,23,24,25,26}  // free GPIO pins
 	#define ETHER_BUFFER_SIZE   16384
 
+    #define USE_OTF
+
 #elif defined(OSBO) // for OSBo
 
 	#define OS_HW_VERSION    OSBO_HW_VERSION_BASE
@@ -435,6 +440,8 @@ enum {
 
 	#define PIN_FREE_LIST     {38,39,34,35,45,44,26,47,27,65,63,62,37,36,33,32,61,86,88,87,89,76,77,74,72,73,70,71}
 	#define ETHER_BUFFER_SIZE   16384
+
+    #define USE_OTF
 
 #else // for demo / simulation
 	// use fake hardware pins
@@ -452,6 +459,8 @@ enum {
 	#define PIN_RFTX        0
 	#define PIN_FREE_LIST  {}
 	#define ETHER_BUFFER_SIZE   16384
+
+    #define USE_OTF
 #endif
 
 #if defined(ENABLE_DEBUG) /** Serial debug functions */
@@ -460,12 +469,14 @@ enum {
 		#define DEBUG_BEGIN(x)   {Serial.begin(x);}
 		#define DEBUG_PRINT(x)   {Serial.print(x);}
 		#define DEBUG_PRINTLN(x) {Serial.println(x);}
+		#define DEBUG_PRINTF(msg, ...)    {Serial.printf(msg, ##__VA_ARGS__);}
 	#else
 		#include <stdio.h>
 		#define DEBUG_BEGIN(x)          {}  /** Serial debug functions */
 		inline  void DEBUG_PRINT(int x) {printf("%d", x);}
 		inline  void DEBUG_PRINT(const char*s) {printf("%s", s);}
 		#define DEBUG_PRINTLN(x)        {DEBUG_PRINT(x);printf("\n");}
+		#define DEBUG_PRINTF(msg, ...)    {printf(msg, ##__VA_ARGS__);}
 	#endif
 
 #else
@@ -473,6 +484,7 @@ enum {
 	#define DEBUG_BEGIN(x)   {}
 	#define DEBUG_PRINT(x)   {}
 	#define DEBUG_PRINTLN(x) {}
+	#define DEBUG_PRINTF(x, ...)  {}
 
 #endif
 
@@ -489,6 +501,7 @@ enum {
 	#define PSTR(x)      x
 	#define F(x)         x
 	#define strcat_P     strcat
+	#define strncat_P     strncat
 	#define strcpy_P     strcpy
 	#define sprintf_P    sprintf
 	#include<string>
