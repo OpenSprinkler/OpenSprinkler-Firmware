@@ -1671,7 +1671,7 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 			struct smtp *smtp = NULL;
 			String email_port_str = to_string(email_port);
 			// todo: check error?
-            int rc;
+			smtp_status_code rc;
 			rc = smtp_open(email_host, email_port_str.c_str(), SMTP_SECURITY_TLS, SMTP_NO_CERT_VERIFY, NULL, &smtp);
 			rc = smtp_auth(smtp, SMTP_AUTH_PLAIN, email_username, email_password);
 			rc = smtp_address_add(smtp, SMTP_ADDRESS_FROM, email_username, "OpenSprinkler");
@@ -1679,9 +1679,9 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 			rc = smtp_header_add(smtp, "Subject", email_message.subject.c_str());
 			rc = smtp_mail(smtp, email_message.message.c_str());
 			rc = smtp_close(smtp);
-            if (!rc) {
-                printf("SMTP: Error %d\n", rc);
-            }
+			if (rc!=SMTP_STATUS_OK) {
+				DEBUG_PRINTF("SMTP: Error %s\n", smtp_status_code_errstr(rc));
+			}
 		#endif
 	}
 }
