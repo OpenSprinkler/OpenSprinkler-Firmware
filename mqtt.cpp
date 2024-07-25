@@ -28,6 +28,7 @@
 	#else
 		#include <Ethernet.h>
 	#endif
+	#define MQTT_SOCKET_TIMEOUT 5
 	#include <PubSubClient.h>
 
 	struct PubSubClient *mqtt_client = NULL;
@@ -493,7 +494,7 @@ int OSMqtt::_init(void) {
 int OSMqtt::_connect(void) {
 	mqtt_client->setServer(_host, _port);
 	boolean state;
-	#define MQTT_CONNECT_NTRIES 3
+	#define MQTT_CONNECT_NTRIES 2
 	unsigned char tries = 0;
 	String avail_topic(_pub_topic);
 	avail_topic += "/";
