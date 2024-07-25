@@ -790,8 +790,8 @@ void OpenSprinkler::reboot_dev(uint8_t cause) {
 
 /** Launch update script */
 void OpenSprinkler::update_dev() {
-	char cmd[1000];
-	snprintf(cmd, 1000, "cd %s && ./updater.sh", get_data_dir());
+	char cmd[500];
+	snprintf(cmd, 500, "cd %s && ./updater.sh", get_data_dir());
 	system(cmd);
 }
 #endif // end network init functions
@@ -2251,8 +2251,9 @@ void OpenSprinkler::factory_reset() {
 /** Parse OTC configuration */
 #if defined(USE_OTF)
 void OpenSprinkler::parse_otc_config() {
-	char server[MAX_SOPTS_SIZE+1] = {0};
-	char token[MAX_SOPTS_SIZE+1] = {0};
+	ArduinoJson::JsonDocument doc; // make sure this has the same scope as server and token
+	const char *server = NULL;
+	const char *token = NULL;
 	int port = DEFAULT_OTC_PORT_DEV;
 	int en = 0;
 
@@ -2266,7 +2267,6 @@ void OpenSprinkler::parse_otc_config() {
 		config[len] = '}';
 		config[len+1] = 0;
 
-		ArduinoJson::JsonDocument doc;
 		ArduinoJson::DeserializationError error = ArduinoJson::deserializeJson(doc, config);
 
 		// Test the parsing otherwise parse
@@ -2275,20 +2275,15 @@ void OpenSprinkler::parse_otc_config() {
 				DEBUG_PRINTLN(error.c_str());
 		} else {
 				en = doc["en"];
-				const char *token_val = doc["token"];
-				if(token_val) strncpy(token, token_val, MAX_SOPTS_SIZE);
-				const char *server_val = doc["server"];
-				if(server_val) strncpy(server, server_val, MAX_SOPTS_SIZE);
+				token = doc["token"];
+				server = doc["server"];
 				port = doc["port"];
 		}
-
-		token[MAX_SOPTS_SIZE] = 0;
-		server[MAX_SOPTS_SIZE] = 0;
 	}
 
 	otc.en = en;
-	otc.token = String(token);
-	otc.server = String(server);
+	//otc.token = token ? String(token) : "";
+	//otc.server = server ? String(server) : "";
 	otc.port = port;
 }
 #endif
@@ -2492,9 +2487,9 @@ void OpenSprinkler::iopts_save() {
 }
 
 /** Load a string option from file */
-void OpenSprinkler::sopt_load(unsigned char oid, char *buf) {
-	file_read_block(SOPTS_FILENAME, buf, MAX_SOPTS_SIZE*oid, MAX_SOPTS_SIZE);
-	buf[MAX_SOPTS_SIZE]=0;  // ensure the string ends properly
+void OpenSprinkler::sopt_load(unsigned char oid, char *buf, uint16_t maxlen) {
+	file_read_block(SOPTS_FILENAME, buf, MAX_SOPTS_SIZE*oid, maxlen);
+	buf[maxlen]=0;  // ensure the string ends properly
 }
 
 /** Load a string option from file, return String */

@@ -1360,15 +1360,15 @@ void server_change_scripturl(OTF_PARAMS_DEF) {
 	handle_return(HTML_REDIRECT_HOME);
 #endif
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("jsp"), true)) {
+		tmp_buffer[TMP_BUFFER_SIZE-1]=0;	// make sure we don't exceed the maximum size
 		urlDecode(tmp_buffer);
-		tmp_buffer[TMP_BUFFER_SIZE]=0;	// make sure we don't exceed the maximum size
 		// trim unwanted space characters
 		string_remove_space(tmp_buffer);
 		os.sopt_save(SOPT_JAVASCRIPTURL, tmp_buffer);
 	}
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("wsp"), true)) {
+		tmp_buffer[TMP_BUFFER_SIZE-1]=0;
 		urlDecode(tmp_buffer);
-		tmp_buffer[TMP_BUFFER_SIZE]=0;
 		string_remove_space(tmp_buffer);
 		os.sopt_save(SOPT_WEATHERURL, tmp_buffer);
 	}
@@ -1570,8 +1570,9 @@ void server_change_password(OTF_PARAMS_DEF) {
 	char* p = get_buffer;
 #endif
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("npw"), true)) {
-		char tbuf2[TMP_BUFFER_SIZE];
-		if (findKeyVal(FKV_SOURCE, tbuf2, TMP_BUFFER_SIZE, PSTR("cpw"), true) && strncmp(tmp_buffer, tbuf2, TMP_BUFFER_SIZE) == 0) {
+		const int pwBufferSize = TMP_BUFFER_SIZE/2;
+		char *tbuf2 = tmp_buffer + pwBufferSize;	// use the second half of tmp_buffer 
+		if (findKeyVal(FKV_SOURCE, tbuf2, pwBufferSize, PSTR("cpw"), true) && strncmp(tmp_buffer, tbuf2, pwBufferSize) == 0) {
 			urlDecode(tmp_buffer);
 			os.sopt_save(SOPT_PASSWORD, tmp_buffer);
 			handle_return(HTML_SUCCESS);
@@ -1922,8 +1923,15 @@ static int freeHeap () {
 }
 #endif
 #else
-static int freeHeap() {
-    return sysconf(_SC_AVPHYS_PAGES) * sysconf(_SC_PAGESIZE);
+#include <sys/sysinfo.h>
+static unsigned long freeHeap() {
+	//return sysconf(_SC_AVPHYS_PAGES) * sysconf(_SC_PAGESIZE);
+	struct sysinfo info;
+	if (sysinfo(&info) == 0) {
+		return info.freeram;
+	} else {
+		return 0;
+	}
 }
 #endif
 
@@ -1934,7 +1942,7 @@ void server_json_debug(OTF_PARAMS_DEF) {
 #else
 	print_header();
 #endif
-	bfill.emit_p(PSTR("{\"date\":\"$S\",\"time\":\"$S\",\"heap\":$D"), __DATE__, __TIME__,
+	bfill.emit_p(PSTR("{\"date\":\"$S\",\"time\":\"$S\",\"heap\":$L"), __DATE__, __TIME__,
 #if defined(ESP8266)
 	(uint16_t)ESP.getFreeHeap());
 	FSInfo fs_info;
@@ -1964,7 +1972,7 @@ void server_json_debug(OTF_PARAMS_DEF) {
 	}
 */
 #else
-	(uint16_t)freeHeap());
+	(unsigned long)freeHeap());
 	bfill.emit_p(PSTR("}"));
 #endif
 	handle_return(HTML_OK);

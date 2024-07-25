@@ -34,17 +34,17 @@ char dec2hexchar(unsigned char dec);
 class BufferFiller {
 	char *start; //!< Pointer to start of buffer
 	char *ptr; //!< Pointer to cursor position
-    size_t len;
+	size_t len;
 public:
 	BufferFiller () {}
 	BufferFiller (char *buf, size_t buffer_len) {
-        start = buf;
-        ptr = buf;
-        len = buffer_len;
-    }
+		start = buf;
+		ptr = buf;
+		len = buffer_len;
+	}
 
-    char* buffer () const { return start; }
-    size_t length () const { return len; }
+	char* buffer () const { return start; }
+	size_t length () const { return len; }
 	unsigned int position () const { return ptr - start; }
 
 	void emit_p(PGM_P fmt, ...) {

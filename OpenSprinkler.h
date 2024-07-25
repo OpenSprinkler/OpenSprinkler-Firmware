@@ -312,7 +312,7 @@ public:
 	static void iopts_load();
 	static void iopts_save();
 	static bool sopt_save(unsigned char oid, const char *buf);
-	static void sopt_load(unsigned char oid, char *buf);
+	static void sopt_load(unsigned char oid, char *buf, uint16_t maxlen=MAX_SOPTS_SIZE);
 	static String sopt_load(unsigned char oid);
 	static void populate_master();
 	static unsigned char password_verify(const char *pw);  // verify password
