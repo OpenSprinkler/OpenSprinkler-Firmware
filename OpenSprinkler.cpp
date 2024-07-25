@@ -1944,6 +1944,10 @@ void remote_http_callback(char* buffer) {
 
 int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char* p, void(*callback)(char*), bool usessl, uint16_t timeout) {
 
+	if(server == NULL || server[0]==0 || port==0 ) { // sanity checking
+		DEBUG_PRINTLN("server:port is invalid!");
+		return HTTP_RQT_CONNECT_ERR;
+	}
 #if defined(ARDUINO)
 
 	Client *client = NULL;
