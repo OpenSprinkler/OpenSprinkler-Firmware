@@ -2282,8 +2282,8 @@ void OpenSprinkler::parse_otc_config() {
 	}
 
 	otc.en = en;
-	//otc.token = token ? String(token) : "";
-	//otc.server = server ? String(server) : "";
+	otc.token = token ? String(token) : "";
+	otc.server = server ? String(server) : "";
 	otc.port = port;
 }
 #endif
