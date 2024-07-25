@@ -26,6 +26,7 @@
 #include "gpio.h"
 #include "testmode.h"
 #include "program.h"
+#include "ArduinoJson.hpp"
 
 /** Declare static data members */
 OSMqtt OpenSprinkler::mqtt;
@@ -82,7 +83,6 @@ extern ProgramData pd;
 	IOEXP* OpenSprinkler::mainio; // main controller IO expander object
 	IOEXP* OpenSprinkler::drio; // driver board IO expander object
 	RCSwitch OpenSprinkler::rfswitch;
-	OTCConfig OpenSprinkler::otc;
 
 	String OpenSprinkler::wifi_ssid="";
 	String OpenSprinkler::wifi_pass="";
@@ -96,8 +96,11 @@ extern ProgramData pd;
 	#if defined(OSPI)
 		unsigned char OpenSprinkler::pin_sr_data = PIN_SR_DATA;
 	#endif
-    OTCConfig OpenSprinkler::otc;
 	// todo future: LCD define for Linux-based systems
+#endif
+
+#if defined(USE_OTF)
+	OTCConfig OpenSprinkler::otc;
 #endif
 
 /** Option json names (stored in PROGMEM to reduce RAM usage) */
@@ -168,6 +171,15 @@ const char iopt_json_names[] PROGMEM =
 	"subn2"
 	"subn3"
 	"subn4"
+	"fwire"
+	"resv1"
+	"resv2"
+	"resv3"
+	"resv4"
+	"resv5"
+	"resv6"
+	"resv7"
+	"resv8"
 	"wimod"
 	"reset"
 	;
@@ -225,7 +237,7 @@ const char iopt_prompts[] PROGMEM =
 	"DNS server.ip3: "
 	"DNS server.ip4: "
 	"Special Refresh?"
-	"IFTTT Enable:   "
+	"Notif Enable:   "
 	"Sensor 1 type:  "
 	"Normally open?  "
 	"Sensor 2 type:  "
@@ -238,6 +250,15 @@ const char iopt_prompts[] PROGMEM =
 	"Subnet mask2:   "
 	"Subnet mask3:   "
 	"Subnet mask4:   "
+	"Force wired?    "
+	"Reserved 1      "
+	"Reserved 2      "
+	"Reserved 3      "
+	"Reserved 4      "
+	"Reserved 5      "
+	"Reserved 6      "
+	"Reserved 7      "
+	"Reserved 8      "
 	"WiFi mode?      "
 	"Factory reset?  ";
 
@@ -297,6 +318,15 @@ const unsigned char iopt_max[] PROGMEM = {
 	255,
 	255,
 	1,
+	255,
+	1,
+	255,
+	255,
+	255,
+	255,
+	255,
+	255,
+	255,
 	255,
 	1,
 	255,
@@ -369,7 +399,7 @@ unsigned char OpenSprinkler::iopts[] = {
 	8,
 	8,
 	0,  // special station auto refresh
-	0,  // ifttt enable bits
+	0,  // notif enable bits
 	0,  // sensor 1 type (see SENSOR_TYPE macro defines)
 	1,  // sensor 1 option. 0: normally closed; 1: normally open.	default 1.
 	0,  // sensor 2 type
@@ -382,6 +412,15 @@ unsigned char OpenSprinkler::iopts[] = {
 	255,// subnet mask 2
 	255,// subnet mask 3
 	0,
+	1,  // force wired connection
+	0,  // reserved 1
+	0,  // reserved 2
+	0,  // reserved 3
+	0,  // reserved 4
+	0,  // reserved 5
+	0,  // reserved 6
+	0,  // reserved 7
+	0,  // reserved 8
 	WIFI_MODE_AP, // wifi mode
 	0   // reset
 };
@@ -400,6 +439,7 @@ const char *OpenSprinkler::sopts[] = {
 	DEFAULT_EMPTY_STRING, // SOPT_OTC_OPTS
 	DEFAULT_DEVICE_NAME,
 	DEFAULT_EMPTY_STRING, // SOPT_STA_BSSID_CHL
+	DEFAULT_EMPTY_STRING, // SOPT_EMAIL_OPTS
 };
 
 /** Weekday strings (stored in PROGMEM to reduce RAM usage) */
@@ -412,6 +452,14 @@ static const char days_str[] PROGMEM =
 	"Sat\0"
 	"Sun\0";
 
+
+#if !defined(ARDUINO)
+static inline int32_t now() {
+    time_t rawtime;
+    time(&rawtime);
+    return rawtime;
+}
+#endif
 /** Calculate local time (UTC time plus time zone offset) */
 time_os_t OpenSprinkler::now_tz() {
 	return now()+(int32_t)3600/4*(int32_t)(iopts[IOPT_TIMEZONE]-48);
@@ -470,7 +518,7 @@ unsigned char OpenSprinkler::start_network() {
 		useEth = false;
 	}
 
-	if((useEth || get_wifi_mode()==WIFI_MODE_STA) && otc.en>0 && otc.token.length()>=32) {
+	if((useEth || get_wifi_mode()==WIFI_MODE_STA) && otc.en>0 && otc.token.length()>=DEFAULT_OTC_TOKEN_LENGTH) {
 		otf = new OTF::OpenThingsFramework(httpport, otc.server, otc.port, otc.token, false, ether_buffer, ETHER_BUFFER_SIZE);
 		DEBUG_PRINTLN(F("Started OTF with remote connection"));
 	} else {
@@ -580,15 +628,20 @@ unsigned char OpenSprinkler::start_ether() {
 	eth.setDefault();
 	if(!eth.begin((uint8_t*)tmp_buffer))	return 0;
 	lcd_print_line_clear_pgm(PSTR("Start wired link"), 1);
-	lcd_print_line_clear_pgm(eth.isW5500 ? PSTR("    (w5500)    ") : PSTR("   (enc28j60)   "), 2);
+	lcd_print_line_clear_pgm(eth.isW5500 ? PSTR("  [w5500]    ") : PSTR(" [enc28j60]  "), 2);
 	
 	ulong timeout = millis()+60000; // 60 seconds time out
+	unsigned char timecount = 1;
 	while (!eth.connected() && millis()<timeout) {
 		DEBUG_PRINT(".");
+		lcd.setCursor(13, 2);
+		lcd.print(timecount);
 		delay(1000);
+		timecount++;
 	}
-	// if wired connection is not done at this point, return directly
+	lcd_print_line_clear_pgm(PSTR(""), 2);
 	if(eth.connected()) {
+		// if wired connection is successful at this point, copy the network ips to config
 		DEBUG_PRINTLN();
 		DEBUG_PRINT("eth.ip:");
 		DEBUG_PRINTLN(eth.localIP());
@@ -602,9 +655,11 @@ unsigned char OpenSprinkler::start_ether() {
 			memcpy(iopts+IOPT_SUBNET_MASK1, &(eth.subnetMask()[0]), 4);
 			iopts_save();
 		}
+		return 1;
+	} else {
+		// if wired connection has failed at this point, return depending on whether the user wants to force wired
+		return (iopts[IOPT_FORCE_WIRED] ? 1 : 0);
 	}
-
-	return 1;
 
 #else
 	Ethernet.init(PIN_ETHER_CS);  // make sure to call this before any Ethernet calls
@@ -677,7 +732,7 @@ unsigned char OpenSprinkler::start_network() {
 	port = 80;
 #endif
 #endif
-    if(otc.en>0 && otc.token.length()>=32) {
+	if(otc.en>0 && otc.token.length()>=DEFAULT_OTC_TOKEN_LENGTH) {
 		otf = new OTF::OpenThingsFramework(port, otc.server.c_str(), otc.port, otc.token.c_str(), false, ether_buffer, ETHER_BUFFER_SIZE);
 		DEBUG_PRINTLN(F("Started OTF with remote connection"));
 	} else {
@@ -685,7 +740,7 @@ unsigned char OpenSprinkler::start_network() {
 		DEBUG_PRINTLN(F("Started OTF with just local connection"));
 	}
 
-    return 1;
+	return 1;
 }
 
 bool OpenSprinkler::network_connected(void) {
@@ -735,8 +790,8 @@ void OpenSprinkler::reboot_dev(uint8_t cause) {
 
 /** Launch update script */
 void OpenSprinkler::update_dev() {
-	char cmd[1000];
-	sprintf(cmd, "cd %s && ./updater.sh", get_data_dir());
+	char cmd[500];
+	snprintf(cmd, 500, "cd %s && ./updater.sh", get_data_dir());
 	system(cmd);
 }
 #endif // end network init functions
@@ -1224,14 +1279,14 @@ void OpenSprinkler::apply_all_station_bits() {
 		}
 
 		// Handle driver board (on main controller)
-		if(drio->type==IOEXP_TYPE_8574) {
-			/* revision 0 uses PCF8574 with active low logic, so all bits must be flipped */
-			drio->i2c_write(NXP_OUTPUT_REG, ~station_bits[0]);
-		} else if(drio->type==IOEXP_TYPE_9555) {
-			/* revision 1 uses PCA9555 with active high logic */
+		if(drio->type==IOEXP_TYPE_9555) {
+			/* revision >= 1 uses PCA9555 with active high logic */
 			uint16_t reg = drio->i2c_read(NXP_OUTPUT_REG);  // read current output reg value
 			reg = (reg&0xFF00) | station_bits[0]; // output channels are the low 8-bit
 			drio->i2c_write(NXP_OUTPUT_REG, reg); // write value to register
+		} else if(drio->type==IOEXP_TYPE_8574) {
+			/* revision 0 uses PCF8574 with active low logic, so all bits must be flipped */
+			drio->i2c_write(NXP_OUTPUT_REG, ~station_bits[0]);
 		}
 
 		// Handle expansion boards
@@ -1245,6 +1300,7 @@ void OpenSprinkler::apply_all_station_bits() {
 			}
 		}
 	}
+
 #else
 	digitalWrite(PIN_SR_LATCH, LOW);
 	unsigned char bid, s, sbits;
@@ -1252,7 +1308,7 @@ void OpenSprinkler::apply_all_station_bits() {
 	// Shift out all station bit values
 	// from the highest bit to the lowest
 	for(bid=0;bid<=MAX_EXT_BOARDS;bid++) {
-		if (status.enabled)
+		if (status.enabled) // TODO: checking enabled bit here is inconsistent with Arduino implementation
 			sbits = station_bits[MAX_EXT_BOARDS-bid];
 		else
 			sbits = 0;
@@ -1718,8 +1774,12 @@ void OpenSprinkler::switch_special_station(unsigned char sid, unsigned char valu
 			switch_rfstation((RFStationData *)pdata->sped, value);
 			break;
 
-		case STN_TYPE_REMOTE:
-			switch_remotestation((RemoteStationData *)pdata->sped, value, dur);
+		case STN_TYPE_REMOTE_IP:
+			switch_remotestation((RemoteIPStationData *)pdata->sped, value, dur);
+			break;
+
+		case STN_TYPE_REMOTE_OTC:
+			switch_remotestation((RemoteOTCStationData *)pdata->sped, value, dur);
 			break;
 
 		case STN_TYPE_GPIO:
@@ -1727,8 +1787,13 @@ void OpenSprinkler::switch_special_station(unsigned char sid, unsigned char valu
 			break;
 
 		case STN_TYPE_HTTP:
-			switch_httpstation((HTTPStationData *)pdata->sped, value);
+			switch_httpstation((HTTPStationData *)pdata->sped, value, false);
 			break;
+
+		case STN_TYPE_HTTPS:
+			switch_httpstation((HTTPStationData *)pdata->sped, value, true);
+			break;
+
 		}
 	}
 }
@@ -1763,6 +1828,13 @@ unsigned char OpenSprinkler::set_station_bit(unsigned char sid, unsigned char va
 	return 0;
 }
 
+unsigned char OpenSprinkler::get_station_bit(unsigned char sid) {
+	unsigned char *data = station_bits+(sid>>3); // pointer to the station byte
+	unsigned char mask = (unsigned char)1<<(sid&0x07); // mask
+	if ((*data)&mask) return 1;
+	else return 0;
+}
+
 /** Clear all station bits */
 void OpenSprinkler::clear_all_station_bits() {
 	unsigned char sid;
@@ -1790,7 +1862,7 @@ void transmit_rfbit(ulong lenH, ulong lenL) {
 		delayMicroseconds(lenL);
 	#endif
 #else
-	gpio_write(rf_gpio_fd, 1);
+	gpio_write(rf_gpio_fd, 1);	// TODO: fix this or it won't work on Raspbian bookworm
 	delayMicrosecondsHard(lenH);
 	gpio_write(rf_gpio_fd, 0);
 	delayMicrosecondsHard(lenL);
@@ -1865,22 +1937,37 @@ void OpenSprinkler::switch_gpiostation(GPIOStationData *data, bool turnon) {
 
 /** Callback function for switching remote station */
 void remote_http_callback(char* buffer) {
-/*
+
 	DEBUG_PRINTLN(buffer);
-*/
+
 }
 
-int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char* p, void(*callback)(char*), uint16_t timeout) {
+int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char* p, void(*callback)(char*), bool usessl, uint16_t timeout) {
 
+	if(server == NULL || server[0]==0 || port==0 ) { // sanity checking
+		DEBUG_PRINTLN("server:port is invalid!");
+		return HTTP_RQT_CONNECT_ERR;
+	}
 #if defined(ARDUINO)
 
-	Client *client;
+	Client *client = NULL;
 	#if defined(ESP8266)
-		WiFiClient wifiClient;
-		client = &wifiClient;
+		if(usessl) {
+			WiFiClientSecure *_c = new WiFiClientSecure();
+			_c->setInsecure();
+  		bool mfln = _c->probeMaxFragmentLength(server, port, 512);
+  		DEBUG_PRINTF("MFLN supported: %s\n", mfln ? "yes" : "no");
+  		if (mfln) {
+				_c->setBufferSizes(512, 512); 
+			} else {
+				_c->setBufferSizes(2048, 2048);
+			}
+			client = _c;
+		} else {
+			client = new WiFiClient();
+		}
 	#else
-		EthernetClient etherClient;
-		client = &etherClient;
+		client = new EthernetClient();
 	#endif
 
 	#define HTTP_CONNECT_NTRIES 3
@@ -1900,21 +1987,25 @@ int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char*
 	if(tries==HTTP_CONNECT_NTRIES) {
 		DEBUG_PRINTLN(F("failed."));
 		client->stop();
+		delete client;
 		return HTTP_RQT_CONNECT_ERR;
 	}
 #else
+	EthernetClient *client = NULL;
+	
+	if (usessl) {
+		client = new EthernetClientSsl();
+	} else {
+		client = new EthernetClient();
+	}
 
-	EthernetClient etherClient;
-	EthernetClient *client = &etherClient;
-	struct hostent *host;
 	DEBUG_PRINT(server);
 	DEBUG_PRINT(":");
 	DEBUG_PRINTLN(port);
-	host = gethostbyname(server);
-	if (!host) { return HTTP_RQT_CONNECT_ERR; }
-	if(!client->connect((uint8_t*)host->h_addr, port)) {
+	if(!client->connect(server, port)) {
 		DEBUG_PRINT(F("failed."));
 		client->stop();
+		delete client;
 		return HTTP_RQT_CONNECT_ERR;
 	}
 
@@ -1925,7 +2016,7 @@ int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char*
 	if(client->connected()) {
 		client->write((uint8_t *)p, len);
 	} else {
-		DEBUG_PRINTLN(F("clint no longer connected"));
+		DEBUG_PRINTLN(F("client no longer connected"));
 	}
 	memset(ether_buffer, 0, ETHER_BUFFER_SIZE);
 	uint32_t stoptime = millis()+timeout;
@@ -1953,51 +2044,45 @@ int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char*
 		}
 	}
 #else
-	while(client->connected()) {
-		int len=client->read((uint8_t *)ether_buffer+pos, ETHER_BUFFER_SIZE);
-		if (len<=0) continue;
-		pos+=len;
-		if(millis()>stoptime) {
-			DEBUG_PRINTLN(F("host timeout occured"));
-			//return HTTP_RQT_TIMEOUT; // instead of returning with timeout, we'll work with data received so far
-			break;
-		}
-	}
+	len = client->read((uint8_t *)ether_buffer+pos, ETHER_BUFFER_SIZE);
+	pos += len;
+
 #endif
 	ether_buffer[pos]=0; // properly end buffer with 0
 	client->stop();
+	delete client;
 	if(strlen(ether_buffer)==0) return HTTP_RQT_EMPTY_RETURN;
 	if(callback) callback(ether_buffer);
 	return HTTP_RQT_SUCCESS;
 }
 
-int8_t OpenSprinkler::send_http_request(uint32_t ip4, uint16_t port, char* p, void(*callback)(char*), uint16_t timeout) {
+int8_t OpenSprinkler::send_http_request(uint32_t ip4, uint16_t port, char* p, void(*callback)(char*), bool usessl, uint16_t timeout) {
 	char server[20];
 	unsigned char ip[4];
 	ip[0] = ip4>>24;
 	ip[1] = (ip4>>16)&0xff;
 	ip[2] = (ip4>>8)&0xff;
 	ip[3] = ip4&0xff;
-	sprintf(server, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
-	return send_http_request(server, port, p, callback, timeout);
+	snprintf(server, 20, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
+	return send_http_request(server, port, p, callback, usessl, timeout);
 }
 
-int8_t OpenSprinkler::send_http_request(char* server_with_port, char* p, void(*callback)(char*), uint16_t timeout) {
+int8_t OpenSprinkler::send_http_request(char* server_with_port, char* p, void(*callback)(char*), bool usessl, uint16_t timeout) {
 	char * server = strtok(server_with_port, ":");
 	char * port = strtok(NULL, ":");
-	return send_http_request(server, (port==NULL)?80:atoi(port), p, callback, timeout);
+	return send_http_request(server, (port==NULL)?80:atoi(port), p, callback, usessl, timeout);
 }
 
-/** Switch remote station
+/** Switch remote IP station
  * This function takes a remote station code,
  * parses it into remote IP, port, station index,
  * and makes a HTTP GET request.
  * The remote controller is assumed to have the same
  * password as the main controller
  */
-void OpenSprinkler::switch_remotestation(RemoteStationData *data, bool turnon, uint16_t dur) {
-	RemoteStationData copy;
-	memcpy((char*)&copy, (char*)data, sizeof(RemoteStationData));
+void OpenSprinkler::switch_remotestation(RemoteIPStationData *data, bool turnon, uint16_t dur) {
+	RemoteIPStationData copy;
+	memcpy((char*)&copy, (char*)data, sizeof(RemoteIPStationData));
 
 	uint32_t ip4 = hex2ulong(copy.ip, sizeof(copy.ip));
 	uint16_t port = (uint16_t)hex2ulong(copy.port, sizeof(copy.port));
@@ -2008,10 +2093,8 @@ void OpenSprinkler::switch_remotestation(RemoteStationData *data, bool turnon, u
 	ip[2] = (ip4>>8)&0xff;
 	ip[3] = ip4&0xff;
 
-	// use tmp_buffer starting at a later location
-	// because remote station data is loaded at the beginning
 	char *p = tmp_buffer;
-	BufferFiller bf = p;
+    BufferFiller bf = BufferFiller(p, TMP_BUFFER_SIZE*2);
 	// if turning on the zone and duration is defined, give duration as the timer value
 	// otherwise:
 	//   if autorefresh is defined, we give a fixed duration each time, and auto refresh will renew it periodically
@@ -2032,15 +2115,50 @@ void OpenSprinkler::switch_remotestation(RemoteStationData *data, bool turnon, u
 						ip[0],ip[1],ip[2],ip[3]);
 
 	char server[20];
-	sprintf(server, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
+	snprintf(server, 20, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
 	send_http_request(server, port, p, remote_http_callback);
 }
 
-/** Switch http station
- * This function takes an http station code,
+/** Switch remote OTC station
+ * This function takes a remote station code,
+ * parses it into OTC token and station index,
+ * and makes a HTTPS GET request.
+ * The remote controller is assumed to have the same
+ * password as the main controller
+ */
+void OpenSprinkler::switch_remotestation(RemoteOTCStationData *data, bool turnon, uint16_t dur) {
+	RemoteOTCStationData copy;
+	memcpy((char*)&copy, (char*)data, sizeof(RemoteOTCStationData));
+	copy.token[sizeof(copy.token)-1] = 0; // ensure the string ends properly
+	char *p = tmp_buffer;
+	BufferFiller bf = BufferFiller(p, TMP_BUFFER_SIZE*2);
+	// if turning on the zone and duration is defined, give duration as the timer value
+	// otherwise:
+	//   if autorefresh is defined, we give a fixed duration each time, and auto refresh will renew it periodically
+	//   if no auto refresh, we will give the maximum allowed duration, and station will be turned off when off command is sent
+	uint16_t timer = 0;
+	if(turnon) {
+		if(dur>0) {
+			timer = dur;
+		} else {
+			timer = iopts[IOPT_SPE_AUTO_REFRESH]?4*MAX_NUM_STATIONS:64800;
+		}
+	}
+	bf.emit_p(PSTR("GET /forward/v1/$S/cm?pw=$O&sid=$D&en=$D&t=$D"),
+						copy.token,
+						SOPT_PASSWORD,
+						(int)hex2ulong(copy.sid, sizeof(copy.sid)),
+						turnon, timer);
+	bf.emit_p(PSTR(" HTTP/1.0\r\nHOST: $S\r\nConnection:close\r\n\r\n"), DEFAULT_OTC_SERVER_APP);
+
+	int x = send_http_request(DEFAULT_OTC_SERVER_APP, DEFAULT_OTC_PORT_APP, p, remote_http_callback, true);
+}
+
+/** Switch http(s) station
+ * This function takes an http(s) station code,
  * parses it into a server name and two HTTP GET requests.
  */
-void OpenSprinkler::switch_httpstation(HTTPStationData *data, bool turnon) {
+void OpenSprinkler::switch_httpstation(HTTPStationData *data, bool turnon, bool usessl) {
 
 	HTTPStationData copy;
 	// make a copy of the HTTP station data and work with it
@@ -2052,13 +2170,13 @@ void OpenSprinkler::switch_httpstation(HTTPStationData *data, bool turnon) {
 	char * cmd = turnon ? on_cmd : off_cmd;
 
 	char *p = tmp_buffer;
-	BufferFiller bf = p;
+	BufferFiller bf = BufferFiller(p, TMP_BUFFER_SIZE*2);
 
 	if(cmd==NULL || server==NULL) return; // proceed only if cmd and server are valid
 
 	bf.emit_p(PSTR("GET /$S HTTP/1.0\r\nHOST: $S\r\n\r\n"), cmd, server);
 
-	send_http_request(server, atoi(port), p, remote_http_callback);
+	send_http_request(server, atoi(port), p, remote_http_callback, usessl);
 }
 
 /** Prepare factory reset */
@@ -2134,35 +2252,51 @@ void OpenSprinkler::factory_reset() {
 	file_write_byte(DONE_FILENAME, 0, 1);
 }
 
-#define str(s) #s
-#define xstr(s) str(s)
-
 /** Parse OTC configuration */
+#if defined(USE_OTF)
 void OpenSprinkler::parse_otc_config() {
-	char server[MAX_SOPTS_SIZE+1] = {0};
-	char token[MAX_SOPTS_SIZE+1] = {0};
-	int port = DEFAULT_OTC_PORT;
+	ArduinoJson::JsonDocument doc; // make sure this has the same scope as server and token
+	const char *server = NULL;
+	const char *token = NULL;
+	int port = DEFAULT_OTC_PORT_DEV;
 	int en = 0;
 
-	char *config = tmp_buffer;
+	char *config = tmp_buffer + 1;
 	sopt_load(SOPT_OTC_OPTS, config);
 	if (*config != 0) {
-		sscanf(config, "\"en\":%d,\"token\":\"%" xstr(MAX_SOPTS_SIZE) "[^\"]\",\"server\":\"%" xstr(MAX_SOPTS_SIZE) "[^\"]\",\"port\":%d",
-			&en, token, server, &port);
-		token[MAX_SOPTS_SIZE] = 0;
-		server[MAX_SOPTS_SIZE] = 0;
+		// Add the wrapping curly braces to the string
+		config = tmp_buffer;
+		config[0] = '{';
+		int len = strlen(config);
+		config[len] = '}';
+		config[len+1] = 0;
+
+		ArduinoJson::DeserializationError error = ArduinoJson::deserializeJson(doc, config);
+
+		// Test the parsing otherwise parse
+		if (error) {
+				DEBUG_PRINT(F("otf: deserializeJson() failed: "));
+				DEBUG_PRINTLN(error.c_str());
+		} else {
+				en = doc["en"];
+				token = doc["token"];
+				server = doc["server"];
+				port = doc["port"];
+		}
 	}
+
 	otc.en = en;
-	otc.token = String(token);
-	otc.server = String(server);
+	otc.token = token ? String(token) : "";
+	otc.server = server ? String(server) : "";
 	otc.port = port;
 }
+#endif
 
 /** Setup function for options */
 void OpenSprinkler::options_setup() {
 
 	// Check reset conditions:
-	if (file_read_byte(IOPTS_FILENAME, IOPT_FW_VERSION)<220 ||  // fw version is invalid (<219)
+	if (file_read_byte(IOPTS_FILENAME, IOPT_FW_VERSION)!=OS_FW_VERSION ||  // fw major version has changed
 			!file_exists(DONE_FILENAME)) {  // done file doesn't exist
 
 		factory_reset();
@@ -2189,8 +2323,11 @@ void OpenSprinkler::options_setup() {
 				}
 			}
 		}
-        #endif
+		#endif
+		#if defined(USE_OTF)
 		parse_otc_config();
+		#endif
+
 		attribs_load();
 	}
 
@@ -2354,9 +2491,10 @@ void OpenSprinkler::iopts_save() {
 }
 
 /** Load a string option from file */
-void OpenSprinkler::sopt_load(unsigned char oid, char *buf) {
-	file_read_block(SOPTS_FILENAME, buf, MAX_SOPTS_SIZE*oid, MAX_SOPTS_SIZE);
-	buf[MAX_SOPTS_SIZE]=0;  // ensure the string ends properly
+void OpenSprinkler::sopt_load(unsigned char oid, char *buf, uint16_t maxlen) {
+	if(maxlen>MAX_SOPTS_SIZE) maxlen = MAX_SOPTS_SIZE; // cap maxlen
+	file_read_block(SOPTS_FILENAME, buf, MAX_SOPTS_SIZE*oid, maxlen);
+	buf[maxlen]=0;  // ensure the string ends properly
 }
 
 /** Load a string option from file, return String */
@@ -2847,7 +2985,7 @@ void OpenSprinkler::lcd_set_contrast() {
 /** Set LCD brightness (using PWM) */
 void OpenSprinkler::lcd_set_brightness(unsigned char value) {
 #if defined(PIN_LCD_BACKLIGHT)
-	#if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
+	#if defined(OS_AVR)
 	if (lcd.type()==LCD_I2C) {
 		if (value) lcd.backlight();
 		else {

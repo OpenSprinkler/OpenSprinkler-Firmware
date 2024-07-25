@@ -32,9 +32,14 @@
 #include "main.h"
 
 #if defined(ARDUINO)
+#include <Arduino.h>
+#endif
+
+#include "ArduinoJson.hpp"
+
+#if defined(ARDUINO)
 	#if defined(ESP8266)
 		ESP8266WebServer *update_server = NULL;
-		OTF::OpenThingsFramework *otf = NULL;
 		DNSServer *dns = NULL;
 		ENC28J60lwIP enc28j60(PIN_ETHER_CS); // ENC28J60 lwip for wired Ether
 		Wiznet5500lwIP w5500(PIN_ETHER_CS); // W5500 lwip for wired Ether
@@ -49,7 +54,11 @@
 	#endif
 	unsigned long getNtpTime();
 #else // header and defs for RPI/BBB
-    OTF::OpenThingsFramework *otf = NULL;
+
+#endif
+
+#if defined(USE_OTF)
+	OTF::OpenThingsFramework *otf = NULL;
 #endif
 
 void push_message(int type, uint32_t lval=0, float fval=0.f, const char* sval=NULL);
@@ -315,7 +324,7 @@ void do_setup() {
 	os.lcd_print_time(os.now_tz());  // display time to LCD
 	os.powerup_lasttime = os.now_tz();
 
-#if !defined(ESP8266)
+#if defined(OS_AVR)
 	// enable WDT
 	/* In order to change WDE or the prescaler, we need to
 	 * set WDCE (This will allow updates for 4 clock cycles).
@@ -352,7 +361,7 @@ void do_setup() {
 // Arduino software reset function
 void(* sysReset) (void) = 0;
 
-#if !defined(ESP8266)
+#if defined(OS_AVR)
 volatile unsigned char wdt_timeout = 0;
 /** WDT interrupt service routine */
 ISR(WDT_vect)
@@ -394,7 +403,7 @@ void do_setup() {
 	os.mqtt.init();
 	os.status.req_mqtt_restart = true;
 
-    initalize_otf();
+	initalize_otf();
 }
 #endif
 
@@ -580,7 +589,7 @@ void do_loop()
 	ui_state_machine();
 
 #else // Process Ethernet packets for RPI/BBB
-    if(otf) otf->loop();
+	if(otf) otf->loop();
 #endif	// Process Ethernet packets
 
 	// Start up MQTT when we have a network connection
@@ -588,6 +597,7 @@ void do_loop()
 		DEBUG_PRINTLN(F("req_mqtt_restart"));
 		os.mqtt.begin();
 		os.status.req_mqtt_restart = false;
+		os.mqtt.subscribe();
 	}
 	os.mqtt.loop();
 
@@ -886,6 +896,11 @@ void do_loop()
 						}
 					}
 				}
+		
+				if(os.get_station_bit(mas_id - 1) == 0 && masbit == 1){ // notify master on event
+					push_message(NOTIFY_STATION_ON, mas_id - 1, 0);
+				}
+				
 				os.set_station_bit(mas_id - 1, masbit);
 			}
 		}
@@ -963,8 +978,13 @@ void do_loop()
 		}
 		static unsigned char reboot_notification = 1;
 		if(reboot_notification) {
+			#if defined(ESP266)
+				if(useEth || WiFi.status()==WL_CONNECTED)
+			#endif
+			{
 			reboot_notification = 0;
 			push_message(NOTIFY_REBOOT);
+			}
 		}
 	}
 
@@ -1345,26 +1365,91 @@ void manual_start_program(unsigned char pid, unsigned char uwt) {
 // ==========================================
 // ====== PUSH NOTIFICATION FUNCTIONS =======
 // ==========================================
-void ip2string(char* str, unsigned char ip[4]) {
-	sprintf_P(str+strlen(str), PSTR("%d.%d.%d.%d"), ip[0], ip[1], ip[2], ip[3]);
+void ip2string(char* str, size_t str_len, unsigned char ip[4]) {
+	snprintf_P(str+strlen(str), str_len, PSTR("%d.%d.%d.%d"), ip[0], ip[1], ip[2], ip[3]);
 }
 
+#define PUSH_TOPIC_LEN	120
+#define PUSH_PAYLOAD_LEN TMP_BUFFER_SIZE
+
 void push_message(int type, uint32_t lval, float fval, const char* sval) {
-	static char topic[TMP_BUFFER_SIZE];
-	static char payload[TMP_BUFFER_SIZE];
-	char* postval = tmp_buffer;
+	static char topic[PUSH_TOPIC_LEN+1];
+	static char payload[PUSH_PAYLOAD_LEN+1];
+	char* postval = tmp_buffer+1; // +1 so we can fit a opening { before the loaded config
 	uint32_t volume;
 
-	bool ifttt_enabled = os.iopts[IOPT_IFTTT_ENABLE]&type;
+	// check if ifttt key exists and also if the enable bit is set
+	os.sopt_load(SOPT_IFTTT_KEY, tmp_buffer);
+	bool ifttt_enabled = ((os.iopts[IOPT_NOTIF_ENABLE]&type)!=0) && (strlen(tmp_buffer)!=0);
+	
+#define DEFAULT_EMAIL_PORT	465
 
-	// check if this type of event is enabled for push notification
-	if (!ifttt_enabled && !os.mqtt.enabled())
+	// parse email variables
+	#if defined(SUPPORT_EMAIL)
+	// define email variables
+	ArduinoJson::JsonDocument doc; // make sure this has the same scope of email_x variables to prevent use after free
+	const char *email_host = NULL;
+	const char *email_username = NULL;
+	const char *email_password = NULL;
+	const char *email_recipient = NULL;
+	int  email_port = DEFAULT_EMAIL_PORT;
+	int  email_en = 0;
+
+	os.sopt_load(SOPT_EMAIL_OPTS, postval);
+	if (*postval != 0) {
+		// Add the wrapping curly braces to the string
+		postval = tmp_buffer;
+		postval[0] = '{';
+		int len = strlen(postval);
+		postval[len] = '}';
+		postval[len+1] = 0;
+
+		ArduinoJson::DeserializationError error = ArduinoJson::deserializeJson(doc, postval);
+		// Test the parsing otherwise parse
+		if (error) {
+			DEBUG_PRINT(F("mqtt: deserializeJson() failed: "));
+			DEBUG_PRINTLN(error.c_str());
+		} else {
+			email_en = doc["en"];
+			email_host = doc["host"];
+			email_port = doc["port"];
+			email_username = doc["user"];
+			email_password = doc["pass"];
+			email_recipient= doc["recipient"];
+		}
+	}
+	#endif
+
+	#if defined(ESP8266)
+		EMailSender::EMailMessage email_message;
+	#else
+		struct {
+			String subject;
+			String message;
+		} email_message;
+	#endif
+
+	bool email_enabled;
+	if(!email_en){
+		email_enabled = false;
+	}else{
+		email_enabled = os.iopts[IOPT_NOTIF_ENABLE]&type;
+	}
+
+	// if none if enabled, return here
+	if ((!ifttt_enabled) && (!email_enabled) && (!os.mqtt.enabled()))
 		return;
 
-	if (ifttt_enabled) {
+	if (ifttt_enabled || email_enabled) {
 		strcpy_P(postval, PSTR("{\"value1\":\"On site ["));
-		os.sopt_load(SOPT_DEVICE_NAME, postval+strlen(postval));
+		os.sopt_load(SOPT_DEVICE_NAME, topic, PUSH_TOPIC_LEN);
+		topic[PUSH_TOPIC_LEN]=0;
+		strcat(postval+strlen(postval), topic);
 		strcat_P(postval, PSTR("], "));
+		if(email_enabled) {		
+			strcat(topic, " ");
+			email_message.subject = topic; // prefix the email subject with device name
+		}
 	}
 
 	if (os.mqtt.enabled()) {
@@ -1376,39 +1461,50 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 		case  NOTIFY_STATION_ON:
 
 			if (os.mqtt.enabled()) {
-				sprintf_P(topic, PSTR("opensprinkler/station/%d"), lval);
-				sprintf_P(payload, PSTR("{\"state\":1,\"duration\":%d}"), (int)fval);
+				snprintf_P(topic, PUSH_TOPIC_LEN, PSTR("station/%d"), lval);
+				if((int)fval == 0){
+					snprintf_P(payload, PUSH_PAYLOAD_LEN, PSTR("{\"state\":1}"));  // master on event does not have duration attached to it
+				}else{
+					snprintf_P(payload, PUSH_PAYLOAD_LEN, PSTR("{\"state\":1,\"duration\":%d}"), (int)fval);
+				}
 			}
 
-			// todo: add IFTTT support for this event as well.
-			// currently no support due to the number of events exceeds 8 so need to use more than 1 unsigned char
+			// todo: add IFTTT and email support for this event as well.
+			// currently no support due to the number of events exceeds 8 so need to use more than 1 byte
 			break;
 
 		case NOTIFY_STATION_OFF:
 
 			if (os.mqtt.enabled()) {
-				sprintf_P(topic, PSTR("opensprinkler/station/%d"), lval);
+				snprintf_P(topic, PUSH_TOPIC_LEN, PSTR("station/%d"), lval);
 				if (os.iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_FLOW) {
-					sprintf_P(payload, PSTR("{\"state\":0,\"duration\":%d,\"flow\":%d.%02d}"), (int)fval, (int)flow_last_gpm, (int)(flow_last_gpm*100)%100);
+					snprintf_P(payload, PUSH_PAYLOAD_LEN, PSTR("{\"state\":0,\"duration\":%d,\"flow\":%d.%02d}"), (int)fval, (int)flow_last_gpm, (int)(flow_last_gpm*100)%100);
 				} else {
-					sprintf_P(payload, PSTR("{\"state\":0,\"duration\":%d}"), (int)fval);
+					snprintf_P(payload, PUSH_PAYLOAD_LEN, PSTR("{\"state\":0,\"duration\":%d}"), (int)fval);
 				}
 			}
-			if (ifttt_enabled) {
-				strcat_P(postval, PSTR("station ["));
+			if (ifttt_enabled || email_enabled) {
+				strcat_P(postval, PSTR("Station ["));
 				os.get_station_name(lval, postval+strlen(postval));
-				strcat_P(postval, PSTR("] closed. It ran for "));
-				sprintf_P(postval+strlen(postval), PSTR(" %d minutes %d seconds."), (int)fval/60, (int)fval%60);
+				if((int)fval == 0){
+					strcat_P(postval, PSTR("] closed."));
+				}else{
+					strcat_P(postval, PSTR("] closed. It ran for "));
+					size_t len = strlen(postval);
+					snprintf_P(postval + len, TMP_BUFFER_SIZE, PSTR(" %d minutes %d seconds."), (int)fval/60, (int)fval%60);
+				}
 
 				if(os.iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_FLOW) {
-					sprintf_P(postval+strlen(postval), PSTR(" Flow rate: %d.%02d"), (int)flow_last_gpm, (int)(flow_last_gpm*100)%100);
+					size_t len = strlen(postval);
+					snprintf_P(postval + len, TMP_BUFFER_SIZE, PSTR(" Flow rate: %d.%02d"), (int)flow_last_gpm, (int)(flow_last_gpm*100)%100);
 				}
+				if(email_enabled) { email_message.subject += PSTR("station event"); }
 			}
 			break;
 
 		case NOTIFY_PROGRAM_SCHED:
 
-			if (ifttt_enabled) {
+			if (ifttt_enabled || email_enabled) {
 				if (sval) strcat_P(postval, PSTR("manually scheduled "));
 				else strcat_P(postval, PSTR("automatically scheduled "));
 				strcat_P(postval, PSTR("Program "));
@@ -1417,43 +1513,48 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 					pd.read(lval, &prog);
 					if(lval<pd.nprograms) strcat(postval, prog.name);
 				}
-				sprintf_P(postval+strlen(postval), PSTR(" with %d%% water level."), (int)fval);
+				size_t len = strlen(postval);
+				snprintf_P(postval + len, TMP_BUFFER_SIZE, PSTR(" with %d%% water level."), (int)fval);
+				if(email_enabled) { email_message.subject += PSTR("program event"); }
 			}
 			break;
 
 		case NOTIFY_SENSOR1:
 
 			if (os.mqtt.enabled()) {
-				strcpy_P(topic, PSTR("opensprinkler/sensor1"));
-				sprintf_P(payload, PSTR("{\"state\":%d}"), (int)fval);
+				strcpy_P(topic, PSTR("sensor1"));
+				snprintf_P(payload, PUSH_PAYLOAD_LEN, PSTR("{\"state\":%d}"), (int)fval);
 			}
-			if (ifttt_enabled) {
+			if (ifttt_enabled || email_enabled) {
 				strcat_P(postval, PSTR("sensor 1 "));
 				strcat_P(postval, ((int)fval)?PSTR("activated."):PSTR("de-activated."));
+				if(email_enabled) { email_message.subject += PSTR("sensor 1 event"); }
 			}
 			break;
 
 		case NOTIFY_SENSOR2:
 
 			if (os.mqtt.enabled()) {
-				strcpy_P(topic, PSTR("opensprinkler/sensor2"));
-				sprintf_P(payload, PSTR("{\"state\":%d}"), (int)fval);
+				strcpy_P(topic, PSTR("sensor2"));
+				snprintf_P(payload, PUSH_PAYLOAD_LEN, PSTR("{\"state\":%d}"), (int)fval);
 			}
-			if (ifttt_enabled) {
+			if (ifttt_enabled || email_enabled) {
 				strcat_P(postval, PSTR("sensor 2 "));
 				strcat_P(postval, ((int)fval)?PSTR("activated."):PSTR("de-activated."));
+				if(email_enabled) { email_message.subject += PSTR("sensor 2 event"); }
 			}
 			break;
 
 		case NOTIFY_RAINDELAY:
 
 			if (os.mqtt.enabled()) {
-				strcpy_P(topic, PSTR("opensprinkler/raindelay"));
-				sprintf_P(payload, PSTR("{\"state\":%d}"), (int)fval);
+				strcpy_P(topic, PSTR("raindelay"));
+				snprintf_P(payload, PUSH_PAYLOAD_LEN, PSTR("{\"state\":%d}"), (int)fval);
 			}
-			if (ifttt_enabled) {
+			if (ifttt_enabled || email_enabled) {
 				strcat_P(postval, PSTR("rain delay "));
 				strcat_P(postval, ((int)fval)?PSTR("activated."):PSTR("de-activated."));
+				if(email_enabled) { email_message.subject += PSTR("rain delay event"); }
 			}
 			break;
 
@@ -1463,38 +1564,45 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 			volume = (volume<<8)+os.iopts[IOPT_PULSE_RATE_0];
 			volume = lval*volume;
 			if (os.mqtt.enabled()) {
-				strcpy_P(topic, PSTR("opensprinkler/sensor/flow"));
-				sprintf_P(payload, PSTR("{\"count\":%u,\"volume\":%d.%02d}"), lval, (int)volume/100, (int)volume%100);
+				strcpy_P(topic, PSTR("sensor/flow"));
+				snprintf_P(payload, PUSH_PAYLOAD_LEN, PSTR("{\"count\":%u,\"volume\":%d.%02d}"), lval, (int)volume/100, (int)volume%100);
 			}
-			if (ifttt_enabled) {
-				sprintf_P(postval+strlen(postval), PSTR("Flow count: %u, volume: %d.%02d"), lval, (int)volume/100, (int)volume%100);
+			if (ifttt_enabled || email_enabled) {
+				size_t len = strlen(postval);
+				snprintf_P(postval + len, TMP_BUFFER_SIZE, PSTR("Flow count: %u, volume: %d.%02d"), lval, (int)volume/100, (int)volume%100);
+				if(email_enabled) { email_message.subject += PSTR("flow sensor event"); }
 			}
 			break;
 
 		case NOTIFY_WEATHER_UPDATE:
 
-			if (ifttt_enabled) {
+			if (os.mqtt.enabled()) {
+				strcpy_P(topic, PSTR("weather"));
+				snprintf_P(payload, PUSH_PAYLOAD_LEN, PSTR("{\"water level\":%d}"), (int)fval);
+			}
+			if (ifttt_enabled || email_enabled) {
 				if(lval>0) {
 					strcat_P(postval, PSTR("external IP updated: "));
 					unsigned char ip[4] = {(unsigned char)((lval>>24)&0xFF),
 									(unsigned char)((lval>>16)&0xFF),
 									(unsigned char)((lval>>8)&0xFF),
 									(unsigned char)(lval&0xFF)};
-					ip2string(postval, ip);
+					ip2string(postval, TMP_BUFFER_SIZE, ip);
 				}
 				if(fval>=0) {
-					sprintf_P(postval+strlen(postval), PSTR("water level updated: %d%%."), (int)fval);
+					size_t len = strlen(postval);
+					snprintf_P(postval + len, TMP_BUFFER_SIZE, PSTR("water level updated: %d%%."), (int)fval);
 				}
+				if(email_enabled) { email_message.subject += PSTR("weather update event"); }
 			}
 			break;
 
 		case NOTIFY_REBOOT:
-
 			if (os.mqtt.enabled()) {
-				strcpy_P(topic, PSTR("opensprinkler/system"));
+				strcpy_P(topic, PSTR("system"));
 				strcpy_P(payload, PSTR("{\"state\":\"started\"}"));
 			}
-			if (ifttt_enabled) {
+			if (ifttt_enabled || email_enabled) {
 				#if defined(ARDUINO)
 					strcat_P(postval, PSTR("rebooted. Device IP: "));
 					#if defined(ESP8266)
@@ -1507,16 +1615,15 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 							_ip = WiFi.localIP();
 						}
 						unsigned char ip[4] = {_ip[0], _ip[1], _ip[2], _ip[3]};
-						ip2string(postval, ip);
+						ip2string(postval, TMP_BUFFER_SIZE, ip);
 					}
 					#else
-						ip2string(postval, &(Ethernet.localIP()[0]));
+						ip2string(postval, TMP_BUFFER_SIZE, &(Ethernet.localIP()[0]));
 					#endif
-					//strcat(postval, ":");
-					//itoa(_port, postval+strlen(postval), 10);
 				#else
-					strcat_P(postval, PSTR("process restarted."));
+					strcat_P(postval, PSTR("controller process restarted."));
 				#endif
+				if(email_enabled) { email_message.subject += PSTR("reboot event"); }
 			}
 			break;
 	}
@@ -1527,8 +1634,7 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 	if (ifttt_enabled) {
 		strcat_P(postval, PSTR("\"}"));
 
-		//char postBuffer[1500];
-		BufferFiller bf = ether_buffer;
+		BufferFiller bf = BufferFiller(ether_buffer, TMP_BUFFER_SIZE);
 		bf.emit_p(PSTR("POST /trigger/sprinkler/with/key/$O HTTP/1.0\r\n"
 						"Host: $S\r\n"
 						"Accept: */*\r\n"
@@ -1537,6 +1643,41 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 						SOPT_IFTTT_KEY, DEFAULT_IFTTT_URL, strlen(postval), postval);
 
 		os.send_http_request(DEFAULT_IFTTT_URL, 80, ether_buffer, remote_http_callback);
+	}
+
+	if(email_enabled){
+		email_message.message = strchr(postval, 'O'); // ad-hoc: remove the value1 part from the ifttt message
+		#if defined(ARDUINO)
+			#if defined(ESP8266)
+				if(email_host && email_username && email_password && email_recipient) { // make sure all are valid
+					EMailSender emailSend(email_username, email_password);
+					emailSend.setSMTPServer(email_host); // TODO: double check removing strdup
+					emailSend.setSMTPPort(email_port);
+					EMailSender::Response resp = emailSend.send(email_recipient, email_message);
+					// DEBUG_PRINTLN(F("Sending Status:"));
+					// DEBUG_PRINTLN(resp.status);
+					// DEBUG_PRINTLN(resp.code);
+					// DEBUG_PRINTLN(resp.desc);
+				}
+			#endif
+		#else
+			struct smtp *smtp = NULL;
+			String email_port_str = to_string(email_port);
+			// todo: check error?
+			smtp_status_code rc;
+			if(email_host && email_username && email_password && email_recipient) { // make sure all are valid
+				rc = smtp_open(email_host, email_port_str.c_str(), SMTP_SECURITY_TLS, SMTP_NO_CERT_VERIFY, NULL, &smtp);
+				rc = smtp_auth(smtp, SMTP_AUTH_PLAIN, email_username, email_password);
+				rc = smtp_address_add(smtp, SMTP_ADDRESS_FROM, email_username, "OpenSprinkler");
+				rc = smtp_address_add(smtp, SMTP_ADDRESS_TO, email_recipient, "User");
+				rc = smtp_header_add(smtp, "Subject", email_message.subject.c_str());
+				rc = smtp_mail(smtp, email_message.message.c_str());
+				rc = smtp_close(smtp);
+				if (rc!=SMTP_STATUS_OK) {
+					DEBUG_PRINTF("SMTP: Error %s\n", smtp_status_code_errstr(rc));
+				}
+			}
+		#endif
 	}
 }
 
@@ -1584,7 +1725,7 @@ void write_log(unsigned char type, time_os_t curr_time) {
 	if (!os.iopts[IOPT_ENABLE_LOGGING]) return;
 
 	// file name will be logs/xxxxx.tx where xxxxx is the day in epoch time
-	ultoa(curr_time / 86400, tmp_buffer, 10);
+	snprintf (tmp_buffer, TMP_BUFFER_SIZE, "%lu", curr_time / 86400);
 	make_logfile_name(tmp_buffer);
 
 	// Step 1: open file if exists, or create new otherwise,
@@ -1641,18 +1782,24 @@ void write_log(unsigned char type, time_os_t curr_time) {
 	strcpy_P(tmp_buffer, PSTR("["));
 
 	if(type == LOGDATA_STATION) {
-		itoa(pd.lastrun.program, tmp_buffer+strlen(tmp_buffer), 10);
+		size_t size = strlen(tmp_buffer);
+		snprintf(tmp_buffer + size, TMP_BUFFER_SIZE - size , "%d", pd.lastrun.program);
 		strcat_P(tmp_buffer, PSTR(","));
-		itoa(pd.lastrun.station, tmp_buffer+strlen(tmp_buffer), 10);
+		size = strlen(tmp_buffer);
+		snprintf(tmp_buffer + size, TMP_BUFFER_SIZE - size , "%d", pd.lastrun.station);
 		strcat_P(tmp_buffer, PSTR(","));
 		// duration is unsigned integer
-		ultoa((ulong)pd.lastrun.duration, tmp_buffer+strlen(tmp_buffer), 10);
+		size = strlen(tmp_buffer);
+		snprintf(tmp_buffer + size, TMP_BUFFER_SIZE - size , "%lu", (ulong)pd.lastrun.duration);
+
 	} else {
 		ulong lvalue=0;
 		if(type==LOGDATA_FLOWSENSE) {
 			lvalue = (flow_count>os.flowcount_log_start)?(flow_count-os.flowcount_log_start):0;
 		}
-		ultoa(lvalue, tmp_buffer+strlen(tmp_buffer), 10);
+
+		size_t size = strlen(tmp_buffer);
+		snprintf(tmp_buffer + size, TMP_BUFFER_SIZE - size , "%lu", lvalue);
 		strcat_P(tmp_buffer, PSTR(",\""));
 		strcat_P(tmp_buffer, log_type_names+type*3);
 		strcat_P(tmp_buffer, PSTR("\","));
@@ -1674,17 +1821,20 @@ void write_log(unsigned char type, time_os_t curr_time) {
 				lvalue = os.iopts[IOPT_WATER_PERCENTAGE];
 				break;
 		}
-		ultoa(lvalue, tmp_buffer+strlen(tmp_buffer), 10);
+		size = strlen(tmp_buffer);
+		snprintf(tmp_buffer + size, TMP_BUFFER_SIZE - size , "%lu", lvalue);
 	}
 	strcat_P(tmp_buffer, PSTR(","));
-	ultoa(curr_time, tmp_buffer+strlen(tmp_buffer), 10);
+	size_t size = strlen(tmp_buffer);
+	snprintf(tmp_buffer + size, TMP_BUFFER_SIZE - size , "%lu", curr_time);
 	if((os.iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_FLOW) && (type==LOGDATA_STATION)) {
 		// RAH implementation of flow sensor
 		strcat_P(tmp_buffer, PSTR(","));
 		#if defined(ARDUINO)
 		dtostrf(flow_last_gpm,5,2,tmp_buffer+strlen(tmp_buffer));
 		#else
-		sprintf(tmp_buffer+strlen(tmp_buffer), "%5.2f", flow_last_gpm);
+		size_t len = strlen(tmp_buffer);
+		snprintf(tmp_buffer + len, TMP_BUFFER_SIZE - len, "%5.2f", flow_last_gpm);
 		#endif
 	}
 	strcat_P(tmp_buffer, PSTR("]\r\n"));
@@ -1780,7 +1930,7 @@ void delete_log(char *name) {
  * If not, it re-initializes Ethernet controller.
  */
 static void check_network() {
-#if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
+#if defined(OS_AVR)
 	// do not perform network checking if the controller has just started, or if a program is running
 	if (os.status.program_busy) {return;}
 
@@ -1864,19 +2014,19 @@ static void perform_ntp_sync() {
 
 #if !defined(ARDUINO) // main function for RPI/BBB
 int main(int argc, char *argv[]) {
-    printf("Starting OpenSprinkler\n");
+	printf("Starting OpenSprinkler\n");
 
-  int opt;
-  while(-1 != (opt = getopt(argc, argv, "d:"))) {
-    switch(opt) {
-    case 'd':
-      set_data_dir(optarg);
-      break;
-    default:
-      // ignore options we don't understand
-      break;
-    }
-  }
+	int opt;
+	while(-1 != (opt = getopt(argc, argv, "d:"))) {
+		switch(opt) {
+		case 'd':
+			set_data_dir(optarg);
+			break;
+		default:
+			// ignore options we don't understand
+			break;
+		}
+	}
 
   do_setup();
 

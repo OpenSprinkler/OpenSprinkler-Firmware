@@ -24,18 +24,18 @@
 #ifndef _DEFINES_H
 #define _DEFINES_H
 
-//#define ENABLE_DEBUG  // enable serial debug
+// #define ENABLE_DEBUG  // enable serial debug
 
 typedef unsigned long ulong;
 
-#define TMP_BUFFER_SIZE      255   // scratch buffer size
+#define TMP_BUFFER_SIZE      320   // scratch buffer size
 
 /** Firmware version, hardware version, and maximal values */
-#define OS_FW_VERSION  220  // Firmware version: 220 means 2.2.0
+#define OS_FW_VERSION  221  // Firmware version: 221 means 2.2.1
 														// if this number is different from the one stored in non-volatile memory
 														// a device reset will be automatically triggered
 
-#define OS_FW_MINOR      5  // Firmware minor version
+#define OS_FW_MINOR      0  // Firmware minor version
 
 /** Hardware version base numbers */
 #define OS_HW_VERSION_BASE   0x00 // OpenSprinkler
@@ -60,10 +60,11 @@ typedef unsigned long ulong;
 /** Station macro defines */
 #define STN_TYPE_STANDARD    0x00 // standard solenoid station
 #define STN_TYPE_RF          0x01	// Radio Frequency (RF) station
-#define STN_TYPE_REMOTE      0x02	// Remote OpenSprinkler station
+#define STN_TYPE_REMOTE_IP   0x02	// Remote OpenSprinkler station (by IP)
 #define STN_TYPE_GPIO        0x03	// direct GPIO station
 #define STN_TYPE_HTTP        0x04	// HTTP station
 #define STN_TYPE_HTTPS       0x05	// HTTPS station
+#define STN_TYPE_REMOTE_OTC  0x06 // Remote OpenSprinkler station (by OTC)
 #define STN_TYPE_OTHER       0xFF
 
 /** Notification macro defines */
@@ -133,7 +134,7 @@ typedef unsigned long ulong;
 #define MAX_NUM_BOARDS    (1+MAX_EXT_BOARDS)  // maximum number of 8-zone boards including expanders
 #define MAX_NUM_STATIONS  (MAX_NUM_BOARDS*8)  // maximum number of stations
 #define STATION_NAME_SIZE 32    // maximum number of characters in each station name
-#define MAX_SOPTS_SIZE    160   // maximum string option size
+#define MAX_SOPTS_SIZE    320   // maximum string option size
 
 #define STATION_SPECIAL_DATA_SIZE  (TMP_BUFFER_SIZE - STATION_NAME_SIZE - 12)
 
@@ -143,10 +144,21 @@ typedef unsigned long ulong;
 #define DEFAULT_JAVASCRIPT_URL    "https://ui.opensprinkler.com/js"
 #define DEFAULT_WEATHER_URL       "weather.opensprinkler.com"
 #define DEFAULT_IFTTT_URL         "maker.ifttt.com"
-#define DEFAULT_OTC_SERVER        "ws.cloud.openthings.io"
-#define DEFAULT_OTC_PORT          80
+#define DEFAULT_OTC_SERVER_DEV     "ws.cloud.openthings.io"
+#define DEFAULT_OTC_PORT_DEV       80
+#define DEFAULT_OTC_SERVER_APP    "cloud.openthings.io"
+#define DEFAULT_OTC_PORT_APP       443
+#define DEFAULT_OTC_TOKEN_LENGTH   32
 #define DEFAULT_DEVICE_NAME       "My OpenSprinkler"
 #define DEFAULT_EMPTY_STRING      ""
+
+#if (defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__))
+	#define OS_AVR
+#else  // all non-AVR platforms support OTF, EMAIL and HTTPS
+	#define USE_OTF
+	#define SUPPORT_EMAIL
+	#define SUPPORT_HTTPS
+#endif
 
 /* Weather Adjustment Methods */
 enum {
@@ -229,7 +241,7 @@ enum {
 	IOPT_DNS_IP3,
 	IOPT_DNS_IP4,
 	IOPT_SPE_AUTO_REFRESH,
-	IOPT_IFTTT_ENABLE,
+	IOPT_NOTIF_ENABLE,
 	IOPT_SENSOR1_TYPE,
 	IOPT_SENSOR1_OPTION,
 	IOPT_SENSOR2_TYPE,
@@ -242,6 +254,15 @@ enum {
 	IOPT_SUBNET_MASK2,
 	IOPT_SUBNET_MASK3,
 	IOPT_SUBNET_MASK4,
+	IOPT_FORCE_WIRED,
+	IOPT_RESERVE_1,
+	IOPT_RESERVE_2,
+	IOPT_RESERVE_3,
+	IOPT_RESERVE_4,
+	IOPT_RESERVE_5,
+	IOPT_RESERVE_6,
+	IOPT_RESERVE_7,
+	IOPT_RESERVE_8,
 	IOPT_WIFI_MODE, //ro
 	IOPT_RESET,     //ro
 	NUM_IOPTS // total number of integer options
@@ -260,6 +281,7 @@ enum {
 	SOPT_OTC_OPTS,
 	SOPT_DEVICE_NAME,
 	SOPT_STA_BSSID_CHL, // wifi extra info: bssid and channel
+	SOPT_EMAIL_OPTS,
 	NUM_SOPTS // total number of string options
 };
 
@@ -275,7 +297,7 @@ enum {
 #undef OS_HW_VERSION
 
 /** Hardware defines */
-#if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__) // for OS 2.3
+#if defined(OS_AVR) // for OS 2.3
 
 	#define OS_HW_VERSION   (OS_HW_VERSION_BASE+23)
 	#define PIN_FREE_LIST   {2,10,12,13,14,15,18,19}  // Free GPIO pins
@@ -404,8 +426,6 @@ enum {
 	#define V2_PIN_SENSOR1       3  // sensor 1
 	#define V2_PIN_SENSOR2       10 // sensor 2
 
-    #define USE_OTF
-
 #elif defined(OSPI) // for OSPi
 
 	#define OS_HW_VERSION    OSPI_HW_VERSION_BASE
@@ -424,8 +444,6 @@ enum {
 	#define PIN_FREE_LIST       {5,6,7,8,9,10,11,12,13,16,18,19,20,21,23,24,25,26}  // free GPIO pins
 	#define ETHER_BUFFER_SIZE   16384
 
-    #define USE_OTF
-
 #elif defined(OSBO) // for OSBo
 
 	#define OS_HW_VERSION    OSBO_HW_VERSION_BASE
@@ -440,8 +458,6 @@ enum {
 
 	#define PIN_FREE_LIST     {38,39,34,35,45,44,26,47,27,65,63,62,37,36,33,32,61,86,88,87,89,76,77,74,72,73,70,71}
 	#define ETHER_BUFFER_SIZE   16384
-
-    #define USE_OTF
 
 #else // for demo / simulation
 	// use fake hardware pins
@@ -460,7 +476,6 @@ enum {
 	#define PIN_FREE_LIST  {}
 	#define ETHER_BUFFER_SIZE   16384
 
-    #define USE_OTF
 #endif
 
 #if defined(ENABLE_DEBUG) /** Serial debug functions */
@@ -494,16 +509,13 @@ enum {
 	#include <stdlib.h>
 	#include <string.h>
 	#include <stddef.h>
-	inline void itoa(int v,char *s,int b)   {sprintf(s,"%d",v);}
-	inline void ultoa(unsigned long v,char *s,int b) {sprintf(s,"%lu",v);}
-	#define now()       time(0)
 	#define pgm_read_byte(x) *(x)
 	#define PSTR(x)      x
 	#define F(x)         x
 	#define strcat_P     strcat
 	#define strncat_P     strncat
 	#define strcpy_P     strcpy
-	#define sprintf_P    sprintf
+	#define snprintf_P    snprintf
 	#include<string>
 	#define String       string
 	using namespace std;
