@@ -2488,6 +2488,7 @@ void OpenSprinkler::iopts_save() {
 
 /** Load a string option from file */
 void OpenSprinkler::sopt_load(unsigned char oid, char *buf, uint16_t maxlen) {
+	if(maxlen>MAX_SOPTS_SIZE) maxlen = MAX_SOPTS_SIZE; // cap maxlen
 	file_read_block(SOPTS_FILENAME, buf, MAX_SOPTS_SIZE*oid, maxlen);
 	buf[maxlen]=0;  // ensure the string ends properly
 }

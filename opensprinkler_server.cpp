@@ -1944,7 +1944,7 @@ void server_json_debug(OTF_PARAMS_DEF) {
 #endif
 	bfill.emit_p(PSTR("{\"date\":\"$S\",\"time\":\"$S\",\"heap\":$L"), __DATE__, __TIME__,
 #if defined(ESP8266)
-	(uint16_t)ESP.getFreeHeap());
+	(unsigned long)ESP.getFreeHeap());
 	FSInfo fs_info;
 	LittleFS.info(fs_info);
 	bfill.emit_p(PSTR(",\"flash\":$D,\"used\":$D,"), fs_info.totalBytes, fs_info.usedBytes);
