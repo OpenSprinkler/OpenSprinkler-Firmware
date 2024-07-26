@@ -1429,12 +1429,14 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 		} email_message;
 	#endif
 
-	bool email_enabled;
+	bool email_enabled = false;
+#if defined(SUPPORT_EMAIL)
 	if(!email_en){
 		email_enabled = false;
 	}else{
 		email_enabled = os.iopts[IOPT_NOTIF_ENABLE]&type;
 	}
+#endif
 
 	// if none if enabled, return here
 	if ((!ifttt_enabled) && (!email_enabled) && (!os.mqtt.enabled()))
