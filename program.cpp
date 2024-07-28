@@ -345,6 +345,19 @@ unsigned char ProgramStruct::check_match(time_os_t t) {
 	return 0;
 }
 
+struct StationNameSortElem {
+	unsigned char idx;
+	char *name;
+};
+
+int StationNameSortAscendCmp(const void *a, const void *b) {
+	return strcmp(((StationNameSortElem*)a)->name,((StationNameSortElem*)b)->name);
+}
+
+int StationNameSortDescendCmp(const void *a, const void *b) {
+	return StationNameSortAscendCmp(b, a);
+}
+
 // generate station runorder based on the annotation in program names
 // alternating means on the odd numbered runs of the program, it uses one order; on the even runs, it uses the opposite order
 void ProgramStruct::gen_station_runorder(uint16_t runcount, unsigned char *order) {
@@ -366,35 +379,49 @@ void ProgramStruct::gen_station_runorder(uint16_t runcount, unsigned char *order
 			case 'a': // alternating: odd-numbered runs ascending by index, even-numbered runs descending.
 			case 'A': // odd-numbered runs descending by index, even-numbered runs ascending
 
-				if(anno=='I' || (anno=='a' && (runcount%2==0)) || (anno=='A' && runcount%2==1))  {
-					// reverse the order
-					for(i=0;i<ns;i++) {
-						order[i] = ns-1-i;
-					}
+			if(anno=='I' || (anno=='a' && (runcount%2==0)) || (anno=='A' && (runcount%2==1)))  {
+				// reverse the order
+				for(i=0;i<ns;i++) {
+					order[i] = ns-1-i;
 				}
-				break;
+			}
+			break;
 
 			case 'n': // ascending by name
 			case 'N': // descending by name
 			case 't': // alternating: odd-numbered runs ascending by name, even-numbered runs descending.
 			case 'T': // odd-numbered runs descending by name, even-numbered runs ascending
-
+			{
+				StationNameSortElem elems[ns];
+				for(i=0;i<ns;i++) {
+					elems[i].idx=i;
+					os.get_station_name(i,tmp_buffer);
+					elems[i].name=strdup(tmp_buffer);
+				}
+				if(anno=='n' || (anno=='t' && (runcount%2==0)) || (anno='T' && (runcount%2==1))) {
+					qsort(elems, ns, sizeof(StationNameSortElem), StationNameSortAscendCmp);
+				} else {
+					qsort(elems, ns, sizeof(StationNameSortElem), StationNameSortDescendCmp);
+				}
+				for(i=0;i<ns;i++) {
+					order[i]=elems[i].idx;
+					free(elems[i].name);
+				}
+			}
 			break;
 
 			case 'r': // random ordering
 			case 'R': // random ordering
 
-				for(i=0;i<ns-1;i++) {
-					#if defined(ESP8266)
-					unsigned char sel = random(i, ns); // select random element
-					#else
+			{
+				for(i=0;i<ns-1;i++) { // todo: need random seeding
 					unsigned char sel = (rand()%(ns-i))+i;
-					#endif
 					temp = order[i]; // swap order[i] with order[sel]
 					order[i] = order[sel];
 					order[sel] = temp;
 				}
-				break;
+			}
+			break;
 		}
 	}
 	DEBUG_PRINT("station order:[");

@@ -705,7 +705,7 @@ void do_loop()
 					if(process_special_program_command(prog.name, curr_time))	continue;
 
 					// get station ordering
-					unsigned char* order = (unsigned char*)tmp_buffer;
+					unsigned char order[os.nstations];
 					prog.gen_station_runorder(runcount, order);
 					// process all selected stations
 					for(unsigned char oi=0;oi<os.nstations;oi++) {
