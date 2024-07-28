@@ -179,7 +179,7 @@ void EthernetClient::stop()
 		m_sock = 0;
 		m_connected = false;
 		tmpbufidx = tmpbufsize = 0;
-		free(tmpbuf);
+		if (tmpbuf) free(tmpbuf);
 		tmpbuf = NULL;
 	}
 }
