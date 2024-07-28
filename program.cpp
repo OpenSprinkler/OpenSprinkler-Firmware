@@ -294,6 +294,8 @@ unsigned char ProgramStruct::check_day_match(time_os_t t) {
 // Check if a given time matches program's start time
 // this also checks for programs that started the previous
 // day and ran over night
+// Return value: 0 if no match; otherwise return the n-th count of the match.
+// For example, if this is the first-run of the day, return 1 etc.
 unsigned char ProgramStruct::check_match(time_os_t t) {
 
 	// check program enable status
@@ -311,7 +313,7 @@ unsigned char ProgramStruct::check_match(time_os_t t) {
 		if (starttime_type) {
 			// given start time type
 			for(unsigned char i=0;i<MAX_NUM_STARTTIMES;i++) {
-				if (current_minute == starttime_decode(starttimes[i]))	return 1; // if curren_minute matches any of the given start time, return 1
+				if (current_minute == starttime_decode(starttimes[i]))	return (i+1); // if curren_minute matches any of the given start time, return matched index + 1
 			}
 			return 0; // otherwise return 0
 		} else {
@@ -324,7 +326,7 @@ unsigned char ProgramStruct::check_match(time_os_t t) {
 				// check if we are on any interval match
 				int16_t c = (current_minute - start) / interval;
 				if ((c * interval == (current_minute - start)) && c <= repeat) {
-					return 1;
+					return (c+1);  // return match count n
 				}
 			}
 		}
@@ -337,10 +339,70 @@ unsigned char ProgramStruct::check_match(time_os_t t) {
 		// t-86400L matches the program's start day
 		int16_t c = (current_minute - start + 1440) / interval;
 		if ((c * interval == (current_minute - start + 1440)) && c <= repeat) {
-			return 1;
+			return (c+1);  // return the match count n
 		}
 	}
 	return 0;
+}
+
+// generate station runorder based on the annotation in program names
+// alternating means on the odd numbered runs of the program, it uses one order; on the even runs, it uses the opposite order
+void ProgramStruct::gen_station_runorder(uint16_t runcount, unsigned char *order) {
+	unsigned char len = strlen(name);
+	unsigned char ns = os.nstations;
+	int16_t i;
+	unsigned char temp;
+
+	// default order: ascending by index
+	for(i=0;i<ns;i++) {
+		order[i] = i;
+	}
+
+	// check matches with program name annotation
+	if(len>=2 && name[len-2]=='>') {
+		char anno = name[len-1];
+		switch(anno) {
+			case 'I':	// descending by index
+			case 'a': // alternating: odd-numbered runs ascending by index, even-numbered runs descending.
+			case 'A': // odd-numbered runs descending by index, even-numbered runs ascending
+
+				if(anno=='I' || (anno=='a' && (runcount%2==0)) || (anno=='A' && runcount%2==1))  {
+					// reverse the order
+					for(i=0;i<ns;i++) {
+						order[i] = ns-1-i;
+					}
+				}
+				break;
+
+			case 'n': // ascending by name
+			case 'N': // descending by name
+			case 't': // alternating: odd-numbered runs ascending by name, even-numbered runs descending.
+			case 'T': // odd-numbered runs descending by name, even-numbered runs ascending
+
+			break;
+
+			case 'r': // random ordering
+			case 'R': // random ordering
+
+				for(i=0;i<ns-1;i++) {
+					#if defined(ESP8266)
+					unsigned char sel = random(i, ns); // select random element
+					#else
+					unsigned char sel = (rand()%(ns-i))+i;
+					#endif
+					temp = order[i]; // swap order[i] with order[sel]
+					order[i] = order[sel];
+					order[sel] = temp;
+				}
+				break;
+		}
+	}
+	DEBUG_PRINT("station order:[");
+	for(i=0;i<ns;i++) {
+		DEBUG_PRINT(order[i]);
+		DEBUG_PRINT(",");
+	}
+	DEBUG_PRINTLN("]");
 }
 
 // convert absolute remainder (reference time 1970 01-01) to relative remainder (reference time today)

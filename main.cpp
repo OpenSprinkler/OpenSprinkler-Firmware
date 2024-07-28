@@ -698,13 +698,18 @@ void do_loop()
 			// check through all programs
 			for(pid=0; pid<pd.nprograms; pid++) {
 				pd.read(pid, &prog);	// todo future: reduce load time
-				if(prog.check_match(curr_time)) {
+				unsigned char runcount = prog.check_match(curr_time);
+				if(runcount>0) {
 					// program match found
 					// check and process special program command
 					if(process_special_program_command(prog.name, curr_time))	continue;
 
+					// get station ordering
+					unsigned char* order = (unsigned char*)tmp_buffer;
+					prog.gen_station_runorder(runcount, order);
 					// process all selected stations
-					for(sid=0;sid<os.nstations;sid++) {
+					for(unsigned char oi=0;oi<os.nstations;oi++) {
+						sid=order[oi];
 						bid=sid>>3;
 						s=sid&0x07;
 						// skip if the station is a master station (because master cannot be scheduled independently

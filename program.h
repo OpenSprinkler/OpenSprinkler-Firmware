@@ -105,6 +105,7 @@ public:
 
 	int16_t daterange[2] = {MIN_ENCODED_DATE, MAX_ENCODED_DATE}; // date range: start date, end date
 	unsigned char check_match(time_os_t t);
+	void gen_station_runorder(uint16_t runcount, unsigned char *order);
 	int16_t starttime_decode(int16_t t);
 
 protected:
