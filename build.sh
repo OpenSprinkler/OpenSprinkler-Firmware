@@ -84,6 +84,13 @@ if [ ! "$SILENT" = true ] && [ -f OpenSprinkler.service ] && [ -f startOpenSprin
 
 	# Make file executable
 	chmod +x startOpenSprinkler.sh
+
+    # Reload systemd
+    systemctl daemon-reload
+
+    # Enable and start the service
+    systemctl enable OpenSprinkler
+    systemctl start OpenSprinkler
 fi
 
 echo "Done!"

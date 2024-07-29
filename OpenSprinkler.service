@@ -8,7 +8,7 @@ Restart=always
 RestartSec=1
 User=root
 WorkingDir=__OpenSprinkler_Path__
-ExecStart=./startOpenSprinkler.sh
+ExecStart=/bin/bash -c ./startOpenSprinkler.sh
 
 [Install]
 WantedBy=multi-user.target
