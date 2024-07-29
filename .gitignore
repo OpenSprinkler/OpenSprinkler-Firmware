@@ -10,3 +10,4 @@ build-1284/*
 *.o
 !build.sh
 !startOpenSprinkler.sh
+!updater.sh
