@@ -7,7 +7,7 @@ Type=simple
 Restart=always
 RestartSec=1
 User=root
-WorkingDir=__OpenSprinkler_Path__
+WorkingDirectory=__OpenSprinkler_Path__
 ExecStart=/bin/bash -c ./startOpenSprinkler.sh
 
 [Install]
