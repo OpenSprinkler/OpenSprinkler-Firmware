@@ -1598,7 +1598,6 @@ void OpenSprinkler::get_station_name(unsigned char sid, char tmp[]) {
 
 /** Set station name */
 void OpenSprinkler::set_station_name(unsigned char sid, char tmp[]) {
-	// todo: store the right size
 	tmp[STATION_NAME_SIZE]=0;
 	char n0[STATION_NAME_SIZE+1];
 	get_station_name(sid, n0);
@@ -1754,7 +1753,6 @@ unsigned char OpenSprinkler::weekday_today() {
 	return (wd+3) % 7;	// Jan 1, 1970 is a Thursday
 #else
 	return 0;
-	// todo future: is this function needed for RPI/BBB?
 #endif
 }
 
@@ -1843,30 +1841,12 @@ void OpenSprinkler::clear_all_station_bits() {
 	}
 }
 
-#if !defined(ARDUINO)
-int rf_gpio_fd = -1;
-#endif
-
 /** Transmit one RF signal bit */
 void transmit_rfbit(ulong lenH, ulong lenL) {
-#if defined(ARDUINO)
-	#if defined(ESP8266)
-		digitalWrite(PIN_RFTX, 1);
-		delayMicroseconds(lenH);
-		digitalWrite(PIN_RFTX, 0);
-		delayMicroseconds(lenL);
-	#else
-		PORT_RF |= (1<<PINX_RF);
-		delayMicroseconds(lenH);
-		PORT_RF &=~(1<<PINX_RF);
-		delayMicroseconds(lenL);
-	#endif
-#else
-	gpio_write(rf_gpio_fd, 1);	// TODO: fix this or it won't work on Raspbian bookworm
-	delayMicrosecondsHard(lenH);
-	gpio_write(rf_gpio_fd, 0);
-	delayMicrosecondsHard(lenL);
-#endif
+	digitalWriteExt(PIN_RFTX, 1);
+	delayMicroseconds(lenH);
+	digitalWriteExt(PIN_RFTX, 0);
+	delayMicroseconds(lenL);
 }
 
 /** Transmit RF signal */
@@ -1900,22 +1880,16 @@ void OpenSprinkler::switch_rfstation(RFStationData *data, bool turnon) {
 
 	if(PIN_RFTX == 255) return; // ignore RF station if RF pin disabled
 
-#if defined(ARDUINO)
-	#if defined(ESP8266)
+
+#if defined(ESP8266)
 	rfswitch.enableTransmit(PIN_RFTX);
 	rfswitch.setProtocol(1);
 	rfswitch.setPulseLength(length);
 	rfswitch.send(turnon ? on : off, 24);
-	#else
-	send_rfsignal(turnon ? on : off, length);
-	#endif
 #else
-	// pre-open gpio file to minimize overhead
-	rf_gpio_fd = gpio_fd_open(PIN_RFTX);
 	send_rfsignal(turnon ? on : off, length);
-	gpio_fd_close(rf_gpio_fd);
-	rf_gpio_fd = -1;
 #endif
+
 
 }
 
@@ -2720,7 +2694,7 @@ void OpenSprinkler::lcd_print_screen(char c) {
 	lcd.setCursor(LCD_CURSOR_NETWORK, 1);
 #if defined(ESP8266)
 	if(useEth) {
-		lcd.write(eth.connected()?ICON_ETHER_CONNECTED:ICON_ETHER_DISCONNECTED);	// todo: need to detect ether status
+		lcd.write(eth.connected()?ICON_ETHER_CONNECTED:ICON_ETHER_DISCONNECTED);
 	}
 	else
 		lcd.write(WiFi.status()==WL_CONNECTED?ICON_WIFI_CONNECTED:ICON_WIFI_DISCONNECTED);

@@ -1025,9 +1025,7 @@ void check_weather() {
 	if (os.status.program_busy) return;
 
 #if defined(ESP8266)
-	if (!useEth) { // todo: what about useEth==true?
-		if (os.get_wifi_mode()!=WIFI_MODE_STA || WiFi.status()!=WL_CONNECTED || os.state!=OS_STATE_CONNECTED) return;
-	}
+	if (!os.network_connected()) return;
 #endif
 
 	time_os_t ntz = os.now_tz();
@@ -1181,7 +1179,6 @@ void process_dynamic_events(time_os_t curr_time) {
 		 && os.status.sensor2_active)
 		sn2 = true;
 
-	// todo: handle sensor 2
 	unsigned char sid, s, bid, qid, igs, igs2, igrd;
 	for(bid=0;bid<os.nboards;bid++) {
 		igs = os.attrib_igs[bid];
@@ -1658,7 +1655,7 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 			#if defined(ESP8266)
 				if(email_host && email_username && email_password && email_recipient) { // make sure all are valid
 					EMailSender emailSend(email_username, email_password);
-					emailSend.setSMTPServer(email_host); // TODO: double check removing strdup
+					emailSend.setSMTPServer(email_host);
 					emailSend.setSMTPPort(email_port);
 					EMailSender::Response resp = emailSend.send(email_recipient, email_message);
 					// DEBUG_PRINTLN(F("Sending Status:"));
@@ -1670,7 +1667,6 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 		#else
 			struct smtp *smtp = NULL;
 			String email_port_str = to_string(email_port);
-			// todo: check error?
 			smtp_status_code rc;
 			if(email_host && email_username && email_password && email_recipient) { // make sure all are valid
 				rc = smtp_open(email_host, email_port_str.c_str(), SMTP_SECURITY_TLS, SMTP_NO_CERT_VERIFY, NULL, &smtp);

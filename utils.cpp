@@ -503,6 +503,11 @@ void strReplace(char *str, char c, char r) {
 	}
 }
 
+void strReplaceQuoteBackslash(char *buf) {
+	strReplace(buf, '\"', '\'');
+	strReplace(buf, '\\', '/');
+}
+
 static const unsigned char month_days[] = {31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
 
 bool isValidDate(unsigned char m, unsigned char d) {

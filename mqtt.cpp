@@ -110,7 +110,6 @@ boolean checkPassword(char* pw) {
 	if (os.iopts[IOPT_IGNORE_PASSWORD])  return true;
 
 	if(findKeyVal(pw, tmp_buffer, TMP_BUFFER_SIZE, PSTR("pw"), true)){
-		urlDecode(tmp_buffer);
 		if (os.password_verify(tmp_buffer)) return true;
 	}else{
 		DEBUG_LOGF("Device password not found.\r\n");
@@ -376,7 +375,6 @@ void OSMqtt::begin(void) {
 
 	if(_sub_topic[0] == 0) { // subscribe topic is empty
 		DEBUG_LOGF("No sub_topic found\r\n");
-		// TODO: do not subscribe then
 	}
 
 	DEBUG_LOGF("MQTT Begin: Config (%s:%d %s) %s\r\n", _host, _port, _username, _enabled ? "Enabled" : "Disabled");

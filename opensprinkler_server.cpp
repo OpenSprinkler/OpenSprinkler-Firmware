@@ -389,7 +389,6 @@ boolean check_password(char *p)
 		p = get_buffer;
 	}
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("pw"), true)) {
-		urlDecode(tmp_buffer);
 		if (os.password_verify(tmp_buffer)) return true;
 	}
 #else
@@ -570,9 +569,10 @@ void server_change_stations(OTF_PARAMS_DEF) {
 	for(sid=0;sid<os.nstations;sid++) {
 		snprintf(tbuf2+1, 3, "%d", sid);
 		if(findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, tbuf2)) {
+			#if !defined(USE_OTF)
 			urlDecode(tmp_buffer);
-			strReplace(tmp_buffer, '\"', '\'');
-			strReplace(tmp_buffer, '\\', '/');
+			#endif
+			strReplaceQuoteBackslash(tmp_buffer);
 			os.set_station_name(sid, tmp_buffer);
 		}
 	}
@@ -608,9 +608,6 @@ void server_change_stations(OTF_PARAMS_DEF) {
 					handle_return(HTML_DATA_OUTOFBOUND);
 				}
 			} else if ((tmp_buffer[0] == STN_TYPE_HTTP) || (tmp_buffer[0] == STN_TYPE_HTTPS) || (tmp_buffer[0] == STN_TYPE_REMOTE_OTC)) {
-				#if !defined(ESP8266) // ESP8266 does automatic decoding
-					urlDecode(tmp_buffer + 1);
-				#endif
 				if (strlen(tmp_buffer+1) > sizeof(HTTPStationData)) {
 					handle_return(HTML_DATA_OUTOFBOUND);
 				}
@@ -701,7 +698,9 @@ void server_change_runonce(OTF_PARAMS_DEF) {
 	char *p = get_buffer;
 
 	// decode url first
+	#if !defined(USE_OTF)
 	if(p) urlDecode(p);
+	#endif
 	// search for the start of t=[
 	char *pv;
 	boolean found=false;
@@ -849,9 +848,10 @@ void server_change_program(OTF_PARAMS_DEF) {
 
 	// parse program name
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("name"), true)) {
+		#if !defined(USE_OTF)
 		urlDecode(tmp_buffer);
-		strReplace(tmp_buffer, '\"', '\'');
-		strReplace(tmp_buffer, '\\', '/');
+		#endif
+		strReplaceQuoteBackslash(tmp_buffer);
 		strncpy(prog.name, tmp_buffer, PROGRAM_NAME_SIZE);
 	} else {
 		strcpy_P(prog.name, _str_program);
@@ -881,7 +881,6 @@ void server_change_program(OTF_PARAMS_DEF) {
 #if defined(USE_OTF)
 	if(!findKeyVal(FKV_SOURCE,tmp_buffer,TMP_BUFFER_SIZE, "v",false)) handle_return(HTML_DATA_MISSING);
 	char *pv = tmp_buffer+1;
-	// TODO: may need a urlDecode for non-ESP platforms
 #else
 	// parse ad-hoc v=[...
 	// search for the start of v=[
@@ -1361,14 +1360,18 @@ void server_change_scripturl(OTF_PARAMS_DEF) {
 #endif
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("jsp"), true)) {
 		tmp_buffer[TMP_BUFFER_SIZE-1]=0;	// make sure we don't exceed the maximum size
+		#if !defined(USE_OTF)
 		urlDecode(tmp_buffer);
+		#endif
 		// trim unwanted space characters
 		string_remove_space(tmp_buffer);
 		os.sopt_save(SOPT_JAVASCRIPTURL, tmp_buffer);
 	}
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("wsp"), true)) {
 		tmp_buffer[TMP_BUFFER_SIZE-1]=0;
+		#if !defined(USE_OTF)
 		urlDecode(tmp_buffer);
+		#endif
 		string_remove_space(tmp_buffer);
 		os.sopt_save(SOPT_WEATHERURL, tmp_buffer);
 	}
@@ -1450,14 +1453,19 @@ void server_change_options(OTF_PARAMS_DEF)
 	}
 
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("loc"), true)) {
+		#if !defined(USE_OTF)
 		urlDecode(tmp_buffer);
+		#endif
+		strReplaceQuoteBackslash(tmp_buffer);
 		if (os.sopt_save(SOPT_LOCATION, tmp_buffer)) { // if location string has changed
 			weather_change = true;
 		}
 	}
 	uint8_t keyfound = 0;
 	if(findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("wto"), true)) {
+		#if !defined(USE_OTF)
 		urlDecode(tmp_buffer);
+		#endif
 		if (os.sopt_save(SOPT_WEATHER_OPTS, tmp_buffer)) {
 			if(os.iopts[IOPT_USE_WEATHER]==WEATHER_METHOD_MONTHLY) {
 				load_wt_monthly(tmp_buffer);
@@ -1466,12 +1474,13 @@ void server_change_options(OTF_PARAMS_DEF)
 				weather_change = true;	// if wto has changed
 			}
 		}
-		//DEBUG_PRINTLN(os.sopt_load(SOPT_WEATHER_OPTS));
 	}
 
 	keyfound = 0;
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("ifkey"), true, &keyfound)) {
+		#if !defined(USE_OTF)
 		urlDecode(tmp_buffer);
+		#endif
 		os.sopt_save(SOPT_IFTTT_KEY, tmp_buffer);
 	} else if (keyfound) {
 		tmp_buffer[0]=0;
@@ -1480,7 +1489,9 @@ void server_change_options(OTF_PARAMS_DEF)
 
 	keyfound = 0;
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("otc"), true, &keyfound)) {
+		#if !defined(USE_OTF)
 		urlDecode(tmp_buffer);
+		#endif
 		os.sopt_save(SOPT_OTC_OPTS, tmp_buffer);
 	} else if (keyfound) {
 		tmp_buffer[0]=0;
@@ -1489,7 +1500,9 @@ void server_change_options(OTF_PARAMS_DEF)
 
 	keyfound = 0;
 	if(findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("mqtt"), true, &keyfound)) {
+		#if !defined(USE_OTF)
 		urlDecode(tmp_buffer);
+		#endif
 		os.sopt_save(SOPT_MQTT_OPTS, tmp_buffer);
 		os.status.req_mqtt_restart = true;
 	} else if (keyfound) {
@@ -1500,7 +1513,9 @@ void server_change_options(OTF_PARAMS_DEF)
 
 	keyfound = 0;
 	if(findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("email"), true, &keyfound)) {
+		#if !defined(USE_OTF)
 		urlDecode(tmp_buffer);
+		#endif
 		os.sopt_save(SOPT_EMAIL_OPTS, tmp_buffer);
 	} else if (keyfound) {
 		tmp_buffer[0]=0;
@@ -1508,9 +1523,10 @@ void server_change_options(OTF_PARAMS_DEF)
 	}
 
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("dname"), true)) {
+		#if !defined(USE_OTF)
 		urlDecode(tmp_buffer);
-		strReplace(tmp_buffer, '\"', '\'');
-		strReplace(tmp_buffer, '\\', '/');
+		#endif
+		strReplaceQuoteBackslash(tmp_buffer);
 		os.sopt_save(SOPT_DEVICE_NAME, tmp_buffer);
 	}
 
@@ -1573,7 +1589,6 @@ void server_change_password(OTF_PARAMS_DEF) {
 		const int pwBufferSize = TMP_BUFFER_SIZE/2;
 		char *tbuf2 = tmp_buffer + pwBufferSize;	// use the second half of tmp_buffer 
 		if (findKeyVal(FKV_SOURCE, tbuf2, pwBufferSize, PSTR("cpw"), true) && strncmp(tmp_buffer, tbuf2, pwBufferSize) == 0) {
-			urlDecode(tmp_buffer);
 			os.sopt_save(SOPT_PASSWORD, tmp_buffer);
 			handle_return(HTML_SUCCESS);
 		} else {
