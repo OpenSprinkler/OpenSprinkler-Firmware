@@ -63,7 +63,7 @@ else
 	g++ -o OpenSprinkler -DOSPI $USEGPIO -DSMTP_OPENSSL -std=c++14 -include string.h main.cpp OpenSprinkler.cpp program.cpp opensprinkler_server.cpp utils.cpp weather.cpp gpio.cpp mqtt.cpp smtp.c -Iexternal/TinyWebsockets/tiny_websockets_lib/include $ws -Iexternal/OpenThings-Framework-Firmware-Library/ $otf -lpthread -lmosquitto -lssl -lcrypto $GPIOLIB
 fi
 
-if [ -f /etc/init.d/OpenSprinkler.sh ]
+if [ -f /etc/init.d/OpenSprinkler.sh ]; then
     echo "Detected the only init.d start up script, removing."
     echo "If you still want OpenSprinkler to launch on startup make sure when you run the build script to answer \"Y\" to the following question."
     /etc/init.d/OpenSprinkler.sh stop
