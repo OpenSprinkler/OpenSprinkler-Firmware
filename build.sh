@@ -66,6 +66,7 @@ fi
 if [ -f /etc/init.d/OpenSprinkler.sh ]
     echo "Detected the only init.d start up script, removing."
     echo "If you still want OpenSprinkler to launch on startup make sure when you run the build script to answer \"Y\" to the following question."
+    /etc/init.d/OpenSprinkler.sh stop
     rm /etc/init.d/OpenSprinkler.sh
 fi
 
