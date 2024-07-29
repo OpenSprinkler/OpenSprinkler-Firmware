@@ -1,0 +1,14 @@
+[Unit]
+Description=OpenSprinkler
+After=network.target
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=1
+User=root
+WorkingDir=__OpenSprinkler_Path__
+ExecStart=./startOpenSprinkler.sh
+
+[Install]
+WantedBy=multi-user.target

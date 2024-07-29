@@ -8,3 +8,5 @@ build-1284/*
 .vscode
 .pio
 *.o
+!build.sh
+!startOpenSprinkler.sh
