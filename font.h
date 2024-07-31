@@ -3,13 +3,7 @@
 #ifndef FONT_H
 #define FONT_H
 
-#if not defined(ESP8266)
-#include <stdint.h>
-#define PROGMEM
-#define byte uint8_t
-#endif
-
-const byte Monospaced_plain_13[] PROGMEM = {
+const unsigned char Monospaced_plain_13[] PROGMEM = {
 	0x08, // Width: 8
 	0x11, // Height: 17
 	0x20, // First Char: 32

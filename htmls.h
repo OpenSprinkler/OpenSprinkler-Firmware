@@ -53,11 +53,10 @@ id('bssid').disabled=false;id('channel').disabled=false;
 }
 };
 var comm='ccap?ssid='+encodeURIComponent(id('ssid').value)+'&pass='+encodeURIComponent(id('pass').value);
-if(id('bssid').value.length>0) {    
+if(id('bssid').value.length>0) {
 if(id('channel').value.length>0) comm+='&extra='+encodeURIComponent(id('bssid').value+'@'+id('channel').value);
 else comm+='&extra='+encodeURIComponent(id('bssid').value+'@0');
 }
-
 xhr.open('POST', comm, true); xhr.send();
 id('butt').disabled=true;id('ssid').disabled=true;id('pass').disabled=true;
 id('bssid').disabled=true;id('channel').disabled=true;
@@ -99,6 +98,7 @@ const char ap_update_html[] PROGMEM = R"(<head>
 <tr><td><input type='file' name='file' accept='.bin' id='file'></td></tr>
 <tr><td><b>Device password: </b><input type='password' name='pw' size=36 maxlength=36 id='pw'></td></tr>
 <tr><td><label id='msg'></label></td></tr>
+<tr><td style='width:460px'><b>IMPORTANT:</b> firmware update across major revisions (e.g. from 2.2.0 to 2.2.1) will trigger a factory reset. Save a copy of your current configurations before proceeding, so you can import and recover them after the upgrade. </td></tr>
 </table>
 <button id='btn_submit' style='height:48px;'>Submit</a>
 </form>
@@ -159,6 +159,7 @@ const char sta_update_html[] PROGMEM = R"(<head>
 <tr><td><input type='file' name='file' accept='.bin' id='file'></td></tr>
 <tr><td><b>Device password: </b><input type='password' name='pw' size=36 maxlength=36 id='pw'></td></tr>
 <tr><td><label id='msg'></label></td></tr>
+<tr><td style='width:400px'><b>IMPORTANT:</b> firmware update across major revisions (e.g. from 2.2.0 to 2.2.1) will trigger a factory reset. Save a copy of your current configurations before proceeding, so you can import and recover them after the upgrade. </td></tr>
 </table>
 <a href='#' data-role='button' data-inline='true' data-theme='b' id='btn_submit'>Submit</a>
 </form>

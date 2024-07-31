@@ -34,9 +34,9 @@ extern char tmp_buffer[];
 extern char ether_buffer[];
 char wt_rawData[TMP_BUFFER_SIZE];
 int wt_errCode = HTTP_RQT_NOT_RECEIVED;
-byte wt_monthly[12] = {100,100,100,100,100,100,100,100,100,100,100,100};
+unsigned char wt_monthly[12] = {100,100,100,100,100,100,100,100,100,100,100,100};
 
-byte findKeyVal (const char *str,char *strbuf, uint16_t maxlen,const char *key,bool key_in_pgm=false,uint8_t *keyfound=NULL);
+unsigned char findKeyVal (const char *str,char *strbuf, uint16_t maxlen,const char *key,bool key_in_pgm=false,uint8_t *keyfound=NULL);
 
 // The weather function calls getweather.py on remote server to retrieve weather data
 // the default script is WEATHER_SCRIPT_HOST/weather?.py
@@ -137,7 +137,7 @@ void GetWeather() {
 		if (os.state!=OS_STATE_CONNECTED || WiFi.status()!=WL_CONNECTED) return;
 #endif
 	// use temp buffer to construct get command
-	BufferFiller bf = tmp_buffer;
+	BufferFiller bf = BufferFiller(tmp_buffer, TMP_BUFFER_SIZE*2);
 	int method = os.iopts[IOPT_USE_WEATHER];
 	// use manual adjustment call for monthly adjustment -- a bit ugly, but does not involve weather server changes
 	if(method==WEATHER_METHOD_MONTHLY) method=WEATHER_METHOD_MANUAL;
@@ -188,7 +188,7 @@ void GetWeather() {
 }
 
 void load_wt_monthly(char* wto) {
-	byte i;
+	unsigned char i;
 	int p[12];
 	for(i=0;i<12;i++) p[i]=100; // init all to 100
 	sscanf(wto, "\"scales\":[%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d]", p,p+1,p+2,p+3,p+4,p+5,p+6,p+7,p+8,p+9,p+10,p+11);
@@ -203,11 +203,11 @@ void apply_monthly_adjustment(time_os_t curr_time) {
 		// ====== Check monthly water percentage ======
 		if(os.iopts[IOPT_USE_WEATHER]==WEATHER_METHOD_MONTHLY) {
 #if defined(ARDUINO)
-			byte m = month(curr_time)-1;
+			unsigned char m = month(curr_time)-1;
 #else
 			time_os_t ct = curr_time;
 			struct tm *ti = gmtime(&ct);
-			byte m = ti->tm_mon;  // tm_mon ranges from [0,11]
+			unsigned char m = ti->tm_mon;  // tm_mon ranges from [0,11]
 #endif
 			if(os.iopts[IOPT_WATER_PERCENTAGE]!=wt_monthly[m]) {
 				os.iopts[IOPT_WATER_PERCENTAGE]=wt_monthly[m];
