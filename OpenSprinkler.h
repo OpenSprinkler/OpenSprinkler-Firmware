@@ -420,7 +420,7 @@ public:
 
 #else
 static void lcd_print_pgm(const char *str);
-static void lcd_print_line_clear_pgm(const char *str, byte line);
+static void lcd_print_line_clear_pgm(const char *str, unsigned char line);
 #endif // LCD functions for Arduino
 
 private:
