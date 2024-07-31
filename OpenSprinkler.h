@@ -30,6 +30,7 @@
 #include "utils.h"
 #include "gpio.h"
 #include "images.h"
+#include "rpitime.h"
 #include "mqtt.h"
 
 #if defined(ARDUINO) // headers for Arduino
