@@ -629,6 +629,7 @@ void do_loop()
 
 #else // Process Ethernet packets for RPI/BBB
 	if(otf) otf->loop();
+    ui_state_machine();
 #endif	// Process Ethernet packets
 
 	// Start up MQTT when we have a network connection
