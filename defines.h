@@ -488,10 +488,10 @@ enum {
 	#else
 		#include <stdio.h>
 		#define DEBUG_BEGIN(x)          {}  /** Serial debug functions */
-		inline  void DEBUG_PRINT(int x) {printf("%d", x);}
-		inline  void DEBUG_PRINT(const char*s) {printf("%s", s);}
-		#define DEBUG_PRINTLN(x)        {DEBUG_PRINT(x);printf("\n");}
-		#define DEBUG_PRINTF(msg, ...)    {printf(msg, ##__VA_ARGS__);}
+		inline  void DEBUG_PRINT(int x) {fprintf(stdout, "%d", x);}
+		inline  void DEBUG_PRINT(const char*s) {fprintf(stdout, "%s", s);}
+		#define DEBUG_PRINTLN(x)        {DEBUG_PRINT(x);fprintf(stdout, "\n");}
+		#define DEBUG_PRINTF(msg, ...)    {fprintf(stdout, msg, ##__VA_ARGS__);}
 	#endif
 
 #else
