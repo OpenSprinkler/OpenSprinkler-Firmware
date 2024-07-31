@@ -424,14 +424,14 @@ static void lcd_print_line_clear_pgm(const char *str, unsigned char line);
 #endif // LCD functions for Arduino
 
 private:
-#if defined(USE_DISPLAY)
+#if defined(USE_DISPLAY)  // LCD functions
 	static void lcd_print_option(int i);  // print an option to the lcd
 	static void lcd_print_2digit(int v);  // print a integer in 2 digits
 	static void lcd_start();
 	static unsigned char button_read_busy(unsigned char pin_butt, unsigned char waitmode, unsigned char butt, unsigned char is_holding);
+#endif // LCD functions
 
-#if defined(ARDUINO) // LCD functions
-	#if defined(ESP8266)
+#if defined(ESP8266)
 	static void latch_boost();
 	static void latch_open(unsigned char sid);
 	static void latch_close(unsigned char sid);
@@ -441,9 +441,8 @@ private:
 	static void latch_setzoneoutput_v2(unsigned char sid, unsigned char A, unsigned char K);
 	static void latch_apply_all_station_bits();
 	static unsigned char prev_station_bits[];
-	#endif
-#endif // LCD functions
-	static unsigned char engage_booster;
+#endif
+    static unsigned char engage_booster;
 
 	#if defined(USE_OTF)
 	static void parse_otc_config();
