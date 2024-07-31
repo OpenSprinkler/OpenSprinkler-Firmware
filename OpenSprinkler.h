@@ -47,7 +47,6 @@
 		#include <OpenThingsFramework.h>
 		#include <DNSServer.h>
 		#include <Ticker.h>
-		#include "SSD1306Display.h"
 		#include "espconnect.h"
 		#include "EMailSender.h"
 	#else // for AVR
@@ -66,6 +65,14 @@
 	#include "etherport.h"
 	#include "smtp.h"
 #endif // end of headers
+
+#if defined(USE_LCD)
+	#include "LiquidCrystal.h"
+#endif
+
+#if defined(USE_SSD1306)
+	#include "SSD1306Display.h"
+#endif
 
 #if defined(ARDUINO)
 	#if defined(ESP8266)
@@ -112,6 +119,7 @@
 	extern OTF::OpenThingsFramework *otf;
 #else
 	extern EthernetServer *m_server;
+	extern bool useEth;
 #endif
 
 /** Non-volatile data structure */
@@ -212,12 +220,10 @@ class OpenSprinkler {
 public:
 
 	// data members
-#if defined(ESP8266)
+#if defined(USE_SSD1306)
 	static SSD1306Display lcd;  // 128x64 OLED display
-#elif defined(ARDUINO)
+#elif defined(USE_LCD)
 	static LiquidCrystal lcd;   // 16x2 character LCD
-#else
-	// todo: LCD define for RPI/BBB
 #endif
 
 #if defined(OSPI)
@@ -347,19 +353,20 @@ public:
 	#endif
 
 	// -- LCD functions
-#if defined(ARDUINO) // LCD functions for Arduino
-	#if defined(ESP8266)
-	static void lcd_print_pgm(PGM_P str); // ESP8266 does not allow PGM_P followed by PROGMEM
-	static void lcd_print_line_clear_pgm(PGM_P str, unsigned char line);
-	#else
-	static void lcd_print_pgm(PGM_P PROGMEM str);  // print a program memory string
-	static void lcd_print_line_clear_pgm(PGM_P PROGMEM str, unsigned char line);
-	#endif
+#if defined(USE_DISPLAY)
 	static void lcd_print_time(time_os_t t);  // print current time
 	static void lcd_print_ip(const unsigned char *ip, unsigned char endian);  // print ip
 	static void lcd_print_mac(const unsigned char *mac);  // print mac
 	static void lcd_print_screen(char c);  // print station bits of the board selected by display_board
 	static void lcd_print_version(unsigned char v);  // print version number
+	static void lcd_set_brightness(unsigned char value=1);
+	static void lcd_set_contrast();
+
+	#if defined(USE_SSD1306)
+	static void flash_screen();
+	static void toggle_screen_led();
+	static void set_screen_led(unsigned char status);
+	#endif
 
 	static String time2str(uint32_t t) {
 		uint16_t h = hour(t);
@@ -384,17 +391,22 @@ public:
 
 	// -- UI functions --
 	static void ui_set_options(int oid);		// ui for setting options (oid-> starting option index)
-	static void lcd_set_brightness(unsigned char value=1);
-	static void lcd_set_contrast();
+#endif
+
+#if defined(ARDUINO) // LCD functions for Arduino
+	#if defined(ESP8266)
+	static void lcd_print_pgm(PGM_P str); // ESP8266 does not allow PGM_P followed by PROGMEM
+	static void lcd_print_line_clear_pgm(PGM_P str, unsigned char line);
+	#else
+	static void lcd_print_pgm(PGM_P PROGMEM str);  // print a program memory string
+	static void lcd_print_line_clear_pgm(PGM_P PROGMEM str, unsigned char line);
+	#endif
 
 	#if defined(ESP8266)
 	static IOEXP *mainio, *drio;
 	static IOEXP *expanders[];
 	static RCSwitch rfswitch;
 	static void detect_expanders();
-	static void flash_screen();
-	static void toggle_screen_led();
-	static void set_screen_led(unsigned char status);
 	static unsigned char get_wifi_mode() { if (useEth) return WIFI_MODE_STA; else return wifi_testmode ? WIFI_MODE_STA : iopts[IOPT_WIFI_MODE];}
 	static unsigned char wifi_testmode;
 	static String wifi_ssid, wifi_pass;
@@ -405,12 +417,19 @@ public:
 	static unsigned char state;
 	#endif
 
+#else
+static void lcd_print_pgm(const char *str);
+static void lcd_print_line_clear_pgm(const char *str, byte line);
+#endif // LCD functions for Arduino
+
 private:
+#if defined(USE_DISPLAY)
 	static void lcd_print_option(int i);  // print an option to the lcd
 	static void lcd_print_2digit(int v);  // print a integer in 2 digits
 	static void lcd_start();
 	static unsigned char button_read_busy(unsigned char pin_butt, unsigned char waitmode, unsigned char butt, unsigned char is_holding);
 
+#if defined(ARDUINO) // LCD functions
 	#if defined(ESP8266)
 	static void latch_boost();
 	static void latch_open(unsigned char sid);

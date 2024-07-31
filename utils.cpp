@@ -39,7 +39,7 @@ extern OpenSprinkler os;
 
 #else // RPI/BBB
 
-static char* get_runtime_path() {
+char* get_runtime_path() {
 	static char path[PATH_MAX];
 	static unsigned char query = 1;
 
@@ -87,16 +87,6 @@ char* get_filename_fullpath(const char *filename) {
 	return fullpath;
 }
 
-void delay(ulong howLong)
-{
-	struct timespec sleeper, dummy ;
-
-	sleeper.tv_sec  = (time_os_t)(howLong / 1000) ;
-	sleeper.tv_nsec = (long)(howLong % 1000) * 1000000 ;
-
-	nanosleep (&sleeper, &dummy) ;
-}
-
 void delayMicrosecondsHard (ulong howLong)
 {
 	struct timeval tNow, tLong, tEnd ;
@@ -108,24 +98,6 @@ void delayMicrosecondsHard (ulong howLong)
 
 	while (timercmp (&tNow, &tEnd, <))
 		gettimeofday (&tNow, NULL) ;
-}
-
-void delayMicroseconds (ulong howLong)
-{
-	struct timespec sleeper ;
-	unsigned int uSecs = howLong % 1000000 ;
-	unsigned int wSecs = howLong / 1000000 ;
-
-	/**/ if (howLong ==		0)
-		return ;
-	else if (howLong < 100)
-		delayMicrosecondsHard (howLong) ;
-	else
-	{
-		sleeper.tv_sec  = wSecs ;
-		sleeper.tv_nsec = (long)(uSecs * 1000L) ;
-		nanosleep (&sleeper, NULL) ;
-	}
 }
 
 static uint64_t epochMilli, epochMicro ;
@@ -183,6 +155,56 @@ unsigned int detect_rpi_rev() {
 		fclose(filp);
 	}
 	return rev;
+}
+
+route_t get_route() {
+	route_t route;
+	char iface[16];
+	unsigned long dst, gw;
+	unsigned int flags, refcnt, use, metric, mask, mtu, window, irtt;
+
+	FILE *filp;
+	char buf[512];
+	char term;
+	filp = fopen("/proc/net/route", "r");
+	if(filp) {
+		while(fgets(buf, sizeof(buf), filp) != NULL) {
+			if(sscanf(buf, "%s %lx %lx %X %d %d %d %lx %d %d %d", iface, &dst, &gw, &flags, &refcnt, &use, &metric, &mask, &mtu, &window, &irtt) == 11) {
+				if(flags & RTF_UP) {
+					if(dst==0) {
+						strcpy(route.iface, iface);
+						route.gateway = gw;
+						route.destination = dst;
+					}
+				}
+			}
+		}
+		fclose(filp);
+	}
+	return route;
+}
+
+in_addr_t get_ip_address(char *iface) {
+	struct ifaddrs *ifaddr; 
+	struct ifaddrs *ifa;
+	in_addr_t ip = 0;
+	if(getifaddrs(&ifaddr) == -1) {
+		return 0;
+	}
+
+	ifa = ifaddr;
+
+	while(ifa) {
+		if(ifa->ifa_addr && ifa->ifa_addr->sa_family == AF_INET) {
+			if(strcmp(ifa->ifa_name, iface)==0) {
+				ip = ((struct sockaddr_in *)ifa->ifa_addr)->sin_addr.s_addr;
+				break;
+			}
+		}
+		ifa = ifa->ifa_next;
+	}
+	freeifaddrs(ifaddr);
+	return ip;
 }
 #endif
 

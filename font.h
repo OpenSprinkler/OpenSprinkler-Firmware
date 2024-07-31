@@ -1,6 +1,8 @@
-#if defined(ESP8266)
 // Created by http://oleddisplay.squix.ch/ Consider a donation
 // In case of problems make sure that you are using the font file with the correct version!
+#ifndef FONT_H
+#define FONT_H
+
 const unsigned char Monospaced_plain_13[] PROGMEM = {
 	0x08, // Width: 8
 	0x11, // Height: 17

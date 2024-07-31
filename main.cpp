@@ -45,7 +45,6 @@
 		Wiznet5500lwIP w5500(PIN_ETHER_CS); // W5500 lwip for wired Ether
 		lwipEth eth;
 		bool useEth = false; // tracks whether we are using WiFi or wired Ether connection
-		static uint16_t led_blink_ms = LED_FAST_BLINK;
 	#else
 		EthernetServer *m_server = NULL;
 		EthernetClient *m_client = NULL;
@@ -59,6 +58,14 @@
 
 #if defined(USE_OTF)
 	OTF::OpenThingsFramework *otf = NULL;
+#endif
+
+#if defined(USE_SSD1306)
+	#if defined(ESP8266)
+	static uint16_t led_blink_ms = LED_FAST_BLINK;
+	#else
+	static uint16_t led_blink_ms = 0;
+	#endif
 #endif
 
 void push_message(int type, uint32_t lval=0, float fval=0.f, const char* sval=NULL);
@@ -119,7 +126,6 @@ void flow_poll() {
 	/* End of RAH implementation of flow sensor */
 }
 
-#if defined(ARDUINO)
 // ====== UI defines ======
 static char ui_anim_chars[3] = {'.', 'o', 'O'};
 
@@ -146,14 +152,13 @@ bool ui_confirm(PGM_P str) {
 }
 
 void ui_state_machine() {
-
 	// to avoid ui_state_machine taking too much computation time
 	// we run it only every UI_STATE_MACHINE_INTERVAL ms
 	static uint32_t last_usm = 0;
 	if(millis() - last_usm <= UI_STATE_MACHINE_INTERVAL) { return; }
 	last_usm = millis();
 
-#if defined(ESP8266)
+#if defined(USE_SSD1306)
 	// process screen led
 	static ulong led_toggle_timeout = 0;
 	if(led_blink_ms) {
@@ -188,29 +193,56 @@ void ui_state_machine() {
 					if(!ui_confirm(PSTR("Start 2s test?"))) {ui_state = UI_STATE_DEFAULT; break;}
 					manual_start_program(255, 0);
 				} else if (digitalReadExt(PIN_BUTTON_2)==0) { // if B2 is pressed while holding B1, display gateway IP
+					#if defined(USE_SSD1306)
+						os.lcd.setAutoDisplay(false);
+					#endif
 					os.lcd.clear(0, 1);
 					os.lcd.setCursor(0, 0);
+					#if defined(Arduino)
 					#if defined(ESP8266)
 					if (useEth) { os.lcd.print(eth.gatewayIP()); }
 					else { os.lcd.print(WiFi.gatewayIP()); }
 					#else
 					{ os.lcd.print(Ethernet.gatewayIP()); }
 					#endif
+					#else
+					route_t route = get_route();
+					char str[INET_ADDRSTRLEN];
+
+					inet_ntop(AF_INET, &(route.gateway), str, INET_ADDRSTRLEN);
+					os.lcd.print(str);
+					#endif
 					os.lcd.setCursor(0, 1);
 					os.lcd_print_pgm(PSTR("(gwip)"));
 					ui_state = UI_STATE_DISP_IP;
+					#if defined(USE_SSD1306)
+						os.lcd.display();
+						os.lcd.setAutoDisplay(true);
+					#endif
 				} else {  // if no other button is clicked, stop all zones
 					if(!ui_confirm(PSTR("Stop all zones?"))) {ui_state = UI_STATE_DEFAULT; break;}
 					reset_all_stations();
 				}
 			} else {  // clicking B1: display device IP and port
+				#if defined(USE_SSD1306)
+					os.lcd.setAutoDisplay(false);
+				#endif
 				os.lcd.clear(0, 1);
 				os.lcd.setCursor(0, 0);
+				#if defined(Arduino)
 				#if defined(ESP8266)
 				if (useEth) { os.lcd.print(eth.localIP()); }
 				else { os.lcd.print(WiFi.localIP()); }
 				#else
 				{ os.lcd.print(Ethernet.localIP()); }
+				#endif
+				#else
+				route_t route = get_route();
+				char str[INET_ADDRSTRLEN];
+				in_addr_t ip = get_ip_address(route.iface);
+
+				inet_ntop(AF_INET, &ip, str, INET_ADDRSTRLEN);
+				os.lcd.print(str);
 				#endif
 				os.lcd.setCursor(0, 1);
 				os.lcd_print_pgm(PSTR(":"));
@@ -218,6 +250,10 @@ void ui_state_machine() {
 				os.lcd.print(httpport);
 				os.lcd_print_pgm(PSTR(" (ip:port)"));
 				ui_state = UI_STATE_DISP_IP;
+				#if defined(USE_SSD1306)
+					os.lcd.display();
+					os.lcd.setAutoDisplay(true);
+				#endif
 			}
 			break;
 		case BUTTON_2:
@@ -299,9 +335,11 @@ void ui_state_machine() {
 	}
 }
 
+
 // ======================
 // Setup Function
 // ======================
+#if defined(ARDUINO)
 void do_setup() {
 	/* Clear WDT reset flag. */
 #if defined(ESP8266)
@@ -405,6 +443,7 @@ void do_setup() {
 
 	initalize_otf();
 }
+
 #endif
 
 void turn_on_station(unsigned char sid, ulong duration);
@@ -614,7 +653,7 @@ void do_loop()
 		last_time = curr_time;
 		if (os.button_timeout) os.button_timeout--;
 
-#if defined(ARDUINO)
+#if defined(USE_DISPLAY)
 		if (!ui_state)
 			os.lcd_print_time(curr_time);  // print time
 #endif
@@ -919,10 +958,9 @@ void do_loop()
 		// activate/deactivate valves
 		os.apply_all_station_bits();
 
-#if defined(ARDUINO)
+#if defined(USE_DISPLAY)
 		// process LCD display
 		if (!ui_state) { os.lcd_print_screen(ui_anim_chars[(unsigned long)curr_time%3]); }
-
 #endif
 
 		// handle reboot request

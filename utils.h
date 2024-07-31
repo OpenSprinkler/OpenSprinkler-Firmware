@@ -30,7 +30,11 @@
 	#include <stdio.h>
 	#include <limits.h>
 	#include <sys/time.h>
-
+	#include <bcm2835.h>
+	#include <arpa/inet.h>
+	#include <sys/socket.h>
+	#include <ifaddrs.h>
+	#include <net/route.h>
 #endif
 #include "defines.h"
 
@@ -73,14 +77,22 @@ void str2mac(const char *_str, unsigned char mac[]);
 	const char* get_data_dir();
 	void set_data_dir(const char *new_data_dir);
 	char* get_filename_fullpath(const char *filename);
-	void delay(ulong ms);
-	void delayMicroseconds(ulong us);
 	void delayMicrosecondsHard(ulong us);
 	ulong millis();
 	ulong micros();
 	void initialiseEpoch();
 	#if defined(OSPI)
 	unsigned int detect_rpi_rev();
+	char* get_runtime_path();
+
+	struct route_t {
+		char iface[16];
+		in_addr_t gateway;
+		in_addr_t destination;
+	};
+
+	route_t get_route();
+	in_addr_t get_ip_address(char *iface);
 	#endif
 
 #endif
