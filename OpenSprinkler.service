@@ -10,6 +10,9 @@ RestartSec=1
 User=root
 WorkingDirectory=__OpenSprinkler_Path__
 ExecStart=/bin/bash -c ./startOpenSprinkler.sh
+StandardError=journal
+StandardOutput=journal
+StandardInput=null
 
 [Install]
 WantedBy=multi-user.target
