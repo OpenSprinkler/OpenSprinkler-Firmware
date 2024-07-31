@@ -53,7 +53,7 @@
 	#endif
 	unsigned long getNtpTime();
 #else // header and defs for RPI/BBB
-
+bool useEth = false;
 #endif
 
 #if defined(USE_OTF)

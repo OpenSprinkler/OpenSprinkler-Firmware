@@ -2688,11 +2688,15 @@ void OpenSprinkler::lcd_print_mac(const unsigned char *mac) {
 		lcd.print((mac[i]&0x0F), HEX);
 		if(i==4) lcd.setCursor(0, 1);
 	}
+    #if defined(ARDUINO)
 	if(useEth) {
 		lcd_print_pgm(PSTR(" (Ether MAC)"));
 	} else {
 		lcd_print_pgm(PSTR(" (WiFi MAC)"));
 	}
+    #else
+        lcd_print_pgm(PSTR(" (MAC)"));
+    #endif
 
 	#if defined(USE_SSD1306)
 		lcd.display();
