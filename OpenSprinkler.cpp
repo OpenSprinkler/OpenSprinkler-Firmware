@@ -2794,9 +2794,12 @@ void OpenSprinkler::lcd_print_screen(char c) {
 	lcd.write(status.network_fails>2?ICON_ETHER_DISCONNECTED:ICON_ETHER_CONNECTED);  // if network failure detection is more than 2, display disconnect icon
 #endif
 
-#if defined(ESP8266)
-
-	if(useEth || (get_wifi_mode()==WIFI_MODE_STA && WiFi.status()==WL_CONNECTED && WiFi.localIP())) {
+#if defined(USE_SSD1306)
+    #if defined(ESP8266)
+    if(useEth || (get_wifi_mode()==WIFI_MODE_STA && WiFi.status()==WL_CONNECTED && WiFi.localIP())) {
+    #else
+    {
+    #endif
 		lcd.setCursor(0, -1);
 		if(status.rain_delayed) {
 			lcd.print(F("<Rain Delay On> "));
@@ -2808,17 +2811,21 @@ void OpenSprinkler::lcd_print_screen(char c) {
 			lcd.print(F(" (System Idle)  "));
 		}
 
+    #if defined(ESP8266)
 		lcd.setCursor(2, 2);
 		if(status.program_busy && !status.pause_state) {
 			//lcd.print(F("Curr: "));
 			lcd.print(read_current());
 			lcd.print(F(" mA      "));
 		} else {
+    #else
+        {
+    #endif
 			lcd.clear(2, 2);
 		}
 	}
-#endif
-#if defined(USE_SSD1306)
+
+
 	lcd.display();
 	lcd.setAutoDisplay(true);
 #endif
