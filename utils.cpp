@@ -236,6 +236,51 @@ in_addr_t get_ip_address(char *iface) {
 }
 #endif
 
+BoardType get_board_type() {
+    FILE *file = fopen("/proc/device-tree/compatible", "rb");
+    if (file == NULL) {
+        return BoardType::Unknown;
+    }
+
+    char buffer[100];
+
+    BoardType res = BoardType::Unknown;
+
+    int total = fread(buffer, 1, sizeof(buffer), file);
+
+    if (prefix("raspberrypi", buffer)) {
+        res = BoardType::RaspberryPi_Unknown;
+        const char *cpu_buf = buffer;
+        size_t index = 0;
+
+        // model and cpu is seperated by a null byte
+        while (index < (total - 1) && cpu_buf[index]) {
+            index += 1;
+        }
+
+        cpu_buf += index + 1;  
+        
+        if (!strcmp("brcm,bcm2712", cpu_buf)) {
+            // Pi 5
+            res = BoardType::RaspberryPi_bcm2712;
+        } else if (!strcmp("brcm,bcm2711", cpu_buf)) {
+            // Pi 4
+            res = BoardType::RaspberryPi_bcm2711;
+        } else if (!strcmp("brcm,bcm2837", cpu_buf)) {
+            // Pi 3 / Pi Zero 2
+            res = BoardType::RaspberryPi_bcm2837;
+        } else if (!strcmp("brcm,bcm2836", cpu_buf)) {
+            // Pi 2
+            res = BoardType::RaspberryPi_bcm2836;
+        } else if (!strcmp("brcm,bcm2835", cpu_buf)) {
+            // Pi / Pi Zero
+            res = BoardType::RaspberryPi_bcm2835;
+        }
+    }
+
+    return res;
+}
+
 #endif
 
 

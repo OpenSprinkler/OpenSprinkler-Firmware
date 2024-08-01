@@ -90,13 +90,8 @@ private:
 #include <string.h>
 
 #include <cstdio>
-#include <sys/ioctl.h>
 
-
-extern "C" {
-    #include <linux/i2c-dev.h>
-    #include <i2c/smbus.h>
-}
+#include "i2cd.h"
 
 #include "font.h"
 #include "images.h"
@@ -484,7 +479,7 @@ class SSD1306Display {
   void createChar(unsigned char idx, const unsigned char *ptr) {
 		createChar(idx, (const char *)ptr);
 	}
-    
+
   void setAutoDisplay(bool v) { auto_display = v; }
 
  private:
@@ -500,56 +495,6 @@ class SSD1306Display {
 
   void clear_buffer() {
     memset(frame, 0x00, sizeof(frame));
-  }
-
-  bool transaction = false;
-  unsigned char transaction_id = 0;
-  unsigned char transaction_buffer[32];
-  unsigned char transaction_buffer_length = 0;
-
-  int i2c_begin_transaction(unsigned char id) {
-    if (transaction) {
-        return -1;
-    } else {
-        transaction_id = id;
-        transaction = true;
-        memset(transaction_buffer, 0x00, sizeof(transaction_buffer));
-        transaction_buffer_length = 0;
-        return 0;
-    }
-  }
-  
-  int i2c_send_transaction() {
-    return i2c_smbus_write_i2c_block_data(file, transaction_id, transaction_buffer_length, transaction_buffer);
-  }
-
-  int i2c_end_transaction() {
-    if (transaction) {
-        transaction = false;
-        return i2c_send_transaction();
-    } else {
-        return -1;
-    }
-  }
-
-  int i2c_send(unsigned char reg, unsigned char data) {
-    if (transaction) {
-        if (reg != transaction_id) {
-            return -1;
-        }
-
-        int res = 0;
-        if (transaction_buffer_length >= sizeof(transaction_buffer)) {
-            res = i2c_send_transaction();
-            transaction_buffer_length = 0;
-        }
-        
-        transaction_buffer[transaction_buffer_length] = data;
-        transaction_buffer_length++;
-        return res;
-    } else {
-        return i2c_smbus_write_byte_data(file, reg, data);
-    }
   }
 
   int ssd1306_command(unsigned char command) {
