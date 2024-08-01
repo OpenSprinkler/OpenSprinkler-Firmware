@@ -72,6 +72,11 @@ public:
 	void createChar(unsigned char idx, PGM_P ptr) {
 		if(idx>=0&&idx<NUM_CUSTOM_ICONS) custom_chars[idx]=ptr;
 	}
+
+    void createChar(unsigned char idx, const unsigned char *ptr) {
+		createChar(idx, (const char *)ptr);
+	}
+
 	void setAutoDisplay(bool v) {auto_display=v;}
 private:
 	bool auto_display = true;
@@ -475,6 +480,11 @@ class SSD1306Display {
   void createChar(uint8_t idx, const char *ptr) {
     if (idx >= 0 && idx < NUM_CUSTOM_ICONS) custom_chars[idx] = ptr;
   }
+
+  void createChar(unsigned char idx, const unsigned char *ptr) {
+		createChar(idx, (const char *)ptr);
+	}
+    
   void setAutoDisplay(bool v) { auto_display = v; }
 
  private:
