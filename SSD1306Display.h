@@ -84,9 +84,7 @@ private:
 #include <stdint.h>
 #include <string.h>
 
-#include <bcm2835.h>
 #include <cstdio>
-#include "SSD1306_OLED.hpp"
 
 #include "font.h"
 #include "images.h"
