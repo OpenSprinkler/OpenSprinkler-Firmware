@@ -2193,7 +2193,7 @@ void start_server_ap() {
 #endif
 
 #if defined(USE_OTF) && !defined(ARDUINO)
-void initalize_otf() {
+void initialize_otf() {
 	if(!otf) return;
 	static bool callback_initialized = false;
 

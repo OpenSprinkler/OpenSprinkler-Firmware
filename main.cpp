@@ -199,7 +199,7 @@ void ui_state_machine() {
 					#endif
 					os.lcd.clear(0, 1);
 					os.lcd.setCursor(0, 0);
-					#if defined(Arduino)
+					#if defined(ARDUINO)
 					#if defined(ESP8266)
 					if (useEth) { os.lcd.print(eth.gatewayIP()); }
 					else { os.lcd.print(WiFi.gatewayIP()); }
@@ -230,7 +230,7 @@ void ui_state_machine() {
 				#endif
 				os.lcd.clear(0, 1);
 				os.lcd.setCursor(0, 0);
-				#if defined(Arduino)
+				#if defined(ARDUINO)
 				#if defined(ESP8266)
 				if (useEth) { os.lcd.print(eth.localIP()); }
 				else { os.lcd.print(WiFi.localIP()); }
@@ -416,7 +416,7 @@ ISR(WDT_vect)
 #endif
 
 #else
-void initalize_otf();
+void initialize_otf();
 
 void do_setup() {
 	initialiseEpoch();   // initialize time reference for millis() and micros()
@@ -443,7 +443,7 @@ void do_setup() {
 	os.mqtt.init();
 	os.status.req_mqtt_restart = true;
 
-	initalize_otf();
+	initialize_otf();
 }
 
 #endif
