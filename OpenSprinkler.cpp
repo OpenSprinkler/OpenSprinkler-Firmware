@@ -2928,7 +2928,6 @@ void OpenSprinkler::lcd_print_option(int i) {
 
 }
 
-#endif
 
 /** Button functions */
 /** wait for button */
@@ -3121,6 +3120,8 @@ void OpenSprinkler::set_screen_led(unsigned char status) {
 	lcd.display();
 	lcd.setColor(WHITE);
 }
+
+#endif
 
 #endif
 

@@ -30,7 +30,6 @@
 #include "utils.h"
 #include "gpio.h"
 #include "images.h"
-#include "rpitime.h"
 #include "mqtt.h"
 
 #if defined(ARDUINO) // headers for Arduino
@@ -64,6 +63,7 @@
 	#include <sys/stat.h>
 	#include "OpenThingsFramework.h"
 	#include "etherport.h"
+    #include "rpitime.h"
 	#include "smtp.h"
 #endif // end of headers
 

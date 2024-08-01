@@ -126,6 +126,7 @@ void flow_poll() {
 	/* End of RAH implementation of flow sensor */
 }
 
+#if defined(USE_DISPLAY)
 // ====== UI defines ======
 static char ui_anim_chars[3] = {'.', 'o', 'O'};
 
@@ -334,6 +335,7 @@ void ui_state_machine() {
 		break;
 	}
 }
+#endif
 
 
 // ======================
@@ -629,7 +631,9 @@ void do_loop()
 
 #else // Process Ethernet packets for RPI/BBB
 	if(otf) otf->loop();
+#if defined(USE_DISPLAY)
     ui_state_machine();
+#endif
 #endif	// Process Ethernet packets
 
 	// Start up MQTT when we have a network connection
