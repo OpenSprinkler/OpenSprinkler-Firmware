@@ -87,6 +87,34 @@ char* get_filename_fullpath(const char *filename) {
 	return fullpath;
 }
 
+void delay(ulong howLong)
+{
+	struct timespec sleeper, dummy ;
+
+	sleeper.tv_sec  = (time_os_t)(howLong / 1000) ;
+	sleeper.tv_nsec = (long)(howLong % 1000) * 1000000 ;
+
+	nanosleep (&sleeper, &dummy) ;
+}
+
+void delayMicroseconds (ulong howLong)
+{
+	struct timespec sleeper ;
+	unsigned int uSecs = howLong % 1000000 ;
+	unsigned int wSecs = howLong / 1000000 ;
+
+	/**/ if (howLong ==		0)
+		return ;
+	else if (howLong < 100)
+		delayMicrosecondsHard (howLong) ;
+	else
+	{
+		sleeper.tv_sec  = wSecs ;
+		sleeper.tv_nsec = (long)(uSecs * 1000L) ;
+		nanosleep (&sleeper, NULL) ;
+	}
+}
+
 void delayMicrosecondsHard (ulong howLong)
 {
 	struct timeval tNow, tLong, tEnd ;
