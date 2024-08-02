@@ -120,12 +120,15 @@ private:
 
 class SSD1306Display {
  public:
-  SSD1306Display(uint8_t _addr, uint8_t _sda, uint8_t _scl) {
+  SSD1306Display(uint8_t addr, uint8_t _sda, uint8_t _scl) {
     cx = 0;
     cy = 0;
+    _addr = addr;
     for (uint8_t i = 0; i < NUM_CUSTOM_ICONS; i++) custom_chars[i] = 0;
 
     clear_buffer(); 
+
+    i2c = I2CDevice();
   }
 
   ~SSD1306Display() {
@@ -136,48 +139,13 @@ class SSD1306Display {
   void init() {}  // Dummy function to match ESP8266
   
   int begin() {
-    // if (!OLEDSetBufferPtr(128, 64, frame, sizeof(frame))) return -1;
+    i2c.begin(_addr);
 
-    // const uint16_t I2C_Speed = BCM2835_I2C_CLOCK_DIVIDER_148;
-    // const uint8_t I2C_Address = 0x3C;
-    // bool I2C_debug = false;
-
-    // // Check if Bcm28235 lib installed and print version.
-    // if (!bcm2835_init()) {
-    //   printf("Error 1201: init bcm2835 library , Is it installed ?\r\n");
-    //   return -1;
-    // }
-
-    // // Turn on I2C bus (optionally it may already be on)
-    // if (!OLED_I2C_ON()) {
-    //   printf("Error 1202: bcm2835_i2c_begin :Cannot start I2C, Running as root?\n");
-    //   bcm2835_close(); // Close the library
-    //   return -1;
-    // }
-
-    // OLEDbegin(I2C_Speed, I2C_Address, I2C_debug); // initialize the OLED
     setFont(Monospaced_plain_13);
     fontWidth = 8;
     fontHeight = 16;
 
-    int adapter_nr = 1; /* probably dynamically determined */
-    char filename[20];
-
-    snprintf(filename, 19, "/dev/i2c-%d", adapter_nr);
-    file = open(filename, O_RDWR);
-    if (file < 0) {
-        /* ERROR HANDLING; you can check errno to see what went wrong */
-        exit(1);
-    }
-
-    int addr = 0x3C; /* The I2C address */
-
-    if (ioctl(file, I2C_SLAVE, addr) < 0) {
-    /* ERROR HANDLING; you can check errno to see what went wrong */
-    exit(1);
-    }
-
-    i2c_begin_transaction(0x00);
+    i2c.begin_transaction(0x00);
     ssd1306_command(0xAE);
     ssd1306_command(0xD5);
     ssd1306_command(0x80);
@@ -207,7 +175,7 @@ class SSD1306Display {
     ssd1306_command(0x2E);
     ssd1306_command(0xAF);
 
-    i2c_end_transaction();
+    i2c.end_transaction();
 
     return 0;
   }
@@ -215,7 +183,7 @@ class SSD1306Display {
   void setFont(const uint8_t *f) { font = (uint8_t *)f; }
 
   void display() {
-    i2c_begin_transaction(0x00);
+    i2c.begin_transaction(0x00);
     ssd1306_command(0x22);
     ssd1306_command(0x00);
     ssd1306_command(0xFF);
@@ -224,16 +192,16 @@ class SSD1306Display {
     
     int width = 128;
     ssd1306_command(width - 1); // Column end address
-    i2c_end_transaction();
+    i2c.end_transaction();
     
-    i2c_begin_transaction(0x40);
+    i2c.begin_transaction(0x40);
 
     int b;
     for (b = 0; b < 1024; b++) {
       ssd1306_data(frame[b]);
     }  
 
-    i2c_end_transaction();
+    i2c.end_transaction();
   }
 
   void clear() {
@@ -493,16 +461,19 @@ class SSD1306Display {
   bool color;
   uint8_t *font;
 
+  I2CDevice i2c;
+  unsigned char _addr;
+
   void clear_buffer() {
     memset(frame, 0x00, sizeof(frame));
   }
 
   int ssd1306_command(unsigned char command) {
-    return i2c_send(0x00, command);
+    return i2c.send(0x00, command);
   }
 
   int ssd1306_data(unsigned char value) {
-    return i2c_send(0x40, value);
+    return i2c.send(0x40, value);
   }
 };
 #endif

@@ -7,6 +7,8 @@
 extern "C" {
 #include <i2c/smbus.h>
 #include <linux/i2c-dev.h>
+#include <string.h>
+#include "utils.h"
 }
 
 class I2CDevice {
@@ -19,14 +21,12 @@ public:
       return _file;
     }
 
-    return ioctl(file, I2C_SLAVE, addr);
+    return ioctl(_file, I2C_SLAVE, addr);
   }
 
-  int begin(unsigned char addr) {
-    return begin(getDefaultBus(), addr);
-  }
+  int begin(unsigned char addr) { return begin(getDefaultBus(), addr); }
 
-  int i2c_begin_transaction(unsigned char id) {
+  int begin_transaction(unsigned char id) {
     if (transaction) {
       return -1;
     } else {
@@ -38,21 +38,16 @@ public:
     }
   }
 
-  int i2c_send_transaction() {
-    return i2c_smbus_write_i2c_block_data(
-        file, transaction_id, transaction_buffer_length, transaction_buffer);
-  }
-
-  int i2c_end_transaction() {
+  int end_transaction() {
     if (transaction) {
       transaction = false;
-      return i2c_send_transaction();
+      return send_transaction();
     } else {
       return -1;
     }
   }
 
-  int i2c_send(unsigned char reg, unsigned char data) {
+  int send(unsigned char reg, unsigned char data) {
     if (transaction) {
       if (reg != transaction_id) {
         return -1;
@@ -60,7 +55,7 @@ public:
 
       int res = 0;
       if (transaction_buffer_length >= sizeof(transaction_buffer)) {
-        res = i2c_send_transaction();
+        res = send_transaction();
         transaction_buffer_length = 0;
       }
 
@@ -68,7 +63,7 @@ public:
       transaction_buffer_length++;
       return res;
     } else {
-      return i2c_smbus_write_byte_data(file, reg, data);
+      return i2c_smbus_write_byte_data(_file, reg, data);
     }
   }
 
@@ -79,8 +74,24 @@ private:
   unsigned char transaction_buffer[32];
   unsigned char transaction_buffer_length = 0;
 
-  const char *getDefaultBus() {
-    return NULL;
+  const char *getDefaultBus() { 
+    switch (get_board_type()) {
+            case BoardType::RaspberryPi_bcm2712:
+            case BoardType::RaspberryPi_bcm2711:
+            case BoardType::RaspberryPi_bcm2837:
+            case BoardType::RaspberryPi_bcm2836:
+            case BoardType::RaspberryPi_bcm2835:
+                return "/dev/i2c-1";
+            case BoardType::Unknown: 
+            case BoardType::RaspberryPi_Unknown: 
+            default:
+                return "/dev/i2c-0";
+        }
+   }
+
+  int send_transaction() {
+    return i2c_smbus_write_i2c_block_data(
+        _file, transaction_id, transaction_buffer_length, transaction_buffer);
   }
 };
 
