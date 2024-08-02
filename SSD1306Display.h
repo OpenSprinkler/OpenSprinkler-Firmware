@@ -218,22 +218,22 @@ public:
 
     switch (height) {
     case 64:
-      SSD1306_command(SSD1306_SET_COM_PINS);
-      SSD1306_command(0x12);
-      SSD1306_command(SSD1306_SET_CONTRAST_CONTROL);
-      SSD1306_command(0xCF);
+      ssd1306_command(SSD1306_SET_COM_PINS);
+      ssd1306_command(0x12);
+      ssd1306_command(SSD1306_SET_CONTRAST_CONTROL);
+      ssd1306_command(0xCF);
       break;
     case 32:
-      SSD1306_command(SSD1306_SET_COM_PINS);
-      SSD1306_command(0x02);
-      SSD1306_command(SSD1306_SET_CONTRAST_CONTROL);
-      SSD1306_command(0x8F);
+      ssd1306_command(SSD1306_SET_COM_PINS);
+      ssd1306_command(0x02);
+      ssd1306_command(SSD1306_SET_CONTRAST_CONTROL);
+      ssd1306_command(0x8F);
       break;
     case 16: // NOTE: not tested, lacking part.
-      SSD1306_command(SSD1306_SET_COM_PINS);
-      SSD1306_command(0x2);
-      SSD1306_command(SSD1306_SET_CONTRAST_CONTROL);
-      SSD1306_command(0xAF);
+      ssd1306_command(SSD1306_SET_COM_PINS);
+      ssd1306_command(0x2);
+      ssd1306_command(SSD1306_SET_CONTRAST_CONTROL);
+      ssd1306_command(0xAF);
       break;
     }
 
