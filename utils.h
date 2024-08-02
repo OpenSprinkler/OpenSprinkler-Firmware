@@ -96,15 +96,15 @@ void str2mac(const char *_str, unsigned char mac[]);
 	in_addr_t get_ip_address(char *iface);
 	#endif
 
-    enum BoardType = {
-        Unknown;
-        RaspberryPi_Unknown;
-        RaspberryPi_bcm2712;
-        RaspberryPi_bcm2711;
-        RaspberryPi_bcm2837;
-        RaspberryPi_bcm2836;
-        RaspberryPi_bcm2835;
-    }
+    enum BoardType {
+        Unknown,
+        RaspberryPi_Unknown,
+        RaspberryPi_bcm2712,
+        RaspberryPi_bcm2711,
+        RaspberryPi_bcm2837,
+        RaspberryPi_bcm2836,
+        RaspberryPi_bcm2835,
+    };
 
     BoardType get_board_type();
 #endif

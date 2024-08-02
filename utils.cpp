@@ -39,6 +39,8 @@ extern OpenSprinkler os;
 
 #else // RPI/BBB
 
+#include <stdio.h>
+
 char* get_runtime_path() {
 	static char path[PATH_MAX];
 	static unsigned char query = 1;
@@ -235,6 +237,10 @@ in_addr_t get_ip_address(char *iface) {
 	return ip;
 }
 #endif
+
+bool prefix(const char *pre, const char *str) {
+    return strncmp(pre, str, strlen(pre)) == 0;
+}
 
 BoardType get_board_type() {
     FILE *file = fopen("/proc/device-tree/compatible", "rb");
