@@ -1,24 +1,6 @@
 #!/bin/bash
 set -e
 
-function download_wiringpi {
-	echo "Downloading WiringPi..."
-	if [ $(arch) == "aarch64" ]; then
-		wget https://github.com/WiringPi/WiringPi/releases/download/3.6/wiringpi_3.6_arm64.deb -O wiringpi.deb
-	else
-		wget https://github.com/WiringPi/WiringPi/releases/download/3.6/wiringpi_3.6_armhf.deb -O wiringpi.deb
-	fi
-
-	if [ $? -ne 0 ]; then
-		echo "Failed to download WiringPi"
-		exit 1
-	fi
-
-	echo "Installing WiringPi..."
-	dpkg -i wiringpi.deb
-	rm wiringpi.deb
-}
-
 function enable_i2c {
 	sudo raspi-config nonint do_i2c 1
 	sudo dtparam i2c_baudrate=400000
@@ -77,10 +59,6 @@ else
 		exit 0
 	fi
 
-	if [ ! -f /usr/lib/libwiringPi.so ]; then
-		download_wiringpi
-	fi
-
 	USEGPIO=""
 	GPIOLIB=""
 
@@ -95,7 +73,7 @@ else
 
     ws=$(ls external/TinyWebsockets/tiny_websockets_lib/src/*.cpp)
     otf=$(ls external/OpenThings-Framework-Firmware-Library/*.cpp)
-	g++ -o OpenSprinkler -DOSPI $USEGPIO -DSMTP_OPENSSL $DEBUG -std=c++14 -include string.h main.cpp OpenSprinkler.cpp program.cpp opensprinkler_server.cpp utils.cpp weather.cpp gpio.cpp mqtt.cpp smtp.c -Iexternal/TinyWebsockets/tiny_websockets_lib/include $ws -Iexternal/OpenThings-Framework-Firmware-Library/ $otf -lpthread -lmosquitto -lssl -lcrypto  -lgpiod -li2c $GPIOLIB
+	g++ -o OpenSprinkler -DOSPI $USEGPIO -DSMTP_OPENSSL $DEBUG -std=c++14 -include string.h main.cpp OpenSprinkler.cpp program.cpp opensprinkler_server.cpp utils.cpp weather.cpp gpio.cpp mqtt.cpp smtp.c -Iexternal/TinyWebsockets/tiny_websockets_lib/include $ws -Iexternal/OpenThings-Framework-Firmware-Library/ $otf -lpthread -lmosquitto -lssl -lcrypto -li2c $GPIOLIB
 fi
 
 if [ -f /etc/init.d/OpenSprinkler.sh ]; then
