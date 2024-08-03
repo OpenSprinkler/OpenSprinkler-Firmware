@@ -1,10 +1,10 @@
 [Unit]
 Description=OpenSprinkler
-Wants=network-online.target
-After=network.target network-online.target
+Requires=multi-user.target network.target network-online.target
+After=multi-user.target network.target network-online.target
 
 [Service]
-Type=simple
+Type=exec
 Restart=always
 RestartSec=1
 User=root
