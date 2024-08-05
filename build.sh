@@ -4,9 +4,9 @@ set -e
 function enable_i2c {
     if command -v raspi-config &> /dev/null; then
         echo "Enabling i2c"
-    	sudo raspi-config nonint do_i2c 0
         sudo dtparam i2c_baudrate=400000
         sudo modprobe i2c-dev
+        sudo raspi-config nonint do_i2c 0
     else
 		echo "Can not automatically enable i2c you might have to do this manually"
 	fi
