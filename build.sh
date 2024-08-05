@@ -6,7 +6,7 @@ function enable_i2c {
         echo "Enabling i2c"
         sudo modprobe i2c-dev
         sudo raspi-config nonint do_i2c 0
-        if ! [ grep 'dtparam=i2c_arm=on$' /boot/config.txt ]; then
+        if [[ -z $(grep 'dtparam=i2c_arm=on$' /boot/config.txt) ]] ; then
             echo "Setting the i2c clock speed to 400 kHz, you will have to reboot for this to take effect."
             sudo sed -i -e 's/dtparam=i2c_arm=on$/dtparam=i2c_arm=on,i2c_arm_baudrate=400000/g' /boot/config.txt
         fi
