@@ -54,6 +54,8 @@ else
 	apt-get update
 	apt-get install -y libmosquitto-dev raspi-gpio libi2c-dev libssl-dev libgpiod-dev
 
+    enable_i2c()
+
 	if ! command -v raspi-gpio &> /dev/null; then
 		echo "Command raspi-gpio is required and is not installed"
 		exit 0
