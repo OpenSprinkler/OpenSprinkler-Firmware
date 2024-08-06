@@ -91,6 +91,7 @@ extern ProgramData pd;
 	unsigned char OpenSprinkler::wifi_testmode = 0;
 #elif defined(ARDUINO)
 	LiquidCrystal OpenSprinkler::lcd;
+	RCSwitch OpenSprinkler::rfswitch;
 	extern SdFat sd;
 #else
 	#if defined(OSPI)
@@ -1564,18 +1565,28 @@ static ulong hex2ulong(unsigned char *code, unsigned char len) {
 	return v;
 }
 
-/** Parse RF code into on/off/timeing sections */
-uint16_t OpenSprinkler::parse_rfstation_code(RFStationData *data, ulong* on, ulong *off) {
-	ulong v;
-	v = hex2ulong(data->on, sizeof(data->on));
-	if (!v) return 0;
-	if (on) *on = v;
-	v = hex2ulong(data->off, sizeof(data->off));
-	if (!v) return 0;
-	if (off) *off = v;
-	v = hex2ulong(data->timing, sizeof(data->timing));
-	if (!v) return 0;
-	return v;
+/** Parse RF  station data into code */
+bool OpenSprinkler::parse_rfstation_code(RFStationData *data, RFStationCode *code) {
+	if(!code) return false;
+	code->timing = 0; // temporarily set it to 0
+	if(data->version=='H') {
+		// this is version G rf code data (25 bytes long including version signature at the beginning)
+		code->on = hex2ulong(data->on, sizeof(data->on));
+		code->off = hex2ulong(data->off, sizeof(data->off));
+		code->timing = hex2ulong(data->timing, sizeof(data->timing));
+		code->protocol = hex2ulong(data->protocol, sizeof(data->protocol));
+		code->bitlength = hex2ulong(data->bitlength, sizeof(data->bitlength));
+	} else {
+		// this is classic rf code data (16 bytes long, assuming protocol=1 and bitlength=24)
+		RFStationDataClassic *classic = (RFStationDataClassic*)data;
+		code->on = hex2ulong(classic->on, sizeof(classic->on));
+		code->off = hex2ulong(classic->off, sizeof(classic->off));
+		code->timing = hex2ulong(classic->timing, sizeof(classic->timing));
+		code->protocol = 1;
+		code->bitlength = 24;
+	}
+	if(!code->timing) return false;
+	return true;
 }
 
 /** Get station data */
@@ -1895,20 +1906,16 @@ void send_rfsignal(ulong code, ulong len) {
  * and sends it out through RF transmitter.
  */
 void OpenSprinkler::switch_rfstation(RFStationData *data, bool turnon) {
-	ulong on, off;
-	uint16_t length = parse_rfstation_code(data, &on, &off);
+	RFStationCode code;
+	if(!parse_rfstation_code(data, &code)) return; // return if the timing parameter is 0
 
 	if(PIN_RFTX == 255) return; // ignore RF station if RF pin disabled
 
 #if defined(ARDUINO)
-	#if defined(ESP8266)
 	rfswitch.enableTransmit(PIN_RFTX);
-	rfswitch.setProtocol(1);
-	rfswitch.setPulseLength(length);
-	rfswitch.send(turnon ? on : off, 24);
-	#else
-	send_rfsignal(turnon ? on : off, length);
-	#endif
+	rfswitch.setProtocol(code.protocol);
+	rfswitch.setPulseLength(code.timing);
+	rfswitch.send(turnon ? code.on : code.off, code.bitlength);
 #else
 	// pre-open gpio file to minimize overhead
 	rf_gpio_fd = gpio_fd_open(PIN_RFTX);
