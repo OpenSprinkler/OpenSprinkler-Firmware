@@ -100,7 +100,7 @@ bool EthernetServer::begin()
 }
 
 //	This function blocks until we get a client connected.
-//	 It will timeout after 50ms and return a blank client.
+//	 It will timeout after 5ms and return a blank client.
 //	 If it succeeds it will return an EthernetClient.
 EthernetClient EthernetServer::available()
 {
@@ -108,7 +108,7 @@ EthernetClient EthernetServer::available()
 	memset(&fds, 0, sizeof(fds));
 	fds.fd = m_sock;
 	fds.events = POLLIN;
-	int timeout = 50;
+	int timeout = 5;
 
 	int rc = poll(&fds, 1, timeout);
 	if (rc > 0)
@@ -289,7 +289,7 @@ bool EthernetClient::available() {
 	memset(&fds, 0, sizeof(fds));
 	fds.fd = m_sock;
 	fds.events = POLLIN;
-	int timeout = 50;
+	int timeout = 5;
 
 	int rc = poll(&fds, 1, timeout);
 	return rc > 0;
