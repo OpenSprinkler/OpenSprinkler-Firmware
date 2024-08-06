@@ -513,8 +513,9 @@ enum {
 	#define PSTR(x)      x
 	#define F(x)         x
 	#define strcat_P     strcat
-	#define strncat_P     strncat
+	#define strncat_P    strncat
 	#define strcpy_P     strcpy
+	#define memcpy_P     memcpy
 	#define snprintf_P    snprintf
 	#include<string>
 	#define String       string

@@ -31,6 +31,7 @@
 #include "gpio.h"
 #include "images.h"
 #include "mqtt.h"
+#include "RCSwitch.h"
 
 #if defined(ARDUINO) // headers for Arduino
 	#include <Arduino.h>

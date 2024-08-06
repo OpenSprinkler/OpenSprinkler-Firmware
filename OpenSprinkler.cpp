@@ -70,6 +70,7 @@ unsigned char OpenSprinkler::attrib_dis[MAX_NUM_BOARDS];
 unsigned char OpenSprinkler::attrib_spe[MAX_NUM_BOARDS];
 unsigned char OpenSprinkler::attrib_grp[MAX_NUM_STATIONS];
 unsigned char OpenSprinkler::masters[NUM_MASTER_ZONES][NUM_MASTER_OPTS];
+RCSwitch OpenSprinkler::rfswitch;
 
 extern char tmp_buffer[];
 extern char ether_buffer[];
@@ -82,8 +83,6 @@ extern ProgramData pd;
 	IOEXP* OpenSprinkler::expanders[MAX_NUM_BOARDS/2];
 	IOEXP* OpenSprinkler::mainio; // main controller IO expander object
 	IOEXP* OpenSprinkler::drio; // driver board IO expander object
-	RCSwitch OpenSprinkler::rfswitch;
-
 	String OpenSprinkler::wifi_ssid="";
 	String OpenSprinkler::wifi_pass="";
 	unsigned char OpenSprinkler::wifi_bssid[6]={0};
@@ -91,7 +90,6 @@ extern ProgramData pd;
 	unsigned char OpenSprinkler::wifi_testmode = 0;
 #elif defined(ARDUINO)
 	LiquidCrystal OpenSprinkler::lcd;
-	RCSwitch OpenSprinkler::rfswitch;
 	extern SdFat sd;
 #else
 	#if defined(OSPI)
@@ -1854,52 +1852,6 @@ void OpenSprinkler::clear_all_station_bits() {
 	}
 }
 
-#if !defined(ARDUINO)
-int rf_gpio_fd = -1;
-#endif
-
-/** Transmit one RF signal bit */
-void transmit_rfbit(ulong lenH, ulong lenL) {
-#if defined(ARDUINO)
-	#if defined(ESP8266)
-		digitalWrite(PIN_RFTX, 1);
-		delayMicroseconds(lenH);
-		digitalWrite(PIN_RFTX, 0);
-		delayMicroseconds(lenL);
-	#else
-		PORT_RF |= (1<<PINX_RF);
-		delayMicroseconds(lenH);
-		PORT_RF &=~(1<<PINX_RF);
-		delayMicroseconds(lenL);
-	#endif
-#else
-	gpio_write(rf_gpio_fd, 1);	// TODO: fix this or it won't work on Raspbian bookworm
-	delayMicrosecondsHard(lenH);
-	gpio_write(rf_gpio_fd, 0);
-	delayMicrosecondsHard(lenL);
-#endif
-}
-
-/** Transmit RF signal */
-void send_rfsignal(ulong code, ulong len) {
-	ulong len3 = len * 3;
-	ulong len31 = len * 31;
-	for(unsigned char n=0;n<15;n++) {
-		int i=23;
-		// send code
-		while(i>=0) {
-			if ((code>>i) & 1) {
-				transmit_rfbit(len3, len);
-			} else {
-				transmit_rfbit(len, len3);
-			}
-			i--;
-		};
-		// send sync
-		transmit_rfbit(len, len31);
-	}
-}
-
 /** Switch RF station
  * This function takes a RF code,
  * parses it into signals and timing,
@@ -1911,19 +1863,10 @@ void OpenSprinkler::switch_rfstation(RFStationData *data, bool turnon) {
 
 	if(PIN_RFTX == 255) return; // ignore RF station if RF pin disabled
 
-#if defined(ARDUINO)
 	rfswitch.enableTransmit(PIN_RFTX);
 	rfswitch.setProtocol(code.protocol);
 	rfswitch.setPulseLength(code.timing);
 	rfswitch.send(turnon ? code.on : code.off, code.bitlength);
-#else
-	// pre-open gpio file to minimize overhead
-	rf_gpio_fd = gpio_fd_open(PIN_RFTX);
-	send_rfsignal(turnon ? on : off, length);
-	gpio_fd_close(rf_gpio_fd);
-	rf_gpio_fd = -1;
-#endif
-
 }
 
 /** Switch GPIO station
