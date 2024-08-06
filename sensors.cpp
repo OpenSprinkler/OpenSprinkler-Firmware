@@ -58,7 +58,7 @@ static ProgSensorAdjust_t *progSensorAdjusts = NULL;
 
 // modbus transaction id
 static uint16_t modbusTcpId = 0;
-static uint i2c_rs485_allocated;
+static uint i2c_rs485_allocated[4];
 
 const char *sensor_unitNames[]{
     "",   "%",   "°C",  "°F", "V", "%", "in",
@@ -117,7 +117,10 @@ void detect_asb_board() {
   if (detect_i2c(ASB_BOARD_ADDR2a) && detect_i2c(ASB_BOARD_ADDR2b))
     asb_detected_boards |= ASB_BOARD2;
 
-  if (detect_i2c(RS485_TRUEBNER_ADDR)) asb_detected_boards |= RS485_TRUEBNER;
+  if (detect_i2c(RS485_TRUEBNER1_ADDR)) asb_detected_boards |= RS485_TRUEBNER1;
+  if (detect_i2c(RS485_TRUEBNER2_ADDR)) asb_detected_boards |= RS485_TRUEBNER2;
+  if (detect_i2c(RS485_TRUEBNER3_ADDR)) asb_detected_boards |= RS485_TRUEBNER3;
+  if (detect_i2c(RS485_TRUEBNER4_ADDR)) asb_detected_boards |= RS485_TRUEBNER4;
 #endif
 
 // Old, pre OSPi 1.43 analog inputs:
@@ -1113,15 +1116,17 @@ int read_sensor_http(Sensor_t *sensor, ulong time) {
  */
 int read_sensor_i2c(Sensor_t *sensor) {
   DEBUG_PRINTLN(F("read_sensor_i2c"));
-  if ((asb_detected_boards & RS485_TRUEBNER) == 0) return HTTP_RQT_NOT_RECEIVED;
+  int device = sensor->port % 4;
+  if ((asb_detected_boards & (RS485_TRUEBNER1 << device)) == 0) 
+    return HTTP_RQT_NOT_RECEIVED;
 
-  if (i2c_rs485_allocated > 0 && i2c_rs485_allocated != sensor->nr) {
+  if (i2c_rs485_allocated[device] > 0 && i2c_rs485_allocated[device] != sensor->nr) {
     sensor->repeat_read = 1000;
     DEBUG_PRINT(F("cant' read, allocated by sensor "));
-    DEBUG_PRINTLN(i2c_rs485_allocated);
-    Sensor_t *t = sensor_by_nr(i2c_rs485_allocated);
+    DEBUG_PRINTLN(i2c_rs485_allocated[device]);
+    Sensor_t *t = sensor_by_nr(i2c_rs485_allocated[device]);
     if (!t || !t->flags.enable)
-      i2c_rs485_allocated = 0; //breakout
+      i2c_rs485_allocated[device] = 0; //breakout
     return HTTP_RQT_NOT_RECEIVED;
   }
 
@@ -1132,20 +1137,20 @@ int read_sensor_i2c(Sensor_t *sensor) {
                                                       : 0x02;
 
   if (sensor->repeat_read == 0 || sensor->repeat_read == 1000) {
-    Wire.beginTransmission(RS485_TRUEBNER_ADDR);
+    Wire.beginTransmission(RS485_TRUEBNER1_ADDR + device);
     Wire.write((uint8_t)sensor->id);
     Wire.write(type);
     if (Wire.endTransmission() == 0) {
       DEBUG_PRINTF("read_sensor_i2c: request send: %d - %d\n", sensor->id,
                    type);
       sensor->repeat_read = 1;
-      i2c_rs485_allocated = sensor->nr;
+      i2c_rs485_allocated[device] = sensor->nr;
     }
     return HTTP_RQT_NOT_RECEIVED;
     // delay(500);
   }
 
-  if (Wire.requestFrom((uint8_t)RS485_TRUEBNER_ADDR, (size_t)4, true)) {
+  if (Wire.requestFrom((uint8_t)(RS485_TRUEBNER1_ADDR + device), (size_t)4, true)) {
     // read the incoming bytes:
     uint8_t addr = Wire.read();
     uint8_t reg = Wire.read();
@@ -1166,7 +1171,7 @@ int read_sensor_i2c(Sensor_t *sensor) {
       sensor->flags.data_ok = true;
 
       sensor->repeat_read = 0;
-      i2c_rs485_allocated = 0;
+      i2c_rs485_allocated[device] = 0;
       return HTTP_RQT_SUCCESS;
     }
   }
@@ -1175,7 +1180,7 @@ int read_sensor_i2c(Sensor_t *sensor) {
   if (sensor->repeat_read > 4) {  // timeout
     sensor->repeat_read = 0;
     sensor->flags.data_ok = false;
-    i2c_rs485_allocated = 0;
+    i2c_rs485_allocated[device] = 0;
     DEBUG_PRINTLN(F("read_sensor_i2c: timeout"));
   }
   DEBUG_PRINTLN(F("read_sensor_i2c: exit"));
@@ -1663,23 +1668,25 @@ int set_sensor_address_ip(Sensor_t *sensor, uint8_t new_address) {
  */
 int set_sensor_address_i2c(Sensor_t *sensor, uint8_t new_address) {
   DEBUG_PRINTLN(F("set_sensor_address_i2c"));
-  if ((asb_detected_boards & RS485_TRUEBNER) == 0) return HTTP_RQT_NOT_RECEIVED;
+  int device = sensor->port % 4;
+  if ((asb_detected_boards & (RS485_TRUEBNER1 << device)) == 0) 
+    return HTTP_RQT_NOT_RECEIVED;
 
-  if (i2c_rs485_allocated > 0) {
+  if (i2c_rs485_allocated[device] > 0) {
     DEBUG_PRINT(F("sensor currently allocated by "));
-    DEBUG_PRINTLN(i2c_rs485_allocated);
-    Sensor_t *t = sensor_by_nr(i2c_rs485_allocated);
+    DEBUG_PRINTLN(i2c_rs485_allocated[device]);
+    Sensor_t *t = sensor_by_nr(i2c_rs485_allocated[device]);
     if (!t || !t->flags.enable)
-      i2c_rs485_allocated = 0; //breakout
+      i2c_rs485_allocated[device] = 0; //breakout
     return HTTP_RQT_NOT_RECEIVED;
   }
 
-  Wire.beginTransmission(RS485_TRUEBNER_ADDR);
+  Wire.beginTransmission(RS485_TRUEBNER1_ADDR + device);
   Wire.write(254);
   Wire.write(new_address);
   Wire.endTransmission();
   delay(3000);
-  Wire.requestFrom((uint8_t)RS485_TRUEBNER_ADDR, (size_t)1, true);
+  Wire.requestFrom((uint8_t)(RS485_TRUEBNER1_ADDR + device), (size_t)1, true);
   if (Wire.available()) {
     delay(10);
     uint8_t modbus_address = Wire.read();

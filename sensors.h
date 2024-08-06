@@ -130,11 +130,14 @@ extern "C" {
 #define MAX_SENSOR_READ_TIME 1        // second for reading sensors
 
 // detected Analog Sensor Boards:
-#define ASB_BOARD1 0x01
-#define ASB_BOARD2 0x02
-#define OSPI_PCF8591 0x04
-#define OSPI_ADS1115 0x08
-#define RS485_TRUEBNER 0x20
+#define ASB_BOARD1 0x0001
+#define ASB_BOARD2 0x0002
+#define OSPI_PCF8591 0x0004
+#define OSPI_ADS1115 0x0008
+#define RS485_TRUEBNER1 0x0020
+#define RS485_TRUEBNER2 0x0040
+#define RS485_TRUEBNER3 0x0080
+#define RS485_TRUEBNER4 0x0100
 
 typedef struct SensorFlags {
   uint enable : 1;   // enabled
@@ -254,7 +257,10 @@ typedef struct SensorUrl {
 #define ASB_BOARD_ADDR1b 0x49
 #define ASB_BOARD_ADDR2a 0x4A
 #define ASB_BOARD_ADDR2b 0x4B
-#define RS485_TRUEBNER_ADDR 0x38
+#define RS485_TRUEBNER1_ADDR 0x38
+#define RS485_TRUEBNER2_ADDR 0x39
+#define RS485_TRUEBNER3_ADDR 0x3A
+#define RS485_TRUEBNER4_ADDR 0x3B
 
 void sensor_api_init();
 byte get_asb_detected_boards();
