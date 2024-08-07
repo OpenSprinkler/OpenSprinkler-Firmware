@@ -34,12 +34,13 @@
 #endif
 
 #include "TimeLib.h"
+#include "types.h"
 
 static tmElements_t tm;  // a cache of time elements
-static time_t cacheTime;  // the time the cache was updated
+static time_os_t cacheTime;  // the time the cache was updated
 static uint32_t syncInterval = 300;  // time sync will be attempted after this many seconds
 
-void refreshCache(time_t t) {
+void refreshCache(time_os_t t) {
 	if (t != cacheTime) {
 		breakTime(t, tm);
 		cacheTime = t;
@@ -50,7 +51,7 @@ int hour() { // the hour now
 	return hour(now());
 }
 
-int hour(time_t t) { // the hour for the given time
+int hour(time_os_t t) { // the hour for the given time
 	refreshCache(t);
 	return tm.Hour;
 }
@@ -59,7 +60,7 @@ int hourFormat12() { // the hour now in 12 hour format
 	return hourFormat12(now());
 }
 
-int hourFormat12(time_t t) { // the hour for the given time in 12 hour format
+int hourFormat12(time_os_t t) { // the hour for the given time in 12 hour format
 	refreshCache(t);
 	if( tm.Hour == 0 )
 		return 12; // 12 midnight
@@ -73,7 +74,7 @@ uint8_t isAM() { // returns true if time now is AM
 	return !isPM(now());
 }
 
-uint8_t isAM(time_t t) { // returns true if given time is AM
+uint8_t isAM(time_os_t t) { // returns true if given time is AM
 	return !isPM(t);
 }
 
@@ -81,7 +82,7 @@ uint8_t isPM() { // returns true if PM
 	return isPM(now());
 }
 
-uint8_t isPM(time_t t) { // returns true if PM
+uint8_t isPM(time_os_t t) { // returns true if PM
 	return (hour(t) >= 12);
 }
 
@@ -89,7 +90,7 @@ int minute() {
 	return minute(now());
 }
 
-int minute(time_t t) { // the minute for the given time
+int minute(time_os_t t) { // the minute for the given time
 	refreshCache(t);
 	return tm.Minute;
 }
@@ -98,7 +99,7 @@ int second() {
 	return second(now());
 }
 
-int second(time_t t) { // the second for the given time
+int second(time_os_t t) { // the second for the given time
 	refreshCache(t);
 	return tm.Second;
 }
@@ -107,7 +108,7 @@ int day(){
 	return(day(now()));
 }
 
-int day(time_t t) { // the day for the given time (0-6)
+int day(time_os_t t) { // the day for the given time (0-6)
 	refreshCache(t);
 	return tm.Day;
 }
@@ -116,7 +117,7 @@ int weekday() { // Sunday is day 1
 	return	weekday(now());
 }
 
-int weekday(time_t t) {
+int weekday(time_os_t t) {
 	refreshCache(t);
 	return tm.Wday;
 }
@@ -125,7 +126,7 @@ int month(){
 	return month(now());
 }
 
-int month(time_t t) { // the month for the given time
+int month(time_os_t t) { // the month for the given time
 	refreshCache(t);
 	return tm.Month;
 }
@@ -134,7 +135,7 @@ int year() {	// as in Processing, the full four digit year: (2009, 2010 etc)
 	return year(now());
 }
 
-int year(time_t t) { // the year for the given time
+int year(time_os_t t) { // the year for the given time
 	refreshCache(t);
 	return tmYearToCalendar(tm.Year);
 }
@@ -148,8 +149,8 @@ int year(time_t t) { // the year for the given time
 
 static	const uint8_t monthDays[]={31,28,31,30,31,30,31,31,30,31,30,31}; // API starts months from 1, this array starts from 0
 
-void breakTime(time_t timeInput, tmElements_t &tm){
-// break the given time_t into time components
+void breakTime(time_os_t timeInput, tmElements_t &tm){
+// break the given time_os_t into time components
 // this is a more compact version of the C library localtime function
 // note that year is offset from 1970 !!!
 
@@ -201,8 +202,8 @@ void breakTime(time_t timeInput, tmElements_t &tm){
 	tm.Day = time + 1;     // day of month
 }
 
-time_t makeTime(tmElements_t &tm){
-// assemble time elements into time_t
+time_os_t makeTime(tmElements_t &tm){
+// assemble time elements into time_os_t
 // note year argument is offset from 1970 (see macros in time.h to convert to other formats)
 // previous version used full four digit year (or digits since 2000),i.e. 2009 was 2009 or 9
 
@@ -229,7 +230,7 @@ time_t makeTime(tmElements_t &tm){
 	seconds+= tm.Hour * SECS_PER_HOUR;
 	seconds+= tm.Minute * SECS_PER_MIN;
 	seconds+= tm.Second;
-	return (time_t)seconds;
+	return (time_os_t)seconds;
 }
 /*=====================================================*/
 /* Low level system time functions	*/
@@ -243,11 +244,11 @@ getExternalTime getTimePtr;  // pointer to external sync function
 //setExternalTime setTimePtr; // not used in this version
 
 #ifdef TIME_DRIFT_INFO	 // define this to get drift data
-time_t sysUnsyncedTime = 0; // the time sysTime unadjusted by sync
+time_os_t sysUnsyncedTime = 0; // the time sysTime unadjusted by sync
 #endif
 
 
-time_t now() {
+time_os_t now() {
 	// calculate number of seconds passed since last call to now()
 	while (millis() - prevMillis >= 1000) {
 		// millis() and prevMillis are both unsigned ints thus the subtraction will always be the absolute value of the difference
@@ -259,7 +260,7 @@ time_t now() {
 	}
 	if (nextSyncTime <= sysTime) {
 		if (getTimePtr != 0) {
-			time_t t = getTimePtr();
+			time_os_t t = getTimePtr();
 			if (t != 0) {
 				setTime(t);
 			} else {
@@ -268,10 +269,10 @@ time_t now() {
 			}
 		}
 	}
-	return (time_t)sysTime;
+	return (time_os_t)sysTime;
 }
 
-void setTime(time_t t) {
+void setTime(time_os_t t) {
 #ifdef TIME_DRIFT_INFO
 	if(sysUnsyncedTime == 0)
 		sysUnsyncedTime = t;  // store the time of the first call to set a valid Time
@@ -315,7 +316,7 @@ void setSyncProvider( getExternalTime getTimeFunction){
 	now(); // this will sync the clock
 }
 
-void setSyncInterval(time_t interval){ // set the number of seconds between re-sync
+void setSyncInterval(time_os_t interval){ // set the number of seconds between re-sync
 	syncInterval = (uint32_t)interval;
 	nextSyncTime = sysTime + syncInterval;
 }
