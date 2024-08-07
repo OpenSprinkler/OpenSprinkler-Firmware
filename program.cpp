@@ -1,4 +1,4 @@
-/* OpenSprinkler Unified (AVR/RPI/BBB/LINUX) Firmware
+/* OpenSprinkler Unified Firmware
  * Copyright (C) 2015 by Ray Wang (ray@opensprinkler.com)
  *
  * Program data structures and functions
@@ -231,7 +231,7 @@ unsigned char ProgramStruct::check_day_match(time_os_t t) {
 	unsigned char weekday_t = weekday(t);  // weekday ranges from [0,6] within Sunday being 1
 	unsigned char day_t = day(t);
 	unsigned char month_t = month(t);
-#else // get current time from RPI/BBB
+#else // get current time from RPI/LINUX
 	time_os_t ct = t;
 	struct tm *ti = gmtime(&ct);
 	unsigned char weekday_t = (ti->tm_wday+1)%7;  // tm_wday ranges from [0,6] with Sunday being 0

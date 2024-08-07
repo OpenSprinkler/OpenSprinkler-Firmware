@@ -1,4 +1,4 @@
-/* OpenSprinkler Unified (AVR/RPI/BBB/LINUX) Firmware
+/* OpenSprinkler Unified Firmware
  * Copyright (C) 2015 by Ray Wang (ray@opensprinkler.com)
  *
  * Main loop
@@ -53,7 +53,7 @@
 		bool useEth = true;
 	#endif
 	unsigned long getNtpTime();
-#else // header and defs for RPI/BBB
+#else // header and defs for RPI/Linux
 
 #endif
 
@@ -588,7 +588,7 @@ void do_loop()
 
 	ui_state_machine();
 
-#else // Process Ethernet packets for RPI/BBB
+#else // Process Ethernet packets for RPI/LINUX
 	if(otf) otf->loop();
 #endif	// Process Ethernet packets
 
@@ -989,7 +989,7 @@ void do_loop()
 	}
 
 	#if !defined(ARDUINO)
-		delay(1); // For OSPI/OSBO/LINUX, sleep 1 ms to minimize CPU usage
+		delay(1); // For OSPI/LINUX, sleep 1 ms to minimize CPU usage
 	#endif
 }
 
@@ -1764,7 +1764,7 @@ void write_log(unsigned char type, time_os_t curr_time) {
 	}
 	#endif
 
-#else // prepare log folder for RPI/BBB
+#else // prepare log folder for RPI/LINUX
 	struct stat st;
 	if(stat(get_filename_fullpath(LOG_PREFIX), &st)) {
 		if(mkdir(get_filename_fullpath(LOG_PREFIX), S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IWGRP | S_IXGRP | S_IROTH | S_IWOTH | S_IXOTH)) {
@@ -1914,7 +1914,7 @@ void delete_log(char *name) {
 	}
 	#endif
 
-#else // delete_log implementation for RPI/BBB
+#else // delete_log implementation for RPI/LINUX
 	if (strncmp(name, "all", 3) == 0) {
 		// delete the log folder
 		rmdir(get_filename_fullpath(LOG_PREFIX));
@@ -2014,7 +2014,7 @@ static void perform_ntp_sync() {
 #endif
 }
 
-#if !defined(ARDUINO) // main function for RPI/BBB
+#if !defined(ARDUINO) // main function for RPI/LINUX
 int main(int argc, char *argv[]) {
     // Disable buffering to work with systemctl journal
     setvbuf(stdout, NULL, _IOLBF, 0);

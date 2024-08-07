@@ -1,4 +1,4 @@
-/* OpenSprinkler Unified (AVR/RPI/BBB/LINUX/ESP8266) Firmware
+/* OpenSprinkler Unified Firmware
  * Copyright (C) 2015 by Ray Wang (ray@opensprinkler.com)
  *
  * OpenSprinkler macro defines and hardware pin assignments
@@ -40,7 +40,6 @@ typedef unsigned long ulong;
 /** Hardware version base numbers */
 #define OS_HW_VERSION_BASE   0x00 // OpenSprinkler
 #define OSPI_HW_VERSION_BASE 0x40 // OpenSprinkler Pi
-#define OSBO_HW_VERSION_BASE 0x80 // OpenSprinkler Beagle
 #define SIM_HW_VERSION_BASE  0xC0 // simulation hardware
 
 /** Hardware type macro defines */
@@ -442,21 +441,6 @@ enum {
 	//#define PIN_BUTTON_3      25    // button 3
 
 	#define PIN_FREE_LIST       {5,6,7,8,9,10,11,12,13,16,18,19,20,21,23,24,25,26}  // free GPIO pins
-	#define ETHER_BUFFER_SIZE   16384
-
-#elif defined(OSBO) // for OSBo
-
-	#define OS_HW_VERSION    OSBO_HW_VERSION_BASE
-	// these are gpio pin numbers, refer to
-	// https://github.com/mkaczanowski/BeagleBoneBlack-GPIO/blob/master/GPIO/GPIOConst.cpp
-	#define PIN_SR_LATCH      60    // P9_12, shift register latch pin
-	#define PIN_SR_DATA       30    // P9_11, shift register data pin
-	#define PIN_SR_CLOCK      31    // P9_13, shift register clock pin
-	#define PIN_SR_OE         50    // P9_14, shift register output enable pin
-	#define PIN_SENSOR1       48
-	#define PIN_RFTX          51    // RF transmitter pin
-
-	#define PIN_FREE_LIST     {38,39,34,35,45,44,26,47,27,65,63,62,37,36,33,32,61,86,88,87,89,76,77,74,72,73,70,71}
 	#define ETHER_BUFFER_SIZE   16384
 
 #else // for demo / simulation

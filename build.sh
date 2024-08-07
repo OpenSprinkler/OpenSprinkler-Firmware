@@ -35,33 +35,13 @@ if [ "$1" == "demo" ]; then
     ws=$(ls external/TinyWebsockets/tiny_websockets_lib/src/*.cpp)
     otf=$(ls external/OpenThings-Framework-Firmware-Library/*.cpp)
     g++ -o OpenSprinkler -DDEMO -DSMTP_OPENSSL $DEBUG -std=c++14 -include string.h main.cpp OpenSprinkler.cpp program.cpp opensprinkler_server.cpp utils.cpp weather.cpp gpio.cpp mqtt.cpp smtp.c RCSwitch.cpp -Iexternal/TinyWebsockets/tiny_websockets_lib/include $ws -Iexternal/OpenThings-Framework-Firmware-Library/ $otf -lpthread -lmosquitto -lssl -lcrypto
-elif [ "$1" == "osbo" ]; then
-	echo "Installing required libraries..."
-	apt-get install -y libmosquitto-dev libssl-dev
-	echo "Compiling osbo firmware..."
-
-    ws=$(ls external/TinyWebsockets/tiny_websockets_lib/src/*.cpp)
-    otf=$(ls external/OpenThings-Framework-Firmware-Library/*.cpp)
-	g++ -o OpenSprinkler -DOSBO -DSMTP_OPENSSL $DEBUG -std=c++14 -include string.h main.cpp OpenSprinkler.cpp program.cpp opensprinkler_server.cpp utils.cpp weather.cpp gpio.cpp mqtt.cpp smtp.c RCSwitch.cpp -Iexternal/TinyWebsockets/tiny_websockets_lib/include $ws -Iexternal/OpenThings-Framework-Firmware-Library/ $otf -lpthread -lmosquitto -lssl -lcrypto
 else
 	echo "Installing required libraries..."
 	apt-get update
-	apt-get install -y libmosquitto-dev raspi-gpio libi2c-dev libssl-dev libgpiod-dev
-	if ! command -v raspi-gpio &> /dev/null
-	then
-		echo "Command raspi-gpio is required and is not installed"
-		exit 0
-	fi
+	apt-get install -y libmosquitto-dev raspi-gpio libi2c-dev libssl-dev libgpiod-dev gpiod
 
-	USEGPIO=""
-	GPIOLIB=""
-
-
-	if [ -h "/sys/class/gpio/gpiochip512" ]; then
-		echo "using libgpiod"
-		USEGPIO="-DLIBGPIOD"
-		GPIOLIB="-lgpiod"
-	fi
+	USEGPIO="-DLIBGPIOD"
+	GPIOLIB="-lgpiod"
 
 	echo "Compiling ospi firmware..."
     ws=$(ls external/TinyWebsockets/tiny_websockets_lib/src/*.cpp)

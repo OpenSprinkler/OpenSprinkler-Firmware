@@ -1,6 +1,6 @@
-============================================
-==== OpenSprinkler AVR/RPI/BBB Firmware ====
-============================================
+========================================
+==== OpenSprinkler Unified Firmware ====
+========================================
 
 This is a unified OpenSprinkler firmware for Arduino, and Linux-based OpenSprinklers such as OpenSprinkler Pi.
 
@@ -11,7 +11,7 @@ Compilation instructions for OS (Arduino-based OpenSprinkler) 2.3 and 3.x:
 Additional details:
 https://openthings.freshdesk.com/support/solutions/articles/5000165132
 
-For OSPi/OSBO or other Linux-based OpenSprinkler:
+For OSPi or other Linux-based OpenSprinkler:
 https://openthings.freshdesk.com/support/solutions/articles/5000631599
 
 ============================================

@@ -1,4 +1,4 @@
-/* OpenSprinkler Unified (AVR/RPI/BBB/LINUX/ESP8266) Firmware
+/* OpenSprinkler Unified Firmware
  * Copyright (C) 2015 by Ray Wang (ray@opensprinkler.com)
  *
  * OpenSprinkler library
@@ -359,7 +359,7 @@ unsigned char OpenSprinkler::iopts[] = {
 #if defined(ARDUINO)  // on AVR, the default HTTP port is 80
 	80, // this and next byte define http port number
 	0,
-#else // on RPI/BBB/LINUX, the default HTTP port is 8080
+#else // on RPI/LINUX, the default HTTP port is 8080
 	144,// this and next byte define http port number
 	31,
 #endif
@@ -711,7 +711,7 @@ void OpenSprinkler::reboot_dev(uint8_t cause) {
 #endif
 }
 
-#else // RPI/BBB/LINUX network init functions
+#else // RPI/LINUX network init functions
 
 #include "etherport.h"
 #include <sys/reboot.h>
@@ -1763,7 +1763,7 @@ unsigned char OpenSprinkler::weekday_today() {
 	return (wd+3) % 7;	// Jan 1, 1970 is a Thursday
 #else
 	return 0;
-	// todo future: is this function needed for RPI/BBB?
+	// todo future: is this function needed for RPI/LINUX
 #endif
 }
 

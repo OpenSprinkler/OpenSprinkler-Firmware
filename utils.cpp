@@ -1,4 +1,4 @@
-/* OpenSprinkler Unified (AVR/RPI/BBB/LINUX) Firmware
+/* OpenSprinkler Unified Firmware
  * Copyright (C) 2015 by Ray Wang (ray@opensprinkler.com)
  *
  * Utility functions
@@ -37,7 +37,7 @@ extern OpenSprinkler os;
 		extern SdFat sd;
 	#endif
 
-#else // RPI/BBB
+#else // RPI/LINUX
 
 static char* get_runtime_path() {
 	static char path[PATH_MAX];

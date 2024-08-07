@@ -1,4 +1,4 @@
-/* OpenSprinkler Unified (AVR/RPI/BBB/LINUX) Firmware
+/* OpenSprinkler Unified Firmware
  * Copyright (C) 2015 by Ray Wang (ray@opensprinkler.com)
  *
  * Utility functions header file
@@ -26,7 +26,7 @@
 
 #if defined(ARDUINO)
 	#include <Arduino.h>
-#else // headers for RPI/BBB
+#else // headers for RPI/LINUX
 	#include <stdio.h>
 	#include <limits.h>
 	#include <sys/time.h>
@@ -69,7 +69,7 @@ void str2mac(const char *_str, unsigned char mac[]);
 
 #if defined(ARDUINO)
 
-#else // Arduino compatible functions for RPI/BBB
+#else // Arduino compatible functions for RPI/LINUX
 	const char* get_data_dir();
 	void set_data_dir(const char *new_data_dir);
 	char* get_filename_fullpath(const char *filename);
