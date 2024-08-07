@@ -1055,6 +1055,8 @@ void check_weather() {
 void turn_on_station(unsigned char sid, ulong duration) {
 	// RAH implementation of flow sensor
 	flow_start=0;
+	//Added flow_gallons reset to station turn on.
+	flow_gallons=0;
 
 	if (os.set_station_bit(sid, 1, duration)) {
 		push_message(NOTIFY_STATION_ON, sid, duration);
