@@ -215,44 +215,27 @@ struct gpiod_line* gpio_lines[] = {
 	NULL, NULL, NULL, NULL, NULL,
 };
 
-bool prefix(const char *pre, const char *str) {
-    return strncmp(pre, str, strlen(pre)) == 0;
-}
-
 int assert_gpiod_chip() {
 	if( !chip ) {
         const char *chip_name = NULL;
 
-        FILE *file = fopen("/proc/device-tree/compatible", "rb");
-        if (file != NULL) {
-            char buffer[100];
-
-            int total = fread(buffer, 1, sizeof(buffer), file);
-
-            if (prefix("raspberrypi", buffer)) {
-                const char *cpu_buf = buffer;
-                size_t index = 0;
-
-                // model and cpu is seperated by a null byte
-                while (index < (total - 1) && cpu_buf[index]) {
-                    index += 1;
-                }
-
-                cpu_buf += index + 1;  
-                
-                if (!strcmp("brcm,bcm2712", cpu_buf)) {
-                    // Pi 5
-                    chip_name = "pinctrl-rp1";
-                } else if (!strcmp("brcm,bcm2711", cpu_buf)) {
-                    // Pi 4
-                    chip_name = "pinctrl-bcm2711";
-                } else if (!strcmp("brcm,bcm2837", cpu_buf)
-                || !strcmp("brcm,bcm2836", cpu_buf)
-                || !strcmp("brcm,bcm2835", cpu_buf)) {
-                    // Pi 0-3
-                    chip_name = "pinctrl-bcm2835";
-                }
-            }
+        switch (get_board_type()) {
+            case BoardType::RaspberryPi_bcm2712:
+                chip_name = "pinctrl-rp1";
+                break;
+            case BoardType::RaspberryPi_bcm2711:
+                chip_name = "pinctrl-bcm2711";
+                break;
+            case BoardType::RaspberryPi_bcm2837:
+            case BoardType::RaspberryPi_bcm2836:
+            case BoardType::RaspberryPi_bcm2835:
+                chip_name = "pinctrl-bcm2835";
+                break;
+            case BoardType::Unknown: 
+            case BoardType::RaspberryPi_Unknown: 
+            default:
+            // Unknown chip
+            break;
         }
 
         

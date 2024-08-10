@@ -76,8 +76,13 @@ extern char tmp_buffer[];
 extern char ether_buffer[];
 extern ProgramData pd;
 
-#if defined(ESP8266)
+#if defined(USE_SSD1306)
 	SSD1306Display OpenSprinkler::lcd(0x3c, SDA, SCL);
+#elif defined(USE_LCD)
+	LiquidCrystal OpenSprinkler::lcd;
+#endif
+
+#if defined(ESP8266)
 	unsigned char OpenSprinkler::state = OS_STATE_INITIAL;
 	unsigned char OpenSprinkler::prev_station_bits[MAX_NUM_BOARDS];
 	IOEXP* OpenSprinkler::expanders[MAX_NUM_BOARDS/2];
@@ -89,13 +94,11 @@ extern ProgramData pd;
 	unsigned char OpenSprinkler::wifi_channel=255;
 	unsigned char OpenSprinkler::wifi_testmode = 0;
 #elif defined(ARDUINO)
-	LiquidCrystal OpenSprinkler::lcd;
 	extern SdFat sd;
 #else
 	#if defined(OSPI)
 		unsigned char OpenSprinkler::pin_sr_data = PIN_SR_DATA;
 	#endif
-	// todo future: LCD define for Linux-based systems
 #endif
 
 #if defined(USE_OTF)
@@ -795,16 +798,16 @@ void OpenSprinkler::update_dev() {
 }
 #endif // end network init functions
 
-#if defined(ARDUINO)
+#if defined(USE_DISPLAY)
 /** Initialize LCD */
 void OpenSprinkler::lcd_start() {
 
-#if defined(ESP8266)
+#if defined(USE_SSD1306)
 	// initialize SSD1306
 	lcd.init();
 	lcd.begin();
 	flash_screen();
-#else
+#elif defined(USE_LCD)
 	// initialize 16x2 character LCD
 	// turn on lcd
 	lcd.init(1, PIN_LCD_RS, 255, PIN_LCD_EN, PIN_LCD_D4, PIN_LCD_D5, PIN_LCD_D6, PIN_LCD_D7, 0,0,0,0);
@@ -957,6 +960,12 @@ void OpenSprinkler::begin() {
 
 #endif
 
+#if defined(OSPI)
+pinModeExt(PIN_BUTTON_1, INPUT_PULLUP);
+pinModeExt(PIN_BUTTON_2, INPUT_PULLUP);
+pinModeExt(PIN_BUTTON_3, INPUT_PULLUP);
+#endif
+
 	// Reset all stations
 	clear_all_station_bits();
 	apply_all_station_bits();
@@ -1037,27 +1046,28 @@ void OpenSprinkler::begin() {
 		baseline_current = 0;
 
 	#endif
-
+#endif
+#if defined(USE_DISPLAY)
 	lcd_start();
 
-	#if defined(ESP8266)
+	#if defined(USE_SSD1306)
 		lcd.createChar(ICON_ETHER_CONNECTED, _iconimage_ether_connected);
 		lcd.createChar(ICON_ETHER_DISCONNECTED, _iconimage_ether_disconnected);
-	#else
+		lcd.createChar(ICON_WIFI_CONNECTED, _iconimage_wifi_connected);
+		lcd.createChar(ICON_WIFI_DISCONNECTED, _iconimage_wifi_disconnected);
+	#elif defined(USE_LCD)
 		lcd.createChar(ICON_ETHER_CONNECTED, _iconimage_connected);
 		lcd.createChar(ICON_ETHER_DISCONNECTED, _iconimage_disconnected);
 	#endif
+
 	lcd.createChar(ICON_REMOTEXT, _iconimage_remotext);
 	lcd.createChar(ICON_RAINDELAY, _iconimage_raindelay);
 	lcd.createChar(ICON_RAIN, _iconimage_rain);
 	lcd.createChar(ICON_SOIL, _iconimage_soil);
+#endif
 
+#if defined(ARDUINO)
 	#if defined(ESP8266)
-
-		/* create custom characters */
-		lcd.createChar(ICON_WIFI_CONNECTED, _iconimage_wifi_connected);
-		lcd.createChar(ICON_WIFI_DISCONNECTED, _iconimage_wifi_disconnected);
-
 		lcd.setCursor(0,0);
 		lcd.print(F("Init file system"));
 		lcd.setCursor(0,1);
@@ -1761,8 +1771,9 @@ unsigned char OpenSprinkler::weekday_today() {
 	ulong wd = now_tz() / 86400L;
 	return (wd+3) % 7;	// Jan 1, 1970 is a Thursday
 #else
-	return 0;
-	// todo future: is this function needed for RPI/LINUX
+	time_t t = time(NULL);
+	struct tm *tm = localtime(&t);
+	return (tm->tm_wday+6) % 7;
 #endif
 }
 
@@ -2499,6 +2510,7 @@ void OpenSprinkler::raindelay_stop() {
 }
 
 /** LCD and button functions */
+#if defined(USE_DISPLAY)
 #if defined(ARDUINO)		// AVR LCD and button functions
 /** print a program memory string */
 #if defined(ESP8266)
@@ -2528,6 +2540,28 @@ void OpenSprinkler::lcd_print_line_clear_pgm(PGM_P PROGMEM str, unsigned char li
 	for(; (16-cnt) >= 0; cnt ++) lcd_print_pgm(PSTR(" "));
 }
 
+#else
+void OpenSprinkler::lcd_print_pgm(const char *str) {
+	lcd.print(str);
+}
+void OpenSprinkler::lcd_print_line_clear_pgm(const char *str, uint8_t line) {
+	char buf[16];
+	uint8_t c;
+	int8_t cnt = 0;
+	while((c=*str++)!= '\0' && cnt<16) {
+		buf[cnt] = c;
+		cnt++;
+	}
+
+	for(int i=cnt; i<16; i++) buf[i] = ' ';
+
+	lcd.setCursor(0, line);
+	lcd.print(buf);
+}
+
+#define PGSTR(s) s
+#endif
+
 void OpenSprinkler::lcd_print_2digit(int v)
 {
 	lcd.print((int)(v/10));
@@ -2537,21 +2571,29 @@ void OpenSprinkler::lcd_print_2digit(int v)
 /** print time to a given line */
 void OpenSprinkler::lcd_print_time(time_os_t t)
 {
-#if defined(ESP8266)
+#if defined(USE_SSD1306)
 	lcd.setAutoDisplay(false);
 #endif
 	lcd.setCursor(0, 0);
 	lcd_print_2digit(hour(t));
+	
 	lcd_print_pgm(PSTR(":"));
+
 	lcd_print_2digit(minute(t));
+
 	lcd_print_pgm(PSTR("  "));
+
 	// each weekday string has 3 characters + ending 0
 	lcd_print_pgm(days_str+4*weekday_today());
+
 	lcd_print_pgm(PSTR(" "));
+
 	lcd_print_2digit(month(t));
+
 	lcd_print_pgm(PSTR("-"));
+
 	lcd_print_2digit(day(t));
-#if defined(ESP8266)
+#if defined(USE_SSD1306)
 	lcd.display();
 	lcd.setAutoDisplay(true);
 #endif
@@ -2559,37 +2601,61 @@ void OpenSprinkler::lcd_print_time(time_os_t t)
 
 /** print ip address */
 void OpenSprinkler::lcd_print_ip(const unsigned char *ip, unsigned char endian) {
-#if defined(ESP8266)
+#if defined(USE_SSD1306)
 	lcd.clear(0, 1);
-#else
+	lcd.setAutoDisplay(false);
+#elif defined(USE_LCD)
 	lcd.clear();
 #endif
 	lcd.setCursor(0, 0);
 	for (unsigned char i=0; i<4; i++) {
 		lcd.print(endian ? (int)ip[3-i] : (int)ip[i]);
-		if(i<3) lcd_print_pgm(PSTR("."));
+		
+		if(i<3) {
+			lcd_print_pgm(PSTR("."));
+		}
 	}
+
+	#if defined(USE_SSD1306)
+		lcd.display();
+		lcd.setAutoDisplay(true);
+	#endif
 }
 
 /** print mac address */
 void OpenSprinkler::lcd_print_mac(const unsigned char *mac) {
+	#if defined(USE_SSD1306)
+		lcd.setAutoDisplay(false); // reduce screen drawing time by turning off display() when drawing individual characters
+	#endif
 	lcd.setCursor(0, 0);
 	for(unsigned char i=0; i<6; i++) {
-		if(i)  lcd_print_pgm(PSTR("-"));
+		if(i) {
+			lcd_print_pgm(PSTR("-"));
+		}
+
 		lcd.print((mac[i]>>4), HEX);
 		lcd.print((mac[i]&0x0F), HEX);
 		if(i==4) lcd.setCursor(0, 1);
 	}
+    #if defined(ARDUINO)
 	if(useEth) {
 		lcd_print_pgm(PSTR(" (Ether MAC)"));
 	} else {
 		lcd_print_pgm(PSTR(" (WiFi MAC)"));
 	}
+    #else
+        lcd_print_pgm(PSTR(" (MAC)"));
+    #endif
+
+	#if defined(USE_SSD1306)
+		lcd.display();
+		lcd.setAutoDisplay(true);
+	#endif
 }
 
 /** print station bits */
 void OpenSprinkler::lcd_print_screen(char c) {
-#if defined(ESP8266)
+#if defined(USE_SSD1306)
 	lcd.setAutoDisplay(false); // reduce screen drawing time by turning off display() when drawing individual characters
 #endif
 	lcd.setCursor(0, 1);
@@ -2677,9 +2743,12 @@ void OpenSprinkler::lcd_print_screen(char c) {
 	lcd.write(status.network_fails>2?ICON_ETHER_DISCONNECTED:ICON_ETHER_CONNECTED);  // if network failure detection is more than 2, display disconnect icon
 #endif
 
-#if defined(ESP8266)
-
-	if(useEth || (get_wifi_mode()==WIFI_MODE_STA && WiFi.status()==WL_CONNECTED && WiFi.localIP())) {
+#if defined(USE_SSD1306)
+    #if defined(ESP8266)
+    if(useEth || (get_wifi_mode()==WIFI_MODE_STA && WiFi.status()==WL_CONNECTED && WiFi.localIP())) {
+    #else
+    {
+    #endif
 		lcd.setCursor(0, -1);
 		if(status.rain_delayed) {
 			lcd.print(F("<Rain Delay On> "));
@@ -2691,17 +2760,21 @@ void OpenSprinkler::lcd_print_screen(char c) {
 			lcd.print(F(" (System Idle)  "));
 		}
 
+    #if defined(ESP8266)
 		lcd.setCursor(2, 2);
 		if(status.program_busy && !status.pause_state) {
 			//lcd.print(F("Curr: "));
 			lcd.print(read_current());
 			lcd.print(F(" mA      "));
 		} else {
+    #else
+        {
+    #endif
 			lcd.clear(2, 2);
 		}
 	}
-#endif
-#if defined(ESP8266)
+
+
 	lcd.display();
 	lcd.setAutoDisplay(true);
 #endif
@@ -2804,6 +2877,7 @@ void OpenSprinkler::lcd_print_option(int i) {
 
 }
 
+
 /** Button functions */
 /** wait for button */
 unsigned char OpenSprinkler::button_read_busy(unsigned char pin_butt, unsigned char waitmode, unsigned char butt, unsigned char is_holding) {
@@ -2854,6 +2928,8 @@ unsigned char OpenSprinkler::button_read(unsigned char waitmode)
 
 	return ret;
 }
+
+#if defined(ARDUINO)
 
 /** user interface for setting options during startup */
 void OpenSprinkler::ui_set_options(int oid)
@@ -2920,6 +2996,9 @@ void OpenSprinkler::ui_set_options(int oid)
 	lcd.noBlink();
 }
 
+#else
+#endif  // end of LCD and button functions
+
 /** Set LCD contrast (using PWM) */
 void OpenSprinkler::lcd_set_contrast() {
 #ifdef PIN_LCD_CONTRAST
@@ -2954,7 +3033,7 @@ void OpenSprinkler::lcd_set_brightness(unsigned char value) {
 		}
 	}
 
-#elif defined(ESP8266)
+#elif defined(USE_SSD1306)
 	if (value) {lcd.displayOn();lcd.setBrightness(255); }
 	else {
 		if(iopts[IOPT_LCD_DIMMING]==0) lcd.displayOff();
@@ -2962,9 +3041,10 @@ void OpenSprinkler::lcd_set_brightness(unsigned char value) {
 	}
 #endif
 }
-#endif  // end of LCD and button functions
 
-#if defined(ESP8266)
+
+
+#if defined(USE_SSD1306)
 #include "images.h"
 void OpenSprinkler::flash_screen() {
 	lcd.setCursor(0, -1);
@@ -2989,6 +3069,12 @@ void OpenSprinkler::set_screen_led(unsigned char status) {
 	lcd.display();
 	lcd.setColor(WHITE);
 }
+
+#endif
+
+#endif
+
+#if defined(ESP8266)
 
 void OpenSprinkler::reset_to_ap() {
 	iopts[IOPT_WIFI_MODE] = WIFI_MODE_AP;
