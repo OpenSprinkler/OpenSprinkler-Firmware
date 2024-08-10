@@ -250,6 +250,25 @@ void ui_state_machine() {
 				uint16_t httpport = (uint16_t)(os.iopts[IOPT_HTTPPORT_1]<<8) + (uint16_t)os.iopts[IOPT_HTTPPORT_0];
 				os.lcd.print(httpport);
 				os.lcd_print_pgm(PSTR(" (ip:port)"));
+				#if defined(USE_OTF)
+					os.lcd.setCursor(0, 2);
+					os.lcd_print_pgm(PSTR("OTC:"));
+					switch(otf->getCloudStatus()) {
+						case OTF::NOT_ENABLED:
+							os.lcd_print_pgm(PSTR(" not enabled"));
+							break;
+						case OTF::UNABLE_TO_CONNECT:
+							os.lcd_print_pgm(PSTR("connecting.."));
+							break;
+						case OTF::DISCONNECTED:
+							os.lcd_print_pgm(PSTR("disconnected"));
+							break;
+						case OTF::CONNECTED:
+							os.lcd_print_pgm(PSTR(" Connected"));
+							break;
+					}
+				#endif
+				
 				ui_state = UI_STATE_DISP_IP;
 				#if defined(USE_SSD1306)
 					os.lcd.display();
