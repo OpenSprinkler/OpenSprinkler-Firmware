@@ -35,7 +35,7 @@ typedef unsigned long ulong;
 														// if this number is different from the one stored in non-volatile memory
 														// a device reset will be automatically triggered
 
-#define OS_FW_MINOR      0  // Firmware minor version
+#define OS_FW_MINOR      1  // Firmware minor version
 
 /** Hardware version base numbers */
 #define OS_HW_VERSION_BASE   0x00 // OpenSprinkler
@@ -453,7 +453,7 @@ enum {
 
 	#define USE_DISPLAY
 	#define USE_SSD1306
-	
+
 #else // for demo / simulation
 	// use fake hardware pins
 	#if defined(DEMO)
