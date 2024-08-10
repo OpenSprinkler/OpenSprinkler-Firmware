@@ -1881,8 +1881,9 @@ void server_delete_log(OTF_PARAMS_DEF) {
 }
 
 /**
- * Command: "/pq?pw=x&dur=x"
+ * Command: "/pq?pw=x&dur=x&repl=x"
  * dur: duration (in units of seconds)
+ * repl: replace (in units of seconds) (New UI allows for replace, extend, and pause using this)
  */
 void server_pause_queue(OTF_PARAMS_DEF) {
 #if defined(USE_OTF)
@@ -1892,6 +1893,19 @@ void server_pause_queue(OTF_PARAMS_DEF) {
 #endif
 
 	ulong duration = 0;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("repl"), true)) {
+		duration = strtoul(tmp_buffer, NULL, 0);
+		pd.resume_stations();
+		os.status.pause_state = 0;
+		if(duration != 0){
+			os.pause_timer = duration;
+			pd.set_pause();
+			os.status.pause_state = 1;
+		}
+		
+		handle_return(HTML_SUCCESS);
+	}
+
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("dur"), true)) {
 		duration = strtoul(tmp_buffer, NULL, 0);
 	}
