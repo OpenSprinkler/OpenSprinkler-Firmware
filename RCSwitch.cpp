@@ -172,9 +172,16 @@ void RCSwitch::send(uint32_t code, uint16_t length) {
 void RCSwitch::transmit(HighLow pulses) {
   uint8_t firstLogicLevel = (this->protocol.invertedSignal) ? LOW : HIGH;
   uint8_t secondLogicLevel = (this->protocol.invertedSignal) ? HIGH : LOW;
-  
+ 
+  ulong timeout = micros() + this->protocol.pulseLength * pulses.high; 
   digitalWrite(this->nTransmitterPin, firstLogicLevel);
-  delayMicroseconds( this->protocol.pulseLength * pulses.high);
+  while(micros() < timeout) {
+    delayMicroseconds(5);
+  }
+
+  timeout = micros() + this->protocol.pulseLength * pulses.low;
   digitalWrite(this->nTransmitterPin, secondLogicLevel);
-  delayMicroseconds( this->protocol.pulseLength * pulses.low);
+  while(micros() < timeout) {
+    delayMicroseconds(5);
+  }
 }
