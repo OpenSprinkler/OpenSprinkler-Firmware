@@ -1,6 +1,7 @@
 # Running OpenSprinkler via Docker
 
-Before trying to build the docker image, you need to download the submodules:
+Before trying to build the docker image, you need to download the submodules. 
+You can do it via:
 ```sh
 git submodule update --recursive --init
 ```
