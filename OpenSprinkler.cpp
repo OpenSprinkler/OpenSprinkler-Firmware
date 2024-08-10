@@ -1762,10 +1762,7 @@ unsigned char OpenSprinkler::weekday_today() {
 	return (wd+3) % 7;	// Jan 1, 1970 is a Thursday
 #else
 	return 0;
-<<<<<<< HEAD
-=======
 	// todo future: is this function needed for RPI/LINUX
->>>>>>> rfstation-update
 #endif
 }
 
@@ -1854,37 +1851,6 @@ void OpenSprinkler::clear_all_station_bits() {
 	}
 }
 
-<<<<<<< HEAD
-/** Transmit one RF signal bit */
-void transmit_rfbit(ulong lenH, ulong lenL) {
-	digitalWriteExt(PIN_RFTX, 1);
-	delayMicroseconds(lenH);
-	digitalWriteExt(PIN_RFTX, 0);
-	delayMicroseconds(lenL);
-}
-
-/** Transmit RF signal */
-void send_rfsignal(ulong code, ulong len) {
-	ulong len3 = len * 3;
-	ulong len31 = len * 31;
-	for(unsigned char n=0;n<15;n++) {
-		int i=23;
-		// send code
-		while(i>=0) {
-			if ((code>>i) & 1) {
-				transmit_rfbit(len3, len);
-			} else {
-				transmit_rfbit(len, len3);
-			}
-			i--;
-		};
-		// send sync
-		transmit_rfbit(len, len31);
-	}
-}
-
-=======
->>>>>>> rfstation-update
 /** Switch RF station
  * This function takes a RF code,
  * parses it into signals and timing,
@@ -1896,24 +1862,10 @@ void OpenSprinkler::switch_rfstation(RFStationData *data, bool turnon) {
 
 	if(PIN_RFTX == 255) return; // ignore RF station if RF pin disabled
 
-<<<<<<< HEAD
-
-#if defined(ESP8266)
-	rfswitch.enableTransmit(PIN_RFTX);
-	rfswitch.setProtocol(1);
-	rfswitch.setPulseLength(length);
-	rfswitch.send(turnon ? on : off, 24);
-#else
-	send_rfsignal(turnon ? on : off, length);
-#endif
-
-
-=======
 	rfswitch.enableTransmit(PIN_RFTX);
 	rfswitch.setProtocol(code.protocol);
 	rfswitch.setPulseLength(code.timing);
 	rfswitch.send(turnon ? code.on : code.off, code.bitlength);
->>>>>>> rfstation-update
 }
 
 /** Switch GPIO station
