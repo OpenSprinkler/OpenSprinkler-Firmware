@@ -1,10 +1,16 @@
 #!/bin/bash
 set -e
 
-while getopts ":s" opt; do
+DEBUG=""
+
+while getopts ":s:d" opt; do
   case $opt in
     s)
 	  SILENT=true
+	  command shift
+      ;;
+    d)
+      DEBUG="-DENABLE_DEBUG -DSERIAL_DEBUG"
 	  command shift
       ;;
   esac
@@ -28,42 +34,29 @@ if [ "$1" == "demo" ]; then
 
     ws=$(ls external/TinyWebsockets/tiny_websockets_lib/src/*.cpp)
     otf=$(ls external/OpenThings-Framework-Firmware-Library/*.cpp)
-    g++ -o OpenSprinkler -DDEMO -DSMTP_OPENSSL -std=c++14 -include string.h main.cpp OpenSprinkler.cpp program.cpp opensprinkler_server.cpp utils.cpp weather.cpp gpio.cpp mqtt.cpp smtp.c -Iexternal/TinyWebsockets/tiny_websockets_lib/include $ws -Iexternal/OpenThings-Framework-Firmware-Library/ $otf -lpthread -lmosquitto -lssl -lcrypto
-elif [ "$1" == "osbo" ]; then
-	echo "Installing required libraries..."
-	apt-get install -y libmosquitto-dev libssl-dev
-	echo "Compiling osbo firmware..."
-
-    ws=$(ls external/TinyWebsockets/tiny_websockets_lib/src/*.cpp)
-    otf=$(ls external/OpenThings-Framework-Firmware-Library/*.cpp)
-	g++ -o OpenSprinkler -DOSBO -DSMTP_OPENSSL -std=c++14 -include string.h main.cpp OpenSprinkler.cpp program.cpp opensprinkler_server.cpp utils.cpp weather.cpp gpio.cpp mqtt.cpp smtp.c -Iexternal/TinyWebsockets/tiny_websockets_lib/include $ws -Iexternal/OpenThings-Framework-Firmware-Library/ $otf -lpthread -lmosquitto -lssl -lcrypto
+    g++ -o OpenSprinkler -DDEMO -DSMTP_OPENSSL $DEBUG -std=c++14 -include string.h main.cpp OpenSprinkler.cpp program.cpp opensprinkler_server.cpp utils.cpp weather.cpp gpio.cpp mqtt.cpp smtp.c RCSwitch.cpp -Iexternal/TinyWebsockets/tiny_websockets_lib/include $ws -Iexternal/OpenThings-Framework-Firmware-Library/ $otf -lpthread -lmosquitto -lssl -lcrypto
 else
 	echo "Installing required libraries..."
 	apt-get update
-	apt-get install -y libmosquitto-dev raspi-gpio libi2c-dev libssl-dev libgpiod-dev
-	if ! command -v raspi-gpio &> /dev/null
-	then
-		echo "Command raspi-gpio is required and is not installed"
-		exit 0
-	fi
+	apt-get install -y libmosquitto-dev raspi-gpio libi2c-dev libssl-dev libgpiod-dev gpiod
 
-	USEGPIO=""
-	GPIOLIB=""
-
-
-	if [ -h "/sys/class/gpio/gpiochip512" ]; then
-		echo "using libgpiod"
-		USEGPIO="-DLIBGPIOD"
-		GPIOLIB="-lgpiod"
-	fi
+	USEGPIO="-DLIBGPIOD"
+	GPIOLIB="-lgpiod"
 
 	echo "Compiling ospi firmware..."
     ws=$(ls external/TinyWebsockets/tiny_websockets_lib/src/*.cpp)
     otf=$(ls external/OpenThings-Framework-Firmware-Library/*.cpp)
-	g++ -o OpenSprinkler -DOSPI $USEGPIO -DSMTP_OPENSSL -std=c++14 -include string.h main.cpp OpenSprinkler.cpp program.cpp opensprinkler_server.cpp utils.cpp weather.cpp gpio.cpp mqtt.cpp smtp.c -Iexternal/TinyWebsockets/tiny_websockets_lib/include $ws -Iexternal/OpenThings-Framework-Firmware-Library/ $otf -lpthread -lmosquitto -lssl -lcrypto $GPIOLIB
+	g++ -o OpenSprinkler -DOSPI $USEGPIO -DSMTP_OPENSSL $DEBUG -std=c++14 -include string.h main.cpp OpenSprinkler.cpp program.cpp opensprinkler_server.cpp utils.cpp weather.cpp gpio.cpp mqtt.cpp smtp.c RCSwitch.cpp -Iexternal/TinyWebsockets/tiny_websockets_lib/include $ws -Iexternal/OpenThings-Framework-Firmware-Library/ $otf -lpthread -lmosquitto -lssl -lcrypto $GPIOLIB
 fi
 
-if [ ! "$SILENT" = true ] && [ -f OpenSprinkler.launch ] && [ ! -f /etc/init.d/OpenSprinkler.sh ]; then
+if [ -f /etc/init.d/OpenSprinkler.sh ]; then
+    echo "Detected the only init.d start up script, removing."
+    echo "If you still want OpenSprinkler to launch on startup make sure when you run the build script to answer \"Y\" to the following question."
+    /etc/init.d/OpenSprinkler.sh stop
+    rm /etc/init.d/OpenSprinkler.sh
+fi
+
+if [ ! "$SILENT" = true ] && [ -f OpenSprinkler.service ] && [ -f startOpenSprinkler.sh ] && [ ! -f /etc/systemd/system/OpenSprinkler.service ]; then
 
 	read -p "Do you want to start OpenSprinkler on startup? " -n 1 -r
 	echo
@@ -72,28 +65,25 @@ if [ ! "$SILENT" = true ] && [ -f OpenSprinkler.launch ] && [ ! -f /etc/init.d/O
 		exit 0
 	fi
 
-	echo "Adding OpenSprinkler launch script..."
+	echo "Adding OpenSprinkler launch service..."
 
 	# Get current directory (binary location)
-	pushd `dirname $0` > /dev/null
-	DIR=`pwd`
+	pushd "$(dirname $0)" > /dev/null
+	DIR="$(pwd)"
 	popd > /dev/null
 
 	# Update binary location in start up script
-	sed -e 's,\_\_OpenSprinkler\_Path\_\_,'"$DIR"',g' OpenSprinkler.launch > OpenSprinkler.sh
+	sed -e 's,\_\_OpenSprinkler\_Path\_\_,'"$DIR"',g' OpenSprinkler.service > /etc/systemd/system/OpenSprinkler.service
 
 	# Make file executable
-	chmod +x OpenSprinkler.sh
+	chmod +x startOpenSprinkler.sh
 
-	# Move start up script to init.d directory
-	sudo mv OpenSprinkler.sh /etc/init.d/
+    # Reload systemd
+    systemctl daemon-reload
 
-	# Add to auto-launch on system startup
-	sudo update-rc.d OpenSprinkler.sh defaults
-
-	# Start the deamon now
-	sudo /etc/init.d/OpenSprinkler.sh start
-
+    # Enable and start the service
+    systemctl enable OpenSprinkler
+    systemctl start OpenSprinkler
 fi
 
 echo "Done!"

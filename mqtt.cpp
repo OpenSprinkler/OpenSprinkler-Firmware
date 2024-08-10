@@ -1,4 +1,4 @@
-/* OpenSprinkler Unified (AVR/RPI/BBB/LINUX/ESP8266) Firmware
+/* OpenSprinkler Unified Firmware
  * Copyright (C) 2015 by Ray Wang (ray@opensprinkler.com)
  *
  * OpenSprinkler library
@@ -590,7 +590,7 @@ const char * OSMqtt::_state_string(int rc) {
 }
 #else
 
-/************************** RASPBERRY PI / BBB / DEMO ****************************************/
+/************************** RASPBERRY PI / Linux ****************************************/
 
 static bool _connected = false;
 

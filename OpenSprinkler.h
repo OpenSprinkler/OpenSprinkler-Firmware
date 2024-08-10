@@ -1,4 +1,4 @@
-/* OpenSprinkler Unified (AVR/RPI/BBB/LINUX/ESP8266) Firmware
+/* OpenSprinkler Unified Firmware
  * Copyright (C) 2015 by Ray Wang (ray@opensprinkler.com)
  *
  * OpenSprinkler library header file
@@ -31,11 +31,13 @@
 #include "gpio.h"
 #include "images.h"
 #include "mqtt.h"
+#include "RCSwitch.h"
 
 #if defined(ARDUINO) // headers for Arduino
 	#include <Arduino.h>
 	#include <Wire.h>
 	#include <SPI.h>
+	#include <RCSwitch.h>
 	#include "I2CRTC.h"
 
 	#if defined(ESP8266) // for ESP8266
@@ -43,7 +45,6 @@
 		#include <LittleFS.h>
 		#include <ENC28J60lwIP.h>
 		#include <W5500lwIP.h>
-		#include <RCSwitch.h>
 		#include <OpenThingsFramework.h>
 		#include <DNSServer.h>
 		#include <Ticker.h>
@@ -56,7 +57,7 @@
 		#include "LiquidCrystal.h"
 	#endif
 
-#else // headers for RPI/BBB/LINUX
+#else // headers for RPI/LINUX
 	#include <time.h>
 	#include <string.h>
 	#include <unistd.h>
@@ -147,6 +148,23 @@ struct StationData {
 
 /** RF station data structures - Must fit in STATION_SPECIAL_DATA_SIZE */
 struct RFStationData {
+	unsigned char version;
+	unsigned char on[8];
+	unsigned char off[8];
+	unsigned char timing[4];
+	unsigned char protocol[2];
+	unsigned char bitlength[2];
+};
+
+struct RFStationCode {
+	uint32_t on;
+	uint32_t off;
+	uint16_t timing;
+	uint8_t protocol;
+	uint8_t bitlength;
+};
+
+struct RFStationDataClassic {
 	unsigned char on[6];
 	unsigned char off[6];
 	unsigned char timing[4];
@@ -217,7 +235,7 @@ public:
 #elif defined(ARDUINO)
 	static LiquidCrystal lcd;   // 16x2 character LCD
 #else
-	// todo: LCD define for RPI/BBB
+	// todo: LCD define for RPI/LINUX
 #endif
 
 #if defined(OSPI)
@@ -295,7 +313,7 @@ public:
 	//static StationAttrib get_station_attrib(unsigned char sid); // get station attribute
 	static void attribs_save(); // repackage attrib bits and save (backward compatibility)
 	static void attribs_load(); // load and repackage attrib bits (backward compatibility)
-	static uint16_t parse_rfstation_code(RFStationData *data, ulong *on, ulong *off); // parse rf code into on/off/time sections
+	static bool parse_rfstation_code(RFStationData *data, RFStationCode *code); // parse rf code into on/off/time sections
 	static void switch_rfstation(RFStationData *data, bool turnon);  // switch rf station
 	static void switch_remotestation(RemoteIPStationData *data, bool turnon, uint16_t dur=0); // switch remote IP station
 	static void switch_remotestation(RemoteOTCStationData *data, bool turnon, uint16_t dur=0); // switch remote OTC station
@@ -390,7 +408,7 @@ public:
 	#if defined(ESP8266)
 	static IOEXP *mainio, *drio;
 	static IOEXP *expanders[];
-	static RCSwitch rfswitch;
+	
 	static void detect_expanders();
 	static void flash_screen();
 	static void toggle_screen_led();
@@ -424,6 +442,7 @@ private:
 	#endif
 #endif // LCD functions
 	static unsigned char engage_booster;
+	static RCSwitch rfswitch;
 
 	#if defined(USE_OTF)
 	static void parse_otc_config();

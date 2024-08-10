@@ -1,4 +1,4 @@
-/* OpenSprinkler Unified (AVR/RPI/BBB/LINUX/ESP8266) Firmware
+/* OpenSprinkler Unified Firmware
  * Copyright (C) 2015 by Ray Wang (ray@opensprinkler.com)
  *
  * OpenSprinkler library
@@ -70,6 +70,7 @@ unsigned char OpenSprinkler::attrib_dis[MAX_NUM_BOARDS];
 unsigned char OpenSprinkler::attrib_spe[MAX_NUM_BOARDS];
 unsigned char OpenSprinkler::attrib_grp[MAX_NUM_STATIONS];
 unsigned char OpenSprinkler::masters[NUM_MASTER_ZONES][NUM_MASTER_OPTS];
+RCSwitch OpenSprinkler::rfswitch;
 
 extern char tmp_buffer[];
 extern char ether_buffer[];
@@ -82,8 +83,6 @@ extern ProgramData pd;
 	IOEXP* OpenSprinkler::expanders[MAX_NUM_BOARDS/2];
 	IOEXP* OpenSprinkler::mainio; // main controller IO expander object
 	IOEXP* OpenSprinkler::drio; // driver board IO expander object
-	RCSwitch OpenSprinkler::rfswitch;
-
 	String OpenSprinkler::wifi_ssid="";
 	String OpenSprinkler::wifi_pass="";
 	unsigned char OpenSprinkler::wifi_bssid[6]={0};
@@ -360,7 +359,7 @@ unsigned char OpenSprinkler::iopts[] = {
 #if defined(ARDUINO)  // on AVR, the default HTTP port is 80
 	80, // this and next byte define http port number
 	0,
-#else // on RPI/BBB/LINUX, the default HTTP port is 8080
+#else // on RPI/LINUX, the default HTTP port is 8080
 	144,// this and next byte define http port number
 	31,
 #endif
@@ -712,7 +711,7 @@ void OpenSprinkler::reboot_dev(uint8_t cause) {
 #endif
 }
 
-#else // RPI/BBB/LINUX network init functions
+#else // RPI/LINUX network init functions
 
 #include "etherport.h"
 #include <sys/reboot.h>
@@ -1564,18 +1563,28 @@ static ulong hex2ulong(unsigned char *code, unsigned char len) {
 	return v;
 }
 
-/** Parse RF code into on/off/timeing sections */
-uint16_t OpenSprinkler::parse_rfstation_code(RFStationData *data, ulong* on, ulong *off) {
-	ulong v;
-	v = hex2ulong(data->on, sizeof(data->on));
-	if (!v) return 0;
-	if (on) *on = v;
-	v = hex2ulong(data->off, sizeof(data->off));
-	if (!v) return 0;
-	if (off) *off = v;
-	v = hex2ulong(data->timing, sizeof(data->timing));
-	if (!v) return 0;
-	return v;
+/** Parse RF  station data into code */
+bool OpenSprinkler::parse_rfstation_code(RFStationData *data, RFStationCode *code) {
+	if(!code) return false;
+	code->timing = 0; // temporarily set it to 0
+	if(data->version=='H') {
+		// this is version G rf code data (25 bytes long including version signature at the beginning)
+		code->on = hex2ulong(data->on, sizeof(data->on));
+		code->off = hex2ulong(data->off, sizeof(data->off));
+		code->timing = hex2ulong(data->timing, sizeof(data->timing));
+		code->protocol = hex2ulong(data->protocol, sizeof(data->protocol));
+		code->bitlength = hex2ulong(data->bitlength, sizeof(data->bitlength));
+	} else {
+		// this is classic rf code data (16 bytes long, assuming protocol=1 and bitlength=24)
+		RFStationDataClassic *classic = (RFStationDataClassic*)data;
+		code->on = hex2ulong(classic->on, sizeof(classic->on));
+		code->off = hex2ulong(classic->off, sizeof(classic->off));
+		code->timing = hex2ulong(classic->timing, sizeof(classic->timing));
+		code->protocol = 1;
+		code->bitlength = 24;
+	}
+	if(!code->timing) return false;
+	return true;
 }
 
 /** Get station data */
@@ -1753,6 +1762,10 @@ unsigned char OpenSprinkler::weekday_today() {
 	return (wd+3) % 7;	// Jan 1, 1970 is a Thursday
 #else
 	return 0;
+<<<<<<< HEAD
+=======
+	// todo future: is this function needed for RPI/LINUX
+>>>>>>> rfstation-update
 #endif
 }
 
@@ -1841,6 +1854,7 @@ void OpenSprinkler::clear_all_station_bits() {
 	}
 }
 
+<<<<<<< HEAD
 /** Transmit one RF signal bit */
 void transmit_rfbit(ulong lenH, ulong lenL) {
 	digitalWriteExt(PIN_RFTX, 1);
@@ -1869,17 +1883,20 @@ void send_rfsignal(ulong code, ulong len) {
 	}
 }
 
+=======
+>>>>>>> rfstation-update
 /** Switch RF station
  * This function takes a RF code,
  * parses it into signals and timing,
  * and sends it out through RF transmitter.
  */
 void OpenSprinkler::switch_rfstation(RFStationData *data, bool turnon) {
-	ulong on, off;
-	uint16_t length = parse_rfstation_code(data, &on, &off);
+	RFStationCode code;
+	if(!parse_rfstation_code(data, &code)) return; // return if the timing parameter is 0
 
 	if(PIN_RFTX == 255) return; // ignore RF station if RF pin disabled
 
+<<<<<<< HEAD
 
 #if defined(ESP8266)
 	rfswitch.enableTransmit(PIN_RFTX);
@@ -1891,6 +1908,12 @@ void OpenSprinkler::switch_rfstation(RFStationData *data, bool turnon) {
 #endif
 
 
+=======
+	rfswitch.enableTransmit(PIN_RFTX);
+	rfswitch.setProtocol(code.protocol);
+	rfswitch.setPulseLength(code.timing);
+	rfswitch.send(turnon ? code.on : code.off, code.bitlength);
+>>>>>>> rfstation-update
 }
 
 /** Switch GPIO station
