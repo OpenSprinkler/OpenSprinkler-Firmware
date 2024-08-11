@@ -459,8 +459,8 @@ private:
 	static void latch_setzoneoutput_v2(unsigned char sid, unsigned char A, unsigned char K);
 	static void latch_apply_all_station_bits();
 	static unsigned char prev_station_bits[];
-	static unsigned char engage_booster;
 #endif // LCD functions
+	static unsigned char engage_booster;
 	static RCSwitch rfswitch;
 
 	#if defined(USE_OTF)

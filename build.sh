@@ -54,7 +54,7 @@ if [ "$1" == "demo" ]; then
 else
 	echo "Installing required libraries..."
 	apt-get update
-	apt-get install -y libmosquitto-dev raspi-gpio libi2c-dev libssl-dev libgpiod-dev gpiod
+	apt-get install -y libmosquitto-dev libi2c-dev libssl-dev libgpiod-dev gpiod
     enable_i2c
 
 	USEGPIO="-DLIBGPIOD"
