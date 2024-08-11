@@ -1,7 +1,9 @@
 /* OpenSprinkler Unified (AVR/RPI/BBB/LINUX) Firmware
  * Copyright (C) 2015 by Ray Wang (ray@opensprinkler.com)
  *
- * Weather functions header file
+ * Header file containing declarations of functions defined in main.cpp,
+ * but called by other translation units.
+ * 
  * Feb 2015 @ OpenSprinkler.com
  *
  * This file is part of the OpenSprinkler library
@@ -18,25 +20,20 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see
- * <http://www.gnu.org/licenses/>
+ * <http://www.gnu.org/licenses/>.
  */
 
 
-#ifndef _WEATHER_H
-#define _WEATHER_H
+#ifndef _MAIN_H
+#define _MAIN_H 1
 
-#define WEATHER_UPDATE_SUNRISE  0x01
-#define WEATHER_UPDATE_SUNSET   0x02
-#define WEATHER_UPDATE_EIP      0x04
-#define WEATHER_UPDATE_WL       0x08
-#define WEATHER_UPDATE_TZ       0x10
-#define WEATHER_UPDATE_RD       0x20
+void turn_off_station(unsigned char sid, time_os_t curr_time, unsigned char shift=0);
+void schedule_all_stations(time_os_t curr_time);
+void process_dynamic_events(time_os_t curr_time);
+void reset_all_stations();
+void reset_all_stations_immediate();
+void delete_log(char *name);
+void write_log(unsigned char type, time_os_t curr_time);
+void make_logfile_name(char *name);
 
-void GetWeather();
-
-extern char wt_rawData[];
-extern int wt_errCode;
-extern unsigned char wt_monthly[];
-void load_wt_monthly(char* wto);
-void apply_monthly_adjustment(time_os_t curr_time);
-#endif  // _WEATHER_H
+#endif // _MAIN_H
