@@ -369,7 +369,6 @@ void OSMqtt::begin(void) {
 	// JSON configuration settings in the form of {"en":0|1,"host":"server_name|IP address","port":1883,"user:"","pass":"","pubt":"","subt":""}
 	char *config = tmp_buffer + 1;
 	os.sopt_load(SOPT_MQTT_OPTS, config);
-	os.sopt_load(SOPT_MQTT_OPTS2, config+MAX_SOPTS_SIZE);
 
 	if(*config != 0) {
 		// Add the wrapping curly braces to the string

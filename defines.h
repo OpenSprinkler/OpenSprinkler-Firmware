@@ -31,7 +31,7 @@ typedef unsigned long ulong;
 #define TMP_BUFFER_SIZE      320   // scratch buffer size
 
 /** Firmware version, hardware version, and maximal values */
-#define OS_FW_VERSION  231  // Firmware version: 220 means 2.2.0
+#define OS_FW_VERSION  232  // Firmware version: 220 means 2.2.0
 														// if this number is different from the one stored in non-volatile memory
 														// a device reset will be automatically triggered
 
@@ -281,7 +281,6 @@ enum {
 	SOPT_OTC_OPTS,
 	SOPT_DEVICE_NAME,
 	SOPT_STA_BSSID_CHL, // wifi extra info: bssid and channel
-	SOPT_MQTT_OPTS2, // MQTT Extra if url+user+pass > 160
 	SOPT_EMAIL_OPTS,
 	NUM_SOPTS // total number of string options
 };

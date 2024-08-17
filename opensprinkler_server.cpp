@@ -1177,9 +1177,8 @@ void server_json_controller_main(OTF_PARAMS_DEF) {
 #else
 	os.load_hardware_mac(mac, true);
 #endif
-	char mqtt_opt[MAX_SOPTS_SIZE*2];
+	char mqtt_opt[MAX_SOPTS_SIZE];
 	os.sopt_load(SOPT_MQTT_OPTS, mqtt_opt);
-	os.sopt_load(SOPT_MQTT_OPTS2, mqtt_opt+MAX_SOPTS_SIZE);
 
 	bfill.emit_p(PSTR("\"mac\":\"$X:$X:$X:$X:$X:$X\","), mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 
@@ -1521,12 +1520,10 @@ void server_change_options(OTF_PARAMS_DEF)
 	if(findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("mqtt"), true, &keyfound)) {
 		urlDecode(tmp_buffer);
 		os.sopt_save(SOPT_MQTT_OPTS, tmp_buffer);
-		os.sopt_save(SOPT_MQTT_OPTS2, tmp_buffer+MAX_SOPTS_SIZE);
 		os.status.req_mqtt_restart = true;
 	} else if (keyfound) {
 		tmp_buffer[0]=0;
 		os.sopt_save(SOPT_MQTT_OPTS, tmp_buffer);
-		os.sopt_save(SOPT_MQTT_OPTS2, tmp_buffer+MAX_SOPTS_SIZE);
 		os.status.req_mqtt_restart = true;
 	}
 
@@ -3409,10 +3406,25 @@ URLHandler urls[] = {
 	server_change_scripturl,// cu
 	server_json_all,        // ja
 	server_pause_queue,     // pq
+	server_sensor_config_userdef,//si
+	server_sensorurl_get,//sj
+	server_sensorurl_config,//sk
+	server_sensor_config,//sc
+	server_sensor_list,//sl
+	server_sensor_get,//sg
+	server_sensor_readnow,//sr
+	server_set_sensor_address,//sa
+	server_sensorlog_list,//so
+	server_sensorlog_clear,//sn
+	server_sensorprog_config,//sb
+	server_sensorprog_calc,//sd
+	server_sensorprog_list,//se
+	server_sensor_types,//sf
+	server_usage,//du
+	server_sensorprog_types,//sh
+	server_sensorconfig_backup,//sx
 	server_json_debug,      // db
-#if defined(ARDUINO)
 	//server_fill_files,
-#endif
 };
 
 // handle Ethernet request

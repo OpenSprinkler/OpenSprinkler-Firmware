@@ -831,7 +831,7 @@ void push_message(Sensor_t *sensor) {
     strcat_P(postval, PSTR("\"}"));
 
     // char postBuffer[1500];
-    BufferFiller bf;
+    BufferFiller bf = BufferFiller(ether_buffer, ETHER_BUFFER_SIZE*2);
     bf.emit_p(PSTR("POST /trigger/sprinkler/with/key/$O HTTP/1.0\r\n"
                    "Host: $S\r\n"
                    "Accept: */*\r\n"
@@ -839,8 +839,7 @@ void push_message(Sensor_t *sensor) {
                    "Content-Type: application/json\r\n\r\n$S"),
               SOPT_IFTTT_KEY, DEFAULT_IFTTT_URL, strlen(postval), postval);
 
-    os.send_http_request(DEFAULT_IFTTT_URL, 80, ether_buffer,
-                         sensor_remote_http_callback);
+    os.send_http_request(DEFAULT_IFTTT_URL, 80, ether_buffer, sensor_remote_http_callback);
     DEBUG_PRINTLN("push ifttt2");
   }
 }
@@ -1045,7 +1044,7 @@ int read_sensor_http(Sensor_t *sensor, ulong time) {
   DEBUG_PRINTLN(F("read_sensor_http"));
 
   char *p = tmp_buffer;
-  BufferFiller bf;
+  BufferFiller bf = BufferFiller(ether_buffer, ETHER_BUFFER_SIZE*2);
 
   bf.emit_p(PSTR("GET /sg?pw=$O&nr=$D"), SOPT_PASSWORD, sensor->id);
   bf.emit_p(PSTR(" HTTP/1.0\r\nHOST: $D.$D.$D.$D\r\n\r\n"), ip[0], ip[1], ip[2],
@@ -1056,8 +1055,7 @@ int read_sensor_http(Sensor_t *sensor, ulong time) {
   char server[20];
   sprintf(server, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
 
-  int res = os.send_http_request(server, sensor->port, p, NULL, 2000,
-                                 1);  // timeout=2000, tries=1
+  int res = os.send_http_request(server, sensor->port, p, NULL, false, 500);
   if (res == HTTP_RQT_SUCCESS) {
     DEBUG_PRINTLN("Send Ok");
     p = ether_buffer;
@@ -2191,7 +2189,7 @@ void GetSensorWeather() {
   if (time < last_weather_time + 60 * 60) return;
 
   // use temp buffer to construct get command
-  BufferFiller bf;
+  BufferFiller bf = BufferFiller(tmp_buffer, TMP_BUFFER_SIZE);
   bf.emit_p(PSTR("weatherData?loc=$O&wto=$O"), SOPT_LOCATION,
             SOPT_WEATHER_OPTS);
 
@@ -2230,8 +2228,7 @@ void GetSensorWeather() {
   DEBUG_PRINTLN(F("GetSensorWeather"));
   DEBUG_PRINTLN(ether_buffer);
 
-  int ret = os.send_http_request(host, ether_buffer, NULL, 2000,
-                                 1);  // timeout=2000, ntries=1
+  int ret = os.send_http_request(host, ether_buffer, NULL, false, 500);
   if (ret == HTTP_RQT_SUCCESS) {
     last_weather_time = time;
     DEBUG_PRINTLN(ether_buffer);
