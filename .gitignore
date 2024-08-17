@@ -13,3 +13,7 @@ opensprinkler_server.cpp.bak
 opensprinkler_server.h~
 sensor.bak
 *~
+*.o
+!build.sh
+!startOpenSprinkler.sh
+!updater.sh

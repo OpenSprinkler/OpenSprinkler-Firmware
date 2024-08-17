@@ -815,7 +815,7 @@ void push_message(Sensor_t *sensor) {
     os.mqtt.publish(topic, payload);
     DEBUG_PRINTLN("push mqtt2");
   }
-  if (os.iopts[IOPT_IFTTT_ENABLE]) {
+  if (os.iopts[IOPT_NOTIF_ENABLE]) {
     DEBUG_PRINTLN("push ifttt");
     strcpy_P(postval, PSTR("{\"value1\":\"On site ["));
     os.sopt_load(SOPT_DEVICE_NAME, postval + strlen(postval));
@@ -831,7 +831,7 @@ void push_message(Sensor_t *sensor) {
     strcat_P(postval, PSTR("\"}"));
 
     // char postBuffer[1500];
-    BufferFiller bf = ether_buffer;
+    BufferFiller bf;
     bf.emit_p(PSTR("POST /trigger/sprinkler/with/key/$O HTTP/1.0\r\n"
                    "Host: $S\r\n"
                    "Accept: */*\r\n"
@@ -1045,7 +1045,7 @@ int read_sensor_http(Sensor_t *sensor, ulong time) {
   DEBUG_PRINTLN(F("read_sensor_http"));
 
   char *p = tmp_buffer;
-  BufferFiller bf = p;
+  BufferFiller bf;
 
   bf.emit_p(PSTR("GET /sg?pw=$O&nr=$D"), SOPT_PASSWORD, sensor->id);
   bf.emit_p(PSTR(" HTTP/1.0\r\nHOST: $D.$D.$D.$D\r\n\r\n"), ip[0], ip[1], ip[2],
@@ -2191,7 +2191,7 @@ void GetSensorWeather() {
   if (time < last_weather_time + 60 * 60) return;
 
   // use temp buffer to construct get command
-  BufferFiller bf = tmp_buffer;
+  BufferFiller bf;
   bf.emit_p(PSTR("weatherData?loc=$O&wto=$O"), SOPT_LOCATION,
             SOPT_WEATHER_OPTS);
 

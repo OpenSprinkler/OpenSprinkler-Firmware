@@ -15,7 +15,7 @@ public:
 	SSD1306Display(uint8_t _addr, uint8_t _sda, uint8_t _scl) : SSD1306(_addr, _sda, _scl) {
 		cx = 0;
 		cy = 0;
-		for(byte i=0;i<NUM_CUSTOM_ICONS;i++) custom_chars[i]=NULL;
+		for(unsigned char i=0;i<NUM_CUSTOM_ICONS;i++) custom_chars[i]=NULL;
 	}
 	void begin() {
 		Wire.setClock(400000L); // lower clock to 400kHz
@@ -50,7 +50,7 @@ public:
 		setColor(WHITE);
 
 		if(c<NUM_CUSTOM_ICONS && custom_chars[c]!=NULL) {
-			drawXbm(cx, cy, fontWidth, fontHeight, (const byte*) custom_chars[c]);
+			drawXbm(cx, cy, fontWidth, fontHeight, (const unsigned char*) custom_chars[c]);
 		} else {
 			drawString(cx, cy, String((char)c));
 		}
@@ -68,7 +68,7 @@ public:
 		if(auto_display) display();	// todo: not very efficient
 		return nc;
 	}
-	void createChar(byte idx, PGM_P ptr) {
+	void createChar(unsigned char idx, PGM_P ptr) {
 		if(idx>=0&&idx<NUM_CUSTOM_ICONS) custom_chars[idx]=ptr;
 	}
 	void setAutoDisplay(bool v) {auto_display=v;}

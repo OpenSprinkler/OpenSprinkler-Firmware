@@ -4,11 +4,15 @@
 
 This is a unified OpenSprinkler firmware for Arduino, and Linux-based OpenSprinklers such as OpenSprinkler Pi.
 
-For OS (Arduino-based OpenSprinkler) 2.x:
-https://openthings.freshdesk.com/support/solutions/articles/5000165132-how-to-compile-opensprinkler-firmware
+Compilation instructions for OS (Arduino-based OpenSprinkler) 2.3 and 3.x:
+* Install VS Code
+* Launch VS Code, search and install the platformio extension.
+* Download and unzip the OpenSprinkler firmware repository, open the folder in VS Code, at the bottom of the screen, click PlatformIO:Build. The firmware repository contains platformio.ini which has all the information needed for PlatformIO to build the firmware.
+Additional details:
+https://openthings.freshdesk.com/support/solutions/articles/5000165132
 
 For OSPi/OSBO or other Linux-based OpenSprinkler:
-https://openthings.freshdesk.com/support/solutions/articles/5000631599-installing-and-updating-the-unified-firmware
+https://openthings.freshdesk.com/support/solutions/articles/5000631599
 
 ============================================
 Questions and comments:

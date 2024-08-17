@@ -20,7 +20,7 @@ int main(int argc, char* argv[])
   printf("-----------------------------------------\n");
 
   char command[100];
-  sprintf(command, "ls *.html > %s", LIST_FNAME);
+  snprintf(command, 100, "ls *.html > %s", LIST_FNAME);
   system(command);
   FILE *lp = fopen(LIST_FNAME, "rb");
   if(!lp) {file_error(LIST_FNAME); return 0;}
