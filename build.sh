@@ -15,6 +15,12 @@ while getopts ":s:d" opt; do
       ;;
   esac
 done
+
+if [ ! "$SILENT" <> true ] ;then
+	echo "This version has a new configuration data structure. Please backup configuration and restore after update!"
+	read -p "Press ctrl-c to stop now or enter to continue"
+fi
+
 echo "Building OpenSprinkler..."
 
 #Git update submodules

@@ -1044,7 +1044,7 @@ int read_sensor_http(Sensor_t *sensor, ulong time) {
   DEBUG_PRINTLN(F("read_sensor_http"));
 
   char *p = tmp_buffer;
-  BufferFiller bf = BufferFiller(ether_buffer, ETHER_BUFFER_SIZE*2);
+  BufferFiller bf = BufferFiller(tmp_buffer, TMP_BUFFER_SIZE);
 
   bf.emit_p(PSTR("GET /sg?pw=$O&nr=$D"), SOPT_PASSWORD, sensor->id);
   bf.emit_p(PSTR(" HTTP/1.0\r\nHOST: $D.$D.$D.$D\r\n\r\n"), ip[0], ip[1], ip[2],
