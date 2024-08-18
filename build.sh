@@ -46,15 +46,15 @@ elif [ "$1" == "osbo" ]; then
 else
 	echo "Installing required libraries..."
 	apt-get update
-	apt-get install -y libmosquitto-dev
-	apt-get install -y raspi-gpio
+	apt-get install -y libmosquitto-dev raspi-gpio libi2c-dev libssl-dev libgpiod-dev
 	if ! command -v raspi-gpio &> /dev/null
 	then
 		echo "Command raspi-gpio is required and is not installed"
 		exit 0
 	fi
-	echo "Compiling firmware..."
-	g++ -o OpenSprinkler -DOSPI main.cpp OpenSprinkler.cpp program.cpp opensprinkler_server.cpp utils.cpp weather.cpp gpio.cpp etherport.cpp mqtt.cpp sensors.cpp -lpthread -lmosquitto
+	
+
+	source build2.sh	
 fi
 
 if [ ! "$SILENT" = true ] && [ -f OpenSprinkler.service ] && [ -f startOpenSprinkler.sh ] && [ ! -f /etc/systemd/system/OpenSprinkler.service ]; then

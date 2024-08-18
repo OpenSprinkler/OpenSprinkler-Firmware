@@ -166,12 +166,12 @@ typedef struct Sensor {
   int16_t offset2;  // offset unit value 1/100 - for custom sensor (after):
                     //   sensorvalue = (read_value-offset_mv/1000) * factor /
                     //   divider + offset2/100
-  byte assigned_unitid;  // unitid for userdef and mqtt sensors
-  byte undef[15];        // for later
+  unsigned char assigned_unitid;  // unitid for userdef and mqtt sensors
+  unsigned char undef[15];        // for later
   // unstored:
   bool mqtt_init : 1;
   bool mqtt_push : 1;
-  byte unitid;
+  unsigned char unitid;
   uint32_t repeat_read;
   double repeat_data;
   uint64_t repeat_native;
@@ -216,7 +216,7 @@ typedef struct ProgSensorAdjust {
   double factor2;
   double min;
   double max;
-  byte undef[32];  // for later
+  unsigned char undef[32];  // for later
   ProgSensorAdjust *next;
 } ProgSensorAdjust_t;
 #define PROGSENSOR_STORE_SIZE \
@@ -263,19 +263,19 @@ typedef struct SensorUrl {
 #define RS485_TRUEBNER4_ADDR 0x3B
 
 void sensor_api_init();
-byte get_asb_detected_boards();
+unsigned char get_asb_detected_boards();
 
 Sensor_t *getSensors();
 const char *getSensorUnit(int unitid);
 const char *getSensorUnit(Sensor_t *sensor);
-byte getSensorUnitId(int type);
-byte getSensorUnitId(Sensor_t *sensor);
+unsigned char getSensorUnitId(int type);
+unsigned char getSensorUnitId(Sensor_t *sensor);
 
 extern char ether_buffer[];
 extern char tmp_buffer[];
 
 // Utils:
-uint16_t CRC16(byte buf[], int len);
+uint16_t CRC16(unsigned char buf[], int len);
 
 // Sensor API functions:
 int sensor_delete(uint nr);

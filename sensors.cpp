@@ -40,7 +40,7 @@
 #include "sensor_ospi_pcf8591.h"
 #endif
 
-byte findKeyVal(const char *str, char *strbuf, uint16_t maxlen, const char *key,
+unsigned char findKeyVal(const char *str, char *strbuf, uint16_t maxlen, const char *key,
                 bool key_in_pgm = false, uint8_t *keyfound = NULL);
 
 // All sensors:
@@ -48,7 +48,7 @@ static Sensor_t *sensors = NULL;
 static time_t last_save_time = 0;
 
 // Boards:
-static byte asb_detected_boards = 0;  // bit 1=0x48+0x49 bit 2=0x4A+0x4B
+static unsigned char asb_detected_boards = 0;  // bit 1=0x48+0x49 bit 2=0x4A+0x4B
 
 // Sensor URLS:
 static SensorUrl_t *sensorUrls = NULL;
@@ -87,7 +87,7 @@ double current_humidity = 0.0;
 double current_precip = 0.0;
 double current_wind = 0.0;
 
-uint16_t CRC16(byte buf[], int len) {
+uint16_t CRC16(unsigned char buf[], int len) {
   uint16_t crc = 0xFFFF;
 
   for (int pos = 0; pos < len; pos++) {
@@ -154,7 +154,7 @@ void detect_asb_board() {
   }
 }
 
-byte get_asb_detected_boards() { return asb_detected_boards; }
+unsigned char get_asb_detected_boards() { return asb_detected_boards; }
 /*
  * init sensor api and load data
  */
@@ -804,7 +804,7 @@ void push_message(Sensor_t *sensor) {
     os.sopt_load(SOPT_DEVICE_NAME, topic);
     strncat_P(topic, PSTR("/analogsensor/"), sizeof(topic) - 1);
     strncat(topic, sensor->name, sizeof(topic) - 1);
-    sprintf_P(payload,
+    snprintf_P(payload, TMP_BUFFER_SIZE,
               PSTR("{\"nr\":%u,\"type\":%u,\"data_ok\":%u,\"time\":%u,"
                    "\"value\":%d.%02d,\"unit\":\"%s\"}"),
               sensor->nr, sensor->type, sensor->flags.data_ok,
@@ -822,7 +822,7 @@ void push_message(Sensor_t *sensor) {
     strcat_P(postval, PSTR("], "));
 
     strcat_P(postval, PSTR("analogsensor "));
-    sprintf_P(postval + strlen(postval),
+    snprintf_P(postval + strlen(postval), TMP_BUFFER_SIZE - strlen(postval),
               PSTR("nr: %u, type: %u, data_ok: %u, time: %u, value: %d.%02d, "
                    "unit: %s"),
               sensor->nr, sensor->type, sensor->flags.data_ok,
@@ -1032,13 +1032,13 @@ bool extract(char *s, char *buf, int maxlen) {
 int read_sensor_http(Sensor_t *sensor, ulong time) {
 #if defined(ESP8266)
   IPAddress _ip(sensor->ip);
-  byte ip[4] = {_ip[0], _ip[1], _ip[2], _ip[3]};
+  unsigned char ip[4] = {_ip[0], _ip[1], _ip[2], _ip[3]};
 #else
-  byte ip[4];
-  ip[3] = (byte)((sensor->ip >> 24) & 0xFF);
-  ip[2] = (byte)((sensor->ip >> 16) & 0xFF);
-  ip[1] = (byte)((sensor->ip >> 8) & 0xFF);
-  ip[0] = (byte)((sensor->ip & 0xFF));
+  unsigned char ip[4];
+  ip[3] = (unsigned char)((sensor->ip >> 24) & 0xFF);
+  ip[2] = (unsigned char)((sensor->ip >> 16) & 0xFF);
+  ip[1] = (unsigned char)((sensor->ip >> 8) & 0xFF);
+  ip[0] = (unsigned char)((sensor->ip & 0xFF));
 #endif
 
   DEBUG_PRINTLN(F("read_sensor_http"));
@@ -1215,26 +1215,18 @@ int read_sensor_ip(Sensor_t *sensor) {
 
 #if defined(ARDUINO)
   IPAddress _ip(sensor->ip);
-  byte ip[4] = {_ip[0], _ip[1], _ip[2], _ip[3]};
+  unsigned char ip[4] = {_ip[0], _ip[1], _ip[2], _ip[3]};
 #else
-  byte ip[4];
-  ip[3] = (byte)((sensor->ip >> 24) & 0xFF);
-  ip[2] = (byte)((sensor->ip >> 16) & 0xFF);
-  ip[1] = (byte)((sensor->ip >> 8) & 0xFF);
-  ip[0] = (byte)((sensor->ip & 0xFF));
+  unsigned char ip[4];
+  ip[3] = (unsigned char)((sensor->ip >> 24) & 0xFF);
+  ip[2] = (unsigned char)((sensor->ip >> 16) & 0xFF);
+  ip[1] = (unsigned char)((sensor->ip >> 8) & 0xFF);
+  ip[0] = (unsigned char)((sensor->ip & 0xFF));
 #endif
   char server[20];
   sprintf(server, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
-#if defined(ESP8266)
   client->setTimeout(200);
   if (!client->connect(server, sensor->port)) {
-#else
-  struct hostent *host = gethostbyname(server);
-  if (!host) {
-    return HTTP_RQT_CONNECT_ERR;
-  }
-  if (!client->connect((uint8_t *)host->h_addr, sensor->port)) {
-#endif
     DEBUG_PRINT(server);
     DEBUG_PRINT(":");
     DEBUG_PRINT(sensor->port);
@@ -1573,26 +1565,18 @@ int set_sensor_address_ip(Sensor_t *sensor, uint8_t new_address) {
 #endif
 #if defined(ESP8266)
   IPAddress _ip(sensor->ip);
-  byte ip[4] = {_ip[0], _ip[1], _ip[2], _ip[3]};
+  unsigned char ip[4] = {_ip[0], _ip[1], _ip[2], _ip[3]};
 #else
-  byte ip[4];
-  ip[3] = (byte)((sensor->ip >> 24) & 0xFF);
-  ip[2] = (byte)((sensor->ip >> 16) & 0xFF);
-  ip[1] = (byte)((sensor->ip >> 8) & 0xFF);
-  ip[0] = (byte)((sensor->ip & 0xFF));
+  unsigned char ip[4];
+  ip[3] = (unsigned char)((sensor->ip >> 24) & 0xFF);
+  ip[2] = (unsigned char)((sensor->ip >> 16) & 0xFF);
+  ip[1] = (unsigned char)((sensor->ip >> 8) & 0xFF);
+  ip[0] = (unsigned char)((sensor->ip & 0xFF));
 #endif
   char server[20];
   sprintf(server, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
-#if defined(ESP8266)
   client->setTimeout(200);
   if (!client->connect(server, sensor->port)) {
-#else
-  struct hostent *host = gethostbyname(server);
-  if (!host) {
-    return HTTP_RQT_CONNECT_ERR;
-  }
-  if (!client->connect((uint8_t *)host->h_addr, sensor->port)) {
-#endif
     DEBUG_PRINT(F("Cannot connect to "));
     DEBUG_PRINT(server);
     DEBUG_PRINT(":");
@@ -2028,7 +2012,7 @@ boolean sensor_isgroup(Sensor_t *sensor) {
   }
 }
 
-byte getSensorUnitId(int type) {
+unsigned char getSensorUnitId(int type) {
   switch (type) {
     case SENSOR_SMT100_MOIS:
       return UNIT_PERCENT;
@@ -2092,7 +2076,7 @@ byte getSensorUnitId(int type) {
   }
 }
 
-byte getSensorUnitId(Sensor_t *sensor) {
+unsigned char getSensorUnitId(Sensor_t *sensor) {
   if (!sensor) return 0;
 
   switch (sensor->type) {

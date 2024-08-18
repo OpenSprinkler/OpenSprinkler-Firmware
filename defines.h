@@ -511,6 +511,8 @@ enum {
 	#include <stdlib.h>
 	#include <string.h>
 	#include <stddef.h>
+	inline void itoa(int v,char *s,int b)   {sprintf(s,"%d",v);}
+	inline void ultoa(unsigned long v,char *s,int b) {sprintf(s,"%lu",v);}
 	#define pgm_read_byte(x) *(x)
 	#define PSTR(x)      x
 	#define F(x)         x

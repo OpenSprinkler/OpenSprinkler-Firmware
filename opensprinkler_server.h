@@ -29,6 +29,10 @@
 #include <unistd.h>
 #endif
 
+#if defined(ESP8266) || defined(OSPI)
+#define OTF_ENABLED
+#endif
+
 char dec2hexchar(unsigned char dec);
 
 class BufferFiller {

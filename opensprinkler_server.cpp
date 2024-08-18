@@ -3043,7 +3043,7 @@ void server_sensor_types(OTF_PARAMS_DEF) {
 			continue;
 		if (i > 0)
 			bfill.emit_p(PSTR(","));
-		byte unitid = getSensorUnitId(type);
+		unsigned char unitid = getSensorUnitId(type);
 		bfill.emit_p(PSTR("{\"type\":$D,\"name\":\"$S\",\"unit\":\"$S\",\"unitid\":$D}"),
 			type, sensor_names[i], getSensorUnit(unitid), unitid);
 		send_packet(OTF_PARAMS);
@@ -3179,7 +3179,7 @@ void server_sensorprog_calc(OTF_PARAMS_DEF) {
 		handle_return(HTML_DATA_MISSING);
 	progAdj.max = atof(tmp_buffer); // Max value
 
-	byte unitId = getSensorUnitId(sensor);
+	unsigned char unitId = getSensorUnitId(sensor);
 
 	int diff = progAdj.max-progAdj.min;
 	int minEx = progAdj.min - diff/2;
