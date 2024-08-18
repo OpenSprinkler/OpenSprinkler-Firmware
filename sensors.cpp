@@ -1112,8 +1112,8 @@ int read_sensor_http(Sensor_t *sensor, ulong time) {
  * @param sensor
  * @return int
  */
-int read_sensor_i2c(Sensor_t *sensor) {
-  DEBUG_PRINTLN(F("read_sensor_i2c"));
+int read_sensor_rs485(Sensor_t *sensor) {
+  DEBUG_PRINTLN(F("read_sensor_rs485"));
   int device = sensor->port % 4;
   if ((asb_detected_boards & (RS485_TRUEBNER1 << device)) == 0) 
     return HTTP_RQT_NOT_RECEIVED;
@@ -1128,7 +1128,7 @@ int read_sensor_i2c(Sensor_t *sensor) {
     return HTTP_RQT_NOT_RECEIVED;
   }
 
-  DEBUG_PRINTLN(F("read_sensor_i2c: check-ok"));
+  DEBUG_PRINTLN(F("read_sensor_rs485: check-ok"));
 
   uint8_t type = sensor->type == SENSOR_SMT100_TEMP   ? 0x00
                  : sensor->type == SENSOR_SMT100_MOIS ? 0x01
@@ -1139,7 +1139,7 @@ int read_sensor_i2c(Sensor_t *sensor) {
     Wire.write((uint8_t)sensor->id);
     Wire.write(type);
     if (Wire.endTransmission() == 0) {
-      DEBUG_PRINTF("read_sensor_i2c: request send: %d - %d\n", sensor->id,
+      DEBUG_PRINTF("read_sensor_rs485: request send: %d - %d\n", sensor->id,
                    type);
       sensor->repeat_read = 1;
       i2c_rs485_allocated[device] = sensor->nr;
@@ -1156,7 +1156,7 @@ int read_sensor_i2c(Sensor_t *sensor) {
     uint8_t high_byte = Wire.read();
     if (addr == sensor->id && reg == type) {
       uint16_t data = (high_byte << 8) | low_byte;
-      DEBUG_PRINTF("read_sensor_i2c: result: %d - %d (%d %d)\n", sensor->id,
+      DEBUG_PRINTF("read_sensor_rs485: result: %d - %d (%d %d)\n", sensor->id,
                    data, low_byte, high_byte);
       double value =
           sensor->type == SENSOR_SMT100_TEMP
@@ -1179,9 +1179,9 @@ int read_sensor_i2c(Sensor_t *sensor) {
     sensor->repeat_read = 0;
     sensor->flags.data_ok = false;
     i2c_rs485_allocated[device] = 0;
-    DEBUG_PRINTLN(F("read_sensor_i2c: timeout"));
+    DEBUG_PRINTLN(F("read_sensor_rs485: timeout"));
   }
-  DEBUG_PRINTLN(F("read_sensor_i2c: exit"));
+  DEBUG_PRINTLN(F("read_sensor_rs485: exit"));
   return HTTP_RQT_NOT_RECEIVED;
 }
 
@@ -1400,7 +1400,7 @@ int read_sensor(Sensor_t *sensor, ulong time) {
       if (sensor->ip) return read_sensor_ip(sensor);
 #ifdef ESP8266
       if (sensor->port == 0)  // 0 = Truebner RS485 Adapter
-        return read_sensor_i2c(sensor);
+        return read_sensor_rs485(sensor);
 #endif
       break;
 
