@@ -801,8 +801,7 @@ void push_message(Sensor_t *sensor) {
 
   if (os.mqtt.enabled()) {
     DEBUG_PRINTLN("push mqtt1");
-    os.sopt_load(SOPT_DEVICE_NAME, topic);
-    strncat_P(topic, PSTR("/analogsensor/"), sizeof(topic) - 1);
+    strncpy_P(topic, PSTR("analogsensor/"), sizeof(topic) - 1);
     strncat(topic, sensor->name, sizeof(topic) - 1);
     snprintf_P(payload, TMP_BUFFER_SIZE,
               PSTR("{\"nr\":%u,\"type\":%u,\"data_ok\":%u,\"time\":%u,"
