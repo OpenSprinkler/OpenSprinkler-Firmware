@@ -428,6 +428,7 @@ void OSMqtt::loop(void) {
 	// Only attemp to reconnect every MQTT_RECONNECT_DELAY seconds to avoid blocking the main loop
 	if (!_connected() && (millis() - last_reconnect_attempt >= MQTT_RECONNECT_DELAY * 1000UL)) {
 		DEBUG_LOGF("MQTT Loop: Reconnecting\r\n");
+		_done_subscribed = false;
 		_connect();
 		last_reconnect_attempt = millis();
 	}
