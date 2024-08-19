@@ -2346,8 +2346,24 @@ void OpenSprinkler::parse_otc_config() {
 /** Setup function for options */
 void OpenSprinkler::options_setup() {
 
+	//Convert old SOPTS
+	ulong fsize = file_size(SOPTS_FILENAME);
+	if (fsize >= 160 * 9 && fsize <= 160 * 13) {
+		DEBUG_PRINTLN("Converting SOPTS...");
+		#define SOPTS_TMP "sopts.dat.sav"
+		rename_file(SOPTS_FILENAME, SOPTS_TMP);
+		for (ulong pos = 0; pos < NUM_SOPTS; pos++) {
+			char buffer[MAX_SOPTS_SIZE];
+			memset(buffer, 0, sizeof(buffer));
+			file_read_block(SOPTS_TMP, buffer, pos*160, 160);
+			file_write_block(SOPTS_FILENAME, buffer, pos * MAX_SOPTS_SIZE, MAX_SOPTS_SIZE);
+		}
+		remove_file(SOPTS_TMP);
+		DEBUG_PRINTLN("Finished converting SOPTS!");
+	}
+
 	// Check reset conditions:
-	if (file_read_byte(IOPTS_FILENAME, IOPT_FW_VERSION)!=OS_FW_VERSION ||  // fw major version has changed
+	if (//file_read_byte(IOPTS_FILENAME, IOPT_FW_VERSION)!=OS_FW_VERSION ||  // fw major version has changed
 			!file_exists(DONE_FILENAME)) {  // done file doesn't exist
 
 		factory_reset();

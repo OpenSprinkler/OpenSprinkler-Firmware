@@ -289,7 +289,7 @@ ulong file_read_block(const char *fn, void *dst, ulong pos, ulong len) {
 	File f = LittleFS.open(fn, "r");
 	if(f) {
 		f.seek(pos, SeekSet);
-		f.read((unsigned char*)dst, len);
+		result = f.read((unsigned char*)dst, len);
 		f.close();
 	}
 
