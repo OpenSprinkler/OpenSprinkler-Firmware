@@ -684,10 +684,13 @@ void server_manual_program(OTF_PARAMS_DEF) {
 
 /**
  * Change run-once program
- * Command: /cr?pw=xxx&t=[x,x,x...]
+ * Command: /cr?pw=xxx&t=[x,x,x...]&cnt?=xxx&int?=xxx&uwt?=xxx
  *
  * pw: password
  * t:  station water time
+ * cnt?: repeat count
+ * int?: repeat interval
+ * uwt?: use weather adjustment
  */
 void server_change_runonce(OTF_PARAMS_DEF) {
 #if defined(USE_OTF)
@@ -717,11 +720,65 @@ void server_change_runonce(OTF_PARAMS_DEF) {
 	// reset all stations and prepare to run one-time program
 	reset_all_stations_immediate();
 
-	unsigned char sid, bid, s;
+	ProgramStruct prog;
+
 	uint16_t dur;
+	for(int i=0;i<os.nstations;i++) {
+		dur = parse_listdata(&pv);
+		prog.durations[i] = dur > 0 ? dur : 0;
+	}
+
+	//check if repeat count is defined and create program to perform the repetitions
+	if(findKeyVal(FKV_SOURCE,tmp_buffer,TMP_BUFFER_SIZE,PSTR("cnt"),true)){
+		prog.starttimes[1] = (uint16_t)atol(tmp_buffer) - 1;
+		if(prog.starttimes[1] >= 0){
+			if(findKeyVal(FKV_SOURCE,tmp_buffer,TMP_BUFFER_SIZE,PSTR("int"),true)){
+				prog.starttimes[2] = (uint16_t)atol(tmp_buffer);
+			}else{
+				handle_return(HTML_DATA_MISSING);
+			}
+			//check for positive interval length
+			if(prog.starttimes[2] < 1){
+				handle_return(HTML_DATA_OUTOFBOUND);
+			}
+			unsigned long curr_time = os.now_tz();
+
+			curr_time = (curr_time / 60) + prog.starttimes[2] + 1; //time in minutes for one interval past current time
+			uint16_t epoch_t = curr_time / 1440;
+
+			//if repeat count and interval are defined --> complete program
+			prog.enabled = 1;
+			prog.use_weather = 0;
+			if(findKeyVal(FKV_SOURCE,tmp_buffer,TMP_BUFFER_SIZE,PSTR("uwt"),true)){
+				if((uint16_t)atol(tmp_buffer)){
+					prog.use_weather = 1;
+				}
+			}
+			prog.oddeven = 0;
+			prog.type = 1;
+			prog.starttime_type = 0;
+			prog.en_daterange = 0;
+			prog.days[0] = (epoch_t >> 8) & 0b11111111; //one interval past current day in epoch time
+			prog.days[1] = epoch_t & 0b11111111; //one interval past current day in epoch time
+			prog.starttimes[0] = curr_time % 1440; //one interval past current time
+			strcpy_P(prog.name, "Run Once (Repeat)"); //TODO: Change name
+
+			//if no more repeats, remove interval to flag for deletion
+			if(prog.starttimes[1] == 0){
+				prog.starttimes[2] = 0;
+			}
+
+			if(!pd.add(&prog)){
+				handle_return(HTML_DATA_OUTOFBOUND);
+			}
+		}
+	}
+
+	//No repeat count defined or first repeat --> use old API
+	unsigned char sid, bid, s;
 	boolean match_found = false;
 	for(sid=0;sid<os.nstations;sid++) {
-		dur=parse_listdata(&pv);
+		dur=prog.durations[sid];
 		bid=sid>>3;
 		s=sid&0x07;
 		// if non-zero duration is given

@@ -761,7 +761,8 @@ void do_loop()
 			// check through all programs
 			for(pid=0; pid<pd.nprograms; pid++) {
 				pd.read(pid, &prog);	// todo future: reduce load time
-				unsigned char runcount = prog.check_match(curr_time);
+				bool will_delete = false;
+				unsigned char runcount = prog.check_match(curr_time, &will_delete);
 				if(runcount>0) {
 					// program match found
 					// check and process special program command
@@ -810,6 +811,10 @@ void do_loop()
 					}// for sid
 					if(match_found) {
 						push_message(NOTIFY_PROGRAM_SCHED, pid, prog.use_weather?os.iopts[IOPT_WATER_PERCENTAGE]:100);
+					}
+					//delete run-once if on final runtime (stations have already been queued)
+					if(will_delete){
+						pd.del(pid);
 					}
 				}// if check_match
 			}// for pid
@@ -999,9 +1004,10 @@ void do_loop()
 			if (!os.status.program_busy) {
 				// and if no program is scheduled to run in the next minute
 				bool willrun = false;
+				bool will_delete = false;
 				for(pid=0; pid<pd.nprograms; pid++) {
 					pd.read(pid, &prog);
-					if(prog.check_match(curr_time+60)) {
+					if(prog.check_match(curr_time+60, &will_delete)) {
 						willrun = true;
 						break;
 					}

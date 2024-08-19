@@ -63,6 +63,7 @@ void strReplace(char *, char c, char r);
 #define date_encode(m,d) ((m<<5)+d)
 #define MIN_ENCODED_DATE date_encode(1,1)
 #define MAX_ENCODED_DATE date_encode(12, 31)
+bool isLastDayofMonth(unsigned char month, unsigned char day);
 bool isValidDate(uint16_t date);
 #if defined(ESP8266)
 unsigned char hex2dec(const char *hex);

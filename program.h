@@ -41,10 +41,10 @@ struct LogStruct {
 	uint32_t endtime;
 };
 
-#define PROGRAM_TYPE_WEEKLY   0
-#define PROGRAM_TYPE_BIWEEKLY 1
-#define PROGRAM_TYPE_MONTHLY  2
-#define PROGRAM_TYPE_INTERVAL 3
+#define PROGRAM_TYPE_WEEKLY    0
+#define PROGRAM_TYPE_SINGLERUN 1
+#define PROGRAM_TYPE_MONTHLY   2
+#define PROGRAM_TYPE_INTERVAL  3
 
 #define STARTTIME_SUNRISE_BIT 14
 #define STARTTIME_SUNSET_BIT  13
@@ -67,7 +67,7 @@ public:
 	unsigned char oddeven:2;
 
 	// schedule type:
-	// 0: weekly, 1->biweekly, 2->monthly, 3->interval
+	// 0: weekly, 1->single-run, 2->monthly, 3->interval
 	unsigned char type:2;
 
 	// starttime type:
@@ -78,10 +78,10 @@ public:
 	// enable date range
 	unsigned char en_daterange:1;
 
-	// weekly:   days[0][0..6] correspond to Monday till Sunday
-	// bi-weekly:days[0][0..6] and [1][0..6] store two weeks
-	// monthly:  days[0][0..5] stores the day of the month (32 means last day of month)
-	// interval: days[1] stores the interval (0 to 255), days[0] stores the starting day remainder (0 to 254)
+	// weekly:    days[0][0..6] correspond to Monday till Sunday
+	// single-run:days[0] and [1] store the epoch time in days of the start 
+	// monthly:   days[0][0..5] stores the day of the month (32 means last day of month)
+	// interval:  days[1] stores the interval (0 to 255), days[0] stores the starting day remainder (0 to 254)
 	unsigned char days[2];
 
 	// When the program is a fixed start time type:
@@ -104,7 +104,7 @@ public:
 	char name[PROGRAM_NAME_SIZE];
 
 	int16_t daterange[2] = {MIN_ENCODED_DATE, MAX_ENCODED_DATE}; // date range: start date, end date
-	unsigned char check_match(time_os_t t);
+	unsigned char check_match(time_os_t t, bool *to_delete);
 	void gen_station_runorder(uint16_t runcount, unsigned char *order);
 	int16_t starttime_decode(int16_t t);
 
