@@ -1280,7 +1280,7 @@ void process_dynamic_events(time_os_t curr_time) {
  * this function determines the appropriate start and dequeue times
  * of stations bound to master stations with on and off adjustments
  */
-void handle_master_adjustments(time_os_t curr_time, RuntimeQueueStruct *q) {
+void handle_master_adjustments(time_os_t curr_time, RuntimeQueueStruct *q, byte gid, ulong *seq_start_times) {
 
 	int16_t start_adj = 0;
 	int16_t dequeue_adj = 0;
@@ -1303,6 +1303,7 @@ void handle_master_adjustments(time_os_t curr_time, RuntimeQueueStruct *q) {
 	// push back station's start time to allow sufficient time to turn on master
 	if (q->st - curr_time < abs(start_adj)) {
 		q->st += abs(start_adj);
+		seq_start_times[gid] += abs(start_adj);
 	}
 
 	q->deque_time = q->st + q->dur + dequeue_adj;
@@ -1350,7 +1351,7 @@ void schedule_all_stations(time_os_t curr_time) {
 			con_start_time++;
 		}
 
-		handle_master_adjustments(curr_time, q);
+		handle_master_adjustments(curr_time, q, gid, seq_start_times);
 
 		if (!os.status.program_busy) {
 			os.status.program_busy = 1;  // set program busy bit
