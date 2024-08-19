@@ -41,7 +41,7 @@
 //#define ENABLE_ATTACHMENTS
 
 // Uncomment to enable printing out nice debug messages.
-//#define EMAIL_SENDER_DEBUG
+#define EMAIL_SENDER_DEBUG
 
 // Define where debug output will be printed.
 #define DEBUG_PRINTER Serial
@@ -79,7 +79,7 @@
 // #define FORCE_DISABLE_SSL
 
 // If you want add a wrapper to emulate SSL over Client like EthernetClient
-// #define SSLCLIENT_WRAPPER
+//#define SSLCLIENT_WRAPPER
 
 // esp8266 microcontrollers configuration
 #ifndef DEFAULT_EMAIL_NETWORK_TYPE_ESP8266
@@ -136,7 +136,7 @@
 	 *  For enc28j60 use EthernetENC available from library manager or
 	 *  https://github.com/jandrassy/EthernetENC
 	 */
-	#define ANALOG_PIN A7
+	#define ANALOG_PIN -1
 	#include <SSLClient.h>
 	#include "trust_anchors.h"
 

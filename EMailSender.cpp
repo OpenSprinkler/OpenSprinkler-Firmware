@@ -432,7 +432,7 @@ EMailSender::Response EMailSender::send(const char* to, EMailMessage &email, Att
 	  EMAIL_DEBUG_PRINT(F("ONLY ONE RECIPIENT"));
 
 	const char* arrEmail[] =  {to};
-	return send(arrEmail, 1, email, attachments);
+	return send(arrEmail, 1, 0, 0, email, attachments);
 }
 
 EMailSender::Response EMailSender::send(const char* to[], byte sizeOfTo, EMailMessage &email, Attachments attachments) {

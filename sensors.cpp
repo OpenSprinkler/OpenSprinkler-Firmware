@@ -900,7 +900,7 @@ void read_all_sensors(boolean online) {
  * Read ESP8296 ADS1115 sensors
  */
 int read_sensor_adc(Sensor_t *sensor, ulong time) {
-  DEBUG_PRINTLN(F("read_sensor_adc"));
+  //DEBUG_PRINTLN(F("read_sensor_adc"));
   if (!sensor || !sensor->flags.enable) return HTTP_RQT_NOT_RECEIVED;
   if (sensor->id >= 16) return HTTP_RQT_NOT_RECEIVED;
   // Init + Detect:
@@ -1393,8 +1393,8 @@ int read_sensor(Sensor_t *sensor, ulong time) {
     case SENSOR_SMT100_MOIS:
     case SENSOR_SMT100_TEMP:
     case SENSOR_SMT100_PMTY:
-      DEBUG_PRINT(F("Reading sensor "));
-      DEBUG_PRINTLN(sensor->name);
+      //DEBUG_PRINT(F("Reading sensor "));
+      //DEBUG_PRINTLN(sensor->name);
       sensor->last_read = time;
       if (sensor->ip) return read_sensor_ip(sensor);
 #ifdef ESP8266
@@ -1415,8 +1415,8 @@ int read_sensor(Sensor_t *sensor, ulong time) {
     case SENSOR_THERM200:
     case SENSOR_AQUAPLUMB:
     case SENSOR_USERDEF:
-      DEBUG_PRINT(F("Reading sensor "));
-      DEBUG_PRINTLN(sensor->name);
+      //DEBUG_PRINT(F("Reading sensor "));
+      //DEBUG_PRINTLN(sensor->name);
       return read_sensor_adc(sensor, time);
 #endif
 #else

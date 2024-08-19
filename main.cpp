@@ -1438,7 +1438,7 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 		ArduinoJson::DeserializationError error = ArduinoJson::deserializeJson(doc, postval);
 		// Test the parsing otherwise parse
 		if (error) {
-			DEBUG_PRINT(F("mqtt: deserializeJson() failed: "));
+			DEBUG_PRINT(F("email: deserializeJson() failed: "));
 			DEBUG_PRINTLN(error.c_str());
 		} else {
 			email_en = doc["en"];
@@ -1502,8 +1502,17 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 				}
 			}
 
-			// todo: add IFTTT and email support for this event as well.
-			// currently no support due to the number of events exceeds 8 so need to use more than 1 byte
+			if (ifttt_enabled || email_enabled) {
+				strcat_P(postval, PSTR("Station ["));
+				os.get_station_name(lval, postval+strlen(postval));
+				strcat_P(postval, PSTR("] open now."));
+				
+				if(os.iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_FLOW) {
+					size_t len = strlen(postval);
+					snprintf_P(postval + len, TMP_BUFFER_SIZE, PSTR(" Flow rate: %d.%02d"), (int)flow_last_gpm, (int)(flow_last_gpm*100)%100);
+				}
+				if(email_enabled) { email_message.subject += PSTR("station event"); }
+			}
 			break;
 
 		case NOTIFY_STATION_OFF:
@@ -1687,10 +1696,10 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 					emailSend.setSMTPServer(email_host); // TODO: double check removing strdup
 					emailSend.setSMTPPort(email_port);
 					EMailSender::Response resp = emailSend.send(email_recipient, email_message);
-					// DEBUG_PRINTLN(F("Sending Status:"));
-					// DEBUG_PRINTLN(resp.status);
-					// DEBUG_PRINTLN(resp.code);
-					// DEBUG_PRINTLN(resp.desc);
+					DEBUG_PRINTLN(F("Sending Status:"));
+					DEBUG_PRINTLN(resp.status);
+					DEBUG_PRINTLN(resp.code);
+					DEBUG_PRINTLN(resp.desc);
 				}
 			#endif
 		#else
