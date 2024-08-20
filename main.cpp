@@ -1280,7 +1280,7 @@ void process_dynamic_events(time_os_t curr_time) {
  * this function determines the appropriate start and dequeue times
  * of stations bound to master stations with on and off adjustments
  */
-void handle_master_adjustments(time_os_t curr_time, RuntimeQueueStruct *q, byte gid, ulong *seq_start_times) {
+void handle_master_adjustments(time_os_t curr_time, RuntimeQueueStruct *q, unsigned char gid, ulong *seq_start_times) {
 
 	int16_t start_adj = 0;
 	int16_t dequeue_adj = 0;
