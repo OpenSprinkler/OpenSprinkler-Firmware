@@ -629,7 +629,8 @@ EMailSender::Response EMailSender::send(const char* to[], byte sizeOfTo,  byte s
 //		  String auth = "AUTH PLAIN "+String(encode64(logPass));
 		  EMAIL_DEBUG_PRINTLN(auth);
 		  client.println(auth);
-          }
+		  free(logPass);
+      }
 #if defined(ESP32)
 	  else if (this->isCramMD5Login == true) {
 		  EMAIL_DEBUG_PRINTLN(F("AUTH CRAM-MD5"));

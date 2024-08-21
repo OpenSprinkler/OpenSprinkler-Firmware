@@ -1692,6 +1692,7 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 		#if defined(ARDUINO)
 			#if defined(ESP8266)
 				if(email_host && email_username && email_password && email_recipient) { // make sure all are valid
+					free_tmp_memory();
 					EMailSender emailSend(email_username, email_password);
 					emailSend.setSMTPServer(email_host); // TODO: double check removing strdup
 					emailSend.setSMTPPort(email_port);
@@ -1700,6 +1701,7 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 					DEBUG_PRINTLN(resp.status);
 					DEBUG_PRINTLN(resp.code);
 					DEBUG_PRINTLN(resp.desc);
+					restore_tmp_memory();
 				}
 			#endif
 		#else
@@ -2135,32 +2137,27 @@ static void check_network() {
 #endif
 }
 
-/**
+void free_tmp_memory() {
 #if defined(ESP8266)
+	DEBUG_PRINT(F("freememory start: "));
+	DEBUG_PRINTLN(freeMemory());
 
-#define NET_ENC28J60_EIR                                 0x1C
-#define NET_ENC28J60_ESTAT                               0x1D
-#define NET_ENC28J60_ECON1                               0x1F
-#define NET_ENC28J60_EIR_RXERIF                          0x01
-#define NET_ENC28J60_ESTAT_BUFFER                        0x40
-#define NET_ENC28J60_ECON1_RXEN                          0x04
+	sensor_save_all();
+	sensor_api_free();
 
-bool check_enc28j60() {
-	
-	uint8_t stateEconRxen = eth.readreg((uint8_t) NET_ENC28J60_ECON1) & NET_ENC28J60_ECON1_RXEN;
-    // ESTAT.BUFFER rised on TX or RX error
-    // I think the test of this register is not necessary - EIR.RXERIF state checking may be enough
-    uint8_t stateEstatBuffer = eth.readreg((uint8_t) NET_ENC28J60_ESTAT) & NET_ENC28J60_ESTAT_BUFFER;
-    // EIR.RXERIF set on RX error
-    uint8_t stateEirRxerif = eth.readreg((uint8_t) NET_ENC28J60_EIR) & NET_ENC28J60_EIR_RXERIF;
-    if (!stateEconRxen || (stateEstatBuffer && stateEirRxerif)) {
-		DEBUG_PRINTLN(F("ENC28J60 FAILED - REBOOT!"))
-		return false;
-	}
-	return true;
-}
+	DEBUG_PRINT(F("freememory now: "));
+	DEBUG_PRINTLN(freeMemory());
 #endif
-*/
+}
+
+void restore_tmp_memory() {
+#if defined(ESP8266)
+	sensor_api_init();
+
+	DEBUG_PRINT(F("freememory restore: "));
+	DEBUG_PRINTLN(freeMemory());
+#endif
+}
 
 /** Perform NTP sync */
 static void perform_ntp_sync() {

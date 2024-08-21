@@ -264,6 +264,8 @@ typedef struct SensorUrl {
 
 void sensor_api_init();
 unsigned char get_asb_detected_boards();
+void sensor_save_all();
+void sensor_api_free();
 
 Sensor_t *getSensors();
 const char *getSensorUnit(int unitid);

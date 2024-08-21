@@ -46,6 +46,7 @@ unsigned char findKeyVal(const char *str, char *strbuf, uint16_t maxlen, const c
 // All sensors:
 static Sensor_t *sensors = NULL;
 static time_t last_save_time = 0;
+static boolean apiInit = false;
 
 // Boards:
 static unsigned char asb_detected_boards = 0;  // bit 1=0x48+0x49 bit 2=0x4A+0x4B
@@ -159,10 +160,48 @@ unsigned char get_asb_detected_boards() { return asb_detected_boards; }
  * init sensor api and load data
  */
 void sensor_api_init() {
+  apiInit = true;
   detect_asb_board();
   sensor_load();
   prog_adjust_load();
   sensor_mqtt_init();
+}
+
+void sensor_save_all() {
+  sensor_save();
+  prog_adjust_save();
+  SensorUrl_save();
+}
+
+/**
+ * @brief Unload sensorapi from memory, free everything. Be sure that you have save all before
+ * 
+ */
+void sensor_api_free() {
+  apiInit = false;
+
+  os.mqtt.setCallback(NULL);
+
+  while (progSensorAdjusts) {
+    ProgSensorAdjust_t* next = progSensorAdjusts->next;
+    free(progSensorAdjusts);
+    progSensorAdjusts = next;
+  }
+
+  while (sensorUrls) {
+    SensorUrl_t* next = sensorUrls->next;
+    free(sensorUrls);
+    sensorUrls = next;
+  }
+
+  while (sensors) {
+    Sensor_t* next = sensors->next;
+    free(sensors);
+    sensors = next;
+  }
+
+  modbusTcpId = 0;
+  memset(i2c_rs485_allocated, 0, sizeof(i2c_rs485_allocated));
 }
 
 /*
@@ -332,6 +371,7 @@ void sensor_load() {
  *
  */
 void sensor_save() {
+  if (!apiInit) return;
   DEBUG_PRINTLN(F("sensor_save"));
   if (file_exists(SENSOR_FILENAME_BAK)) remove_file(SENSOR_FILENAME_BAK);
   if (file_exists(SENSOR_FILENAME))
@@ -1898,6 +1938,7 @@ int prog_adjust_delete(uint nr) {
 }
 
 void prog_adjust_save() {
+  if (!apiInit) return;
   if (file_exists(PROG_SENSOR_FILENAME)) remove_file(PROG_SENSOR_FILENAME);
 
   ulong pos = 0;
@@ -2292,6 +2333,7 @@ void SensorUrl_load() {
 }
 
 void SensorUrl_save() {
+  if (!apiInit) return;
   if (file_exists(SENSORURL_FILENAME)) remove_file(SENSORURL_FILENAME);
 
   ulong pos = 0;

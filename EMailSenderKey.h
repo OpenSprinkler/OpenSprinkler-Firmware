@@ -41,7 +41,7 @@
 //#define ENABLE_ATTACHMENTS
 
 // Uncomment to enable printing out nice debug messages.
-#define EMAIL_SENDER_DEBUG
+//#define EMAIL_SENDER_DEBUG
 
 // Define where debug output will be printed.
 #define DEBUG_PRINTER Serial
