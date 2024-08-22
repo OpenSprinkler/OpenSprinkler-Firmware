@@ -1458,6 +1458,21 @@ int read_sensor(Sensor_t *sensor, ulong time) {
       //DEBUG_PRINT(F("Reading sensor "));
       //DEBUG_PRINTLN(sensor->name);
       return read_sensor_adc(sensor, time);
+    case SENSOR_FREE_MEMORY:
+      sensor->last_data = freeMemory();
+      sensor->last_read = time;
+      sensor->flags.data_ok = true;
+      return HTTP_RQT_SUCCESS;
+
+    case SENSOR_FREE_STORE: {
+    	struct FSInfo fsinfo;
+	    boolean ok = LittleFS.info(fsinfo);
+      if (ok)
+        sensor->last_data = fsinfo.totalBytes-fsinfo.usedBytes;
+      sensor->flags.data_ok = ok;
+      sensor->last_read = time;
+      return HTTP_RQT_SUCCESS;
+    }
 #endif
 #else
 #if defined ADS1115 | PCF8591
@@ -2082,6 +2097,8 @@ unsigned char getSensorUnitId(int type) {
     case SENSOR_AQUAPLUMB:
       return UNIT_PERCENT;
     case SENSOR_USERDEF:
+    case SENSOR_FREE_MEMORY:
+    case SENSOR_FREE_STORE:
       return UNIT_USERDEF;
 #endif
 #else
@@ -2148,6 +2165,8 @@ unsigned char getSensorUnitId(Sensor_t *sensor) {
     case SENSOR_AQUAPLUMB:
       return UNIT_PERCENT;
     case SENSOR_USERDEF:
+    case SENSOR_FREE_MEMORY:
+    case SENSOR_FREE_STORE:
       return UNIT_USERDEF;
 #endif
 #else
@@ -2196,7 +2215,7 @@ unsigned char getSensorUnitId(Sensor_t *sensor) {
           sen = sen->next;
         }
       }
-
+      
     default:
       return UNIT_NONE;
   }

@@ -122,6 +122,10 @@ extern "C" {
 #define SENSOR_GROUP_AVG 1002  // Sensor group with avg value
 #define SENSOR_GROUP_SUM 1003  // Sensor group with sum value
 
+//Diagnostic
+#define SENSOR_FREE_MEMORY 10000 //Free memory
+#define SENSOR_FREE_STORE 10001 //Free storage
+
 #define SENSOR_READ_TIMEOUT 3000  // ms
 
 #define MIN_DISK_FREE 8192  // 8Kb min

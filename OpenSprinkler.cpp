@@ -2006,13 +2006,13 @@ int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char*
 		if(usessl) {
 			WiFiClientSecure *_c = new WiFiClientSecure();
 			_c->setInsecure();
-  			bool mfln = _c->probeMaxFragmentLength(server, port, 512);
+  			/*bool mfln = _c->probeMaxFragmentLength(server, port, 512);
   			DEBUG_PRINTF("MFLN supported: %s\n", mfln ? "yes" : "no");
-  			if (mfln) {
+  			if (mfln) {*/
 				_c->setBufferSizes(512, 512); 
-			} else {
+			/*} else {
 				_c->setBufferSizes(2048, 2048);
-			}
+			}*/
 			client = _c;
 		} else {
 			client = new WiFiClient();

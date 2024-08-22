@@ -2967,6 +2967,10 @@ static const int sensor_types[] = {
 	SENSOR_GROUP_MAX,
 	SENSOR_GROUP_AVG,
 	SENSOR_GROUP_SUM,
+#if defined(ESP8266)	
+	SENSOR_FREE_MEMORY,
+	SENSOR_FREE_STORE,
+#endif
 };
 
 static const char* sensor_names[] = {
@@ -3006,6 +3010,10 @@ static const char* sensor_names[] = {
 	"Sensor group with max value",
 	"Sensor group with avg value",
 	"Sensor group with sum value",
+#if defined(ESP8266)
+	"Free Memory",
+	"Free Storage",
+#endif
 };
 
 /**
