@@ -1502,17 +1502,8 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 				}
 			}
 
-			if (ifttt_enabled || email_enabled) {
-				strcat_P(postval, PSTR("Station ["));
-				os.get_station_name(lval, postval+strlen(postval));
-				strcat_P(postval, PSTR("] open now."));
-				
-				if(os.iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_FLOW) {
-					size_t len = strlen(postval);
-					snprintf_P(postval + len, TMP_BUFFER_SIZE, PSTR(" Flow rate: %d.%02d"), (int)flow_last_gpm, (int)(flow_last_gpm*100)%100);
-				}
-				if(email_enabled) { email_message.subject += PSTR("station event"); }
-			}
+			// todo: add IFTTT and email support for this event as well.
+			// currently no support due to the number of events exceeds 8 so need to use more than 1 byte
 			break;
 
 		case NOTIFY_STATION_OFF:

@@ -1459,16 +1459,26 @@ int read_sensor(Sensor_t *sensor, ulong time) {
       //DEBUG_PRINTLN(sensor->name);
       return read_sensor_adc(sensor, time);
     case SENSOR_FREE_MEMORY:
-      sensor->last_data = freeMemory();
+    {
+      uint32_t fm = freeMemory();
+      if (sensor->last_native_data == fm)
+        return HTTP_RQT_NOT_RECEIVED;
+      sensor->last_native_data = fm;
+      sensor->last_data = fm;
       sensor->last_read = time;
       sensor->flags.data_ok = true;
       return HTTP_RQT_SUCCESS;
-
+    }
     case SENSOR_FREE_STORE: {
     	struct FSInfo fsinfo;
 	    boolean ok = LittleFS.info(fsinfo);
-      if (ok)
-        sensor->last_data = fsinfo.totalBytes-fsinfo.usedBytes;
+      if (ok) {
+        uint32_t fd = fsinfo.totalBytes-fsinfo.usedBytes;
+        if (sensor->last_native_data == fd)
+          return HTTP_RQT_NOT_RECEIVED;
+        sensor->last_native_data = fd;
+        sensor->last_data = fd;
+      } 
       sensor->flags.data_ok = ok;
       sensor->last_read = time;
       return HTTP_RQT_SUCCESS;
