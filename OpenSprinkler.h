@@ -450,7 +450,7 @@ private:
 #endif // LCD functions
 
 #if defined(ESP8266)
-	static void latch_boost();
+	static void latch_boost(unsigned char volt=0);
 	static void latch_open(unsigned char sid);
 	static void latch_close(unsigned char sid);
 	static void latch_setzonepin(unsigned char sid, unsigned char value);

@@ -254,8 +254,8 @@ enum {
 	IOPT_SUBNET_MASK3,
 	IOPT_SUBNET_MASK4,
 	IOPT_FORCE_WIRED,
-	IOPT_RESERVE_1,
-	IOPT_RESERVE_2,
+	IOPT_LATCH_ON_VOLTAGE,
+	IOPT_LATCH_OFF_VOLTAGE,
 	IOPT_RESERVE_3,
 	IOPT_RESERVE_4,
 	IOPT_RESERVE_5,
@@ -357,7 +357,8 @@ enum {
 	#define LCD_I2CADDR      0x3C // 128x64 OLED display I2C address
 	#define EEPROM_I2CADDR   0x50 // 24C02 EEPROM I2C address
 
-	#define PIN_CURR_SENSE    A0
+	#define PIN_CURR_SENSE    A0    // current sensing pin
+	#define PIN_LATCH_VOLT_SENSE A0 // latch voltage sensing pin
 	#define PIN_FREE_LIST     {} // no free GPIO pin at the moment
 	#define ETHER_BUFFER_SIZE   2048
 

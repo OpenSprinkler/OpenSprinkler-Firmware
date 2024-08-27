@@ -174,8 +174,8 @@ const char iopt_json_names[] PROGMEM =
 	"subn3"
 	"subn4"
 	"fwire"
-	"resv1"
-	"resv2"
+	"laton"
+	"latof"
 	"resv3"
 	"resv4"
 	"resv5"
@@ -253,8 +253,8 @@ const char iopt_prompts[] PROGMEM =
 	"Subnet mask3:   "
 	"Subnet mask4:   "
 	"Force wired?    "
-	"Reserved 1      "
-	"Reserved 2      "
+	"Latch On Volt.  "
+	"Latch Off Volt. "
 	"Reserved 3      "
 	"Reserved 4      "
 	"Reserved 5      "
@@ -331,8 +331,8 @@ const unsigned char iopt_max[] PROGMEM = {
 	255,
 	255,
 	1,
-	255,
-	255,
+	24,
+	24,
 	255,
 	255,
 	255,
@@ -415,8 +415,8 @@ unsigned char OpenSprinkler::iopts[] = {
 	255,// subnet mask 3
 	0,
 	1,  // force wired connection
-	0,  // reserved 1
-	0,  // reserved 2
+	0,  // latch on volt
+	0,  // latch off volt
 	0,  // reserved 3
 	0,  // reserved 4
 	0,  // reserved 5
@@ -1113,10 +1113,23 @@ pinModeExt(PIN_BUTTON_3, INPUT_PULLUP);
 /** LATCH boost voltage
  *
  */
-void OpenSprinkler::latch_boost() {
-	digitalWriteExt(PIN_BOOST, HIGH);      // enable boost converter
-	delay((int)iopts[IOPT_BOOST_TIME]<<2); // wait for booster to charge
-	digitalWriteExt(PIN_BOOST, LOW);       // disable boost converter
+void OpenSprinkler::latch_boost(unsigned char volt) {
+	// if volt is 0 or larger than max volt, ignore it and boost according to BOOST_TIME only
+	if(volt==0 || volt>iopt_max[IOPT_LATCH_ON_VOLTAGE]) {
+		digitalWriteExt(PIN_BOOST, HIGH);      // enable boost converter
+		delay((int)iopts[IOPT_BOOST_TIME]<<2); // wait for booster to charge
+		digitalWriteExt(PIN_BOOST, LOW);       // disable boost converter
+	} else {
+    // boost to specified volt, up to time specified by BOOST_TIME
+    uint16_t top = (uint16_t)(volt * 19.25f); // ADC = 1024 * volt * 1.5k / 79.8k
+    uint32_t boost_timeout = millis() + (iopts[IOPT_BOOST_TIME]<<2);
+    digitalWriteExt(PIN_BOOST, HIGH);
+    // boost until either top voltage is reached or boost timeout is reached
+    while(millis()<boost_timeout && analogRead(PIN_CURR_SENSE)<top) {
+      delay(5);
+    }
+    digitalWriteExt(PIN_BOOST, LOW);
+	}
 }
 
 /** Set all zones (for LATCH controller)
@@ -1199,7 +1212,9 @@ void OpenSprinkler::latch_open(unsigned char sid) {
 	if(hw_rev>=2) {
 		DEBUG_PRINTLN(F("latch_open_v2"));
 		latch_disable_alloutputs_v2(); // disable all output pins
-		latch_boost(); // generate boost voltage
+		DEBUG_PRINTLN(F("boost on voltage: "));
+		DEBUG_PRINTLN(iopts[IOPT_LATCH_ON_VOLTAGE]);
+		latch_boost(iopts[IOPT_LATCH_ON_VOLTAGE]); // generate boost voltage
 		digitalWriteExt(PIN_LATCH_COMA, HIGH); // enable COM+
 		latch_setzoneoutput_v2(sid, LOW, HIGH); // enable sid-
 		digitalWriteExt(PIN_BOOST_EN, HIGH); // enable output path
@@ -1222,7 +1237,9 @@ void OpenSprinkler::latch_close(unsigned char sid) {
 	if(hw_rev>=2) {
 		DEBUG_PRINTLN(F("latch_close_v2"));
 		latch_disable_alloutputs_v2(); // disable all output pins
-		latch_boost(); // generate boost voltage
+		DEBUG_PRINTLN(F("boost off voltage: "));
+		DEBUG_PRINTLN(iopts[IOPT_LATCH_OFF_VOLTAGE]);
+		latch_boost(iopts[IOPT_LATCH_OFF_VOLTAGE]); // generate boost voltage
 		latch_setzoneoutput_v2(sid, HIGH, LOW); // enable sid+
 		digitalWriteExt(PIN_LATCH_COMK, HIGH); // enable COM-
 		digitalWriteExt(PIN_BOOST_EN, HIGH); // enable output path
@@ -2863,6 +2880,19 @@ void OpenSprinkler::lcd_print_option(int i) {
 		lcd.print('-');
 		#endif
 		break;
+	case IOPT_LATCH_ON_VOLTAGE:
+	case IOPT_LATCH_OFF_VOLTAGE:
+		#if defined(ARDUINO)
+		if(hw_type==HW_TYPE_LATCH) {
+			lcd.print((int)iopts[i]);
+			lcd.print('V');
+		} else {
+			lcd.print('-');
+		}
+		#else
+		lcd.print('-');
+		#endif
+		break;
 	default:
 		// if this is a boolean option
 		if (pgm_read_byte(iopt_max+i)==1)
@@ -2979,6 +3009,7 @@ void OpenSprinkler::ui_set_options(int oid)
 				if(i==IOPT_URS_RETIRED) i++;
 				if(i==IOPT_RSO_RETIRED) i++;
 				if (hw_type==HW_TYPE_AC && i==IOPT_BOOST_TIME) i++;	// skip boost time for non-DC controller
+				if (i==IOPT_LATCH_ON_VOLTAGE && hw_type!=HW_TYPE_LATCH) i+= 2; // skip latch voltage defs for non-latch controllers
 				#if defined(ESP8266)
 				else if (lcd.type()==LCD_I2C && i==IOPT_LCD_CONTRAST) i+=3;
 				#else

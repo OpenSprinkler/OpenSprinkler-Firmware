@@ -1027,8 +1027,11 @@ void server_json_options_main() {
 			if (os.hw_type==HW_TYPE_AC || os.hw_type==HW_TYPE_UNKNOWN) continue;
 			else v<<=2;
 		}
+		if (oid==IOPT_LATCH_ON_VOLTAGE || oid==IOPT_LATCH_OFF_VOLTAGE) {
+			if (os.hw_type!=HW_TYPE_LATCH) continue;
+		}
 		#else
-		if (oid==IOPT_BOOST_TIME) continue;
+		if (oid==IOPT_BOOST_TIME || oid==IOPT_LATCH_ON_VOLTAGE || oid==IOPT_LATCH_OFF_VOLTAGE) continue;
 		#endif
 
 		#if defined(ESP8266)
