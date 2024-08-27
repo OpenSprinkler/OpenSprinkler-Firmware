@@ -1122,6 +1122,7 @@ void OpenSprinkler::latch_boost(unsigned char volt) {
 	} else {
     // boost to specified volt, up to time specified by BOOST_TIME
     uint16_t top = (uint16_t)(volt * 19.25f); // ADC = 1024 * volt * 1.5k / 79.8k
+		if(analogRead(PIN_CURR_SENSE)>=top) return; // if the voltage has already reached top, return right away
     uint32_t boost_timeout = millis() + (iopts[IOPT_BOOST_TIME]<<2);
     digitalWriteExt(PIN_BOOST, HIGH);
     // boost until either top voltage is reached or boost timeout is reached
