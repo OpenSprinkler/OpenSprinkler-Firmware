@@ -159,9 +159,10 @@ unsigned char get_asb_detected_boards() { return asb_detected_boards; }
 /*
  * init sensor api and load data
  */
-void sensor_api_init() {
+void sensor_api_init(boolean detect_boards) {
   apiInit = true;
-  detect_asb_board();
+  if (detect_boards)
+    detect_asb_board();
   sensor_load();
   prog_adjust_load();
   sensor_mqtt_init();
@@ -854,7 +855,11 @@ void push_message(Sensor_t *sensor) {
     os.mqtt.publish(topic, payload);
     DEBUG_PRINTLN("push mqtt2");
   }
-  if (os.iopts[IOPT_NOTIF_ENABLE]) {
+  
+  //ifttt is enabled, when the ifttt key is present!
+  os.sopt_load(SOPT_IFTTT_KEY, tmp_buffer);
+	bool ifttt_enabled = strlen(tmp_buffer)!=0;
+  if (ifttt_enabled) {
     DEBUG_PRINTLN("push ifttt");
     strcpy_P(postval, PSTR("{\"value1\":\"On site ["));
     os.sopt_load(SOPT_DEVICE_NAME, postval + strlen(postval));

@@ -365,7 +365,7 @@ void do_setup() {
 
 	os.button_timeout = LCD_BACKLIGHT_TIMEOUT;
 	
-	sensor_api_init();
+	sensor_api_init(true);
 }
 
 // Arduino software reset function
@@ -414,7 +414,7 @@ void do_setup() {
 	os.mqtt.init();
 	os.status.req_mqtt_restart = true;
 	
-	sensor_api_init();
+	sensor_api_init(true);
 
 	initalize_otf();
 }
@@ -1397,7 +1397,8 @@ void manual_start_program(unsigned char pid, unsigned char uwt) {
 // ====== PUSH NOTIFICATION FUNCTIONS =======
 // ==========================================
 void ip2string(char* str, size_t str_len, unsigned char ip[4]) {
-	snprintf_P(str+strlen(str), str_len, PSTR("%d.%d.%d.%d"), ip[0], ip[1], ip[2], ip[3]);
+	int len = strlen(str);
+	snprintf_P(str+len, str_len-len, PSTR("%d.%d.%d.%d"), ip[0], ip[1], ip[2], ip[3]);
 }
 
 #define PUSH_TOPIC_LEN	120
@@ -1524,12 +1525,12 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 				}else{
 					strcat_P(postval, PSTR("] closed. It ran for "));
 					size_t len = strlen(postval);
-					snprintf_P(postval + len, TMP_BUFFER_SIZE, PSTR(" %d minutes %d seconds."), (int)fval/60, (int)fval%60);
+					snprintf_P(postval + len, TMP_BUFFER_SIZE-len, PSTR(" %d minutes %d seconds."), (int)fval/60, (int)fval%60);
 				}
 
 				if(os.iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_FLOW) {
 					size_t len = strlen(postval);
-					snprintf_P(postval + len, TMP_BUFFER_SIZE, PSTR(" Flow rate: %d.%02d"), (int)flow_last_gpm, (int)(flow_last_gpm*100)%100);
+					snprintf_P(postval + len, TMP_BUFFER_SIZE-len, PSTR(" Flow rate: %d.%02d"), (int)flow_last_gpm, (int)(flow_last_gpm*100)%100);
 				}
 				if(email_enabled) { email_message.subject += PSTR("station event"); }
 			}
@@ -1547,7 +1548,7 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 					if(lval<pd.nprograms) strcat(postval, prog.name);
 				}
 				size_t len = strlen(postval);
-				snprintf_P(postval + len, TMP_BUFFER_SIZE, PSTR(" with %d%% water level."), (int)fval);
+				snprintf_P(postval + len, TMP_BUFFER_SIZE-len, PSTR(" with %d%% water level."), (int)fval);
 				if(email_enabled) { email_message.subject += PSTR("program event"); }
 			}
 			break;
@@ -1602,7 +1603,7 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 			}
 			if (ifttt_enabled || email_enabled) {
 				size_t len = strlen(postval);
-				snprintf_P(postval + len, TMP_BUFFER_SIZE, PSTR("Flow count: %u, volume: %d.%02d"), lval, (int)volume/100, (int)volume%100);
+				snprintf_P(postval + len, TMP_BUFFER_SIZE-len, PSTR("Flow count: %u, volume: %d.%02d"), lval, (int)volume/100, (int)volume%100);
 				if(email_enabled) { email_message.subject += PSTR("flow sensor event"); }
 			}
 			break;
@@ -1624,7 +1625,7 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 				}
 				if(fval>=0) {
 					size_t len = strlen(postval);
-					snprintf_P(postval + len, TMP_BUFFER_SIZE, PSTR("water level updated: %d%%."), (int)fval);
+					snprintf_P(postval + len, TMP_BUFFER_SIZE-len, PSTR("water level updated: %d%%."), (int)fval);
 				}
 				if(email_enabled) { email_message.subject += PSTR("weather update event"); }
 			}
@@ -1653,6 +1654,25 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 					#else
 						ip2string(postval, TMP_BUFFER_SIZE, &(Ethernet.localIP()[0]));
 					#endif
+
+					//Adding restart reasons:
+					struct rst_info *rtc_info = system_get_rst_info();
+					if (rtc_info) {
+						int len = strlen(postval);
+						snprintf_P(postval+len, TMP_BUFFER_SIZE-len, PSTR("<br>reset reason: %x"), rtc_info->reason);
+						if (rtc_info->reason == REASON_WDT_RST ||
+						    rtc_info->reason == REASON_EXCEPTION_RST ||
+							rtc_info->reason == REASON_SOFT_WDT_RST) {
+								if (rtc_info->reason == REASON_EXCEPTION_RST) {
+									len = strlen(postval);
+									snprintf_P(postval+len, TMP_BUFFER_SIZE-len, PSTR("<br>Fatal exception: %d"), rtc_info->exccause);
+								}
+								len = strlen(postval);
+								snprintf_P(postval+len, TMP_BUFFER_SIZE-len, PSTR("<br>epc1=0x%08x, epc2=0x%08x, epc3=0x%08x, excvaddr=0x%08x, depc=0x%08x"),
+									rtc_info->epc1, rtc_info->epc2, rtc_info->epc3, rtc_info->excvaddr, rtc_info->depc);
+							}
+					}
+
 				#else
 					strcat_P(postval, PSTR("controller process restarted."));
 				#endif
@@ -2143,7 +2163,7 @@ void free_tmp_memory() {
 
 void restore_tmp_memory() {
 #if defined(ESP8266)
-	sensor_api_init();
+	sensor_api_init(false);
 
 	DEBUG_PRINT(F("freememory restore: "));
 	DEBUG_PRINTLN(freeMemory());

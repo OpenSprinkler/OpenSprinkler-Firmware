@@ -266,7 +266,7 @@ typedef struct SensorUrl {
 #define RS485_TRUEBNER3_ADDR 0x3A
 #define RS485_TRUEBNER4_ADDR 0x3B
 
-void sensor_api_init();
+void sensor_api_init(boolean detect_boards);
 unsigned char get_asb_detected_boards();
 void sensor_save_all();
 void sensor_api_free();
