@@ -47,6 +47,7 @@ unsigned char findKeyVal(const char *str, char *strbuf, uint16_t maxlen, const c
 static Sensor_t *sensors = NULL;
 static time_t last_save_time = 0;
 static boolean apiInit = false;
+static Sensor_t *current_sensor = NULL;
 
 // Boards:
 static unsigned char asb_detected_boards = 0;  // bit 1=0x48+0x49 bit 2=0x4A+0x4B
@@ -166,12 +167,14 @@ void sensor_api_init(boolean detect_boards) {
   sensor_load();
   prog_adjust_load();
   sensor_mqtt_init();
+  current_sensor = NULL;
 }
 
 void sensor_save_all() {
   sensor_save();
   prog_adjust_save();
   SensorUrl_save();
+  current_sensor = NULL;
 }
 
 /**
@@ -902,36 +905,35 @@ void read_all_sensors(boolean online) {
     return;  // wait 30s before first sensor read
 
   // When we run out of time, skip some sensors and continue on next loop
-  static Sensor_t *sensor = NULL;
-  if (sensor == NULL) sensor = sensors;
+  if (current_sensor == NULL) current_sensor = sensors;
 
-  while (sensor) {
-    if (time >= sensor->last_read + sensor->read_interval ||
-        sensor->repeat_read) {
-      if (online || (sensor->ip == 0 && sensor->type != SENSOR_MQTT)) {
-        int result = read_sensor(sensor, time);
+  while (current_sensor) {
+    if (time >= current_sensor->last_read + current_sensor->read_interval ||
+        current_sensor->repeat_read) {
+      if (online || (current_sensor->ip == 0 && current_sensor->type != SENSOR_MQTT)) {
+        int result = read_sensor(current_sensor, time);
         if (result == HTTP_RQT_SUCCESS) {
-          sensorlog_add(LOG_STD, sensor, time);
-          push_message(sensor);
+          sensorlog_add(LOG_STD, current_sensor, time);
+          push_message(current_sensor);
         } else if (result == HTTP_RQT_TIMEOUT) {
           // delay next read on timeout:
-          sensor->last_read = time + max((uint)60, sensor->read_interval);
-          sensor->repeat_read = 0;
+          current_sensor->last_read = time + max((uint)60, current_sensor->read_interval);
+          current_sensor->repeat_read = 0;
           DEBUG_PRINTF("Delayed1: %s", sensor->name);
         } else if (result == HTTP_RQT_CONNECT_ERR) {
           // delay next read on error:
-          sensor->last_read = time + max((uint)60, sensor->read_interval);
-          sensor->repeat_read = 0;
-          DEBUG_PRINTF("Delayed2: %s", sensor->name);
+          current_sensor->last_read = time + max((uint)60, current_sensor->read_interval);
+          current_sensor->repeat_read = 0;
+          DEBUG_PRINTF("Delayed2: %s", current_sensor->name);
         }
         ulong passed = os.now_tz() - time;
         if (passed > MAX_SENSOR_READ_TIME) {
-          sensor = sensor->next;
+          current_sensor = current_sensor->next;
           break;
         }
       }
     }
-    sensor = sensor->next;
+    current_sensor = current_sensor->next;
   }
   sensor_update_groups();
   calc_sensorlogs();
