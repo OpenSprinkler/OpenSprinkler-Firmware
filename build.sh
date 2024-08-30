@@ -16,8 +16,11 @@ while getopts ":s:d" opt; do
   esac
 done
 
-if [ ! "$SILENT" <> true ] ;then
-	echo "This version has a new configuration data structure. Please backup configuration and restore after update!"
+if [ !"$SILENT" ]; then
+	echo "This version has a new configuration data structure." 
+	echo "Please backup configuration and restore after update!"
+	echo "Otherwise your configuration is lost"
+	echo "however, if this is a new installation, then you can proceed directly"
 	read -p "Press ctrl-c to stop now or enter to continue"
 fi
 
