@@ -167,14 +167,12 @@ void sensor_api_init(boolean detect_boards) {
   sensor_load();
   prog_adjust_load();
   sensor_mqtt_init();
-  current_sensor = NULL;
 }
 
 void sensor_save_all() {
   sensor_save();
   prog_adjust_save();
   SensorUrl_save();
-  current_sensor = NULL;
 }
 
 /**
@@ -344,6 +342,7 @@ int sensor_define_userdef(uint nr, int16_t factor, int16_t divider,
 void sensor_load() {
   // DEBUG_PRINTLN(F("sensor_load"));
   sensors = NULL;
+  current_sensor = NULL;
   if (!file_exists(SENSOR_FILENAME)) return;
 
   ulong pos = 0;
@@ -391,6 +390,7 @@ void sensor_save() {
 
   last_save_time = os.now_tz();
   DEBUG_PRINTLN(F("sensor_save2"));
+  current_sensor = NULL;
 }
 
 uint sensor_count() {
