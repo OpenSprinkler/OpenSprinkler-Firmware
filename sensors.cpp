@@ -188,19 +188,20 @@ void sensor_api_free() {
 
   while (progSensorAdjusts) {
     ProgSensorAdjust_t* next = progSensorAdjusts->next;
-    free(progSensorAdjusts);
+    delete progSensorAdjusts;
     progSensorAdjusts = next;
   }
 
   while (sensorUrls) {
     SensorUrl_t* next = sensorUrls->next;
-    free(sensorUrls);
+    free(sensorUrls->urlstr);
+    delete sensorUrls;
     sensorUrls = next;
   }
 
   while (sensors) {
     Sensor_t* next = sensors->next;
-    free(sensors);
+    delete sensors;
     sensors = next;
   }
 
@@ -892,8 +893,8 @@ void push_message(Sensor_t *sensor) {
 }
 
 void read_all_sensors(boolean online) {
-  // DEBUG_PRINTLN(F("read_all_sensors"));
   if (!sensors) return;
+  //DEBUG_PRINTLN(F("read_all_sensors"));
 
   ulong time = os.now_tz();
 
@@ -919,7 +920,7 @@ void read_all_sensors(boolean online) {
           // delay next read on timeout:
           current_sensor->last_read = time + max((uint)60, current_sensor->read_interval);
           current_sensor->repeat_read = 0;
-          DEBUG_PRINTF("Delayed1: %s", sensor->name);
+          DEBUG_PRINTF("Delayed1: %s", current_sensor->name);
         } else if (result == HTTP_RQT_CONNECT_ERR) {
           // delay next read on error:
           current_sensor->last_read = time + max((uint)60, current_sensor->read_interval);

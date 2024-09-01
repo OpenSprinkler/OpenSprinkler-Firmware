@@ -24,7 +24,7 @@
 #ifndef _DEFINES_H
 #define _DEFINES_H
 
-//#define ENABLE_DEBUG  // enable serial debug
+#define ENABLE_DEBUG  // enable serial debug
 
 typedef unsigned long ulong;
 
@@ -485,7 +485,6 @@ enum {
 		#define DEBUG_BEGIN(x)   {Serial.begin(x);}
 		#define DEBUG_PRINT(x)   {Serial.print(x);}
 		#define DEBUG_PRINTLN(x) {Serial.println(x);}
-		#define DEBUG_PRINTF(msg, ...)    {Serial.printf(msg, ##__VA_ARGS__);}
 		#define DEBUG_PRINTF(msg, ...)    {Serial.printf(msg, ##__VA_ARGS__);}
 	#else
 		#include <stdio.h>

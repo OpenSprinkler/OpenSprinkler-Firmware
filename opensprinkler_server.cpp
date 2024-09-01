@@ -3016,6 +3016,28 @@ static const char* sensor_names[] = {
 #endif
 };
 
+void free_tmp_memory() {
+#if defined(ESP8266)
+	DEBUG_PRINT(F("freememory start: "));
+	DEBUG_PRINTLN(freeMemory());
+
+	sensor_save_all();
+	sensor_api_free();
+
+	DEBUG_PRINT(F("freememory now: "));
+	DEBUG_PRINTLN(freeMemory());
+#endif
+}
+
+void restore_tmp_memory() {
+#if defined(ESP8266)
+	sensor_api_init(false);
+
+	DEBUG_PRINT(F("freememory restore: "));
+	DEBUG_PRINTLN(freeMemory());
+#endif
+}
+
 /**
  * sf
  * List supported sensor types
