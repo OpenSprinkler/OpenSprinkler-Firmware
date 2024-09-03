@@ -2311,6 +2311,7 @@ void GetSensorWeather() {
     if (s && extract(s, buf, sizeof(buf))) {
       current_wind = atof(buf);
     }
+#ifdef ENABLE_DEBUG
     char tmp[10];
     DEBUG_PRINT("temp: ");
     dtostrf(current_temp, 2, 2, tmp);
@@ -2324,7 +2325,7 @@ void GetSensorWeather() {
     DEBUG_PRINT("wind: ");
     dtostrf(current_wind, 2, 2, tmp);
     DEBUG_PRINTLN(tmp)
-
+#endif
     current_weather_ok = true;
   } else {
     current_weather_ok = false;
