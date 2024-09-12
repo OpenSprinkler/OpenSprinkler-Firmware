@@ -775,7 +775,9 @@ void do_loop()
 			// check through all programs
 			for(pid=0; pid<pd.nprograms; pid++) {
 				pd.read(pid, &prog);	// todo future: reduce load time
-				if(prog.check_match(curr_time+60)) {
+				bool will_delete = false;
+				unsigned char runcount = prog.check_match(curr_time, &will_delete);
+				if(runcount>0) {
 					// Check and update weather if weatherdata is older than 30min:
 					if (os.checkwt_success_lasttime && (!os.checkwt_lasttime || os.now_tz() > os.checkwt_lasttime + 30*60)) {
 						os.checkwt_lasttime = 0;
@@ -783,11 +785,7 @@ void do_loop()
 						check_weather();
 					}
 					break;
-				}
 
-				bool will_delete = false;
-				unsigned char runcount = prog.check_match(curr_time, &will_delete);
-				if(runcount>0) {
 					// program match found
 					// check and process special program command
 					if(process_special_program_command(prog.name, curr_time))	continue;
