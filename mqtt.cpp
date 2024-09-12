@@ -113,7 +113,6 @@ boolean checkPassword(char* pw) {
 	if (os.iopts[IOPT_IGNORE_PASSWORD])  return true;
 
 	if(findKeyVal(pw, tmp_buffer, TMP_BUFFER_SIZE, PSTR("pw"), true)){
-		urlDecode(tmp_buffer);
 		if (os.password_verify(tmp_buffer)) return true;
 	}else{
 		DEBUG_LOGF("Device password not found.\r\n");

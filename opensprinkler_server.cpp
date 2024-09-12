@@ -418,7 +418,6 @@ boolean check_password(char *p)
 		p = get_buffer;
 	}
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("pw"), true)) {
-		urlDecode(tmp_buffer);
 		if (os.password_verify(tmp_buffer)) return true;
 	}
 #else
@@ -635,9 +634,6 @@ void server_change_stations(OTF_PARAMS_DEF) {
 					handle_return(HTML_DATA_OUTOFBOUND);
 				}
 			} else if ((tmp_buffer[0] == STN_TYPE_HTTP) || (tmp_buffer[0] == STN_TYPE_HTTPS) || (tmp_buffer[0] == STN_TYPE_REMOTE_OTC)) {
-				#if !defined(ESP8266) // ESP8266 does automatic decoding
-					urlDecode(tmp_buffer + 1);
-				#endif
 				if (strlen(tmp_buffer+1) > sizeof(HTTPStationData)) {
 					handle_return(HTML_DATA_OUTOFBOUND);
 				}
@@ -728,7 +724,9 @@ void server_change_runonce(OTF_PARAMS_DEF) {
 	char *p = get_buffer;
 
 	// decode url first
+	#if !defined(USE_OTF)
 	if(p) urlDecode(p);
+	#endif
 	// search for the start of t=[
 	char *pv;
 	boolean found=false;
@@ -2030,7 +2028,9 @@ void server_fill_files(OTF_PARAMS_DEF) {
 */
 
 char* urlDecodeAndUnescape(char *buf) {
+	#if !defined(USE_OTF)
 	urlDecode(buf);
+	#endif
 	strReplace(buf, '\"', '\'');
 	strReplace(buf, '\\', '/');
 	return buf;
