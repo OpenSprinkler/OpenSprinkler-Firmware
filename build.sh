@@ -16,12 +16,16 @@ while getopts ":s:d" opt; do
   esac
 done
 
-if [ !"$SILENT" ]; then
-	echo "This version has a new configuration data structure." 
-	echo "Please backup configuration and restore after update!"
-	echo "Otherwise your configuration is lost"
-	echo "however, if this is a new installation, then you can proceed directly"
-	read -p "Press ctrl-c to stop now or enter to continue"
+FILENAME="sopts.dat"
+if [[ ! "$SILENT" && -f "$FILENAME" ]];  then
+	FILESIZE=$(stat -c%s "$FILENAME")
+	if [[ "$FILESIZE" != "4160" ]]; then
+		echo "This version has a new configuration data structure." 
+		echo "Please backup configuration and restore after update!"
+		echo "Otherwise your configuration is lost"
+		echo "however, if this is a new installation, then you can proceed directly"
+		read -p "Press ctrl-c to stop now or enter to continue"
+	fi
 fi
 
 echo "Building OpenSprinkler..."
