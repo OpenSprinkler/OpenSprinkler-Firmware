@@ -550,17 +550,7 @@ unsigned char OpenSprinkler::start_network() {
 #endif
 }
 
-unsigned char OpenSprinkler::start_ether() {
-#if defined(ESP8266)
-	if(hw_rev<2) return 0;  // ethernet capability is only available when hw_rev>=2
-	eth.isW5500 = (hw_rev==2)?false:true; // os 3.2 uses enc28j60 and 3.3 uses w5500
-
-	SPI.begin();
-	SPI.setBitOrder(MSBFIRST);
-	SPI.setDataMode(SPI_MODE0);
-	SPI.setFrequency(4000000);
-
-	if(eth.isW5500) {
+bool init_W5500(boolean initSPI) {
 		DEBUG_PRINTLN(F("detect existence of W5500"));
 		/* this is copied from w5500.cpp wizchip_sw_reset
 		 * perform a software reset and see if we get a correct response
@@ -571,7 +561,16 @@ unsigned char OpenSprinkler::start_ether() {
 		static const uint8_t AccessModeRead = (0x00 << 2);
 		static const uint8_t AccessModeWrite = (0x01 << 2);
 		static const uint8_t BlockSelectCReg = (0x00 << 3);
+
+	if (initSPI) {
+		SPI.begin();
+		SPI.setBitOrder(MSBFIRST);
+		SPI.setDataMode(SPI_MODE0);
+		SPI.setFrequency(32000000);
+	}
+	
 		pinMode(PIN_ETHER_CS, OUTPUT);
+	
 		// ==> setMR(MR_RST)
 		digitalWrite(PIN_ETHER_CS, LOW);
 		SPI.transfer((0x00 & 0xFF00) >> 8);
@@ -588,8 +587,17 @@ unsigned char OpenSprinkler::start_ether() {
 		SPI.transfer(BlockSelectCReg | AccessModeRead);
 		ret = SPI.transfer(0);
 		digitalWrite(PIN_ETHER_CS, HIGH);
-		if(ret!=0) return 0; // ret is expected to be 0
-	} else {
+
+	if(ret!=0) { // ret is expected to be 0
+		return false;
+	}  
+		
+	eth.isW5500 = true;
+	DEBUG_PRINTLN(F("found W5500"));
+	return true;
+}
+
+bool init_ENC28J60() {
 		/* this is copied from enc28j60.cpp geterevid
 		 * check to see if the hardware revision number if expected
 		 * */
@@ -598,12 +606,22 @@ unsigned char OpenSprinkler::start_ether() {
 		#define EREVID 0x12
 		#define ECON1 0x1f
 
+	SPI.begin();
+	SPI.setBitOrder(MSBFIRST);
+	SPI.setDataMode(SPI_MODE0);
+	SPI.setFrequency(4000000);
+
 		// ==> setregbank(MAADRX_BANK);
 		pinMode(PIN_ETHER_CS, OUTPUT);
 		uint8_t r;
 		digitalWrite(PIN_ETHER_CS, LOW);
 		SPI.transfer(0x00 | (ECON1 & 0x1f));
 		r = SPI.transfer(0);
+	DEBUG_PRINT("ECON1=")
+	DEBUG_PRINTLN(r);
+	if (r == 2) {
+		return false;
+	}
 		digitalWrite(PIN_ETHER_CS, HIGH);
 
 		digitalWrite(PIN_ETHER_CS, LOW);
@@ -615,8 +633,28 @@ unsigned char OpenSprinkler::start_ether() {
 		digitalWrite(PIN_ETHER_CS, LOW);
 		SPI.transfer(0x00 | (EREVID & 0x1f));
 		r = SPI.transfer(0);
+	DEBUG_PRINTLN(r);
 		digitalWrite(PIN_ETHER_CS, HIGH);
-		if(r==0 || r==255) return 0; // r is expected to be a non-255 revision number
+	if(r==0 || r==255) { // r is expected to be a non-255 revision number
+		return false;
+	} 
+
+	eth.isW5500 = false;
+	DEBUG_PRINTLN(F("found ENC28J60"));
+	return true;
+}
+
+byte OpenSprinkler::start_ether() {
+#if defined(ESP8266)
+	if(hw_rev<2) return 0;  // ethernet capability is only available when hw_rev>=2
+	
+	// os 3.2 uses enc28j60 and 3.3 uses w5500
+	if (hw_rev==2) {
+		if (!init_ENC28J60() && !init_W5500(false))
+			return 0;
+	} else {
+		if (!init_W5500(true))
+			return 0;
 	}
 
 	load_hardware_mac((uint8_t*)tmp_buffer, true);
@@ -1153,7 +1191,7 @@ void OpenSprinkler::latch_setallzonepins(unsigned char value) {
 	}
 }
 
-void OpenSprinkler::latch_disable_alloutputs_v2() {
+void OpenSprinkler::latch_disable_alloutputs_v2(unsigned char expvalue) {
 	digitalWriteExt(PIN_LATCH_COMA, LOW);
 	digitalWriteExt(PIN_LATCH_COMK, LOW);
 
@@ -1162,7 +1200,12 @@ void OpenSprinkler::latch_disable_alloutputs_v2() {
 	// latch v2 has a 74hc595 which controls all h-bridge cathode pins
 	drio->shift_out(V2_PIN_SRLAT, V2_PIN_SRCLK, V2_PIN_SRDAT, 0x00);
 
-	// todo: handle expander
+	// Handle all expansion boards
+	for(byte i=0;i<MAX_EXT_BOARDS/2;i++) {
+		if(expanders[i]->type==IOEXP_TYPE_9555) {
+			expanders[i]->i2c_write(NXP_OUTPUT_REG, expvalue?0xFFFF:0x0000);
+		}
+	}
 }
 
 /** Set one zone (for LATCH controller)
@@ -1201,8 +1244,15 @@ void OpenSprinkler::latch_setzoneoutput_v2(unsigned char sid, unsigned char A, u
 
 		drio->shift_out(V2_PIN_SRLAT, V2_PIN_SRCLK, V2_PIN_SRDAT, K ? (1<<sid) : 0);
 
-	} else { // on expander
-		// todo: handle expander
+	} else { // for expander
+		byte bid=(sid-8)>>4;
+		uint16_t s=(sid-8)&0x0F;
+		if(expanders[bid]->type==IOEXP_TYPE_9555) {
+			uint16_t reg = expanders[bid]->i2c_read(NXP_OUTPUT_REG);  // read current output reg value
+			if(A==HIGH && K==LOW) reg |= (1<<s);
+			else if(K==HIGH && A==LOW) reg &= (~(1<<s));
+			expanders[bid]->i2c_write(NXP_OUTPUT_REG, reg);
+		}
 	}
 }
 
@@ -1212,7 +1262,7 @@ void OpenSprinkler::latch_setzoneoutput_v2(unsigned char sid, unsigned char A, u
 void OpenSprinkler::latch_open(unsigned char sid) {
 	if(hw_rev>=2) {
 		DEBUG_PRINTLN(F("latch_open_v2"));
-		latch_disable_alloutputs_v2(); // disable all output pins
+		latch_disable_alloutputs_v2(HIGH); // disable all output pins; set expanders all to HIGH
 		DEBUG_PRINTLN(F("boost on voltage: "));
 		DEBUG_PRINTLN(iopts[IOPT_LATCH_ON_VOLTAGE]);
 		latch_boost(iopts[IOPT_LATCH_ON_VOLTAGE]); // generate boost voltage
@@ -1221,7 +1271,7 @@ void OpenSprinkler::latch_open(unsigned char sid) {
 		digitalWriteExt(PIN_BOOST_EN, HIGH); // enable output path
 		delay(150);
 		digitalWriteExt(PIN_BOOST_EN, LOW); // disabled output boosted voltage path
-		latch_disable_alloutputs_v2(); // disable all output pins
+		latch_disable_alloutputs_v2(HIGH); // disable all output pins; set expanders all to HIGH
 	} else {
 		latch_boost();  // boost voltage
 		latch_setallzonepins(HIGH);  // set all switches to HIGH, including COM
@@ -1237,7 +1287,7 @@ void OpenSprinkler::latch_open(unsigned char sid) {
 void OpenSprinkler::latch_close(unsigned char sid) {
 	if(hw_rev>=2) {
 		DEBUG_PRINTLN(F("latch_close_v2"));
-		latch_disable_alloutputs_v2(); // disable all output pins
+		latch_disable_alloutputs_v2(LOW); // disable all output pins; set expanders all to LOW
 		DEBUG_PRINTLN(F("boost off voltage: "));
 		DEBUG_PRINTLN(iopts[IOPT_LATCH_OFF_VOLTAGE]);
 		latch_boost(iopts[IOPT_LATCH_OFF_VOLTAGE]); // generate boost voltage
@@ -1246,7 +1296,7 @@ void OpenSprinkler::latch_close(unsigned char sid) {
 		digitalWriteExt(PIN_BOOST_EN, HIGH); // enable output path
 		delay(150);
 		digitalWriteExt(PIN_BOOST_EN, LOW); // disable output boosted voltage path
-		latch_disable_alloutputs_v2(); // disable all output pins
+		latch_disable_alloutputs_v2(HIGH); // disable all output pins; set expanders all to HIGH
 	} else {
 		latch_boost();  // boost voltage
 		latch_setallzonepins(LOW);  // set all switches to LOW, including COM
@@ -1931,6 +1981,7 @@ int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char*
 	Client *client = NULL;
 	#if defined(ESP8266)
 		if(usessl) {
+			free_tmp_memory();
 			WiFiClientSecure *_c = new WiFiClientSecure();
 			_c->setInsecure();
   		bool mfln = _c->probeMaxFragmentLength(server, port, 512);
@@ -1940,6 +1991,7 @@ int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char*
 			} else {
 				_c->setBufferSizes(2048, 2048);
 			}
+			restore_tmp_memory();
 			client = _c;
 		} else {
 			client = new WiFiClient();
