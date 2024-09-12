@@ -24,18 +24,18 @@
 #ifndef _DEFINES_H
 #define _DEFINES_H
 
-// #define ENABLE_DEBUG  // enable serial debug
+//#define ENABLE_DEBUG  // enable serial debug
 
 typedef unsigned long ulong;
 
 #define TMP_BUFFER_SIZE      320   // scratch buffer size
 
 /** Firmware version, hardware version, and maximal values */
-#define OS_FW_VERSION  221  // Firmware version: 221 means 2.2.1
+#define OS_FW_VERSION  232  // Firmware version: 220 means 2.2.0
 														// if this number is different from the one stored in non-volatile memory
 														// a device reset will be automatically triggered
 
-#define OS_FW_MINOR      1  // Firmware minor version
+#define OS_FW_MINOR      167  // Firmware minor version
 
 /** Hardware version base numbers */
 #define OS_HW_VERSION_BASE   0x00 // OpenSprinkler
@@ -139,8 +139,8 @@ typedef unsigned long ulong;
 
 /** Default string option values */
 #define DEFAULT_PASSWORD          "a6d82bced638de3def1e9bbb4983225c"  // md5 of 'opendoor'
-#define DEFAULT_LOCATION          "42.36,-71.06"  // Boston,MA
-#define DEFAULT_JAVASCRIPT_URL    "https://ui.opensprinkler.com/js"
+#define DEFAULT_LOCATION          "49.484018,8.475593"  // Mannheim,Germany
+#define DEFAULT_JAVASCRIPT_URL    "https://ui.opensprinklershop.de/js"
 #define DEFAULT_WEATHER_URL       "weather.opensprinkler.com"
 #define DEFAULT_IFTTT_URL         "maker.ifttt.com"
 #define DEFAULT_OTC_SERVER_DEV     "ws.cloud.openthings.io"
@@ -356,6 +356,7 @@ enum {
 	#define EXP_I2CADDR_BASE 0x24 // base of expander I2C address
 	#define LCD_I2CADDR      0x3C // 128x64 OLED display I2C address
 	#define EEPROM_I2CADDR   0x50 // 24C02 EEPROM I2C address
+	#define EEPROM_I2CADDR   0x50 // 24C02 EEPROM I2C address
 
 	#define PIN_CURR_SENSE    A0    // current sensing pin
 	#define PIN_LATCH_VOLT_SENSE A0 // latch voltage sensing pin
@@ -505,6 +506,8 @@ enum {
 	#include <stdlib.h>
 	#include <string.h>
 	#include <stddef.h>
+	inline void itoa(int v,char *s,int b)   {sprintf(s,"%d",v);}
+	inline void ultoa(unsigned long v,char *s,int b) {sprintf(s,"%lu",v);}
 	#define pgm_read_byte(x) *(x)
 	#define PSTR(x)      x
 	#define F(x)         x

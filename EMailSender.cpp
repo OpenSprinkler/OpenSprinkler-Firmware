@@ -432,7 +432,7 @@ EMailSender::Response EMailSender::send(const char* to, EMailMessage &email, Att
 	  EMAIL_DEBUG_PRINT(F("ONLY ONE RECIPIENT"));
 
 	const char* arrEmail[] =  {to};
-	return send(arrEmail, 1, email, attachments);
+	return send(arrEmail, 1, 0, 0, email, attachments);
 }
 
 EMailSender::Response EMailSender::send(const char* to[], byte sizeOfTo, EMailMessage &email, Attachments attachments) {
@@ -476,16 +476,17 @@ EMailSender::Response EMailSender::send(const char* to[], byte sizeOfTo,  byte s
 			#ifndef ARDUINO_ESP8266_RELEASE_2_4_2
 			  if (this->isSecure == false){
 				  client.setInsecure();
+				  /*
 				  bool mfln = client.probeMaxFragmentLength(this->smtp_server, this->smtp_port, 512);
 
 				  EMAIL_DEBUG_PRINT("MFLN supported: ");
 				  EMAIL_DEBUG_PRINTLN(mfln?"yes":"no");
 
-				  if (mfln) {
+				  if (mfln) {*/
 					  client.setBufferSizes(512, 512);
-				  } else {
+				  /*} else {
 					  client.setBufferSizes(2048, 2048);
-				  }
+				  }*/
 			  }
 			#endif
 		#elif (EMAIL_NETWORK_TYPE == NETWORK_ESP32)
@@ -629,7 +630,8 @@ EMailSender::Response EMailSender::send(const char* to[], byte sizeOfTo,  byte s
 //		  String auth = "AUTH PLAIN "+String(encode64(logPass));
 		  EMAIL_DEBUG_PRINTLN(auth);
 		  client.println(auth);
-          }
+		  free(logPass);
+      }
 #if defined(ESP32)
 	  else if (this->isCramMD5Login == true) {
 		  EMAIL_DEBUG_PRINTLN(F("AUTH CRAM-MD5"));

@@ -29,6 +29,7 @@
 #include "weather.h"
 #include "opensprinkler_server.h"
 #include "mqtt.h"
+#include "sensors.h"
 #include "main.h"
 
 #if defined(ARDUINO)
@@ -39,8 +40,14 @@
 
 #if defined(ARDUINO)
 	#if defined(ESP8266)
+		#include <pinger.h>
+		#include <lwip/icmp.h>
+		//extern "C" struct netif* eagle_lwip_getif (int netif_index);
+		Pinger *pinger = NULL;
 		ESP8266WebServer *update_server = NULL;
+
 		DNSServer *dns = NULL;
+
 		ENC28J60lwIP enc28j60(PIN_ETHER_CS); // ENC28J60 lwip for wired Ether
 		Wiznet5500lwIP w5500(PIN_ETHER_CS); // W5500 lwip for wired Ether
 		lwipEth eth;
@@ -103,10 +110,11 @@ unsigned char prev_flow_state = HIGH;
 float flow_last_gpm=0;
 
 uint32_t reboot_timer = 0;
+uint32_t ping_ok = 0;
 
 void flow_poll() {
 	#if defined(ESP8266)
-	if(os.hw_rev>=2) pinModeExt(PIN_SENSOR1, INPUT_PULLUP); // this seems necessary for OS 3.2
+	if(os.hw_rev >= 2) pinModeExt(PIN_SENSOR1, INPUT_PULLUP); // this seems necessary for OS 3.2
 	#endif
 	unsigned char curr_flow_state = digitalReadExt(PIN_SENSOR1);
 	if(!(prev_flow_state==HIGH && curr_flow_state==LOW)) { // only record on falling edge
@@ -415,6 +423,8 @@ void do_setup() {
 	}
 
 	os.button_timeout = LCD_BACKLIGHT_TIMEOUT;
+	
+	sensor_api_init(true);
 }
 
 // Arduino software reset function
@@ -452,6 +462,7 @@ void do_setup() {
 		os.status.network_fails = 1;
 	}
 	os.status.req_network = 0;
+	os.powerup_lasttime = os.now_tz();
 
 	// because at reboot we don't know if special stations
 	// are in OFF state, here we explicitly turn them off
@@ -461,6 +472,8 @@ void do_setup() {
 
 	os.mqtt.init();
 	os.status.req_mqtt_restart = true;
+
+	sensor_api_init(true);
 
 	initialize_otf();
 }
@@ -485,7 +498,8 @@ void reboot_in(uint32_t ms) {
 		reboot_ticker.once_ms(ms, ESP.restart);
 	}
 }
-#else
+bool check_enc28j60();
+#elif !defined(OSPI)
 void handle_web_request(char *p);
 #endif
 
@@ -761,6 +775,16 @@ void do_loop()
 			// check through all programs
 			for(pid=0; pid<pd.nprograms; pid++) {
 				pd.read(pid, &prog);	// todo future: reduce load time
+				if(prog.check_match(curr_time+60)) {
+					// Check and update weather if weatherdata is older than 30min:
+					if (os.checkwt_success_lasttime && (!os.checkwt_lasttime || os.now_tz() > os.checkwt_lasttime + 30*60)) {
+						os.checkwt_lasttime = 0;
+						os.checkwt_success_lasttime = 0;
+						check_weather();
+					}
+					break;
+				}
+
 				bool will_delete = false;
 				unsigned char runcount = prog.check_match(curr_time, &will_delete);
 				if(runcount>0) {
@@ -792,6 +816,9 @@ void do_loop()
 																								// do not water
 									water_time = 0;
 							}
+
+							// Analog sensor water time adjustments:
+							water_time = (ulong)((double)water_time * calc_sensor_watering(pid));
 
 							if (water_time) {
 								// check if water time is still valid
@@ -1049,6 +1076,10 @@ void do_loop()
 			push_message(NOTIFY_WEATHER_UPDATE, 0, os.iopts[IOPT_WATER_PERCENTAGE]);
 			os.weather_update_flag = 0;
 		}
+
+		// read analog sensors
+		read_all_sensors(curr_time && os.network_connected());
+
 		static unsigned char reboot_notification = 1;
 		if(reboot_notification) {
 			#if defined(ESP266)
@@ -1437,7 +1468,8 @@ void manual_start_program(unsigned char pid, unsigned char uwt) {
 // ====== PUSH NOTIFICATION FUNCTIONS =======
 // ==========================================
 void ip2string(char* str, size_t str_len, unsigned char ip[4]) {
-	snprintf_P(str+strlen(str), str_len, PSTR("%d.%d.%d.%d"), ip[0], ip[1], ip[2], ip[3]);
+	int len = strlen(str);
+	snprintf_P(str+len, str_len-len, PSTR("%d.%d.%d.%d"), ip[0], ip[1], ip[2], ip[3]);
 }
 
 #define PUSH_TOPIC_LEN	120
@@ -1478,7 +1510,7 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 		ArduinoJson::DeserializationError error = ArduinoJson::deserializeJson(doc, postval);
 		// Test the parsing otherwise parse
 		if (error) {
-			DEBUG_PRINT(F("mqtt: deserializeJson() failed: "));
+			DEBUG_PRINT(F("email: deserializeJson() failed: "));
 			DEBUG_PRINTLN(error.c_str());
 		} else {
 			email_en = doc["en"];
@@ -1564,12 +1596,12 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 				}else{
 					strcat_P(postval, PSTR("] closed. It ran for "));
 					size_t len = strlen(postval);
-					snprintf_P(postval + len, TMP_BUFFER_SIZE, PSTR(" %d minutes %d seconds."), (int)fval/60, (int)fval%60);
+					snprintf_P(postval + len, TMP_BUFFER_SIZE-len, PSTR(" %d minutes %d seconds."), (int)fval/60, (int)fval%60);
 				}
 
 				if(os.iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_FLOW) {
 					size_t len = strlen(postval);
-					snprintf_P(postval + len, TMP_BUFFER_SIZE, PSTR(" Flow rate: %d.%02d"), (int)flow_last_gpm, (int)(flow_last_gpm*100)%100);
+					snprintf_P(postval + len, TMP_BUFFER_SIZE-len, PSTR(" Flow rate: %d.%02d"), (int)flow_last_gpm, (int)(flow_last_gpm*100)%100);
 				}
 				if(email_enabled) { email_message.subject += PSTR("station event"); }
 			}
@@ -1587,7 +1619,7 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 					if(lval<pd.nprograms) strcat(postval, prog.name);
 				}
 				size_t len = strlen(postval);
-				snprintf_P(postval + len, TMP_BUFFER_SIZE, PSTR(" with %d%% water level."), (int)fval);
+				snprintf_P(postval + len, TMP_BUFFER_SIZE-len, PSTR(" with %d%% water level."), (int)fval);
 				if(email_enabled) { email_message.subject += PSTR("program event"); }
 			}
 			break;
@@ -1642,7 +1674,7 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 			}
 			if (ifttt_enabled || email_enabled) {
 				size_t len = strlen(postval);
-				snprintf_P(postval + len, TMP_BUFFER_SIZE, PSTR("Flow count: %u, volume: %d.%02d"), lval, (int)volume/100, (int)volume%100);
+				snprintf_P(postval + len, TMP_BUFFER_SIZE-len, PSTR("Flow count: %u, volume: %d.%02d"), lval, (int)volume/100, (int)volume%100);
 				if(email_enabled) { email_message.subject += PSTR("flow sensor event"); }
 			}
 			break;
@@ -1664,7 +1696,7 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 				}
 				if(fval>=0) {
 					size_t len = strlen(postval);
-					snprintf_P(postval + len, TMP_BUFFER_SIZE, PSTR("water level updated: %d%%."), (int)fval);
+					snprintf_P(postval + len, TMP_BUFFER_SIZE-len, PSTR("water level updated: %d%%."), (int)fval);
 				}
 				if(email_enabled) { email_message.subject += PSTR("weather update event"); }
 			}
@@ -1693,6 +1725,25 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 					#else
 						ip2string(postval, TMP_BUFFER_SIZE, &(Ethernet.localIP()[0]));
 					#endif
+
+					//Adding restart reasons:
+					struct rst_info *rtc_info = system_get_rst_info();
+					if (rtc_info) {
+						int len = strlen(postval);
+						snprintf_P(postval+len, TMP_BUFFER_SIZE-len, PSTR("<br>reset reason: %x"), rtc_info->reason);
+						if (rtc_info->reason == REASON_WDT_RST ||
+						    rtc_info->reason == REASON_EXCEPTION_RST ||
+							rtc_info->reason == REASON_SOFT_WDT_RST) {
+								if (rtc_info->reason == REASON_EXCEPTION_RST) {
+									len = strlen(postval);
+									snprintf_P(postval+len, TMP_BUFFER_SIZE-len, PSTR("<br>Fatal exception: %d"), rtc_info->exccause);
+								}
+								len = strlen(postval);
+								snprintf_P(postval+len, TMP_BUFFER_SIZE-len, PSTR("<br>epc1=0x%08x, epc2=0x%08x, epc3=0x%08x, excvaddr=0x%08x, depc=0x%08x"),
+									rtc_info->epc1, rtc_info->epc2, rtc_info->epc3, rtc_info->excvaddr, rtc_info->depc);
+							}
+					}
+
 				#else
 					strcat_P(postval, PSTR("controller process restarted."));
 				#endif
@@ -1723,14 +1774,16 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 		#if defined(ARDUINO)
 			#if defined(ESP8266)
 				if(email_host && email_username && email_password && email_recipient) { // make sure all are valid
+					free_tmp_memory();
 					EMailSender emailSend(email_username, email_password);
 					emailSend.setSMTPServer(email_host);
 					emailSend.setSMTPPort(email_port);
 					EMailSender::Response resp = emailSend.send(email_recipient, email_message);
-					// DEBUG_PRINTLN(F("Sending Status:"));
-					// DEBUG_PRINTLN(resp.status);
-					// DEBUG_PRINTLN(resp.code);
-					// DEBUG_PRINTLN(resp.desc);
+					DEBUG_PRINTLN(F("Sending Status:"));
+					DEBUG_PRINTLN(resp.status);
+					DEBUG_PRINTLN(resp.code);
+					DEBUG_PRINTLN(resp.desc);
+					restore_tmp_memory();
 				}
 			#endif
 		#else
@@ -2045,8 +2098,123 @@ static void check_network() {
 				os.status.network_fails=0;
 		}
 	}
-#else
-	// nothing to do for other platforms
+#endif
+#if defined(ESP8266)
+	if (os.status.program_busy) {return;}
+
+	if (os.status.req_network) {
+		os.status.req_network = 0;
+		// change LCD icon to indicate it's checking network
+		if (!ui_state) {
+			os.lcd.setCursor(LCD_CURSOR_NETWORK, 1);
+			os.lcd.write('>');
+		}
+
+		if (!pinger) {
+			pinger = new Pinger();
+#if defined(ENABLE_DEBUG)
+			pinger->OnReceive([](const PingerResponse& response) {
+    			if (response.ReceivedResponse) {
+      				Serial.printf(
+        				"Reply from %s: bytes=%d time=%ums TTL=%d\r\n",
+        			response.DestIPAddress.toString().c_str(),
+        			response.EchoMessageSize - sizeof(struct icmp_echo_hdr),
+        			response.ResponseTime,
+        			response.TimeToLive);
+    			} else {
+      				Serial.printf("Request timed out.\r\n");
+    			}
+
+    			// Return true to continue the ping sequence.
+    			// If current event returns false, the ping sequence is interrupted.
+    			return true;
+  			});
+#endif
+
+			pinger->OnEnd([](const PingerResponse &response) {
+#if defined(ENABLE_DEBUG)
+    			// Evaluate lost packet percentage
+    			float loss = 100;
+    			if(response.TotalReceivedResponses > 0) {
+      				loss = (response.TotalSentRequests - response.TotalReceivedResponses) * 100 / response.TotalSentRequests;
+    			}
+    
+    			// Print packet trip data
+    			Serial.printf("Ping statistics for %s:\r\n",
+      			response.DestIPAddress.toString().c_str());
+    			Serial.printf("    Packets: Sent = %u, Received = %u, Lost = %u (%.2f%% loss),\r\n",
+      				response.TotalSentRequests,
+      				response.TotalReceivedResponses,
+      				response.TotalSentRequests - response.TotalReceivedResponses,
+      				loss);
+
+			    // Print time information
+    			if(response.TotalReceivedResponses > 0)
+    			{
+      				Serial.printf("Approximate round trip times in milli-seconds:\r\n");
+      				Serial.printf("    Minimum = %ums, Maximum = %ums, Average = %.2fms\r\n",
+        				response.MinResponseTime,
+        				response.MaxResponseTime,
+        				response.AvgResponseTime);
+    			}
+    
+    			// Print host data
+    			Serial.printf("Destination host data:\r\n");
+    			Serial.printf("    IP address: %s\r\n", 
+					response.DestIPAddress.toString().c_str());
+    			if(response.DestMacAddress != nullptr) {
+      				Serial.printf("    MAC address: " MACSTR "\r\n",
+        			MAC2STR(response.DestMacAddress->addr));
+    			}
+    			if(response.DestHostname != "") {
+      				Serial.printf("    DNS name: %s\r\n",
+        			response.DestHostname.c_str());
+    			}
+#endif	
+				boolean failed = response.TotalSentRequests > response.TotalReceivedResponses;
+
+				//Idee: If we never received a ping response, then the gateway is blocked.
+				//      So only reboot if we failed 3 times and we never received any ping response.
+				ping_ok += response.TotalReceivedResponses;
+				if (!ping_ok)
+					return true;
+
+				if (failed)  {
+					if(os.status.network_fails<3)  os.status.network_fails++;
+					// clamp it to 6
+					//if (os.status.network_fails > 6) os.status.network_fails = 6;
+				}
+				else os.status.network_fails=0;
+				// if failed more than 3 times, restart
+				if (os.status.network_fails==3) {
+					// mark for safe restart
+					os.nvdata.reboot_cause = REBOOT_CAUSE_NETWORK_FAIL;
+					os.status.safe_reboot = 1;
+				} else if (os.status.network_fails>2) {
+					// if failed more than twice, try to reconnect
+					if (os.start_network())
+						os.status.network_fails=0;
+				}
+
+    			return true; 
+			});
+		}
+		if (useEth && (!eth.connected() || !eth.gatewayIP() || !eth.gatewayIP().isSet())) {
+			os.status.network_fails++;
+			return;
+		}
+		if (!useEth && (!WiFi.isConnected() || !WiFi.gatewayIP() || !WiFi.gatewayIP().isSet() || os.get_wifi_mode()==WIFI_MODE_AP)) {
+			os.status.network_fails++;
+			return;
+		}
+			
+		if(!pinger->Ping(useEth?eth.gatewayIP() : WiFi.gatewayIP())) {
+			os.status.network_fails++;
+#if defined(ENABLE_DEBUG)
+    		Serial.println("Error during last ping command.");
+#endif
+  		}
+	}
 #endif
 }
 

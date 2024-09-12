@@ -48,6 +48,8 @@
 		#include <OpenThingsFramework.h>
 		#include <DNSServer.h>
 		#include <Ticker.h>
+		#include <WiFiClientSecure.h>
+		#include "SSD1306Display.h"
 		#include "espconnect.h"
 		#include "EMailSender.h"
 	#else // for AVR
@@ -113,6 +115,7 @@
 		// AVR specific
 	#endif
 	extern bool useEth;
+	bool detect_i2c(int addr);
 #else
 	// OSPI/Linux specific
 #endif
@@ -455,7 +458,7 @@ private:
 	static void latch_close(unsigned char sid);
 	static void latch_setzonepin(unsigned char sid, unsigned char value);
 	static void latch_setallzonepins(unsigned char value);
-	static void latch_disable_alloutputs_v2();
+	static void latch_disable_alloutputs_v2(unsigned char expvalue);
 	static void latch_setzoneoutput_v2(unsigned char sid, unsigned char A, unsigned char K);
 	static void latch_apply_all_station_bits();
 	static unsigned char prev_station_bits[];

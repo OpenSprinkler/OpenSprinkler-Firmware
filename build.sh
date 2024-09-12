@@ -31,6 +31,19 @@ while getopts ":s:d" opt; do
       ;;
   esac
 done
+
+FILENAME="sopts.dat"
+if [[ ! "$SILENT" && -f "$FILENAME" ]];  then
+	FILESIZE=$(stat -c%s "$FILENAME")
+	if [[ "$FILESIZE" != "4160" ]]; then
+		echo "This version has a new configuration data structure." 
+		echo "Please backup configuration and restore after update!"
+		echo "Otherwise your configuration is lost"
+		echo "however, if this is a new installation, then you can proceed directly"
+		read -p "Press ctrl-c to stop now or enter to continue"
+	fi
+fi
+
 echo "Building OpenSprinkler..."
 
 #Git update submodules
@@ -51,20 +64,34 @@ if [ "$1" == "demo" ]; then
     ws=$(ls external/TinyWebsockets/tiny_websockets_lib/src/*.cpp)
     otf=$(ls external/OpenThings-Framework-Firmware-Library/*.cpp)
     g++ -o OpenSprinkler -DDEMO -DSMTP_OPENSSL $DEBUG -std=c++14 -include string.h main.cpp OpenSprinkler.cpp program.cpp opensprinkler_server.cpp utils.cpp weather.cpp gpio.cpp mqtt.cpp smtp.c RCSwitch.cpp -Iexternal/TinyWebsockets/tiny_websockets_lib/include $ws -Iexternal/OpenThings-Framework-Firmware-Library/ $otf -lpthread -lmosquitto -lssl -lcrypto
+elif [ "$1" == "osbo" ]; then
+	echo "Installing required libraries..."
+	apt-get install -y libmosquitto-dev libssl-dev
+	echo "Compiling osbo firmware..."
+
+    ws=$(ls external/TinyWebsockets/tiny_websockets_lib/src/*.cpp)
+    otf=$(ls external/OpenThings-Framework-Firmware-Library/*.cpp)
+	g++ -o OpenSprinkler -DOSBO -DSMTP_OPENSSL $DEBUG -std=c++14 -include string.h main.cpp OpenSprinkler.cpp program.cpp opensprinkler_server.cpp utils.cpp weather.cpp gpio.cpp mqtt.cpp smtp.c -Iexternal/TinyWebsockets/tiny_websockets_lib/include $ws -Iexternal/OpenThings-Framework-Firmware-Library/ $otf -lpthread -lmosquitto -lssl -lcrypto
 else
 	echo "Installing required libraries..."
 	apt-get update
 	apt-get install -y libmosquitto-dev libi2c-dev libssl-dev libgpiod-dev gpiod
-    enable_i2c
+	enable_i2c
 
-	USEGPIO="-DLIBGPIOD"
-	GPIOLIB="-lgpiod"
+	USEGPIO=""
+	GPIOLIB=""
+
+
+	if [ -h "/sys/class/gpio/gpiochip512" ]; then
+		echo "using libgpiod"
+		USEGPIO="-DLIBGPIOD"
+		GPIOLIB="-lgpiod"
+	fi
 
 	echo "Compiling ospi firmware..."
-
     ws=$(ls external/TinyWebsockets/tiny_websockets_lib/src/*.cpp)
     otf=$(ls external/OpenThings-Framework-Firmware-Library/*.cpp)
-	g++ -o OpenSprinkler -DOSPI $USEGPIO -DSMTP_OPENSSL $DEBUG -std=c++14 -include string.h main.cpp OpenSprinkler.cpp program.cpp opensprinkler_server.cpp utils.cpp weather.cpp gpio.cpp mqtt.cpp smtp.c RCSwitch.cpp -Iexternal/TinyWebsockets/tiny_websockets_lib/include $ws -Iexternal/OpenThings-Framework-Firmware-Library/ $otf -lpthread -lmosquitto -lssl -lcrypto -li2c $GPIOLIB
+	g++ -o OpenSprinkler -DOSPI $USEGPIO -DSMTP_OPENSSL $DEBUG -std=c++14 -include string.h main.cpp OpenSprinkler.cpp program.cpp opensprinkler_server.cpp utils.cpp weather.cpp gpio.cpp mqtt.cpp smtp.c -Iexternal/TinyWebsockets/tiny_websockets_lib/include $ws -Iexternal/OpenThings-Framework-Firmware-Library/ $otf -lpthread -lmosquitto -lssl -lcrypto $GPIOLIB
 fi
 
 if [ -f /etc/init.d/OpenSprinkler.sh ]; then

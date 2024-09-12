@@ -41,10 +41,14 @@
 //remove unused functions: void write_to_file(const char *fname, const char *data, ulong size, ulong pos=0, bool trunc=true);
 //remove unused functions: void read_from_file(const char *fname, char *data, ulong maxsize=TMP_BUFFER_SIZE, int pos=0);
 void remove_file(const char *fname);
+bool rename_file(const char *fn_old, const char *fn_new);
 bool file_exists(const char *fname);
 
-void file_read_block (const char *fname, void *dst, ulong pos, ulong len);
+ulong file_size(const char *fn);
+
+ulong file_read_block (const char *fname, void *dst, ulong pos, ulong len);
 void file_write_block(const char *fname, const void *src, ulong pos, ulong len);
+void file_append_block(const char *fname, const void *src, ulong len);
 void file_copy_block (const char *fname, ulong from, ulong to, ulong len, void *tmp=0);
 unsigned char file_read_byte (const char *fname, ulong pos);
 void file_write_byte(const char *fname, ulong pos, unsigned char v);
@@ -59,6 +63,7 @@ void urlDecode(char *);
 void strReplaceQuoteBackslash(char *);
 void peel_http_header(char*);
 void strReplace(char *, char c, char r);
+size_t freeMemory();
 
 #define date_encode(m,d) ((m<<5)+d)
 #define MIN_ENCODED_DATE date_encode(1,1)
