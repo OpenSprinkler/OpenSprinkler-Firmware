@@ -89,6 +89,7 @@ extern ProgramData pd;
 	unsigned char OpenSprinkler::wifi_bssid[6]={0};
 	unsigned char OpenSprinkler::wifi_channel=255;
 	unsigned char OpenSprinkler::wifi_testmode = 0;
+	OSInfluxDB OpenSprinkler::influxdb;
 #elif defined(ARDUINO)
 	LiquidCrystal OpenSprinkler::lcd;
 	extern SdFat sd;

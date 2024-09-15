@@ -327,6 +327,8 @@ const char *getlogfile2(uint8_t log);
 void checkLogSwitch(uint8_t log);
 void checkLogSwitchAfterWrite(uint8_t log);
 
+//influxdb
+void add_influx_data(Sensor_t *sensor);
 
 // Set Sensor Address for SMT100:
 int set_sensor_address(Sensor_t *sensor, uint8_t new_address);
