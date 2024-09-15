@@ -51,6 +51,7 @@
 		#include "SSD1306Display.h"
 		#include "espconnect.h"
 		#include "EMailSender.h"
+		#include "influxdb.h"
 	#else // for AVR
 		#include <SdFat.h>
 		#include <Ethernet.h>
@@ -216,6 +217,7 @@ public:
 	// data members
 #if defined(ESP8266)
 	static SSD1306Display lcd;  // 128x64 OLED display
+	static OSInfluxDB influxdb;
 #elif defined(ARDUINO)
 	static LiquidCrystal lcd;   // 16x2 character LCD
 #else
@@ -227,7 +229,6 @@ public:
 #endif
 
 	static OSMqtt mqtt;
-
 	static NVConData nvdata;
 	static ConStatus status;
 	static ConStatus old_status;
