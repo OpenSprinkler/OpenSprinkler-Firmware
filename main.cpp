@@ -31,6 +31,7 @@
 #include "mqtt.h"
 #include "sensors.h"
 #include "main.h"
+#include "osinfluxdb.h"
 
 #if defined(ARDUINO)
 #include <Arduino.h>

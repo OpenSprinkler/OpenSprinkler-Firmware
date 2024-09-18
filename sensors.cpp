@@ -33,12 +33,14 @@
 #include "sensor_mqtt.h"
 #include "utils.h"
 #include "weather.h"
+#include "osinfluxdb.h"
 #ifdef ADS1115
 #include "sensor_ospi_ads1115.h"
 #endif
 #ifdef PCF8591
 #include "sensor_ospi_pcf8591.h"
 #endif
+
 
 unsigned char findKeyVal(const char *str, char *strbuf, uint16_t maxlen, const char *key,
                 bool key_in_pgm = false, uint8_t *keyfound = NULL);
@@ -509,6 +511,7 @@ bool sensorlog_add(uint8_t log, SensorLog_t *sensorlog) {
 }
 
 bool sensorlog_add(uint8_t log, Sensor_t *sensor, ulong time) {
+
   if (sensor->flags.data_ok && sensor->flags.log && time > 1000) {
     SensorLog_t sensorlog;
     memset(&sensorlog, 0, sizeof(SensorLog_t));
@@ -516,6 +519,10 @@ bool sensorlog_add(uint8_t log, Sensor_t *sensor, ulong time) {
     sensorlog.time = time;
     sensorlog.native_data = sensor->last_native_data;
     sensorlog.data = sensor->last_data;
+
+    if (log == LOG_STD)
+      add_influx_data(sensor);
+
     if (!sensorlog_add(log, &sensorlog)) {
       sensor->flags.log = 0;
       return false;
@@ -2452,4 +2459,28 @@ char *SensorUrl_get(uint nr, uint type) {
     sensorUrl = sensorUrl->next;
   }
   return NULL;
+}
+
+/**
+ * @brief Write data to influx db
+ * 
+ * @param sensor 
+ * @param log 
+ */
+void add_influx_data(Sensor_t *sensor) {
+  if (!os.influxdb.isEnabled())
+    return;
+
+  Point sensor_data("analogsensor");
+  os.sopt_load(SOPT_DEVICE_NAME, tmp_buffer);
+  sensor_data.addTag("devicename", tmp_buffer);
+  snprintf(tmp_buffer, 10, "%d", sensor->nr);
+  sensor_data.addTag("nr", tmp_buffer);
+  sensor_data.addTag("name", sensor->name);
+  sensor_data.addTag("unit", getSensorUnit(sensor));
+
+  sensor_data.addField("native_data", sensor->last_native_data);
+  sensor_data.addField("data", sensor->last_data);
+
+  os.influxdb.write_influx_data(sensor_data);
 }
