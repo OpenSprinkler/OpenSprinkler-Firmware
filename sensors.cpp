@@ -33,7 +33,7 @@
 #include "sensor_mqtt.h"
 #include "utils.h"
 #include "weather.h"
-#include "influxdb.h"
+#include "osinfluxdb.h"
 #ifdef ADS1115
 #include "sensor_ospi_ads1115.h"
 #endif
