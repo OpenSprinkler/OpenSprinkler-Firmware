@@ -32,6 +32,7 @@
 #include "images.h"
 #include "mqtt.h"
 #include "RCSwitch.h"
+#include "osinfluxdb.h"
 
 #if defined(ARDUINO) // headers for Arduino
 	#include <Arduino.h>
@@ -52,7 +53,6 @@
 		#include "SSD1306Display.h"
 		#include "espconnect.h"
 		#include "EMailSender.h"
-		#include "osinfluxdb.h"
 	#else // for AVR
 		#include <SdFat.h>
 		#include <Ethernet.h>
@@ -243,9 +243,9 @@ class OpenSprinkler {
 public:
 
 	// data members
+	static OSInfluxDB influxdb;
 #if defined(USE_SSD1306)
 	static SSD1306Display lcd;  // 128x64 OLED display
-	static OSInfluxDB influxdb;
 #elif defined(USE_LCD)
 	static LiquidCrystal lcd;   // 16x2 character LCD
 #endif

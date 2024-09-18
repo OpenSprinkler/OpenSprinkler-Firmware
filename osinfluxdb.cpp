@@ -89,6 +89,10 @@ boolean OSInfluxDB::isEnabled() {
 }
 
 #if defined(ESP8266)
+OSInfluxDB::~OSInfluxDB() {
+    if (client) delete client;
+}
+
 void OSInfluxDB::write_influx_data(Point &sensor_data) {
     if (!initialized) init();
     if (!enabled) 
@@ -133,15 +137,18 @@ void OSInfluxDB::write_influx_data(Point &sensor_data) {
 }
 
 #else
+OSInfluxDB::~OSInfluxDB() {
+    if (client) delete client;
+}
 
-void OSInfluxDB::write_influx_data(Point &sensor_data) {
+influxdb_cpp::server_info *OSInfluxDB::get_client() {
     if (!initialized) init();
     if (!enabled) 
-        return;
+        return NULL;
 
     if (!client) {
         if (!file_exists(INFLUX_CONFIG_FILE))
-            return;
+            return NULL;
 
         //Load influx config:
         ArduinoJson::JsonDocument doc; 
@@ -150,10 +157,10 @@ void OSInfluxDB::write_influx_data(Point &sensor_data) {
 	    if (error) {
 			DEBUG_PRINT(F("email: deserializeJson() failed: "));
 			DEBUG_PRINTLN(error.c_str());  
-            return;
+            return NULL;
         }
         if (!doc["enabled"])
-            return;
+            return NULL;
 /*
 influxdb_cpp::server_info si("127.0.0.1", 8086, "db", "usr", "pwd");
 influxdb_cpp::builder()
@@ -167,18 +174,10 @@ influxdb_cpp::builder()
     .timestamp(1512722735522840439)
     .post_http(si);
 */
-        client = new influxdb_cpp::server_info(doc["url"], doc["port"], doc["bucket"]", "", "", "ms", doc["token"]);
-    }
 
-    if (client) {
-        String resp;
-        sensor_data.timestamp(millis());
-        int ret = sensor_data.post_http(client*, &resp);
-        if (!ret) {
-            DEBUG_PRINT("InfluxDB write failed: ");
-            DEBUG_PRINTLN(client->getLastErrorMessage());
-        }     
+        client = new influxdb_cpp::server_info(doc["url"], doc["port"], doc["bucket"], "", "", "ms", doc["token"]);
     }
+    return client;
 }
 
 #endif

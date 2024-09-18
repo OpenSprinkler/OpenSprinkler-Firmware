@@ -71,6 +71,7 @@ unsigned char OpenSprinkler::attrib_spe[MAX_NUM_BOARDS];
 unsigned char OpenSprinkler::attrib_grp[MAX_NUM_STATIONS];
 unsigned char OpenSprinkler::masters[NUM_MASTER_ZONES][NUM_MASTER_OPTS];
 RCSwitch OpenSprinkler::rfswitch;
+OSInfluxDB OpenSprinkler::influxdb;
 
 extern char tmp_buffer[];
 extern char ether_buffer[];
@@ -93,7 +94,6 @@ extern ProgramData pd;
 	unsigned char OpenSprinkler::wifi_bssid[6]={0};
 	unsigned char OpenSprinkler::wifi_channel=255;
 	unsigned char OpenSprinkler::wifi_testmode = 0;
-	OSInfluxDB OpenSprinkler::influxdb;
 #elif defined(ARDUINO)
 	extern SdFat sd;
 #else

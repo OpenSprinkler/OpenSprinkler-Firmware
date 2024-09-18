@@ -2471,6 +2471,7 @@ void add_influx_data(Sensor_t *sensor) {
   if (!os.influxdb.isEnabled())
     return;
 
+  #if defined(ESP8266)
   Point sensor_data("analogsensor");
   os.sopt_load(SOPT_DEVICE_NAME, tmp_buffer);
   sensor_data.addTag("devicename", tmp_buffer);
@@ -2483,4 +2484,39 @@ void add_influx_data(Sensor_t *sensor) {
   sensor_data.addField("data", sensor->last_data);
 
   os.influxdb.write_influx_data(sensor_data);
+
+  #else
+
+/*
+influxdb_cpp::server_info si("127.0.0.1", 8086, "db", "usr", "pwd");
+influxdb_cpp::builder()
+    .meas("foo")
+    .tag("k", "v")
+    .tag("x", "y")
+    .field("x", 10)
+    .field("y", 10.3, 2)
+    .field("z", 10.3456)
+    .field("b", !!10)
+    .timestamp(1512722735522840439)
+    .post_http(si);
+*/
+  influxdb_cpp::server_info * client = os.influxdb.get_client();
+  if (client == NULL)
+    return;
+
+  os.sopt_load(SOPT_DEVICE_NAME, tmp_buffer);
+  char nr_buf[10];
+  snprintf(nr_buf, 10, "%d", sensor->nr);
+  influxdb_cpp::builder()
+    .meas("analogsensor")
+    .tag("devicename", tmp_buffer)
+    .tag("nr", nr_buf)
+    .tag("name", sensor->name)
+    .tag("unit", getSensorUnit(sensor))
+    .field("native_data", (long)sensor->last_native_data)
+    .field("data", sensor->last_data, 2)
+    .timestamp(millis())
+    .post_http(*client);
+
+  #endif
 }
