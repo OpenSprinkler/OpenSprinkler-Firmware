@@ -1309,6 +1309,15 @@ void server_json_controller_main(OTF_PARAMS_DEF) {
 	}
 	bfill.emit_p(PSTR("]"));
 
+	//influxdb
+	if(!buffer_available()) {
+		send_packet(OTF_PARAMS);
+	}
+	bfill.emit_p(PSTR(",\"influxdb\":"));
+	server_influx_get_main();
+	//end influxdb
+
+
 	bfill.emit_p(PSTR("}"));
 }
 
@@ -1605,6 +1614,19 @@ void server_change_options(OTF_PARAMS_DEF)
 		os.sopt_save(SOPT_MQTT_OPTS, tmp_buffer);
 		os.status.req_mqtt_restart = true;
 	}
+
+	//influxdb set
+	keyfound = 0;
+	if(findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("influxdb"), true, &keyfound)) {
+		#if !defined(USE_OTF)
+		urlDecode(tmp_buffer);
+		#endif
+		os.influxdb.set_influx_config(tmp_buffer);
+	} else if (keyfound) {
+		tmp_buffer[0]=0;
+		os.influxdb.set_influx_config(tmp_buffer);
+	}
+	//end influxdb set
 
 	keyfound = 0;
 	if(findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("email"), true, &keyfound)) {
@@ -3539,7 +3561,13 @@ void server_influx_get(OTF_PARAMS_DEF) {
 #else
 	print_header();
 #endif
+	server_influx_get_main();
 
+	send_packet(OTF_PARAMS);
+	handle_return(HTML_OK);
+}
+
+void server_influx_get_main() {
 	ArduinoJson::JsonDocument doc;
 	os.influxdb.get_influx_config(doc);
 	int enabled = doc["enabled"];
@@ -3551,8 +3579,6 @@ void server_influx_get(OTF_PARAMS_DEF) {
 
 	bfill.emit_p(PSTR("{\"enabled\":$D,\"url\":\"$S\",\"port\":$D,\"org\":\"$S\",\"bucket\":\"$S\",\"token\":\"$S\"}"), 
 		enabled, url, port, org, bucket, token);
-	send_packet(OTF_PARAMS);
-	handle_return(HTML_OK);
 }
 
 typedef void (*URLHandler)(OTF_PARAMS_DEF);

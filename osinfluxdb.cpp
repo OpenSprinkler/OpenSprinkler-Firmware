@@ -52,6 +52,18 @@ void OSInfluxDB::set_influx_config(ArduinoJson::JsonDocument &doc) {
     initialized = true;
 }
 
+void OSInfluxDB::set_influx_config(const char *data) {
+    size_t size = strlen(data);
+    file_write_block(INFLUX_CONFIG_FILE, data, 0, size+1);
+    if (client)
+    {
+        delete client;
+        client = NULL;
+    }
+    enabled = false;
+    initialized = false;
+}
+
 void OSInfluxDB::get_influx_config(ArduinoJson::JsonDocument &doc) {
     //Load influx config:
     memset(tmp_buffer, 0, TMP_BUFFER_SIZE*2);

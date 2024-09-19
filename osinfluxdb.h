@@ -46,6 +46,7 @@ public:
     ~OSInfluxDB();
     void set_influx_config(int enabled, char *url, uint16_t port, char *org, char *bucket, char *token);
     void set_influx_config(ArduinoJson::JsonDocument &doc);
+    void set_influx_config(const char *json);
     void get_influx_config(ArduinoJson::JsonDocument &doc);
     bool isEnabled();
     #if defined(ESP8266) 

@@ -112,6 +112,7 @@ public:
 	}
 };
 
+void server_influx_get_main();
 void free_tmp_memory();
 void restore_tmp_memory();
 
