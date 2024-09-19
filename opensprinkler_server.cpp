@@ -3488,7 +3488,7 @@ void server_influx_set(OTF_PARAMS_DEF) {
 #endif
 
 	int enabled = 0;
-	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("enabled"), true)) {
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("en"), true)) {
 		enabled = strtol(tmp_buffer, NULL, 0); 
 	}
 
@@ -3570,14 +3570,14 @@ void server_influx_get(OTF_PARAMS_DEF) {
 void server_influx_get_main() {
 	ArduinoJson::JsonDocument doc;
 	os.influxdb.get_influx_config(doc);
-	int enabled = doc["enabled"];
+	int enabled = doc["en"];
 	const char *url = doc["url"];
 	const uint16_t port = doc["port"];
 	const char *org = doc["org"];
 	const char *bucket = doc["bucket"];
 	const char *token = doc["token"];
 
-	bfill.emit_p(PSTR("{\"enabled\":$D,\"url\":\"$S\",\"port\":$D,\"org\":\"$S\",\"bucket\":\"$S\",\"token\":\"$S\"}"), 
+	bfill.emit_p(PSTR("{\"en\":$D,\"url\":\"$S\",\"port\":$D,\"org\":\"$S\",\"bucket\":\"$S\",\"token\":\"$S\"}"), 
 		enabled, url, port, org, bucket, token);
 }
 

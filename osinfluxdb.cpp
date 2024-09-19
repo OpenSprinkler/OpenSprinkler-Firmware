@@ -31,7 +31,7 @@ extern char tmp_buffer[TMP_BUFFER_SIZE*2];
 
 void OSInfluxDB::set_influx_config(int enabled, char *url, uint16_t port, char *org, char *bucket, char *token) {
     ArduinoJson::JsonDocument doc; 
-    doc["enabled"] = enabled;
+    doc["en"] = enabled;
     doc["url"] = url;
     doc["port]"] = port;
     doc["org"] = org;
@@ -48,7 +48,7 @@ void OSInfluxDB::set_influx_config(ArduinoJson::JsonDocument &doc) {
         delete client;
         client = NULL;
     }
-    enabled = doc["enabled"];
+    enabled = doc["en"];
     initialized = true;
 }
 
@@ -70,26 +70,26 @@ void OSInfluxDB::get_influx_config(ArduinoJson::JsonDocument &doc) {
     if (file_exists(INFLUX_CONFIG_FILE))
         file_read_block(INFLUX_CONFIG_FILE, tmp_buffer, 0, TMP_BUFFER_SIZE*2);
     ArduinoJson::DeserializationError error = ArduinoJson::deserializeJson(doc, tmp_buffer);
-	if (error || doc.isNull() || doc["enabled"] > 1) {
+	if (error || doc.isNull() || doc["en"] > 1) {
         if (error) {
             DEBUG_PRINT(F("email: deserializeJson() failed: "));
 		    DEBUG_PRINTLN(error.c_str());  
         }
-        doc["enabled"] = 0;
+        doc["en"] = 0;
 		doc["url"] = "";
         doc["port"] = 8086;
 		doc["org"] = "";
 		doc["bucket"] = "";
 		doc["token"] = "";
     }
-    enabled = doc["enabled"];
+    enabled = doc["en"];
     initialized = true; 
 }
 
 void OSInfluxDB::init() {
     ArduinoJson::JsonDocument doc;
     get_influx_config(doc);
-    enabled = doc["enabled"];
+    enabled = doc["en"];
     initialized = true; 
 }
 
@@ -123,7 +123,7 @@ void OSInfluxDB::write_influx_data(Point &sensor_data) {
 			DEBUG_PRINTLN(error.c_str());  
             return;
         }
-        if (!doc["enabled"])
+        if (!doc["en"])
             return;
         
         //InfluxDBClient client(INFLUXDB_URL, INFLUXDB_ORG, INFLUXDB_BUCKET, INFLUXDB_TOKEN, InfluxDbCloud2CACert);
@@ -171,7 +171,7 @@ influxdb_cpp::server_info *OSInfluxDB::get_client() {
 			DEBUG_PRINTLN(error.c_str());  
             return NULL;
         }
-        if (!doc["enabled"])
+        if (!doc["en"])
             return NULL;
 /*
 influxdb_cpp::server_info si("127.0.0.1", 8086, "db", "usr", "pwd");
