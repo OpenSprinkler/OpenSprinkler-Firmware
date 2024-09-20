@@ -2501,7 +2501,7 @@ influxdb_cpp::builder()
     .post_http(si);
 */
   influxdb_cpp::server_info * client = os.influxdb.get_client();
-  if (client == NULL)
+  if (!client)
     return;
 
   os.sopt_load(SOPT_DEVICE_NAME, tmp_buffer);

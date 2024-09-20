@@ -30,7 +30,7 @@ extern char tmp_buffer[TMP_BUFFER_SIZE*2];
 #define INFLUX_CONFIG_FILE "influx.json"
 
 void OSInfluxDB::set_influx_config(int enabled, char *url, uint16_t port, char *org, char *bucket, char *token) {
-    ArduinoJson::JsonDocument doc; 
+    ArduinoJson::JsonDocument doc;
     doc["en"] = enabled;
     doc["url"] = url;
     doc["port]"] = port;
@@ -54,7 +54,9 @@ void OSInfluxDB::set_influx_config(ArduinoJson::JsonDocument &doc) {
 
 void OSInfluxDB::set_influx_config(const char *data) {
     size_t size = strlen(data);
-    file_write_block(INFLUX_CONFIG_FILE, data, 0, size);
+    file_write_block(INFLUX_CONFIG_FILE, "{", 0, 1);
+    file_write_block(INFLUX_CONFIG_FILE, data, 1, size);
+    file_write_block(INFLUX_CONFIG_FILE, "}", size+1, 1);
     if (client)
     {
         delete client;
@@ -157,17 +159,12 @@ influxdb_cpp::server_info *OSInfluxDB::get_client() {
     if (!initialized) init();
     if (!enabled) 
         return NULL;
-
     if (!client) {
-        if (!file_exists(INFLUX_CONFIG_FILE))
-            return NULL;
-
         //Load influx config:
         ArduinoJson::JsonDocument doc; 
         get_influx_config(doc);
         if (doc["en"] == 0)
             return NULL;
-
         client = new influxdb_cpp::server_info(doc["url"], doc["port"], doc["bucket"], "", "", "ms", doc["token"]);
     }
     return client;
