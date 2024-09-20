@@ -29,6 +29,7 @@
 #include "mqtt.h"
 #include "main.h"
 #include "sensors.h"
+#include "osinfluxdb.h"
 
 // External variables defined in main ion file
 #if defined(USE_OTF)
@@ -418,7 +419,6 @@ boolean check_password(char *p)
 		p = get_buffer;
 	}
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("pw"), true)) {
-		urlDecode(tmp_buffer);
 		if (os.password_verify(tmp_buffer)) return true;
 	}
 #else
@@ -635,9 +635,6 @@ void server_change_stations(OTF_PARAMS_DEF) {
 					handle_return(HTML_DATA_OUTOFBOUND);
 				}
 			} else if ((tmp_buffer[0] == STN_TYPE_HTTP) || (tmp_buffer[0] == STN_TYPE_HTTPS) || (tmp_buffer[0] == STN_TYPE_REMOTE_OTC)) {
-				#if !defined(ESP8266) // ESP8266 does automatic decoding
-					urlDecode(tmp_buffer + 1);
-				#endif
 				if (strlen(tmp_buffer+1) > sizeof(HTTPStationData)) {
 					handle_return(HTML_DATA_OUTOFBOUND);
 				}
@@ -728,7 +725,9 @@ void server_change_runonce(OTF_PARAMS_DEF) {
 	char *p = get_buffer;
 
 	// decode url first
+	#if !defined(USE_OTF)
 	if(p) urlDecode(p);
+	#endif
 	// search for the start of t=[
 	char *pv;
 	boolean found=false;
@@ -2030,7 +2029,9 @@ void server_fill_files(OTF_PARAMS_DEF) {
 */
 
 char* urlDecodeAndUnescape(char *buf) {
+	#if !defined(USE_OTF)
 	urlDecode(buf);
+	#endif
 	strReplace(buf, '\"', '\'');
 	strReplace(buf, '\\', '/');
 	return buf;
@@ -3356,7 +3357,107 @@ void server_sensorconfig_backup(OTF_PARAMS_DEF) {
 	handle_return(HTML_OK);
 }
 
+/**
+ * is
+ * @brief influx set config
+ *
+ */
+void server_influx_set(OTF_PARAMS_DEF) {
+#if defined(USE_OTF)
+	if(!process_password(OTF_PARAMS)) return;
+#else
+	char *p = get_buffer;
+#endif
 
+	int enabled = 0;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("enabled"), true)) {
+		enabled = strtol(tmp_buffer, NULL, 0); 
+	}
+
+	char *url = NULL;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("url"), true)) {
+		urlDecodeAndUnescape(tmp_buffer);
+		DEBUG_PRINTLN(tmp_buffer);
+		url = strdup(tmp_buffer);
+	}
+
+	int port = 8086;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("port"), true)) {
+		DEBUG_PRINTLN(tmp_buffer);
+		port = strtol(tmp_buffer, NULL, 0); 
+	}
+
+	char *org = NULL;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("org"), true)) {
+		urlDecodeAndUnescape(tmp_buffer);
+		DEBUG_PRINTLN(tmp_buffer);
+		org = strdup(tmp_buffer);
+	}
+
+	char *bucket = NULL;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("bucket"), true)) {
+		urlDecodeAndUnescape(tmp_buffer);
+		DEBUG_PRINTLN(tmp_buffer);
+		bucket = strdup(tmp_buffer);
+	}
+
+	char *token = NULL;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("token"), true)) {
+		urlDecodeAndUnescape(tmp_buffer);
+		DEBUG_PRINTLN(tmp_buffer);
+		token = strdup(tmp_buffer);
+	}
+
+#if defined(USE_OTF)
+	// as the log data can be large, we will use ESP8266's sendContent function to
+	// send multiple packets of data, instead of the standard way of using send().
+	rewind_ether_buffer();
+	print_header(OTF_PARAMS);
+#else
+	print_header();
+#endif
+
+	os.influxdb.set_influx_config(enabled, url, port, org, bucket, token);
+
+	handle_return(HTML_OK);
+}
+
+
+/**
+ * ig
+ * @brief influx get config
+ *
+ */
+void server_influx_get(OTF_PARAMS_DEF) {
+#if defined(USE_OTF)
+	if(!process_password(OTF_PARAMS)) return;
+#else
+	char *p = get_buffer;
+#endif
+
+#if defined(USE_OTF)
+	// as the log data can be large, we will use ESP8266's sendContent function to
+	// send multiple packets of data, instead of the standard way of using send().
+	rewind_ether_buffer();
+	print_header(OTF_PARAMS);
+#else
+	print_header();
+#endif
+
+	ArduinoJson::JsonDocument doc;
+	os.influxdb.get_influx_config(doc);
+	int enabled = doc["enabled"];
+	const char *url = doc["url"];
+	const uint16_t port = doc["port"];
+	const char *org = doc["org"];
+	const char *bucket = doc["bucket"];
+	const char *token = doc["token"];
+
+	bfill.emit_p(PSTR("{\"enabled\":$D,\"url\":\"$S\",\"port\":$D,\"org\":\"$S\",\"bucket\":\"$S\",\"token\":\"$S\"}"), 
+		enabled, url, port, org, bucket, token);
+	send_packet(OTF_PARAMS);
+	handle_return(HTML_OK);
+}
 
 typedef void (*URLHandler)(OTF_PARAMS_DEF);
 
@@ -3407,6 +3508,8 @@ const char _url_keys[] PROGMEM =
 	"sh"
 	"sx"
     "db"
+	"is"
+	"ig"
 #if defined(ARDUINO)
 	//"ff"
 #endif
@@ -3454,6 +3557,8 @@ URLHandler urls[] = {
 	server_sensorprog_types,//sh
 	server_sensorconfig_backup,//sx
 	server_json_debug,      // db
+	server_influx_set,
+	server_influx_get,
 	//server_fill_files,
 };
 
