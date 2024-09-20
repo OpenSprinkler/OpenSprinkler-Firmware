@@ -42,7 +42,7 @@ void OSInfluxDB::set_influx_config(int enabled, char *url, uint16_t port, char *
 
 void OSInfluxDB::set_influx_config(ArduinoJson::JsonDocument &doc) {
     size_t size = ArduinoJson::serializeJson(doc, tmp_buffer);
-    file_write_block(INFLUX_CONFIG_FILE, tmp_buffer, 0, size+1);
+    file_write_block(INFLUX_CONFIG_FILE, tmp_buffer, 0, size);
     if (client)
     {
         delete client;
@@ -54,7 +54,7 @@ void OSInfluxDB::set_influx_config(ArduinoJson::JsonDocument &doc) {
 
 void OSInfluxDB::set_influx_config(const char *data) {
     size_t size = strlen(data);
-    file_write_block(INFLUX_CONFIG_FILE, data, 0, size+1);
+    file_write_block(INFLUX_CONFIG_FILE, data, 0, size);
     if (client)
     {
         delete client;
@@ -65,14 +65,20 @@ void OSInfluxDB::set_influx_config(const char *data) {
 }
 
 void OSInfluxDB::get_influx_config(ArduinoJson::JsonDocument &doc) {
-    //Load influx config:
-    memset(tmp_buffer, 0, TMP_BUFFER_SIZE*2);
+    DEBUG_PRINTLN("Load influx config");
     if (file_exists(INFLUX_CONFIG_FILE))
-        file_read_block(INFLUX_CONFIG_FILE, tmp_buffer, 0, TMP_BUFFER_SIZE*2);
+    {
+        ulong size = file_read_block(INFLUX_CONFIG_FILE, tmp_buffer, 0, TMP_BUFFER_SIZE*2);
+        DEBUG_PRINT(F("influx config size="));
+        DEBUG_PRINTLN(size);
+        tmp_buffer[size] = 0;
+        DEBUG_PRINT(F("influx config="));
+        DEBUG_PRINTLN(tmp_buffer);
+    }
     ArduinoJson::DeserializationError error = ArduinoJson::deserializeJson(doc, tmp_buffer);
 	if (error || doc.isNull() || doc["en"] > 1) {
         if (error) {
-            DEBUG_PRINT(F("email: deserializeJson() failed: "));
+            DEBUG_PRINT(F("influxdb: deserializeJson() failed: "));
 		    DEBUG_PRINTLN(error.c_str());  
         }
         doc["en"] = 0;
@@ -116,14 +122,8 @@ void OSInfluxDB::write_influx_data(Point &sensor_data) {
 
         //Load influx config:
         ArduinoJson::JsonDocument doc; 
-        file_read_block(INFLUX_CONFIG_FILE, tmp_buffer, 0, TMP_BUFFER_SIZE*2);
-        ArduinoJson::DeserializationError error = ArduinoJson::deserializeJson(doc, tmp_buffer);
-	    if (error) {
-			DEBUG_PRINT(F("email: deserializeJson() failed: "));
-			DEBUG_PRINTLN(error.c_str());  
-            return;
-        }
-        if (!doc["en"])
+        get_influx_config(doc);
+        if (doc[en] == 0)
             return;
         
         //InfluxDBClient client(INFLUXDB_URL, INFLUXDB_ORG, INFLUXDB_BUCKET, INFLUXDB_TOKEN, InfluxDbCloud2CACert);
@@ -142,7 +142,7 @@ void OSInfluxDB::write_influx_data(Point &sensor_data) {
   
         // Write point
         if (!client->writePoint(sensor_data)) {
-            DEBUG_PRINT("InfluxDB write failed: ");
+            DEBUG_PRINT("influxdb write failed: ");
             DEBUG_PRINTLN(client->getLastErrorMessage());
         }     
     }
@@ -164,28 +164,9 @@ influxdb_cpp::server_info *OSInfluxDB::get_client() {
 
         //Load influx config:
         ArduinoJson::JsonDocument doc; 
-        file_read_block(INFLUX_CONFIG_FILE, tmp_buffer, 0, TMP_BUFFER_SIZE*2);
-        ArduinoJson::DeserializationError error = ArduinoJson::deserializeJson(doc, tmp_buffer);
-	    if (error) {
-			DEBUG_PRINT(F("email: deserializeJson() failed: "));
-			DEBUG_PRINTLN(error.c_str());  
+        get_influx_config(doc);
+        if (doc["en"] == 0)
             return NULL;
-        }
-        if (!doc["en"])
-            return NULL;
-/*
-influxdb_cpp::server_info si("127.0.0.1", 8086, "db", "usr", "pwd");
-influxdb_cpp::builder()
-    .meas("foo")
-    .tag("k", "v")
-    .tag("x", "y")
-    .field("x", 10)
-    .field("y", 10.3, 2)
-    .field("z", 10.3456)
-    .field("b", !!10)
-    .timestamp(1512722735522840439)
-    .post_http(si);
-*/
 
         client = new influxdb_cpp::server_info(doc["url"], doc["port"], doc["bucket"], "", "", "ms", doc["token"]);
     }
