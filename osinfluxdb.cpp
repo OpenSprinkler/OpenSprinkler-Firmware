@@ -67,7 +67,7 @@ void OSInfluxDB::set_influx_config(const char *data) {
 }
 
 void OSInfluxDB::get_influx_config(ArduinoJson::JsonDocument &doc) {
-    DEBUG_PRINTLN("Load influx config");
+    //DEBUG_PRINTLN("Load influx config");
     tmp_buffer[0] = 0;
     if (file_exists(INFLUX_CONFIG_FILE))
     {
