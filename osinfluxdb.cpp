@@ -67,7 +67,8 @@ void OSInfluxDB::set_influx_config(const char *data) {
 }
 
 void OSInfluxDB::get_influx_config(ArduinoJson::JsonDocument &doc) {
-    //DEBUG_PRINTLN("Load influx config");
+    DEBUG_PRINTLN("Load influx config");
+    tmp_buffer[0] = 0;
     if (file_exists(INFLUX_CONFIG_FILE))
     {
         ulong size = file_read_block(INFLUX_CONFIG_FILE, tmp_buffer, 0, TMP_BUFFER_SIZE*2);
@@ -77,6 +78,8 @@ void OSInfluxDB::get_influx_config(ArduinoJson::JsonDocument &doc) {
         //DEBUG_PRINT(F("influx config="));
         //DEBUG_PRINTLN(tmp_buffer);
     }
+    if (tmp_buffer[0] != '{')
+        strcpy(tmp_buffer, "{}");
     ArduinoJson::DeserializationError error = ArduinoJson::deserializeJson(doc, tmp_buffer);
 	if (error || doc.isNull() || doc["en"] > 1) {
         if (error) {
@@ -133,7 +136,7 @@ void OSInfluxDB::write_influx_data(Point &sensor_data) {
         int port = doc["port"];
         if (port == 0)
             port = 8086;
-        url += ":"+port;
+        url = url + ":" + port;
         client = new InfluxDBClient(url, doc["org"], doc["bucket"], doc["token"], InfluxDbCloud2CACert);
     }
 
