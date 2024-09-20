@@ -125,7 +125,7 @@ void OSInfluxDB::write_influx_data(Point &sensor_data) {
         //Load influx config:
         ArduinoJson::JsonDocument doc; 
         get_influx_config(doc);
-        if (doc[en] == 0)
+        if (doc["en"] == 0)
             return;
         
         //InfluxDBClient client(INFLUXDB_URL, INFLUXDB_ORG, INFLUXDB_BUCKET, INFLUXDB_TOKEN, InfluxDbCloud2CACert);
