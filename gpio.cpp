@@ -1,4 +1,4 @@
-/* OpenSprinkler Unified (AVR/RPI/BBB/LINUX) Firmware
+/* OpenSprinkler Unified Firmware
  * Copyright (C) 2014 by Ray Wang (ray@opensprinkler.com)
  *
  * GPIO functions
@@ -175,276 +175,7 @@ unsigned char digitalReadExt(unsigned char pin) {
 }
 #endif
 
-#elif defined(OSPI) || defined(OSBO)
-
-#if !defined(LIBGPIOD)	// use classic sysfs
-
-#include <sys/types.h>
-#include <sys/ioctl.h>
-#include <fcntl.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <string.h>
-#include <poll.h>
-#include <pthread.h>
-
-#define BUFFER_MAX 64
-#define GPIO_MAX	 64
-
-// GPIO file descriptors
-static int sysFds[GPIO_MAX] = {
-	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
-	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
-	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
-	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
-} ;
-
-// Interrupt service routine functions
-static void (*isrFunctions [GPIO_MAX])(void);
-
-static volatile int		 pinPass = -1 ;
-static pthread_mutex_t pinMutex ;
-
-/** Export gpio pin */
-static unsigned char GPIOExport(int pin) {
-	char buffer[BUFFER_MAX];
-	int fd, len;
-
-	fd = open("/sys/class/gpio/export", O_WRONLY);
-	if (fd < 0) {
-		DEBUG_PRINTLN("failed to open export for writing");
-		return 0;
-	}
-
-	len = snprintf(buffer, sizeof(buffer), "%d", pin);
-	write(fd, buffer, len);
-	close(fd);
-	return 1;
-}
-
-#if 0
-/** Unexport gpio pin */
-static unsigned char GPIOUnexport(int pin) {
-	char buffer[BUFFER_MAX];
-	int fd, len;
-
-	fd = open("/sys/class/gpio/unexport", O_WRONLY);
-	if (fd < 0) {
-		DEBUG_PRINTLN("failed to open unexport for writing");
-		return 0;
-	}
-
-	len = snprintf(buffer, sizeof(buffer), "%d", pin);
-	write(fd, buffer, len);
-	close(fd);
-	return 1;
-}
-#endif
-
-/** Set interrupt edge mode */
-static unsigned char GPIOSetEdge(int pin, const char *edge) {
-	char path[BUFFER_MAX];
-	int fd;
-
-	snprintf(path, BUFFER_MAX, "/sys/class/gpio/gpio%d/edge", pin);
-
-	fd = open(path, O_WRONLY);
-	if (fd < 0) {
-		DEBUG_PRINTLN("failed to open gpio edge for writing");
-		return 0;
-	}
-	write(fd, edge, strlen(edge)+1);
-	close(fd);
-	return 1;
-}
-
-/** Set pin mode, in or out */
-void pinMode(int pin, unsigned char mode) {
-	static const char dir_str[]  = "in\0out";
-
-	char path[BUFFER_MAX];
-	int fd;
-
-	snprintf(path, BUFFER_MAX, "/sys/class/gpio/gpio%d/direction", pin);
-
-	struct stat st;
-	if(stat(path, &st)) {
-		if (!GPIOExport(pin)) return;
-	}
-
-	fd = open(path, O_WRONLY);
-	if (fd < 0) {
-		DEBUG_PRINTLN("failed to open gpio direction for writing");
-		return;
-	}
-
-	if (-1 == write(fd, &dir_str[(INPUT==mode)||(INPUT_PULLUP==mode)?0:3], (INPUT==mode)||(INPUT_PULLUP==mode)?2:3)) {
-		DEBUG_PRINTLN("failed to set direction");
-		return;
-	}
-
-	close(fd);
-#if defined(OSPI)
-	if(mode==INPUT_PULLUP) {
-		char cmd[BUFFER_MAX];
-		//snprintf(cmd, BUFFER_MAX, "gpio -g mode %d up", pin);
-		snprintf(cmd, BUFFER_MAX, "raspi-gpio set %d pu", pin);
-		system(cmd);
-	}
-#endif
-	return;
-}
-
-/** Open file for digital pin */
-int gpio_fd_open(int pin, int mode) {
-	char path[BUFFER_MAX];
-	int fd;
-
-	snprintf(path, BUFFER_MAX, "/sys/class/gpio/gpio%d/value", pin);
-	fd = open(path, mode);
-	if (fd < 0) {
-		DEBUG_PRINTLN("failed to open gpio");
-		return -1;
-	}
-	return fd;
-}
-
-/** Close file */
-void gpio_fd_close(int fd) {
-	close(fd);
-}
-
-/** Read digital value */
-unsigned char digitalRead(int pin) {
-	char value_str[3];
-
-	int fd = gpio_fd_open(pin, O_RDONLY);
-	if (fd < 0) {
-		return 0;
-	}
-
-	if (read(fd, value_str, 3) < 0) {
-		DEBUG_PRINTLN("failed to read value");
-		return 0;
-	}
-
-	close(fd);
-	return atoi(value_str);
-}
-
-/** Write digital value given file descriptor */
-void gpio_write(int fd, unsigned char value) {
-	static const char value_str[] = "01";
-
-	if (1 != write(fd, &value_str[LOW==value?0:1], 1)) {
-		DEBUG_PRINT("failed to write value on pin ");
-	}
-}
-
-/** Write digital value */
-void digitalWrite(int pin, unsigned char value) {
-	int fd = gpio_fd_open(pin);
-	if (fd < 0) {
-		return;
-	}
-	gpio_write(fd, value);
-	close(fd);
-}
-
-static int HiPri (const int pri) {
-	struct sched_param sched ;
-
-	memset (&sched, 0, sizeof(sched)) ;
-
-	if (pri > sched_get_priority_max (SCHED_RR))
-		sched.sched_priority = sched_get_priority_max (SCHED_RR) ;
-	else
-		sched.sched_priority = pri ;
-
-	return sched_setscheduler (0, SCHED_RR, &sched) ;
-}
-
-static int waitForInterrupt (int pin, int mS)
-{
-	int fd, x ;
-	uint8_t c ;
-	struct pollfd polls ;
-
-	if((fd=sysFds[pin]) < 0)
-		return -2;
-
-	polls.fd		 = fd ;
-	polls.events = POLLPRI ;			// Urgent data!
-
-	x = poll (&polls, 1, mS) ;
-// Do a dummy read to clear the interrupt
-//			A one character read appars to be enough.
-//			Followed by a seek to reset it.
-
-	(void)read (fd, &c, 1);
-	lseek (fd, 0, SEEK_SET);
-
-	return x ;
-}
-
-static void *interruptHandler (void *arg) {
-	int myPin ;
-
-	(void) HiPri (55) ;  // Only effective if we run as root
-
-	myPin		= pinPass ;
-	pinPass = -1 ;
-
-	for (;;)
-		if (waitForInterrupt (myPin, -1) > 0)
-			isrFunctions[myPin]() ;
-
-	return NULL ;
-}
-
-#include "utils.h"
-/** Attach an interrupt function to pin */
-void attachInterrupt(int pin, const char* mode, void (*isr)(void)) {
-	if((pin<0)||(pin>GPIO_MAX)) {
-		DEBUG_PRINTLN("pin out of range");
-		return;
-	}
-
-	// set pin to INPUT mode and set interrupt edge mode
-	pinMode(pin, INPUT);
-	GPIOSetEdge(pin, mode);
-
-	char path[BUFFER_MAX];
-	snprintf(path, BUFFER_MAX, "/sys/class/gpio/gpio%d/value", pin);
-
-	// open gpio file
-	if(sysFds[pin]==-1) {
-		if((sysFds[pin]=open(path, O_RDWR))<0) {
-			DEBUG_PRINTLN("failed to open gpio value for reading");
-			return;
-		}
-	}
-
-	int count, i;
-	char c;
-	// clear any pending interrupts
-	ioctl (sysFds[pin], FIONREAD, &count) ;
-	for (i=0; i<count; i++)
-		read (sysFds[pin], &c, 1) ;
-
-	// record isr function
-	isrFunctions[pin] = isr;
-
-	pthread_t threadId ;
-	pthread_mutex_lock (&pinMutex) ;
-		pinPass = pin ;
-		pthread_create (&threadId, NULL, interruptHandler, NULL) ;
-		while (pinPass != -1)
-			delay(1) ;
-	pthread_mutex_unlock (&pinMutex) ;
-}
-#else // use GPIOD
+#elif defined(OSPI)
 
 /**
  * NEW GPIO Implementation for Raspberry Pi OS 12 (bookworm)
@@ -484,44 +215,27 @@ struct gpiod_line* gpio_lines[] = {
 	NULL, NULL, NULL, NULL, NULL,
 };
 
-bool prefix(const char *pre, const char *str) {
-    return strncmp(pre, str, strlen(pre)) == 0;
-}
-
 int assert_gpiod_chip() {
 	if( !chip ) {
         const char *chip_name = NULL;
 
-        FILE *file = fopen("/proc/device-tree/compatible", "rb");
-        if (file != NULL) {
-            char buffer[100];
-
-            int total = fread(buffer, 1, sizeof(buffer), file);
-
-            if (prefix("raspberrypi", buffer)) {
-                const char *cpu_buf = buffer;
-                size_t index = 0;
-
-                // model and cpu is seperated by a null byte
-                while (index < (total - 1) && cpu_buf[index]) {
-                    index += 1;
-                }
-
-                cpu_buf += index + 1;  
-                
-                if (!strcmp("brcm,bcm2712", cpu_buf)) {
-                    // Pi 5
-                    chip_name = "pinctrl-rp1";
-                } else if (!strcmp("brcm,bcm2711", cpu_buf)) {
-                    // Pi 4
-                    chip_name = "pinctrl-bcm2711";
-                } else if (!strcmp("brcm,bcm2837", cpu_buf)
-                || !strcmp("brcm,bcm2836", cpu_buf)
-                || !strcmp("brcm,bcm2835", cpu_buf)) {
-                    // Pi 0-3
-                    chip_name = "pinctrl-bcm2835";
-                }
-            }
+        switch (get_board_type()) {
+            case BoardType::RaspberryPi_bcm2712:
+                chip_name = "pinctrl-rp1";
+                break;
+            case BoardType::RaspberryPi_bcm2711:
+                chip_name = "pinctrl-bcm2711";
+                break;
+            case BoardType::RaspberryPi_bcm2837:
+            case BoardType::RaspberryPi_bcm2836:
+            case BoardType::RaspberryPi_bcm2835:
+                chip_name = "pinctrl-bcm2835";
+                break;
+            case BoardType::Unknown: 
+            case BoardType::RaspberryPi_Unknown: 
+            default:
+            // Unknown chip
+            break;
         }
 
         
@@ -623,21 +337,10 @@ void digitalWrite(int pin, unsigned char value) {
 	}
 }
 
-void attachInterrupt(int pin, const char* mode, void (*isr)(void)) {}
-void gpio_write(int fd, unsigned char value) {}
-int gpio_fd_open(int pin, int mode) {return 0;}
-void gpio_fd_close(int fd) {}
-
-#endif
-
 #else
 
 void pinMode(int pin, unsigned char mode) {}
 void digitalWrite(int pin, unsigned char value) {}
 unsigned char digitalRead(int pin) {return 0;}
-void attachInterrupt(int pin, const char* mode, void (*isr)(void)) {}
-int gpio_fd_open(int pin, int mode) {return 0;}
-void gpio_fd_close(int fd) {}
-void gpio_write(int fd, unsigned char value) {}
 
 #endif

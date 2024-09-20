@@ -1,4 +1,4 @@
-/* OpenSprinkler Unified (AVR/RPI/BBB/LINUX) Firmware
+/* OpenSprinkler Unified Firmware
  * Copyright (C) 2015 by Ray Wang (ray@opensprinkler.com)
  *
  * Utility functions
@@ -38,9 +38,11 @@ extern OpenSprinkler os;
 		extern SdFat sd;
 	#endif
 
-#else // RPI/BBB
+#else // RPI/LINUX
 
-static char* get_runtime_path() {
+#include <stdio.h>
+
+char* get_runtime_path() {
 	static char path[PATH_MAX];
 	static unsigned char query = 1;
 
@@ -98,19 +100,6 @@ void delay(ulong howLong)
 	nanosleep (&sleeper, &dummy) ;
 }
 
-void delayMicrosecondsHard (ulong howLong)
-{
-	struct timeval tNow, tLong, tEnd ;
-
-	gettimeofday (&tNow, NULL) ;
-	tLong.tv_sec  = howLong / 1000000 ;
-	tLong.tv_usec = howLong % 1000000 ;
-	timeradd (&tNow, &tLong, &tEnd) ;
-
-	while (timercmp (&tNow, &tEnd, <))
-		gettimeofday (&tNow, NULL) ;
-}
-
 void delayMicroseconds (ulong howLong)
 {
 	struct timespec sleeper ;
@@ -127,6 +116,19 @@ void delayMicroseconds (ulong howLong)
 		sleeper.tv_nsec = (long)(uSecs * 1000L) ;
 		nanosleep (&sleeper, NULL) ;
 	}
+}
+
+void delayMicrosecondsHard (ulong howLong)
+{
+	struct timeval tNow, tLong, tEnd ;
+
+	gettimeofday (&tNow, NULL) ;
+	tLong.tv_sec  = howLong / 1000000 ;
+	tLong.tv_usec = howLong % 1000000 ;
+	timeradd (&tNow, &tLong, &tEnd) ;
+
+	while (timercmp (&tNow, &tEnd, <))
+		gettimeofday (&tNow, NULL) ;
 }
 
 static uint64_t epochMilli, epochMicro ;
@@ -185,7 +187,106 @@ unsigned int detect_rpi_rev() {
 	}
 	return rev;
 }
+
+route_t get_route() {
+	route_t route;
+	char iface[16];
+	unsigned long dst, gw;
+	unsigned int flags, refcnt, use, metric, mask, mtu, window, irtt;
+
+	FILE *filp;
+	char buf[512];
+	char term;
+	filp = fopen("/proc/net/route", "r");
+	if(filp) {
+		while(fgets(buf, sizeof(buf), filp) != NULL) {
+			if(sscanf(buf, "%s %lx %lx %X %d %d %d %lx %d %d %d", iface, &dst, &gw, &flags, &refcnt, &use, &metric, &mask, &mtu, &window, &irtt) == 11) {
+				if(flags & RTF_UP) {
+					if(dst==0) {
+						strcpy(route.iface, iface);
+						route.gateway = gw;
+						route.destination = dst;
+					}
+				}
+			}
+		}
+		fclose(filp);
+	}
+	return route;
+}
+
+in_addr_t get_ip_address(char *iface) {
+	struct ifaddrs *ifaddr; 
+	struct ifaddrs *ifa;
+	in_addr_t ip = 0;
+	if(getifaddrs(&ifaddr) == -1) {
+		return 0;
+	}
+
+	ifa = ifaddr;
+
+	while(ifa) {
+		if(ifa->ifa_addr && ifa->ifa_addr->sa_family == AF_INET) {
+			if(strcmp(ifa->ifa_name, iface)==0) {
+				ip = ((struct sockaddr_in *)ifa->ifa_addr)->sin_addr.s_addr;
+				break;
+			}
+		}
+		ifa = ifa->ifa_next;
+	}
+	freeifaddrs(ifaddr);
+	return ip;
+}
 #endif
+
+bool prefix(const char *pre, const char *str) {
+    return strncmp(pre, str, strlen(pre)) == 0;
+}
+
+BoardType get_board_type() {
+    FILE *file = fopen("/proc/device-tree/compatible", "rb");
+    if (file == NULL) {
+        return BoardType::Unknown;
+    }
+
+    char buffer[100];
+
+    BoardType res = BoardType::Unknown;
+
+    int total = fread(buffer, 1, sizeof(buffer), file);
+
+    if (prefix("raspberrypi", buffer)) {
+        res = BoardType::RaspberryPi_Unknown;
+        const char *cpu_buf = buffer;
+        size_t index = 0;
+
+        // model and cpu is seperated by a null byte
+        while (index < (total - 1) && cpu_buf[index]) {
+            index += 1;
+        }
+
+        cpu_buf += index + 1;  
+        
+        if (!strcmp("brcm,bcm2712", cpu_buf)) {
+            // Pi 5
+            res = BoardType::RaspberryPi_bcm2712;
+        } else if (!strcmp("brcm,bcm2711", cpu_buf)) {
+            // Pi 4
+            res = BoardType::RaspberryPi_bcm2711;
+        } else if (!strcmp("brcm,bcm2837", cpu_buf)) {
+            // Pi 3 / Pi Zero 2
+            res = BoardType::RaspberryPi_bcm2837;
+        } else if (!strcmp("brcm,bcm2836", cpu_buf)) {
+            // Pi 2
+            res = BoardType::RaspberryPi_bcm2836;
+        } else if (!strcmp("brcm,bcm2835", cpu_buf)) {
+            // Pi / Pi Zero
+            res = BoardType::RaspberryPi_bcm2835;
+        }
+    }
+
+    return res;
+}
 
 #endif
 
@@ -594,7 +695,16 @@ void strReplace(char *str, char c, char r) {
 	}
 }
 
+void strReplaceQuoteBackslash(char *buf) {
+	strReplace(buf, '\"', '\'');
+	strReplace(buf, '\\', '/');
+}
+
 static const unsigned char month_days[] = {31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+
+bool isLastDayofMonth(unsigned char month, unsigned char day) {
+	return day == month_days[month];
+}
 
 bool isValidDate(unsigned char m, unsigned char d) {
 	if(m<1 || m>12) return false;

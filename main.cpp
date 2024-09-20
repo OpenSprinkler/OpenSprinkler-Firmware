@@ -1,4 +1,4 @@
-/* OpenSprinkler Unified (AVR/RPI/BBB/LINUX) Firmware
+/* OpenSprinkler Unified Firmware
  * Copyright (C) 2015 by Ray Wang (ray@opensprinkler.com)
  *
  * Main loop
@@ -53,7 +53,6 @@
 		Wiznet5500lwIP w5500(PIN_ETHER_CS); // W5500 lwip for wired Ether
 		lwipEth eth;
 		bool useEth = false; // tracks whether we are using WiFi or wired Ether connection
-		static uint16_t led_blink_ms = LED_FAST_BLINK;
 	#else
 		EthernetServer *m_server = NULL;
 		EthernetClient *m_client = NULL;
@@ -61,12 +60,20 @@
 		bool useEth = true;
 	#endif
 	unsigned long getNtpTime();
-#else // header and defs for RPI/BBB
-
+#else // header and defs for RPI/Linux
+	bool useEth = false;
 #endif
 
 #if defined(USE_OTF)
 	OTF::OpenThingsFramework *otf = NULL;
+#endif
+
+#if defined(USE_SSD1306)
+	#if defined(ESP8266)
+	static uint16_t led_blink_ms = LED_FAST_BLINK;
+	#else
+	static uint16_t led_blink_ms = 0;
+	#endif
 #endif
 
 void push_message(int type, uint32_t lval=0, float fval=0.f, const char* sval=NULL);
@@ -128,7 +135,7 @@ void flow_poll() {
 	/* End of RAH implementation of flow sensor */
 }
 
-#if defined(ARDUINO)
+#if defined(USE_DISPLAY)
 // ====== UI defines ======
 static char ui_anim_chars[3] = {'.', 'o', 'O'};
 
@@ -155,14 +162,13 @@ bool ui_confirm(PGM_P str) {
 }
 
 void ui_state_machine() {
-
 	// to avoid ui_state_machine taking too much computation time
 	// we run it only every UI_STATE_MACHINE_INTERVAL ms
 	static uint32_t last_usm = 0;
 	if(millis() - last_usm <= UI_STATE_MACHINE_INTERVAL) { return; }
 	last_usm = millis();
 
-#if defined(ESP8266)
+#if defined(USE_SSD1306)
 	// process screen led
 	static ulong led_toggle_timeout = 0;
 	if(led_blink_ms) {
@@ -197,36 +203,86 @@ void ui_state_machine() {
 					if(!ui_confirm(PSTR("Start 2s test?"))) {ui_state = UI_STATE_DEFAULT; break;}
 					manual_start_program(255, 0);
 				} else if (digitalReadExt(PIN_BUTTON_2)==0) { // if B2 is pressed while holding B1, display gateway IP
+					#if defined(USE_SSD1306)
+						os.lcd.setAutoDisplay(false);
+					#endif
 					os.lcd.clear(0, 1);
 					os.lcd.setCursor(0, 0);
+					#if defined(ARDUINO)
 					#if defined(ESP8266)
 					if (useEth) { os.lcd.print(eth.gatewayIP()); }
 					else { os.lcd.print(WiFi.gatewayIP()); }
 					#else
 					{ os.lcd.print(Ethernet.gatewayIP()); }
 					#endif
+					#else
+					route_t route = get_route();
+					char str[INET_ADDRSTRLEN];
+
+					inet_ntop(AF_INET, &(route.gateway), str, INET_ADDRSTRLEN);
+					os.lcd.print(str);
+					#endif
 					os.lcd.setCursor(0, 1);
 					os.lcd_print_pgm(PSTR("(gwip)"));
 					ui_state = UI_STATE_DISP_IP;
+					#if defined(USE_SSD1306)
+						os.lcd.display();
+						os.lcd.setAutoDisplay(true);
+					#endif
 				} else {  // if no other button is clicked, stop all zones
 					if(!ui_confirm(PSTR("Stop all zones?"))) {ui_state = UI_STATE_DEFAULT; break;}
 					reset_all_stations();
 				}
 			} else {  // clicking B1: display device IP and port
+				#if defined(USE_SSD1306)
+					os.lcd.setAutoDisplay(false);
+				#endif
 				os.lcd.clear(0, 1);
 				os.lcd.setCursor(0, 0);
+				#if defined(ARDUINO)
 				#if defined(ESP8266)
 				if (useEth) { os.lcd.print(eth.localIP()); }
 				else { os.lcd.print(WiFi.localIP()); }
 				#else
 				{ os.lcd.print(Ethernet.localIP()); }
 				#endif
+				#else
+				route_t route = get_route();
+				char str[INET_ADDRSTRLEN];
+				in_addr_t ip = get_ip_address(route.iface);
+
+				inet_ntop(AF_INET, &ip, str, INET_ADDRSTRLEN);
+				os.lcd.print(str);
+				#endif
 				os.lcd.setCursor(0, 1);
 				os.lcd_print_pgm(PSTR(":"));
 				uint16_t httpport = (uint16_t)(os.iopts[IOPT_HTTPPORT_1]<<8) + (uint16_t)os.iopts[IOPT_HTTPPORT_0];
 				os.lcd.print(httpport);
 				os.lcd_print_pgm(PSTR(" (ip:port)"));
+				#if defined(USE_OTF)
+					os.lcd.setCursor(0, 2);
+					os.lcd_print_pgm(PSTR("OTC:"));
+					switch(otf->getCloudStatus()) {
+						case OTF::NOT_ENABLED:
+							os.lcd_print_pgm(PSTR(" not enabled"));
+							break;
+						case OTF::UNABLE_TO_CONNECT:
+							os.lcd_print_pgm(PSTR("connecting.."));
+							break;
+						case OTF::DISCONNECTED:
+							os.lcd_print_pgm(PSTR("disconnected"));
+							break;
+						case OTF::CONNECTED:
+							os.lcd_print_pgm(PSTR(" Connected"));
+							break;
+					}
+				#endif
+				
 				ui_state = UI_STATE_DISP_IP;
+				#if defined(USE_SSD1306)
+					os.lcd.display();
+					os.lcd.setAutoDisplay(true);
+				#endif
 			}
 			break;
 		case BUTTON_2:
@@ -307,10 +363,13 @@ void ui_state_machine() {
 		break;
 	}
 }
+#endif
+
 
 // ======================
 // Setup Function
 // ======================
+#if defined(ARDUINO)
 void do_setup() {
 	/* Clear WDT reset flag. */
 #if defined(ESP8266)
@@ -387,7 +446,7 @@ ISR(WDT_vect)
 #endif
 
 #else
-void initalize_otf();
+void initialize_otf();
 
 void do_setup() {
 	initialiseEpoch();   // initialize time reference for millis() and micros()
@@ -414,11 +473,12 @@ void do_setup() {
 
 	os.mqtt.init();
 	os.status.req_mqtt_restart = true;
-	
+
 	sensor_api_init(true);
 
-	initalize_otf();
+	initialize_otf();
 }
+
 #endif
 
 void turn_on_station(unsigned char sid, ulong duration);
@@ -603,8 +663,11 @@ void do_loop()
 
 	ui_state_machine();
 
-#else // Process Ethernet packets for RPI/BBB
+#else // Process Ethernet packets for RPI/LINUX
 	if(otf) otf->loop();
+#if defined(USE_DISPLAY)
+    ui_state_machine();
+#endif
 #endif	// Process Ethernet packets
 
 	// Start up MQTT when we have a network connection
@@ -629,7 +692,7 @@ void do_loop()
 		last_time = curr_time;
 		if (os.button_timeout) os.button_timeout--;
 
-#if defined(ARDUINO)
+#if defined(USE_DISPLAY)
 		if (!ui_state)
 			os.lcd_print_time(curr_time);  // print time
 #endif
@@ -713,7 +776,9 @@ void do_loop()
 			// check through all programs
 			for(pid=0; pid<pd.nprograms; pid++) {
 				pd.read(pid, &prog);	// todo future: reduce load time
-				if(prog.check_match(curr_time+60)) {
+				bool will_delete = false;
+				unsigned char runcount = prog.check_match(curr_time, &will_delete);
+				if(runcount>0) {
 					// Check and update weather if weatherdata is older than 30min:
 					if (os.checkwt_success_lasttime && (!os.checkwt_lasttime || os.now_tz() > os.checkwt_lasttime + 30*60)) {
 						os.checkwt_lasttime = 0;
@@ -721,15 +786,17 @@ void do_loop()
 						check_weather();
 					}
 					break;
-				}
 
-				if(prog.check_match(curr_time)) {
 					// program match found
 					// check and process special program command
 					if(process_special_program_command(prog.name, curr_time))	continue;
 
+					// get station ordering
+					unsigned char order[os.nstations];
+					prog.gen_station_runorder(runcount, order);
 					// process all selected stations
-					for(sid=0;sid<os.nstations;sid++) {
+					for(unsigned char oi=0;oi<os.nstations;oi++) {
+						sid=order[oi];
 						bid=sid>>3;
 						s=sid&0x07;
 						// skip if the station is a master station (because master cannot be scheduled independently
@@ -770,6 +837,10 @@ void do_loop()
 					}// for sid
 					if(match_found) {
 						push_message(NOTIFY_PROGRAM_SCHED, pid, prog.use_weather?os.iopts[IOPT_WATER_PERCENTAGE]:100);
+					}
+					//delete run-once if on final runtime (stations have already been queued)
+					if(will_delete){
+						pd.del(pid);
 					}
 				}// if check_match
 			}// for pid
@@ -947,10 +1018,9 @@ void do_loop()
 		// activate/deactivate valves
 		os.apply_all_station_bits();
 
-#if defined(ARDUINO)
+#if defined(USE_DISPLAY)
 		// process LCD display
 		if (!ui_state) { os.lcd_print_screen(ui_anim_chars[(unsigned long)curr_time%3]); }
-
 #endif
 
 		// handle reboot request
@@ -960,9 +1030,10 @@ void do_loop()
 			if (!os.status.program_busy) {
 				// and if no program is scheduled to run in the next minute
 				bool willrun = false;
+				bool will_delete = false;
 				for(pid=0; pid<pd.nprograms; pid++) {
 					pd.read(pid, &prog);
-					if(prog.check_match(curr_time+60)) {
+					if(prog.check_match(curr_time+60, &will_delete)) {
 						willrun = true;
 						break;
 					}
@@ -1021,7 +1092,7 @@ void do_loop()
 	}
 
 	#if !defined(ARDUINO)
-		delay(1); // For OSPI/OSBO/LINUX, sleep 1 ms to minimize CPU usage
+		delay(1); // For OSPI/LINUX, sleep 1 ms to minimize CPU usage
 	#endif
 }
 
@@ -1052,9 +1123,7 @@ void check_weather() {
 	if (os.status.program_busy) return;
 
 #if defined(ESP8266)
-	if (!useEth) { // todo: what about useEth==true?
-		if (os.get_wifi_mode()!=WIFI_MODE_STA || WiFi.status()!=WL_CONNECTED || os.state!=OS_STATE_CONNECTED) return;
-	}
+	if (!os.network_connected()) return;
 #endif
 
 	time_os_t ntz = os.now_tz();
@@ -1208,7 +1277,6 @@ void process_dynamic_events(time_os_t curr_time) {
 		 && os.status.sensor2_active)
 		sn2 = true;
 
-	// todo: handle sensor 2
 	unsigned char sid, s, bid, qid, igs, igs2, igrd;
 	for(bid=0;bid<os.nboards;bid++) {
 		igs = os.attrib_igs[bid];
@@ -1242,7 +1310,7 @@ void process_dynamic_events(time_os_t curr_time) {
  * this function determines the appropriate start and dequeue times
  * of stations bound to master stations with on and off adjustments
  */
-void handle_master_adjustments(time_os_t curr_time, RuntimeQueueStruct *q) {
+void handle_master_adjustments(time_os_t curr_time, RuntimeQueueStruct *q, unsigned char gid, ulong *seq_start_times) {
 
 	int16_t start_adj = 0;
 	int16_t dequeue_adj = 0;
@@ -1265,6 +1333,7 @@ void handle_master_adjustments(time_os_t curr_time, RuntimeQueueStruct *q) {
 	// push back station's start time to allow sufficient time to turn on master
 	if (q->st - curr_time < abs(start_adj)) {
 		q->st += abs(start_adj);
+		seq_start_times[gid] += abs(start_adj);
 	}
 
 	q->deque_time = q->st + q->dur + dequeue_adj;
@@ -1312,7 +1381,7 @@ void schedule_all_stations(time_os_t curr_time) {
 			con_start_time++;
 		}
 
-		handle_master_adjustments(curr_time, q);
+		handle_master_adjustments(curr_time, q, gid, seq_start_times);
 
 		if (!os.status.program_busy) {
 			os.status.program_busy = 1;  // set program busy bit
@@ -1706,7 +1775,7 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 				if(email_host && email_username && email_password && email_recipient) { // make sure all are valid
 					free_tmp_memory();
 					EMailSender emailSend(email_username, email_password);
-					emailSend.setSMTPServer(email_host); // TODO: double check removing strdup
+					emailSend.setSMTPServer(email_host);
 					emailSend.setSMTPPort(email_port);
 					EMailSender::Response resp = emailSend.send(email_recipient, email_message);
 					DEBUG_PRINTLN(F("Sending Status:"));
@@ -1719,7 +1788,6 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 		#else
 			struct smtp *smtp = NULL;
 			String email_port_str = to_string(email_port);
-			// todo: check error?
 			smtp_status_code rc;
 			if(email_host && email_username && email_password && email_recipient) { // make sure all are valid
 				rc = smtp_open(email_host, email_port_str.c_str(), SMTP_SECURITY_TLS, SMTP_NO_CERT_VERIFY, NULL, &smtp);
@@ -1818,7 +1886,7 @@ void write_log(unsigned char type, time_os_t curr_time) {
 	}
 	#endif
 
-#else // prepare log folder for RPI/BBB
+#else // prepare log folder for RPI/LINUX
 	struct stat st;
 	if(stat(get_filename_fullpath(LOG_PREFIX), &st)) {
 		if(mkdir(get_filename_fullpath(LOG_PREFIX), S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IWGRP | S_IXGRP | S_IROTH | S_IWOTH | S_IXOTH)) {
@@ -1968,7 +2036,7 @@ void delete_log(char *name) {
 	}
 	#endif
 
-#else // delete_log implementation for RPI/BBB
+#else // delete_log implementation for RPI/LINUX
 	if (strncmp(name, "all", 3) == 0) {
 		// delete the log folder
 		rmdir(get_filename_fullpath(LOG_PREFIX));
@@ -2183,7 +2251,7 @@ static void perform_ntp_sync() {
 #endif
 }
 
-#if !defined(ARDUINO) // main function for RPI/BBB
+#if !defined(ARDUINO) // main function for RPI/LINUX
 int main(int argc, char *argv[]) {
     // Disable buffering to work with systemctl journal
     setvbuf(stdout, NULL, _IOLBF, 0);

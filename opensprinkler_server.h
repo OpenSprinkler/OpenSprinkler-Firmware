@@ -1,4 +1,4 @@
-/* OpenSprinkler Unified (AVR/RPI/BBB/LINUX) Firmware
+/* OpenSprinkler Unified Firmware
  * Copyright (C) 2015 by Ray Wang (ray@opensprinkler.com)
  *
  * Server functions
@@ -112,6 +112,7 @@ public:
 	}
 };
 
+void server_influx_get_main();
 void free_tmp_memory();
 void restore_tmp_memory();
 

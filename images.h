@@ -32,11 +32,15 @@ enum {
 #endif
 
 
-#if defined(ESP8266)
+#if defined(USE_SSD1306)
+
+#if not defined(ARDUINO)
+#define PROGMEM
+#endif
 
 #define WiFi_Logo_width 60
 #define WiFi_Logo_height 36
-const char WiFi_Logo_image[] PROGMEM = {
+const unsigned char WiFi_Logo_image[] PROGMEM = {
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xF8,
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80, 0xFF, 0x07, 0x00, 0x00, 0x00,
 	0x00, 0x00, 0xE0, 0xFF, 0x1F, 0x00, 0x00, 0x00, 0x00, 0x00, 0xF8, 0xFF,
@@ -63,56 +67,56 @@ const char WiFi_Logo_image[] PROGMEM = {
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 	};
 
-const char _iconimage_wifi_connected[] PROGMEM = {
+const unsigned char _iconimage_wifi_connected[] PROGMEM = {
 	0x00, 0x00, 0x00, 0x00,
 	0x00, 0x00, 0x80, 0x80,
 	0xA0, 0xA0, 0xA8, 0xA8,
 	0xAA, 0xAA, 0x00, 0x00,
 	};
 
-const char _iconimage_wifi_disconnected[] PROGMEM = {
+const unsigned char _iconimage_wifi_disconnected[] PROGMEM = {
 	0x00, 0x00, 0x00, 0x11,
 	0x0A, 0x04, 0x8A, 0x91,
 	0xA0, 0xA0, 0xA8, 0xA8,
 	0xAA, 0xAA, 0x00, 0x00,
 	};
 
-const char _iconimage_remotext[] PROGMEM = {
+const unsigned char _iconimage_remotext[] PROGMEM = {
 	0x00, 0x00, 0x00, 0x00,
 	0x00, 0x00, 0x00, 0x41,
 	0x62, 0x54, 0x48, 0x44,
 	0x22, 0x1F, 0x00, 0x00,
 	};
 
-const char _iconimage_raindelay[] PROGMEM = {
+const unsigned char _iconimage_raindelay[] PROGMEM = {
 	0x00, 0x00, 0x00, 0x1C,
 	0x22, 0x49, 0x49, 0x49,
 	0x59, 0x41, 0x41, 0x41,
 	0x22, 0x1C, 0x00, 0x00,
 	};
 
-const char _iconimage_rain[] PROGMEM = {
+const unsigned char _iconimage_rain[] PROGMEM = {
 	0x00, 0x00, 0x00, 0x00,
 	0x18, 0x24, 0x3E, 0x00,
 	0x2A, 0x2A, 0x00, 0x2A,
 	0x2A, 0x00, 0x00, 0x00,
 	};
 
-const char _iconimage_soil[] PROGMEM = {
+const unsigned char _iconimage_soil[] PROGMEM = {
 	0x00, 0x00, 0x10,
 	0x10, 0x28, 0x28, 0x44,
 	0x44, 0x8A, 0x8A, 0x92,
 	0x44, 0x38, 0x00, 0xC6, 0x38,
 	};
 
-const char _iconimage_ether_connected[] PROGMEM = {
+const unsigned char _iconimage_ether_connected[] PROGMEM = {
 	0x00, 0x00, 0x00, 0x38,
 	0x28, 0x38, 0x10, 0x10,
 	0xFE, 0x44, 0x44, 0xEE,
 	0xAA, 0xEE, 0x00, 0x00,
 	};
 
-const char _iconimage_ether_disconnected[] PROGMEM = {
+const unsigned char _iconimage_ether_disconnected[] PROGMEM = {
 	0x00, 0x00, 0x11, 0x0A,
 	0x04, 0xEA, 0xB1, 0xE0,
 	0x40, 0xFE, 0x44, 0xEE,
@@ -121,14 +125,14 @@ const char _iconimage_ether_disconnected[] PROGMEM = {
 
 /*
 
-const char _iconimage_flow[] PROGMEM = {
+const unsigned char _iconimage_flow[] PROGMEM = {
 	0x00, 0x00, 0x0F, 0x0F,
 	0x03, 0x0F, 0x0F, 0x03,
 	0x1B, 0x18, 0x18, 0x18,
 	0x78, 0x78, 0x00, 0x00,
 	};
 
-const char _iconimage_pswitch[] PROGMEM = {
+const unsigned char _iconimage_pswitch[] PROGMEM = {
 	0x00, 0x00, 0x1E, 0x12,
 	0x12, 0x12, 0x1E, 0x02,
 	0x22, 0x32, 0x22, 0x20,
@@ -137,9 +141,9 @@ const char _iconimage_pswitch[] PROGMEM = {
 
 */
 
-#elif defined(ARDUINO)
+#elif defined(USE_LCD)
 
-const char _iconimage_connected[] PROGMEM = {
+const unsigned char _iconimage_connected[] PROGMEM = {
 	B00000,
 	B00000,
 	B00000,
@@ -150,7 +154,7 @@ const char _iconimage_connected[] PROGMEM = {
 	B10101
 };
 
-const char _iconimage_disconnected[] PROGMEM = {
+const unsigned char _iconimage_disconnected[] PROGMEM = {
 	B00000,
 	B10100,
 	B01000,
@@ -161,7 +165,7 @@ const char _iconimage_disconnected[] PROGMEM = {
 	B10101
 };
 
-const char _iconimage_remotext[] PROGMEM = {
+const unsigned char _iconimage_remotext[] PROGMEM = {
 	B00000,
 	B00000,
 	B00000,
@@ -172,7 +176,7 @@ const char _iconimage_remotext[] PROGMEM = {
 	B11110
 };
 
-const char _iconimage_raindelay[] PROGMEM = {
+const unsigned char _iconimage_raindelay[] PROGMEM = {
 	B00000,
 	B01110,
 	B10101,
@@ -183,7 +187,7 @@ const char _iconimage_raindelay[] PROGMEM = {
 	B01110
 };
 
-const char _iconimage_rain[] PROGMEM = {
+const unsigned char _iconimage_rain[] PROGMEM = {
 	B00000,
 	B00000,
 	B00110,
@@ -194,7 +198,7 @@ const char _iconimage_rain[] PROGMEM = {
 	B10101
 };
 
-const char _iconimage_soil[] PROGMEM = {
+const unsigned char _iconimage_soil[] PROGMEM = {
 	B00100,
 	B00100,
 	B01010,
@@ -206,7 +210,7 @@ const char _iconimage_soil[] PROGMEM = {
 };
 
 /*
-const char _iconimage_flow[] PROGMEM = {
+const unsigned char _iconimage_flow[] PROGMEM = {
 	B00000,
 	B00000,
 	B00000,
@@ -217,7 +221,7 @@ const char _iconimage_flow[] PROGMEM = {
 	B00000
 };
 
-const char _iconimage_pswitch[] PROGMEM = {
+const unsigned char _iconimage_pswitch[] PROGMEM = {
 	B00000,
 	B11000,
 	B10100,
@@ -232,9 +236,7 @@ const char _iconimage_pswitch[] PROGMEM = {
 
 */
 
-#else
-
 #endif
 
-#endif
 
+#endif

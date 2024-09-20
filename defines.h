@@ -1,4 +1,4 @@
-/* OpenSprinkler Unified (AVR/RPI/BBB/LINUX/ESP8266) Firmware
+/* OpenSprinkler Unified Firmware
  * Copyright (C) 2015 by Ray Wang (ray@opensprinkler.com)
  *
  * OpenSprinkler macro defines and hardware pin assignments
@@ -35,12 +35,11 @@ typedef unsigned long ulong;
 														// if this number is different from the one stored in non-volatile memory
 														// a device reset will be automatically triggered
 
-#define OS_FW_MINOR      166  // Firmware minor version
+#define OS_FW_MINOR      167  // Firmware minor version
 
 /** Hardware version base numbers */
 #define OS_HW_VERSION_BASE   0x00 // OpenSprinkler
 #define OSPI_HW_VERSION_BASE 0x40 // OpenSprinkler Pi
-#define OSBO_HW_VERSION_BASE 0x80 // OpenSprinkler Beagle
 #define SIM_HW_VERSION_BASE  0xC0 // simulation hardware
 
 /** Hardware type macro defines */
@@ -255,8 +254,8 @@ enum {
 	IOPT_SUBNET_MASK3,
 	IOPT_SUBNET_MASK4,
 	IOPT_FORCE_WIRED,
-	IOPT_RESERVE_1,
-	IOPT_RESERVE_2,
+	IOPT_LATCH_ON_VOLTAGE,
+	IOPT_LATCH_OFF_VOLTAGE,
 	IOPT_RESERVE_3,
 	IOPT_RESERVE_4,
 	IOPT_RESERVE_5,
@@ -344,6 +343,8 @@ enum {
 	#define digitalReadExt    digitalRead
 	#define digitalWriteExt   digitalWrite
 
+	#define USE_DISPLAY
+	#define USE_LCD
 #elif defined(ESP8266) // for ESP8266
 
 	#define OS_HW_VERSION    (OS_HW_VERSION_BASE+30)
@@ -357,7 +358,8 @@ enum {
 	#define EEPROM_I2CADDR   0x50 // 24C02 EEPROM I2C address
 	#define EEPROM_I2CADDR   0x50 // 24C02 EEPROM I2C address
 
-	#define PIN_CURR_SENSE    A0
+	#define PIN_CURR_SENSE    A0    // current sensing pin
+	#define PIN_LATCH_VOLT_SENSE A0 // latch voltage sensing pin
 	#define PIN_FREE_LIST     {} // no free GPIO pin at the moment
 	#define ETHER_BUFFER_SIZE   2048
 
@@ -427,6 +429,9 @@ enum {
 	#define V2_PIN_SENSOR1       3  // sensor 1
 	#define V2_PIN_SENSOR2       10 // sensor 2
 
+	#define USE_DISPLAY
+	#define USE_SSD1306
+
 #elif defined(OSPI) // for OSPi
 
 	#define OS_HW_VERSION    OSPI_HW_VERSION_BASE
@@ -438,27 +443,18 @@ enum {
 	#define PIN_SENSOR1       14
 	#define PIN_SENSOR2       23
 	#define PIN_RFTX          15    // RF transmitter pin
-	//#define PIN_BUTTON_1      23    // button 1
-	//#define PIN_BUTTON_2      24    // button 2
-	//#define PIN_BUTTON_3      25    // button 3
+	#define PIN_BUTTON_1      24    // button 1
+	#define PIN_BUTTON_2      18    // button 2
+	#define PIN_BUTTON_3      10    // button 3
 
-	#define PIN_FREE_LIST       {5,6,7,8,9,10,11,12,13,16,18,19,20,21,23,24,25,26}  // free GPIO pins
+	#define PIN_FREE_LIST       {5,6,7,8,9,11,12,13,16,19,20,21,23,25,26}  // free GPIO pins
 	#define ETHER_BUFFER_SIZE   16384
 
-#elif defined(OSBO) // for OSBo
+	#define SDA 0
+	#define SCL 0
 
-	#define OS_HW_VERSION    OSBO_HW_VERSION_BASE
-	// these are gpio pin numbers, refer to
-	// https://github.com/mkaczanowski/BeagleBoneBlack-GPIO/blob/master/GPIO/GPIOConst.cpp
-	#define PIN_SR_LATCH      60    // P9_12, shift register latch pin
-	#define PIN_SR_DATA       30    // P9_11, shift register data pin
-	#define PIN_SR_CLOCK      31    // P9_13, shift register clock pin
-	#define PIN_SR_OE         50    // P9_14, shift register output enable pin
-	#define PIN_SENSOR1       48
-	#define PIN_RFTX          51    // RF transmitter pin
-
-	#define PIN_FREE_LIST     {38,39,34,35,45,44,26,47,27,65,63,62,37,36,33,32,61,86,88,87,89,76,77,74,72,73,70,71}
-	#define ETHER_BUFFER_SIZE   16384
+	#define USE_DISPLAY
+	#define USE_SSD1306
 
 #else // for demo / simulation
 	// use fake hardware pins
@@ -516,8 +512,9 @@ enum {
 	#define PSTR(x)      x
 	#define F(x)         x
 	#define strcat_P     strcat
-	#define strncat_P     strncat
+	#define strncat_P    strncat
 	#define strcpy_P     strcpy
+	#define memcpy_P     memcpy
 	#define snprintf_P    snprintf
 	#include<string>
 	#define String       string

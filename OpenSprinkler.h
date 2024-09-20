@@ -1,4 +1,4 @@
-/* OpenSprinkler Unified (AVR/RPI/BBB/LINUX/ESP8266) Firmware
+/* OpenSprinkler Unified Firmware
  * Copyright (C) 2015 by Ray Wang (ray@opensprinkler.com)
  *
  * OpenSprinkler library header file
@@ -31,11 +31,14 @@
 #include "gpio.h"
 #include "images.h"
 #include "mqtt.h"
+#include "RCSwitch.h"
+#include "osinfluxdb.h"
 
 #if defined(ARDUINO) // headers for Arduino
 	#include <Arduino.h>
 	#include <Wire.h>
 	#include <SPI.h>
+	#include <RCSwitch.h>
 	#include "I2CRTC.h"
 
 	#if defined(ESP8266) // for ESP8266
@@ -43,7 +46,6 @@
 		#include <LittleFS.h>
 		#include <ENC28J60lwIP.h>
 		#include <W5500lwIP.h>
-		#include <RCSwitch.h>
 		#include <OpenThingsFramework.h>
 		#include <DNSServer.h>
 		#include <Ticker.h>
@@ -51,14 +53,13 @@
 		#include "SSD1306Display.h"
 		#include "espconnect.h"
 		#include "EMailSender.h"
-		#include "osinfluxdb.h"
 	#else // for AVR
 		#include <SdFat.h>
 		#include <Ethernet.h>
 		#include "LiquidCrystal.h"
 	#endif
 
-#else // headers for RPI/BBB/LINUX
+#else // headers for RPI/LINUX
 	#include <time.h>
 	#include <string.h>
 	#include <unistd.h>
@@ -66,8 +67,17 @@
 	#include <sys/stat.h>
 	#include "OpenThingsFramework.h"
 	#include "etherport.h"
+    #include "rpitime.h"
 	#include "smtp.h"
 #endif // end of headers
+
+#if defined(USE_LCD)
+	#include "LiquidCrystal.h"
+#endif
+
+#if defined(USE_SSD1306)
+	#include "SSD1306Display.h"
+#endif
 
 #if defined(ARDUINO)
 	#if defined(ESP8266)
@@ -115,6 +125,7 @@
 	extern OTF::OpenThingsFramework *otf;
 #else
 	extern EthernetServer *m_server;
+	extern bool useEth;
 #endif
 
 /** Non-volatile data structure */
@@ -150,6 +161,23 @@ struct StationData {
 
 /** RF station data structures - Must fit in STATION_SPECIAL_DATA_SIZE */
 struct RFStationData {
+	unsigned char version;
+	unsigned char on[8];
+	unsigned char off[8];
+	unsigned char timing[4];
+	unsigned char protocol[2];
+	unsigned char bitlength[2];
+};
+
+struct RFStationCode {
+	uint32_t on;
+	uint32_t off;
+	uint16_t timing;
+	uint8_t protocol;
+	uint8_t bitlength;
+};
+
+struct RFStationDataClassic {
 	unsigned char on[6];
 	unsigned char off[6];
 	unsigned char timing[4];
@@ -215,13 +243,11 @@ class OpenSprinkler {
 public:
 
 	// data members
-#if defined(ESP8266)
-	static SSD1306Display lcd;  // 128x64 OLED display
 	static OSInfluxDB influxdb;
-#elif defined(ARDUINO)
+#if defined(USE_SSD1306)
+	static SSD1306Display lcd;  // 128x64 OLED display
+#elif defined(USE_LCD)
 	static LiquidCrystal lcd;   // 16x2 character LCD
-#else
-	// todo: LCD define for RPI/BBB
 #endif
 
 #if defined(OSPI)
@@ -298,7 +324,7 @@ public:
 	//static StationAttrib get_station_attrib(unsigned char sid); // get station attribute
 	static void attribs_save(); // repackage attrib bits and save (backward compatibility)
 	static void attribs_load(); // load and repackage attrib bits (backward compatibility)
-	static uint16_t parse_rfstation_code(RFStationData *data, ulong *on, ulong *off); // parse rf code into on/off/time sections
+	static bool parse_rfstation_code(RFStationData *data, RFStationCode *code); // parse rf code into on/off/time sections
 	static void switch_rfstation(RFStationData *data, bool turnon);  // switch rf station
 	static void switch_remotestation(RemoteIPStationData *data, bool turnon, uint16_t dur=0); // switch remote IP station
 	static void switch_remotestation(RemoteOTCStationData *data, bool turnon, uint16_t dur=0); // switch remote OTC station
@@ -350,19 +376,20 @@ public:
 	#endif
 
 	// -- LCD functions
-#if defined(ARDUINO) // LCD functions for Arduino
-	#if defined(ESP8266)
-	static void lcd_print_pgm(PGM_P str); // ESP8266 does not allow PGM_P followed by PROGMEM
-	static void lcd_print_line_clear_pgm(PGM_P str, unsigned char line);
-	#else
-	static void lcd_print_pgm(PGM_P PROGMEM str);  // print a program memory string
-	static void lcd_print_line_clear_pgm(PGM_P PROGMEM str, unsigned char line);
-	#endif
+#if defined(USE_DISPLAY)
 	static void lcd_print_time(time_os_t t);  // print current time
 	static void lcd_print_ip(const unsigned char *ip, unsigned char endian);  // print ip
 	static void lcd_print_mac(const unsigned char *mac);  // print mac
 	static void lcd_print_screen(char c);  // print station bits of the board selected by display_board
 	static void lcd_print_version(unsigned char v);  // print version number
+	static void lcd_set_brightness(unsigned char value=1);
+	static void lcd_set_contrast();
+
+	#if defined(USE_SSD1306)
+	static void flash_screen();
+	static void toggle_screen_led();
+	static void set_screen_led(unsigned char status);
+	#endif
 
 	static String time2str(uint32_t t) {
 		uint16_t h = hour(t);
@@ -387,17 +414,22 @@ public:
 
 	// -- UI functions --
 	static void ui_set_options(int oid);		// ui for setting options (oid-> starting option index)
-	static void lcd_set_brightness(unsigned char value=1);
-	static void lcd_set_contrast();
+#endif
+
+#if defined(ARDUINO) // LCD functions for Arduino
+	#if defined(ESP8266)
+	static void lcd_print_pgm(PGM_P str); // ESP8266 does not allow PGM_P followed by PROGMEM
+	static void lcd_print_line_clear_pgm(PGM_P str, unsigned char line);
+	#else
+	static void lcd_print_pgm(PGM_P PROGMEM str);  // print a program memory string
+	static void lcd_print_line_clear_pgm(PGM_P PROGMEM str, unsigned char line);
+	#endif
 
 	#if defined(ESP8266)
 	static IOEXP *mainio, *drio;
 	static IOEXP *expanders[];
-	static RCSwitch rfswitch;
+	
 	static void detect_expanders();
-	static void flash_screen();
-	static void toggle_screen_led();
-	static void set_screen_led(unsigned char status);
 	static unsigned char get_wifi_mode() { if (useEth) return WIFI_MODE_STA; else return wifi_testmode ? WIFI_MODE_STA : iopts[IOPT_WIFI_MODE];}
 	static unsigned char wifi_testmode;
 	static String wifi_ssid, wifi_pass;
@@ -408,14 +440,21 @@ public:
 	static unsigned char state;
 	#endif
 
+#else
+static void lcd_print_pgm(const char *str);
+static void lcd_print_line_clear_pgm(const char *str, unsigned char line);
+#endif // LCD functions for Arduino
+
 private:
+#if defined(USE_DISPLAY)  // LCD functions
 	static void lcd_print_option(int i);  // print an option to the lcd
 	static void lcd_print_2digit(int v);  // print a integer in 2 digits
 	static void lcd_start();
 	static unsigned char button_read_busy(unsigned char pin_butt, unsigned char waitmode, unsigned char butt, unsigned char is_holding);
+#endif // LCD functions
 
-	#if defined(ESP8266)
-	static void latch_boost();
+#if defined(ESP8266)
+	static void latch_boost(unsigned char volt=0);
 	static void latch_open(unsigned char sid);
 	static void latch_close(unsigned char sid);
 	static void latch_setzonepin(unsigned char sid, unsigned char value);
@@ -424,9 +463,9 @@ private:
 	static void latch_setzoneoutput_v2(unsigned char sid, unsigned char A, unsigned char K);
 	static void latch_apply_all_station_bits();
 	static unsigned char prev_station_bits[];
-	#endif
 #endif // LCD functions
 	static unsigned char engage_booster;
+	static RCSwitch rfswitch;
 
 	#if defined(USE_OTF)
 	static void parse_otc_config();

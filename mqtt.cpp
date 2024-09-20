@@ -1,4 +1,4 @@
-/* OpenSprinkler Unified (AVR/RPI/BBB/LINUX/ESP8266) Firmware
+/* OpenSprinkler Unified Firmware
  * Copyright (C) 2015 by Ray Wang (ray@opensprinkler.com)
  *
  * OpenSprinkler library
@@ -414,7 +414,6 @@ void OSMqtt::begin(void) {
 
 	if(_sub_topic[0] == 0) { // subscribe topic is empty
 		DEBUG_LOGF("No sub_topic found\r\n");
-		// TODO: do not subscribe then
 	}
 
 	DEBUG_LOGF("MQTT Begin: Config (%s:%d %s) %s\r\n", _host, _port, _username, _enabled ? "Enabled" : "Disabled");
@@ -467,10 +466,8 @@ void OSMqtt::loop(void) {
 	// Only attemp to reconnect every MQTT_RECONNECT_DELAY seconds to avoid blocking the main loop
 	if (!_connected() && (millis() - last_reconnect_attempt >= MQTT_RECONNECT_DELAY * 1000UL)) {
 		DEBUG_LOGF("MQTT Loop: Reconnecting\r\n");
-		if (!last_reconnect_attempt)
-			_connect();
-		else
-			reconnect();
+		_done_subscribed = false;
+		_connect();
 		last_reconnect_attempt = millis();
 	}
 
@@ -660,7 +657,7 @@ bool OSMqtt::reconnect() {
 
 #else
 
-/************************** RASPBERRY PI / BBB / DEMO ****************************************/
+/************************** RASPBERRY PI / Linux ****************************************/
 
 static bool _connected = false;
 

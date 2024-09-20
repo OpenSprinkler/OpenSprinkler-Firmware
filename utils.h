@@ -1,4 +1,4 @@
-/* OpenSprinkler Unified (AVR/RPI/BBB/LINUX) Firmware
+/* OpenSprinkler Unified Firmware
  * Copyright (C) 2015 by Ray Wang (ray@opensprinkler.com)
  *
  * Utility functions header file
@@ -26,11 +26,14 @@
 
 #if defined(ARDUINO)
 	#include <Arduino.h>
-#else // headers for RPI/BBB
+#else // headers for RPI/LINUX
 	#include <stdio.h>
 	#include <limits.h>
 	#include <sys/time.h>
-
+	#include <arpa/inet.h>
+	#include <sys/socket.h>
+	#include <ifaddrs.h>
+	#include <net/route.h>
 #endif
 #include "defines.h"
 
@@ -57,6 +60,7 @@ ulong water_time_resolve(uint16_t v);
 unsigned char water_time_encode_signed(int16_t i);
 int16_t water_time_decode_signed(unsigned char i);
 void urlDecode(char *);
+void strReplaceQuoteBackslash(char *);
 void peel_http_header(char*);
 void strReplace(char *, char c, char r);
 size_t freeMemory();
@@ -64,6 +68,7 @@ size_t freeMemory();
 #define date_encode(m,d) ((m<<5)+d)
 #define MIN_ENCODED_DATE date_encode(1,1)
 #define MAX_ENCODED_DATE date_encode(12, 31)
+bool isLastDayofMonth(unsigned char month, unsigned char day);
 bool isValidDate(uint16_t date);
 #if defined(ESP8266)
 unsigned char hex2dec(const char *hex);
@@ -74,20 +79,41 @@ void str2mac(const char *_str, unsigned char mac[]);
 
 #if defined(ARDUINO)
 
-#else // Arduino compatible functions for RPI/BBB
+#else // Arduino compatible functions for RPI/LINUX
 	const char* get_data_dir();
 	void set_data_dir(const char *new_data_dir);
 	char* get_filename_fullpath(const char *filename);
-	void delay(ulong ms);
-	void delayMicroseconds(ulong us);
+    void delay(ulong ms);
+    void delayMicroseconds(ulong us);
 	void delayMicrosecondsHard(ulong us);
 	ulong millis();
 	ulong micros();
 	void initialiseEpoch();
 	#if defined(OSPI)
 	unsigned int detect_rpi_rev();
+	char* get_runtime_path();
+
+	struct route_t {
+		char iface[16];
+		in_addr_t gateway;
+		in_addr_t destination;
+	};
+
+	route_t get_route();
+	in_addr_t get_ip_address(char *iface);
 	#endif
 
+    enum BoardType {
+        Unknown,
+        RaspberryPi_Unknown,
+        RaspberryPi_bcm2712,
+        RaspberryPi_bcm2711,
+        RaspberryPi_bcm2837,
+        RaspberryPi_bcm2836,
+        RaspberryPi_bcm2835,
+    };
+
+    BoardType get_board_type();
 #endif
 
 #endif // _UTILS_H

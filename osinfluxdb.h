@@ -30,31 +30,29 @@
 #else
 #include "influxdb.hpp"
 
-//compatibility class:
-class Point {
-    influxdb_cpp::builder ib();
-    Point(char *m) {ib.meas(m);};
-    void addTag(char *tag, char *value) {ib.tag(tag, value);}
-    void addField(char *field, char *value) {ib.field(field, value);};
-}
 #endif
 
 class OSInfluxDB {
 private:
     #if defined(ESP8266) 
-    InfluxDBClient *client;
+    InfluxDBClient * client;
     #else
-    influxdb_cpp::server_info *client;
+    influxdb_cpp::server_info * client;
     #endif
-    boolean enabled;
-    boolean initialized;
+    bool enabled;
+    bool initialized;
     void init();
 public:
-    ~OSInfluxDB() { if (client) delete client; }
+    ~OSInfluxDB();
     void set_influx_config(int enabled, char *url, uint16_t port, char *org, char *bucket, char *token);
     void set_influx_config(ArduinoJson::JsonDocument &doc);
+    void set_influx_config(const char *json);
     void get_influx_config(ArduinoJson::JsonDocument &doc);
+    bool isEnabled();
+    #if defined(ESP8266) 
     void write_influx_data(Point &sensor_data);
-    boolean isEnabled();
+    #else
+    influxdb_cpp::server_info * get_client();
+    #endif
 };
 #endif
