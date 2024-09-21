@@ -76,6 +76,7 @@ typedef unsigned long ulong;
 #define NOTIFY_SENSOR2         0x0040
 #define NOTIFY_RAINDELAY       0x0080
 #define NOTIFY_STATION_ON      0x0100
+#define NOTIFY_FLOW_ALERT      0x0200
 
 /** HTTP request macro defines */
 #define HTTP_RQT_SUCCESS       0
@@ -256,7 +257,7 @@ enum {
 	IOPT_FORCE_WIRED,
 	IOPT_LATCH_ON_VOLTAGE,
 	IOPT_LATCH_OFF_VOLTAGE,
-	IOPT_RESERVE_3,
+	IOPT_NOTIF2_ENABLE, // Notification part 2
 	IOPT_RESERVE_4,
 	IOPT_RESERVE_5,
 	IOPT_RESERVE_6,

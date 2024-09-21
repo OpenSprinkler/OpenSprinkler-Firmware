@@ -1541,6 +1541,11 @@ void server_change_options(OTF_PARAMS_DEF)
 			if(oid==IOPT_BOOST_TIME) {
 				 v>>=2;
 			}
+			if (oid==IOPT_NOTIF_ENABLE) {
+				set_notif_enabled(v);
+				continue;
+			}
+
 			if (v>=0 && v<=max_value) {
 				os.iopts[oid] = v;
 			} else {
@@ -3244,10 +3249,10 @@ extern uint32_t ping_ok;
 		fsinfo.maxPathLength,
 		ping_ok,
 		os.mqtt.connected(),
-		os.iopts[IOPT_NOTIF_ENABLE]);
+		get_notif_enabled());
 
 #else
-	bfill.emit_p(PSTR("{\"status\":$D,\"mqtt\":$D,\"ifttt\":$D"), 1, os.mqtt.connected(), os.iopts[IOPT_NOTIF_ENABLE]);
+	bfill.emit_p(PSTR("{\"status\":$D,\"mqtt\":$D,\"ifttt\":$D"), 1, os.mqtt.connected(), get_notif_enabled());
 
 #endif
 

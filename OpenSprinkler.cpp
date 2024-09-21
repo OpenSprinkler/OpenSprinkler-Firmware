@@ -177,7 +177,7 @@ const char iopt_json_names[] PROGMEM =
 	"fwire"
 	"laton"
 	"latof"
-	"resv3"
+	"ife2\0"
 	"resv4"
 	"resv5"
 	"resv6"
@@ -256,7 +256,7 @@ const char iopt_prompts[] PROGMEM =
 	"Force wired?    "
 	"Latch On Volt.  "
 	"Latch Off Volt. "
-	"Reserved 3      "
+	"Notif2 Enable:  "
 	"Reserved 4      "
 	"Reserved 5      "
 	"Reserved 6      "
@@ -418,7 +418,7 @@ unsigned char OpenSprinkler::iopts[] = {
 	1,  // force wired connection
 	0,  // latch on volt
 	0,  // latch off volt
-	0,  // reserved 3
+	0,  // notif enable bits - part 2
 	0,  // reserved 4
 	0,  // reserved 5
 	0,  // reserved 6
