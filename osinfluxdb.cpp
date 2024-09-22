@@ -81,7 +81,7 @@ void OSInfluxDB::get_influx_config(ArduinoJson::JsonDocument &doc) {
     if (tmp_buffer[0] != '{')
         strcpy(tmp_buffer, "{}");
     ArduinoJson::DeserializationError error = ArduinoJson::deserializeJson(doc, tmp_buffer);
-	if (error || doc.isNull() || doc["en"] > 1) {
+	if (error || doc.isNull() || !doc.containsKey("en")) {
         if (error) {
             DEBUG_PRINT(F("influxdb: deserializeJson() failed: "));
 		    DEBUG_PRINTLN(error.c_str());  
