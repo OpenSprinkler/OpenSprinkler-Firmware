@@ -1453,8 +1453,7 @@ int read_sensor(Sensor_t *sensor, ulong time) {
       sensor->last_read = time;
       if (sensor->ip) return read_sensor_ip(sensor);
 #ifdef ESP8266
-      if (sensor->port == 0)  // 0 = Truebner RS485 Adapter
-        return read_sensor_rs485(sensor);
+      return read_sensor_rs485(sensor);
 #endif
       break;
 
