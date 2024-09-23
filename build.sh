@@ -47,9 +47,9 @@ fi
 echo "Building OpenSprinkler..."
 
 if [ -f /etc/init.d/OpenSprinkler.sh ]; then
-	/etc/init.d/OpenSprinkler.sh stop 2>/dev/null
+	/etc/init.d/OpenSprinkler.sh stop
 else
-	service OpenSprinkler stop 2>/dev/null
+	systemctl stop OpenSprinkler
 fi
 
 #Git update submodules
@@ -116,13 +116,12 @@ if [ ! "$SILENT" = true ] && [ -f OpenSprinkler.service ] && [ -f startOpenSprin
 
 	# Make file executable
 	chmod +x startOpenSprinkler.sh
-
-    # Reload systemd
-    systemctl daemon-reload
-
-    # Enable and start the service
-    systemctl enable OpenSprinkler
-    systemctl start OpenSprinkler
 fi
+# Reload systemd
+systemctl daemon-reload
+
+# Enable and start the service
+systemctl enable OpenSprinkler
+systemctl start OpenSprinkler
 
 echo "Done!"
