@@ -46,6 +46,9 @@ fi
 
 echo "Building OpenSprinkler..."
 
+/etc/init.d/OpenSprinkler.sh stop 2>/dev/null
+service OpenSprinkler stop 2>/dev/null
+
 #Git update submodules
 
 if git submodule status | grep --quiet '^-'; then
