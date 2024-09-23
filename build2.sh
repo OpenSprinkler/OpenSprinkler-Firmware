@@ -2,6 +2,17 @@
 
 	echo "Compiling OSPi firmware..."
 
+	USEGPIO=""
+        GPIOLIB=""
+
+
+        if [ -h "/sys/class/gpio/gpiochip512" ]; then
+                echo "using libgpiod"
+                USEGPIO="-DLIBGPIOD"
+                GPIOLIB="-lgpiod"
+        fi
+
+
         ADS1115=""
         ADS1115FILES=""
 
@@ -23,7 +34,7 @@
         ws=$(ls external/TinyWebsockets/tiny_websockets_lib/src/*.cpp)
         otf=$(ls external/OpenThings-Framework-Firmware-Library/*.cpp)
         ifx=$(ls external/influxdb-cpp/*.hpp)
-        g++ -o OpenSprinkler -DOSPI $ADS1115 $PCF8591 -DSMTP_OPENSSL $DEBUG -std=c++17 -include string.h main.cpp \
+        g++ -o OpenSprinkler -DOSPI $USEGPIO $ADS1115 $PCF8591 -DSMTP_OPENSSL $DEBUG -std=c++17 -include string.h main.cpp \
                 OpenSprinkler.cpp program.cpp opensprinkler_server.cpp utils.cpp weather.cpp gpio.cpp mqtt.cpp \
                 smtp.c RCSwitch.cpp sensor*.cpp \
                 $ADS1115FILES $PCF8591FILES \
@@ -32,6 +43,6 @@
                 -Iexternal/OpenThings-Framework-Firmware-Library/ \
                 $otf \
                 $ifx osinfluxdb.cpp -Iexternal/influxdb-cpp/ \
-                -lpthread -lmosquitto -lssl -lcrypto -li2c -lgpiod
+                -lpthread -lmosquitto -lssl -lcrypto -li2c $GPIOLIB
 
 
