@@ -275,6 +275,7 @@ int sensor_define(uint nr, const char *name, uint type, uint group, uint32_t ip,
               sizeof(sensor->userdef_unit) - 1);
       sensor->flags = flags;
       if (assigned_unitid >= 0) sensor->assigned_unitid = assigned_unitid;
+      else sensor->assigned_unitid = 0;
       sensor_save();
       return HTTP_RQT_SUCCESS;
     }
@@ -306,6 +307,7 @@ int sensor_define(uint nr, const char *name, uint type, uint group, uint32_t ip,
           sizeof(new_sensor->userdef_unit) - 1);
   new_sensor->flags = flags;
   if (assigned_unitid >= 0) new_sensor->assigned_unitid = assigned_unitid;
+  else new_sensor->assigned_unitid = 0;
 
   if (last) {
     new_sensor->next = last->next;
@@ -2188,7 +2190,6 @@ unsigned char getSensorUnitId(Sensor_t *sensor) {
       return UNIT_DEGREE;
     case SENSOR_AQUAPLUMB:
       return UNIT_PERCENT;
-    case SENSOR_USERDEF:
     case SENSOR_FREE_MEMORY:
     case SENSOR_FREE_STORE:
       return UNIT_USERDEF;
@@ -2203,6 +2204,7 @@ unsigned char getSensorUnitId(Sensor_t *sensor) {
     case SENSOR_OSPI_ANALOG_SMT50_TEMP:
       return UNIT_DEGREE;
 #endif
+    case SENSOR_USERDEF:
     case SENSOR_MQTT:
     case SENSOR_REMOTE:
       return sensor->assigned_unitid > 0 ? sensor->assigned_unitid
