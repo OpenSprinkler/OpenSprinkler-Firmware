@@ -46,8 +46,11 @@ fi
 
 echo "Building OpenSprinkler..."
 
-/etc/init.d/OpenSprinkler.sh stop 2>/dev/null
-service OpenSprinkler stop 2>/dev/null
+if [ -f /etc/init.d/OpenSprinkler.sh ]; then
+	/etc/init.d/OpenSprinkler.sh stop 2>/dev/null
+else
+	service OpenSprinkler stop 2>/dev/null
+fi
 
 #Git update submodules
 
