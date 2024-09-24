@@ -66,7 +66,7 @@ void OSInfluxDB::set_influx_config(const char *data) {
     initialized = false;
 }
 
-void OSInfluxDB::get_influx_config(char *json {
+void OSInfluxDB::get_influx_config(char *json) {
     json[0] = 0;
     if (file_exists(INFLUX_CONFIG_FILE))
     {
