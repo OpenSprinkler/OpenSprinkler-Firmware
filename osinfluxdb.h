@@ -48,6 +48,7 @@ public:
     void set_influx_config(ArduinoJson::JsonDocument &doc);
     void set_influx_config(const char *json);
     void get_influx_config(ArduinoJson::JsonDocument &doc);
+    void get_influx_config(char *json);
     bool isEnabled();
     #if defined(ESP8266) 
     void write_influx_data(Point &sensor_data);

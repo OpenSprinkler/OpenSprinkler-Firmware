@@ -3573,17 +3573,8 @@ void server_influx_get(OTF_PARAMS_DEF) {
 }
 
 void server_influx_get_main() {
-	ArduinoJson::JsonDocument doc;
-	os.influxdb.get_influx_config(doc);
-	int enabled = doc["en"];
-	const char *url = doc["url"];
-	const uint16_t port = doc["port"];
-	const char *org = doc["org"];
-	const char *bucket = doc["bucket"];
-	const char *token = doc["token"];
-
-	bfill.emit_p(PSTR("{\"en\":$D,\"url\":\"$S\",\"port\":$D,\"org\":\"$S\",\"bucket\":\"$S\",\"token\":\"$S\"}"), 
-		enabled, url, port, org, bucket, token);
+	os.influxdb.get_influx_config(tmp_buffer);
+	bfill.emit_p(tmp_buffer);
 }
 
 typedef void (*URLHandler)(OTF_PARAMS_DEF);

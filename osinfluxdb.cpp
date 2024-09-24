@@ -66,20 +66,25 @@ void OSInfluxDB::set_influx_config(const char *data) {
     initialized = false;
 }
 
-void OSInfluxDB::get_influx_config(ArduinoJson::JsonDocument &doc) {
-    //DEBUG_PRINTLN("Load influx config");
-    tmp_buffer[0] = 0;
+void OSInfluxDB::get_influx_config(char *json {
+    json[0] = 0;
     if (file_exists(INFLUX_CONFIG_FILE))
     {
-        ulong size = file_read_block(INFLUX_CONFIG_FILE, tmp_buffer, 0, TMP_BUFFER_SIZE*2);
+        ulong size = file_read_block(INFLUX_CONFIG_FILE, json, 0, TMP_BUFFER_SIZE*2);
         //DEBUG_PRINT(F("influx config size="));
         //DEBUG_PRINTLN(size);
-        tmp_buffer[size] = 0;
+        json[size] = 0;
         //DEBUG_PRINT(F("influx config="));
         //DEBUG_PRINTLN(tmp_buffer);
     }
-    if (tmp_buffer[0] != '{')
-        strcpy(tmp_buffer, "{}");
+    if (json[0] != '{')
+        strcpy(json, "{\"en\":0}");
+
+}
+
+void OSInfluxDB::get_influx_config(ArduinoJson::JsonDocument &doc) {
+    //DEBUG_PRINTLN("Load influx config");
+    get_influx_config(tmp_buffer);
     ArduinoJson::DeserializationError error = ArduinoJson::deserializeJson(doc, tmp_buffer);
 	if (error || doc.isNull() || doc["en"] > 1) {
         if (error) {
