@@ -572,7 +572,7 @@ void sensorlog_clear(bool std, bool week, bool month) {
 }
 
 ulong sensorlog_clear_sensor(uint sensorNr, uint8_t log, bool use_under,
-                             double under, bool use_over, double over) {
+                             double under, bool use_over, double over, time_t before, time_t after) {
   SensorLog_t sensorlog;
   checkLogSwitch(log);
   const char *flast = getlogfile2(log);
@@ -595,9 +595,13 @@ ulong sensorlog_clear_sensor(uint sensorNr, uint8_t log, bool use_under,
                                    SENSORLOG_STORE_SIZE);
     if (result == 0) break;
     if (sensorlog.nr > 0 && (sensorlog.nr == sensorNr || sensorNr == 0)) {
-      boolean found = true;
-      if (use_under && sensorlog.data > under) found = false;
-      if (use_over && sensorlog.data < over) found = false;
+      boolean found = false;
+      if (use_under && sensorlog.data < under) found = true;
+      if (use_over && sensorlog.data > over) found = true;
+      if (before && sensorlog.time < before) found = true;
+      if (after && sensorlog.time > after) found = true;
+      if (sensorNr > 0 && sensorlog.nr != sensorNr) found = false;
+      if (sensorNr > 0 && sensorlog.nr == sensorNr && !use_under && !use_over && !before && !after) found = true;
       if (found) {
         sensorlog.nr = 0;
         file_write_block(f, &sensorlog, idx * SENSORLOG_STORE_SIZE,
