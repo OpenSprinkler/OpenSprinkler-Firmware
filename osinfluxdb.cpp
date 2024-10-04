@@ -42,6 +42,7 @@ void OSInfluxDB::set_influx_config(int enabled, char *url, uint16_t port, char *
 
 void OSInfluxDB::set_influx_config(ArduinoJson::JsonDocument &doc) {
     size_t size = ArduinoJson::serializeJson(doc, tmp_buffer);
+    remove_file(INFLUX_CONFIG_FILE);
     file_write_block(INFLUX_CONFIG_FILE, tmp_buffer, 0, size);
     if (client)
     {
@@ -54,6 +55,7 @@ void OSInfluxDB::set_influx_config(ArduinoJson::JsonDocument &doc) {
 
 void OSInfluxDB::set_influx_config(const char *data) {
     size_t size = strlen(data);
+    remove_file(INFLUX_CONFIG_FILE);
     file_write_block(INFLUX_CONFIG_FILE, "{", 0, 1);
     file_write_block(INFLUX_CONFIG_FILE, data, 1, size);
     file_write_block(INFLUX_CONFIG_FILE, "}", size+1, 1);
@@ -77,9 +79,10 @@ void OSInfluxDB::get_influx_config(char *json) {
         //DEBUG_PRINT(F("influx config="));
         //DEBUG_PRINTLN(tmp_buffer);
     }
-    if (json[0] != '{')
+    if (json[0] != '{' || strchr(json, '}') != strrchr(json, '}')) {
         strcpy(json, "{\"en\":0}");
-
+        set_influx_config(json);
+    }
 }
 
 void OSInfluxDB::get_influx_config(ArduinoJson::JsonDocument &doc) {
@@ -97,6 +100,7 @@ void OSInfluxDB::get_influx_config(ArduinoJson::JsonDocument &doc) {
 		doc["org"] = "";
 		doc["bucket"] = "";
 		doc["token"] = "";
+        set_influx_config(doc);
     }
     enabled = doc["en"];
     initialized = true; 
