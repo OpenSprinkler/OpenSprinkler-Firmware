@@ -1549,6 +1549,7 @@ void influxdb_send_flowalert(const char *name, uint32_t station, int f1, int f2,
 }
 #else
 void influxdb_send_state(const char *name, int state) {
+  if (!os.influxdb.isEnabled()) return;
   influxdb_cpp::server_info * client = os.influxdb.get_client();
   if (!client)
     return;
@@ -1564,6 +1565,7 @@ void influxdb_send_state(const char *name, int state) {
 }
 
 void influxdb_send_station(const char *name, uint32_t station, int state) {
+  if (!os.influxdb.isEnabled()) return;
   influxdb_cpp::server_info * client = os.influxdb.get_client();
   if (!client)
     return;
@@ -1573,13 +1575,14 @@ void influxdb_send_station(const char *name, uint32_t station, int state) {
     .meas("opensprinkler")
     .tag("devicename", tmp_buffer)
     .tag("name", name)
-    .field("station", station)
+    .field("station", (int)station)
     .field("state", state)
     .timestamp(millis())
     .post_http(*client);
 }
 
 void influxdb_send_program(const char *name, uint32_t nr, float level) {
+  if (!os.influxdb.isEnabled()) return;
   influxdb_cpp::server_info * client = os.influxdb.get_client();
   if (!client)
     return;
@@ -1589,13 +1592,14 @@ void influxdb_send_program(const char *name, uint32_t nr, float level) {
     .meas("opensprinkler")
     .tag("devicename", tmp_buffer)
     .tag("name", name)
-    .field("program", nr)
+    .field("program", (int)nr)
     .field("level", level)
     .timestamp(millis())
     .post_http(*client);
 }
 
 void influxdb_send_flowsensor(const char *name, uint32_t count, float volume) {
+  if (!os.influxdb.isEnabled()) return;
   influxdb_cpp::server_info * client = os.influxdb.get_client();
   if (!client)
     return;
@@ -1605,14 +1609,14 @@ void influxdb_send_flowsensor(const char *name, uint32_t count, float volume) {
     .meas("opensprinkler")
     .tag("devicename", tmp_buffer)
     .tag("name", name)
-    .field("count", count)
+    .field("count", (int)count)
     .field("volume", volume)
     .timestamp(millis())
     .post_http(*client);
 }
 
 void influxdb_send_flowalert(const char *name, uint32_t station, int f1, int f2, int f3, int f4, int f5) {
-    if (!os.influxdb.isEnabled()) return;
+  if (!os.influxdb.isEnabled()) return;
   influxdb_cpp::server_info * client = os.influxdb.get_client();
   if (!client)
     return;
@@ -1622,8 +1626,8 @@ void influxdb_send_flowalert(const char *name, uint32_t station, int f1, int f2,
     .meas("opensprinkler")
     .tag("devicename", tmp_buffer)
     .tag("name", name)
-    .field("station", station)
-    .field("flow_rate",  (double)(f1)+(double)(f2)/100)
+    .field("station", (int)(station))
+    .field("flowrate", (double)(f1)+(double)(f2)/100)
 	.field("duration", f3)
 	.field("alert_setpoint", (double)(f4)+(double)(f5)/100)
     .timestamp(millis())
