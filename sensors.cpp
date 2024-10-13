@@ -266,7 +266,9 @@ void sensor_api_free() {
   }
 
   modbusTcpId = 0;
+  #ifdef ESP8266
   memset(i2c_rs485_allocated, 0, sizeof(i2c_rs485_allocated));
+  #endif
 }
 
 /*
