@@ -142,6 +142,7 @@ extern "C" {
 #define RS485_TRUEBNER2 0x0040
 #define RS485_TRUEBNER3 0x0080
 #define RS485_TRUEBNER4 0x0100
+#define OSPI_USB_RS485 0x0200
 
 typedef struct SensorFlags {
   uint enable : 1;   // enabled

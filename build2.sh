@@ -43,6 +43,6 @@
                 -Iexternal/OpenThings-Framework-Firmware-Library/ \
                 $otf \
                 $ifx osinfluxdb.cpp -Iexternal/influxdb-cpp/ \
-                -lpthread -lmosquitto -lssl -lcrypto -li2c $GPIOLIB
+                -lpthread -lmosquitto -lssl -lcrypto -li2c -lmodbus $GPIOLIB
 
 
