@@ -26,6 +26,13 @@
 #include "OpenSprinkler.h"
 #ifdef ESP8266
 #include "Wire.h"
+#else
+#include <stdio.h>
+#include <iostream>
+#include <fstream>
+#include <modbus/modbus.h>
+#include <modbus/modbus-rtu.h>
+#include <errno.h>
 #endif
 #include "defines.h"
 #include "opensprinkler_server.h"
@@ -41,6 +48,7 @@
 #include "sensor_ospi_pcf8591.h"
 #endif
 
+#define MAX_RS485_DEVICES 4
 
 unsigned char findKeyVal(const char *str, char *strbuf, uint16_t maxlen, const char *key,
                 bool key_in_pgm = false, uint8_t *keyfound = NULL);
@@ -62,7 +70,10 @@ static ProgSensorAdjust_t *progSensorAdjusts = NULL;
 
 // modbus transaction id
 static uint16_t modbusTcpId = 0;
-static uint i2c_rs485_allocated[4];
+static uint i2c_rs485_allocated[MAX_RS485_DEVICES];
+#ifndef ESP8266
+static modbus_t * ttyDevices[MAX_RS485_DEVICES];
+#endif
 
 const char *sensor_unitNames[]{
     "",   "%",   "°C",  "°F", "V", "%", "in",
@@ -169,12 +180,59 @@ void sensor_api_init(boolean detect_boards) {
   sensor_load();
   prog_adjust_load();
   sensor_mqtt_init();
+#ifndef ESP8266
+  //Read rs485 file. Details see below
+  std::ifstream file;
+  file.open("rs485", std::ifstream::in);
+  if (!file.fail()) {
+    std::string tty;
+    int idx = 0;
+    int n = 0;
+    DEBUG_PRINTLN(F("Opening USB RS485 Adapters:"));
+    while (std::getline(file, tty)) {
+      modbus_t * ctx = modbus_new_rtu(tty.c_str(), 9600, 'E', 8, 1);
+      DEBUG_PRINT(idx);
+      DEBUG_PRINT(": ");
+      DEBUG_PRINTLN(tty.c_str());
+
+      //unavailable on Raspi? modbus_enable_quirks(ctx, MODBUS_QUIRK_MAX_SLAVE);
+      modbus_rtu_set_serial_mode(ctx, MODBUS_RTU_RS485);
+      modbus_rtu_set_rts(ctx, MODBUS_RTU_RTS_NONE); // we use auto RTS function by the HAT
+      modbus_set_response_timeout(ctx, 1, 500000); // 1.5s
+      if (modbus_connect(ctx) == -1) {
+        modbus_free(ctx);
+      } else {
+        n++;
+        ttyDevices[idx] = ctx;
+        #ifdef ENABLE_DEBUG
+        modbus_set_debug(ctx, TRUE);
+        DEBUG_PRINTLN(F("DEBUG ENABLED"));
+        #endif
+      }
+      idx++;
+      if (idx >= MAX_RS485_DEVICES)
+        break;
+    }
+    DEBUG_PRINT(F("Found "));
+    DEBUG_PRINT(n);
+    DEBUG_PRINTLN(F(" RS485 Adapters"));
+  }
+#endif
 }
 
 void sensor_save_all() {
   sensor_save();
   prog_adjust_save();
   SensorUrl_save();
+#ifndef ESP8266
+  for (int i = 0; i < MAX_RS485_DEVICES; i++) {
+    if (ttyDevices[i]) {
+      modbus_close(ttyDevices[i]);
+      modbus_free(ttyDevices[i]);
+    }
+    ttyDevices[i] = NULL;
+  }
+#endif
 }
 
 /**
@@ -1174,8 +1232,8 @@ int read_sensor_http(Sensor_t *sensor, ulong time) {
  */
 int read_sensor_rs485(Sensor_t *sensor) {
   DEBUG_PRINTLN(F("read_sensor_rs485"));
-  int device = sensor->port % 4;
-  if ((asb_detected_boards & (RS485_TRUEBNER1 << device)) == 0) 
+  int device = sensor->port;
+  if (device >= MAX_RS485_DEVICES || (asb_detected_boards & (RS485_TRUEBNER1 << device)) == 0) 
     return HTTP_RQT_NOT_RECEIVED;
 
   if (i2c_rs485_allocated[device] > 0 && i2c_rs485_allocated[device] != sensor->nr) {
@@ -1244,6 +1302,52 @@ int read_sensor_rs485(Sensor_t *sensor) {
   DEBUG_PRINTLN(F("read_sensor_rs485: exit"));
   return HTTP_RQT_NOT_RECEIVED;
 }
+#else
+/**
+ * USB RS485 Adapter
+ * Howto use: Create a file rs485 inside the OpenSprinkler-Firmware directory, enter the USB-TTY connections here.
+ * For example:
+ *  /dev/ttyUSB0
+ *  /dev/ttyUSB1
+ * You can use multiple rs485 adapters, every line increments the "port" index, starting with 0 for the first line
+ */
+
+/**
+ * @brief Raspberry PI RS485 Interface
+ *
+ * @param sensor
+ * @return int
+ */
+int read_sensor_rs485(Sensor_t *sensor) {
+  DEBUG_PRINTLN(F("read_sensor_rs485"));
+  int device = sensor->port;
+  if (device >= MAX_RS485_DEVICES || !ttyDevices[device])
+    return HTTP_RQT_NOT_RECEIVED;
+
+  DEBUG_PRINTLN(F("read_sensor_rs485: check-ok"));
+
+  uint8_t buffer[10];
+  uint8_t type = sensor->type == SENSOR_SMT100_TEMP   ? 0x00
+                 : sensor->type == SENSOR_SMT100_MOIS ? 0x01
+                                                      : 0x02;
+  uint16_t tab_reg[3] = {0};
+  modbus_set_slave(ttyDevices[device], sensor->id);
+  if (modbus_read_registers(ttyDevices[device], type, 2, tab_reg) > 0) {
+    uint16_t data = tab_reg[0];
+    DEBUG_PRINTF("read_sensor_rs485: result: %d - %d\n", sensor->id, data);
+    double value =
+        sensor->type == SENSOR_SMT100_TEMP
+            ? (data / 100.0) - 100.0
+            : (sensor->type == SENSOR_SMT100_MOIS ? data / 100.0 : data);
+    sensor->last_native_data = data;
+    sensor->last_data = value;
+    DEBUG_PRINTLN(sensor->last_data);
+    sensor->flags.data_ok = true;
+    return HTTP_RQT_SUCCESS;
+  }
+  DEBUG_PRINTLN(F("read_sensor_rs485: exit"));
+  return HTTP_RQT_NOT_RECEIVED;
+}
 
 #endif
 
@@ -1305,48 +1409,21 @@ int read_sensor_ip(Sensor_t *sensor) {
   else
     modbusTcpId++;
 
+  uint8_t type = sensor->type == SENSOR_SMT100_TEMP   ? 0x00
+                 : sensor->type == SENSOR_SMT100_MOIS ? 0x01
+                                                      : 0x02;
   buffer[0] = (0xFF00 & modbusTcpId) >> 8;
   buffer[1] = (0x00FF & modbusTcpId);
   buffer[2] = 0;
   buffer[3] = 0;
   buffer[4] = 0;
   buffer[5] = 6;  // len
-
-  switch (sensor->type) {
-    case SENSOR_SMT100_MOIS:
-      buffer[6] = sensor->id;  // Modbus ID
-      buffer[7] = 0x03;        // Read Holding Registers
-      buffer[8] = 0x00;
-      buffer[9] = 0x01;  // soil moisture is at address 0x0001
-      buffer[10] = 0x00;
-      buffer[11] = 0x01;  // Number of registers to read (soil moisture value is
-                          // one 16-bit register)
-      break;
-
-    case SENSOR_SMT100_TEMP:
-      buffer[6] = sensor->id;
-      buffer[7] = 0x03;  // Read Holding Registers
-      buffer[8] = 0x00;
-      buffer[9] = 0x00;  // temperature is at address 0x0000
-      buffer[10] = 0x00;
-      buffer[11] = 0x01;  // Number of registers to read (temperature value is
-                          // one 16-bit register)
-      break;
-
-    case SENSOR_SMT100_PMTY:
-      buffer[6] = sensor->id;
-      buffer[7] = 0x03;  // Read Holding Registers
-      buffer[8] = 0x00;
-      buffer[9] = 0x02;  // permittivity is at address 0x0002
-      buffer[10] = 0x00;
-      buffer[11] = 0x01;  // Number of registers to read (permittivity value is
-                          // one 16-bit register)
-      break;
-
-    default:
-      client->stop();
-      return HTTP_RQT_NOT_RECEIVED;
-  }
+  buffer[6] = sensor->id;  // Modbus ID
+  buffer[7] = 0x03;        // Read Holding Registers
+  buffer[8] = 0x00;
+  buffer[9] = type;
+  buffer[10] = 0x00;
+  buffer[11] = 0x01;  
 
   client->write(buffer, 12);
 #if defined(ESP8266)
@@ -1458,9 +1535,7 @@ int read_sensor(Sensor_t *sensor, ulong time) {
       //DEBUG_PRINTLN(sensor->name);
       sensor->last_read = time;
       if (sensor->ip) return read_sensor_ip(sensor);
-#ifdef ESP8266
       return read_sensor_rs485(sensor);
-#endif
       break;
 
 #if defined(ARDUINO)
@@ -1732,10 +1807,10 @@ int set_sensor_address_ip(Sensor_t *sensor, uint8_t new_address) {
  * @param new_address
  * @return int
  */
-int set_sensor_address_i2c(Sensor_t *sensor, uint8_t new_address) {
-  DEBUG_PRINTLN(F("set_sensor_address_i2c"));
-  int device = sensor->port % 4;
-  if ((asb_detected_boards & (RS485_TRUEBNER1 << device)) == 0) 
+int set_sensor_address_rs485(Sensor_t *sensor, uint8_t new_address) {
+  DEBUG_PRINTLN(F("set_sensor_address_rs485"));
+  int device = sensor->port;
+  if (device >= MAX_RS485_DEVICES || (asb_detected_boards & (RS485_TRUEBNER1 << device)) == 0) 
     return HTTP_RQT_NOT_RECEIVED;
 
   if (i2c_rs485_allocated[device] > 0) {
@@ -1760,6 +1835,35 @@ int set_sensor_address_i2c(Sensor_t *sensor, uint8_t new_address) {
   }
   return HTTP_RQT_NOT_RECEIVED;
 }
+#else
+/**
+ * @brief Raspberry PI RS485 Interface - Set SMT100 Sensor address
+ *
+ * @param sensor
+ * @return int
+ */
+int set_sensor_address_rs485(Sensor_t *sensor, uint8_t new_address) {
+  DEBUG_PRINTLN(F("set_sensor_address_rs485"));
+  int device = sensor->port;
+  if (device >= MAX_RS485_DEVICES || !ttyDevices[device])
+    return HTTP_RQT_NOT_RECEIVED;
+
+
+  uint8_t request[10];
+  request[0] = 0xFD; //253=Truebner Broadcast
+  request[1] = 0x06; //Write
+  request[2] = 0x00;
+  request[3] = 0x04; //Register address
+  request[4] = 0x00;
+  request[5] = new_address;
+  
+  if (modbus_send_raw_request(ttyDevices[device], request, 6) > 0) {
+    modbus_flush(ttyDevices[device]);
+    return HTTP_RQT_SUCCESS;
+  }
+  return HTTP_RQT_NOT_RECEIVED;
+}
+
 #endif
 
 int set_sensor_address(Sensor_t *sensor, uint8_t new_address) {
@@ -1772,12 +1876,7 @@ int set_sensor_address(Sensor_t *sensor, uint8_t new_address) {
       sensor->flags.data_ok = false;
       if (sensor->ip && sensor->port)
         return set_sensor_address_ip(sensor, new_address);
-#ifdef ESP8266
-      if (!sensor->ip && sensor->port == 0)
-        return set_sensor_address_i2c(sensor, new_address);
-#endif
-      sensor->flags.enable = false;
-      return HTTP_RQT_NOT_RECEIVED;
+      return set_sensor_address_rs485(sensor, new_address);
   }
   return HTTP_RQT_CONNECT_ERR;
 }
