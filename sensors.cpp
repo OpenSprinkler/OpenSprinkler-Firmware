@@ -70,8 +70,9 @@ static ProgSensorAdjust_t *progSensorAdjusts = NULL;
 
 // modbus transaction id
 static uint16_t modbusTcpId = 0;
+#ifdef ESP8266
 static uint i2c_rs485_allocated[MAX_RS485_DEVICES];
-#ifndef ESP8266
+#else
 static modbus_t * ttyDevices[MAX_RS485_DEVICES];
 #endif
 
@@ -204,6 +205,7 @@ void sensor_api_init(boolean detect_boards) {
       } else {
         n++;
         ttyDevices[idx] = ctx;
+        asb_detected_boards |= OSPI_USB_RS485;
         #ifdef ENABLE_DEBUG
         modbus_set_debug(ctx, TRUE);
         DEBUG_PRINTLN(F("DEBUG ENABLED"));
