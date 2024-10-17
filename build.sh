@@ -48,7 +48,7 @@ echo "Building OpenSprinkler..."
 
 if [ -f /etc/init.d/OpenSprinkler.sh ]; then
 	/etc/init.d/OpenSprinkler.sh stop
-else
+elif [ -f /etc/systemd/system/OpenSprinkler.service ]; then
 	systemctl stop OpenSprinkler
 fi
 
