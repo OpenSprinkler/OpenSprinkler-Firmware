@@ -37,30 +37,53 @@ A8 = 168
 C0 = 192
    = 192.168.000.254
 
-For the Truebner SMT100 RS485 Modbus you need a RS485 Modbus RTU over TCP converter.
+For the Truebner SMT100 RS485 Modbus you need the Truebner RS485 Adapter for OpenSprinkler.
 Set ip/port for the converter, e.a PUSR USR-W610 in transparent modus.
 
 For the analog ports of the extension board (including SMT50) use id 0..7
 
-type:
-SENSOR_NONE                       0   None or deleted sensor
-SENSOR_SMT100_MODBUS_RTU_MOIS     1   Truebner SMT100 RS485 Modbus RTU over TCP, moisture mode
-SENSOR_SMT100_MODBUS_RTU_TEMP     2   Truebner SMT100 RS485 Modbus RTU over TCP, temperature mode
-SENSOR_ANALOG_EXTENSION_BOARD     10  New OpenSprinkler analog extension board x8 - voltage mode 0..4V
-SENSOR_ANALOG_EXTENSION_BOARD_P   11  New OpenSprinkler analog extension board x8 - percent 0..3.3V to 0..100%
-SENSOR_SMT50_MOIS                 15  New OpenSprinkler analog extension board x8 - SMT50 VWC [%] = (U * 50) : 3
-SENSOR_SMT50_TEMP                 16  New OpenSprinkler analog extension board x8 - SMT50 T [°C] = (U – 0,5) * 100
-SENSOR_OSPI_ANALOG_INPUTS         20  Old OSPi analog input
-SENSOR_VH400                      30  New OpenSprinkler analog extension board x8 - Vegetronix VH400
-SENSOR_THERM200                   31  New OpenSprinkler analog extension board x8 - Vegetronix THERM200
-SENSOR_AQUAPLUMB                  32  New OpenSprinkler analog extension board x8 - Vegetronix Aquaplumb
-SENSOR_USERDEF                    49  New OpenSprinkler analog extension board x8 - User defined sensor
-SENSOR_REMOTE                     100 Remote sensor of an remote opensprinkler
-SENSOR_GROUP_MIN                 1000 Sensor group with min value
-SENSOR_GROUP_MAX                 1001 Sensor group with max value
-SENSOR_GROUP_AVG                 1002 Sensor group with avg value
-SENSOR_GROUP_SUM                 1003 Sensor group with sum value
+// Sensor types:
+SENSOR_NONE 0                       // None or deleted sensor
+SENSOR_SMT100_MOIS 1                // Truebner SMT100 RS485, moisture mode
+SENSOR_SMT100_TEMP 2                // Truebner SMT100 RS485, temperature mode
+SENSOR_SMT100_PMTY 3                // Truebner SMT100 RS485, permittivity mode
+SENSOR_ANALOG_EXTENSION_BOARD 10    // New OpenSprinkler analog extension board x8 - voltage mode 0..4V
+SENSOR_ANALOG_EXTENSION_BOARD_P 11  // New OpenSprinkler analog extension board x8 - percent 0..3.3V to 0..100%
+SENSOR_SMT50_MOIS 15                // New OpenSprinkler analog extension board x8 - SMT50 VWC [%] = (U * 50) : 3
+SENSOR_SMT50_TEMP 16                // New OpenSprinkler analog extension board x8 - SMT50 T [°C] = (U – 0,5) * 100
+SENSOR_SMT100_ANALOG_MOIS 17        // New OpenSprinkler analog extension board x8 - SMT100 VWC [%] = (U * 100) : 3
+SENSOR_SMT100_ANALOG_TEMP 18        // New OpenSprinkler analog extension board x8 - SMT50 T [°C] = (U * 100) : 3 - 40
 
+SENSOR_VH400 30                     // New OpenSprinkler analog extension board x8 - Vegetronix VH400
+SENSOR_THERM200 31                  // New OpenSprinkler analog extension board x8 - Vegetronix THERM200
+SENSOR_AQUAPLUMB 32                 // New OpenSprinkler analog extension board x8 - Vegetronix Aquaplumb
+
+SENSOR_USERDEF 49                   // New OpenSprinkler analog extension board x8 - User defined sensor
+
+SENSOR_OSPI_ANALOG 50               // Old OSPi analog input - voltage mode 0..3.3V
+SENSOR_OSPI_ANALOG_P 51             // Old OSPi analog input - percent 0..3.3V to 0...100%
+SENSOR_OSPI_ANALOG_SMT50_MOIS 52    // Old OSPi analog input - SMT50 VWC [%] = (U * 50) : 3
+SENSOR_OSPI_ANALOG_SMT50_TEMP 53    // Old OSPi analog input - SMT50 T [°C] = (U – 0,5) * 100
+
+SENSOR_MQTT 90                      // subscribe to a MQTT server and query a value
+
+SENSOR_REMOTE 100                   // Remote sensor of an remote opensprinkler
+SENSOR_WEATHER_TEMP_F 101           // Weather service - temperature (Fahrenheit)
+SENSOR_WEATHER_TEMP_C 102           // Weather service - temperature (Celcius)
+SENSOR_WEATHER_HUM 103              // Weather service - humidity (%)
+SENSOR_WEATHER_PRECIP_IN 105        // Weather service - precip (inch)
+SENSOR_WEATHER_PRECIP_MM 106        // Weather service - precip (mm)
+SENSOR_WEATHER_WIND_MPH 107         // Weather service - wind (mph)
+SENSOR_WEATHER_WIND_KMH 108         // Weather service - wind (kmh)
+
+SENSOR_GROUP_MIN 1000  // Sensor group with min value
+SENSOR_GROUP_MAX 1001  // Sensor group with max value
+SENSOR_GROUP_AVG 1002  // Sensor group with avg value
+SENSOR_GROUP_SUM 1003  // Sensor group with sum value
+
+//Diagnostic
+SENSOR_FREE_MEMORY 10000 //Free memory
+SENSOR_FREE_STORE 10001 //Free storage
 List Sensors (sl):
 lists the current sensors
 examples:
@@ -94,6 +117,18 @@ Clear Sensor Log (sn):
 clears the sensor log
 examples:
 http://<ip>/sn?pw=<pw>
+http://<ip>/sn?pw=<pw>&log=1
+
+Parameters:
+log=[1|2|3]: 0=Std log, 1=Week log, 2=Month log
+nr=n: Sensor-nr
+under=v: delete only records with values under v
+over=v: delete only records with values over v
+before=t: delete only records with timestamp before t
+after=t: delete only records with timestamp after t
+  v is a float value with point as decimal separator
+  t is a long integer value with an unix timestamp, use this to decode:
+  https://www.epochconverter.com/
 
 Program adjustments (sb):
 defines program adjustments
@@ -106,12 +141,12 @@ examples:
 http://<ip>/sb?pw=<pw>&nr=1&type=1&sensor=4&prog=1&factor1=0&factor2=2&min=0&max=50
 
 type:
-#define PROG_DELETE      	0 //deleted
-#define PROG_LINEAR      	1 //formula see above
-#define PROG_DIGITAL_MIN 	2 //under or equal min : factor1 else factor2
-#define PROG_DIGITAL_MAX 	3 //over or equal max  : factor2 else factor1
-#define PROG_DIGITAL_MINMAX 4 //under min or over max : factor1 else factor2
-#define PROG_NONE        	99 //No adjustment
+PROG_DELETE      	0 //deleted
+PROG_LINEAR      	1 //formula see above
+PROG_DIGITAL_MIN 	2 //under or equal min : factor1 else factor2
+PROG_DIGITAL_MAX 	3 //over or equal max  : factor2 else factor1
+PROG_DIGITAL_MINMAX 4 //under min or over max : factor1 else factor2
+PROG_NONE        	99 //No adjustment
 
 formula:
    min max  factor1 factor2
