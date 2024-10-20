@@ -60,7 +60,7 @@ static boolean apiInit = false;
 static Sensor_t *current_sensor = NULL;
 
 // Boards:
-static unsigned char asb_detected_boards = 0;  // bit 1=0x48+0x49 bit 2=0x4A+0x4B
+static uint16_t asb_detected_boards = 0;  // bit 1=0x48+0x49 bit 2=0x4A+0x4B usw
 
 // Sensor URLS:
 static SensorUrl_t *sensorUrls = NULL;
