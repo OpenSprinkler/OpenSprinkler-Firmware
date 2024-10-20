@@ -68,6 +68,9 @@ static SensorUrl_t *sensorUrls = NULL;
 // Program sensor data
 static ProgSensorAdjust_t *progSensorAdjusts = NULL;
 
+// Monitor data
+static Monitor_t *monitors = NULL;
+
 // modbus transaction id
 static uint16_t modbusTcpId = 0;
 #ifdef ESP8266
@@ -181,6 +184,7 @@ void sensor_api_init(boolean detect_boards) {
   sensor_load();
   prog_adjust_load();
   sensor_mqtt_init();
+  monitor_load();
 #ifndef ESP8266
   //Read rs485 file. Details see below
   std::ifstream file;
@@ -226,6 +230,7 @@ void sensor_save_all() {
   sensor_save();
   prog_adjust_save();
   SensorUrl_save();
+  monitor_save();
 #ifndef ESP8266
   for (int i = 0; i < MAX_RS485_DEVICES; i++) {
     if (ttyDevices[i]) {
@@ -257,6 +262,12 @@ void sensor_api_free() {
     free(sensorUrls->urlstr);
     delete sensorUrls;
     sensorUrls = next;
+  }
+
+  while (monitors) {
+    Monitor_t* next = monitors->next;
+    delete monitors;
+    monitors = next;
   }
 
   while (sensors) {
@@ -989,6 +1000,7 @@ void read_all_sensors(boolean online) {
       if (online || (current_sensor->ip == 0 && current_sensor->type != SENSOR_MQTT)) {
         int result = read_sensor(current_sensor, time);
         if (result == HTTP_RQT_SUCCESS) {
+          check_monitors();
           sensorlog_add(LOG_STD, current_sensor, time);
           push_message(current_sensor);
         } else if (result == HTTP_RQT_TIMEOUT) {
@@ -2019,7 +2031,7 @@ double calc_sensor_watering_by_nr(uint nr) {
 }
 
 int prog_adjust_define(uint nr, uint type, uint sensor, uint prog,
-                       double factor1, double factor2, double min, double max) {
+                       double factor1, double factor2, double min, double max, char * name) {
   ProgSensorAdjust_t *p = progSensorAdjusts;
 
   ProgSensorAdjust_t *last = NULL;
@@ -2033,6 +2045,7 @@ int prog_adjust_define(uint nr, uint type, uint sensor, uint prog,
       p->factor2 = factor2;
       p->min = min;
       p->max = max;
+      strncpy(p->name, name, sizeof(p->name));
       prog_adjust_save();
       return HTTP_RQT_SUCCESS;
     }
@@ -2052,6 +2065,7 @@ int prog_adjust_define(uint nr, uint type, uint sensor, uint prog,
   p->factor2 = factor2;
   p->min = min;
   p->max = max;
+  strncpy(p->name, name, sizeof(p->name));
   if (last) {
     p->next = last->next;
     last->next = p;
@@ -2627,4 +2641,231 @@ influxdb_cpp::builder()
     .post_http(*client);
 
   #endif
+}
+
+
+//Value Monitoring
+void monitor_load() {
+  DEBUG_PRINTLN(F("monitor_load"));
+  monitors = NULL;
+  if (!file_exists(MONITOR_FILENAME)) return;
+
+  ulong pos = 0;
+  Monitor_t *last = NULL;
+  while (true) {
+    Monitor_t *mon = new Monitor_t;
+    memset(mon, 0, sizeof(Monitor_t));
+    file_read_block(MONITOR_FILENAME, mon, pos, MONITOR_STORE_SIZE);
+    if (!mon->nr || !mon->type) {
+      delete mon;
+      break;
+    }
+    mon->active = false;
+    if (!last)
+      monitors = mon;
+    else
+      last->next = mon;
+    last = mon;
+    mon->next = NULL;
+    pos += MONITOR_STORE_SIZE;
+  }
+}
+
+void monitor_save() {
+  if (!apiInit) return;
+  if (file_exists(MONITOR_FILENAME)) remove_file(MONITOR_FILENAME);
+
+  ulong pos = 0;
+  Monitor_t *mon = monitors;
+  while (mon) {
+    file_write_block(MONITOR_FILENAME, mon, pos, MONITOR_STORE_SIZE);
+    mon = mon->next;
+    pos += MONITOR_STORE_SIZE;
+  }
+}
+
+int monitor_count() {
+  int count = 0;
+  Monitor_t *mon = monitors;
+  while (mon) {
+    mon = mon->next;
+    count++;
+  }
+  return count;
+}
+
+int monitor_delete(uint nr) {
+  Monitor_t *p = monitors;
+
+  Monitor_t *last = NULL;
+
+  while (p) {
+    if (p->nr == nr) {
+      if (last)
+        last->next = p->next;
+      else
+        monitors = p->next;
+      delete p;
+      monitor_save();
+      return HTTP_RQT_SUCCESS;
+    }
+    last = p;
+    p = p->next;
+  }
+  return HTTP_RQT_NOT_RECEIVED;
+}
+
+bool monitor_define(uint nr, uint type, uint sensor, uint prog, uint zone, 
+  double value1, double value2, char * name, ulong maxRuntime) {
+  Monitor_t *p = monitors;
+
+  Monitor_t *last = NULL;
+
+  while (p) {
+    if (p->nr == nr) {
+      p->type = type;
+      p->sensor = sensor;
+      p->prog = prog;
+      p->zone = zone;
+      p->value1 = value1;
+      p->value2 = value2;
+      p->active = false;
+      p->maxRuntime = maxRuntime;
+      strncpy(p->name, name, sizeof(p->name));
+      monitor_save();
+      check_monitors();
+      return HTTP_RQT_SUCCESS;
+    }
+
+    if (p->nr > nr) break;
+
+    last = p;
+    p = p->next;
+  }
+
+  p = new Monitor_t;
+  p->nr = nr;
+  p->type = type;
+  p->sensor = sensor;
+  p->zone = zone;
+  p->prog = prog;
+  p->value1 = value1;
+  p->value2 = value2;
+  p->active = false;
+  p->maxRuntime = maxRuntime;
+  strncpy(p->name, name, sizeof(p->name));
+  if (last) {
+    p->next = last->next;
+    last->next = p;
+  } else {
+    p->next = monitors;
+    monitors = p;
+  }
+
+  monitor_save();
+  check_monitors();
+  return HTTP_RQT_SUCCESS;
+}
+
+Monitor_t *monitor_by_nr(uint nr) {
+  Monitor_t *mon = monitors;
+  while (mon) {
+    if (mon->nr == nr) return mon;
+    mon = mon->next;
+  }
+  return NULL;
+}
+
+Monitor_t *monitor_by_idx(uint idx) {
+  Monitor_t *mon = monitors;
+  uint idxCounter = 0;
+  while (mon) {
+    if (idxCounter++ == idx) return mon;
+    mon = mon->next;
+  }
+  return NULL;
+}
+
+void manual_start_program(unsigned char, unsigned char);
+void schedule_all_stations(time_os_t curr_time);
+void turn_off_station(unsigned char sid, time_os_t curr_time, unsigned char shift=0);
+
+
+void start_monitor_action(Monitor_t * mon) {
+  mon->time = os.now_tz();
+  if (mon->prog > 0)
+    manual_start_program(mon->prog, 255);
+
+  if (mon->zone > 0) {
+    uint sid = mon->zone-1;
+    uint16_t timer=mon->maxRuntime;
+    RuntimeQueueStruct *q = NULL;
+		unsigned char sqi = pd.station_qid[sid];
+		// check if the station already has a schedule
+		if (sqi!=0xFF) {  // if so, we will overwrite the schedule
+			q = pd.queue+sqi;
+		} else {  // otherwise create a new queue element
+			q = pd.enqueue();
+		}
+		// if the queue is not full
+		if (q) {
+			q->st = 0;
+			q->dur = timer;
+			q->sid = sid;
+			q->pid = 253;
+			schedule_all_stations(mon->time);
+		} 
+  }
+}
+
+void stop_monitor_action(Monitor_t * mon) {
+  mon->time = os.now_tz();
+  if (mon->zone > 0) {
+    int sid = mon->zone-1;
+    RuntimeQueueStruct *q = pd.queue + pd.station_qid[sid];
+		q->deque_time = mon->time;
+		turn_off_station(sid, mon->time);
+  }
+}
+
+void check_monitors() {
+  Monitor_t *mon = monitors;
+  while (mon) {
+    Sensor_t * sensor = sensor_by_nr(mon->sensor);
+    if (sensor && sensor->flags.data_ok) {
+      double value = sensor->last_data;
+      if (!mon->active) { //Check for start monitor actions:
+        switch(mon->type) {
+          case MONITOR_MIN: 
+            if (value <= mon->value1) {
+              mon->active = true;
+              start_monitor_action(mon);
+            }
+            break;
+          case MONITOR_MAX:
+            if (value >= mon->value1) {
+              mon->active = true;
+              start_monitor_action(mon);
+            }
+            break;
+        }
+      } else { //mon->active, check for stop monitor actions:
+        switch(mon->type) {
+          case MONITOR_MIN: 
+            if (value >= mon->value2) {
+              mon->active = false;
+              stop_monitor_action(mon);
+            }
+            break;
+          case MONITOR_MAX:
+            if (value <= mon->value2) {
+              mon->active = false;
+              stop_monitor_action(mon);
+            }
+            break;
+        }
+      }
+    }
+    mon = mon->next;
+  }
 }

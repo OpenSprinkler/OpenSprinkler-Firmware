@@ -27,6 +27,9 @@
 #if !defined(ARDUINO)
 #include <stdarg.h>
 #include <unistd.h>
+#include <cmath>
+#else
+#include <math.h>
 #endif
 
 #if defined(ESP8266) || defined(OSPI)

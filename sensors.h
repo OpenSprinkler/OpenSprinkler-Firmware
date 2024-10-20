@@ -40,14 +40,15 @@ extern "C" {
 #if defined(ESP8266)
 #include <ADS1X15.h>
 #endif
+#include "program.h"
 
 // Files
 #define SENSOR_FILENAME "sensor.dat"      // analog sensor filename
 #define SENSOR_FILENAME_BAK "sensor.bak"  // analog sensor filename backup
-#define PROG_SENSOR_FILENAME \
-  "progsensor.dat"  // sensor to program assign filename
+#define PROG_SENSOR_FILENAME "progsensor.dat"  // sensor to program assign filename
 #define SENSORLOG_FILENAME1 "sensorlog.dat"   // analog sensor log filename
 #define SENSORLOG_FILENAME2 "sensorlog2.dat"  // analog sensor log filename2
+#define MONITOR_FILENAME "monitors.dat"
 
 #define SENSORLOG_FILENAME_WEEK1 \
   "sensorlogW1.dat"  // analog sensor log filename for  week average
@@ -221,7 +222,8 @@ typedef struct ProgSensorAdjust {
   double factor2;
   double min;
   double max;
-  unsigned char undef[32];  // for later
+  char name[20];
+  unsigned char undef[12];  // for later
   ProgSensorAdjust *next;
 } ProgSensorAdjust_t;
 #define PROGSENSOR_STORE_SIZE \
@@ -240,6 +242,27 @@ typedef struct SensorUrl {
 } SensorUrl_t;
 #define SENSORURL_STORE_SIZE \
   (sizeof(SensorUrl_t) - sizeof(char *) - sizeof(SensorUrl_t *))
+
+#define MONITOR_DELETE 0
+#define MONITOR_MIN 1
+#define MONITOR_MAX 2
+
+typedef struct Monitor {
+  uint nr;
+  uint type;     // MONITOR_TYPES
+  uint sensor;   // sensor-nr
+  uint prog;     // program-nr=pid
+  uint zone;     // Zone
+  double value1;  // MIN/MAX
+  double value2; // Secondary
+  boolean active;
+  ulong time;
+  char name[20];
+  ulong maxRuntime;
+  unsigned char undef[10];  // for later
+  Monitor *next;
+} Monitor_t;
+#define MONITOR_STORE_SIZE (sizeof(Monitor_t) - sizeof(char *) - sizeof(Monitor_t *))
 
 #define UNIT_NONE 0
 #define UNIT_PERCENT 1
@@ -280,6 +303,7 @@ unsigned char getSensorUnitId(Sensor_t *sensor);
 
 extern char ether_buffer[];
 extern char tmp_buffer[];
+extern ProgramData pd;
 
 // Utils:
 uint16_t CRC16(unsigned char buf[], int len);
@@ -336,7 +360,7 @@ int set_sensor_address(Sensor_t *sensor, uint8_t new_address);
 
 // Calc watering adjustment:
 int prog_adjust_define(uint nr, uint type, uint sensor, uint prog,
-                       double factor1, double factor2, double min, double max);
+                       double factor1, double factor2, double min, double max, char * name);
 int prog_adjust_delete(uint nr);
 void prog_adjust_save();
 void prog_adjust_load();
@@ -359,6 +383,17 @@ bool SensorUrl_add(uint nr, uint type, const char *urlstr);
 char *SensorUrl_get(uint nr, uint type);
 
 void detect_asb_board();
+
+//Value Monitoring
+void monitor_load();
+void monitor_save();
+int monitor_count();
+int monitor_delete(uint nr);
+bool monitor_define(uint nr, uint type, uint sensor, uint prog, uint zone, 
+  double value1, double value2, char * name, ulong maxRuntime);
+Monitor_t * monitor_by_nr(uint nr);
+Monitor_t * monitor_by_idx(uint idx);
+void check_monitors();
 
 #if defined(ESP8266)
 ulong diskFree();

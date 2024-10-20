@@ -2903,6 +2903,179 @@ void server_sensorlog_clear(OTF_PARAMS_DEF) {
 }
 
 /**
+ * mt
+ * supported monitor types
+ */
+void server_monitor_types(OTF_PARAMS_DEF) {
+#if defined(USE_OTF)
+	if(!process_password(OTF_PARAMS)) return;
+#else
+	char *p = get_buffer;
+#endif
+
+	DEBUG_PRINTLN(F("server_monitor_types"));
+
+#if defined(USE_OTF)
+	// as the log data can be large, we will use ESP8266's sendContent function to
+	// send multiple packets of data, instead of the standard way of using send().
+	rewind_ether_buffer();
+	print_header(OTF_PARAMS);
+#else
+	print_header();
+#endif
+
+	bfill.emit_p(PSTR("{\"monitortypes\": ["));
+	bfill.emit_p(PSTR("{\"name\":\"Min\",\"type\":$D},"), MONITOR_MIN);
+	bfill.emit_p(PSTR("{\"name\":\"Max\",\"type\":$D}]}"), MONITOR_MAX);
+	handle_return(HTML_OK);
+}
+
+/**
+ * mc
+ * define a monitor
+ */
+void server_monitor_config(OTF_PARAMS_DEF) {
+#if defined(USE_OTF)
+	if(!process_password(OTF_PARAMS)) return;
+#else
+	char *p = get_buffer;
+#endif
+
+	DEBUG_PRINTLN(F("server_monitor_config"));
+
+	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("nr"), true))
+		handle_return(HTML_DATA_MISSING);
+	uint nr = strtoul(tmp_buffer, NULL, 0); // Adjustment nr
+	if (nr == 0)
+		handle_return(HTML_DATA_MISSING);
+
+	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("type"), true))
+		handle_return(HTML_DATA_MISSING);
+	uint type = strtoul(tmp_buffer, NULL, 0); // Adjustment type
+
+	if (type == 0) {
+		monitor_delete(nr);
+		handle_return(HTML_SUCCESS);
+	}
+
+	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("sensor"), true))
+		handle_return(HTML_DATA_MISSING);
+	uint sensor = strtoul(tmp_buffer, NULL, 0); // Sensor nr
+
+	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("prog"), true))
+		handle_return(HTML_DATA_MISSING);
+	uint prog = strtoul(tmp_buffer, NULL, 0); // Program nr
+
+	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("zone"), true))
+		handle_return(HTML_DATA_MISSING);
+	uint zone = strtoul(tmp_buffer, NULL, 0); // Zone
+
+	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("value1"), true))
+		handle_return(HTML_DATA_MISSING);
+	double value1 = atof(tmp_buffer); // Value 1
+
+	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("value2"), true))
+		handle_return(HTML_DATA_MISSING);
+	double value2 = atof(tmp_buffer); // Value 2
+
+	char name[20] = {0};
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("name"), true))
+		strncpy(name, tmp_buffer, sizeof(name));
+
+	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("maxrun"), true))
+		handle_return(HTML_DATA_MISSING);
+	ulong maxRuntime = strtoul(tmp_buffer, NULL, 0); // Zone
+
+	int ret = monitor_define(nr, type, sensor, prog, zone, value1, value2, name, maxRuntime);
+	ret = ret >= HTTP_RQT_SUCCESS?HTML_SUCCESS:HTML_DATA_MISSING;
+	handle_return(ret);
+}
+
+void monitorconfig_json(Monitor_t *mon) {
+	bfill.emit_p(PSTR("{\"nr\":$D,\"type\":$D,\"sensor\":$D,\"prog\":$D,\"zone\":$D,\"value1\":$E,\"value2\":$E,\"name\":\"$S\",\"maxrun\":$L,\"active\":$D}"),
+		mon->nr,
+		mon->type,
+		mon->sensor,
+		mon->prog,
+		mon->zone,
+		isnan(mon->value1)?0:mon->value1,
+		isnan(mon->value2)?0:mon->value2,
+		mon->name,
+		mon->maxRuntime,
+		mon->active);
+}
+
+void monitorconfig_json() {
+	uint count = monitor_count();
+	for (uint i = 0; i < count; i++) {
+		Monitor_t *mon = monitor_by_idx(i);
+		if (i > 0) bfill.emit_p(PSTR(","));
+		monitorconfig_json(mon);
+	}
+}
+
+/**
+ * ml
+ * list monitors
+ */
+void server_monitor_list(OTF_PARAMS_DEF) {
+#if defined(USE_OTF)
+	if(!process_password(OTF_PARAMS)) return;
+#else
+	char *p = get_buffer;
+#endif
+
+	DEBUG_PRINTLN(F("server_monitor_list"));
+
+	uint nr = 0;
+	int prog = -1;
+	uint sensor_nr = 0;
+
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("nr"), true))
+		nr = strtoul(tmp_buffer, NULL, 0);
+
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("prog"), true))
+		prog = strtoul(tmp_buffer, NULL, 0);
+
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("sensor"), true))
+		 sensor_nr = strtoul(tmp_buffer, NULL, 0);
+
+#if defined(USE_OTF)
+	// as the log data can be large, we will use ESP8266's sendContent function to
+	// send multiple packets of data, instead of the standard way of using send().
+	rewind_ether_buffer();
+	print_header(OTF_PARAMS);
+#else
+	print_header();
+#endif
+
+	bfill.emit_p(PSTR("{\"monitors\": ["));
+	uint8_t idx = 0;
+	uint8_t count = monitor_count();
+	bool first = true;
+
+	while (idx < count) {
+		Monitor_t *mon = monitor_by_idx(idx++);
+		if (nr > 0 && mon->nr != nr)
+			continue;
+		if (prog >= 0 && mon->prog != (uint)prog)
+			continue;
+		if (sensor_nr > 0 && mon->sensor != sensor_nr)
+			continue;
+
+		if (!first)
+			bfill.emit_p(PSTR(","));
+		first = false;
+		monitorconfig_json(mon);
+		send_packet(OTF_PARAMS);
+	}
+	bfill.emit_p(PSTR("]}"));
+	handle_return(HTML_OK);
+}
+
+
+
+/**
  * sb
  * define a program adjustment
 */
@@ -2955,13 +3128,17 @@ void server_sensorprog_config(OTF_PARAMS_DEF) {
 		handle_return(HTML_DATA_MISSING);
 	double max = atof(tmp_buffer); // Max value
 
-	int ret = prog_adjust_define(nr, type, sensor, prog, factor1, factor2, min, max);
+	char name[20] = {0};
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("name"), true))
+		strncpy(name, tmp_buffer, sizeof(name));
+
+	int ret = prog_adjust_define(nr, type, sensor, prog, factor1, factor2, min, max, name);
 	ret = ret >= HTTP_RQT_SUCCESS?HTML_SUCCESS:HTML_DATA_MISSING;
 	handle_return(ret);
 }
 
 void progconfig_json(ProgSensorAdjust_t *p, double current) {
-	bfill.emit_p(PSTR("{\"nr\":$D,\"type\":$D,\"sensor\":$D,\"prog\":$D,\"factor1\":$E,\"factor2\":$E,\"min\":$E,\"max\":$E, \"current\":$E}"),
+	bfill.emit_p(PSTR("{\"nr\":$D,\"type\":$D,\"sensor\":$D,\"prog\":$D,\"factor1\":$E,\"factor2\":$E,\"min\":$E,\"max\":$E,\"name\":\"$S\",\"current\":$E}"),
 		p->nr,
 		p->type,
 		p->sensor,
@@ -2970,6 +3147,7 @@ void progconfig_json(ProgSensorAdjust_t *p, double current) {
 		p->factor2,
 		p->min,
 		p->max,
+		(p->name[0] < 0x20 || p->name[0] > 0xEE || p->name[0] == 0x90) ? "" : p->name,
 		current);
 }
 
@@ -3450,9 +3628,10 @@ void server_sensorconfig_backup(OTF_PARAMS_DEF) {
 
 #define BACKUP_SENSORS 1
 #define BACKUP_ADJUSTMENTS 2
+#define BACKUP_MONITORS 4
 
 	//Backup type: 0=no backup 1=Sensors 2=Adjustments 3=Sensors+Adjustments
-	int backup = BACKUP_SENSORS|BACKUP_ADJUSTMENTS;
+	int backup = BACKUP_SENSORS|BACKUP_ADJUSTMENTS|BACKUP_MONITORS;
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("backup"), true)) {
 		backup = strtol(tmp_buffer, NULL, 0); 
 	}
@@ -3473,11 +3652,18 @@ void server_sensorconfig_backup(OTF_PARAMS_DEF) {
 		bfill.emit_p(PSTR(",\"sensors\":["));
 		sensorconfig_json(OTF_PARAMS);
 		bfill.emit_p(PSTR("]"));
+		send_packet(OTF_PARAMS);
 	}
-	send_packet(OTF_PARAMS);
 	if (backup & BACKUP_ADJUSTMENTS)  {
 		bfill.emit_p(PSTR(",\"progadjust\":["));
 		progconfig_json();
+		bfill.emit_p(PSTR("]"));
+		send_packet(OTF_PARAMS);
+	}
+	send_packet(OTF_PARAMS);
+	if (backup & BACKUP_SENSORS)  {
+		bfill.emit_p(PSTR(",\"monitors\":["));
+		monitorconfig_json();
 		bfill.emit_p(PSTR("]"));
 	}
 	bfill.emit_p(PSTR("}"));
@@ -3634,6 +3820,9 @@ const char _url_keys[] PROGMEM =
     "db"
 	"is"
 	"ig"
+	"mc"
+	"ml"
+	"mt"
 #if defined(ARDUINO)
 	//"ff"
 #endif
@@ -3681,8 +3870,11 @@ URLHandler urls[] = {
 	server_sensorprog_types,//sh
 	server_sensorconfig_backup,//sx
 	server_json_debug,      // db
-	server_influx_set,
-	server_influx_get,
+	server_influx_set,// is
+	server_influx_get,// ig
+	server_monitor_config, // mc
+	server_monitor_list, // ml
+	server_monitor_types, // mt
 	//server_fill_files,
 };
 

@@ -1429,7 +1429,8 @@ void reset_all_stations() {
  */
 void manual_start_program(unsigned char pid, unsigned char uwt) {
 	boolean match_found = false;
-	reset_all_stations_immediate();
+	if (uwt != 255)
+		reset_all_stations_immediate();
 	ProgramStruct prog;
 	ulong dur;
 	unsigned char sid, bid, s;
