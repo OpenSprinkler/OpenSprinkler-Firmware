@@ -173,7 +173,7 @@ void detect_asb_board() {
   }
 }
 
-unsigned char get_asb_detected_boards() { return asb_detected_boards; }
+uint16_t get_asb_detected_boards() { return asb_detected_boards; }
 /*
  * init sensor api and load data
  */

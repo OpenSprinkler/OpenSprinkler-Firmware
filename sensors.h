@@ -291,7 +291,7 @@ typedef struct Monitor {
 #define RS485_TRUEBNER4_ADDR 0x3B
 
 void sensor_api_init(boolean detect_boards);
-unsigned char get_asb_detected_boards();
+uint16_t get_asb_detected_boards();
 void sensor_save_all();
 void sensor_api_free();
 
