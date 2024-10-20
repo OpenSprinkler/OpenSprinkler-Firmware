@@ -2729,7 +2729,7 @@ bool monitor_define(uint nr, uint type, uint sensor, uint prog, uint zone,
       p->zone = zone;
       p->value1 = value1;
       p->value2 = value2;
-      p->active = false;
+      //p->active = false;
       p->maxRuntime = maxRuntime;
       strncpy(p->name, name, sizeof(p->name));
       monitor_save();
