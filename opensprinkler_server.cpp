@@ -2980,19 +2980,23 @@ void server_monitor_config(OTF_PARAMS_DEF) {
 
 	char name[20] = {0};
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("name"), true))
-		strncpy(name, tmp_buffer, sizeof(name));
+		strncpy(name, tmp_buffer, sizeof(name)-1);
 
 	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("maxrun"), true))
 		handle_return(HTML_DATA_MISSING);
 	ulong maxRuntime = strtoul(tmp_buffer, NULL, 0); // Zone
 
-	int ret = monitor_define(nr, type, sensor, prog, zone, value1, value2, name, maxRuntime);
+	uint8_t prio = 0;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("prio"), true))
+		prio = strtoul(tmp_buffer, NULL, 0); // prio
+
+	int ret = monitor_define(nr, type, sensor, prog, zone, value1, value2, name, maxRuntime, prio);
 	ret = ret >= HTTP_RQT_SUCCESS?HTML_SUCCESS:HTML_DATA_MISSING;
 	handle_return(ret);
 }
 
 void monitorconfig_json(Monitor_t *mon) {
-	bfill.emit_p(PSTR("{\"nr\":$D,\"type\":$D,\"sensor\":$D,\"prog\":$D,\"zone\":$D,\"value1\":$E,\"value2\":$E,\"name\":\"$S\",\"maxrun\":$L,\"active\":$D}"),
+	bfill.emit_p(PSTR("{\"nr\":$D,\"type\":$D,\"sensor\":$D,\"prog\":$D,\"zone\":$D,\"value1\":$E,\"value2\":$E,\"name\":\"$S\",\"maxrun\":$L,\"prio\":$D,\"active\":$D}"),
 		mon->nr,
 		mon->type,
 		mon->sensor,
@@ -3002,6 +3006,7 @@ void monitorconfig_json(Monitor_t *mon) {
 		isnan(mon->value2)?0:mon->value2,
 		mon->name,
 		mon->maxRuntime,
+		mon->prio,
 		mon->active);
 }
 
@@ -3130,7 +3135,7 @@ void server_sensorprog_config(OTF_PARAMS_DEF) {
 
 	char name[20] = {0};
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("name"), true))
-		strncpy(name, tmp_buffer, sizeof(name));
+		strncpy(name, tmp_buffer, sizeof(name)-1);
 
 	int ret = prog_adjust_define(nr, type, sensor, prog, factor1, factor2, min, max, name);
 	ret = ret >= HTTP_RQT_SUCCESS?HTML_SUCCESS:HTML_DATA_MISSING;

@@ -24,7 +24,7 @@
 #ifndef _DEFINES_H
 #define _DEFINES_H
 
-//#define ENABLE_DEBUG  // enable serial debug
+#define ENABLE_DEBUG  // enable serial debug
 
 typedef unsigned long ulong;
 
@@ -35,7 +35,7 @@ typedef unsigned long ulong;
 														// if this number is different from the one stored in non-volatile memory
 														// a device reset will be automatically triggered
 
-#define OS_FW_MINOR      168  // Firmware minor version
+#define OS_FW_MINOR      169  // Firmware minor version
 
 /** Hardware version base numbers */
 #define OS_HW_VERSION_BASE   0x00 // OpenSprinkler
@@ -77,6 +77,9 @@ typedef unsigned long ulong;
 #define NOTIFY_RAINDELAY       0x0080
 #define NOTIFY_STATION_ON      0x0100
 #define NOTIFY_FLOW_ALERT      0x0200
+#define NOTIFY_MONITOR_LOW     0x0400
+#define NOTIFY_MONITOR_MID     0x0800
+#define NOTIFY_MONITOR_HIGH    0x1000
 
 /** HTTP request macro defines */
 #define HTTP_RQT_SUCCESS       0

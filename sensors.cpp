@@ -2660,7 +2660,6 @@ void monitor_load() {
       delete mon;
       break;
     }
-    mon->active = false;
     if (!last)
       monitors = mon;
     else
@@ -2716,7 +2715,7 @@ int monitor_delete(uint nr) {
 }
 
 bool monitor_define(uint nr, uint type, uint sensor, uint prog, uint zone, 
-  double value1, double value2, char * name, ulong maxRuntime) {
+  double value1, double value2, char * name, ulong maxRuntime, uint8_t prio) {
   Monitor_t *p = monitors;
 
   Monitor_t *last = NULL;
@@ -2731,6 +2730,7 @@ bool monitor_define(uint nr, uint type, uint sensor, uint prog, uint zone,
       p->value2 = value2;
       //p->active = false;
       p->maxRuntime = maxRuntime;
+      p->prio = prio;
       strncpy(p->name, name, sizeof(p->name));
       monitor_save();
       check_monitors();
@@ -2753,6 +2753,7 @@ bool monitor_define(uint nr, uint type, uint sensor, uint prog, uint zone,
   p->value2 = value2;
   p->active = false;
   p->maxRuntime = maxRuntime;
+  p->prio = prio;
   strncpy(p->name, name, sizeof(p->name));
   if (last) {
     p->next = last->next;
@@ -2789,7 +2790,7 @@ Monitor_t *monitor_by_idx(uint idx) {
 void manual_start_program(unsigned char, unsigned char);
 void schedule_all_stations(time_os_t curr_time);
 void turn_off_station(unsigned char sid, time_os_t curr_time, unsigned char shift=0);
-
+void push_message(uint16_t type, uint32_t lval=0, float fval=0.f, const char* sval=NULL);
 
 void start_monitor_action(Monitor_t * mon) {
   mon->time = os.now_tz();
@@ -2828,9 +2829,21 @@ void stop_monitor_action(Monitor_t * mon) {
   }
 }
 
+void push_message(Monitor_t * mon, float value) {
+  uint16_t type; 
+  switch(mon->prio) {
+    case 0: type = NOTIFY_MONITOR_LOW; break;
+    case 1: type = NOTIFY_MONITOR_MID; break;
+    case 2: type = NOTIFY_MONITOR_HIGH; break;
+    default: return;
+  }
+  push_message(type, (uint32_t)mon->prio, value, mon->name);
+}
+
 void check_monitors() {
   Monitor_t *mon = monitors;
   while (mon) {
+    uint nr = mon->nr;
     Sensor_t * sensor = sensor_by_nr(mon->sensor);
     if (sensor && sensor->flags.data_ok) {
       double value = sensor->last_data;
@@ -2840,12 +2853,16 @@ void check_monitors() {
             if (value <= mon->value1) {
               mon->active = true;
               start_monitor_action(mon);
+              push_message(mon, value);
+              mon = monitor_by_nr(nr); //restart because if send by mail we unloaded+reloaded the monitors
             }
             break;
           case MONITOR_MAX:
             if (value >= mon->value1) {
               mon->active = true;
               start_monitor_action(mon);
+              push_message(mon, value);
+              mon = monitor_by_nr(nr); //restart because if send by mail we unloaded+reloaded the monitors
             }
             break;
         }

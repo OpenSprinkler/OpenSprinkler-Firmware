@@ -259,7 +259,8 @@ typedef struct Monitor {
   ulong time;
   char name[20];
   ulong maxRuntime;
-  unsigned char undef[10];  // for later
+  uint8_t prio;
+  unsigned char undef[9];  // for later
   Monitor *next;
 } Monitor_t;
 #define MONITOR_STORE_SIZE (sizeof(Monitor_t) - sizeof(char *) - sizeof(Monitor_t *))
@@ -390,7 +391,7 @@ void monitor_save();
 int monitor_count();
 int monitor_delete(uint nr);
 bool monitor_define(uint nr, uint type, uint sensor, uint prog, uint zone, 
-  double value1, double value2, char * name, ulong maxRuntime);
+  double value1, double value2, char * name, ulong maxRuntime, uint8_t prio);
 Monitor_t * monitor_by_nr(uint nr);
 Monitor_t * monitor_by_idx(uint idx);
 void check_monitors();

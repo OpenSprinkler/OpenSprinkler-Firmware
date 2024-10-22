@@ -1553,6 +1553,20 @@ void influxdb_send_flowalert(const char *name, uint32_t station, int f1, int f2,
 	data.addField("alert_setpoint", (double)(f4)+(double)(f5)/100);
 	os.influxdb.write_influx_data(data);
 }
+
+void influxdb_send_warning(const char *name, uint32_t level, float value) {
+    if (!os.influxdb.isEnabled()) return;
+    Point data("opensprinkler");
+	char tmp[TMP_BUFFER_SIZE];
+    os.sopt_load(SOPT_DEVICE_NAME, tmp);
+    data.addTag("devicename", tmp);
+	data.addTag("warning", name);
+	data.addField("level", (int)level);
+	data.addField("currentvalue", value);
+	os.influxdb.write_influx_data(data);
+}
+
+
 #else
 void influxdb_send_state(const char *name, int state) {
   if (!os.influxdb.isEnabled()) return;
@@ -1640,6 +1654,24 @@ void influxdb_send_flowalert(const char *name, uint32_t station, int f1, int f2,
     .field("flowrate", (double)(f1)+(double)(f2)/100)
 	.field("duration", f3)
 	.field("alert_setpoint", (double)(f4)+(double)(f5)/100)
+    .timestamp(millis())
+    .post_http(*client);
+}
+
+void influxdb_send_warning(const char *name, uint32_t level, float value) {
+  if (!os.influxdb.isEnabled()) return;
+  influxdb_cpp::server_info * client = os.influxdb.get_client();
+  if (!client)
+    return;
+
+  char tmp[TMP_BUFFER_SIZE];
+  os.sopt_load(SOPT_DEVICE_NAME, tmp);
+  influxdb_cpp::builder()
+    .meas("opensprinkler")
+    .tag("devicename", tmp)
+    .tag("warning", name)
+    .field("level", (int)level)
+    .field("currentvalue", value)
     .timestamp(millis())
     .post_http(*client);
 }
@@ -2038,6 +2070,22 @@ void push_message(uint16_t type, uint32_t lval, float fval, const char* sval) {
 				if(email_enabled) { email_message.subject += PSTR("reboot event"); }
 			}
 			break;
+
+		case NOTIFY_MONITOR_LOW: 
+		case NOTIFY_MONITOR_MID:
+		case NOTIFY_MONITOR_HIGH:
+
+			if (os.mqtt.enabled()) {
+				strcpy_P(topic, PSTR("monitoring"));
+				snprintf_P(payload, PUSH_PAYLOAD_LEN, PSTR("{\"warning\":\"%S\",\"prio\":%u,\"value\":%d.%02d}"), sval, lval, (int)fval, (int)fval*100%100);
+			}
+			if (ifttt_enabled || email_enabled) {
+				snprintf_P(postval, TMP_BUFFER_SIZE, PSTR("monitoring: Warning %S with priority %u current value %d.%02d"), sval, lval, (int)fval, (int)fval*100%100);
+				if(email_enabled) { email_message.subject += PSTR("Warning"); }
+			}
+			influxdb_send_flowsensor(sval, lval, fval);
+			break;
+
 	}
 
 	if (os.mqtt.enabled() && strlen(topic) && strlen(payload))
