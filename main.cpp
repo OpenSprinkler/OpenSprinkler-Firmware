@@ -1890,7 +1890,7 @@ void push_message(uint16_t type, uint32_t lval, float fval, const char* sval) {
 
 			if (os.mqtt.enabled()) {
 				strcpy_P(topic, PSTR("monitoring"));
-				int len = strlen(postval);
+				int len = strlen(payload);
 				snprintf_P(payload+len, PUSH_PAYLOAD_LEN-len, PSTR("{\"warning\":\"%s\",\"prio\":%u,\"value\":%d.%02d}"), sval, lval, (int)fval, (int)fval*100%100);
 			}
 			if (ifttt_enabled || email_enabled) {
@@ -1902,6 +1902,11 @@ void push_message(uint16_t type, uint32_t lval, float fval, const char* sval) {
 
 	}
 
+	DEBUG_PRINT("topic: ");
+	DEBUG_PRINTLN(topic);
+	DEBUG_PRINT("payload: ");
+	DEBUG_PRINTLN(payload);
+	
 	if (os.mqtt.enabled() && strlen(topic) && strlen(payload))
 		os.mqtt.publish(topic, payload);
 
