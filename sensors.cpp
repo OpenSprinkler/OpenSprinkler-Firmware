@@ -2731,7 +2731,7 @@ bool monitor_define(uint nr, uint type, uint sensor, uint prog, uint zone,
       //p->active = false;
       p->maxRuntime = maxRuntime;
       p->prio = prio;
-      strncpy(p->name, name, sizeof(p->name));
+      strncpy(p->name, name, sizeof(p->name)-1);
       monitor_save();
       check_monitors();
       return HTTP_RQT_SUCCESS;
@@ -2754,7 +2754,7 @@ bool monitor_define(uint nr, uint type, uint sensor, uint prog, uint zone,
   p->active = false;
   p->maxRuntime = maxRuntime;
   p->prio = prio;
-  strncpy(p->name, name, sizeof(p->name));
+  strncpy(p->name, name, sizeof(p->name)-1);
   if (last) {
     p->next = last->next;
     last->next = p;
