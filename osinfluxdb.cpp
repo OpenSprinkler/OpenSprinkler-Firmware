@@ -24,8 +24,10 @@
 #include "osinfluxdb.h"
 #include "utils.h"
 #include "defines.h"
+#include "OpenSprinkler.h"
 
 extern char tmp_buffer[TMP_BUFFER_SIZE*2];
+extern OpenSprinkler os;
 
 #define INFLUX_CONFIG_FILE "influx.json"
 
@@ -183,3 +185,236 @@ influxdb_cpp::server_info *OSInfluxDB::get_client() {
 }
 
 #endif
+
+
+#if defined(ESP8266) 
+void OSInfluxDB::influxdb_send_state(const char *name, int state) {
+	char tmp[TMP_BUFFER_SIZE];
+    Point data("opensprinkler");
+    os.sopt_load(SOPT_DEVICE_NAME, tmp);
+    data.addTag("devicename", tmp);
+	data.addTag("name", name);
+	data.addField("state", state);
+	write_influx_data(data);
+}
+
+void OSInfluxDB::influxdb_send_station(const char *name, uint32_t station, int state) {
+    Point data("opensprinkler");
+	char tmp[TMP_BUFFER_SIZE];
+    os.sopt_load(SOPT_DEVICE_NAME, tmp);
+    data.addTag("devicename", tmp);
+	data.addTag("name", name);
+	data.addField("station", station);
+	data.addField("state", state);
+	write_influx_data(data);
+}
+
+void OSInfluxDB::influxdb_send_program(const char *name, uint32_t nr, float level) {
+    Point data("opensprinkler");
+	char tmp[TMP_BUFFER_SIZE];
+    os.sopt_load(SOPT_DEVICE_NAME, tmp);
+    data.addTag("devicename", tmp);
+	data.addTag("name", name);
+	data.addField("program", nr);
+	data.addField("level", level);
+	write_influx_data(data);
+}
+
+void OSInfluxDB::influxdb_send_flowsensor(const char *name, uint32_t count, float volume) {
+    Point data("opensprinkler");
+	char tmp[TMP_BUFFER_SIZE];
+    os.sopt_load(SOPT_DEVICE_NAME, tmp);
+    data.addTag("devicename", tmp);
+	data.addTag("name", name);
+	data.addField("count", count);
+	data.addField("volume", volume);
+	write_influx_data(data);
+}
+
+void OSInfluxDB::influxdb_send_flowalert(const char *name, uint32_t station, int f1, int f2, int f3, int f4, int f5) {
+    Point data("opensprinkler");
+	char tmp[TMP_BUFFER_SIZE];
+    os.sopt_load(SOPT_DEVICE_NAME, tmp);
+    data.addTag("devicename", tmp);
+	data.addTag("name", name);
+	data.addField("station", station);
+	data.addField("flowrate", (double)(f1)+(double)(f2)/100);
+	data.addField("duration", f3);
+	data.addField("alert_setpoint", (double)(f4)+(double)(f5)/100);
+	write_influx_data(data);
+}
+
+void OSInfluxDB::influxdb_send_warning(const char *name, uint32_t level, float value) {
+    Point data("opensprinkler");
+	char tmp[TMP_BUFFER_SIZE];
+    os.sopt_load(SOPT_DEVICE_NAME, tmp);
+    data.addTag("devicename", tmp);
+	data.addTag("warning", name);
+	data.addField("level", (int)level);
+	data.addField("currentvalue", value);
+	write_influx_data(data);
+}
+
+#else
+
+void OSInfluxDB::influxdb_send_state(const char *name, int state) {
+  influxdb_cpp::server_info * client = get_client();
+  if (!client)
+    return;
+  char tmp[TMP_BUFFER_SIZE];
+  os.sopt_load(SOPT_DEVICE_NAME, tmp);
+  influxdb_cpp::builder()
+    .meas("opensprinkler")
+    .tag("devicename", tmp)
+    .tag("name", name)
+    .field("state", state)
+    .timestamp(millis())
+    .post_http(*client);
+}
+
+void OSInfluxDB::influxdb_send_station(const char *name, uint32_t station, int state) {
+  influxdb_cpp::server_info * client = get_client();
+  if (!client)
+    return;
+
+  char tmp[TMP_BUFFER_SIZE];
+  os.sopt_load(SOPT_DEVICE_NAME, tmp);
+  influxdb_cpp::builder()
+    .meas("opensprinkler")
+    .tag("devicename", tmp)
+    .tag("name", name)
+    .field("station", (int)station)
+    .field("state", state)
+    .timestamp(millis())
+    .post_http(*client);
+}
+
+void OSInfluxDB::influxdb_send_program(const char *name, uint32_t nr, float level) {
+  influxdb_cpp::server_info * client = get_client();
+  if (!client)
+    return;
+
+  char tmp[TMP_BUFFER_SIZE];
+  os.sopt_load(SOPT_DEVICE_NAME, tmp);
+  influxdb_cpp::builder()
+    .meas("opensprinkler")
+    .tag("devicename", tmp)
+    .tag("name", name)
+    .field("program", (int)nr)
+    .field("level", level)
+    .timestamp(millis())
+    .post_http(*client);
+}
+
+void OSInfluxDB::influxdb_send_flowsensor(const char *name, uint32_t count, float volume) {
+  influxdb_cpp::server_info * client = get_client();
+  if (!client)
+    return;
+
+  char tmp[TMP_BUFFER_SIZE];
+  os.sopt_load(SOPT_DEVICE_NAME, tmp);
+  influxdb_cpp::builder()
+    .meas("opensprinkler")
+    .tag("devicename", tmp)
+    .tag("name", name)
+    .field("count", (int)count)
+    .field("volume", volume)
+    .timestamp(millis())
+    .post_http(*client);
+}
+
+void OSInfluxDB::influxdb_send_flowalert(const char *name, uint32_t station, int f1, int f2, int f3, int f4, int f5) {
+  influxdb_cpp::server_info * client = get_client();
+  if (!client)
+    return;
+
+  char tmp[TMP_BUFFER_SIZE];
+  os.sopt_load(SOPT_DEVICE_NAME, tmp);
+  influxdb_cpp::builder()
+    .meas("opensprinkler")
+    .tag("devicename", tmp)
+    .tag("name", name)
+    .field("station", (int)(station))
+    .field("flowrate", (double)(f1)+(double)(f2)/100)
+	.field("duration", f3)
+	.field("alert_setpoint", (double)(f4)+(double)(f5)/100)
+    .timestamp(millis())
+    .post_http(*client);
+}
+
+void OSInfluxDB::influxdb_send_warning(const char *name, uint32_t level, float value) {
+  influxdb_cpp::server_info * client = get_client();
+  if (!client)
+    return;
+
+  char tmp[TMP_BUFFER_SIZE];
+  os.sopt_load(SOPT_DEVICE_NAME, tmp);
+  influxdb_cpp::builder()
+    .meas("opensprinkler")
+    .tag("devicename", tmp)
+    .tag("warning", name)
+    .field("level", (int)level)
+    .field("currentvalue", value)
+    .timestamp(millis())
+    .post_http(*client);
+}
+#endif
+
+void OSInfluxDB::push_message(uint16_t type, uint32_t lval, float fval, const char* sval) {
+    if (!isEnabled())
+        return;
+
+    uint32_t volume;
+
+   	switch(type) {
+		case  NOTIFY_STATION_ON:
+			influxdb_send_station("station", lval, 1);
+			break;
+
+		case NOTIFY_FLOW_ALERT:{
+			//influxdb_send_flowalert("flowalert", lval, f1, f2, f3, f4, f5);
+			break;
+		}
+
+		case NOTIFY_STATION_OFF:
+			influxdb_send_station("station", lval, 0);
+			break;
+
+		case NOTIFY_PROGRAM_SCHED:
+			influxdb_send_program("program sched", lval, fval);
+			break;
+
+		case NOTIFY_SENSOR1:
+			influxdb_send_state("sensor1", (int)fval);
+			break;
+
+		case NOTIFY_SENSOR2:
+			influxdb_send_state("sensor2", (int)fval);
+			break;
+
+		case NOTIFY_RAINDELAY:
+			influxdb_send_state("raindelay", (int)fval);
+			break;
+
+		case NOTIFY_FLOWSENSOR:
+			volume = os.iopts[IOPT_PULSE_RATE_1];
+			volume = (volume<<8)+os.iopts[IOPT_PULSE_RATE_0];
+			volume = lval*volume;
+			influxdb_send_flowsensor("flowsensor", lval, (float)volume/100);
+			break;
+
+		case NOTIFY_WEATHER_UPDATE:
+			influxdb_send_state("waterlevel", (int)fval);
+			break;
+
+		case NOTIFY_REBOOT:
+			break;
+
+		case NOTIFY_MONITOR_LOW: 
+		case NOTIFY_MONITOR_MID:
+		case NOTIFY_MONITOR_HIGH:
+			influxdb_send_flowsensor(sval, lval, fval);
+			break;
+
+	}
+}

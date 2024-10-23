@@ -1492,194 +1492,14 @@ void ip2string(char* str, size_t str_len, unsigned char ip[4]) {
 #define PUSH_TOPIC_LEN	120
 #define PUSH_PAYLOAD_LEN TMP_BUFFER_SIZE
 
-#if defined(ESP8266) 
-void influxdb_send_state(const char *name, int state) {
-    if (!os.influxdb.isEnabled()) return;
-	char tmp[TMP_BUFFER_SIZE];
-    Point data("opensprinkler");
-    os.sopt_load(SOPT_DEVICE_NAME, tmp);
-    data.addTag("devicename", tmp);
-	data.addTag("name", name);
-	data.addField("state", state);
-	os.influxdb.write_influx_data(data);
-}
-
-void influxdb_send_station(const char *name, uint32_t station, int state) {
-    if (!os.influxdb.isEnabled()) return;
-    Point data("opensprinkler");
-	char tmp[TMP_BUFFER_SIZE];
-    os.sopt_load(SOPT_DEVICE_NAME, tmp);
-    data.addTag("devicename", tmp);
-	data.addTag("name", name);
-	data.addField("station", station);
-	data.addField("state", state);
-	os.influxdb.write_influx_data(data);
-}
-
-void influxdb_send_program(const char *name, uint32_t nr, float level) {
-    if (!os.influxdb.isEnabled()) return;
-    Point data("opensprinkler");
-	char tmp[TMP_BUFFER_SIZE];
-    os.sopt_load(SOPT_DEVICE_NAME, tmp);
-    data.addTag("devicename", tmp);
-	data.addTag("name", name);
-	data.addField("program", nr);
-	data.addField("level", level);
-	os.influxdb.write_influx_data(data);
-}
-
-void influxdb_send_flowsensor(const char *name, uint32_t count, float volume) {
-    if (!os.influxdb.isEnabled()) return;
-    Point data("opensprinkler");
-	char tmp[TMP_BUFFER_SIZE];
-    os.sopt_load(SOPT_DEVICE_NAME, tmp);
-    data.addTag("devicename", tmp);
-	data.addTag("name", name);
-	data.addField("count", count);
-	data.addField("volume", volume);
-	os.influxdb.write_influx_data(data);
-}
-
-void influxdb_send_flowalert(const char *name, uint32_t station, int f1, int f2, int f3, int f4, int f5) {
-    if (!os.influxdb.isEnabled()) return;
-    Point data("opensprinkler");
-	char tmp[TMP_BUFFER_SIZE];
-    os.sopt_load(SOPT_DEVICE_NAME, tmp);
-    data.addTag("devicename", tmp);
-	data.addTag("name", name);
-	data.addField("station", station);
-	data.addField("flowrate", (double)(f1)+(double)(f2)/100);
-	data.addField("duration", f3);
-	data.addField("alert_setpoint", (double)(f4)+(double)(f5)/100);
-	os.influxdb.write_influx_data(data);
-}
-
-void influxdb_send_warning(const char *name, uint32_t level, float value) {
-    if (!os.influxdb.isEnabled()) return;
-    Point data("opensprinkler");
-	char tmp[TMP_BUFFER_SIZE];
-    os.sopt_load(SOPT_DEVICE_NAME, tmp);
-    data.addTag("devicename", tmp);
-	data.addTag("warning", name);
-	data.addField("level", (int)level);
-	data.addField("currentvalue", value);
-	os.influxdb.write_influx_data(data);
-}
-
-
-#else
-void influxdb_send_state(const char *name, int state) {
-  if (!os.influxdb.isEnabled()) return;
-  influxdb_cpp::server_info * client = os.influxdb.get_client();
-  if (!client)
-    return;
-  char tmp[TMP_BUFFER_SIZE];
-  os.sopt_load(SOPT_DEVICE_NAME, tmp);
-  influxdb_cpp::builder()
-    .meas("opensprinkler")
-    .tag("devicename", tmp)
-    .tag("name", name)
-    .field("state", state)
-    .timestamp(millis())
-    .post_http(*client);
-}
-
-void influxdb_send_station(const char *name, uint32_t station, int state) {
-  if (!os.influxdb.isEnabled()) return;
-  influxdb_cpp::server_info * client = os.influxdb.get_client();
-  if (!client)
-    return;
-
-  char tmp[TMP_BUFFER_SIZE];
-  os.sopt_load(SOPT_DEVICE_NAME, tmp);
-  influxdb_cpp::builder()
-    .meas("opensprinkler")
-    .tag("devicename", tmp)
-    .tag("name", name)
-    .field("station", (int)station)
-    .field("state", state)
-    .timestamp(millis())
-    .post_http(*client);
-}
-
-void influxdb_send_program(const char *name, uint32_t nr, float level) {
-  if (!os.influxdb.isEnabled()) return;
-  influxdb_cpp::server_info * client = os.influxdb.get_client();
-  if (!client)
-    return;
-
-  char tmp[TMP_BUFFER_SIZE];
-  os.sopt_load(SOPT_DEVICE_NAME, tmp);
-  influxdb_cpp::builder()
-    .meas("opensprinkler")
-    .tag("devicename", tmp)
-    .tag("name", name)
-    .field("program", (int)nr)
-    .field("level", level)
-    .timestamp(millis())
-    .post_http(*client);
-}
-
-void influxdb_send_flowsensor(const char *name, uint32_t count, float volume) {
-  if (!os.influxdb.isEnabled()) return;
-  influxdb_cpp::server_info * client = os.influxdb.get_client();
-  if (!client)
-    return;
-
-  char tmp[TMP_BUFFER_SIZE];
-  os.sopt_load(SOPT_DEVICE_NAME, tmp);
-  influxdb_cpp::builder()
-    .meas("opensprinkler")
-    .tag("devicename", tmp)
-    .tag("name", name)
-    .field("count", (int)count)
-    .field("volume", volume)
-    .timestamp(millis())
-    .post_http(*client);
-}
-
-void influxdb_send_flowalert(const char *name, uint32_t station, int f1, int f2, int f3, int f4, int f5) {
-  if (!os.influxdb.isEnabled()) return;
-  influxdb_cpp::server_info * client = os.influxdb.get_client();
-  if (!client)
-    return;
-
-  char tmp[TMP_BUFFER_SIZE];
-  os.sopt_load(SOPT_DEVICE_NAME, tmp);
-  influxdb_cpp::builder()
-    .meas("opensprinkler")
-    .tag("devicename", tmp)
-    .tag("name", name)
-    .field("station", (int)(station))
-    .field("flowrate", (double)(f1)+(double)(f2)/100)
-	.field("duration", f3)
-	.field("alert_setpoint", (double)(f4)+(double)(f5)/100)
-    .timestamp(millis())
-    .post_http(*client);
-}
-
-void influxdb_send_warning(const char *name, uint32_t level, float value) {
-  if (!os.influxdb.isEnabled()) return;
-  influxdb_cpp::server_info * client = os.influxdb.get_client();
-  if (!client)
-    return;
-
-  char tmp[TMP_BUFFER_SIZE];
-  os.sopt_load(SOPT_DEVICE_NAME, tmp);
-  influxdb_cpp::builder()
-    .meas("opensprinkler")
-    .tag("devicename", tmp)
-    .tag("warning", name)
-    .field("level", (int)level)
-    .field("currentvalue", value)
-    .timestamp(millis())
-    .post_http(*client);
-}
-#endif
-
-
-
 void push_message(uint16_t type, uint32_t lval, float fval, const char* sval) {
+
+	if (!is_notif_enabled(type)) {
+		DEBUG_PRINT("PUSH INACTIVE: ");
+		DEBUG_PRINTLN(type);
+		return;
+	}
+
 	static char topic[PUSH_TOPIC_LEN+1];
 	static char payload[PUSH_PAYLOAD_LEN+1];
 	char* postval = tmp_buffer+1; // +1 so we can fit a opening { before the loaded config
@@ -1687,7 +1507,7 @@ void push_message(uint16_t type, uint32_t lval, float fval, const char* sval) {
 
 	// check if ifttt key exists and also if the enable bit is set
 	os.sopt_load(SOPT_IFTTT_KEY, tmp_buffer);
-	bool ifttt_enabled = is_notif_enabled(type) && (strlen(tmp_buffer)!=0);
+	bool ifttt_enabled = strlen(tmp_buffer)!=0;
 
 #define DEFAULT_EMAIL_PORT	465
 
@@ -1742,13 +1562,16 @@ void push_message(uint16_t type, uint32_t lval, float fval, const char* sval) {
 	if(!email_en){
 		email_enabled = false;
 	}else{
-		email_enabled = is_notif_enabled(type);
+		email_enabled = true;
 	}
 #endif
 
 	// if none if enabled, return here
-	if ((!ifttt_enabled) && (!email_enabled) && (!os.mqtt.enabled()) && (!influxdb_enabled))
+	if (!ifttt_enabled && !email_enabled && !os.mqtt.enabled()) {
+		if (influxdb_enabled)
+			os.influxdb.push_message(type, lval, fval, sval);
 		return;
+	}
 
 	if (ifttt_enabled || email_enabled) {
 		strcpy_P(postval, PSTR("{\"value1\":\"On site ["));
@@ -1778,7 +1601,6 @@ void push_message(uint16_t type, uint32_t lval, float fval, const char* sval) {
 					snprintf_P(payload, PUSH_PAYLOAD_LEN, PSTR("{\"state\":1,\"duration\":%d}"), (int)fval);
 				}
 			}
-			influxdb_send_station("station", lval, 1);
 			break;
 
 		case NOTIFY_FLOW_ALERT:{
@@ -1878,8 +1700,6 @@ void push_message(uint16_t type, uint32_t lval, float fval, const char* sval) {
 
 				}
 
-				influxdb_send_flowalert("flowalert", lval, f1, f2, f3, f4, f5);
-
 			} else {
 				//Do not send an alert.  Flow was not above setpoint or setpoint not valid. 
 				//Must force ifftt_enabled and email_enabled to false to prevent sending
@@ -1918,7 +1738,6 @@ void push_message(uint16_t type, uint32_t lval, float fval, const char* sval) {
 				}
 				if(email_enabled) { email_message.subject += PSTR("station event"); }
 			}
-			influxdb_send_station("station", lval, 0);
 			break;
 
 		case NOTIFY_PROGRAM_SCHED:
@@ -1936,7 +1755,6 @@ void push_message(uint16_t type, uint32_t lval, float fval, const char* sval) {
 				snprintf_P(postval + len, TMP_BUFFER_SIZE-len, PSTR(" with %d%% water level."), (int)fval);
 				if(email_enabled) { email_message.subject += PSTR("program event"); }
 			}
-			influxdb_send_program("program sched", lval, fval);
 			break;
 
 		case NOTIFY_SENSOR1:
@@ -1950,7 +1768,6 @@ void push_message(uint16_t type, uint32_t lval, float fval, const char* sval) {
 				strcat_P(postval, ((int)fval)?PSTR("activated."):PSTR("de-activated."));
 				if(email_enabled) { email_message.subject += PSTR("sensor 1 event"); }
 			}
-			influxdb_send_state("sensor1", (int)fval);
 			break;
 
 		case NOTIFY_SENSOR2:
@@ -1964,7 +1781,6 @@ void push_message(uint16_t type, uint32_t lval, float fval, const char* sval) {
 				strcat_P(postval, ((int)fval)?PSTR("activated."):PSTR("de-activated."));
 				if(email_enabled) { email_message.subject += PSTR("sensor 2 event"); }
 			}
-			influxdb_send_state("sensor2", (int)fval);
 			break;
 
 		case NOTIFY_RAINDELAY:
@@ -1978,7 +1794,6 @@ void push_message(uint16_t type, uint32_t lval, float fval, const char* sval) {
 				strcat_P(postval, ((int)fval)?PSTR("activated."):PSTR("de-activated."));
 				if(email_enabled) { email_message.subject += PSTR("rain delay event"); }
 			}
-			influxdb_send_state("raindelay", (int)fval);
 			break;
 
 		case NOTIFY_FLOWSENSOR:
@@ -1995,7 +1810,6 @@ void push_message(uint16_t type, uint32_t lval, float fval, const char* sval) {
 				snprintf_P(postval + len, TMP_BUFFER_SIZE-len, PSTR("Flow count: %u, volume: %d.%02d"), lval, (int)volume/100, (int)volume%100);
 				if(email_enabled) { email_message.subject += PSTR("flow sensor event"); }
 			}
-			influxdb_send_flowsensor("flowsensor", lval, (float)volume/100);
 			break;
 
 		case NOTIFY_WEATHER_UPDATE:
@@ -2019,7 +1833,6 @@ void push_message(uint16_t type, uint32_t lval, float fval, const char* sval) {
 				}
 				if(email_enabled) { email_message.subject += PSTR("weather update event"); }
 			}
-			influxdb_send_state("waterlevel", (int)fval);
 			break;
 
 		case NOTIFY_REBOOT:
@@ -2077,13 +1890,14 @@ void push_message(uint16_t type, uint32_t lval, float fval, const char* sval) {
 
 			if (os.mqtt.enabled()) {
 				strcpy_P(topic, PSTR("monitoring"));
-				snprintf_P(payload, PUSH_PAYLOAD_LEN, PSTR("{\"warning\":\"%S\",\"prio\":%u,\"value\":%d.%02d}"), sval, lval, (int)fval, (int)fval*100%100);
+				int len = strlen(postval);
+				snprintf_P(payload+len, PUSH_PAYLOAD_LEN-len, PSTR("{\"warning\":\"%s\",\"prio\":%u,\"value\":%d.%02d}"), sval, lval, (int)fval, (int)fval*100%100);
 			}
 			if (ifttt_enabled || email_enabled) {
-				snprintf_P(postval, TMP_BUFFER_SIZE, PSTR("monitoring: Warning %S with priority %u current value %d.%02d"), sval, lval, (int)fval, (int)fval*100%100);
+				int len = strlen(postval);
+				snprintf_P(postval+len, TMP_BUFFER_SIZE-len, PSTR("monitoring: Warning %s with priority %u current value %d.%02d"), sval, lval, (int)fval, (int)fval*100%100);
 				if(email_enabled) { email_message.subject += PSTR("Warning"); }
 			}
-			influxdb_send_flowsensor(sval, lval, fval);
 			break;
 
 	}
@@ -2140,6 +1954,8 @@ void push_message(uint16_t type, uint32_t lval, float fval, const char* sval) {
 			}
 		#endif
 	}
+	if (influxdb_enabled)
+		os.influxdb.push_message(type, lval, fval, sval);
 }
 
 // ================================

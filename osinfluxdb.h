@@ -42,6 +42,13 @@ private:
     bool enabled;
     bool initialized;
     void init();
+    void influxdb_send_state(const char *name, int state);
+    void influxdb_send_station(const char *name, uint32_t station, int state);
+    void influxdb_send_program(const char *name, uint32_t nr, float level);
+    void influxdb_send_flowsensor(const char *name, uint32_t count, float volume);
+    void influxdb_send_flowalert(const char *name, uint32_t station, int f1, int f2, int f3, int f4, int f5);
+    void influxdb_send_warning(const char *name, uint32_t level, float value);
+
 public:
     ~OSInfluxDB();
     void set_influx_config(int enabled, char *url, uint16_t port, char *org, char *bucket, char *token);
@@ -55,5 +62,6 @@ public:
     #else
     influxdb_cpp::server_info * get_client();
     #endif
+    void push_message(uint16_t type, uint32_t lval, float fval, const char* sval);
 };
 #endif
