@@ -2649,7 +2649,8 @@ void monitor_load() {
   DEBUG_PRINTLN(F("monitor_load"));
   monitors = NULL;
   if (!file_exists(MONITOR_FILENAME)) return;
-
+  if (file_size(MONITOR_FILENAME) % MONITOR_STORE_SIZE != 0) return;
+  
   ulong pos = 0;
   Monitor_t *last = NULL;
   while (true) {
