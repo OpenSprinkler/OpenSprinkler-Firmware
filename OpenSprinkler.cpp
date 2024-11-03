@@ -69,6 +69,8 @@ unsigned char OpenSprinkler::attrib_igrd[MAX_NUM_BOARDS];
 unsigned char OpenSprinkler::attrib_dis[MAX_NUM_BOARDS];
 unsigned char OpenSprinkler::attrib_spe[MAX_NUM_BOARDS];
 unsigned char OpenSprinkler::attrib_grp[MAX_NUM_STATIONS];
+uint16_t OpenSprinkler::attrib_fas[MAX_NUM_STATIONS];
+uint16_t OpenSprinkler::attrib_favg[MAX_NUM_STATIONS];
 unsigned char OpenSprinkler::masters[NUM_MASTER_ZONES][NUM_MASTER_OPTS];
 RCSwitch OpenSprinkler::rfswitch;
 OSInfluxDB OpenSprinkler::influxdb;
@@ -1704,6 +1706,25 @@ unsigned char OpenSprinkler::is_sequential_station(unsigned char sid) {
 	return attrib_grp[sid] != PARALLEL_GROUP_ID;
 }
 
+uint16_t OpenSprinkler::get_flow_alert_setpoint(unsigned char sid) {
+	return attrib_fas[sid];
+}
+
+void OpenSprinkler::set_flow_alert_setpoint(unsigned char sid, uint16_t value) {
+	attrib_fas[sid] = value;
+}
+
+uint16_t OpenSprinkler::get_flow_avg_value(unsigned char sid) {
+	return attrib_favg[sid];
+}
+
+void OpenSprinkler::set_flow_avg_value(unsigned char sid, uint16_t value) {
+	if (value != attrib_favg[sid]) {
+		attrib_favg[sid] = value;
+		file_write_block(STATIONS3_FILENAME, &value, (uint16_t)sid * sizeof(uint16_t), sizeof(uint16_t));
+	}
+}
+
 unsigned char OpenSprinkler::is_master_station(unsigned char sid) {
 	for (unsigned char mas = 0; mas < NUM_MASTER_ZONES; mas++) {
 		if (get_master_id(mas) && (get_master_id(mas) - 1 == sid)) {
@@ -1789,6 +1810,8 @@ void OpenSprinkler::attribs_save() {
 			}
 		}
 	}
+	file_write_block(STATIONS2_FILENAME, attrib_fas, 0, sizeof(attrib_fas));
+	file_write_block(STATIONS3_FILENAME, attrib_favg, 0, sizeof(attrib_favg));
 }
 
 /** Load all station attribs from file (backward compatibility) */
@@ -1805,6 +1828,10 @@ void OpenSprinkler::attribs_load() {
 	memset(attrib_dis, 0, nboards);
 	memset(attrib_spe, 0, nboards);
 	memset(attrib_grp, 0, MAX_NUM_STATIONS);
+	memset(attrib_fas, 0, sizeof(attrib_fas));
+	memset(attrib_favg, 0, sizeof(attrib_favg));
+	file_read_block(STATIONS2_FILENAME, attrib_fas, 0, sizeof(attrib_fas));
+	file_read_block(STATIONS3_FILENAME, attrib_favg, 0, sizeof(attrib_favg));
 
 	for(bid=0;bid<MAX_NUM_BOARDS;bid++) {
 		for(s=0;s<8;s++,sid++) {

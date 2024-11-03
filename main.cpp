@@ -1245,7 +1245,30 @@ void turn_off_station(unsigned char sid, time_os_t curr_time, unsigned char shif
 			// log station run
 			write_log(LOGDATA_STATION, curr_time); // LOG_TODO
 			push_message(NOTIFY_STATION_OFF, sid, pd.lastrun.duration);
-			push_message(NOTIFY_FLOW_ALERT, sid, pd.lastrun.duration);
+
+			//Flow altert?
+			if (pd.lastrun.duration > 90) { //check running > 90s
+				uint16_t flow_alert_setpoint = os.get_flow_alert_setpoint(sid);
+				//flow_last_gpm is actually collected and stored as pulses per minute, not gallons per minute
+				//Get Flow Pulse Rate factor and apply to flow_last_gpm when comparing and outputting
+				float flow_pulse_rate_factor = static_cast<float>(os.iopts[IOPT_PULSE_RATE_1]) + static_cast<float>(os.iopts[IOPT_PULSE_RATE_0]) / 100.0;
+
+				float last_flow = flow_last_gpm * flow_pulse_rate_factor;
+				uint16_t avg_flow = os.get_flow_avg_value(sid);
+				uint16_t int_flow = (int)(last_flow * 100);
+				if (avg_flow > 0)
+					avg_flow = (avg_flow + int_flow) / 2;
+				else 
+					avg_flow = int_flow;
+				os.set_flow_avg_value(sid, int_flow);
+				// Alert Check - Compare flow_gpm_alert_setpoint with flow_last_gpm and enable flow_alert_flag if flow is above setpoint
+				if (flow_alert_setpoint) {
+					float flow_gpm_alert_setpoint = (float)flow_alert_setpoint/100;
+					if (last_flow > flow_gpm_alert_setpoint) {
+						push_message(NOTIFY_FLOW_ALERT, sid, pd.lastrun.duration);
+					}
+				}
+			}
 		}
 	}
 
@@ -1604,110 +1627,58 @@ void push_message(uint16_t type, uint32_t lval, float fval, const char* sval) {
 			break;
 
 		case NOTIFY_FLOW_ALERT:{
-			//First determine if a Flow Alert should be sent based on flow amount and setpoint
+			uint16_t flow_alert_setpoint = os.get_flow_alert_setpoint(lval);
+			float flow_gpm_alert_setpoint =  (float)flow_alert_setpoint/100;
 
-			//Added variable to track flow alert status
-			bool flow_alert_flag = false;
+			//flow_last_gpm is actually collected and stored as pulses per minute, not gallons per minute
+			//Get Flow Pulse Rate factor and apply to flow_last_gpm when comparing and outputting
+			float flow_pulse_rate_factor = static_cast<float>(os.iopts[IOPT_PULSE_RATE_1]) + static_cast<float>(os.iopts[IOPT_PULSE_RATE_0]) / 100.0;
 
-			//Added variable for flow_gpm_alert_setpoint and set default value to max
-			float flow_gpm_alert_setpoint = 999.9f;
-
-			//Added variable for to get flow_pulse_rate_factor and set to 1 as default
-			float flow_pulse_rate_factor = 1;
-
-			//Added variable for tmp station name
 			char tmp_station_name[STATION_NAME_SIZE];
-
-			//Get satation name
 			os.get_station_name(lval, tmp_station_name);
-
-			//Extract flow_gpm_alert_setpoint from last 5 characters of station name
-			if (strlen(tmp_station_name) > 5) {
-				const char *station_name_last_five_chars = tmp_station_name;
-				station_name_last_five_chars = tmp_station_name + strlen(tmp_station_name) - 5;
-
-				//Convert last five characters to number and check if valid
-				if (sscanf(station_name_last_five_chars, "%f", &flow_gpm_alert_setpoint) == 1) {
-
-					//station_name_last_five_chars was successfully converted to a number 
-
-					//flow_last_gpm is actually collected and stored as pulses per minute, not gallons per minute
-					//Get Flow Pulse Rate factor and apply to flow_last_gpm when comparing and outputting
-					flow_pulse_rate_factor = static_cast<float>(os.iopts[IOPT_PULSE_RATE_1]) + static_cast<float>(os.iopts[IOPT_PULSE_RATE_0]) / 100.0;
-
-					// Alert Check - Compare flow_gpm_alert_setpoint with flow_last_gpm and enable flow_alert_flag if flow is above setpoint
-					if ((flow_last_gpm*flow_pulse_rate_factor) > flow_gpm_alert_setpoint) {
-						flow_alert_flag = true;
-					}
-				} else {
-					//Could not convert to a valid number. If a number is not detected as a station name suffix, never send an alert
-					flow_alert_flag = false;
-				}
-			} else {
- 				//Station name was not long enough to include 5 character flow setpoint.
-				flow_alert_flag = false;
+			int f1 = (int)(flow_last_gpm*flow_pulse_rate_factor);
+			int f2 = (int)((flow_last_gpm*flow_pulse_rate_factor) * 100) % 100;
+			int f3 = (int)fval;
+			int f4 = (int)flow_gpm_alert_setpoint;
+			int f5 = (int)(flow_gpm_alert_setpoint * 100) % 100;
+			if (os.mqtt.enabled()) {
+				//Format mqtt message
+				snprintf_P(topic, PUSH_TOPIC_LEN, PSTR("station/%d/alert/flow"), lval);
+				snprintf_P(payload, PUSH_PAYLOAD_LEN, PSTR("{\"flow_rate\":%d.%02d,\"duration\":%d,\"alert_setpoint\":%d.%02d}"), 
+					f1, f2, f3, f4, f5);
 			}
+			if (ifttt_enabled || email_enabled) {
+				//Format ifttt\email message
+				// Get and format current local time as "YYYY-MM-DD hh:mm:ss AM/PM"
+				time_os_t curr_time = os.now_tz();
+				struct tm *tm_info = localtime((time_t*)&curr_time);
+				char formatted_time[TMP_BUFFER_SIZE];
+				strftime(formatted_time, sizeof(formatted_time), "%Y-%m-%d %I:%M:%S %p", tm_info);
+				strcat_P(postval, PSTR("<br>"));
+				strcat(postval, formatted_time);
 
-			// If flow_alert_flag is true, format the appropriate messages, else don't send alert
-			if (flow_alert_flag) {
+				strcat_P(postval, PSTR("<br>Station: "));
+				//Truncate flow setpoint value off station name to shorten ifttt\email message
+				tmp_station_name[(strlen(tmp_station_name) - 5)] = '\0';
+				strcat_P(postval, tmp_station_name);
 
-				int f1 = (int)(flow_last_gpm*flow_pulse_rate_factor);
-				int f2 = (int)((flow_last_gpm*flow_pulse_rate_factor) * 100) % 100;
-				int f3 = (int)fval;
-				int f4 = (int)flow_gpm_alert_setpoint;
-				int f5 = (int)(flow_gpm_alert_setpoint * 100) % 100;
-
-				if (os.mqtt.enabled()) {
-					//Format mqtt message
-					snprintf_P(topic, PUSH_TOPIC_LEN, PSTR("station/%d/alert/flow"), lval);
-					snprintf_P(payload, PUSH_PAYLOAD_LEN, PSTR("{\"flow_rate\":%d.%02d,\"duration\":%d,\"alert_setpoint\":%d.%02d}"), 
-						f1, f2, f3, f4, f5);
-				}
-
-
-				if (ifttt_enabled || email_enabled) {
-					//Format ifttt\email message
-
-					// Get and format current local time as "YYYY-MM-DD hh:mm:ss AM/PM"
-					time_os_t curr_time = os.now_tz();
-					struct tm *tm_info = localtime((time_t*)&curr_time);
-					char formatted_time[TMP_BUFFER_SIZE];
-					strftime(formatted_time, sizeof(formatted_time), "%Y-%m-%d %I:%M:%S %p", tm_info);
-					strcat_P(postval, PSTR("<br>"));
-					strcat(postval, formatted_time);
-
-					strcat_P(postval, PSTR("<br>Station: "));
-					//Truncate flow setpoint value off station name to shorten ifttt\email message
-					tmp_station_name[(strlen(tmp_station_name) - 5)] = '\0';
-					strcat_P(postval, tmp_station_name);
-
-					if((int)fval == 0){
-						strcat_P(postval, PSTR(""));
-					} else {					// master on event does not have duration attached to it
-						strcat_P(postval, PSTR("<br>Duration: "));
-						size_t len = strlen(postval);
-						snprintf_P(postval + len, TMP_BUFFER_SIZE, PSTR(" %d minutes %d seconds"), (int)fval/60, (int)fval%60);
-					}
-
-					strcat_P(postval, PSTR("<br><br>FLOW ALERT!"));
+				if((int)fval == 0){
+					strcat_P(postval, PSTR(""));
+				} else {					// master on event does not have duration attached to it
+					strcat_P(postval, PSTR("<br>Duration: "));
 					size_t len = strlen(postval);
-					snprintf_P(postval + len, TMP_BUFFER_SIZE, PSTR("<br>Flow rate: %d.%02d<br>Flow Alert Setpoint: %d.%02d"), 
-						f1, f2, f4, f5);
-
-					if(email_enabled) { 
-						email_message.subject += PSTR("- FLOW ALERT");
-					}
-
+					snprintf_P(postval + len, TMP_BUFFER_SIZE, PSTR(" %d minutes %d seconds"), (int)fval/60, (int)fval%60);
 				}
 
-			} else {
-				//Do not send an alert.  Flow was not above setpoint or setpoint not valid. 
-				//Must force ifftt_enabled and email_enabled to false to prevent sending
-				//Can not force os.mqtt.enabled() off, but it will not publish an mqtt message as topic\payload will be empty.
-				ifttt_enabled=false;
-				email_enabled=false;
-			}
+				strcat_P(postval, PSTR("<br><br>FLOW ALERT!"));
+				size_t len = strlen(postval);
+				snprintf_P(postval + len, TMP_BUFFER_SIZE, PSTR("<br>Flow rate: %d.%02d<br>Flow Alert Setpoint: %d.%02d"), 
+					f1, f2, f4, f5);
 
+				if(email_enabled) { 
+					email_message.subject += PSTR("- FLOW ALERT");
+				}
+			}
 			break;
 		}
 

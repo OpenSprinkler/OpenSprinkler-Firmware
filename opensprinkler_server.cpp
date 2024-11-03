@@ -466,6 +466,20 @@ void server_json_stations_attrib(const char* name, unsigned char *attrib)
 	bfill.emit_p(PSTR("],"));
 }
 
+void server_json_stations_attrib16(const char* name, uint16_t *attrib)
+{
+	bfill.emit_p(PSTR("\"$F\":["), name);
+	for(unsigned char bid=0;bid<os.nboards;bid++) {
+		for (unsigned char s = 0; s < 8; s++) {
+			bfill.emit_p(PSTR("$D"), attrib[bid * 8 + s]);
+			if(bid != os.nboards-1 || s < 7) {
+				bfill.emit_p(PSTR(","));
+			}
+		}
+	}
+	bfill.emit_p(PSTR("],"));
+}
+
 void server_json_stations_main(OTF_PARAMS_DEF) {
 	server_json_board_attrib(PSTR("masop"), os.attrib_mas);
 	server_json_board_attrib(PSTR("masop2"), os.attrib_mas2);
@@ -475,6 +489,8 @@ void server_json_stations_main(OTF_PARAMS_DEF) {
 	server_json_board_attrib(PSTR("stn_dis"), os.attrib_dis);
 	server_json_board_attrib(PSTR("stn_spe"), os.attrib_spe);
 	server_json_stations_attrib(PSTR("stn_grp"), os.attrib_grp);
+	server_json_stations_attrib16(PSTR("stn_fas"), os.attrib_fas);
+	server_json_stations_attrib16(PSTR("stn_favg"), os.attrib_favg);
 
 	bfill.emit_p(PSTR("\"snames\":["));
 	unsigned char sid;
@@ -573,6 +589,26 @@ void server_change_stations_attrib(char *p, char header, unsigned char *attrib)
 	}
 }
 
+#if defined(USE_OTF)
+void server_change_stations_attrib16(const OTF::Request &req, char header, uint16_t *attrib)
+#else
+void server_change_stations_attrib16(char *p, char header, uint16_t *attrib)
+#endif
+{
+	char tbuf2[6] = {0, 0, 0, 0, 0, 0};
+	unsigned char bid, s, sid;
+	tbuf2[0]=header;
+	for(bid=0;bid<os.nboards;bid++) {
+		for(s=0;s<8;s++) {
+			sid=bid*8+s;
+			snprintf(tbuf2+1, 3, "%d", sid);
+			if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, tbuf2)) {
+				attrib[sid] = atoi(tmp_buffer);
+			}
+		}
+	}
+}
+
 /**Change Station Name and Attributes
  * Command: /cs?pw=xxx&s?=x&m?=x&i?=x&n?=x&d?=x
  *
@@ -585,6 +621,7 @@ void server_change_stations_attrib(char *p, char header, unsigned char *attrib)
  * q?: station sequential bit field
  * p?: station special flag bit field
  * g?: sequential group id
+ * f?: flow alert setpoint value
  */
 void server_change_stations(OTF_PARAMS_DEF) {
 #if defined(USE_OTF)
@@ -614,12 +651,14 @@ void server_change_stations(OTF_PARAMS_DEF) {
 	server_change_board_attrib(FKV_SOURCE, 'n', os.attrib_mas2); // master2
 	server_change_board_attrib(FKV_SOURCE, 'd', os.attrib_dis); // disable
 	server_change_stations_attrib(FKV_SOURCE, 'g', os.attrib_grp); // sequential groups
+	server_change_stations_attrib16(FKV_SOURCE, 'f', os.attrib_fas); // flow alert setpoint
+	server_change_stations_attrib16(FKV_SOURCE, 'a', os.attrib_favg); // flow avg values
 	/* handle special data */
 	if(findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("sid"), true)) {
 		sid = atoi(tmp_buffer);
 		if(sid<0 || sid>os.nstations) handle_return(HTML_DATA_OUTOFBOUND);
 		if(findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("st"), true) &&
-			 findKeyVal(FKV_SOURCE, tmp_buffer+1, TMP_BUFFER_SIZE-1, PSTR("sd"), true)) {
+			findKeyVal(FKV_SOURCE, tmp_buffer+1, TMP_BUFFER_SIZE-1, PSTR("sd"), true)) {
 
 			tmp_buffer[0]-='0';
 			tmp_buffer[STATION_SPECIAL_DATA_SIZE] = 0;
@@ -2978,7 +3017,7 @@ void server_monitor_config(OTF_PARAMS_DEF) {
 		handle_return(HTML_DATA_MISSING);
 	double value2 = atof(tmp_buffer); // Value 2
 
-	char name[20] = {0};
+	char name[30] = {0};
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("name"), true))
 		strncpy(name, tmp_buffer, sizeof(name)-1);
 
@@ -3133,7 +3172,7 @@ void server_sensorprog_config(OTF_PARAMS_DEF) {
 		handle_return(HTML_DATA_MISSING);
 	double max = atof(tmp_buffer); // Max value
 
-	char name[20] = {0};
+	char name[30] = {0};
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("name"), true))
 		strncpy(name, tmp_buffer, sizeof(name)-1);
 
@@ -3185,7 +3224,7 @@ void server_sensorprog_list(OTF_PARAMS_DEF) {
 	uint nr = 0;
 	int prog = -1;
 	uint sensor_nr = 0;
-
+	
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("nr"), true))
 		nr = strtoul(tmp_buffer, NULL, 0);
 

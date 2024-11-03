@@ -2837,7 +2837,7 @@ void push_message(Monitor_t * mon, float value) {
     case 2: type = NOTIFY_MONITOR_HIGH; break;
     default: return;
   }
-  char name[20];
+  char name[30];
   strncpy(name, mon->name, sizeof(name)-1);
   DEBUG_PRINT("monitoring: activated ");
   DEBUG_PRINT(name);

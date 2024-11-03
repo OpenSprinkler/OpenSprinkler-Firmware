@@ -35,7 +35,7 @@ typedef unsigned long ulong;
 														// if this number is different from the one stored in non-volatile memory
 														// a device reset will be automatically triggered
 
-#define OS_FW_MINOR      169  // Firmware minor version
+#define OS_FW_MINOR      170  // Firmware minor version
 
 /** Hardware version base numbers */
 #define OS_HW_VERSION_BASE   0x00 // OpenSprinkler
@@ -52,6 +52,8 @@ typedef unsigned long ulong;
 #define IOPTS_FILENAME        "iopts.dat"   // integer options data file
 #define SOPTS_FILENAME        "sopts.dat"   // string options data file
 #define STATIONS_FILENAME     "stns.dat"    // stations data file
+#define STATIONS2_FILENAME    "stns2.dat"   // stations data file 2 - flow alert values
+#define STATIONS3_FILENAME    "stns3.dat"   // stations data file 3 - flow avg values
 #define NVCON_FILENAME        "nvcon.dat"   // non-volatile controller data file, see OpenSprinkler.h --> struct NVConData
 #define PROG_FILENAME         "prog.dat"    // program data file
 #define DONE_FILENAME         "done.dat"    // used to indicate the completion of all files

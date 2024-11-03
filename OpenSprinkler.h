@@ -275,6 +275,8 @@ public:
 	static unsigned char attrib_dis[];
 	static unsigned char attrib_spe[];
 	static unsigned char attrib_grp[];
+	static uint16_t attrib_fas[MAX_NUM_STATIONS]; //value*100 flow alert setpoint
+	static uint16_t attrib_favg[MAX_NUM_STATIONS]; //value*100 flow avg values
 	static unsigned char masters[NUM_MASTER_ZONES][NUM_MASTER_OPTS];
 
 	// variables for time keeping
@@ -312,8 +314,12 @@ public:
 	static void set_station_name(unsigned char sid, char buf[]); // set station name
 	static unsigned char get_station_type(unsigned char sid); // get station type
 	static unsigned char is_sequential_station(unsigned char sid);
-	static unsigned char is_master_station(unsigned char sid);
-	static unsigned char bound_to_master(unsigned char sid, unsigned char mas);
+    uint16_t get_flow_alert_setpoint(unsigned char sid);
+    void set_flow_alert_setpoint(unsigned char sid, uint16_t value);
+    uint16_t get_flow_avg_value(unsigned char sid);
+    void set_flow_avg_value(unsigned char sid, uint16_t value);
+    static unsigned char is_master_station(unsigned char sid);
+    static unsigned char bound_to_master(unsigned char sid, unsigned char mas);
 	static unsigned char get_master_id(unsigned char mas);
 	static int16_t get_on_adj(unsigned char mas);
 	static int16_t get_off_adj(unsigned char mas);

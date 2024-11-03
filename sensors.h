@@ -222,8 +222,8 @@ typedef struct ProgSensorAdjust {
   double factor2;
   double min;
   double max;
-  char name[20];
-  unsigned char undef[12];  // for later
+  char name[30];
+  unsigned char undef[2];  // for later
   ProgSensorAdjust *next;
 } ProgSensorAdjust_t;
 #define PROGSENSOR_STORE_SIZE \
@@ -257,10 +257,10 @@ typedef struct Monitor {
   double value2; // Secondary
   boolean active;
   ulong time;
-  char name[20];
+  char name[30];
   ulong maxRuntime;
   uint8_t prio;
-  unsigned char undef[9];  // for later
+  unsigned char undef[20];  // for later
   Monitor *next;
 } Monitor_t;
 #define MONITOR_STORE_SIZE (sizeof(Monitor_t) - sizeof(char *) - sizeof(Monitor_t *))
