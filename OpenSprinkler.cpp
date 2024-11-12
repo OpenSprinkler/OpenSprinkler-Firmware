@@ -1875,7 +1875,7 @@ unsigned char OpenSprinkler::get_station_bit(unsigned char sid) {
 /** Clear all station bits */
 void OpenSprinkler::clear_all_station_bits() {
 	unsigned char sid;
-	for(sid=0;sid<=MAX_NUM_STATIONS;sid++) {
+	for(sid=0;sid<MAX_NUM_STATIONS;sid++) {
 		set_station_bit(sid, 0);
 	}
 }
