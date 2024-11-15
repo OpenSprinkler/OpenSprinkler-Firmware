@@ -80,6 +80,10 @@ void OSInfluxDB::get_influx_config(char *json) {
         json[size] = 0;
         //DEBUG_PRINT(F("influx config="));
         //DEBUG_PRINTLN(tmp_buffer);
+        if (size > 10 && (json[size-2] != '"' || json[size-1] != '}')) {
+            strcpy(json, "{\"en\":0}");
+            set_influx_config(json);
+        }
     }
     if (json[0] != '{' || strchr(json, '}') != strrchr(json, '}')) {
         strcpy(json, "{\"en\":0}");

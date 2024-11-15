@@ -1283,6 +1283,15 @@ void server_json_controller_main(OTF_PARAMS_DEF) {
 #endif
 	char mqtt_opt[MAX_SOPTS_SIZE];
 	os.sopt_load(SOPT_MQTT_OPTS, mqtt_opt);
+	//DEBUG_PRINTLN(mqtt_opt);
+
+	//Test for invalid mqtt options:
+	int l = strlen(mqtt_opt);
+	if (l > 0 && mqtt_opt[l-1] != '"') { //first+last char
+		mqtt_opt[l] = '"';
+		mqtt_opt[l+1] = 0;
+	}
+	//DEBUG_PRINTLN(mqtt_opt);
 
 	bfill.emit_p(PSTR("\"mac\":\"$X:$X:$X:$X:$X:$X\","), mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 
@@ -1651,6 +1660,8 @@ void server_change_options(OTF_PARAMS_DEF)
 		#if !defined(USE_OTF)
 		urlDecode(tmp_buffer);
 		#endif
+		DEBUG_PRINTLN("MQTT:");
+		DEBUG_PRINTLN(tmp_buffer);
 		os.sopt_save(SOPT_MQTT_OPTS, tmp_buffer);
 		os.status.req_mqtt_restart = true;
 	} else if (keyfound) {

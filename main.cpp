@@ -785,7 +785,7 @@ void do_loop()
 						os.checkwt_success_lasttime = 0;
 						check_weather();
 					}
-					break;
+					//break;
 
 					// program match found
 					// check and process special program command
