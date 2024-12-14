@@ -19,7 +19,7 @@
  */
 #if defined(ESP8266)
 
-#include "espconnect.h"
+#include "../include/espconnect.h"
 
 String scan_network() {
 	WiFi.mode(WIFI_STA);

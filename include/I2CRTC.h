@@ -26,7 +26,7 @@ class I2CRTC
 	static void write(tmElements_t &tm);
 	static bool detect();
 	static bool exists();
-	
+
 	private:
 	static uint8_t dec2bcd(uint8_t num);
 	static uint8_t bcd2dec(uint8_t num);
@@ -36,4 +36,4 @@ class I2CRTC
 extern I2CRTC RTC;
 
 #endif
- 
+

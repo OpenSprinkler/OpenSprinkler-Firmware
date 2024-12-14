@@ -21,9 +21,9 @@
  * <http://www.gnu.org/licenses/>
  */
 
-#include "utils.h"
-#include "types.h"
-#include "OpenSprinkler.h"
+#include "../include/utils.h"
+#include "../include/types.h"
+#include "../include/OpenSprinkler.h"
 extern OpenSprinkler os;
 
 #if defined(ARDUINO)  // Arduino
@@ -33,7 +33,7 @@ extern OpenSprinkler os;
 		#include <LittleFS.h>
 	#else
 		#include <avr/eeprom.h>
-		#include "SdFat.h"
+		#include "../include/SdFat.h"
 		extern SdFat sd;
 	#endif
 

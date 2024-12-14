@@ -1,6 +1,6 @@
 #if defined(ESP8266)
 
-#include "defines.h"
+#include "../include/defines.h"
 
 unsigned char PIN_BUTTON_1 = 255;
 unsigned char PIN_BUTTON_2 = 255;

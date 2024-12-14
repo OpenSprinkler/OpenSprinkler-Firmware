@@ -23,19 +23,19 @@
 
 #include <limits.h>
 
-#include "types.h"
-#include "OpenSprinkler.h"
-#include "program.h"
-#include "weather.h"
-#include "opensprinkler_server.h"
-#include "mqtt.h"
-#include "main.h"
+#include "../include/types.h"
+#include "../include/OpenSprinkler.h"
+#include "../include/program.h"
+#include "../include/weather.h"
+#include "../include/opensprinkler_server.h"
+#include "../include/mqtt.h"
+#include "../include/main.h"
 
 #if defined(ARDUINO)
 #include <Arduino.h>
 #endif
 
-#include "ArduinoJson.hpp"
+#include "../include/ArduinoJson.hpp"
 
 #if defined(ARDUINO)
 	#if defined(ESP8266)
@@ -896,11 +896,11 @@ void do_loop()
 						}
 					}
 				}
-		
+
 				if(os.get_station_bit(mas_id - 1) == 0 && masbit == 1){ // notify master on event
 					push_message(NOTIFY_STATION_ON, mas_id - 1, 0);
 				}
-				
+
 				os.set_station_bit(mas_id - 1, masbit);
 			}
 		}
@@ -1381,7 +1381,7 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 	// check if ifttt key exists and also if the enable bit is set
 	os.sopt_load(SOPT_IFTTT_KEY, tmp_buffer);
 	bool ifttt_enabled = ((os.iopts[IOPT_NOTIF_ENABLE]&type)!=0) && (strlen(tmp_buffer)!=0);
-	
+
 #define DEFAULT_EMAIL_PORT	465
 
 	// parse email variables
@@ -1448,7 +1448,7 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 		topic[PUSH_TOPIC_LEN]=0;
 		strcat(postval+strlen(postval), topic);
 		strcat_P(postval, PSTR("], "));
-		if(email_enabled) {		
+		if(email_enabled) {
 			strcat(topic, " ");
 			email_message.subject = topic; // prefix the email subject with device name
 		}

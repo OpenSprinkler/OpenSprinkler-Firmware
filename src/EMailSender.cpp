@@ -32,7 +32,7 @@
  * THE SOFTWARE.
  */
 
-#include "EMailSender.h"
+#include "../include/EMailSender.h"
 #include <stdio.h>
 #if defined(ESP32)
 #include <mbedtls/base64.h>
@@ -639,9 +639,9 @@ EMailSender::Response EMailSender::send(const char* to[], byte sizeOfTo,  byte s
 		  //
                   response = awaitSMTPResponse(client,"334","No digest error");
                   if (!response.status) {
-			client.flush(); 
-			client.stop(); 
-			return response; 
+			client.flush();
+			client.stop();
+			return response;
 		  };
 		  _serverResponce = _serverResponce.substring(4); // '334<space>'
 
@@ -654,12 +654,12 @@ EMailSender::Response EMailSender::send(const char* to[], byte sizeOfTo,  byte s
 
 		  int e = mbedtls_base64_decode(digest, sizeof(digest), &len, b64, b64l);
                   if (e || len < 3 || len >= 256) {
-			response.code = F("999"); 
-			response.desc = F("Invalid digest"); 
-			response.status = false; 
-			client.flush(); 
-			client.stop(); 
-			return response; 
+			response.code = F("999");
+			response.desc = F("Invalid digest");
+			response.status = false;
+			client.flush();
+			client.stop();
+			return response;
 		  };
 
 		  // calculate HMAC with the password as the key of this digest.
@@ -670,7 +670,7 @@ EMailSender::Response EMailSender::send(const char* to[], byte sizeOfTo,  byte s
 
 		  mbedtls_md_init(&ctx);
 		  mbedtls_md_setup(&ctx, mbedtls_md_info_from_type(md_type), 1);
-		  mbedtls_md_hmac_starts(&ctx, 
+		  mbedtls_md_hmac_starts(&ctx,
 			(const unsigned char *)this->email_password, strlen(this->email_password));
 		  mbedtls_md_hmac_update(&ctx, digest, len);
 		  mbedtls_md_hmac_finish(&ctx, md5);
@@ -691,7 +691,7 @@ EMailSender::Response EMailSender::send(const char* to[], byte sizeOfTo,  byte s
 
  		  // now exepct the normal login confirmation to continue.
 	}
-#endif 
+#endif
 	  else{
 		  EMAIL_DEBUG_PRINTLN(F("AUTH LOGIN:"));
 		  client.println(F("AUTH LOGIN"));

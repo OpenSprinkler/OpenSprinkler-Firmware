@@ -41,19 +41,19 @@
 	struct mosquitto *mqtt_client = NULL;
 #endif
 
-#include "OpenSprinkler.h"
-#include "opensprinkler_server.h"
-#include "main.h"
-#include "program.h"
-#include "types.h"
-#include "mqtt.h"
-#include "ArduinoJson.hpp"
+#include "../include/OpenSprinkler.h"
+#include "../include/opensprinkler_server.h"
+#include "../include/main.h"
+#include "../include/program.h"
+#include "../include/types.h"
+#include "../include/mqtt.h"
+#include "../include/ArduinoJson.hpp"
 
 // Debug routines to help identify any blocking of the event loop for an extended period
 
 #if defined(ENABLE_DEBUG)
 	#if defined(ARDUINO)
-		#include "TimeLib.h"
+		#include "../include/TimeLib.h"
 		#define DEBUG_TIMESTAMP(msg, ...) {time_os_t t = os.now_tz(); Serial.printf("%02d-%02d-%02d %02d:%02d:%02d - ", year(t), month(t), day(t), hour(t), minute(t), second(t));}
 	#else
 		#include <sys/time.h>
@@ -98,7 +98,7 @@ char OSMqtt::_pub_topic[MQTT_MAX_TOPIC_LEN + 1] = {0}; // topic for publishing d
 char OSMqtt::_sub_topic[MQTT_MAX_TOPIC_LEN + 1] = {0}; // topic for subscribing
 bool OSMqtt::_done_subscribed = false;		//Flag indicating if command topic has been subscribed to
 
-//******************************** HELPER FUNCTIONS ********************************// 
+//******************************** HELPER FUNCTIONS ********************************//
 
 extern uint16_t parse_listdata(char **p);
 extern unsigned char findKeyVal (const char *str,char *strbuf, uint16_t maxlen,const char *key,bool key_in_pgm=false,uint8_t *keyfound=NULL);
@@ -202,7 +202,7 @@ void manualRun(char *message){
 			}else{
 				q = pd.enqueue();
 			}
-			
+
 			if(q){
 				q->st = 0;
 				q->dur = timer;
@@ -361,7 +361,7 @@ void OSMqtt::begin(void) {
 				if(subt_val) strncpy(_sub_topic, subt_val, MQTT_MAX_TOPIC_LEN);
 		}
 
-		// properly end all strings to make sure 
+		// properly end all strings to make sure
 		_host[MQTT_MAX_HOST_LEN] = 0;
 		_username[MQTT_MAX_USERNAME_LEN] = 0;
 		_password[MQTT_MAX_PASSWORD_LEN] = 0;
@@ -600,7 +600,7 @@ static void _mqtt_connection_cb(struct mosquitto *mqtt_client, void *obj, int re
 	DEBUG_LOGF("MQTT Connnection Callback: %s (%d)\r\n", mosquitto_strerror(reason), reason);
 
 	::_connected = true;
-	
+
 	String avail_topic(OSMqtt::get_pub_topic());
 	avail_topic += "/";
 	avail_topic += MQTT_AVAILABILITY_TOPIC;

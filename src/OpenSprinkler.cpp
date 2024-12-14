@@ -21,12 +21,12 @@
  * <http://www.gnu.org/licenses/>.
  */
 
-#include "OpenSprinkler.h"
-#include "opensprinkler_server.h"
-#include "gpio.h"
-#include "testmode.h"
-#include "program.h"
-#include "ArduinoJson.hpp"
+#include "../include/OpenSprinkler.h"
+#include "../include/opensprinkler_server.h"
+#include "../include/gpio.h"
+#include "../include/testmode.h"
+#include "../include/program.h"
+#include "../include/ArduinoJson.hpp"
 
 /** Declare static data members */
 OSMqtt OpenSprinkler::mqtt;
@@ -629,7 +629,7 @@ unsigned char OpenSprinkler::start_ether() {
 	if(!eth.begin((uint8_t*)tmp_buffer))	return 0;
 	lcd_print_line_clear_pgm(PSTR("Start wired link"), 1);
 	lcd_print_line_clear_pgm(eth.isW5500 ? PSTR("  [w5500]    ") : PSTR(" [enc28j60]  "), 2);
-	
+
 	ulong timeout = millis()+60000; // 60 seconds time out
 	unsigned char timecount = 1;
 	while (!eth.connected() && millis()<timeout) {
@@ -714,13 +714,13 @@ void OpenSprinkler::reboot_dev(uint8_t cause) {
 
 #else // RPI/BBB/LINUX network init functions
 
-#include "etherport.h"
+#include "../include/etherport.h"
 #include <sys/reboot.h>
 #include <stdlib.h>
 #include <sys/ioctl.h>
 #include <net/if.h>
-#include "utils.h"
-#include "opensprinkler_server.h"
+#include "../include/utils.h"
+#include "../include/opensprinkler_server.h"
 
 /** Initialize network with the given mac address and http port */
 unsigned char OpenSprinkler::start_network() {
@@ -1958,7 +1958,7 @@ int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char*
   		bool mfln = _c->probeMaxFragmentLength(server, port, 512);
   		DEBUG_PRINTF("MFLN supported: %s\n", mfln ? "yes" : "no");
   		if (mfln) {
-				_c->setBufferSizes(512, 512); 
+				_c->setBufferSizes(512, 512);
 			} else {
 				_c->setBufferSizes(2048, 2048);
 			}
@@ -1992,7 +1992,7 @@ int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char*
 	}
 #else
 	EthernetClient *client = NULL;
-	
+
 	if (usessl) {
 		client = new EthernetClientSsl();
 	} else {
@@ -3016,7 +3016,7 @@ void OpenSprinkler::lcd_set_brightness(unsigned char value) {
 #endif  // end of LCD and button functions
 
 #if defined(ESP8266)
-#include "images.h"
+#include "../include/images.h"
 void OpenSprinkler::flash_screen() {
 	lcd.setCursor(0, -1);
 	lcd.print(F(" OpenSprinkler"));
