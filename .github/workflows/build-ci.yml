@@ -61,7 +61,7 @@ jobs:
           submodules: recursive
 
       - name: Build Script
-        run: sudo ./build.sh -s demo
+        run: sudo ./scripts/build.sh -s demo
 
   build-docker:
     name: Build Docker

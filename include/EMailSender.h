@@ -38,9 +38,9 @@
 #include "EMailSenderKey.h"
 
 #if ARDUINO >= 100
-#include "Arduino.h"
+#include <Arduino.h>
 #else
-#include "WProgram.h"
+#include <WProgram.h>
 #endif
 
 #if(NETWORK_ESP8266_242 == DEFAULT_EMAIL_NETWORK_TYPE_ESP8266)
