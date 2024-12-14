@@ -28,25 +28,25 @@ else
 fi
 
 if [ "$1" == "demo" ]; then
-	#echo "Installing required libraries..."
-	#apt-get install -y libmosquitto-dev libssl-dev
+	echo "Installing required libraries..."
+	apt-get install -y libmosquitto-dev libssl-dev
 	echo "Compiling demo firmware..."
 
     ws=$(ls external/TinyWebsockets/tiny_websockets_lib/src/*.cpp)
     otf=$(ls external/OpenThings-Framework-Firmware-Library/*.cpp)
 	g++ -o OpenSprinkler -DDEMO -DSMTP_OPENSSL $DEBUG -std=c++14 -include string.h src/*.cpp src/smtp.c -Iinclude -Iexternal/TinyWebsockets/tiny_websockets_lib/include -Iexternal/OpenThings-Framework-Firmware-Library/ -lpthread -lmosquitto -lssl -lcrypto
 elif [ "$1" == "osbo" ]; then
-	#echo "Installing required libraries..."
-	#apt-get install -y libmosquitto-dev libssl-dev
+	echo "Installing required libraries..."
+	apt-get install -y libmosquitto-dev libssl-dev
 	echo "Compiling osbo firmware..."
 
     ws=$(ls external/TinyWebsockets/tiny_websockets_lib/src/*.cpp)
     otf=$(ls external/OpenThings-Framework-Firmware-Library/*.cpp)
 	g++ -o OpenSprinkler -DOSBO -DSMTP_OPENSSL $DEBUG -std=c++14 -include string.h src/*.cpp src/smtp.c -Iinclude -Iexternal/TinyWebsockets/tiny_websockets_lib/include -Iexternal/OpenThings-Framework-Firmware-Library/ -lpthread -lmosquitto -lssl -lcrypto
 else
-	#echo "Installing required libraries..."
-	#apt-get update
-	#apt-get install -y libmosquitto-dev raspi-gpio libi2c-dev libssl-dev libgpiod-dev
+	echo "Installing required libraries..."
+	apt-get update
+	apt-get install -y libmosquitto-dev raspi-gpio libi2c-dev libssl-dev libgpiod-dev
 	if ! command -v raspi-gpio &> /dev/null
 	then
 		echo "Command raspi-gpio is required and is not installed"
