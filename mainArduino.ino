@@ -1,4 +1,4 @@
-#include "OpenSprinkler.h"
+#include "include/OpenSprinkler.h"
 
 void do_setup();
 void do_loop();

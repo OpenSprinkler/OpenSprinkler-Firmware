@@ -22,12 +22,12 @@
  */
 
 #include <stdlib.h>
-#include "OpenSprinkler.h"
-#include "utils.h"
-#include "opensprinkler_server.h"
-#include "weather.h"
-#include "main.h"
-#include "types.h"
+#include "../include/OpenSprinkler.h"
+#include "../include/utils.h"
+#include "../include/opensprinkler_server.h"
+#include "../include/weather.h"
+#include "../include/main.h"
+#include "../include/types.h"
 
 extern OpenSprinkler os; // OpenSprinkler object
 extern char tmp_buffer[];

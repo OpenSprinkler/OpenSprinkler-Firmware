@@ -301,7 +301,7 @@ public:
 	static void switch_remotestation(RemoteOTCStationData *data, bool turnon, uint16_t dur=0); // switch remote OTC station
 	static void switch_gpiostation(GPIOStationData *data, bool turnon); // switch gpio station
 	static void switch_httpstation(HTTPStationData *data, bool turnon, bool usessl=false); // switch http station
-	
+
 	// -- options and data storeage
 	static void nvdata_load();
 	static void nvdata_save();
@@ -341,7 +341,7 @@ public:
 	static int8_t send_http_request(uint32_t ip4, uint16_t port, char* p, void(*callback)(char*)=NULL, bool usessl=false, uint16_t timeout=5000);
 	static int8_t send_http_request(const char* server, uint16_t port, char* p, void(*callback)(char*)=NULL, bool usessl=false, uint16_t timeout=5000);
 	static int8_t send_http_request(char* server_with_port, char* p, void(*callback)(char*)=NULL, bool usessl=false, uint16_t timeout=5000);
-	
+
 	#if defined(USE_OTF)
 	static OTCConfig otc;
 	#endif

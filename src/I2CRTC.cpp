@@ -1,6 +1,6 @@
 /*
  * I2CRTC.cpp - library for I2C RTC
-	
+
 	Copyright (c) Michael Margolis 2009
 	This library is intended to be uses with Arduino Time.h library functions
 
@@ -17,17 +17,17 @@
 	You should have received a copy of the GNU Lesser General Public
 	License along with this library; if not, write to the Free Software
 	Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-	
+
 	30 Dec 2009 - Initial release
 	5 Sep 2011 updated for Arduino 1.0
-	
+
 	23 Dec 2013 -- modified by Ray Wang (Rayshobby LLC) to add support for MCP7940
  */
 
 
 #if defined(ARDUINO)
 
-#include "I2CRTC.h"
+#include "../include/I2CRTC.h"
 #include <Wire.h>
 
 static uint8_t _addrs[] = {DS1307_ADDR, MCP7940_ADDR, PCF8563_ADDR};
@@ -69,7 +69,7 @@ void I2CRTC::set(time_os_t t)
 {
 	tmElements_t tm;
 	breakTime(t, tm);
-	write(tm); 
+	write(tm);
 }
 
 // Aquire data from the RTC chip in BCD format
@@ -78,7 +78,7 @@ void I2CRTC::read( tmElements_t &tm)
 	if(!addr) return;
 	Wire.beginTransmission(addr);
 
-	if(addr == PCF8563_ADDR) { 
+	if(addr == PCF8563_ADDR) {
 			Wire.write((uint8_t)0x02);
 			Wire.endTransmission();
 			Wire.requestFrom(addr, (uint8_t)7);
@@ -90,7 +90,7 @@ void I2CRTC::read( tmElements_t &tm)
 			tm.Month = bcd2dec(Wire.read() & 0x1f);   // fix bug for MCP7940
 			tm.Year = (bcd2dec(Wire.read()));
 	} else {
-			Wire.write((uint8_t)0x00); 
+			Wire.write((uint8_t)0x00);
 			Wire.endTransmission();
 			Wire.requestFrom(addr, (uint8_t)7);
 			tm.Second = bcd2dec(Wire.read() & 0x7f);
@@ -108,7 +108,7 @@ void I2CRTC::write(tmElements_t &tm)
 	if(!addr) return;
 	switch(addr) {
 		case DS1307_ADDR:
-			Wire.beginTransmission(addr);  
+			Wire.beginTransmission(addr);
 			Wire.write((uint8_t)0x00); // reset register pointer
 			Wire.write(dec2bcd(tm.Second) & 0x7f);	// ray: start clock by setting CH bit low
 			Wire.write(dec2bcd(tm.Minute));
@@ -116,11 +116,11 @@ void I2CRTC::write(tmElements_t &tm)
 			Wire.write(dec2bcd(tm.Wday));
 			Wire.write(dec2bcd(tm.Day));
 			Wire.write(dec2bcd(tm.Month));
-			Wire.write(dec2bcd(tmYearToY2k(tm.Year))); 
+			Wire.write(dec2bcd(tmYearToY2k(tm.Year)));
 			Wire.endTransmission();
 			break;
 		case MCP7940_ADDR:
-			Wire.beginTransmission(addr);  
+			Wire.beginTransmission(addr);
 			Wire.write((uint8_t)0x00); // reset register pointer
 			Wire.write(dec2bcd(tm.Second) | 0x80); // ray: start clock by setting ST bit high
 			Wire.write(dec2bcd(tm.Minute));
@@ -128,11 +128,11 @@ void I2CRTC::write(tmElements_t &tm)
 			Wire.write(dec2bcd(tm.Wday) | 0x08);  // ray: turn on battery backup by setting VBATEN bit high
 			Wire.write(dec2bcd(tm.Day));
 			Wire.write(dec2bcd(tm.Month));
-			Wire.write(dec2bcd(tmYearToY2k(tm.Year))); 
+			Wire.write(dec2bcd(tmYearToY2k(tm.Year)));
 			Wire.endTransmission();
 			break;
 		case PCF8563_ADDR:
-			Wire.beginTransmission(addr);  
+			Wire.beginTransmission(addr);
 			Wire.write((uint8_t)0x02); // reset register pointer
 			Wire.write(dec2bcd(tm.Second) & 0x7f);
 			Wire.write(dec2bcd(tm.Minute));
@@ -140,7 +140,7 @@ void I2CRTC::write(tmElements_t &tm)
 			Wire.write(dec2bcd(tm.Day));
 			Wire.write(dec2bcd(tm.Wday));
 			Wire.write(dec2bcd(tm.Month));
-			Wire.write(dec2bcd(tm.Year)); 
+			Wire.write(dec2bcd(tm.Year));
 			Wire.endTransmission();
 			break;
 	}

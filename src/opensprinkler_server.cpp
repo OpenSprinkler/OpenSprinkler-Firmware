@@ -21,13 +21,13 @@
  * <http://www.gnu.org/licenses/>.
  */
 
-#include "types.h"
-#include "OpenSprinkler.h"
-#include "program.h"
-#include "opensprinkler_server.h"
-#include "weather.h"
-#include "mqtt.h"
-#include "main.h"
+#include "../include/types.h"
+#include "../include/OpenSprinkler.h"
+#include "../include/program.h"
+#include "../include/opensprinkler_server.h"
+#include "../include/weather.h"
+#include "../include/mqtt.h"
+#include "../include/main.h"
 
 // External variables defined in main ion file
 #if defined(USE_OTF)
@@ -48,19 +48,19 @@
 	#if defined(ESP8266)
 		#include <FS.h>
 		#include <LittleFS.h>
-		#include "espconnect.h"
+		#include "../include/espconnect.h"
 		extern ESP8266WebServer *update_server;
 		extern ENC28J60lwIP enc28j60;
 		extern Wiznet5500lwIP w5500;
 		extern lwipEth eth;
 	#else
-		#include "SdFat.h"
+		#include "../include/SdFat.h"
 		extern SdFat sd;
 	#endif
 #else
 	#include <stdarg.h>
 	#include <stdlib.h>
-	#include "etherport.h"
+	#include "../include/etherport.h"
 #endif
 
 extern char ether_buffer[];
@@ -903,7 +903,7 @@ void server_change_program(OTF_PARAMS_DEF) {
 	*(char*)(&prog) = parse_listdata(&pv);
 	prog.days[0]= parse_listdata(&pv);
 	prog.days[1]= parse_listdata(&pv);
-	
+
 	if (prog.type == PROGRAM_TYPE_INTERVAL) {
 		if (prog.days[1] == 0) handle_return(HTML_DATA_OUTOFBOUND)
 		else if (prog.days[1] >= 1) {
@@ -1571,7 +1571,7 @@ void server_change_password(OTF_PARAMS_DEF) {
 #endif
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("npw"), true)) {
 		const int pwBufferSize = TMP_BUFFER_SIZE/2;
-		char *tbuf2 = tmp_buffer + pwBufferSize;	// use the second half of tmp_buffer 
+		char *tbuf2 = tmp_buffer + pwBufferSize;	// use the second half of tmp_buffer
 		if (findKeyVal(FKV_SOURCE, tbuf2, pwBufferSize, PSTR("cpw"), true) && strncmp(tmp_buffer, tbuf2, pwBufferSize) == 0) {
 			urlDecode(tmp_buffer);
 			os.sopt_save(SOPT_PASSWORD, tmp_buffer);

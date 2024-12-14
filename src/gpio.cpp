@@ -21,14 +21,14 @@
  * <http://www.gnu.org/licenses/>.
  */
 
-#include "gpio.h"
+#include "../include/gpio.h"
 
 #if defined(ARDUINO)
 
 #if defined(ESP8266)
 
 #include <Wire.h>
-#include "defines.h"
+#include "../include/defines.h"
 
 unsigned char IOEXP::detectType(uint8_t address) {
 	Wire.beginTransmission(address);
@@ -140,7 +140,7 @@ void PCF8574::i2c_write(uint8_t reg, uint16_t v) {
 	Wire.endTransmission();
 }
 
-#include "OpenSprinkler.h"
+#include "../include/OpenSprinkler.h"
 
 extern OpenSprinkler os;
 
@@ -403,7 +403,7 @@ static void *interruptHandler (void *arg) {
 	return NULL ;
 }
 
-#include "utils.h"
+#include "../include/utils.h"
 /** Attach an interrupt function to pin */
 void attachInterrupt(int pin, const char* mode, void (*isr)(void)) {
 	if((pin<0)||(pin>GPIO_MAX)) {
@@ -466,7 +466,7 @@ void attachInterrupt(int pin, const char* mode, void (*isr)(void)) {
 #include <pthread.h>
 #include <gpiod.h>
 
-#include "utils.h"
+#include "../include/utils.h"
 
 #define BUFFER_MAX 64
 #define GPIO_MAX	 64
@@ -507,8 +507,8 @@ int assert_gpiod_chip() {
                     index += 1;
                 }
 
-                cpu_buf += index + 1;  
-                
+                cpu_buf += index + 1;
+
                 if (!strcmp("brcm,bcm2712", cpu_buf)) {
                     // Pi 5
                     chip_name = "pinctrl-rp1";
@@ -524,7 +524,7 @@ int assert_gpiod_chip() {
             }
         }
 
-        
+
 
         if (chip_name) {
             gpiod_chip_iter *iter = gpiod_chip_iter_new();

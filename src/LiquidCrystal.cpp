@@ -1,6 +1,6 @@
 #if defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__)
 
-#include "LiquidCrystal.h"
+#include "../include/LiquidCrystal.h"
 #include <inttypes.h>
 #include <Arduino.h>
 #include <Wire.h>
