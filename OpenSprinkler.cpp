@@ -2019,13 +2019,13 @@ int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char*
 		DEBUG_PRINTLN(F("client no longer connected"));
 	}
 	memset(ether_buffer, 0, ETHER_BUFFER_SIZE);
-	uint32_t stoptime = millis()+timeout;
 
 	int pos = 0;
 #if defined(ARDUINO)
 	// with ESP8266 core 3.0.2, client->connected() is not always true even if there is more data
 	// so this loop is going to take longer than it should be
 	// todo: can consider using HTTPClient for ESP8266
+	uint32_t stoptime = millis()+timeout;
 	while(true) {
 		int nbytes = client->available();
 		if(nbytes>0) {
@@ -2151,7 +2151,9 @@ void OpenSprinkler::switch_remotestation(RemoteOTCStationData *data, bool turnon
 						turnon, timer);
 	bf.emit_p(PSTR(" HTTP/1.0\r\nHOST: $S\r\nConnection:close\r\n\r\n"), DEFAULT_OTC_SERVER_APP);
 
-	int x = send_http_request(DEFAULT_OTC_SERVER_APP, DEFAULT_OTC_PORT_APP, p, remote_http_callback, true);
+
+	// TODO: Logging. If we can't return an error, maybe we should log something.
+	(void) send_http_request(DEFAULT_OTC_SERVER_APP, DEFAULT_OTC_PORT_APP, p, remote_http_callback, true);
 }
 
 /** Switch http(s) station
