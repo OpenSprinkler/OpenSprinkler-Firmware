@@ -34,7 +34,7 @@ if [ "$1" == "demo" ]; then
 
     ws=$(ls external/TinyWebsockets/tiny_websockets_lib/src/*.cpp)
     otf=$(ls external/OpenThings-Framework-Firmware-Library/*.cpp)
-    g++ -o OpenSprinkler -DDEMO -DSMTP_OPENSSL $DEBUG -std=c++14 -include string.h main.cpp OpenSprinkler.cpp program.cpp opensprinkler_server.cpp utils.cpp weather.cpp gpio.cpp mqtt.cpp smtp.c -Iexternal/TinyWebsockets/tiny_websockets_lib/include $ws -Iexternal/OpenThings-Framework-Firmware-Library/ $otf -lpthread -lmosquitto -lssl -lcrypto
+    g++ -o OpenSprinkler -DDEMO -DSMTP_OPENSSL $DEBUG -std=c++14 -include string.h -include cstdint main.cpp OpenSprinkler.cpp program.cpp opensprinkler_server.cpp utils.cpp weather.cpp gpio.cpp mqtt.cpp smtp.c -Iexternal/TinyWebsockets/tiny_websockets_lib/include $ws -Iexternal/OpenThings-Framework-Firmware-Library/ $otf -lpthread -lmosquitto -lssl -lcrypto
 elif [ "$1" == "osbo" ]; then
 	echo "Installing required libraries..."
 	apt-get install -y libmosquitto-dev libssl-dev
@@ -42,7 +42,7 @@ elif [ "$1" == "osbo" ]; then
 
     ws=$(ls external/TinyWebsockets/tiny_websockets_lib/src/*.cpp)
     otf=$(ls external/OpenThings-Framework-Firmware-Library/*.cpp)
-	g++ -o OpenSprinkler -DOSBO -DSMTP_OPENSSL $DEBUG -std=c++14 -include string.h main.cpp OpenSprinkler.cpp program.cpp opensprinkler_server.cpp utils.cpp weather.cpp gpio.cpp mqtt.cpp smtp.c -Iexternal/TinyWebsockets/tiny_websockets_lib/include $ws -Iexternal/OpenThings-Framework-Firmware-Library/ $otf -lpthread -lmosquitto -lssl -lcrypto
+	g++ -o OpenSprinkler -DOSBO -DSMTP_OPENSSL $DEBUG -std=c++14 -include string.h -include cstdint main.cpp OpenSprinkler.cpp program.cpp opensprinkler_server.cpp utils.cpp weather.cpp gpio.cpp mqtt.cpp smtp.c -Iexternal/TinyWebsockets/tiny_websockets_lib/include $ws -Iexternal/OpenThings-Framework-Firmware-Library/ $otf -lpthread -lmosquitto -lssl -lcrypto
 else
 	echo "Installing required libraries..."
 	apt-get update
@@ -66,7 +66,7 @@ else
 	echo "Compiling ospi firmware..."
     ws=$(ls external/TinyWebsockets/tiny_websockets_lib/src/*.cpp)
     otf=$(ls external/OpenThings-Framework-Firmware-Library/*.cpp)
-	g++ -o OpenSprinkler -DOSPI $USEGPIO -DSMTP_OPENSSL $DEBUG -std=c++14 -include string.h main.cpp OpenSprinkler.cpp program.cpp opensprinkler_server.cpp utils.cpp weather.cpp gpio.cpp mqtt.cpp smtp.c -Iexternal/TinyWebsockets/tiny_websockets_lib/include $ws -Iexternal/OpenThings-Framework-Firmware-Library/ $otf -lpthread -lmosquitto -lssl -lcrypto $GPIOLIB
+	g++ -o OpenSprinkler -DOSPI $USEGPIO -DSMTP_OPENSSL $DEBUG -std=c++14 -include string.h -include cstdint main.cpp OpenSprinkler.cpp program.cpp opensprinkler_server.cpp utils.cpp weather.cpp gpio.cpp mqtt.cpp smtp.c -Iexternal/TinyWebsockets/tiny_websockets_lib/include $ws -Iexternal/OpenThings-Framework-Firmware-Library/ $otf -lpthread -lmosquitto -lssl -lcrypto $GPIOLIB
 fi
 
 if [ -f /etc/init.d/OpenSprinkler.sh ]; then
