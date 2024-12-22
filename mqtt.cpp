@@ -694,7 +694,7 @@ int OSMqtt::_publish(const char *topic, const char *payload) {
 
 void subscribe_callback(struct mosquitto *mosq, void *obj, const struct mosquitto_message *message){
 	DEBUG_LOGF("Callback\r\n");
-	char *topic = message->topic;
+	// char *topic = message->topic;
 	char *msg = (char*)(message->payload);
 
 	if(!checkPassword(msg)){
