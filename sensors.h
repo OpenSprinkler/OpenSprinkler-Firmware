@@ -246,6 +246,43 @@ typedef struct SensorUrl {
 #define MONITOR_DELETE 0
 #define MONITOR_MIN 1
 #define MONITOR_MAX 2
+#define MONITOR_SENSOR12 3 //Digital OS Sensors
+#define MONITOR_AND 10
+#define MONITOR_OR 11
+#define MONITOR_XOR 12
+#define MONITOR_NOT 13
+
+typedef struct Monitor_MINMAX { // type = 1+2
+  double value1;  // MIN/MAX
+  double value2; // Secondary
+} Monitor_MINMAX_t;
+
+typedef struct Monitor_SENSOR12 { // type = 3
+  uint16_t sensor12;
+  bool invers : 1;
+} Monitor_SENSOR12_t;
+
+typedef struct Monitor_ANDORXOR { // type = 10+11+12
+  uint16_t monitor1;
+  uint16_t monitor2;
+  uint16_t monitor3;
+  uint16_t monitor4;
+  bool invers1 : 1;
+  bool invers2 : 1;
+  bool invers3 : 1;
+  bool invers4 : 1;
+} Monitor_ANDORXOR_t;
+
+typedef struct Monitor_NOT { // type = 13
+  uint16_t monitor;
+} Monitor_NOT_t;
+
+typedef union Monitor_Union {
+    Monitor_MINMAX_t minmax;     // type = 1+2
+    Monitor_SENSOR12_t sensor12; // type = 3
+    Monitor_ANDORXOR_t andorxor; // type = 10+11+12
+    Monitor_NOT_t mnot; // type = 13
+} Monitor_Union_t;
 
 typedef struct Monitor {
   uint nr;
@@ -253,8 +290,7 @@ typedef struct Monitor {
   uint sensor;   // sensor-nr
   uint prog;     // program-nr=pid
   uint zone;     // Zone
-  double value1;  // MIN/MAX
-  double value2; // Secondary
+  Monitor_Union_t m;
   boolean active;
   ulong time;
   char name[30];
@@ -390,8 +426,7 @@ void monitor_load();
 void monitor_save();
 int monitor_count();
 int monitor_delete(uint nr);
-bool monitor_define(uint nr, uint type, uint sensor, uint prog, uint zone, 
-  double value1, double value2, char * name, ulong maxRuntime, uint8_t prio);
+bool monitor_define(uint nr, uint type, uint sensor, uint prog, uint zone, const Monitor_Union_t m, char * name, ulong maxRuntime, uint8_t prio);
 Monitor_t * monitor_by_nr(uint nr);
 Monitor_t * monitor_by_idx(uint idx);
 void check_monitors();

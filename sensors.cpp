@@ -2715,8 +2715,7 @@ int monitor_delete(uint nr) {
   return HTTP_RQT_NOT_RECEIVED;
 }
 
-bool monitor_define(uint nr, uint type, uint sensor, uint prog, uint zone, 
-  double value1, double value2, char * name, ulong maxRuntime, uint8_t prio) {
+bool monitor_define(uint nr, uint type, uint sensor, uint prog, uint zone, const Monitor_Union_t m, char * name, ulong maxRuntime, uint8_t prio) {
   Monitor_t *p = monitors;
 
   Monitor_t *last = NULL;
@@ -2727,8 +2726,7 @@ bool monitor_define(uint nr, uint type, uint sensor, uint prog, uint zone,
       p->sensor = sensor;
       p->prog = prog;
       p->zone = zone;
-      p->value1 = value1;
-      p->value2 = value2;
+      p->m = m;
       //p->active = false;
       p->maxRuntime = maxRuntime;
       p->prio = prio;
@@ -2748,10 +2746,9 @@ bool monitor_define(uint nr, uint type, uint sensor, uint prog, uint zone,
   p->nr = nr;
   p->type = type;
   p->sensor = sensor;
-  p->zone = zone;
   p->prog = prog;
-  p->value1 = value1;
-  p->value2 = value2;
+  p->zone = zone;
+  p->m = m;
   p->active = false;
   p->maxRuntime = maxRuntime;
   p->prio = prio;
@@ -2825,8 +2822,10 @@ void stop_monitor_action(Monitor_t * mon) {
   if (mon->zone > 0) {
     int sid = mon->zone-1;
     RuntimeQueueStruct *q = pd.queue + pd.station_qid[sid];
-		q->deque_time = mon->time;
-		turn_off_station(sid, mon->time);
+    if (q) {
+		  q->deque_time = mon->time;
+		  turn_off_station(sid, mon->time);
+    }
   }
 }
 
@@ -2847,49 +2846,83 @@ void push_message(Monitor_t * mon, float value) {
   push_message(type, (uint32_t)mon->prio, value, name);
 }
 
+bool get_monitor(uint nr, bool inv, bool defaultBool) {
+  Monitor_t *mon = monitor_by_nr(nr);
+  if (!mon) return defaultBool;
+  return inv ? !mon->active : mon->active;
+}
+
 void check_monitors() {
   Monitor_t *mon = monitors;
   while (mon) {
     uint nr = mon->nr;
-    Sensor_t * sensor = sensor_by_nr(mon->sensor);
-    if (sensor && sensor->flags.data_ok) {
-      double value = sensor->last_data;
-      if (!mon->active) { //Check for start monitor actions:
-        switch(mon->type) {
-          case MONITOR_MIN: 
-            if (value <= mon->value1) {
+
+    bool wasActive = mon->active;
+    double value = 0;
+
+    switch(mon->type) {
+      case MONITOR_MIN: 
+      case MONITOR_MAX: {
+       Sensor_t * sensor = sensor_by_nr(mon->sensor);
+        if (sensor && sensor->flags.data_ok) {
+          value = sensor->last_data;
+
+          if (!mon->active) {
+            if ((mon->type == MONITOR_MIN && value <= mon->m.minmax.value1) || 
+              (mon->type == MONITOR_MAX && value >= mon->m.minmax.value1)) {
               mon->active = true;
-              start_monitor_action(mon);
-              push_message(mon, value);
-              mon = monitor_by_nr(nr); //restart because if send by mail we unloaded+reloaded the monitors
             }
-            break;
-          case MONITOR_MAX:
-            if (value >= mon->value1) {
-              mon->active = true;
-              start_monitor_action(mon);
-              push_message(mon, value);
-              mon = monitor_by_nr(nr); //restart because if send by mail we unloaded+reloaded the monitors
-            }
-            break;
-        }
-      } else { //mon->active, check for stop monitor actions:
-        switch(mon->type) {
-          case MONITOR_MIN: 
-            if (value >= mon->value2) {
+          } else {
+            if ((mon->type == MONITOR_MIN && value >= mon->m.minmax.value2) || 
+              (mon->type == MONITOR_MAX && value <= mon->m.minmax.value2)) {
               mon->active = false;
-              stop_monitor_action(mon);
             }
-            break;
-          case MONITOR_MAX:
-            if (value <= mon->value2) {
-              mon->active = false;
-              stop_monitor_action(mon);
-            }
-            break;
+          }
         }
+        break; }
+
+      case MONITOR_SENSOR12:
+        if (mon->m.sensor12.sensor12 == 1)        
+      	  if (os.iopts[IOPT_SENSOR1_TYPE] == SENSOR_TYPE_RAIN || os.iopts[IOPT_SENSOR1_TYPE] == SENSOR_TYPE_SOIL)
+            mon->active = mon->m.sensor12.invers? !os.status.sensor1_active : os.status.sensor1_active;
+        if (mon->m.sensor12.sensor12 == 2)
+          if (os.iopts[IOPT_SENSOR2_TYPE] == SENSOR_TYPE_RAIN || os.iopts[IOPT_SENSOR2_TYPE] == SENSOR_TYPE_SOIL)
+            mon->active = mon->m.sensor12.invers? !os.status.sensor2_active : os.status.sensor2_active;
+        break;
+
+      case MONITOR_AND:
+        mon->active = get_monitor(mon->m.andorxor.monitor1, mon->m.andorxor.invers1, true) &&
+          get_monitor(mon->m.andorxor.monitor2, mon->m.andorxor.invers2, true) &&
+          get_monitor(mon->m.andorxor.monitor3, mon->m.andorxor.invers3, true) &&
+          get_monitor(mon->m.andorxor.monitor4, mon->m.andorxor.invers4, true);          
+        break;
+      case MONITOR_OR:
+        mon->active = get_monitor(mon->m.andorxor.monitor1, mon->m.andorxor.invers1, false) ||
+          get_monitor(mon->m.andorxor.monitor2, mon->m.andorxor.invers2, false) ||
+          get_monitor(mon->m.andorxor.monitor3, mon->m.andorxor.invers3, false) ||
+          get_monitor(mon->m.andorxor.monitor4, mon->m.andorxor.invers4, false);
+        break;
+      case MONITOR_XOR:
+        mon->active = get_monitor(mon->m.andorxor.monitor1, mon->m.andorxor.invers1, false) ^
+          get_monitor(mon->m.andorxor.monitor2, mon->m.andorxor.invers2, false) ^
+          get_monitor(mon->m.andorxor.monitor3, mon->m.andorxor.invers3, false) ^
+          get_monitor(mon->m.andorxor.monitor4, mon->m.andorxor.invers4, false);
+        break;
+      case MONITOR_NOT:
+        mon->active = get_monitor(mon->m.mnot.monitor, true, false);
+        break;
+    }
+
+    if (mon->active != wasActive) {
+      if (mon->active) {
+        start_monitor_action(mon);
+        push_message(mon, value);
+        mon = monitor_by_nr(nr); //restart because if send by mail we unloaded+reloaded the monitors
+      } else {
+        stop_monitor_action(mon);
       }
     }
+
     mon = mon->next;
   }
 }

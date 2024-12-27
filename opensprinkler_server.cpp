@@ -2976,7 +2976,13 @@ void server_monitor_types(OTF_PARAMS_DEF) {
 
 	bfill.emit_p(PSTR("{\"monitortypes\": ["));
 	bfill.emit_p(PSTR("{\"name\":\"Min\",\"type\":$D},"), MONITOR_MIN);
-	bfill.emit_p(PSTR("{\"name\":\"Max\",\"type\":$D}]}"), MONITOR_MAX);
+	bfill.emit_p(PSTR("{\"name\":\"Max\",\"type\":$D},"), MONITOR_MAX);
+	bfill.emit_p(PSTR("{\"name\":\"SN 1/2\",\"type\":$D},"), MONITOR_SENSOR12);
+	bfill.emit_p(PSTR("{\"name\":\"AND\",\"type\":$D},"), MONITOR_AND);
+	bfill.emit_p(PSTR("{\"name\":\"OR\",\"type\":$D},"), MONITOR_OR);
+	bfill.emit_p(PSTR("{\"name\":\"XOR\",\"type\":$D},"), MONITOR_XOR);
+	bfill.emit_p(PSTR("{\"name\":\"NOT\",\"type\":$D}" ), MONITOR_NOT);
+	bfill.emit_p(PSTR("]}"));
 	handle_return(HTML_OK);
 }
 
@@ -2995,38 +3001,30 @@ void server_monitor_config(OTF_PARAMS_DEF) {
 
 	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("nr"), true))
 		handle_return(HTML_DATA_MISSING);
-	uint nr = strtoul(tmp_buffer, NULL, 0); // Adjustment nr
+	uint16_t nr = strtoul(tmp_buffer, NULL, 0); // Adjustment nr
 	if (nr == 0)
 		handle_return(HTML_DATA_MISSING);
 
 	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("type"), true))
 		handle_return(HTML_DATA_MISSING);
-	uint type = strtoul(tmp_buffer, NULL, 0); // Adjustment type
+	uint16_t type = strtoul(tmp_buffer, NULL, 0); // Adjustment type
 
 	if (type == 0) {
 		monitor_delete(nr);
 		handle_return(HTML_SUCCESS);
 	}
 
-	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("sensor"), true))
-		handle_return(HTML_DATA_MISSING);
-	uint sensor = strtoul(tmp_buffer, NULL, 0); // Sensor nr
+	uint16_t sensor = 0;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("sensor"), true))
+		sensor = strtoul(tmp_buffer, NULL, 0); // Sensor nr
 
 	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("prog"), true))
 		handle_return(HTML_DATA_MISSING);
-	uint prog = strtoul(tmp_buffer, NULL, 0); // Program nr
+	uint16_t prog = strtoul(tmp_buffer, NULL, 0); // Program nr
 
 	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("zone"), true))
 		handle_return(HTML_DATA_MISSING);
-	uint zone = strtoul(tmp_buffer, NULL, 0); // Zone
-
-	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("value1"), true))
-		handle_return(HTML_DATA_MISSING);
-	double value1 = atof(tmp_buffer); // Value 1
-
-	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("value2"), true))
-		handle_return(HTML_DATA_MISSING);
-	double value2 = atof(tmp_buffer); // Value 2
+	uint16_t zone = strtoul(tmp_buffer, NULL, 0); // Zone
 
 	char name[30] = {0};
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("name"), true))
@@ -3040,24 +3038,117 @@ void server_monitor_config(OTF_PARAMS_DEF) {
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("prio"), true))
 		prio = strtoul(tmp_buffer, NULL, 0); // prio
 
-	int ret = monitor_define(nr, type, sensor, prog, zone, value1, value2, name, maxRuntime, prio);
+	//type-dependend parameters:
+	//type = MIN/MAX of sensor value:
+	double value1 = 0;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("value1"), true))
+		value1 = atof(tmp_buffer); // Value 1
+
+	double value2 = 0;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("value2"), true))
+		value2 = atof(tmp_buffer); // Value 2
+
+	//type = SENSOR12
+	uint16_t sensor12 = 0;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("sensor12"), true))
+		sensor12 = strtoul(tmp_buffer, NULL, 0); 
+	bool invers = 0;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("invers"), true))
+		invers = strtoul(tmp_buffer, NULL, 0) > 0; 
+
+	//type = AND/OR/XOR:
+	uint16_t monitor1 = 0;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("monitor1"), true))
+		monitor1 = strtoul(tmp_buffer, NULL, 0); 
+	uint16_t monitor2 = 0;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("monitor2"), true))
+		monitor2 = strtoul(tmp_buffer, NULL, 0); 
+	uint16_t monitor3 = 0;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("monitor3"), true))
+		monitor3 = strtoul(tmp_buffer, NULL, 0); 
+	uint16_t monitor4 = 0;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("monitor4"), true))
+		monitor4 = strtoul(tmp_buffer, NULL, 0); 
+
+	bool invers1 = 0;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("invers1"), true))
+		invers1 = strtoul(tmp_buffer, NULL, 0) > 0; 
+	bool invers2 = 0;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("invers2"), true))
+		invers2 = strtoul(tmp_buffer, NULL, 0) > 0; 
+	bool invers3 = 0;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("invers3"), true))
+		invers3 = strtoul(tmp_buffer, NULL, 0) > 0; 
+	bool invers4 = 0;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("invers4"), true))
+		invers4 = strtoul(tmp_buffer, NULL, 0) > 0; 
+
+	//type = NOT
+	uint16_t monitor = 0;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("monitor"), true))
+		monitor = strtoul(tmp_buffer, NULL, 0); 
+
+	Monitor_Union_t m; 
+	switch (type) {
+		case MONITOR_MIN:
+		case MONITOR_MAX:
+			m = (Monitor_Union_t){.minmax = {.value1 = value1, .value2 = value2}};
+			break;
+		case MONITOR_SENSOR12:
+			m = (Monitor_Union_t){.sensor12 = {.sensor12 = sensor12, .invers = invers}};
+			break;
+		case MONITOR_AND:
+		case MONITOR_OR:
+		case MONITOR_XOR:
+			m = (Monitor_Union_t){.andorxor = {.monitor1 = monitor1, .monitor2 = monitor2, .monitor3 = monitor3, .monitor4 = monitor4,
+				.invers1 = invers1, .invers2 = invers2, .invers3 = invers3, .invers4 = invers4}};
+			break;
+		case MONITOR_NOT:
+			m = (Monitor_Union_t){.mnot = {.monitor = monitor}};
+			break;
+		default: handle_return(HTML_DATA_FORMATERROR);
+	}
+	int ret = monitor_define(nr, type, sensor, prog, zone, m, name, maxRuntime, prio);
 	ret = ret >= HTTP_RQT_SUCCESS?HTML_SUCCESS:HTML_DATA_MISSING;
 	handle_return(ret);
 }
 
 void monitorconfig_json(Monitor_t *mon) {
-	bfill.emit_p(PSTR("{\"nr\":$D,\"type\":$D,\"sensor\":$D,\"prog\":$D,\"zone\":$D,\"value1\":$E,\"value2\":$E,\"name\":\"$S\",\"maxrun\":$L,\"prio\":$D,\"active\":$D}"),
-		mon->nr,
-		mon->type,
-		mon->sensor,
-		mon->prog,
-		mon->zone,
-		isnan(mon->value1)?0:mon->value1,
-		isnan(mon->value2)?0:mon->value2,
-		mon->name,
-		mon->maxRuntime,
-		mon->prio,
-		mon->active);
+	bfill.emit_p(PSTR("{\"nr\":$D,\"type\":$D,\"sensor\":$D,\"prog\":$D,\"zone\":$D,\"name\":\"$S\",\"maxrun\":$L,\"prio\":$D,\"active\":$D,"),
+				mon->nr,
+				mon->type,
+				mon->sensor,
+				mon->prog,
+				mon->zone,
+				mon->name,
+				mon->maxRuntime,
+				mon->prio,
+				mon->active);
+
+	switch(mon->type) {
+		case MONITOR_MIN:
+		case MONITOR_MAX:
+			bfill.emit_p(PSTR("\"value1\":$E,\"value2\":$E}"),
+				isnan(mon->m.minmax.value1)?0:mon->m.minmax.value1,
+				isnan(mon->m.minmax.value2)?0:mon->m.minmax.value2);
+			break;
+		case MONITOR_SENSOR12:
+			bfill.emit_p(PSTR("\"sensor12\":$D,\"invers\":$D}"),
+				mon->m.sensor12.sensor12,
+				mon->m.sensor12.invers);
+			break;
+		case MONITOR_AND:
+		case MONITOR_OR:
+		case MONITOR_XOR:
+			bfill.emit_p(PSTR("\"monitor1\":$D,\"monitor2\":$D,\"monitor3\":$D,\"monitor4\":$D,\"invers1\":$D,\"invers2\":$D,\"invers3\":$D,\"invers4\":$D}"),
+				mon->m.andorxor.monitor1, mon->m.andorxor.monitor2, mon->m.andorxor.monitor3, mon->m.andorxor.monitor4,
+				mon->m.andorxor.invers1, mon->m.andorxor.invers2,  mon->m.andorxor.invers3,  mon->m.andorxor.invers4); 
+			break;
+		case MONITOR_NOT:
+			bfill.emit_p(PSTR("\"monitor\":$D}"),
+				mon->m.mnot.monitor);
+			break;
+	}
 }
 
 void monitorconfig_json() {
@@ -3716,7 +3807,7 @@ void server_sensorconfig_backup(OTF_PARAMS_DEF) {
 		send_packet(OTF_PARAMS);
 	}
 	send_packet(OTF_PARAMS);
-	if (backup & BACKUP_SENSORS)  {
+	if (backup & BACKUP_MONITORS)  {
 		bfill.emit_p(PSTR(",\"monitors\":["));
 		monitorconfig_json();
 		bfill.emit_p(PSTR("]"));
