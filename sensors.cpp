@@ -2852,6 +2852,58 @@ bool get_monitor(uint nr, bool inv, bool defaultBool) {
   return inv ? !mon->active : mon->active;
 }
 
+bool get_remote_monitor(Monitor_t *mon, bool defaultBool) {
+#if defined(ESP8266)
+  IPAddress _ip(mon->m.remote.ip);
+  unsigned char ip[4] = {_ip[0], _ip[1], _ip[2], _ip[3]};
+#else
+  unsigned char ip[4];
+  ip[3] = (unsigned char)((mon->m.remote.ip >> 24) & 0xFF);
+  ip[2] = (unsigned char)((mon->m.remote.ip >> 16) & 0xFF);
+  ip[1] = (unsigned char)((mon->m.remote.ip >> 8) & 0xFF);
+  ip[0] = (unsigned char)((mon->m.remote.ip & 0xFF));
+#endif
+
+  DEBUG_PRINTLN(F("read_monitor_http"));
+
+  char *p = tmp_buffer;
+  BufferFiller bf = BufferFiller(tmp_buffer, TMP_BUFFER_SIZE);
+
+  bf.emit_p(PSTR("GET /ml?pw=$O&nr=$D"), SOPT_PASSWORD, mon->m.remote.rmonitor);
+  bf.emit_p(PSTR(" HTTP/1.0\r\nHOST: $D.$D.$D.$D\r\n\r\n"), ip[0], ip[1], ip[2], ip[3]);
+
+  DEBUG_PRINTLN(p);
+
+  char server[20];
+  sprintf(server, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
+
+  int res = os.send_http_request(server, mon->m.remote.port, p, NULL, false, 500);
+  if (res == HTTP_RQT_SUCCESS) {
+    DEBUG_PRINTLN("Send Ok");
+    p = ether_buffer;
+    DEBUG_PRINTLN(p);
+
+    char buf[20];
+    char *s = strstr(p, "\"time\":");
+    if (s && extract(s, buf, sizeof(buf))) {
+      ulong time = strtoul(buf, NULL, 0);
+      if (time == 0 || time == mon->time) {
+        return defaultBool;
+      } else {
+        mon->time = time;
+      }
+    }
+
+    s = strstr(p, "\"active\":");
+    if (s && extract(s, buf, sizeof(buf))) {
+      return strtoul(buf, NULL, 0);
+    }
+
+    return HTTP_RQT_SUCCESS;
+  }
+  return defaultBool;
+}
+
 void check_monitors() {
   Monitor_t *mon = monitors;
   while (mon) {
@@ -2910,6 +2962,9 @@ void check_monitors() {
         break;
       case MONITOR_NOT:
         mon->active = get_monitor(mon->m.mnot.monitor, true, false);
+        break;
+      case MONITOR_REMOTE:
+        mon->active = get_remote_monitor(mon, wasActive);
         break;
     }
 

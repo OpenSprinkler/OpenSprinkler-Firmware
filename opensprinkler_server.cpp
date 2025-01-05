@@ -2981,7 +2981,8 @@ void server_monitor_types(OTF_PARAMS_DEF) {
 	bfill.emit_p(PSTR("{\"name\":\"AND\",\"type\":$D},"), MONITOR_AND);
 	bfill.emit_p(PSTR("{\"name\":\"OR\",\"type\":$D},"), MONITOR_OR);
 	bfill.emit_p(PSTR("{\"name\":\"XOR\",\"type\":$D},"), MONITOR_XOR);
-	bfill.emit_p(PSTR("{\"name\":\"NOT\",\"type\":$D}" ), MONITOR_NOT);
+	bfill.emit_p(PSTR("{\"name\":\"NOT\",\"type\":$D}," ), MONITOR_NOT);
+	bfill.emit_p(PSTR("{\"name\":\"REMOTE\",\"type\":$D}" ), MONITOR_REMOTE);
 	bfill.emit_p(PSTR("]}"));
 	handle_return(HTML_OK);
 }
@@ -3083,10 +3084,21 @@ void server_monitor_config(OTF_PARAMS_DEF) {
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("invers4"), true))
 		invers4 = strtoul(tmp_buffer, NULL, 0) > 0; 
 
-	//type = NOT
+	//type = NOT 
 	uint16_t monitor = 0;
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("monitor"), true))
 		monitor = strtoul(tmp_buffer, NULL, 0); 
+
+	//type = REMOTE ip
+	uint16_t rmonitor = 0;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("rmonitor"), true))
+		rmonitor = strtoul(tmp_buffer, NULL, 0); 
+	uint32_t ip = 0;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("ip"), true))
+		ip = strtoul(tmp_buffer, NULL, 0); 
+	uint16_t port = 0;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("port"), true))
+		port = strtoul(tmp_buffer, NULL, 0); 
 
 	Monitor_Union_t m; 
 	switch (type) {
@@ -3106,6 +3118,9 @@ void server_monitor_config(OTF_PARAMS_DEF) {
 		case MONITOR_NOT:
 			m = (Monitor_Union_t){.mnot = {.monitor = monitor}};
 			break;
+		case MONITOR_REMOTE:
+			m = (Monitor_Union_t){.remote = {.rmonitor = rmonitor, .ip = ip, .port = port}};
+			break;
 		default: handle_return(HTML_DATA_FORMATERROR);
 	}
 	int ret = monitor_define(nr, type, sensor, prog, zone, m, name, maxRuntime, prio);
@@ -3114,7 +3129,7 @@ void server_monitor_config(OTF_PARAMS_DEF) {
 }
 
 void monitorconfig_json(Monitor_t *mon) {
-	bfill.emit_p(PSTR("{\"nr\":$D,\"type\":$D,\"sensor\":$D,\"prog\":$D,\"zone\":$D,\"name\":\"$S\",\"maxrun\":$L,\"prio\":$D,\"active\":$D,"),
+	bfill.emit_p(PSTR("{\"nr\":$D,\"type\":$D,\"sensor\":$D,\"prog\":$D,\"zone\":$D,\"name\":\"$S\",\"maxrun\":$L,\"prio\":$D,\"active\":$D,\"time\":$L,"),
 				mon->nr,
 				mon->type,
 				mon->sensor,
@@ -3123,7 +3138,8 @@ void monitorconfig_json(Monitor_t *mon) {
 				mon->name,
 				mon->maxRuntime,
 				mon->prio,
-				mon->active);
+				mon->active,
+				mon->time);
 
 	switch(mon->type) {
 		case MONITOR_MIN:
@@ -3148,6 +3164,13 @@ void monitorconfig_json(Monitor_t *mon) {
 			bfill.emit_p(PSTR("\"monitor\":$D}"),
 				mon->m.mnot.monitor);
 			break;
+		case MONITOR_REMOTE:
+			bfill.emit_p(PSTR("\"rmonitor\":$D,\"ip\":$L,\"port\":$D}"),
+				mon->m.remote.rmonitor,
+				mon->m.remote.ip,
+				mon->m.remote.port);
+			break;
+
 	}
 }
 
@@ -3432,7 +3455,7 @@ static const char* sensor_names[] = {
 	"Truebner SMT100 RS485 Modbus, temperature mode",
 	"Truebner SMT100 RS485 Modbus, permittivity mode",
  #if defined(ESP8266)
-	"ASB - voltage mode 0..4V",
+	"ASB - voltage mode 0..5V",
 	"ASB - 0..3.3V to 0..100%",
 	"ASB - SMT50 moisture mode",
 	"ASB - SMT50 temperature mode",

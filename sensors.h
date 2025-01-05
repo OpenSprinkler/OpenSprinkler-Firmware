@@ -251,6 +251,7 @@ typedef struct SensorUrl {
 #define MONITOR_OR 11
 #define MONITOR_XOR 12
 #define MONITOR_NOT 13
+#define MONITOR_REMOTE 100
 
 typedef struct Monitor_MINMAX { // type = 1+2
   double value1;  // MIN/MAX
@@ -277,11 +278,18 @@ typedef struct Monitor_NOT { // type = 13
   uint16_t monitor;
 } Monitor_NOT_t;
 
+typedef struct Monitor_REMOTE { // type = 100
+  uint16_t rmonitor;
+  uint32_t ip;
+  uint16_t port;
+} Monitor_REMOTE_t;
+
 typedef union Monitor_Union {
     Monitor_MINMAX_t minmax;     // type = 1+2
     Monitor_SENSOR12_t sensor12; // type = 3
     Monitor_ANDORXOR_t andorxor; // type = 10+11+12
     Monitor_NOT_t mnot; // type = 13
+    Monitor_REMOTE_t remote; //type = 100
 } Monitor_Union_t;
 
 typedef struct Monitor {
