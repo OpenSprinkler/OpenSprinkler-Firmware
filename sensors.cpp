@@ -1541,21 +1541,28 @@ int read_sensor_ip(Sensor_t *sensor) {
   return HTTP_RQT_NOT_RECEIVED;
 }
 
+#if defined(OSPI)
 int read_internal_raspi(Sensor_t *sensor, ulong time) {
   if (!sensor || !sensor->flags.enable) return HTTP_RQT_NOT_RECEIVED;
 
   char buf[10];
-  if (!file_read_block("/sys/class/thermal/thermal_zone0/temp", buf, 0, 10))
+  size_t res = 0;
+  FILE *fp = fopen("/sys/class/thermal/thermal_zone0/temp", "r");
+	if(fp) {
+		res = fread(buf, 1, 10, fp);
+		fclose(fp);
+	}
+  if (!res)
     return HTTP_RQT_NOT_RECEIVED;
 
   sensor->last_read = time;
   sensor->last_native_data = strtol(buf, NULL, 0);
-  sensor->last_data = (double)sensor->last_native_data / 100;
+  sensor->last_data = (double)sensor->last_native_data / 1000;
   sensor->flags.data_ok = true;
 
 	return HTTP_RQT_NOT_RECEIVED;
 }
-
+#endif
 /**
  * read a sensor
  */
