@@ -1560,7 +1560,7 @@ int read_internal_raspi(Sensor_t *sensor, ulong time) {
   sensor->last_data = (double)sensor->last_native_data / 1000;
   sensor->flags.data_ok = true;
 
-	return HTTP_RQT_NOT_RECEIVED;
+	return HTTP_RQT_SUCCESS;
 }
 #endif
 /**
