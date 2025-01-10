@@ -3412,6 +3412,8 @@ static const int sensor_types[] = {
 	SENSOR_SMT100_MOIS,
 	SENSOR_SMT100_TEMP,
 	SENSOR_SMT100_PMTY,
+	SENSOR_TH100_MOIS,
+	SENSOR_TH100_TEMP,
 
 #if defined(ESP8266)
 	SENSOR_ANALOG_EXTENSION_BOARD,
@@ -3430,6 +3432,9 @@ static const int sensor_types[] = {
 	SENSOR_OSPI_ANALOG_P,
 	SENSOR_OSPI_ANALOG_SMT50_MOIS,
 	SENSOR_OSPI_ANALOG_SMT50_TEMP,
+#endif
+#if defined(OSPI)
+    SENSOR_OSPI_INTERNAL_TEMP,
 #endif
 	SENSOR_MQTT,
 	SENSOR_REMOTE,
@@ -3454,6 +3459,8 @@ static const char* sensor_names[] = {
 	"Truebner SMT100 RS485 Modbus, moisture mode",
 	"Truebner SMT100 RS485 Modbus, temperature mode",
 	"Truebner SMT100 RS485 Modbus, permittivity mode",
+	"Truebner TH100 RS485 Modbus, humidity mode",
+	"Truebner TH100 RS485 Modbus, temperature mode",
  #if defined(ESP8266)
 	"ASB - voltage mode 0..5V",
 	"ASB - 0..3.3V to 0..100%",
@@ -3473,6 +3480,9 @@ static const char* sensor_names[] = {
 	"OSPi analog input - 0.3.3V to 0..100%",
 	"OSPi analog input - SMT50 moisture mode",
 	"OSPi analog input - SMT50 temperature mode",
+#endif
+#if defined(OSPI)
+    "Internal Raspbery Pi temperature",
 #endif
 	"MQTT subscription",
 	"Remote opensprinkler sensor",

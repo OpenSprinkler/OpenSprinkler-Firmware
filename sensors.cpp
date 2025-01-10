@@ -1451,6 +1451,8 @@ int read_sensor_ip(Sensor_t *sensor) {
     case SENSOR_SMT100_MOIS:
     case SENSOR_SMT100_TEMP:
     case SENSOR_SMT100_PMTY:
+    case SENSOR_TH100_MOIS:
+	  case SENSOR_TH100_TEMP:
       uint32_t stoptime = millis() + SENSOR_READ_TIMEOUT;
 #if defined(ESP8266)
       while (true) {
@@ -1511,12 +1513,14 @@ int read_sensor_ip(Sensor_t *sensor) {
 
       // Convert to readable value:
       switch (sensor->type) {
+        case SENSOR_TH100_MOIS:
         case SENSOR_SMT100_MOIS:  // Equation: soil moisture [vol.%]=
                                   // (16Bit_soil_moisture_value / 100)
           sensor->last_data = ((double)sensor->last_native_data / 100.0);
           sensor->flags.data_ok = sensor->last_native_data < 10000;
           DEBUG_PRINT(F(" soil moisture %: "));
           break;
+        case SENSOR_TH100_TEMP:
         case SENSOR_SMT100_TEMP:  // Equation: temperature [°C]=
                                   // (16Bit_temperature_value / 100)-100
           sensor->last_data =
@@ -1537,6 +1541,21 @@ int read_sensor_ip(Sensor_t *sensor) {
   return HTTP_RQT_NOT_RECEIVED;
 }
 
+int read_internal_raspi(Sensor_t *sensor, ulong time) {
+  if (!sensor || !sensor->flags.enable) return HTTP_RQT_NOT_RECEIVED;
+
+  char buf[10];
+  if (!file_read_block("/sys/class/thermal/thermal_zone0/temp", buf, 0, 10))
+    return HTTP_RQT_NOT_RECEIVED;
+
+  sensor->last_read = time;
+  sensor->last_native_data = strtol(buf, NULL, 0);
+  sensor->last_data = (double)sensor->last_native_data / 100;
+  sensor->flags.data_ok = true;
+
+	return HTTP_RQT_NOT_RECEIVED;
+}
+
 /**
  * read a sensor
  */
@@ -1547,6 +1566,8 @@ int read_sensor(Sensor_t *sensor, ulong time) {
     case SENSOR_SMT100_MOIS:
     case SENSOR_SMT100_TEMP:
     case SENSOR_SMT100_PMTY:
+    case SENSOR_TH100_MOIS:
+	  case SENSOR_TH100_TEMP:
       //DEBUG_PRINT(F("Reading sensor "));
       //DEBUG_PRINTLN(sensor->name);
       sensor->last_read = time;
@@ -1602,6 +1623,10 @@ int read_sensor(Sensor_t *sensor, ulong time) {
     case SENSOR_OSPI_ANALOG_SMT50_MOIS:
     case SENSOR_OSPI_ANALOG_SMT50_TEMP:
       return read_sensor_ospi(sensor, time);
+#endif
+#if defined(OSPI)
+    case SENSOR_OSPI_INTERNAL_TEMP:
+      return read_internal_raspi(sensor, time);
 #endif
 #endif
     case SENSOR_REMOTE:
@@ -1889,6 +1914,8 @@ int set_sensor_address(Sensor_t *sensor, uint8_t new_address) {
     case SENSOR_SMT100_MOIS:
     case SENSOR_SMT100_TEMP:
     case SENSOR_SMT100_PMTY:
+    case SENSOR_TH100_MOIS:
+	  case SENSOR_TH100_TEMP:
       sensor->flags.data_ok = false;
       if (sensor->ip && sensor->port)
         return set_sensor_address_ip(sensor, new_address);
@@ -2222,6 +2249,10 @@ unsigned char getSensorUnitId(int type) {
       return UNIT_DEGREE;
     case SENSOR_SMT100_PMTY:
       return UNIT_DK;
+    case SENSOR_TH100_MOIS:
+      return UNIT_HUM_PERCENT;
+	  case SENSOR_TH100_TEMP:
+      return UNIT_DEGREE;
 #if defined(ARDUINO)
 #if defined(ESP8266)
     case SENSOR_ANALOG_EXTENSION_BOARD:
@@ -2256,6 +2287,7 @@ unsigned char getSensorUnitId(int type) {
     case SENSOR_OSPI_ANALOG_SMT50_MOIS:
       return UNIT_PERCENT;
     case SENSOR_OSPI_ANALOG_SMT50_TEMP:
+    case SENSOR_OSPI_INTERNAL_TEMP:
       return UNIT_DEGREE;
 #endif
     case SENSOR_MQTT:
@@ -2290,6 +2322,10 @@ unsigned char getSensorUnitId(Sensor_t *sensor) {
       return UNIT_DEGREE;
     case SENSOR_SMT100_PMTY:
       return UNIT_DK;
+    case SENSOR_TH100_MOIS:
+      return UNIT_HUM_PERCENT;
+	  case SENSOR_TH100_TEMP:
+      return UNIT_DEGREE;
 #if defined(ARDUINO)
 #if defined(ESP8266)
     case SENSOR_ANALOG_EXTENSION_BOARD:
@@ -2323,6 +2359,7 @@ unsigned char getSensorUnitId(Sensor_t *sensor) {
     case SENSOR_OSPI_ANALOG_SMT50_MOIS:
       return UNIT_PERCENT;
     case SENSOR_OSPI_ANALOG_SMT50_TEMP:
+    case SENSOR_OSPI_INTERNAL_TEMP:
       return UNIT_DEGREE;
 #endif
     case SENSOR_USERDEF:

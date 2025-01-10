@@ -67,65 +67,50 @@ extern "C" {
 #define MAX_LOG_SIZE_MONTH 1000
 
 // Sensor types:
-#define SENSOR_NONE 0         // None or deleted sensor
-#define SENSOR_SMT100_MOIS 1  // Truebner SMT100 RS485, moisture mode
-#define SENSOR_SMT100_TEMP 2  // Truebner SMT100 RS485, temperature mode
-#define SENSOR_SMT100_PMTY 3  // Truebner SMT100 RS485, permittivity mode
-#define SENSOR_ANALOG_EXTENSION_BOARD \
-  10  // New OpenSprinkler analog extension board x8 - voltage mode 0..4V
-#define SENSOR_ANALOG_EXTENSION_BOARD_P \
-  11  // New OpenSprinkler analog extension board x8 - percent 0..3.3V to
-      // 0..100%
-#define SENSOR_SMT50_MOIS \
-  15  // New OpenSprinkler analog extension board x8 - SMT50 VWC [%] = (U * 50)
-      // : 3
-#define SENSOR_SMT50_TEMP \
-  16  // New OpenSprinkler analog extension board x8 - SMT50 T [°C] = (U – 0,5)
-      // * 100
-#define SENSOR_SMT100_ANALOG_MOIS \
-  17  // New OpenSprinkler analog extension board x8 - SMT100 VWC [%] = (U *
-      // 100) : 3
-#define SENSOR_SMT100_ANALOG_TEMP \
-  18  // New OpenSprinkler analog extension board x8 - SMT50 T [°C] = (U * 100)
-      // : 3 - 40
+#define SENSOR_NONE                     0   // None or deleted sensor
+#define SENSOR_SMT100_MOIS              1   // Truebner SMT100 RS485, moisture mode
+#define SENSOR_SMT100_TEMP              2   // Truebner SMT100 RS485, temperature mode
+#define SENSOR_SMT100_PMTY              3   // Truebner SMT100 RS485, permittivity mode
+#define SENSOR_TH100_MOIS               4   // Truebner TH100 RS485,  humidity mode
+#define SENSOR_TH100_TEMP               5   // Truebner TH100 RS485,  temperature mode
+#define SENSOR_ANALOG_EXTENSION_BOARD   10  // New OpenSprinkler analog extension board x8 - voltage mode 0..4V
+#define SENSOR_ANALOG_EXTENSION_BOARD_P 11  // New OpenSprinkler analog extension board x8 - percent 0..3.3V to 0..100%
+#define SENSOR_SMT50_MOIS               15  // New OpenSprinkler analog extension board x8 - SMT50 VWC [%] = (U * 50) : 3
+#define SENSOR_SMT50_TEMP               16  // New OpenSprinkler analog extension board x8 - SMT50 T [°C] = (U – 0,5) * 100
+#define SENSOR_SMT100_ANALOG_MOIS       17  // New OpenSprinkler analog extension board x8 - SMT100 VWC [%] = (U * 100) : 3
+#define SENSOR_SMT100_ANALOG_TEMP       18  // New OpenSprinkler analog extension board x8 - SMT50 T [°C] = (U * 100) : 3 - 40
 
-#define SENSOR_VH400 \
-  30  // New OpenSprinkler analog extension board x8 - Vegetronix VH400
-#define SENSOR_THERM200 \
-  31  // New OpenSprinkler analog extension board x8 - Vegetronix THERM200
-#define SENSOR_AQUAPLUMB \
-  32  // New OpenSprinkler analog extension board x8 - Vegetronix Aquaplumb
+#define SENSOR_VH400                    30  // New OpenSprinkler analog extension board x8 - Vegetronix VH400
+#define SENSOR_THERM200                 31  // New OpenSprinkler analog extension board x8 - Vegetronix THERM200
+#define SENSOR_AQUAPLUMB                32  // New OpenSprinkler analog extension board x8 - Vegetronix Aquaplumb
 
-#define SENSOR_USERDEF \
-  49  // New OpenSprinkler analog extension board x8 - User defined sensor
+#define SENSOR_USERDEF                  49  // New OpenSprinkler analog extension board x8 - User defined sensor
 
-#define SENSOR_OSPI_ANALOG 50  // Old OSPi analog input - voltage mode 0..3.3V
-#define SENSOR_OSPI_ANALOG_P \
-  51  // Old OSPi analog input - percent 0..3.3V to 0...100%
-#define SENSOR_OSPI_ANALOG_SMT50_MOIS \
-  52  // Old OSPi analog input - SMT50 VWC [%] = (U * 50) : 3
-#define SENSOR_OSPI_ANALOG_SMT50_TEMP \
-  53  // Old OSPi analog input - SMT50 T [°C] = (U – 0,5) * 100
+#define SENSOR_OSPI_ANALOG              50  // Old OSPi analog input - voltage mode 0..3.3V
+#define SENSOR_OSPI_ANALOG_P            51  // Old OSPi analog input - percent 0..3.3V to 0...100%
+#define SENSOR_OSPI_ANALOG_SMT50_MOIS   52  // Old OSPi analog input - SMT50 VWC [%] = (U * 50) : 3
+#define SENSOR_OSPI_ANALOG_SMT50_TEMP   53  // Old OSPi analog input - SMT50 T [°C] = (U – 0,5) * 100
+#define SENSOR_OSPI_INTERNAL_TEMP       54  // Internal OSPI Temperature
+ 
+#define SENSOR_MQTT                     90  // subscribe to a MQTT server and query a value
 
-#define SENSOR_MQTT 90  // subscribe to a MQTT server and query a value
+#define SENSOR_REMOTE                   100 // Remote sensor of an remote opensprinkler
+#define SENSOR_WEATHER_TEMP_F           101 // Weather service - temperature (Fahrenheit)
+#define SENSOR_WEATHER_TEMP_C           102 // Weather service - temperature (Celcius)
+#define SENSOR_WEATHER_HUM              103 // Weather service - humidity (%)
+#define SENSOR_WEATHER_PRECIP_IN        105 // Weather service - precip (inch)
+#define SENSOR_WEATHER_PRECIP_MM        106 // Weather service - precip (mm)
+#define SENSOR_WEATHER_WIND_MPH         107 // Weather service - wind (mph)
+#define SENSOR_WEATHER_WIND_KMH         108 // Weather service - wind (kmh)
 
-#define SENSOR_REMOTE 100          // Remote sensor of an remote opensprinkler
-#define SENSOR_WEATHER_TEMP_F 101  // Weather service - temperature (Fahrenheit)
-#define SENSOR_WEATHER_TEMP_C 102  // Weather service - temperature (Celcius)
-#define SENSOR_WEATHER_HUM 103     // Weather service - humidity (%)
-#define SENSOR_WEATHER_PRECIP_IN 105  // Weather service - precip (inch)
-#define SENSOR_WEATHER_PRECIP_MM 106  // Weather service - precip (mm)
-#define SENSOR_WEATHER_WIND_MPH 107   // Weather service - wind (mph)
-#define SENSOR_WEATHER_WIND_KMH 108   // Weather service - wind (kmh)
-
-#define SENSOR_GROUP_MIN 1000  // Sensor group with min value
-#define SENSOR_GROUP_MAX 1001  // Sensor group with max value
-#define SENSOR_GROUP_AVG 1002  // Sensor group with avg value
-#define SENSOR_GROUP_SUM 1003  // Sensor group with sum value
+#define SENSOR_GROUP_MIN                1000 // Sensor group with min value
+#define SENSOR_GROUP_MAX                1001 // Sensor group with max value
+#define SENSOR_GROUP_AVG                1002 // Sensor group with avg value
+#define SENSOR_GROUP_SUM                1003 // Sensor group with sum value
 
 //Diagnostic
-#define SENSOR_FREE_MEMORY 10000 //Free memory
-#define SENSOR_FREE_STORE 10001 //Free storage
+#define SENSOR_FREE_MEMORY              10000 //Free memory
+#define SENSOR_FREE_STORE               10001 //Free storage
 
 #define SENSOR_READ_TIMEOUT 3000  // ms
 
