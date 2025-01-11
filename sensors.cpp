@@ -1264,10 +1264,10 @@ int read_sensor_rs485(Sensor_t *sensor) {
 
   DEBUG_PRINTLN(F("read_sensor_rs485: check-ok"));
 
-  uint8_t type = sensor->type == SENSOR_SMT100_TEMP   ? 0x00
-                 : sensor->type == SENSOR_SMT100_MOIS ? 0x01
-                                                      : 0x02;
-
+  bool isTemp = sensor->type == SENSOR_SMT100_TEMP || sensor->type == SENSOR_TH100_TEMP;
+  bool isMois = sensor->type == SENSOR_SMT100_MOIS || sensor->type == SENSOR_TH100_MOIS;
+  uint8_t type = isTemp ? 0x00 : isMois ? 0x01 : 0x02;
+  
   if (sensor->repeat_read == 0 || sensor->repeat_read == 1000) {
     Wire.beginTransmission(RS485_TRUEBNER1_ADDR + device);
     Wire.write((uint8_t)sensor->id);
@@ -1292,10 +1292,7 @@ int read_sensor_rs485(Sensor_t *sensor) {
       uint16_t data = (high_byte << 8) | low_byte;
       DEBUG_PRINTF("read_sensor_rs485: result: %d - %d (%d %d)\n", sensor->id,
                    data, low_byte, high_byte);
-      double value =
-          sensor->type == SENSOR_SMT100_TEMP
-              ? (data / 100.0) - 100.0
-              : (sensor->type == SENSOR_SMT100_MOIS ? data / 100.0 : data);
+      double value = isTemp ? (data / 100.0) - 100.0 : (isMois ? data / 100.0 : data);
       sensor->last_native_data = data;
       sensor->last_data = value;
       DEBUG_PRINTLN(sensor->last_data);
@@ -1343,18 +1340,17 @@ int read_sensor_rs485(Sensor_t *sensor) {
   DEBUG_PRINTLN(F("read_sensor_rs485: check-ok"));
 
   uint8_t buffer[10];
-  uint8_t type = sensor->type == SENSOR_SMT100_TEMP   ? 0x00
-                 : sensor->type == SENSOR_SMT100_MOIS ? 0x01
-                                                      : 0x02;
+  bool isTemp = sensor->type == SENSOR_SMT100_TEMP || sensor->type == SENSOR_TH100_TEMP;
+  bool isMois = sensor->type == SENSOR_SMT100_MOIS || sensor->type == SENSOR_TH100_MOIS;
+  uint8_t type = isTemp ? 0x00 : isMois ? 0x01 : 0x02;
+  
   uint16_t tab_reg[3] = {0};
   modbus_set_slave(ttyDevices[device], sensor->id);
   if (modbus_read_registers(ttyDevices[device], type, 2, tab_reg) > 0) {
     uint16_t data = tab_reg[0];
     DEBUG_PRINTF("read_sensor_rs485: result: %d - %d\n", sensor->id, data);
     double value =
-        sensor->type == SENSOR_SMT100_TEMP
-            ? (data / 100.0) - 100.0
-            : (sensor->type == SENSOR_SMT100_MOIS ? data / 100.0 : data);
+        sensor->type == isTemp ? (data / 100.0) - 100.0 : (isMois ? data / 100.0 : data);
     sensor->last_native_data = data;
     sensor->last_data = value;
     DEBUG_PRINTLN(sensor->last_data);
@@ -1425,9 +1421,10 @@ int read_sensor_ip(Sensor_t *sensor) {
   else
     modbusTcpId++;
 
-  uint8_t type = sensor->type == SENSOR_SMT100_TEMP   ? 0x00
-                 : sensor->type == SENSOR_SMT100_MOIS ? 0x01
-                                                      : 0x02;
+  bool isTemp = sensor->type == SENSOR_SMT100_TEMP || sensor->type == SENSOR_TH100_TEMP;
+  bool isMois = sensor->type == SENSOR_SMT100_MOIS || sensor->type == SENSOR_TH100_MOIS;
+  uint8_t type = isTemp ? 0x00 : isMois ? 0x01 : 0x02;
+
   buffer[0] = (0xFF00 & modbusTcpId) >> 8;
   buffer[1] = (0x00FF & modbusTcpId);
   buffer[2] = 0;
