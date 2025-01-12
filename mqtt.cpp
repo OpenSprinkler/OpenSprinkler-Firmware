@@ -645,7 +645,7 @@ void key_callback(char* mtopic, byte* payload, unsigned int length) {
 	}
 }
 
-static void registerCallback(int key, MQTT_CALLBACK_SIGNATURE) {
+void registerCallback(int key, MQTT_CALLBACK_SIGNATURE) {
 	boolean ok = false;
 	for (int i = 0; i < MAX_CALLBACKS; i++) {
 		if (callback) {
@@ -669,7 +669,7 @@ static void registerCallback(int key, MQTT_CALLBACK_SIGNATURE) {
 }
 
 void OSMqtt::setCallback(int key, MQTT_CALLBACK_SIGNATURE) {
-	registerCallback(key, MQTT_CALLBACK_SIGNATURE);
+	registerCallback(key, callback);
 	mqtt_client->setCallback(key_callback);
 }
 
