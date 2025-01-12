@@ -2910,9 +2910,9 @@ void server_sensorlog_clear(OTF_PARAMS_DEF) {
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("over"), true)) // values higher than 
 		use_over = sscanf(tmp_buffer, "%lf", &over) == 1;
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("before"), true)) // values higher than 
-		sscanf(tmp_buffer, "%lf", &before);
+		sscanf(tmp_buffer, "%lu", &before);
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("after"), true)) // values higher than 
-		sscanf(tmp_buffer, "%lf", &after);
+		sscanf(tmp_buffer, "%lu", &after);
 
 	DEBUG_PRINTLN(F("server_sensorlog_clear"));
 
@@ -2925,6 +2925,7 @@ void server_sensorlog_clear(OTF_PARAMS_DEF) {
 	print_header();
 #endif
 
+	DEBUG_PRINTLN(F("start log cleaning"));
 	if (nr > 0 || use_under || use_over || before || after) {
 		ulong n = 0;
 		if (log == -1) {
@@ -2949,6 +2950,7 @@ void server_sensorlog_clear(OTF_PARAMS_DEF) {
 			bfill.emit_p(PSTR("{\"deleted\":$L}"), log==LOG_STD?log_size:log=LOG_WEEK?log_sizeW:log_sizeM);
 		}
 	}
+	DEBUG_PRINTLN(F("end log cleaning"));
 	handle_return(HTML_OK);
 }
 

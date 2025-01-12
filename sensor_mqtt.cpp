@@ -27,7 +27,7 @@
 extern OpenSprinkler os;
 
 void sensor_mqtt_init() {
-	os.mqtt.setCallback(sensor_mqtt_callback);
+	os.mqtt.setCallback(2, sensor_mqtt_callback);
 }
 /**
  * @brief 
@@ -111,8 +111,9 @@ static void sensor_mqtt_callback(struct mosquitto *mosq, void *obj, const struct
 				char *jsonFilter =  SensorUrl_get(sensor->nr, SENSORURL_TYPE_FILTER);
 				char *p = (char*)payload;				
 				char *f = jsonFilter;
+				bool emptyFilter = !jsonFilter||!jsonFilter[0];
 
-				while (f && p) {
+				while (!emptyFilter && f && p) {
 					f = strstr(jsonFilter, "|");
 					if (f) {
 						p = strnlstr(p, jsonFilter, f-jsonFilter, (char*)payload-p+length);
@@ -122,7 +123,7 @@ static void sensor_mqtt_callback(struct mosquitto *mosq, void *obj, const struct
 					}
 				}
 				if (p) {
-					p += strlen(jsonFilter);
+					p += emptyFilter?0:strlen(jsonFilter);
 					char buf[30];
 					p = strpbrk(p, "0123456789.-+nullNULL");
 					uint i = 0;

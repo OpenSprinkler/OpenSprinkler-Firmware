@@ -66,9 +66,9 @@ private:
     static bool unsubscribe(const char *topic);
     static bool reconnect();
 #if defined(ARDUINO)
-    static void setCallback(MQTT_CALLBACK_SIGNATURE);
+    static void setCallback(int key, MQTT_CALLBACK_SIGNATURE);
 #else
-	static void setCallback(void (*on_message)(struct mosquitto *, void *, const struct mosquitto_message *));
+	static void setCallback(int key, void (*on_message)(struct mosquitto *, void *, const struct mosquitto_message *));
 #endif
 };
 

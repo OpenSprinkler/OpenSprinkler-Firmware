@@ -249,7 +249,7 @@ void sensor_save_all() {
 void sensor_api_free() {
   apiInit = false;
 
-  os.mqtt.setCallback(NULL);
+  os.mqtt.setCallback(2, NULL);
 
   while (progSensorAdjusts) {
     ProgSensorAdjust_t* next = progSensorAdjusts->next;
@@ -657,6 +657,8 @@ ulong sensorlog_clear_sensor(uint sensorNr, uint8_t log, bool use_under,
   const char *f;
   ulong idxr = 0;
   ulong n = 0;
+  DEBUG_PRINTLN(F("clearlog1"));
+  DEBUG_PRINTF("nr: %d log: %d under:%lf over: %lf before: %lld after: %lld size: %ld size2: %ld\n", sensorNr, log, under, over, before, after, size, size2);
   while (idxr < size2) {
     ulong idx = idxr;
     if (idx >= size) {
@@ -670,6 +672,7 @@ ulong sensorlog_clear_sensor(uint sensorNr, uint8_t log, bool use_under,
                                    SENSORLOG_STORE_SIZE);
     if (result == 0) break;
     if (sensorlog.nr > 0 && (sensorlog.nr == sensorNr || sensorNr == 0)) {
+      DEBUG_PRINTF("clearlog2 idx=%ld idx2=%ld\n", idx, idxr);
       boolean found = false;
       if (use_under && sensorlog.data < under) found = true;
       if (use_over && sensorlog.data > over) found = true;
@@ -681,11 +684,13 @@ ulong sensorlog_clear_sensor(uint sensorNr, uint8_t log, bool use_under,
         sensorlog.nr = 0;
         file_write_block(f, &sensorlog, idx * SENSORLOG_STORE_SIZE,
                          SENSORLOG_STORE_SIZE);
+        DEBUG_PRINTF("clearlog3 idx=%ld idxr=%ld\n", idx, idxr);
         n++;
       }
     }
     idxr++;
   }
+  DEBUG_PRINTF("clearlog4 n=%ld\n", n);
   return n;
 }
 
@@ -939,7 +944,7 @@ void push_message(Sensor_t *sensor) {
                    "\"value\":%d.%02d,\"unit\":\"%s\"}"),
               sensor->nr, sensor->type, sensor->flags.data_ok,
               sensor->last_read, (int)sensor->last_data,
-              (int)(sensor->last_data * 100) % 100, getSensorUnit(sensor));
+              abs((int)(sensor->last_data * 100) % 100), getSensorUnit(sensor));
 
     if (!os.mqtt.connected()) os.mqtt.reconnect();
     os.mqtt.publish(topic, payload);
@@ -961,7 +966,7 @@ void push_message(Sensor_t *sensor) {
                    "unit: %s"),
               sensor->nr, sensor->type, sensor->flags.data_ok,
               sensor->last_read, (int)sensor->last_data,
-              (int)(sensor->last_data * 100) % 100, getSensorUnit(sensor));
+              abs((int)(sensor->last_data * 100) % 100), getSensorUnit(sensor));
     strcat_P(postval, PSTR("\"}"));
 
     // char postBuffer[1500];
@@ -2459,9 +2464,9 @@ void GetSensorWeather() {
   DEBUG_PRINTLN(F("GetSensorWeather"));
   DEBUG_PRINTLN(ether_buffer);
 
+  last_weather_time = time;
   int ret = os.send_http_request(host, ether_buffer, NULL, false, 500);
   if (ret == HTTP_RQT_SUCCESS) {
-    last_weather_time = time;
     DEBUG_PRINTLN(ether_buffer);
 
     char buf[20];
