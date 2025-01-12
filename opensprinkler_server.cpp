@@ -2313,7 +2313,9 @@ void server_sensorurl_config(OTF_PARAMS_DEF)
 	uint type = strtoul(tmp_buffer, NULL, 0); // Sensor type
 
 	char *value = NULL;
-	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("value"), true))
+	uint8_t value_found = 0;
+	findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("value"), true, &value_found);
+	if (!value_found)
 		handle_return(HTML_DATA_MISSING);
 	DEBUG_PRINTLN(tmp_buffer);
 	urlDecodeAndUnescape(tmp_buffer);
@@ -2425,33 +2427,35 @@ void server_sensor_config(OTF_PARAMS_DEF)
 	
 	//mqtt and other:
 	char* url = NULL;
-	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("url"), true))
+	uint8_t url_found = 0;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("url"), true, &url_found))
 		url = strdup(urlDecodeAndUnescape(tmp_buffer));
 	char* topic = NULL;
-	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("topic"), true)) {
+	uint8_t topic_found = 0;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("topic"), true, &topic_found)) {
 		DEBUG_PRINTLN(tmp_buffer)
 		urlDecodeAndUnescape(tmp_buffer);
 		DEBUG_PRINTLN(tmp_buffer)
 		topic = strdup(tmp_buffer);
 	}
-		
 	char* filter = NULL;
-	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("filter"), true))
+	uint8_t filter_found = 0;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("filter"), true, &filter_found))
 		filter = strdup(urlDecodeAndUnescape(tmp_buffer));
 
 	DEBUG_PRINTLN(F("server_sensor_config4"));
 
 	SensorFlags_t flags = {.enable=enable, .log=log, .show=show};
 	int ret = sensor_define(nr, name, type, group, ip, port, id, ri, factor, divider, userdef_unit, offset_mv, offset2, flags, assigned_unitid);
-	if (url) {
+	if (url_found) {
 		SensorUrl_add(nr, SENSORURL_TYPE_URL, url);
 		free(url);
 	}
-	if (topic) {
+	if (topic_found) {
 		SensorUrl_add(nr, SENSORURL_TYPE_TOPIC, topic);
 		free(topic);
 	}
-	if (filter) {
+	if (filter_found) {
 		SensorUrl_add(nr, SENSORURL_TYPE_FILTER, filter);
 		free(filter);
 	}
