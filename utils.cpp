@@ -612,7 +612,7 @@ void strReplaceQuoteBackslash(char *buf) {
 static const unsigned char month_days[] = {31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
 
 bool isLastDayofMonth(unsigned char month, unsigned char day) {
-	return day == month_days[month];
+	return day == month_days[month-1];
 }
 
 bool isValidDate(unsigned char m, unsigned char d) {

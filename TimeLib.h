@@ -111,6 +111,7 @@ int			month();					 // the month now  (Jan is month 1)
 int			month(time_os_t t);	 // the month for the given time
 int			year();						 // the full four digit year: (2009, 2010 etc)
 int			year(time_os_t t);		 // the year for the given time
+bool		isLeapYear(unsigned char year);	// whether a 4 digit year is a leap year
 
 time_os_t now();							 // return the current time as seconds since Jan 1 1970
 void		setTime(time_os_t t);
