@@ -167,6 +167,8 @@ typedef struct Sensor {
   double repeat_data;
   uint64_t repeat_native;
   ulong last_read;  // millis
+  double last_logged_data;   // last logged sensor data
+  ulong last_logged_time;    // last logged timestamp        /
   Sensor *next;
 } Sensor_t;
 #define SENSOR_STORE_SIZE 111

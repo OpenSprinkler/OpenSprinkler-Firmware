@@ -588,19 +588,25 @@ bool sensorlog_add(uint8_t log, SensorLog_t *sensorlog) {
 bool sensorlog_add(uint8_t log, Sensor_t *sensor, ulong time) {
 
   if (sensor->flags.data_ok && sensor->flags.log && time > 1000) {
-    SensorLog_t sensorlog;
-    memset(&sensorlog, 0, sizeof(SensorLog_t));
-    sensorlog.nr = sensor->nr;
-    sensorlog.time = time;
-    sensorlog.native_data = sensor->last_native_data;
-    sensorlog.data = sensor->last_data;
 
     if (log == LOG_STD)
       add_influx_data(sensor);
 
-    if (!sensorlog_add(log, &sensorlog)) {
-      sensor->flags.log = 0;
-      return false;
+    // Write to log file only if necessary
+    if (time-sensor->last_logged_time > 86400 || abs(sensor->last_data - sensor->last_logged_data) > 0.00999) {
+      SensorLog_t sensorlog;
+      memset(&sensorlog, 0, sizeof(SensorLog_t));
+      sensorlog.nr = sensor->nr;
+      sensorlog.time = time;
+      sensorlog.native_data = sensor->last_native_data;
+      sensorlog.data = sensor->last_data;
+      sensor->last_logged_data = sensor->last_data;
+      sensor->last_logged_time = time;
+
+      if (!sensorlog_add(log, &sensorlog)) {
+        sensor->flags.log = 0;
+        return false;
+      }
     }
     return true;
   }
