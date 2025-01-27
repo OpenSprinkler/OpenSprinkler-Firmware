@@ -2984,6 +2984,7 @@ void server_monitor_types(OTF_PARAMS_DEF) {
 	bfill.emit_p(PSTR("{\"name\":\"Min\",\"type\":$D},"), MONITOR_MIN);
 	bfill.emit_p(PSTR("{\"name\":\"Max\",\"type\":$D},"), MONITOR_MAX);
 	bfill.emit_p(PSTR("{\"name\":\"SN 1/2\",\"type\":$D},"), MONITOR_SENSOR12);
+	bfill.emit_p(PSTR("{\"name\":\"SET SN 1/2\",\"type\":$D},"), MONITOR_SET_SENSOR12);
 	bfill.emit_p(PSTR("{\"name\":\"AND\",\"type\":$D},"), MONITOR_AND);
 	bfill.emit_p(PSTR("{\"name\":\"OR\",\"type\":$D},"), MONITOR_OR);
 	bfill.emit_p(PSTR("{\"name\":\"XOR\",\"type\":$D},"), MONITOR_XOR);
@@ -3115,6 +3116,9 @@ void server_monitor_config(OTF_PARAMS_DEF) {
 		case MONITOR_SENSOR12:
 			m = (Monitor_Union_t){.sensor12 = {.sensor12 = sensor12, .invers = invers}};
 			break;
+		case MONITOR_SET_SENSOR12:
+			m = (Monitor_Union_t){.set_sensor12 = {.monitor = monitor, .sensor12 = sensor12}};
+			break;
 		case MONITOR_AND:
 		case MONITOR_OR:
 		case MONITOR_XOR:
@@ -3158,6 +3162,11 @@ void monitorconfig_json(Monitor_t *mon) {
 			bfill.emit_p(PSTR("\"sensor12\":$D,\"invers\":$D}"),
 				mon->m.sensor12.sensor12,
 				mon->m.sensor12.invers);
+			break;
+		case MONITOR_SET_SENSOR12:
+			bfill.emit_p(PSTR("\"monitor\":$D,\"sensor12\":$D}"),
+				mon->m.set_sensor12.monitor,
+				mon->m.set_sensor12.sensor12);
 			break;
 		case MONITOR_AND:
 		case MONITOR_OR:

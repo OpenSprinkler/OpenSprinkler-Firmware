@@ -231,7 +231,8 @@ typedef struct SensorUrl {
 #define MONITOR_DELETE 0
 #define MONITOR_MIN 1
 #define MONITOR_MAX 2
-#define MONITOR_SENSOR12 3 //Digital OS Sensors
+#define MONITOR_SENSOR12 3 // Read Digital OS Sensors Rain/Soil Moisture 
+#define MONITOR_SET_SENSOR12 4 // Write Digital OS Sensors Rain/Soil Moisture 
 #define MONITOR_AND 10
 #define MONITOR_OR 11
 #define MONITOR_XOR 12
@@ -247,6 +248,11 @@ typedef struct Monitor_SENSOR12 { // type = 3
   uint16_t sensor12;
   bool invers : 1;
 } Monitor_SENSOR12_t;
+
+typedef struct Monitor_SET_SENSOR12 { // type = 4
+  uint16_t monitor;
+  uint16_t sensor12;
+} Monitor_SET_SENSOR12_t;
 
 typedef struct Monitor_ANDORXOR { // type = 10+11+12
   uint16_t monitor1;
@@ -272,6 +278,7 @@ typedef struct Monitor_REMOTE { // type = 100
 typedef union Monitor_Union {
     Monitor_MINMAX_t minmax;     // type = 1+2
     Monitor_SENSOR12_t sensor12; // type = 3
+    Monitor_SET_SENSOR12_t set_sensor12; // type = 4
     Monitor_ANDORXOR_t andorxor; // type = 10+11+12
     Monitor_NOT_t mnot; // type = 13
     Monitor_REMOTE_t remote; //type = 100

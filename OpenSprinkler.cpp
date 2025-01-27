@@ -1458,7 +1458,7 @@ void OpenSprinkler::detect_binarysensor_status(time_os_t curr_time) {
 	if(iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_RAIN || iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_SOIL) {
 		if(hw_rev>=2)	pinModeExt(PIN_SENSOR1, INPUT_PULLUP); // this seems necessary for OS 3.2
 		unsigned char val = digitalReadExt(PIN_SENSOR1);
-		status.sensor1 = (val == iopts[IOPT_SENSOR1_OPTION]) ? 0 : 1;
+		status.sensor1 = status.forced_sensor1 || ((val == iopts[IOPT_SENSOR1_OPTION]) ? 0 : 1);
 		if(status.sensor1) {
 			if(!sensor1_on_timer) {
 				// add minimum of 5 seconds on delay
@@ -1488,7 +1488,7 @@ void OpenSprinkler::detect_binarysensor_status(time_os_t curr_time) {
 	if(iopts[IOPT_SENSOR2_TYPE]==SENSOR_TYPE_RAIN || iopts[IOPT_SENSOR2_TYPE]==SENSOR_TYPE_SOIL) {
 		if(hw_rev>=2)	pinModeExt(PIN_SENSOR2, INPUT_PULLUP); // this seems necessary for OS 3.2
 		unsigned char val = digitalReadExt(PIN_SENSOR2);
-		status.sensor2 = (val == iopts[IOPT_SENSOR2_OPTION]) ? 0 : 1;
+		status.sensor2 = status.forced_sensor2 || ((val == iopts[IOPT_SENSOR2_OPTION]) ? 0 : 1);
 		if(status.sensor2) {
 			if(!sensor2_on_timer) {
 				// add minimum of 5 seconds on delay

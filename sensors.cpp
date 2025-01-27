@@ -557,8 +557,7 @@ void checkLogSwitch(uint8_t log) {
 
 void checkLogSwitchAfterWrite(uint8_t log) {
   ulong size = file_size(getlogfile(log));
-  if ((size / SENSORLOG_STORE_SIZE) >=
-      MAX_LOG_SIZE) {  // switch logs if max reached
+  if ((size / SENSORLOG_STORE_SIZE) >= MAX_LOG_SIZE) {  // switch logs if max reached
     if (logFileSwitch[log] == 1)
       logFileSwitch[log] = 2;
     else
@@ -2994,6 +2993,15 @@ void check_monitors() {
             mon->active = mon->m.sensor12.invers? !os.status.sensor2_active : os.status.sensor2_active;
         break;
 
+      case MONITOR_SET_SENSOR12:
+        mon->active = get_monitor(mon->m.set_sensor12.monitor, false, false);
+        if (mon->m.set_sensor12.sensor12 == 1) {
+          os.status.forced_sensor1 = mon->active;
+        }
+        if (mon->m.set_sensor12.sensor12 == 2) {
+          os.status.forced_sensor2 = mon->active;
+        }
+        break;
       case MONITOR_AND:
         mon->active = get_monitor(mon->m.andorxor.monitor1, mon->m.andorxor.invers1, true) &&
           get_monitor(mon->m.andorxor.monitor2, mon->m.andorxor.invers2, true) &&
