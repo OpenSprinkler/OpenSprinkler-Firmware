@@ -63,8 +63,6 @@ extern "C" {
 
 // MaxLogSize
 #define MAX_LOG_SIZE 8000
-#define MAX_LOG_SIZE_WEEK 2000
-#define MAX_LOG_SIZE_MONTH 1000
 
 // Sensor types:
 #define SENSOR_NONE                     0   // None or deleted sensor
