@@ -630,10 +630,8 @@ bool isValidDate(uint16_t date) {
 	return isValidDate(month, day);
 }
 
-#define LEAP_YEAR(Y)		 ( ((1970+Y)>0) && !((1970+Y)%4) && ( ((1970+Y)%100) || !((1970+Y)%400) ) )
-
-bool isLeapYear(unsigned char year){ // Accepts 4 digit year and returns if leap year
-	return LEAP_YEAR(year-1970);
+bool isLeapYear(uint16_t y){ // Accepts 4 digit year and returns if leap year
+	return (y%400==0) || ((y%4==0) && (y%100!=0));
 }
 
 #if defined(ESP8266)
