@@ -149,10 +149,6 @@ int year(time_os_t t) { // the year for the given time
 
 static	const uint8_t monthDays[]={31,28,31,30,31,30,31,31,30,31,30,31}; // API starts months from 1, this array starts from 0
 
-bool isLeapYear(unsigned char year){ // Accepts 4 digit year and returns if leap year
-	return LEAP_YEAR(year-1970);
-}
-
 void breakTime(time_os_t timeInput, tmElements_t &tm){
 // break the given time_os_t into time components
 // this is a more compact version of the C library localtime function
