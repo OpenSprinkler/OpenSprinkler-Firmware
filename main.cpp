@@ -1126,6 +1126,8 @@ void check_weather() {
 void turn_on_station(unsigned char sid, ulong duration) {
 	// RAH implementation of flow sensor
 	flow_start=0;
+	//Added flow_gallons reset to station turn on.
+	flow_gallons=0;  
 
 	if (os.set_station_bit(sid, 1, duration)) {
 		push_message(NOTIFY_STATION_ON, sid, duration);
@@ -1213,6 +1215,7 @@ void turn_off_station(unsigned char sid, time_os_t curr_time, unsigned char shif
 			// log station run
 			write_log(LOGDATA_STATION, curr_time); // LOG_TODO
 			push_message(NOTIFY_STATION_OFF, sid, pd.lastrun.duration);
+			push_message(NOTIFY_FLOW_ALERT, sid, pd.lastrun.duration);
 		}
 	}
 
@@ -1452,7 +1455,11 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 	// check if ifttt key exists and also if the enable bit is set
 	os.sopt_load(SOPT_IFTTT_KEY, tmp_buffer);
 	bool ifttt_enabled = ((os.iopts[IOPT_NOTIF_ENABLE]&type)!=0) && (strlen(tmp_buffer)!=0);
-	
+
+	//todo: Remove this after UI is modified for new push_message type "NOTIFY_FLOW_ALERT"
+	//Until the UI is modified for the new push_message type, force the IFTTT_enabled flag true if a flow sensor is enabled and the IFTTT key is not empty
+	if(os.iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_FLOW && (strlen(tmp_buffer)!=0 && type==NOTIFY_FLOW_ALERT)) {ifttt_enabled=true;}
+
 #define DEFAULT_EMAIL_PORT	465
 
 	// parse email variables
@@ -1506,6 +1513,10 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 		email_enabled = false;
 	}else{
 		email_enabled = os.iopts[IOPT_NOTIF_ENABLE]&type;
+
+		//todo: Remove this after UI is modified for new push_message type "NOTIFY_FLOW_ALERT"
+		//Until the UI is modified for the new push_message type, force the email_enabled flag true if a flow sensor is enabled and the email config checks above are passed
+		if(os.iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_FLOW && type==NOTIFY_FLOW_ALERT) {email_enabled=true;}
 	}
 #endif
 
@@ -1575,6 +1586,102 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 			}
 			break;
 
+		case NOTIFY_FLOW_ALERT:{
+			//First determine if a Flow Alert should be sent based on flow amount and setpoint
+
+			//Added variable to track flow alert status
+			bool flow_alert_flag = false;
+
+			//Added variable for flow_gpm_alert_setpoint and set default value to max
+			float flow_gpm_alert_setpoint = 999.9f;
+
+			//Added variable for to get flow_pulse_rate_factor and set to 1 as default
+			float flow_pulse_rate_factor = 1;
+
+			//Added variable for tmp station name
+			char tmp_station_name[STATION_NAME_SIZE];
+
+			//Get satation name
+			os.get_station_name(lval, tmp_station_name);
+
+			//Extract flow_gpm_alert_setpoint from last 5 characters of station name
+			if (strlen(tmp_station_name) > 5) {
+				const char *station_name_last_five_chars = tmp_station_name;
+				station_name_last_five_chars = tmp_station_name + strlen(tmp_station_name) - 5;
+
+				//Convert last five characters to number and check if valid
+				if (sscanf(station_name_last_five_chars, "%f", &flow_gpm_alert_setpoint) == 1) {
+
+					//station_name_last_five_chars was successfully converted to a number 
+
+					//flow_last_gpm is actually collected and stored as pulses per minute, not gallons per minute
+					//Get Flow Pulse Rate factor and apply to flow_last_gpm when comparing and outputting
+					flow_pulse_rate_factor = static_cast<float>(os.iopts[IOPT_PULSE_RATE_1]) + static_cast<float>(os.iopts[IOPT_PULSE_RATE_0]) / 100.0;
+
+					// Alert Check - Compare flow_gpm_alert_setpoint with flow_last_gpm and enable flow_alert_flag if flow is above setpoint
+					if ((flow_last_gpm*flow_pulse_rate_factor) > flow_gpm_alert_setpoint) {
+						flow_alert_flag = true;
+					}
+				} else {
+					//Could not convert to a valid number. If a number is not detected as a station name suffix, never send an alert
+					flow_alert_flag = false;
+				}
+			} else {
+ 				//Station name was not long enough to include 5 character flow setpoint.
+				flow_alert_flag = false;
+			}
+
+			// If flow_alert_flag is true, format the appropriate messages, else don't send alert
+			if (flow_alert_flag == true) {
+
+				if (os.mqtt.enabled()) {
+					//Format mqtt message
+					snprintf_P(topic, PUSH_TOPIC_LEN, PSTR("station/%d/alert/flow"), lval);
+					snprintf_P(payload, PUSH_PAYLOAD_LEN, PSTR("{\"flow_rate\":%d.%02d,\"duration\":%d,\"alert_setpoint\":%d.%02d}"), (int)(flow_last_gpm*flow_pulse_rate_factor), (int)((flow_last_gpm*flow_pulse_rate_factor) * 100) % 100, (int)fval, (int)flow_gpm_alert_setpoint, (int)(flow_gpm_alert_setpoint * 100) % 100);
+				}
+
+
+				if (ifttt_enabled || email_enabled) {
+					//Format ifttt\email message
+
+					// Get and format current local time as "YYYY-MM-DD hh:mm:ss AM/PM"
+					time_os_t curr_time = os.now_tz();
+					struct tm *tm_info = localtime((time_t*)&curr_time);
+					char formatted_time[TMP_BUFFER_SIZE];
+					strftime(formatted_time, sizeof(formatted_time), "%Y-%m-%d %I:%M:%S %p", tm_info);
+					strcat_P(postval, PSTR("<br>"));
+					strcat(postval, formatted_time);
+
+					strcat_P(postval, PSTR("<br>Station: "));
+					//Truncate flow setpoint value off station name to shorten ifttt\email message
+					tmp_station_name[(strlen(tmp_station_name) - 5)] = '\0';
+					strcat_P(postval, tmp_station_name);
+	
+					if((int)fval == 0){
+						strcat_P(postval, PSTR(""));
+					}else{					// master on event does not have duration attached to it
+						strcat_P(postval, PSTR("<br>Duration: "));
+						size_t len = strlen(postval);
+						snprintf_P(postval + len, TMP_BUFFER_SIZE, PSTR(" %d minutes %d seconds"), (int)fval/60, (int)fval%60);
+					}
+
+					strcat_P(postval, PSTR("<br><br>FLOW ALERT!"));
+					size_t len = strlen(postval);
+					snprintf_P(postval + len, TMP_BUFFER_SIZE, PSTR("<br>Flow rate: %d.%02d<br>Flow Alert Setpoint: %d.%02d"), (int)(flow_last_gpm*flow_pulse_rate_factor), (int)((flow_last_gpm*flow_pulse_rate_factor) * 100) % 100, (int)flow_gpm_alert_setpoint, (int)(flow_gpm_alert_setpoint * 100) % 100);
+
+					if(email_enabled) { email_message.subject += PSTR("- FLOW ALERT"); }
+
+				}
+			} else {
+				//Do not send an alert.  Flow was not above setpoint or setpoint not valid. 
+				//Must force ifftt_enabled and email_enabled to false to prevent sending
+				//Can not force os.mqtt.enabled() off, but it will not publish an mqtt message as topic\payload will be empty.
+				ifttt_enabled=false;
+				email_enabled=false;
+			}
+		break;
+		}
+ 
 		case NOTIFY_PROGRAM_SCHED:
 
 			if (ifttt_enabled || email_enabled) {
