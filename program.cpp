@@ -428,11 +428,12 @@ void ProgramStruct::gen_station_runorder(uint16_t runcount, unsigned char *order
 			case 'I':	// descending by index
 			case 'a': // alternating: odd-numbered runs ascending by index, even-numbered runs descending.
 			case 'A': // odd-numbered runs descending by index, even-numbered runs ascending
-
-			if(anno=='I' || (anno=='a' && (runcount%2==0)) || (anno=='A' && (runcount%2==1)))  {
-				// reverse the order
-				for(i=0;i<ns;i++) {
-					order[i] = ns-1-i;
+			{
+				if((anno=='I') || ((anno=='a') && (runcount%2==0)) || ((anno=='A') && (runcount%2==1)))  {
+					// reverse the order
+					for(i=0;i<ns;i++) {
+						order[i] = ns-1-i;
+					}
 				}
 			}
 			break;
@@ -448,7 +449,7 @@ void ProgramStruct::gen_station_runorder(uint16_t runcount, unsigned char *order
 					os.get_station_name(i,tmp_buffer);
 					elems[i].name=strdup(tmp_buffer);
 				}
-				if(anno=='n' || (anno=='t' && (runcount%2==0)) || (anno='T' && (runcount%2==1))) {
+				if((anno=='n') || ((anno=='t') && (runcount%2==0)) || ((anno=='T') && (runcount%2==1))) {
 					qsort(elems, ns, sizeof(StationNameSortElem), StationNameSortAscendCmp);
 				} else {
 					qsort(elems, ns, sizeof(StationNameSortElem), StationNameSortDescendCmp);
