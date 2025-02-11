@@ -449,7 +449,7 @@ void ProgramStruct::gen_station_runorder(uint16_t runcount, unsigned char *order
 					os.get_station_name(i,tmp_buffer);
 					elems[i].name=strdup(tmp_buffer);
 				}
-				if((anno=='n') || ((anno=='t') && (runcount%2==0)) || ((anno=='T') && (runcount%2==1))) {
+				if((anno=='n') || ((anno=='t') && (runcount%2==1)) || ((anno=='T') && (runcount%2==0))) {
 					qsort(elems, ns, sizeof(StationNameSortElem), StationNameSortAscendCmp);
 				} else {
 					qsort(elems, ns, sizeof(StationNameSortElem), StationNameSortDescendCmp);
