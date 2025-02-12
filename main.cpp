@@ -1436,6 +1436,20 @@ void manual_start_program(unsigned char pid, unsigned char uwt) {
 	}
 }
 
+bool is_notif_enabled(uint16_t type) {
+	uint16_t notif = (uint16_t)os.iopts[IOPT_NOTIF_ENABLE] | ((uint16_t)os.iopts[IOPT_NOTIF2_ENABLE] << 8);
+	return  (notif&type) != 0;
+}
+
+uint16_t get_notif_enabled() {
+	return (uint16_t)os.iopts[IOPT_NOTIF_ENABLE]|((uint16_t)os.iopts[IOPT_NOTIF2_ENABLE]<<8);
+}
+
+void set_notif_enabled(uint16_t notif) {
+	os.iopts[IOPT_NOTIF_ENABLE] = notif&0xFF;
+	os.iopts[IOPT_NOTIF2_ENABLE] = notif >> 8;
+}
+
 // ==========================================
 // ====== PUSH NOTIFICATION FUNCTIONS =======
 // ==========================================
@@ -1447,6 +1461,12 @@ void ip2string(char* str, size_t str_len, unsigned char ip[4]) {
 #define PUSH_PAYLOAD_LEN TMP_BUFFER_SIZE
 
 void push_message(int type, uint32_t lval, float fval, const char* sval) {
+
+	if (!is_notif_enabled(type)) {
+		DEBUG_PRINT("push_message type not enabled: ");
+		DEBUG_PRINTLN(type);
+		return;
+	}
 	static char topic[PUSH_TOPIC_LEN+1];
 	static char payload[PUSH_PAYLOAD_LEN+1];
 	char* postval = tmp_buffer+1; // +1 so we can fit a opening { before the loaded config
@@ -1454,11 +1474,7 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 
 	// check if ifttt key exists and also if the enable bit is set
 	os.sopt_load(SOPT_IFTTT_KEY, tmp_buffer);
-	bool ifttt_enabled = ((os.iopts[IOPT_NOTIF_ENABLE]&type)!=0) && (strlen(tmp_buffer)!=0);
-
-	//todo: Remove this after UI is modified for new push_message type "NOTIFY_FLOW_ALERT"
-	//Until the UI is modified for the new push_message type, force the IFTTT_enabled flag true if a flow sensor is enabled and the IFTTT key is not empty
-	if(os.iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_FLOW && (strlen(tmp_buffer)!=0 && type==NOTIFY_FLOW_ALERT)) {ifttt_enabled=true;}
+	bool ifttt_enabled = (strlen(tmp_buffer)!=0);
 
 #define DEFAULT_EMAIL_PORT	465
 
@@ -1509,14 +1525,10 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 
 	bool email_enabled = false;
 #if defined(SUPPORT_EMAIL)
-	if(!email_en){
+	if(!email_en){  // todo: this should be simplified
 		email_enabled = false;
 	}else{
-		email_enabled = os.iopts[IOPT_NOTIF_ENABLE]&type;
-
-		//todo: Remove this after UI is modified for new push_message type "NOTIFY_FLOW_ALERT"
-		//Until the UI is modified for the new push_message type, force the email_enabled flag true if a flow sensor is enabled and the email config checks above are passed
-		if(os.iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_FLOW && type==NOTIFY_FLOW_ALERT) {email_enabled=true;}
+		email_enabled = true;
 	}
 #endif
 

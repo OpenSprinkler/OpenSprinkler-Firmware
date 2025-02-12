@@ -24,7 +24,7 @@
 #ifndef _DEFINES_H
 #define _DEFINES_H
 
-// #define ENABLE_DEBUG  // enable serial debug
+#define ENABLE_DEBUG  // enable serial debug
 
 typedef unsigned long ulong;
 
@@ -257,7 +257,7 @@ enum {
 	IOPT_FORCE_WIRED,
 	IOPT_LATCH_ON_VOLTAGE,
 	IOPT_LATCH_OFF_VOLTAGE,
-	IOPT_RESERVE_3,
+	IOPT_NOTIF2_ENABLE,
 	IOPT_RESERVE_4,
 	IOPT_RESERVE_5,
 	IOPT_RESERVE_6,
