@@ -1463,10 +1463,11 @@ void ip2string(char* str, size_t str_len, unsigned char ip[4]) {
 void push_message(int type, uint32_t lval, float fval, const char* sval) {
 
 	if (!is_notif_enabled(type)) {
-		DEBUG_PRINT("push_message type not enabled: ");
-		DEBUG_PRINTLN(type);
 		return;
 	}
+
+	DEBUG_PRINTF("push message type: %d\n", type);
+
 	static char topic[PUSH_TOPIC_LEN+1];
 	static char payload[PUSH_PAYLOAD_LEN+1];
 	char* postval = tmp_buffer+1; // +1 so we can fit a opening { before the loaded config
@@ -1564,10 +1565,18 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 					snprintf_P(payload, PUSH_PAYLOAD_LEN, PSTR("{\"state\":1,\"duration\":%d}"), (int)fval);
 				}
 			}
-
-			// todo: add IFTTT and email support for this event as well.
-			// currently no support due to the number of events exceeds 8 so need to use more than 1 byte
-			break;
+			if (ifttt_enabled || email_enabled) {
+				strcat_P(postval, PSTR("Station ["));
+				os.get_station_name(lval, postval+strlen(postval));
+				if((int)fval == 0){
+					strcat_P(postval, PSTR("] just turned on."));
+				}else{
+					strcat_P(postval, PSTR("] just turned on. It's scheduled to run for "));
+					size_t len = strlen(postval);
+					snprintf_P(postval + len, TMP_BUFFER_SIZE, PSTR(" %d minutes %d seconds."), (int)fval/60, (int)fval%60);
+				}
+				if(email_enabled) { email_message.subject += PSTR("station event"); }
+			}			break;
 
 		case NOTIFY_STATION_OFF:
 
