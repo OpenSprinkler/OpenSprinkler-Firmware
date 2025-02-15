@@ -1354,14 +1354,13 @@ int read_sensor_rs485(Sensor_t *sensor) {
   bool isTemp = sensor->type == SENSOR_SMT100_TEMP || sensor->type == SENSOR_TH100_TEMP;
   bool isMois = sensor->type == SENSOR_SMT100_MOIS || sensor->type == SENSOR_TH100_MOIS;
   uint8_t type = isTemp ? 0x00 : isMois ? 0x01 : 0x02;
-  
+
   uint16_t tab_reg[3] = {0};
   modbus_set_slave(ttyDevices[device], sensor->id);
   if (modbus_read_registers(ttyDevices[device], type, 2, tab_reg) > 0) {
     uint16_t data = tab_reg[0];
     DEBUG_PRINTF("read_sensor_rs485: result: %d - %d\n", sensor->id, data);
-    double value =
-        sensor->type == isTemp ? (data / 100.0) - 100.0 : (isMois ? data / 100.0 : data);
+    double value = isTemp ? (data / 100.0) - 100.0 : (isMois ? data / 100.0 : data);
     sensor->last_native_data = data;
     sensor->last_data = value;
     DEBUG_PRINTLN(sensor->last_data);

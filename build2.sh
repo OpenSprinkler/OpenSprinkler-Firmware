@@ -5,8 +5,8 @@
 	USEGPIO=""
         GPIOLIB=""
 
-
-        if [ -h "/sys/class/gpio/gpiochip512" ]; then
+	source /etc/os-release
+        if [[ $VERSION_ID -gt 10 ]]; then
                 echo "using libgpiod"
                 USEGPIO="-DLIBGPIOD"
                 GPIOLIB="-lgpiod"
