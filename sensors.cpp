@@ -80,9 +80,8 @@ static modbus_t * ttyDevices[MAX_RS485_DEVICES];
 #endif
 
 const char *sensor_unitNames[]{
-    "",   "%",   "°C",  "°F", "V", "%", "in",
-    "mm", "mph", "kmh", "%",  "DK"
-    //   0   1     2     3    4    5     6      7      8      9   10,  11
+    "",  "%", "°C", "°F", "V", "%", "in", "mm", "mph", "kmh", "%", "DK", "LM", "LX"
+    //0   1     2     3    4    5    6     7      8      9     10,  11,   12,   13
     //   0=Nothing
     //   1=Soil moisture
     //   2=degree celsius temperature
@@ -94,7 +93,9 @@ const char *sensor_unitNames[]{
     //   8=Wind mph
     //   9=Wind kmh
     //  10=Level %
-    //  11=DK
+    //  11=DK (Permitivität)
+    //  12=LM (Lumen)
+    //  13=LX (LUX)
 };
 uint8_t logFileSwitch[3] = {0, 0, 0};  // 0=use smaller File, 1=LOG1, 2=LOG2
 
@@ -2848,6 +2849,13 @@ void start_monitor_action(Monitor_t * mon) {
 
   if (mon->zone > 0) {
     uint sid = mon->zone-1;
+
+		// schedule manual station
+		// skip if the station is a master station
+		// (because master cannot be scheduled independently)
+		if ((os.status.mas==sid+1) || (os.status.mas2==sid+1))
+			return;
+
     uint16_t timer=mon->maxRuntime;
     RuntimeQueueStruct *q = NULL;
 		unsigned char sqi = pd.station_qid[sid];

@@ -312,7 +312,9 @@ typedef struct Monitor {
 #define UNIT_MPH 8
 #define UNIT_KMH 9
 #define UNIT_LEVEL 10
-#define UNIT_DK 11
+#define UNIT_DK 11 //Permitivität
+#define UNIT_LM 12 //Lumen
+#define UNIT_LX 13 //Lux
 #define UNIT_USERDEF 99
 
 // Unitnames
