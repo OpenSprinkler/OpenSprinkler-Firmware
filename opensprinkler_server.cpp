@@ -1734,12 +1734,12 @@ void server_change_manual(OTF_PARAMS_DEF) {
 			RuntimeQueueStruct *q = NULL;
 			unsigned char sqi = pd.station_qid[sid];
 			// check if the station already has a schedule
-			if (sqi!=0xFF) {  // if so, we will overwrite the schedule
-				q = pd.queue+sqi;
+			if (sqi!=0xFF) { // if so, do nothing
+
 			} else {  // otherwise create a new queue element
 				q = pd.enqueue();
 			}
-			// if the queue is not full
+			// if the queue is not full (and the station doesn't already have a schedule
 			if (q) {
 				q->st = 0;
 				q->dur = timer;
