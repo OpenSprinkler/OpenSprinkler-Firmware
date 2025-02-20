@@ -1051,7 +1051,7 @@ void do_loop()
 		}
 		static unsigned char reboot_notification = 1;
 		if(reboot_notification) {
-			#if defined(ESP266)
+			#if defined(ESP8266)
 				if(useEth || WiFi.status()==WL_CONNECTED)
 			#endif
 			{
@@ -1801,11 +1801,11 @@ void push_message(int type, uint32_t lval, float fval, const char* sval) {
 		case NOTIFY_REBOOT:
 			if (os.mqtt.enabled()) {
 				strcpy_P(topic, PSTR("system"));
-				strcpy_P(payload, PSTR("{\"state\":\"started\"}"));
+				snprintf_P(payload, PUSH_PAYLOAD_LEN, PSTR("{\"state\":\"started\",\"cause\":%d}"), (int)os.last_reboot_cause);
 			}
 			if (ifttt_enabled || email_enabled) {
 				#if defined(ARDUINO)
-					strcat_P(postval, PSTR("rebooted. Device IP: "));
+					snprintf_P(postval + strlen(postval), TMP_BUFFER_SIZE, PSTR("rebooted. Cause: %d. Device IP: "), os.last_reboot_cause);
 					#if defined(ESP8266)
 					{
 						IPAddress _ip;
