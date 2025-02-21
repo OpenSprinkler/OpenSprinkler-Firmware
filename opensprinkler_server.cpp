@@ -206,7 +206,7 @@ unsigned char findKeyVal (const char *str,char *strbuf, uint16_t maxlen,const ch
 }
 
 void rewind_ether_buffer() {
-    bfill = BufferFiller(ether_buffer, ETHER_BUFFER_SIZE*2);
+	bfill = BufferFiller(ether_buffer, ETHER_BUFFER_SIZE*2);
 	ether_buffer[0] = 0;
 }
 
