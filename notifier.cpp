@@ -218,8 +218,7 @@ void push_message(uint16_t type, uint32_t lval, float fval, uint8_t bval) {
 					strcat_P(postval, PSTR("] just turned on."));
 				}else{
 					strcat_P(postval, PSTR("] just turned on. It's scheduled to run for "));
-					size_t len = strlen(postval);
-					snprintf_P(postval + len, TMP_BUFFER_SIZE, PSTR(" %d minutes %d seconds."), (int)fval/60, (int)fval%60);
+					snprintf_P(postval+strlen(postval), TMP_BUFFER_SIZE, PSTR(" %d minutes %d seconds."), (int)fval/60, (int)fval%60);
 				}
 				if(email_enabled) { email_message.subject += PSTR("station event"); }
 			}			break;
@@ -241,13 +240,11 @@ void push_message(uint16_t type, uint32_t lval, float fval, uint8_t bval) {
 					strcat_P(postval, PSTR("] closed."));
 				}else{
 					strcat_P(postval, PSTR("] closed. It ran for "));
-					size_t len = strlen(postval);
-					snprintf_P(postval + len, TMP_BUFFER_SIZE, PSTR(" %d minutes %d seconds."), (int)fval/60, (int)fval%60);
+					snprintf_P(postval+strlen(postval), TMP_BUFFER_SIZE, PSTR(" %d minutes %d seconds."), (int)fval/60, (int)fval%60);
 				}
 
 				if(os.iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_FLOW) {
-					size_t len = strlen(postval);
-					snprintf_P(postval + len, TMP_BUFFER_SIZE, PSTR(" Flow rate: %d.%02d"), (int)flow_last_gpm, (int)(flow_last_gpm*100)%100);
+					snprintf_P(postval+strlen(postval), TMP_BUFFER_SIZE, PSTR(" Flow rate: %d.%02d"), (int)flow_last_gpm, (int)(flow_last_gpm*100)%100);
 				}
 				if(email_enabled) { email_message.subject += PSTR("station event"); }
 			}
@@ -313,11 +310,19 @@ void push_message(uint16_t type, uint32_t lval, float fval, uint8_t bval) {
 
 					// Get and format current local time as "YYYY-MM-DD hh:mm:ss AM/PM"
 					time_os_t curr_time = os.now_tz();
+					#if defined(OS_AVR)
+					strcat_P(postval, PSTR("<br>"));
+					tmElements_t tm;
+					breakTime(curr_time, tm);
+					snprintf_P(postval+strlen(postval), TMP_BUFFER_SIZE, PSTR("%4d-%2d-%2d %2d:%2d:%2d"),
+						1970+tm.Year, tm.Month, tm.Day, tm.Hour, tm.Minute, tm.Second);
+					#else
 					struct tm *tm_info = localtime((time_t*)&curr_time);
 					char formatted_time[TMP_BUFFER_SIZE];
 					strftime(formatted_time, sizeof(formatted_time), "%Y-%m-%d %I:%M:%S %p", tm_info);
 					strcat_P(postval, PSTR("<br>"));
 					strcat(postval, formatted_time);
+					#endif
 
 					strcat_P(postval, PSTR("<br>Station: "));
 					//Truncate flow setpoint value off station name to shorten ifttt\email message
@@ -328,13 +333,11 @@ void push_message(uint16_t type, uint32_t lval, float fval, uint8_t bval) {
 						strcat_P(postval, PSTR(""));
 					}else{					// master on event does not have duration attached to it
 						strcat_P(postval, PSTR("<br>Duration: "));
-						size_t len = strlen(postval);
-						snprintf_P(postval + len, TMP_BUFFER_SIZE, PSTR(" %d minutes %d seconds"), (int)fval/60, (int)fval%60);
+						snprintf_P(postval+strlen(postval), TMP_BUFFER_SIZE, PSTR(" %d minutes %d seconds"), (int)fval/60, (int)fval%60);
 					}
 
 					strcat_P(postval, PSTR("<br><br>FLOW ALERT!"));
-					size_t len = strlen(postval);
-					snprintf_P(postval + len, TMP_BUFFER_SIZE, PSTR("<br>Flow rate: %d.%02d<br>Flow Alert Setpoint: %d.%02d"), (int)(flow_last_gpm*flow_pulse_rate_factor), (int)((flow_last_gpm*flow_pulse_rate_factor) * 100) % 100, (int)flow_gpm_alert_setpoint, (int)(flow_gpm_alert_setpoint * 100) % 100);
+					snprintf_P(postval+strlen(postval), TMP_BUFFER_SIZE, PSTR("<br>Flow rate: %d.%02d<br>Flow Alert Setpoint: %d.%02d"), (int)(flow_last_gpm*flow_pulse_rate_factor), (int)((flow_last_gpm*flow_pulse_rate_factor) * 100) % 100, (int)flow_gpm_alert_setpoint, (int)(flow_gpm_alert_setpoint * 100) % 100);
 
 					if(email_enabled) { email_message.subject += PSTR("- FLOW ALERT"); }
 
@@ -360,8 +363,7 @@ void push_message(uint16_t type, uint32_t lval, float fval, uint8_t bval) {
 					pd.read(lval, &prog);
 					if(lval<pd.nprograms) strcat(postval, prog.name);
 				}
-				size_t len = strlen(postval);
-				snprintf_P(postval + len, TMP_BUFFER_SIZE, PSTR(" with %d%% water level."), (int)fval);
+				snprintf_P(postval+strlen(postval), TMP_BUFFER_SIZE, PSTR(" with %d%% water level."), (int)fval);
 				if(email_enabled) { email_message.subject += PSTR("program event"); }
 			}
 			break;
@@ -415,8 +417,7 @@ void push_message(uint16_t type, uint32_t lval, float fval, uint8_t bval) {
 				snprintf_P(payload, PUSH_PAYLOAD_LEN, PSTR("{\"count\":%u,\"volume\":%d.%02d}"), lval, (int)volume/100, (int)volume%100);
 			}
 			if (ifttt_enabled || email_enabled) {
-				size_t len = strlen(postval);
-				snprintf_P(postval + len, TMP_BUFFER_SIZE, PSTR("Flow count: %u, volume: %d.%02d"), lval, (int)volume/100, (int)volume%100);
+				snprintf_P(postval+strlen(postval), TMP_BUFFER_SIZE, PSTR("Flow count: %u, volume: %d.%02d"), lval, (int)volume/100, (int)volume%100);
 				if(email_enabled) { email_message.subject += PSTR("flow sensor event"); }
 			}
 			break;
@@ -437,8 +438,7 @@ void push_message(uint16_t type, uint32_t lval, float fval, uint8_t bval) {
 					ip2string(postval, TMP_BUFFER_SIZE, ip);
 				}
 				if(fval>=0) {
-					size_t len = strlen(postval);
-					snprintf_P(postval + len, TMP_BUFFER_SIZE, PSTR("water level updated: %d%%."), (int)fval);
+					snprintf_P(postval+strlen(postval), TMP_BUFFER_SIZE, PSTR("water level updated: %d%%."), (int)fval);
 				}
 				if(email_enabled) { email_message.subject += PSTR("weather update event"); }
 			}
@@ -451,7 +451,7 @@ void push_message(uint16_t type, uint32_t lval, float fval, uint8_t bval) {
 			}
 			if (ifttt_enabled || email_enabled) {
 				#if defined(ARDUINO)
-					snprintf_P(postval + strlen(postval), TMP_BUFFER_SIZE, PSTR("rebooted. Cause: %d. Device IP: "), os.last_reboot_cause);
+					snprintf_P(postval+strlen(postval), TMP_BUFFER_SIZE, PSTR("rebooted. Cause: %d. Device IP: "), os.last_reboot_cause);
 					#if defined(ESP8266)
 					{
 						IPAddress _ip;

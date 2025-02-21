@@ -1585,8 +1585,7 @@ void write_log(unsigned char type, time_os_t curr_time) {
 		#if defined(ARDUINO)
 		dtostrf(flow_last_gpm,5,2,tmp_buffer+strlen(tmp_buffer));
 		#else
-		size_t len = strlen(tmp_buffer);
-		snprintf(tmp_buffer + len, TMP_BUFFER_SIZE - len, "%5.2f", flow_last_gpm);
+		snprintf(tmp_buffer+strlen(tmp_buffer), TMP_BUFFER_SIZE - len, "%5.2f", flow_last_gpm);
 		#endif
 	}
 	strcat_P(tmp_buffer, PSTR("]\r\n"));
