@@ -37,7 +37,28 @@ extern char ether_buffer[];
 extern float flow_last_gpm;
 void remote_http_callback(char*);
 
+bool is_notif_enabled(uint16_t type) {
+	uint16_t notif = (uint16_t)os.iopts[IOPT_NOTIF_ENABLE] | ((uint16_t)os.iopts[IOPT_NOTIF2_ENABLE] << 8);
+	return  (notif&type) != 0;
+}
+
+uint16_t get_notif_enabled() {
+	return (uint16_t)os.iopts[IOPT_NOTIF_ENABLE]|((uint16_t)os.iopts[IOPT_NOTIF2_ENABLE]<<8);
+}
+
+void set_notif_enabled(uint16_t notif) {
+	os.iopts[IOPT_NOTIF_ENABLE] = notif&0xFF;
+	os.iopts[IOPT_NOTIF2_ENABLE] = notif >> 8;
+}
+
+void ip2string(char* str, size_t str_len, unsigned char ip[4]) {
+	snprintf_P(str+strlen(str), str_len, PSTR("%d.%d.%d.%d"), ip[0], ip[1], ip[2], ip[3]);
+}
+
 bool NotifQueue::add(uint16_t t, uint32_t l, float f, uint8_t b) {
+		if (!is_notif_enabled(t)) { // if not subscribed to this type, return
+		return false;
+	}
 	if(nqueue<NOTIF_QUEUE_MAXSIZE) {
 		NotifNodeStruct* node = new NotifNodeStruct(t, l, f, b);
 		if(tail==NULL) {
@@ -50,6 +71,7 @@ bool NotifQueue::add(uint16_t t, uint32_t l, float f, uint8_t b) {
 		DEBUG_PRINTF("NotifQueue::add(%d, %u, %f) [%d]\n", t, l, f, nqueue);
 		return true;
 	}
+	DEBUG_PRINTLN(F("NotifQueue::add queue is full!"));
 	return false;
 }
 
@@ -63,7 +85,6 @@ void NotifQueue::clear() {
 		delete node;
 		nqueue--;
 	}
-	DEBUG_PRINTF("NotifQueue::clear = %d\n", nqueue);
 }
 
 void push_message(uint16_t type, uint32_t lval, float fval, uint8_t bval);
@@ -86,35 +107,13 @@ bool NotifQueue::run(int n) {
 	return true;
 }
 
-bool is_notif_enabled(uint16_t type) {
-	uint16_t notif = (uint16_t)os.iopts[IOPT_NOTIF_ENABLE] | ((uint16_t)os.iopts[IOPT_NOTIF2_ENABLE] << 8);
-	return  (notif&type) != 0;
-}
-
-uint16_t get_notif_enabled() {
-	return (uint16_t)os.iopts[IOPT_NOTIF_ENABLE]|((uint16_t)os.iopts[IOPT_NOTIF2_ENABLE]<<8);
-}
-
-void set_notif_enabled(uint16_t notif) {
-	os.iopts[IOPT_NOTIF_ENABLE] = notif&0xFF;
-	os.iopts[IOPT_NOTIF2_ENABLE] = notif >> 8;
-}
-
-void ip2string(char* str, size_t str_len, unsigned char ip[4]) {
-	snprintf_P(str+strlen(str), str_len, PSTR("%d.%d.%d.%d"), ip[0], ip[1], ip[2], ip[3]);
-}
-
 #define PUSH_TOPIC_LEN	120
 #define PUSH_PAYLOAD_LEN TMP_BUFFER_SIZE
 
 void push_message(uint16_t type, uint32_t lval, float fval, uint8_t bval) {
-
 	if (!is_notif_enabled(type)) {
 		return;
 	}
-
-	DEBUG_PRINTF("push message type: %d\n", type);
-
 	static char topic[PUSH_TOPIC_LEN+1];
 	static char payload[PUSH_PAYLOAD_LEN+1];
 	char* postval = tmp_buffer+1; // +1 so we can fit a opening { before the loaded config
@@ -502,10 +501,6 @@ void push_message(uint16_t type, uint32_t lval, float fval, uint8_t bval) {
 					emailSend.setSMTPServer(email_host);
 					emailSend.setSMTPPort(email_port);
 					EMailSender::Response resp = emailSend.send(email_recipient, email_message);
-					// DEBUG_PRINTLN(F("Sending Status:"));
-					// DEBUG_PRINTLN(resp.status);
-					// DEBUG_PRINTLN(resp.code);
-					// DEBUG_PRINTLN(resp.desc);
 				}
 			#endif
 		#else
