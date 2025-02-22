@@ -761,7 +761,7 @@ void server_change_runonce(OTF_PARAMS_DEF) {
 			prog.days[0] = (epoch_t >> 8) & 0b11111111; //one interval past current day in epoch time
 			prog.days[1] = epoch_t & 0b11111111; //one interval past current day in epoch time
 			prog.starttimes[0] = curr_time % 1440; //one interval past current time
-			strcpy_P(prog.name, "Run Once (Repeat)"); //TODO: Change name
+			strcpy_P(prog.name, PSTR("Run-Once with repeat"));
 
 			//if no more repeats, remove interval to flag for deletion
 			if(prog.starttimes[1] == 0){
