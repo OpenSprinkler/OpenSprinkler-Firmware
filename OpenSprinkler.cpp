@@ -70,6 +70,7 @@ unsigned char OpenSprinkler::attrib_dis[MAX_NUM_BOARDS];
 unsigned char OpenSprinkler::attrib_spe[MAX_NUM_BOARDS];
 unsigned char OpenSprinkler::attrib_grp[MAX_NUM_STATIONS];
 unsigned char OpenSprinkler::masters[NUM_MASTER_ZONES][NUM_MASTER_OPTS];
+time_os_t OpenSprinkler::masters_last_on[NUM_MASTER_ZONES];
 RCSwitch OpenSprinkler::rfswitch;
 
 extern char tmp_buffer[];
@@ -967,6 +968,8 @@ pinModeExt(PIN_BUTTON_2, INPUT_PULLUP);
 pinModeExt(PIN_BUTTON_3, INPUT_PULLUP);
 #endif
 
+	// init masters_last_on array
+	memset(masters_last_on, 0, sizeof(masters_last_on));
 	// Reset all stations
 	clear_all_station_bits();
 	apply_all_station_bits();

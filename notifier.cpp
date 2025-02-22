@@ -99,7 +99,7 @@ bool NotifQueue::run(int n) {
 			tail = NULL;
 		}
 		push_message(node->type, node->lval, node->fval, node->bval);
-		DEBUG_PRINTF("NotifQueue::run(%d, %ul, %f) [%d]\n", node->type, node->lval, node->fval, nqueue);
+		DEBUG_PRINTF("NotifQueue::run(%d, %u, %f) [%d]\n", node->type, node->lval, node->fval, nqueue);
 		delete node;
 		nqueue--;
 		n--;
@@ -205,19 +205,18 @@ void push_message(uint16_t type, uint32_t lval, float fval, uint8_t bval) {
 
 			if (os.mqtt.enabled()) {
 				snprintf_P(topic, PUSH_TOPIC_LEN, PSTR("station/%d"), lval);
-				if((int)fval == 0){
-					snprintf_P(payload, PUSH_PAYLOAD_LEN, PSTR("{\"state\":1}"));  // master on event does not have duration attached to it
-				}else{
-					snprintf_P(payload, PUSH_PAYLOAD_LEN, PSTR("{\"state\":1,\"duration\":%d}"), (int)fval);
+				strcat_P(payload, PSTR("{\"state\":1"));
+				if((int)fval > 0){
+					snprintf_P(payload+strlen(payload), PUSH_PAYLOAD_LEN, PSTR(",\"duration\":%d}"), (int)fval);
 				}
+				strcat_P(payload, PSTR("}"));
 			}
 			if (ifttt_enabled || email_enabled) {
 				strcat_P(postval, PSTR("Station ["));
 				os.get_station_name(lval, postval+strlen(postval));
-				if((int)fval == 0){
-					strcat_P(postval, PSTR("] just turned on."));
-				}else{
-					strcat_P(postval, PSTR("] just turned on. It's scheduled to run for "));
+				strcat_P(postval, PSTR("] just turned on."));
+				if((int)fval > 0){
+					strcat_P(postval, PSTR(" It's scheduled to run for "));
 					snprintf_P(postval+strlen(postval), TMP_BUFFER_SIZE, PSTR(" %d minutes %d seconds."), (int)fval/60, (int)fval%60);
 				}
 				if(email_enabled) { email_message.subject += PSTR("station event"); }
@@ -227,19 +226,21 @@ void push_message(uint16_t type, uint32_t lval, float fval, uint8_t bval) {
 
 			if (os.mqtt.enabled()) {
 				snprintf_P(topic, PUSH_TOPIC_LEN, PSTR("station/%d"), lval);
-				if (os.iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_FLOW) {
-					snprintf_P(payload, PUSH_PAYLOAD_LEN, PSTR("{\"state\":0,\"duration\":%d,\"flow\":%d.%02d}"), (int)fval, (int)flow_last_gpm, (int)(flow_last_gpm*100)%100);
-				} else {
-					snprintf_P(payload, PUSH_PAYLOAD_LEN, PSTR("{\"state\":0,\"duration\":%d}"), (int)fval);
+				strcat_P(payload, PSTR("{\"state\":0"));
+				if((int)fval > 0) {
+					snprintf_P(payload+strlen(payload), PUSH_PAYLOAD_LEN, PSTR(",\"duration\":%d"), (int)fval);
+					if (os.iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_FLOW) {
+						snprintf_P(payload+strlen(payload), PUSH_PAYLOAD_LEN, PSTR(",\"flow\":%d.%02d"), (int)fval, (int)flow_last_gpm, (int)(flow_last_gpm*100)%100);
+					}
 				}
+				strcat_P(payload, PSTR("}"));
 			}
 			if (ifttt_enabled || email_enabled) {
 				strcat_P(postval, PSTR("Station ["));
 				os.get_station_name(lval, postval+strlen(postval));
-				if((int)fval == 0){
-					strcat_P(postval, PSTR("] closed."));
-				}else{
-					strcat_P(postval, PSTR("] closed. It ran for "));
+				strcat_P(postval, PSTR("] closed."));
+				if((int)fval > 0) {
+					strcat_P(postval, PSTR(" It ran for "));
 					snprintf_P(postval+strlen(postval), TMP_BUFFER_SIZE, PSTR(" %d minutes %d seconds."), (int)fval/60, (int)fval%60);
 				}
 
@@ -355,9 +356,9 @@ void push_message(uint16_t type, uint32_t lval, float fval, uint8_t bval) {
 		case NOTIFY_PROGRAM_SCHED:
 
 			if (ifttt_enabled || email_enabled) {
-				if (bval) strcat_P(postval, PSTR("manually scheduled "));
-				else strcat_P(postval, PSTR("automatically scheduled "));
-				strcat_P(postval, PSTR("Program "));
+				if (bval) strcat_P(postval, PSTR("manually"));
+				else strcat_P(postval, PSTR("automatically"));
+				strcat_P(postval, PSTR(" scheduled Program "));
 				{
 					ProgramStruct prog;
 					pd.read(lval, &prog);

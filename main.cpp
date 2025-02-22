@@ -967,11 +967,7 @@ void do_loop()
 						}
 					}
 				}
-		
-				if(os.get_station_bit(mas_id - 1) == 0 && masbit == 1){ // notify master on event
-					notif.add(NOTIFY_STATION_ON, mas_id - 1, 0);
-				}
-				
+
 				os.set_station_bit(mas_id - 1, masbit);
 			}
 		}
@@ -986,6 +982,23 @@ void do_loop()
 		}
 		// process dynamic events
 		process_dynamic_events(curr_time);
+
+		// handle master on / off notif events
+		for (unsigned char mas = MASTER_1; mas < NUM_MASTER_ZONES; mas++) {
+			unsigned char mas_id = os.masters[mas][MASOPT_SID];
+			if (mas_id) { // if this master station is defined
+				time_os_t laston = os.masters_last_on[mas];
+				unsigned char masbit = os.get_station_bit(mas_id - 1);
+				if(!laston && masbit) { // master is about to turn on
+					notif.add(NOTIFY_STATION_ON, mas_id - 1, 0);
+					os.masters_last_on[mas] = curr_time;
+				}
+				if(laston > 0 && !masbit) { // master is about to turn off
+					notif.add(NOTIFY_STATION_OFF, mas_id - 1, (curr_time>laston) ? (curr_time-laston) : 0);
+					os.masters_last_on[mas] = 0;
+				}
+			}
+		}
 
 		// activate/deactivate valves
 		os.apply_all_station_bits();

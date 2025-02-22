@@ -272,6 +272,7 @@ public:
 	static unsigned char attrib_spe[];
 	static unsigned char attrib_grp[];
 	static unsigned char masters[NUM_MASTER_ZONES][NUM_MASTER_OPTS];
+	static time_os_t masters_last_on[NUM_MASTER_ZONES];
 
 	// variables for time keeping
 	static time_os_t sensor1_on_timer;  // time when sensor1 is detected on last time
