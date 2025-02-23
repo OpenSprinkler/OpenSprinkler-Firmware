@@ -1251,9 +1251,8 @@ void turn_off_station(unsigned char sid, time_os_t curr_time, unsigned char shif
 				uint16_t flow_alert_setpoint = os.get_flow_alert_setpoint(sid);
 				//flow_last_gpm is actually collected and stored as pulses per minute, not gallons per minute
 				//Get Flow Pulse Rate factor and apply to flow_last_gpm when comparing and outputting
-				float flow_pulse_rate_factor = static_cast<float>(os.iopts[IOPT_PULSE_RATE_1]) + static_cast<float>(os.iopts[IOPT_PULSE_RATE_0]) / 100.0;
-
-				float last_flow = flow_last_gpm * flow_pulse_rate_factor;
+				uint16_t fpr = (unsigned int)(os.iopts[IOPT_PULSE_RATE_1]<<8)+os.iopts[IOPT_PULSE_RATE_0];
+				float last_flow = flow_last_gpm * fpr;
 				uint16_t avg_flow = os.get_flow_avg_value(sid);
 				uint16_t int_flow = (int)(last_flow * 100);
 				if (avg_flow > 0)
