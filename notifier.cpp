@@ -232,7 +232,11 @@ void push_message(uint16_t type, uint32_t lval, float fval, uint8_t bval) {
 					snprintf_P(payload+strlen(payload), PUSH_PAYLOAD_LEN, PSTR(",\"duration\":%d"), (int)fval);
 					if (os.iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_FLOW) {
 						float gpm = flow_last_gpm * flowrate100 / 100.f;
+						#if defined(OS_AVR)
+						snprintf_P(payload+strlen(payload), PUSH_PAYLOAD_LEN, PSTR(",\"flow\":%d.%02d"), (int)gpm, (int)(gpm*100)%100);
+						#else
 						snprintf_P(payload+strlen(payload), PUSH_PAYLOAD_LEN, PSTR(",\"flow\":%.2f"), gpm);
+						#endif
 					}
 				}
 				strcat_P(payload, PSTR("}"));
@@ -248,7 +252,11 @@ void push_message(uint16_t type, uint32_t lval, float fval, uint8_t bval) {
 
 				if(os.iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_FLOW) {
 					float gpm = flow_last_gpm * flowrate100 / 100.f;
+					#if defined(OS_AVR)
+					snprintf_P(postval+strlen(postval), TMP_BUFFER_SIZE, PSTR(" Flow rate: %d.%02d"), (int)gpm, (int)(gpm*100)%100);
+					#else
 					snprintf_P(postval+strlen(postval), TMP_BUFFER_SIZE, PSTR(" Flow rate: %.2f"), gpm);
+					#endif
 				}
 				if(email_enabled) { email_message.subject += PSTR("station event"); }
 			}
@@ -301,7 +309,12 @@ void push_message(uint16_t type, uint32_t lval, float fval, uint8_t bval) {
 					//Format mqtt message
 					snprintf_P(topic, PUSH_TOPIC_LEN, PSTR("station/%d/alert/flow"), lval);
 					float gpm = flow_last_gpm * flowrate100 / 100.f;
+					#if defined(OS_AVR)
+					snprintf_P(payload, PUSH_PAYLOAD_LEN, PSTR("{\"flow_rate\":%d.%02d,\"duration\":%d,\"alert_setpoint\":%d.%02d}"), (int)gpm, (int)(gpm*100)%100,
+					(int)fval, (int)flow_gpm_alert_setpoint, (int)(flow_gpm_alert_setpoint*100)%100);
+					#else
 					snprintf_P(payload, PUSH_PAYLOAD_LEN, PSTR("{\"flow_rate\":%.2f,\"duration\":%d,\"alert_setpoint\":%.4f}"), gpm, (int)fval, flow_gpm_alert_setpoint);
+					#endif
 				}
 
 
@@ -338,8 +351,13 @@ void push_message(uint16_t type, uint32_t lval, float fval, uint8_t bval) {
 
 					strcat_P(postval, PSTR("<br><br>FLOW ALERT!"));
 					float gpm = flow_last_gpm * flowrate100 / 100.f;
+					#if defined(OS_AVR)
+					snprintf_P(postval+strlen(postval), TMP_BUFFER_SIZE, PSTR("<br>Flow rate: %d.%02d<br>Flow Alert Setpoint: %d.%02d"),
+						(int)gpm, (int)(gpm*100)%100, (int)flow_gpm_alert_setpoint, (int)(flow_gpm_alert_setpoint*100)%100);
+					#else
 					snprintf_P(postval+strlen(postval), TMP_BUFFER_SIZE, PSTR("<br>Flow rate: %.2f<br>Flow Alert Setpoint: %.4f"),
 						gpm, flow_gpm_alert_setpoint);
+					#endif
 
 					if(email_enabled) { email_message.subject += PSTR("- FLOW ALERT"); }
 
@@ -411,13 +429,21 @@ void push_message(uint16_t type, uint32_t lval, float fval, uint8_t bval) {
 
 		case NOTIFY_FLOWSENSOR:
 			{
-				uint32_t vol100 = lval*flowrate100;
+				float vol = lval*flowrate100/100.f;
 				if (os.mqtt.enabled()) {
 					strcpy_P(topic, PSTR("sensor/flow"));
-					snprintf_P(payload, PUSH_PAYLOAD_LEN, PSTR("{\"count\":%d,\"volume\":%.2f}"), (int)lval, vol100/100.f);
+					#if defined(OS_AVR)
+					snprintf_P(payload, PUSH_PAYLOAD_LEN, PSTR("{\"count\":%d,\"volume\":%d.%02d}"), (int)lval, (int)vol, (int)(vol*100)%100);
+					#else
+					snprintf_P(payload, PUSH_PAYLOAD_LEN, PSTR("{\"count\":%d,\"volume\":%.2f}"), (int)lval, vol);
+					#endif
 				}
 				if (ifttt_enabled || email_enabled) {
-					snprintf_P(postval+strlen(postval), TMP_BUFFER_SIZE, PSTR("Flow count: %d, volume: %.2f"), (int)lval, vol100/100.f);
+					#if defined(OS_VAR)
+					snprintf_P(postval+strlen(postval), TMP_BUFFER_SIZE, PSTR("Flow count: %d, volume: %d.%02d"), (int)lval, (int)vol, (int)(vol*100)%100);
+					#else
+					snprintf_P(postval+strlen(postval), TMP_BUFFER_SIZE, PSTR("Flow count: %d, volume: %.2f"), (int)lval, vol);
+					#endif
 					if(email_enabled) { email_message.subject += PSTR("flow sensor event"); }
 				}
 			}
