@@ -322,7 +322,7 @@ void push_message(uint16_t type, uint32_t lval, float fval, uint8_t bval) {
 					//Format ifttt\email message
 
 					// Get and format current local time as "YYYY-MM-DD hh:mm:ss AM/PM"
-					strcat_P(postval, PSTR(", at "));
+					strcat_P(postval, PSTR("at "));
 					time_os_t curr_time = os.now_tz();
 					#if defined(ARDUINO)
 					tmElements_t tm;
@@ -342,7 +342,7 @@ void push_message(uint16_t type, uint32_t lval, float fval, uint8_t bval) {
 					strcat_P(postval, PSTR("]"));
 					if(fval > 0){ // if there is a valid duration
 						strcat_P(postval, PSTR(" ran for "));
-						snprintf_P(postval+strlen(postval), TMP_BUFFER_SIZE, PSTR(" %d minutes %d seconds."), (int)fval/60, ((int)fval%60));
+						snprintf_P(postval+strlen(postval), TMP_BUFFER_SIZE, PSTR("%d minutes %d seconds."), (int)fval/60, ((int)fval%60));
 					}
 
 					strcat_P(postval, PSTR(" FLOW ALERT!"));
