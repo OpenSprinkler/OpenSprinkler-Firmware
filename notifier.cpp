@@ -322,22 +322,20 @@ void push_message(uint16_t type, uint32_t lval, float fval, uint8_t bval) {
 					//Format ifttt\email message
 
 					// Get and format current local time as "YYYY-MM-DD hh:mm:ss AM/PM"
+					strcat_P(postval, PSTR(" | "));
 					time_os_t curr_time = os.now_tz();
 					#if defined(ARDUINO)
-					strcat_P(postval, PSTR("<br>"));
 					tmElements_t tm;
 					breakTime(curr_time, tm);
 					snprintf_P(postval+strlen(postval), TMP_BUFFER_SIZE, PSTR("%04d-%02d-%02d %02d:%02d:%02d"),
 						1970+tm.Year, tm.Month, tm.Day, tm.Hour, tm.Minute, tm.Second);
 					#else
-					struct tm *tm_info = localtime((time_t*)&curr_time);
-					char formatted_time[TMP_BUFFER_SIZE];
-					strftime(formatted_time, sizeof(formatted_time), "%Y-%m-%d %I:%M:%S %p", tm_info);
-					strcat_P(postval, PSTR("<br>"));
-					strcat(postval, formatted_time);
+					struct tm *ti = gmtime(&curr_time);
+					snprintf_P(postval+strlen(postval), TMP_BUFFER_SIZE, PSTR("%04d-%02d-%02d %02d:%02d:%02d"),
+						ti->tm_year, ti->tm_mon+1, ti->tm_mday, ti->tm_hour, ti->tm_min, ti->tm_sec);
 					#endif
 
-					strcat_P(postval, PSTR("<br>Station: "));
+					strcat_P(postval, PSTR(" | Station: "));
 					//Truncate flow setpoint value off station name to shorten ifttt\email message
 					tmp_station_name[(strlen(tmp_station_name) - 5)] = '\0';
 					strcat_P(postval, tmp_station_name);
@@ -345,17 +343,17 @@ void push_message(uint16_t type, uint32_t lval, float fval, uint8_t bval) {
 					if((int)fval == 0){
 						strcat_P(postval, PSTR(""));
 					}else{					// master on event does not have duration attached to it
-						strcat_P(postval, PSTR("<br>Duration: "));
+						strcat_P(postval, PSTR(" | Duration: "));
 						snprintf_P(postval+strlen(postval), TMP_BUFFER_SIZE, PSTR(" %d minutes %d seconds"), (int)fval/60, ((int)fval%60));
 					}
 
-					strcat_P(postval, PSTR("<br><br>FLOW ALERT!"));
+					strcat_P(postval, PSTR(" | FLOW ALERT!"));
 					float gpm = flow_last_gpm * flowrate100 / 100.f;
 					#if defined(OS_AVR)
-					snprintf_P(postval+strlen(postval), TMP_BUFFER_SIZE, PSTR("<br>Flow rate: %d.%02d<br>Flow Alert Setpoint: %d.%02d"),
+					snprintf_P(postval+strlen(postval), TMP_BUFFER_SIZE, PSTR(" | Flow rate: %d.%02d > Flow Alert Setpoint: %d.%02d"),
 						(int)gpm, (int)(gpm*100)%100, (int)flow_gpm_alert_setpoint, (int)(flow_gpm_alert_setpoint*100)%100);
 					#else
-					snprintf_P(postval+strlen(postval), TMP_BUFFER_SIZE, PSTR("<br>Flow rate: %.2f<br>Flow Alert Setpoint: %.4f"),
+					snprintf_P(postval+strlen(postval), TMP_BUFFER_SIZE, PSTR(" | Flow rate: %.2f > Flow Alert Setpoint: %.4f"),
 						gpm, flow_gpm_alert_setpoint);
 					#endif
 
