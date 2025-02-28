@@ -1053,8 +1053,8 @@ void server_json_options_main() {
 		}
 		#endif
 #else
-		// for Linux-based platforms, there is no LCD currently
-		if(oid==IOPT_LCD_CONTRAST || oid==IOPT_LCD_BACKLIGHT || oid==IOPT_LCD_DIMMING) continue;
+		// for Linux-based platforms, we can't adjust contrast or backlight
+		if(oid==IOPT_LCD_CONTRAST || oid==IOPT_LCD_BACKLIGHT) continue;
 #endif
 
 		// each json name takes 5 characters
