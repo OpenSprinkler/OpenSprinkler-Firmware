@@ -487,11 +487,12 @@ void reboot_in(uint32_t ms) {
 void handle_web_request(char *p);
 #endif
 
+
 /** Main Loop */
 void do_loop()
 {
-	// handle flow sensor using polling every 1ms (maximum freq 1/(2*1ms)=500Hz)
 	static ulong flowpoll_timeout=0;
+	// handle flow sensor using polling every 1ms (maximum freq 1/(2*1ms)=500Hz)
 	if(os.iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_FLOW) {
 		ulong curr = millis();
 		if(curr!=flowpoll_timeout) {
@@ -649,7 +650,7 @@ void do_loop()
 #else // Process Ethernet packets for RPI/LINUX
 	if(otf) otf->loop();
 #if defined(USE_DISPLAY)
-    ui_state_machine();
+	ui_state_machine();
 #endif
 #endif	// Process Ethernet packets
 
@@ -1794,7 +1795,7 @@ int main(int argc, char *argv[]) {
 		}
 	}
 
-  do_setup();
+	do_setup();
 
 	while(true) {
 		do_loop();

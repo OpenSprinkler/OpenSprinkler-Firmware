@@ -11,6 +11,9 @@ function enable_i2c {
     if [[ $(grep -c '^dtparam=i2c_arm=on$' /boot/config.txt) -ge 1 ]] ; then
         echo "Setting the i2c clock speed to 400 kHz, you will have to reboot for this to take effect."
         sudo sed -i -e 's/dtparam=i2c_arm=on$/dtparam=i2c_arm=on,i2c_arm_baudrate=400000/g' /boot/config.txt
+    elif [[ $(grep -c '^dtparam=i2c_arm=on$' /boot/firmware/config.txt) -ge 1 ]] ; then
+        echo "Setting the i2c clock speed to 400 kHz, you will have to reboot for this to take effect."
+        sudo sed -i -e 's/dtparam=i2c_arm=on$/dtparam=i2c_arm=on,i2c_arm_baudrate=400000/g' /boot/firmware/config.txt
     fi
     else
 		echo "Can not automatically enable i2c you might have to do this manually"
