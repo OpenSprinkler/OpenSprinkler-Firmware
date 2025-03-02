@@ -2172,7 +2172,9 @@ void on_sta_update(OTF_PARAMS_DEF) {
 }
 
 void on_sta_upload_fin() {
-	if(!(update_server->hasArg("pw") && os.password_verify(update_server->arg("pw").c_str()))) {
+	if (os.iopts[IOPT_IGNORE_PASSWORD]) {
+		// don't check password
+	} else if(!(update_server->hasArg("pw") && os.password_verify(update_server->arg("pw").c_str()))) {
 		update_server_send_result(HTML_UNAUTHORIZED);
 		Update.end(false);
 		return;
