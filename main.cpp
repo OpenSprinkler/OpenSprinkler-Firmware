@@ -628,6 +628,14 @@ void do_loop()
 			if(size>0) {
 				if(size>ETHER_BUFFER_SIZE) size=ETHER_BUFFER_SIZE;
 				int len = client.read((uint8_t*) ether_buffer, size);
+				// Hack: see if we may have another packet, in case there is an overly large packet
+				// This really should be implemented more gracefully
+				size = client.available();
+				if(size>0) {
+					// There is still more data to read
+					if(size+len > ETHER_BUFFER_SIZE) size = ETHER_BUFFER_SIZE - len; // cap read size
+					len += client.read((uint8_t*) ether_buffer+len, size);
+				}
 				if(len>0) {
 					m_client = &client;
 					ether_buffer[len] = 0;  // properly end the buffer
