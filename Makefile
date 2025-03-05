@@ -3,7 +3,7 @@ CXX=g++
 VERSION=OSPI
 CXXFLAGS=-std=gnu++14 -D$(VERSION) -DSMTP_OPENSSL -Wall -include string.h -include cstdint -Iexternal/TinyWebsockets/tiny_websockets_lib/include -Iexternal/OpenThings-Framework-Firmware-Library/
 LD=$(CXX)
-LIBS=pthread mosquitto ssl crypto i2c
+LIBS=pthread mosquitto ssl crypto i2c gpiod
 LDFLAGS=$(addprefix -l,$(LIBS))
 BINARY=OpenSprinkler
 SOURCES=main.cpp OpenSprinkler.cpp notifier.cpp program.cpp opensprinkler_server.cpp utils.cpp weather.cpp gpio.cpp mqtt.cpp smtp.c RCSwitch.cpp $(wildcard external/TinyWebsockets/tiny_websockets_lib/src/*.cpp) $(wildcard external/OpenThings-Framework-Firmware-Library/*.cpp)
