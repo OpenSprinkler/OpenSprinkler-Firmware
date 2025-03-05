@@ -7,7 +7,7 @@ ARG BUILD_VERSION="OSPI"
 FROM base AS os-build
 
 ENV DEBIAN_FRONTEND=noninteractive
-RUN apt-get update && apt-get install -y bash g++ make libmosquittopp-dev libssl-dev libi2c-dev
+RUN apt-get update && apt-get install -y bash g++ make libmosquittopp-dev libssl-dev libi2c-dev libgpiod-dev gpiod
 RUN rm -rf /var/lib/apt/lists/*
 COPY . /OpenSprinkler
 WORKDIR /OpenSprinkler
