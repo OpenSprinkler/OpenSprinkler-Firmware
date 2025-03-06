@@ -1,4 +1,4 @@
-/* OpenSprinkler Unified (AVR/RPI/BBB/LINUX) Firmware
+/* OpenSprinkler Unified Firmware
  * Copyright (C) 2015 by Ray Wang (ray@opensprinkler.com)
  *
  * Main loop
@@ -30,12 +30,11 @@
 #include "opensprinkler_server.h"
 #include "mqtt.h"
 #include "main.h"
+#include "notifier.h"
 
 #if defined(ARDUINO)
 #include <Arduino.h>
 #endif
-
-#include "ArduinoJson.hpp"
 
 #if defined(ARDUINO)
 	#if defined(ESP8266)
@@ -45,7 +44,6 @@
 		Wiznet5500lwIP w5500(PIN_ETHER_CS); // W5500 lwip for wired Ether
 		lwipEth eth;
 		bool useEth = false; // tracks whether we are using WiFi or wired Ether connection
-		static uint16_t led_blink_ms = LED_FAST_BLINK;
 	#else
 		EthernetServer *m_server = NULL;
 		EthernetClient *m_client = NULL;
@@ -53,17 +51,23 @@
 		bool useEth = true;
 	#endif
 	unsigned long getNtpTime();
-#else // header and defs for RPI/BBB
-
+#else // header and defs for RPI/Linux
+	bool useEth = false;
 #endif
 
 #if defined(USE_OTF)
 	OTF::OpenThingsFramework *otf = NULL;
 #endif
 
-void push_message(int type, uint32_t lval=0, float fval=0.f, const char* sval=NULL);
+#if defined(USE_SSD1306)
+	#if defined(ESP8266)
+	static uint16_t led_blink_ms = LED_FAST_BLINK;
+	#else
+	static uint16_t led_blink_ms = 0;
+	#endif
+#endif
+
 void manual_start_program(unsigned char, unsigned char);
-void remote_http_callback(char*);
 
 // Small variations have been added to the timing values below
 // to minimize conflicting events
@@ -83,6 +87,7 @@ char tmp_buffer[TMP_BUFFER_SIZE*2]; // scratch buffer, make it twice as large to
 // ====== Object defines ======
 OpenSprinkler os; // OpenSprinkler object
 ProgramData pd;   // ProgramdData object
+NotifQueue notif; // NotifQueue object
 
 /* ====== Robert Hillman (RAH)'s implementation of flow sensor ======
  * flow_begin - time when valve turns on
@@ -119,7 +124,7 @@ void flow_poll() {
 	/* End of RAH implementation of flow sensor */
 }
 
-#if defined(ARDUINO)
+#if defined(USE_DISPLAY)
 // ====== UI defines ======
 static char ui_anim_chars[3] = {'.', 'o', 'O'};
 
@@ -146,14 +151,13 @@ bool ui_confirm(PGM_P str) {
 }
 
 void ui_state_machine() {
-
 	// to avoid ui_state_machine taking too much computation time
 	// we run it only every UI_STATE_MACHINE_INTERVAL ms
 	static uint32_t last_usm = 0;
 	if(millis() - last_usm <= UI_STATE_MACHINE_INTERVAL) { return; }
 	last_usm = millis();
 
-#if defined(ESP8266)
+#if defined(USE_SSD1306)
 	// process screen led
 	static ulong led_toggle_timeout = 0;
 	if(led_blink_ms) {
@@ -188,36 +192,86 @@ void ui_state_machine() {
 					if(!ui_confirm(PSTR("Start 2s test?"))) {ui_state = UI_STATE_DEFAULT; break;}
 					manual_start_program(255, 0);
 				} else if (digitalReadExt(PIN_BUTTON_2)==0) { // if B2 is pressed while holding B1, display gateway IP
+					#if defined(USE_SSD1306)
+						os.lcd.setAutoDisplay(false);
+					#endif
 					os.lcd.clear(0, 1);
 					os.lcd.setCursor(0, 0);
+					#if defined(ARDUINO)
 					#if defined(ESP8266)
 					if (useEth) { os.lcd.print(eth.gatewayIP()); }
 					else { os.lcd.print(WiFi.gatewayIP()); }
 					#else
 					{ os.lcd.print(Ethernet.gatewayIP()); }
 					#endif
+					#else
+					route_t route = get_route();
+					char str[INET_ADDRSTRLEN];
+
+					inet_ntop(AF_INET, &(route.gateway), str, INET_ADDRSTRLEN);
+					os.lcd.print(str);
+					#endif
 					os.lcd.setCursor(0, 1);
 					os.lcd_print_pgm(PSTR("(gwip)"));
 					ui_state = UI_STATE_DISP_IP;
+					#if defined(USE_SSD1306)
+						os.lcd.display();
+						os.lcd.setAutoDisplay(true);
+					#endif
 				} else {  // if no other button is clicked, stop all zones
 					if(!ui_confirm(PSTR("Stop all zones?"))) {ui_state = UI_STATE_DEFAULT; break;}
 					reset_all_stations();
 				}
 			} else {  // clicking B1: display device IP and port
+				#if defined(USE_SSD1306)
+					os.lcd.setAutoDisplay(false);
+				#endif
 				os.lcd.clear(0, 1);
 				os.lcd.setCursor(0, 0);
+				#if defined(ARDUINO)
 				#if defined(ESP8266)
 				if (useEth) { os.lcd.print(eth.localIP()); }
 				else { os.lcd.print(WiFi.localIP()); }
 				#else
 				{ os.lcd.print(Ethernet.localIP()); }
 				#endif
+				#else
+				route_t route = get_route();
+				char str[INET_ADDRSTRLEN];
+				in_addr_t ip = get_ip_address(route.iface);
+
+				inet_ntop(AF_INET, &ip, str, INET_ADDRSTRLEN);
+				os.lcd.print(str);
+				#endif
 				os.lcd.setCursor(0, 1);
 				os.lcd_print_pgm(PSTR(":"));
 				uint16_t httpport = (uint16_t)(os.iopts[IOPT_HTTPPORT_1]<<8) + (uint16_t)os.iopts[IOPT_HTTPPORT_0];
 				os.lcd.print(httpport);
 				os.lcd_print_pgm(PSTR(" (ip:port)"));
+				#if defined(USE_OTF)
+					os.lcd.setCursor(0, 2);
+					os.lcd_print_pgm(PSTR("OTC:"));
+					switch(otf->getCloudStatus()) {
+						case OTF::NOT_ENABLED:
+							os.lcd_print_pgm(PSTR(" not enabled"));
+							break;
+						case OTF::UNABLE_TO_CONNECT:
+							os.lcd_print_pgm(PSTR("connecting.."));
+							break;
+						case OTF::DISCONNECTED:
+							os.lcd_print_pgm(PSTR("disconnected"));
+							break;
+						case OTF::CONNECTED:
+							os.lcd_print_pgm(PSTR(" Connected"));
+							break;
+					}
+				#endif
+				
 				ui_state = UI_STATE_DISP_IP;
+				#if defined(USE_SSD1306)
+					os.lcd.display();
+					os.lcd.setAutoDisplay(true);
+				#endif
 			}
 			break;
 		case BUTTON_2:
@@ -298,10 +352,13 @@ void ui_state_machine() {
 		break;
 	}
 }
+#endif
+
 
 // ======================
 // Setup Function
 // ======================
+#if defined(ARDUINO)
 void do_setup() {
 	/* Clear WDT reset flag. */
 #if defined(ESP8266)
@@ -376,7 +433,7 @@ ISR(WDT_vect)
 #endif
 
 #else
-void initalize_otf();
+void initialize_otf();
 
 void do_setup() {
 	initialiseEpoch();   // initialize time reference for millis() and micros()
@@ -403,8 +460,9 @@ void do_setup() {
 	os.mqtt.init();
 	os.status.req_mqtt_restart = true;
 
-	initalize_otf();
+	initialize_otf();
 }
+
 #endif
 
 void turn_on_station(unsigned char sid, ulong duration);
@@ -429,11 +487,12 @@ void reboot_in(uint32_t ms) {
 void handle_web_request(char *p);
 #endif
 
+
 /** Main Loop */
 void do_loop()
 {
-	// handle flow sensor using polling every 1ms (maximum freq 1/(2*1ms)=500Hz)
 	static ulong flowpoll_timeout=0;
+	// handle flow sensor using polling every 1ms (maximum freq 1/(2*1ms)=500Hz)
 	if(os.iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_FLOW) {
 		ulong curr = millis();
 		if(curr!=flowpoll_timeout) {
@@ -569,6 +628,14 @@ void do_loop()
 			if(size>0) {
 				if(size>ETHER_BUFFER_SIZE) size=ETHER_BUFFER_SIZE;
 				int len = client.read((uint8_t*) ether_buffer, size);
+				// Hack: see if we may have another packet, in case there is an overly large packet
+				// This really should be implemented more gracefully
+				size = client.available();
+				if(size>0) {
+					// There is still more data to read
+					if(size+len > ETHER_BUFFER_SIZE) size = ETHER_BUFFER_SIZE - len; // cap read size
+					len += client.read((uint8_t*) ether_buffer+len, size);
+				}
 				if(len>0) {
 					m_client = &client;
 					ether_buffer[len] = 0;  // properly end the buffer
@@ -588,8 +655,11 @@ void do_loop()
 
 	ui_state_machine();
 
-#else // Process Ethernet packets for RPI/BBB
+#else // Process Ethernet packets for RPI/LINUX
 	if(otf) otf->loop();
+#if defined(USE_DISPLAY)
+	ui_state_machine();
+#endif
 #endif	// Process Ethernet packets
 
 	// Start up MQTT when we have a network connection
@@ -614,7 +684,7 @@ void do_loop()
 		last_time = curr_time;
 		if (os.button_timeout) os.button_timeout--;
 
-#if defined(ARDUINO)
+#if defined(USE_DISPLAY)
 		if (!ui_state)
 			os.lcd_print_time(curr_time);  // print time
 #endif
@@ -635,12 +705,12 @@ void do_loop()
 			if (os.status.rain_delayed) {
 				// rain delay started, record time
 				os.raindelay_on_lasttime = curr_time;
-				push_message(NOTIFY_RAINDELAY, LOGDATA_RAINDELAY, 1);
+				notif.add(NOTIFY_RAINDELAY, LOGDATA_RAINDELAY, 1);
 
 			} else {
 				// rain delay stopped, write log
 				write_log(LOGDATA_RAINDELAY, curr_time);
-				push_message(NOTIFY_RAINDELAY, LOGDATA_RAINDELAY, 0);
+				notif.add(NOTIFY_RAINDELAY, LOGDATA_RAINDELAY, 0);
 			}
 			os.old_status.rain_delayed = os.status.rain_delayed;
 		}
@@ -652,10 +722,10 @@ void do_loop()
 			// send notification when sensor1 becomes active
 			if(os.status.sensor1_active) {
 				os.sensor1_active_lasttime = curr_time;
-				push_message(NOTIFY_SENSOR1, LOGDATA_SENSOR1, 1);
+				notif.add(NOTIFY_SENSOR1, LOGDATA_SENSOR1, 1);
 			} else {
 				write_log(LOGDATA_SENSOR1, curr_time);
-				push_message(NOTIFY_SENSOR1, LOGDATA_SENSOR1, 0);
+				notif.add(NOTIFY_SENSOR1, LOGDATA_SENSOR1, 0);
 			}
 		}
 		os.old_status.sensor1_active = os.status.sensor1_active;
@@ -664,10 +734,10 @@ void do_loop()
 			// send notification when sensor1 becomes active
 			if(os.status.sensor2_active) {
 				os.sensor2_active_lasttime = curr_time;
-				push_message(NOTIFY_SENSOR2, LOGDATA_SENSOR2, 1);
+				notif.add(NOTIFY_SENSOR2, LOGDATA_SENSOR2, 1);
 			} else {
 				write_log(LOGDATA_SENSOR2, curr_time);
-				push_message(NOTIFY_SENSOR2, LOGDATA_SENSOR2, 0);
+				notif.add(NOTIFY_SENSOR2, LOGDATA_SENSOR2, 0);
 			}
 		}
 		os.old_status.sensor2_active = os.status.sensor2_active;
@@ -698,13 +768,19 @@ void do_loop()
 			// check through all programs
 			for(pid=0; pid<pd.nprograms; pid++) {
 				pd.read(pid, &prog);	// todo future: reduce load time
-				if(prog.check_match(curr_time)) {
+				bool will_delete = false;
+				unsigned char runcount = prog.check_match(curr_time, &will_delete);
+				if(runcount>0) {
 					// program match found
 					// check and process special program command
 					if(process_special_program_command(prog.name, curr_time))	continue;
 
+					// get station ordering
+					unsigned char order[os.nstations];
+					prog.gen_station_runorder(runcount, order);
 					// process all selected stations
-					for(sid=0;sid<os.nstations;sid++) {
+					for(unsigned char oi=0;oi<os.nstations;oi++) {
+						sid=order[oi];
 						bid=sid>>3;
 						s=sid&0x07;
 						// skip if the station is a master station (because master cannot be scheduled independently
@@ -741,7 +817,11 @@ void do_loop()
 						}// if prog.durations[sid]
 					}// for sid
 					if(match_found) {
-						push_message(NOTIFY_PROGRAM_SCHED, pid, prog.use_weather?os.iopts[IOPT_WATER_PERCENTAGE]:100);
+						notif.add(NOTIFY_PROGRAM_SCHED, pid, prog.use_weather?os.iopts[IOPT_WATER_PERCENTAGE]:100);
+					}
+					//delete run-once if on final runtime (stations have already been queued)
+					if(will_delete){
+						pd.del(pid);
 					}
 				}// if check_match
 			}// for pid
@@ -859,7 +939,7 @@ void do_loop()
 				// log flow sensor reading if flow sensor is used
 				if(os.iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_FLOW) {
 					write_log(LOGDATA_FLOWSENSE, curr_time);
-					push_message(NOTIFY_FLOWSENSOR, (flow_count>os.flowcount_log_start)?(flow_count-os.flowcount_log_start):0);
+					notif.add(NOTIFY_FLOWSENSOR, (flow_count>os.flowcount_log_start)?(flow_count-os.flowcount_log_start):0);
 				}
 
 				// in case some options have changed while executing the program
@@ -896,11 +976,7 @@ void do_loop()
 						}
 					}
 				}
-		
-				if(os.get_station_bit(mas_id - 1) == 0 && masbit == 1){ // notify master on event
-					push_message(NOTIFY_STATION_ON, mas_id - 1, 0);
-				}
-				
+
 				os.set_station_bit(mas_id - 1, masbit);
 			}
 		}
@@ -916,13 +992,29 @@ void do_loop()
 		// process dynamic events
 		process_dynamic_events(curr_time);
 
+		// handle master on / off notif events
+		for (unsigned char mas = MASTER_1; mas < NUM_MASTER_ZONES; mas++) {
+			unsigned char mas_id = os.masters[mas][MASOPT_SID];
+			if (mas_id) { // if this master station is defined
+				time_os_t laston = os.masters_last_on[mas];
+				unsigned char masbit = os.get_station_bit(mas_id - 1);
+				if(!laston && masbit) { // master is about to turn on
+					notif.add(NOTIFY_STATION_ON, mas_id - 1, 0);
+					os.masters_last_on[mas] = curr_time;
+				}
+				if(laston > 0 && !masbit) { // master is about to turn off
+					notif.add(NOTIFY_STATION_OFF, mas_id - 1, (curr_time>laston) ? (curr_time-laston) : 0);
+					os.masters_last_on[mas] = 0;
+				}
+			}
+		}
+
 		// activate/deactivate valves
 		os.apply_all_station_bits();
 
-#if defined(ARDUINO)
+#if defined(USE_DISPLAY)
 		// process LCD display
 		if (!ui_state) { os.lcd_print_screen(ui_anim_chars[(unsigned long)curr_time%3]); }
-
 #endif
 
 		// handle reboot request
@@ -932,9 +1024,10 @@ void do_loop()
 			if (!os.status.program_busy) {
 				// and if no program is scheduled to run in the next minute
 				bool willrun = false;
+				bool will_delete = false;
 				for(pid=0; pid<pd.nprograms; pid++) {
 					pd.read(pid, &prog);
-					if(prog.check_match(curr_time+60)) {
+					if(prog.check_match(curr_time+60, &will_delete)) {
 						willrun = true;
 						break;
 					}
@@ -970,26 +1063,26 @@ void do_loop()
 		// check weather
 		check_weather();
 
+		// process notifier events
+		if(os.network_connected()) {
+			notif.run();
+		}
+
 		if(os.weather_update_flag & WEATHER_UPDATE_WL) {
 			// at the moment, we only send notification if water level changed
 			// the other changes, such as sunrise, sunset changes are ignored for notification
-			push_message(NOTIFY_WEATHER_UPDATE, 0, os.iopts[IOPT_WATER_PERCENTAGE]);
+			notif.add(NOTIFY_WEATHER_UPDATE, 0, os.iopts[IOPT_WATER_PERCENTAGE]);
 			os.weather_update_flag = 0;
 		}
 		static unsigned char reboot_notification = 1;
 		if(reboot_notification) {
-			#if defined(ESP266)
-				if(useEth || WiFi.status()==WL_CONNECTED)
-			#endif
-			{
 			reboot_notification = 0;
-			push_message(NOTIFY_REBOOT);
-			}
+			notif.add(NOTIFY_REBOOT);
 		}
 	}
 
 	#if !defined(ARDUINO)
-		delay(1); // For OSPI/OSBO/LINUX, sleep 1 ms to minimize CPU usage
+		delay(1); // For OSPI/LINUX, sleep 1 ms to minimize CPU usage
 	#endif
 }
 
@@ -1019,11 +1112,7 @@ void check_weather() {
 	if (os.status.network_fails>0 || os.iopts[IOPT_REMOTE_EXT_MODE]) return;
 	if (os.status.program_busy) return;
 
-#if defined(ESP8266)
-	if (!useEth) { // todo: what about useEth==true?
-		if (os.get_wifi_mode()!=WIFI_MODE_STA || WiFi.status()!=WL_CONNECTED || os.state!=OS_STATE_CONNECTED) return;
-	}
-#endif
+	if (!os.network_connected()) return;
 
 	time_os_t ntz = os.now_tz();
 	if (os.checkwt_success_lasttime && (ntz > os.checkwt_success_lasttime + CHECK_WEATHER_SUCCESS_TIMEOUT)) {
@@ -1055,9 +1144,11 @@ void check_weather() {
 void turn_on_station(unsigned char sid, ulong duration) {
 	// RAH implementation of flow sensor
 	flow_start=0;
+	//Added flow_gallons reset to station turn on.
+	flow_gallons=0;  
 
 	if (os.set_station_bit(sid, 1, duration)) {
-		push_message(NOTIFY_STATION_ON, sid, duration);
+		notif.add(NOTIFY_STATION_ON, sid, duration);
 	}
 }
 
@@ -1141,7 +1232,8 @@ void turn_off_station(unsigned char sid, time_os_t curr_time, unsigned char shif
 
 			// log station run
 			write_log(LOGDATA_STATION, curr_time); // LOG_TODO
-			push_message(NOTIFY_STATION_OFF, sid, pd.lastrun.duration);
+			notif.add(NOTIFY_STATION_OFF, sid, pd.lastrun.duration);
+			notif.add(NOTIFY_FLOW_ALERT, sid, pd.lastrun.duration);
 		}
 	}
 
@@ -1176,7 +1268,6 @@ void process_dynamic_events(time_os_t curr_time) {
 		 && os.status.sensor2_active)
 		sn2 = true;
 
-	// todo: handle sensor 2
 	unsigned char sid, s, bid, qid, igs, igs2, igrd;
 	for(bid=0;bid<os.nboards;bid++) {
 		igs = os.attrib_igs[bid];
@@ -1210,7 +1301,7 @@ void process_dynamic_events(time_os_t curr_time) {
  * this function determines the appropriate start and dequeue times
  * of stations bound to master stations with on and off adjustments
  */
-void handle_master_adjustments(time_os_t curr_time, RuntimeQueueStruct *q) {
+void handle_master_adjustments(time_os_t curr_time, RuntimeQueueStruct *q, unsigned char gid, ulong *seq_start_times) {
 
 	int16_t start_adj = 0;
 	int16_t dequeue_adj = 0;
@@ -1233,6 +1324,7 @@ void handle_master_adjustments(time_os_t curr_time, RuntimeQueueStruct *q) {
 	// push back station's start time to allow sufficient time to turn on master
 	if (q->st - curr_time < abs(start_adj)) {
 		q->st += abs(start_adj);
+		seq_start_times[gid] += abs(start_adj);
 	}
 
 	q->deque_time = q->st + q->dur + dequeue_adj;
@@ -1280,7 +1372,7 @@ void schedule_all_stations(time_os_t curr_time) {
 			con_start_time++;
 		}
 
-		handle_master_adjustments(curr_time, q);
+		handle_master_adjustments(curr_time, q, gid, seq_start_times);
 
 		if (!os.status.program_busy) {
 			os.status.program_busy = 1;  // set program busy bit
@@ -1331,7 +1423,7 @@ void manual_start_program(unsigned char pid, unsigned char uwt) {
 	unsigned char sid, bid, s;
 	if ((pid>0)&&(pid<255)) {
 		pd.read(pid-1, &prog);
-		push_message(NOTIFY_PROGRAM_SCHED, pid-1, uwt?os.iopts[IOPT_WATER_PERCENTAGE]:100, "");
+		notif.add(NOTIFY_PROGRAM_SCHED, pid-1, uwt?os.iopts[IOPT_WATER_PERCENTAGE]:100, 1);
 	}
 	for(sid=0;sid<os.nstations;sid++) {
 		bid=sid>>3;
@@ -1362,326 +1454,6 @@ void manual_start_program(unsigned char pid, unsigned char uwt) {
 	}
 }
 
-// ==========================================
-// ====== PUSH NOTIFICATION FUNCTIONS =======
-// ==========================================
-void ip2string(char* str, size_t str_len, unsigned char ip[4]) {
-	snprintf_P(str+strlen(str), str_len, PSTR("%d.%d.%d.%d"), ip[0], ip[1], ip[2], ip[3]);
-}
-
-#define PUSH_TOPIC_LEN	120
-#define PUSH_PAYLOAD_LEN TMP_BUFFER_SIZE
-
-void push_message(int type, uint32_t lval, float fval, const char* sval) {
-	static char topic[PUSH_TOPIC_LEN+1];
-	static char payload[PUSH_PAYLOAD_LEN+1];
-	char* postval = tmp_buffer+1; // +1 so we can fit a opening { before the loaded config
-	uint32_t volume;
-
-	// check if ifttt key exists and also if the enable bit is set
-	os.sopt_load(SOPT_IFTTT_KEY, tmp_buffer);
-	bool ifttt_enabled = ((os.iopts[IOPT_NOTIF_ENABLE]&type)!=0) && (strlen(tmp_buffer)!=0);
-	
-#define DEFAULT_EMAIL_PORT	465
-
-	// parse email variables
-	#if defined(SUPPORT_EMAIL)
-	// define email variables
-	ArduinoJson::JsonDocument doc; // make sure this has the same scope of email_x variables to prevent use after free
-	const char *email_host = NULL;
-	const char *email_username = NULL;
-	const char *email_password = NULL;
-	const char *email_recipient = NULL;
-	int  email_port = DEFAULT_EMAIL_PORT;
-	int  email_en = 0;
-
-	os.sopt_load(SOPT_EMAIL_OPTS, postval);
-	if (*postval != 0) {
-		// Add the wrapping curly braces to the string
-		postval = tmp_buffer;
-		postval[0] = '{';
-		int len = strlen(postval);
-		postval[len] = '}';
-		postval[len+1] = 0;
-
-		ArduinoJson::DeserializationError error = ArduinoJson::deserializeJson(doc, postval);
-		// Test the parsing otherwise parse
-		if (error) {
-			DEBUG_PRINT(F("mqtt: deserializeJson() failed: "));
-			DEBUG_PRINTLN(error.c_str());
-		} else {
-			email_en = doc["en"];
-			email_host = doc["host"];
-			email_port = doc["port"];
-			email_username = doc["user"];
-			email_password = doc["pass"];
-			email_recipient= doc["recipient"];
-		}
-	}
-	#endif
-
-	#if defined(ESP8266)
-		EMailSender::EMailMessage email_message;
-	#else
-		struct {
-			String subject;
-			String message;
-		} email_message;
-	#endif
-
-	bool email_enabled = false;
-#if defined(SUPPORT_EMAIL)
-	if(!email_en){
-		email_enabled = false;
-	}else{
-		email_enabled = os.iopts[IOPT_NOTIF_ENABLE]&type;
-	}
-#endif
-
-	// if none if enabled, return here
-	if ((!ifttt_enabled) && (!email_enabled) && (!os.mqtt.enabled()))
-		return;
-
-	if (ifttt_enabled || email_enabled) {
-		strcpy_P(postval, PSTR("{\"value1\":\"On site ["));
-		os.sopt_load(SOPT_DEVICE_NAME, topic, PUSH_TOPIC_LEN);
-		topic[PUSH_TOPIC_LEN]=0;
-		strcat(postval+strlen(postval), topic);
-		strcat_P(postval, PSTR("], "));
-		if(email_enabled) {		
-			strcat(topic, " ");
-			email_message.subject = topic; // prefix the email subject with device name
-		}
-	}
-
-	if (os.mqtt.enabled()) {
-		topic[0] = 0;
-		payload[0] = 0;
-	}
-
-	switch(type) {
-		case  NOTIFY_STATION_ON:
-
-			if (os.mqtt.enabled()) {
-				snprintf_P(topic, PUSH_TOPIC_LEN, PSTR("station/%d"), lval);
-				if((int)fval == 0){
-					snprintf_P(payload, PUSH_PAYLOAD_LEN, PSTR("{\"state\":1}"));  // master on event does not have duration attached to it
-				}else{
-					snprintf_P(payload, PUSH_PAYLOAD_LEN, PSTR("{\"state\":1,\"duration\":%d}"), (int)fval);
-				}
-			}
-
-			// todo: add IFTTT and email support for this event as well.
-			// currently no support due to the number of events exceeds 8 so need to use more than 1 byte
-			break;
-
-		case NOTIFY_STATION_OFF:
-
-			if (os.mqtt.enabled()) {
-				snprintf_P(topic, PUSH_TOPIC_LEN, PSTR("station/%d"), lval);
-				if (os.iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_FLOW) {
-					snprintf_P(payload, PUSH_PAYLOAD_LEN, PSTR("{\"state\":0,\"duration\":%d,\"flow\":%d.%02d}"), (int)fval, (int)flow_last_gpm, (int)(flow_last_gpm*100)%100);
-				} else {
-					snprintf_P(payload, PUSH_PAYLOAD_LEN, PSTR("{\"state\":0,\"duration\":%d}"), (int)fval);
-				}
-			}
-			if (ifttt_enabled || email_enabled) {
-				strcat_P(postval, PSTR("Station ["));
-				os.get_station_name(lval, postval+strlen(postval));
-				if((int)fval == 0){
-					strcat_P(postval, PSTR("] closed."));
-				}else{
-					strcat_P(postval, PSTR("] closed. It ran for "));
-					size_t len = strlen(postval);
-					snprintf_P(postval + len, TMP_BUFFER_SIZE, PSTR(" %d minutes %d seconds."), (int)fval/60, (int)fval%60);
-				}
-
-				if(os.iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_FLOW) {
-					size_t len = strlen(postval);
-					snprintf_P(postval + len, TMP_BUFFER_SIZE, PSTR(" Flow rate: %d.%02d"), (int)flow_last_gpm, (int)(flow_last_gpm*100)%100);
-				}
-				if(email_enabled) { email_message.subject += PSTR("station event"); }
-			}
-			break;
-
-		case NOTIFY_PROGRAM_SCHED:
-
-			if (ifttt_enabled || email_enabled) {
-				if (sval) strcat_P(postval, PSTR("manually scheduled "));
-				else strcat_P(postval, PSTR("automatically scheduled "));
-				strcat_P(postval, PSTR("Program "));
-				{
-					ProgramStruct prog;
-					pd.read(lval, &prog);
-					if(lval<pd.nprograms) strcat(postval, prog.name);
-				}
-				size_t len = strlen(postval);
-				snprintf_P(postval + len, TMP_BUFFER_SIZE, PSTR(" with %d%% water level."), (int)fval);
-				if(email_enabled) { email_message.subject += PSTR("program event"); }
-			}
-			break;
-
-		case NOTIFY_SENSOR1:
-
-			if (os.mqtt.enabled()) {
-				strcpy_P(topic, PSTR("sensor1"));
-				snprintf_P(payload, PUSH_PAYLOAD_LEN, PSTR("{\"state\":%d}"), (int)fval);
-			}
-			if (ifttt_enabled || email_enabled) {
-				strcat_P(postval, PSTR("sensor 1 "));
-				strcat_P(postval, ((int)fval)?PSTR("activated."):PSTR("de-activated."));
-				if(email_enabled) { email_message.subject += PSTR("sensor 1 event"); }
-			}
-			break;
-
-		case NOTIFY_SENSOR2:
-
-			if (os.mqtt.enabled()) {
-				strcpy_P(topic, PSTR("sensor2"));
-				snprintf_P(payload, PUSH_PAYLOAD_LEN, PSTR("{\"state\":%d}"), (int)fval);
-			}
-			if (ifttt_enabled || email_enabled) {
-				strcat_P(postval, PSTR("sensor 2 "));
-				strcat_P(postval, ((int)fval)?PSTR("activated."):PSTR("de-activated."));
-				if(email_enabled) { email_message.subject += PSTR("sensor 2 event"); }
-			}
-			break;
-
-		case NOTIFY_RAINDELAY:
-
-			if (os.mqtt.enabled()) {
-				strcpy_P(topic, PSTR("raindelay"));
-				snprintf_P(payload, PUSH_PAYLOAD_LEN, PSTR("{\"state\":%d}"), (int)fval);
-			}
-			if (ifttt_enabled || email_enabled) {
-				strcat_P(postval, PSTR("rain delay "));
-				strcat_P(postval, ((int)fval)?PSTR("activated."):PSTR("de-activated."));
-				if(email_enabled) { email_message.subject += PSTR("rain delay event"); }
-			}
-			break;
-
-		case NOTIFY_FLOWSENSOR:
-
-			volume = os.iopts[IOPT_PULSE_RATE_1];
-			volume = (volume<<8)+os.iopts[IOPT_PULSE_RATE_0];
-			volume = lval*volume;
-			if (os.mqtt.enabled()) {
-				strcpy_P(topic, PSTR("sensor/flow"));
-				snprintf_P(payload, PUSH_PAYLOAD_LEN, PSTR("{\"count\":%u,\"volume\":%d.%02d}"), lval, (int)volume/100, (int)volume%100);
-			}
-			if (ifttt_enabled || email_enabled) {
-				size_t len = strlen(postval);
-				snprintf_P(postval + len, TMP_BUFFER_SIZE, PSTR("Flow count: %u, volume: %d.%02d"), lval, (int)volume/100, (int)volume%100);
-				if(email_enabled) { email_message.subject += PSTR("flow sensor event"); }
-			}
-			break;
-
-		case NOTIFY_WEATHER_UPDATE:
-
-			if (os.mqtt.enabled()) {
-				strcpy_P(topic, PSTR("weather"));
-				snprintf_P(payload, PUSH_PAYLOAD_LEN, PSTR("{\"water level\":%d}"), (int)fval);
-			}
-			if (ifttt_enabled || email_enabled) {
-				if(lval>0) {
-					strcat_P(postval, PSTR("external IP updated: "));
-					unsigned char ip[4] = {(unsigned char)((lval>>24)&0xFF),
-									(unsigned char)((lval>>16)&0xFF),
-									(unsigned char)((lval>>8)&0xFF),
-									(unsigned char)(lval&0xFF)};
-					ip2string(postval, TMP_BUFFER_SIZE, ip);
-				}
-				if(fval>=0) {
-					size_t len = strlen(postval);
-					snprintf_P(postval + len, TMP_BUFFER_SIZE, PSTR("water level updated: %d%%."), (int)fval);
-				}
-				if(email_enabled) { email_message.subject += PSTR("weather update event"); }
-			}
-			break;
-
-		case NOTIFY_REBOOT:
-			if (os.mqtt.enabled()) {
-				strcpy_P(topic, PSTR("system"));
-				strcpy_P(payload, PSTR("{\"state\":\"started\"}"));
-			}
-			if (ifttt_enabled || email_enabled) {
-				#if defined(ARDUINO)
-					strcat_P(postval, PSTR("rebooted. Device IP: "));
-					#if defined(ESP8266)
-					{
-						IPAddress _ip;
-						if (useEth) {
-							//_ip = Ethernet.localIP();
-							_ip = eth.localIP();
-						} else {
-							_ip = WiFi.localIP();
-						}
-						unsigned char ip[4] = {_ip[0], _ip[1], _ip[2], _ip[3]};
-						ip2string(postval, TMP_BUFFER_SIZE, ip);
-					}
-					#else
-						ip2string(postval, TMP_BUFFER_SIZE, &(Ethernet.localIP()[0]));
-					#endif
-				#else
-					strcat_P(postval, PSTR("controller process restarted."));
-				#endif
-				if(email_enabled) { email_message.subject += PSTR("reboot event"); }
-			}
-			break;
-	}
-
-	if (os.mqtt.enabled() && strlen(topic) && strlen(payload))
-		os.mqtt.publish(topic, payload);
-
-	if (ifttt_enabled) {
-		strcat_P(postval, PSTR("\"}"));
-
-		BufferFiller bf = BufferFiller(ether_buffer, TMP_BUFFER_SIZE);
-		bf.emit_p(PSTR("POST /trigger/sprinkler/with/key/$O HTTP/1.0\r\n"
-						"Host: $S\r\n"
-						"Accept: */*\r\n"
-						"Content-Length: $D\r\n"
-						"Content-Type: application/json\r\n\r\n$S"),
-						SOPT_IFTTT_KEY, DEFAULT_IFTTT_URL, strlen(postval), postval);
-
-		os.send_http_request(DEFAULT_IFTTT_URL, 80, ether_buffer, remote_http_callback);
-	}
-
-	if(email_enabled){
-		email_message.message = strchr(postval, 'O'); // ad-hoc: remove the value1 part from the ifttt message
-		#if defined(ARDUINO)
-			#if defined(ESP8266)
-				if(email_host && email_username && email_password && email_recipient) { // make sure all are valid
-					EMailSender emailSend(email_username, email_password);
-					emailSend.setSMTPServer(email_host); // TODO: double check removing strdup
-					emailSend.setSMTPPort(email_port);
-					EMailSender::Response resp = emailSend.send(email_recipient, email_message);
-					// DEBUG_PRINTLN(F("Sending Status:"));
-					// DEBUG_PRINTLN(resp.status);
-					// DEBUG_PRINTLN(resp.code);
-					// DEBUG_PRINTLN(resp.desc);
-				}
-			#endif
-		#else
-			struct smtp *smtp = NULL;
-			String email_port_str = to_string(email_port);
-			// todo: check error?
-			smtp_status_code rc;
-			if(email_host && email_username && email_password && email_recipient) { // make sure all are valid
-				rc = smtp_open(email_host, email_port_str.c_str(), SMTP_SECURITY_TLS, SMTP_NO_CERT_VERIFY, NULL, &smtp);
-				rc = smtp_auth(smtp, SMTP_AUTH_PLAIN, email_username, email_password);
-				rc = smtp_address_add(smtp, SMTP_ADDRESS_FROM, email_username, "OpenSprinkler");
-				rc = smtp_address_add(smtp, SMTP_ADDRESS_TO, email_recipient, "User");
-				rc = smtp_header_add(smtp, "Subject", email_message.subject.c_str());
-				rc = smtp_mail(smtp, email_message.message.c_str());
-				rc = smtp_close(smtp);
-				if (rc!=SMTP_STATUS_OK) {
-					DEBUG_PRINTF("SMTP: Error %s\n", smtp_status_code_errstr(rc));
-				}
-			}
-		#endif
-	}
-}
 
 // ================================
 // ====== LOGGING FUNCTIONS =======
@@ -1764,7 +1536,7 @@ void write_log(unsigned char type, time_os_t curr_time) {
 	}
 	#endif
 
-#else // prepare log folder for RPI/BBB
+#else // prepare log folder for RPI/LINUX
 	struct stat st;
 	if(stat(get_filename_fullpath(LOG_PREFIX), &st)) {
 		if(mkdir(get_filename_fullpath(LOG_PREFIX), S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IWGRP | S_IXGRP | S_IROTH | S_IWOTH | S_IXOTH)) {
@@ -1835,8 +1607,7 @@ void write_log(unsigned char type, time_os_t curr_time) {
 		#if defined(ARDUINO)
 		dtostrf(flow_last_gpm,5,2,tmp_buffer+strlen(tmp_buffer));
 		#else
-		size_t len = strlen(tmp_buffer);
-		snprintf(tmp_buffer + len, TMP_BUFFER_SIZE - len, "%5.2f", flow_last_gpm);
+		snprintf(tmp_buffer+strlen(tmp_buffer), TMP_BUFFER_SIZE, "%5.2f", flow_last_gpm);
 		#endif
 	}
 	strcat_P(tmp_buffer, PSTR("]\r\n"));
@@ -1914,7 +1685,7 @@ void delete_log(char *name) {
 	}
 	#endif
 
-#else // delete_log implementation for RPI/BBB
+#else // delete_log implementation for RPI/LINUX
 	if (strncmp(name, "all", 3) == 0) {
 		// delete the log folder
 		rmdir(get_filename_fullpath(LOG_PREFIX));
@@ -2014,7 +1785,7 @@ static void perform_ntp_sync() {
 #endif
 }
 
-#if !defined(ARDUINO) // main function for RPI/BBB
+#if !defined(ARDUINO) // main function for RPI/LINUX
 int main(int argc, char *argv[]) {
     // Disable buffering to work with systemctl journal
     setvbuf(stdout, NULL, _IOLBF, 0);
@@ -2032,7 +1803,7 @@ int main(int argc, char *argv[]) {
 		}
 	}
 
-  do_setup();
+	do_setup();
 
 	while(true) {
 		do_loop();

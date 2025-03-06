@@ -1,4 +1,4 @@
-/* OpenSprinkler Unified (AVR/RPI/BBB/LINUX) Firmware
+/* OpenSprinkler Unified Firmware
  * Copyright (C) 2015 by Ray Wang (ray@opensprinkler.com)
  *
  * Weather functions
@@ -132,10 +132,7 @@ static void getweather_callback_with_peel_header(char* buffer) {
 }
 
 void GetWeather() {
-#if defined(ESP8266)
-	if (!useEth)
-		if (os.state!=OS_STATE_CONNECTED || WiFi.status()!=WL_CONNECTED) return;
-#endif
+	if(!os.network_connected()) return;
 	// use temp buffer to construct get command
 	BufferFiller bf = BufferFiller(tmp_buffer, TMP_BUFFER_SIZE*2);
 	int method = os.iopts[IOPT_USE_WEATHER];

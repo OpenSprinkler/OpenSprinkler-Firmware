@@ -1,4 +1,4 @@
-/* OpenSprinkler Unified (AVR/RPI/BBB/LINUX) Firmware
+/* OpenSprinkler Unified Firmware
  * Copyright (C) 2015 by Ray Wang (ray@opensprinkler.com)
  *
  * Program data structures and functions
@@ -231,14 +231,17 @@ unsigned char ProgramStruct::check_day_match(time_os_t t) {
 	unsigned char weekday_t = weekday(t);  // weekday ranges from [0,6] within Sunday being 1
 	unsigned char day_t = day(t);
 	unsigned char month_t = month(t);
-#else // get current time from RPI/BBB
+	unsigned char year_t = year(t);
+#else // get current time from RPI/LINUX
 	time_os_t ct = t;
 	struct tm *ti = gmtime(&ct);
 	unsigned char weekday_t = (ti->tm_wday+1)%7;  // tm_wday ranges from [0,6] with Sunday being 0
 	unsigned char day_t = ti->tm_mday;
 	unsigned char month_t = ti->tm_mon+1;  // tm_mon ranges from [0,11]
+	unsigned char year_t = ti->tm_year+1900; // tm_year is years since 1900
 #endif // get current time
 
+	int epoch_t = (t / 86400);
 	unsigned char wd = (weekday_t+5)%7;
 	unsigned char dt = day_t;
 
@@ -261,13 +264,26 @@ unsigned char ProgramStruct::check_day_match(time_os_t t) {
 				return 0;
 		break;
 
-		case PROGRAM_TYPE_BIWEEKLY:
-			// todo future
+		case PROGRAM_TYPE_SINGLERUN:
+			// check match of exact day
+			if(((days[0] << 8) + days[1]) != epoch_t)
+				return 0;
 		break;
 
 		case PROGRAM_TYPE_MONTHLY:
-			if (dt != (days[0]&0b11111))
+			if ((days[0]&0b11111) == 0) {
+				if(month_t == 2){
+					if((isLeapYear(year_t) && dt != 29) || (!isLeapYear(year_t) && dt != 28)){
+						return 0;
+					}
+				}else{
+					if(!isLastDayofMonth(month_t, dt))
+						return 0;
+				}
+			} else if (dt != (days[0]&0b11111)){
 				return 0;
+			}
+				
 		break;
 
 		case PROGRAM_TYPE_INTERVAL:
@@ -294,7 +310,9 @@ unsigned char ProgramStruct::check_day_match(time_os_t t) {
 // Check if a given time matches program's start time
 // this also checks for programs that started the previous
 // day and ran over night
-unsigned char ProgramStruct::check_match(time_os_t t) {
+// Return value: 0 if no match; otherwise return the n-th count of the match.
+// For example, if this is the first-run of the day, return 1 etc.
+unsigned char ProgramStruct::check_match(time_os_t t, bool *to_delete) {
 
 	// check program enable status
 	if (!enabled) return 0;
@@ -310,21 +328,49 @@ unsigned char ProgramStruct::check_match(time_os_t t) {
 
 		if (starttime_type) {
 			// given start time type
+			unsigned char maxStartTime = -1;
 			for(unsigned char i=0;i<MAX_NUM_STARTTIMES;i++) {
-				if (current_minute == starttime_decode(starttimes[i]))	return 1; // if curren_minute matches any of the given start time, return 1
+				if (starttime_decode(starttimes[i]) > maxStartTime){
+					maxStartTime = starttime_decode(starttimes[i]);
+				}
+			}
+			for(unsigned char i=0;i<MAX_NUM_STARTTIMES;i++) {
+				//if curr = largest start time and the program is run once --> delete
+				if (current_minute == starttime_decode(starttimes[i])){
+					if(maxStartTime == current_minute && type == PROGRAM_TYPE_SINGLERUN){
+						*to_delete = true;
+					}else{
+						*to_delete = false;
+					}
+					return (i+1); // if curren_minute matches any of the given start time, return matched index + 1
+				}
 			}
 			return 0; // otherwise return 0
 		} else {
 			// repeating type
 			// if current_minute matches start time, return 1
-			if (current_minute == start) return 1;
+			// if also no interval and run once --> delete
+			if (current_minute == start){
+				if(!interval && type == PROGRAM_TYPE_SINGLERUN){
+					*to_delete = true;
+				}else{
+					*to_delete = false;
+				}
+				return 1;
+			}
 
 			// otherwise, current_minute must be larger than start time, and interval must be non-zero
 			if (current_minute > start && interval) {
 				// check if we are on any interval match
 				int16_t c = (current_minute - start) / interval;
 				if ((c * interval == (current_minute - start)) && c <= repeat) {
-					return 1;
+					//if c == repeat (final repeat) and program is run-once --> delete
+					if(c == repeat && type == PROGRAM_TYPE_SINGLERUN){
+						*to_delete = true;
+					}else{
+						*to_delete = false;
+					}
+					return (c+1);  // return match count n
 				}
 			}
 		}
@@ -337,10 +383,104 @@ unsigned char ProgramStruct::check_match(time_os_t t) {
 		// t-86400L matches the program's start day
 		int16_t c = (current_minute - start + 1440) / interval;
 		if ((c * interval == (current_minute - start + 1440)) && c <= repeat) {
-			return 1;
+			//if c == repeat (final repeat) and program is run-once --> delete
+			if(c == repeat && type == PROGRAM_TYPE_SINGLERUN){
+				*to_delete = true;
+			}else{
+				*to_delete = false;
+			}
+			return (c+1);  // return the match count n
 		}
 	}
 	return 0;
+}
+
+struct StationNameSortElem {
+	unsigned char idx;
+	char *name;
+};
+
+int StationNameSortAscendCmp(const void *a, const void *b) {
+	return strcmp(((StationNameSortElem*)a)->name,((StationNameSortElem*)b)->name);
+}
+
+int StationNameSortDescendCmp(const void *a, const void *b) {
+	return StationNameSortAscendCmp(b, a);
+}
+
+// generate station runorder based on the annotation in program names
+// alternating means on the odd numbered runs of the program, it uses one order; on the even runs, it uses the opposite order
+void ProgramStruct::gen_station_runorder(uint16_t runcount, unsigned char *order) {
+	unsigned char len = strlen(name);
+	unsigned char ns = os.nstations;
+	int16_t i;
+	unsigned char temp;
+
+	// default order: ascending by index
+	for(i=0;i<ns;i++) {
+		order[i] = i;
+	}
+
+	// check matches with program name annotation
+	if(len>=2 && name[len-2]=='>') {
+		char anno = name[len-1];
+		switch(anno) {
+			case 'I':	// descending by index
+			case 'a': // alternating: odd-numbered runs ascending by index, even-numbered runs descending.
+			case 'A': // odd-numbered runs descending by index, even-numbered runs ascending
+			{
+				if((anno=='I') || ((anno=='a') && (runcount%2==0)) || ((anno=='A') && (runcount%2==1)))  {
+					// reverse the order
+					for(i=0;i<ns;i++) {
+						order[i] = ns-1-i;
+					}
+				}
+			}
+			break;
+
+			case 'n': // ascending by name
+			case 'N': // descending by name
+			case 't': // alternating: odd-numbered runs ascending by name, even-numbered runs descending.
+			case 'T': // odd-numbered runs descending by name, even-numbered runs ascending
+			{
+				StationNameSortElem elems[ns];
+				for(i=0;i<ns;i++) {
+					elems[i].idx=i;
+					os.get_station_name(i,tmp_buffer);
+					elems[i].name=strdup(tmp_buffer);
+				}
+				if((anno=='n') || ((anno=='t') && (runcount%2==1)) || ((anno=='T') && (runcount%2==0))) {
+					qsort(elems, ns, sizeof(StationNameSortElem), StationNameSortAscendCmp);
+				} else {
+					qsort(elems, ns, sizeof(StationNameSortElem), StationNameSortDescendCmp);
+				}
+				for(i=0;i<ns;i++) {
+					order[i]=elems[i].idx;
+					free(elems[i].name);
+				}
+			}
+			break;
+
+			case 'r': // random ordering
+			case 'R': // random ordering
+
+			{
+				for(i=0;i<ns-1;i++) { // todo: need random seeding
+					unsigned char sel = (rand()%(ns-i))+i;
+					temp = order[i]; // swap order[i] with order[sel]
+					order[i] = order[sel];
+					order[sel] = temp;
+				}
+			}
+			break;
+		}
+	}
+	DEBUG_PRINT("station order:[");
+	for(i=0;i<ns;i++) {
+		DEBUG_PRINT(order[i]);
+		DEBUG_PRINT(",");
+	}
+	DEBUG_PRINTLN("]");
 }
 
 // convert absolute remainder (reference time 1970 01-01) to relative remainder (reference time today)

@@ -1,4 +1,4 @@
-/* OpenSprinkler Unified (AVR/RPI/BBB/LINUX) Firmware
+/* OpenSprinkler Unified Firmware
  * Copyright (C) 2015 by Ray Wang (ray@opensprinkler.com)
  *
  * Server functions
@@ -206,7 +206,7 @@ unsigned char findKeyVal (const char *str,char *strbuf, uint16_t maxlen,const ch
 }
 
 void rewind_ether_buffer() {
-    bfill = BufferFiller(ether_buffer, ETHER_BUFFER_SIZE*2);
+	bfill = BufferFiller(ether_buffer, ETHER_BUFFER_SIZE*2);
 	ether_buffer[0] = 0;
 }
 
@@ -389,7 +389,6 @@ boolean check_password(char *p)
 		p = get_buffer;
 	}
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("pw"), true)) {
-		urlDecode(tmp_buffer);
 		if (os.password_verify(tmp_buffer)) return true;
 	}
 #else
@@ -570,9 +569,10 @@ void server_change_stations(OTF_PARAMS_DEF) {
 	for(sid=0;sid<os.nstations;sid++) {
 		snprintf(tbuf2+1, 3, "%d", sid);
 		if(findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, tbuf2)) {
+			#if !defined(USE_OTF)
 			urlDecode(tmp_buffer);
-			strReplace(tmp_buffer, '\"', '\'');
-			strReplace(tmp_buffer, '\\', '/');
+			#endif
+			strReplaceQuoteBackslash(tmp_buffer);
 			os.set_station_name(sid, tmp_buffer);
 		}
 	}
@@ -608,9 +608,6 @@ void server_change_stations(OTF_PARAMS_DEF) {
 					handle_return(HTML_DATA_OUTOFBOUND);
 				}
 			} else if ((tmp_buffer[0] == STN_TYPE_HTTP) || (tmp_buffer[0] == STN_TYPE_HTTPS) || (tmp_buffer[0] == STN_TYPE_REMOTE_OTC)) {
-				#if !defined(ESP8266) // ESP8266 does automatic decoding
-					urlDecode(tmp_buffer + 1);
-				#endif
 				if (strlen(tmp_buffer+1) > sizeof(HTTPStationData)) {
 					handle_return(HTML_DATA_OUTOFBOUND);
 				}
@@ -687,10 +684,13 @@ void server_manual_program(OTF_PARAMS_DEF) {
 
 /**
  * Change run-once program
- * Command: /cr?pw=xxx&t=[x,x,x...]
+ * Command: /cr?pw=xxx&t=[x,x,x...]&cnt?=xxx&int?=xxx&uwt?=xxx
  *
  * pw: password
  * t:  station water time
+ * cnt?: repeat count
+ * int?: repeat interval
+ * uwt?: use weather adjustment
  */
 void server_change_runonce(OTF_PARAMS_DEF) {
 #if defined(USE_OTF)
@@ -701,7 +701,9 @@ void server_change_runonce(OTF_PARAMS_DEF) {
 	char *p = get_buffer;
 
 	// decode url first
+	#if !defined(USE_OTF)
 	if(p) urlDecode(p);
+	#endif
 	// search for the start of t=[
 	char *pv;
 	boolean found=false;
@@ -718,11 +720,65 @@ void server_change_runonce(OTF_PARAMS_DEF) {
 	// reset all stations and prepare to run one-time program
 	reset_all_stations_immediate();
 
-	unsigned char sid, bid, s;
+	ProgramStruct prog;
+
 	uint16_t dur;
+	for(int i=0;i<os.nstations;i++) {
+		dur = parse_listdata(&pv);
+		prog.durations[i] = dur > 0 ? dur : 0;
+	}
+
+	//check if repeat count is defined and create program to perform the repetitions
+	if(findKeyVal(FKV_SOURCE,tmp_buffer,TMP_BUFFER_SIZE,PSTR("cnt"),true)){
+		prog.starttimes[1] = (uint16_t)atol(tmp_buffer) - 1;
+		if(prog.starttimes[1] >= 0){
+			if(findKeyVal(FKV_SOURCE,tmp_buffer,TMP_BUFFER_SIZE,PSTR("int"),true)){
+				prog.starttimes[2] = (uint16_t)atol(tmp_buffer);
+			}else{
+				handle_return(HTML_DATA_MISSING);
+			}
+			//check for positive interval length
+			if(prog.starttimes[2] < 1){
+				handle_return(HTML_DATA_OUTOFBOUND);
+			}
+			unsigned long curr_time = os.now_tz();
+
+			curr_time = (curr_time / 60) + prog.starttimes[2] + 1; //time in minutes for one interval past current time
+			uint16_t epoch_t = curr_time / 1440;
+
+			//if repeat count and interval are defined --> complete program
+			prog.enabled = 1;
+			prog.use_weather = 0;
+			if(findKeyVal(FKV_SOURCE,tmp_buffer,TMP_BUFFER_SIZE,PSTR("uwt"),true)){
+				if((uint16_t)atol(tmp_buffer)){
+					prog.use_weather = 1;
+				}
+			}
+			prog.oddeven = 0;
+			prog.type = 1;
+			prog.starttime_type = 0;
+			prog.en_daterange = 0;
+			prog.days[0] = (epoch_t >> 8) & 0b11111111; //one interval past current day in epoch time
+			prog.days[1] = epoch_t & 0b11111111; //one interval past current day in epoch time
+			prog.starttimes[0] = curr_time % 1440; //one interval past current time
+			strcpy_P(prog.name, PSTR("Run-Once with repeat"));
+
+			//if no more repeats, remove interval to flag for deletion
+			if(prog.starttimes[1] == 0){
+				prog.starttimes[2] = 0;
+			}
+
+			if(!pd.add(&prog)){
+				handle_return(HTML_DATA_OUTOFBOUND);
+			}
+		}
+	}
+
+	//No repeat count defined or first repeat --> use old API
+	unsigned char sid, bid, s;
 	boolean match_found = false;
 	for(sid=0;sid<os.nstations;sid++) {
-		dur=parse_listdata(&pv);
+		dur=prog.durations[sid];
 		bid=sid>>3;
 		s=sid&0x07;
 		// if non-zero duration is given
@@ -849,9 +905,10 @@ void server_change_program(OTF_PARAMS_DEF) {
 
 	// parse program name
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("name"), true)) {
+		#if !defined(USE_OTF)
 		urlDecode(tmp_buffer);
-		strReplace(tmp_buffer, '\"', '\'');
-		strReplace(tmp_buffer, '\\', '/');
+		#endif
+		strReplaceQuoteBackslash(tmp_buffer);
 		strncpy(prog.name, tmp_buffer, PROGRAM_NAME_SIZE);
 	} else {
 		strcpy_P(prog.name, _str_program);
@@ -881,7 +938,6 @@ void server_change_program(OTF_PARAMS_DEF) {
 #if defined(USE_OTF)
 	if(!findKeyVal(FKV_SOURCE,tmp_buffer,TMP_BUFFER_SIZE, "v",false)) handle_return(HTML_DATA_MISSING);
 	char *pv = tmp_buffer+1;
-	// TODO: may need a urlDecode for non-ESP platforms
 #else
 	// parse ad-hoc v=[...
 	// search for the start of v=[
@@ -971,8 +1027,11 @@ void server_json_options_main() {
 			if (os.hw_type==HW_TYPE_AC || os.hw_type==HW_TYPE_UNKNOWN) continue;
 			else v<<=2;
 		}
+		if (oid==IOPT_LATCH_ON_VOLTAGE || oid==IOPT_LATCH_OFF_VOLTAGE) {
+			if (os.hw_type!=HW_TYPE_LATCH) continue;
+		}
 		#else
-		if (oid==IOPT_BOOST_TIME) continue;
+		if (oid==IOPT_BOOST_TIME || oid==IOPT_LATCH_ON_VOLTAGE || oid==IOPT_LATCH_OFF_VOLTAGE) continue;
 		#endif
 
 		#if defined(ESP8266)
@@ -994,8 +1053,8 @@ void server_json_options_main() {
 		}
 		#endif
 #else
-		// for Linux-based platforms, there is no LCD currently
-		if(oid==IOPT_LCD_CONTRAST || oid==IOPT_LCD_BACKLIGHT || oid==IOPT_LCD_DIMMING) continue;
+		// for Linux-based platforms, we can't adjust contrast or backlight
+		if(oid==IOPT_LCD_CONTRAST || oid==IOPT_LCD_BACKLIGHT) continue;
 #endif
 
 		// each json name takes 5 characters
@@ -1263,7 +1322,7 @@ void server_home(OTF_PARAMS_DEF)
  * rd:	rain delay hours (0 turns off rain delay)
  * re:	remote extension mode
  * ap:	reset to ap (ESP8266 only)
- * update: launch update script (for OSPi/OSBo/Linux only)
+ * update: launch update script (for OSPi/Linux only)
  */
 void server_change_values(OTF_PARAMS_DEF)
 {
@@ -1361,14 +1420,18 @@ void server_change_scripturl(OTF_PARAMS_DEF) {
 #endif
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("jsp"), true)) {
 		tmp_buffer[TMP_BUFFER_SIZE-1]=0;	// make sure we don't exceed the maximum size
+		#if !defined(USE_OTF)
 		urlDecode(tmp_buffer);
+		#endif
 		// trim unwanted space characters
 		string_remove_space(tmp_buffer);
 		os.sopt_save(SOPT_JAVASCRIPTURL, tmp_buffer);
 	}
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("wsp"), true)) {
 		tmp_buffer[TMP_BUFFER_SIZE-1]=0;
+		#if !defined(USE_OTF)
 		urlDecode(tmp_buffer);
+		#endif
 		string_remove_space(tmp_buffer);
 		os.sopt_save(SOPT_WEATHERURL, tmp_buffer);
 	}
@@ -1450,14 +1513,19 @@ void server_change_options(OTF_PARAMS_DEF)
 	}
 
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("loc"), true)) {
+		#if !defined(USE_OTF)
 		urlDecode(tmp_buffer);
+		#endif
+		strReplaceQuoteBackslash(tmp_buffer);
 		if (os.sopt_save(SOPT_LOCATION, tmp_buffer)) { // if location string has changed
 			weather_change = true;
 		}
 	}
 	uint8_t keyfound = 0;
 	if(findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("wto"), true)) {
+		#if !defined(USE_OTF)
 		urlDecode(tmp_buffer);
+		#endif
 		if (os.sopt_save(SOPT_WEATHER_OPTS, tmp_buffer)) {
 			if(os.iopts[IOPT_USE_WEATHER]==WEATHER_METHOD_MONTHLY) {
 				load_wt_monthly(tmp_buffer);
@@ -1466,12 +1534,13 @@ void server_change_options(OTF_PARAMS_DEF)
 				weather_change = true;	// if wto has changed
 			}
 		}
-		//DEBUG_PRINTLN(os.sopt_load(SOPT_WEATHER_OPTS));
 	}
 
 	keyfound = 0;
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("ifkey"), true, &keyfound)) {
+		#if !defined(USE_OTF)
 		urlDecode(tmp_buffer);
+		#endif
 		os.sopt_save(SOPT_IFTTT_KEY, tmp_buffer);
 	} else if (keyfound) {
 		tmp_buffer[0]=0;
@@ -1480,7 +1549,9 @@ void server_change_options(OTF_PARAMS_DEF)
 
 	keyfound = 0;
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("otc"), true, &keyfound)) {
+		#if !defined(USE_OTF)
 		urlDecode(tmp_buffer);
+		#endif
 		os.sopt_save(SOPT_OTC_OPTS, tmp_buffer);
 	} else if (keyfound) {
 		tmp_buffer[0]=0;
@@ -1489,7 +1560,9 @@ void server_change_options(OTF_PARAMS_DEF)
 
 	keyfound = 0;
 	if(findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("mqtt"), true, &keyfound)) {
+		#if !defined(USE_OTF)
 		urlDecode(tmp_buffer);
+		#endif
 		os.sopt_save(SOPT_MQTT_OPTS, tmp_buffer);
 		os.status.req_mqtt_restart = true;
 	} else if (keyfound) {
@@ -1500,7 +1573,9 @@ void server_change_options(OTF_PARAMS_DEF)
 
 	keyfound = 0;
 	if(findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("email"), true, &keyfound)) {
+		#if !defined(USE_OTF)
 		urlDecode(tmp_buffer);
+		#endif
 		os.sopt_save(SOPT_EMAIL_OPTS, tmp_buffer);
 	} else if (keyfound) {
 		tmp_buffer[0]=0;
@@ -1508,9 +1583,10 @@ void server_change_options(OTF_PARAMS_DEF)
 	}
 
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("dname"), true)) {
+		#if !defined(USE_OTF)
 		urlDecode(tmp_buffer);
-		strReplace(tmp_buffer, '\"', '\'');
-		strReplace(tmp_buffer, '\\', '/');
+		#endif
+		strReplaceQuoteBackslash(tmp_buffer);
 		os.sopt_save(SOPT_DEVICE_NAME, tmp_buffer);
 	}
 
@@ -1573,7 +1649,6 @@ void server_change_password(OTF_PARAMS_DEF) {
 		const int pwBufferSize = TMP_BUFFER_SIZE/2;
 		char *tbuf2 = tmp_buffer + pwBufferSize;	// use the second half of tmp_buffer 
 		if (findKeyVal(FKV_SOURCE, tbuf2, pwBufferSize, PSTR("cpw"), true) && strncmp(tmp_buffer, tbuf2, pwBufferSize) == 0) {
-			urlDecode(tmp_buffer);
 			os.sopt_save(SOPT_PASSWORD, tmp_buffer);
 			handle_return(HTML_SUCCESS);
 		} else {
@@ -1659,12 +1734,12 @@ void server_change_manual(OTF_PARAMS_DEF) {
 			RuntimeQueueStruct *q = NULL;
 			unsigned char sqi = pd.station_qid[sid];
 			// check if the station already has a schedule
-			if (sqi!=0xFF) {  // if so, we will overwrite the schedule
-				q = pd.queue+sqi;
+			if (sqi!=0xFF) { // if so, do nothing
+
 			} else {  // otherwise create a new queue element
 				q = pd.enqueue();
 			}
-			// if the queue is not full
+			// if the queue is not full (and the station doesn't already have a schedule
 			if (q) {
 				q->st = 0;
 				q->dur = timer;
@@ -1778,7 +1853,7 @@ void server_json_log(OTF_PARAMS_DEF) {
 		if (!sd.exists(tmp_buffer)) continue;
 		SdFile file;
 		file.open(tmp_buffer, O_READ);
-#else // prepare to open log file for RPI/BBB
+#else // prepare to open log file for Linux
 		FILE *file = fopen(get_filename_fullpath(tmp_buffer), "rb");
 		if(!file) continue;
 #endif // prepare to open log file
@@ -1866,8 +1941,9 @@ void server_delete_log(OTF_PARAMS_DEF) {
 }
 
 /**
- * Command: "/pq?pw=x&dur=x"
+ * Command: "/pq?pw=x&dur=x&repl=x"
  * dur: duration (in units of seconds)
+ * repl: replace (in units of seconds) (New UI allows for replace, extend, and pause using this)
  */
 void server_pause_queue(OTF_PARAMS_DEF) {
 #if defined(USE_OTF)
@@ -1877,6 +1953,19 @@ void server_pause_queue(OTF_PARAMS_DEF) {
 #endif
 
 	ulong duration = 0;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("repl"), true)) {
+		duration = strtoul(tmp_buffer, NULL, 0);
+		pd.resume_stations();
+		os.status.pause_state = 0;
+		if(duration != 0){
+			os.pause_timer = duration;
+			pd.set_pause();
+			os.status.pause_state = 1;
+		}
+		
+		handle_return(HTML_SUCCESS);
+	}
+
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("dur"), true)) {
 		duration = strtoul(tmp_buffer, NULL, 0);
 	}
@@ -2083,7 +2172,9 @@ void on_sta_update(OTF_PARAMS_DEF) {
 }
 
 void on_sta_upload_fin() {
-	if(!(update_server->hasArg("pw") && os.password_verify(update_server->arg("pw").c_str()))) {
+	if (os.iopts[IOPT_IGNORE_PASSWORD]) {
+		// don't check password
+	} else if(!(update_server->hasArg("pw") && os.password_verify(update_server->arg("pw").c_str()))) {
 		update_server_send_result(HTML_UNAUTHORIZED);
 		Update.end(false);
 		return;
@@ -2193,7 +2284,7 @@ void start_server_ap() {
 #endif
 
 #if defined(USE_OTF) && !defined(ARDUINO)
-void initalize_otf() {
+void initialize_otf() {
 	if(!otf) return;
 	static bool callback_initialized = false;
 
