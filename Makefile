@@ -1,6 +1,6 @@
 CXX=g++
 # -std=gnu++17
-VERSION=OSPI
+VERSION?=OSPI
 CXXFLAGS=-std=gnu++14 -D$(VERSION) -DSMTP_OPENSSL -Wall -include string.h -include cstdint -Iexternal/TinyWebsockets/tiny_websockets_lib/include -Iexternal/OpenThings-Framework-Firmware-Library/
 LD=$(CXX)
 LIBS=pthread mosquitto ssl crypto i2c gpiod
