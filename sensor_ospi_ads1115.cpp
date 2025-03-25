@@ -32,16 +32,11 @@
 
 #define DEFAULT_RANGE 6.144
 
-/**
-* Read the OSPi 1.6 onboard ADS1115 A2D
-**/
-int read_sensor_ospi(Sensor_t *sensor, ulong time) {
-        if (!sensor || !sensor->flags.enable) return HTTP_RQT_NOT_RECEIVED;
+static ads1115_handle_t gs_handle; /**< ads1115 handle */
 
-        static ads1115_handle_t gs_handle; /**< ads1115 handle */
-        uint8_t res;
-
-
+void init_ads1115() {
+        if (gs_handle.inited) return;
+        
         DRIVER_ADS1115_LINK_INIT(&gs_handle, ads1115_handle_t);
         DRIVER_ADS1115_LINK_IIC_INIT(&gs_handle, ads1115_interface_iic_init);
         DRIVER_ADS1115_LINK_IIC_DEINIT(&gs_handle, ads1115_interface_iic_deinit);
@@ -49,6 +44,18 @@ int read_sensor_ospi(Sensor_t *sensor, ulong time) {
         DRIVER_ADS1115_LINK_IIC_WRITE(&gs_handle, ads1115_interface_iic_write);
         DRIVER_ADS1115_LINK_DELAY_MS(&gs_handle, ads1115_interface_delay_ms);
         DRIVER_ADS1115_LINK_DEBUG_PRINT(&gs_handle, ads1115_interface_debug_print);
+        
+        ads1115_init(&gs_handle);
+}
+/**
+* Read the OSPi 1.6 onboard ADS1115 A2D
+**/
+int read_sensor_ospi(Sensor_t *sensor, ulong time) {
+        if (!sensor || !sensor->flags.enable) return HTTP_RQT_NOT_RECEIVED;
+
+        uint8_t res;
+
+        init_ads1115();
 
         ads1115_address_t addr    = (ads1115_address_t)(ADS1115_ADDR_GND         + sensor->id / 4);
         ads1115_channel_t channel = (ads1115_channel_t)(ADS1115_CHANNEL_AIN0_GND + sensor->id % 4);
@@ -58,35 +65,26 @@ int read_sensor_ospi(Sensor_t *sensor, ulong time) {
         if (res != 0)
                 return HTTP_RQT_NOT_RECEIVED;
 
-        /* ads1115 init */
-        res = ads1115_init(&gs_handle);
-        if (res != 0)
-            return HTTP_RQT_NOT_RECEIVED;
-
         res = ads1115_set_channel(&gs_handle, channel);
         if (res != 0) {
-                ads1115_deinit(&gs_handle);
                 return HTTP_RQT_NOT_RECEIVED;
         }
 
         /* set default range */
         res = ads1115_set_range(&gs_handle, ADS1115_BASIC_DEFAULT_RANGE);
         if (res != 0) {
-                ads1115_deinit(&gs_handle);
                 return HTTP_RQT_NOT_RECEIVED;
         }
 
         /* set default rate */
         res = ads1115_set_rate(&gs_handle, ADS1115_BASIC_DEFAULT_RATE);
         if (res != 0) {
-                ads1115_deinit(&gs_handle);
                 return HTTP_RQT_NOT_RECEIVED;
         }
 
         /* disable compare */
         res = ads1115_set_compare(&gs_handle, ADS1115_BOOL_FALSE);
         if (res != 0) {
-                ads1115_deinit(&gs_handle);
                 return HTTP_RQT_NOT_RECEIVED;
         }
 
@@ -94,11 +92,8 @@ int read_sensor_ospi(Sensor_t *sensor, ulong time) {
         float   v;
         res = ads1115_single_read(&gs_handle, &raw, &v);
         if (res != 0) {
-                ads1115_deinit(&gs_handle);
                 return HTTP_RQT_NOT_RECEIVED;
         }
-
-        ads1115_deinit(&gs_handle);
 
         sensor->repeat_native += raw;
         sensor->repeat_data += v;
