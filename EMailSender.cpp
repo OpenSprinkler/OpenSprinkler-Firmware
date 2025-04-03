@@ -231,6 +231,7 @@ EMailSender::Response EMailSender::awaitSMTPResponse(EMAIL_NETWORK_CLASS &client
 	EMailSender::Response response;
 	uint32_t ts = millis();
 	while (!client.available()) {
+		wdt_reset();
 		if (millis() > (ts + timeOut)) {
 			response.code = F("1");
 			response.desc = String(respDesc) + "! " + F("SMTP Response TIMEOUT!");

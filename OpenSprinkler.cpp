@@ -2152,7 +2152,7 @@ void OpenSprinkler::switch_remotestation(RemoteIPStationData *data, bool turnon,
 	ip[3] = ip4&0xff;
 
 	char *p = tmp_buffer;
-    BufferFiller bf = BufferFiller(p, TMP_BUFFER_SIZE*2);
+    BufferFiller bf = BufferFiller(p, TMP_BUFFER_SIZE_L);
 	// if turning on the zone and duration is defined, give duration as the timer value
 	// otherwise:
 	//   if autorefresh is defined, we give a fixed duration each time, and auto refresh will renew it periodically
@@ -2189,7 +2189,7 @@ void OpenSprinkler::switch_remotestation(RemoteOTCStationData *data, bool turnon
 	memcpy((char*)&copy, (char*)data, sizeof(RemoteOTCStationData));
 	copy.token[sizeof(copy.token)-1] = 0; // ensure the string ends properly
 	char *p = tmp_buffer;
-	BufferFiller bf = BufferFiller(p, TMP_BUFFER_SIZE*2);
+	BufferFiller bf = BufferFiller(p, TMP_BUFFER_SIZE_L);
 	// if turning on the zone and duration is defined, give duration as the timer value
 	// otherwise:
 	//   if autorefresh is defined, we give a fixed duration each time, and auto refresh will renew it periodically
@@ -2228,7 +2228,7 @@ void OpenSprinkler::switch_httpstation(HTTPStationData *data, bool turnon, bool 
 	char * cmd = turnon ? on_cmd : off_cmd;
 
 	char *p = tmp_buffer;
-	BufferFiller bf = BufferFiller(p, TMP_BUFFER_SIZE*2);
+	BufferFiller bf = BufferFiller(p, TMP_BUFFER_SIZE_L);
 
 	if(cmd==NULL || server==NULL) return; // proceed only if cmd and server are valid
 

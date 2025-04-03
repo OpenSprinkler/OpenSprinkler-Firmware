@@ -208,7 +208,7 @@ unsigned char findKeyVal (const char *str,char *strbuf, uint16_t maxlen,const ch
 }
 
 void rewind_ether_buffer() {
-    bfill = BufferFiller(ether_buffer, ETHER_BUFFER_SIZE*2);
+    bfill = BufferFiller(ether_buffer, ETHER_BUFFER_SIZE_L);
 	ether_buffer[0] = 0;
 }
 
@@ -1955,7 +1955,7 @@ void server_json_log(OTF_PARAMS_DEF) {
 
 	bool comma = 0;
 	for(unsigned int i=start;i<=end;i++) {
-		snprintf(tmp_buffer, TMP_BUFFER_SIZE*2 , "%d", i);
+		snprintf(tmp_buffer, TMP_BUFFER_SIZE_L , "%d", i);
 		make_logfile_name(tmp_buffer);
 
 #if defined(ESP8266)
@@ -2186,7 +2186,7 @@ void server_fill_files(OTF_PARAMS_DEF) {
 	ether_buffer[75] = 0;
 	FSInfo fs_info;
 	for(int index=1;index<64;index++) {
-		snprintf(tmp_buffer, TMP_BUFFER_SIZE*2 , "%d", index);
+		snprintf(tmp_buffer, TMP_BUFFER_SIZE_L , "%d", index);
 		make_logfile_name(tmp_buffer);
 		DEBUG_PRINT(F("creating "));
 		DEBUG_PRINT(tmp_buffer);
@@ -2989,6 +2989,7 @@ void server_monitor_types(OTF_PARAMS_DEF) {
 	bfill.emit_p(PSTR("{\"name\":\"OR\",\"type\":$D},"), MONITOR_OR);
 	bfill.emit_p(PSTR("{\"name\":\"XOR\",\"type\":$D},"), MONITOR_XOR);
 	bfill.emit_p(PSTR("{\"name\":\"NOT\",\"type\":$D}," ), MONITOR_NOT);
+	bfill.emit_p(PSTR("{\"name\":\"TIME\",\"type\":$D}," ), MONITOR_TIME);
 	bfill.emit_p(PSTR("{\"name\":\"REMOTE\",\"type\":$D}" ), MONITOR_REMOTE);
 	bfill.emit_p(PSTR("]}"));
 	handle_return(HTML_OK);
@@ -3096,6 +3097,17 @@ void server_monitor_config(OTF_PARAMS_DEF) {
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("monitor"), true))
 		monitor = strtoul(tmp_buffer, NULL, 0); 
 
+	//type = TIME
+	uint16_t time_from = 0000;
+	uint16_t time_to = 2400;
+	uint8_t wdays = 0xFF;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("from"), true)) //Format: HHMM
+		time_from = strtoul(tmp_buffer, NULL, 0); 
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("to"), true)) //Format: HHMM
+		time_to = strtoul(tmp_buffer, NULL, 0); 
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("wdays"), true)) //0=Monday
+		wdays = strtoul(tmp_buffer, NULL, 0); 
+
 	//type = REMOTE ip
 	uint16_t rmonitor = 0;
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("rmonitor"), true))
@@ -3127,6 +3139,9 @@ void server_monitor_config(OTF_PARAMS_DEF) {
 			break;
 		case MONITOR_NOT:
 			m = (Monitor_Union_t){.mnot = {.monitor = monitor}};
+			break;
+		case MONITOR_TIME:
+			m = (Monitor_Union_t){.mtime = {.time_from = time_from, .time_to = time_to, .weekdays = wdays}};
 			break;
 		case MONITOR_REMOTE:
 			m = (Monitor_Union_t){.remote = {.rmonitor = rmonitor, .ip = ip, .port = port}};
@@ -3178,6 +3193,9 @@ void monitorconfig_json(Monitor_t *mon) {
 		case MONITOR_NOT:
 			bfill.emit_p(PSTR("\"monitor\":$D}"),
 				mon->m.mnot.monitor);
+			break;
+		case MONITOR_TIME:
+			bfill.emit_p(PSTR("\"from\":$D,\"to\":$D,\"wdays\":$D}"), mon->m.mtime.time_from, mon->m.mtime.time_to, mon->m.mtime.weekdays);
 			break;
 		case MONITOR_REMOTE:
 			bfill.emit_p(PSTR("\"rmonitor\":$D,\"ip\":$L,\"port\":$D}"),

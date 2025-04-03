@@ -338,7 +338,7 @@ void OSMqtt::init(void) {
 
 const char* getOnlineTopic() {
 	os.sopt_load(SOPT_DEVICE_NAME, tmp_buffer);
-	strncat(tmp_buffer, MQTT_AVAILABILITY_TOPIC, TMP_BUFFER_SIZE*2);
+	strncat(tmp_buffer, MQTT_AVAILABILITY_TOPIC, TMP_BUFFER_SIZE_L);
 	return tmp_buffer;
 }
 
@@ -646,26 +646,20 @@ void key_callback(char* mtopic, byte* payload, unsigned int length) {
 }
 
 void registerCallback(int key, MQTT_CALLBACK_SIGNATURE) {
-	boolean ok = false;
+	int j = -1;
 	for (int i = 0; i < MAX_CALLBACKS; i++) {
-		if (callback) {
-			if (key_callbacks[i].key == 0 || key_callbacks[i].key == key) {
-				key_callbacks[i].callback = callback;
-				key_callbacks[i].key = key;
-				ok = true;
-				break;
-			}
-		} else {
-			if (key_callbacks[i].key == key) {
-				key_callbacks[i].callback = NULL;
-				key_callbacks[i].key = 0;
-				ok = true;
-				break;
-			}
+		if ((callback && key_callbacks[i].key == 0) || key_callbacks[i].key == key) {
+			if (j < 0 || key > key_callbacks[j].key)
+				j = i;
+			break;
 		}
 	}
-	if (!ok)
-		DEBUG_LOGF("MQTT setCallback: failed!");
+	if (j >= 0) {
+		key_callbacks[j].callback = callback;
+		key_callbacks[j].key = key;
+		return;
+	}
+	DEBUG_LOGF("MQTT setCallback: failed!");
 }
 
 void OSMqtt::setCallback(int key, MQTT_CALLBACK_SIGNATURE) {
