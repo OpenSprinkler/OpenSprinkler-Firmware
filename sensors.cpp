@@ -3047,7 +3047,13 @@ void check_monitors() {
       case MONITOR_TIME: {
         time_os_t timeNow = os.now_tz();
         uint16_t time = hour(timeNow) * 100 + minute(timeNow); //HHMM
+#if defined(ARDUINO)       
         uint8_t wday = (weekday(timeNow)+5)%7; //Monday = 0
+#else
+        time_os_t ct = timeNow;
+	struct tm *ti = gmtime(&ct);
+	uint8_t wday = (ti->tm_wday+1)%7; 
+#endif
         mon->active  = (mon->m.mtime.weekdays >> wday) & 0x01;
         if (mon->m.mtime.time_from > mon->m.mtime.time_to) // FROM > TO ? Over night value
           mon->active &= time >= mon->m.mtime.time_from || time <= mon->m.mtime.time_to;
