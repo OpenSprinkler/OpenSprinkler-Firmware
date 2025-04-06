@@ -338,7 +338,7 @@ void OSMqtt::init(void) {
 
 const char* getOnlineTopic() {
 	os.sopt_load(SOPT_DEVICE_NAME, tmp_buffer);
-	strncat(tmp_buffer, MQTT_AVAILABILITY_TOPIC, TMP_BUFFER_SIZE*2);
+	strncat(tmp_buffer, MQTT_AVAILABILITY_TOPIC, TMP_BUFFER_SIZE_L);
 	return tmp_buffer;
 }
 
@@ -646,30 +646,24 @@ void key_callback(char* mtopic, byte* payload, unsigned int length) {
 }
 
 void registerCallback(int key, MQTT_CALLBACK_SIGNATURE) {
-	boolean ok = false;
+	int j = -1;
 	for (int i = 0; i < MAX_CALLBACKS; i++) {
-		if (callback) {
-			if (key_callbacks[i].key == 0 || key_callbacks[i].key == key) {
-				key_callbacks[i].callback = callback;
-				key_callbacks[i].key = key;
-				ok = true;
-				break;
-			}
-		} else {
-			if (key_callbacks[i].key == key) {
-				key_callbacks[i].callback = NULL;
-				key_callbacks[i].key = 0;
-				ok = true;
-				break;
-			}
+		if ((callback && key_callbacks[i].key == 0) || key_callbacks[i].key == key) {
+			if (j < 0 || key > key_callbacks[j].key)
+				j = i;
+			break;
 		}
 	}
-	if (!ok)
-		DEBUG_LOGF("MQTT setCallback: failed!");
+	if (j >= 0) {
+		key_callbacks[j].callback = callback;
+		key_callbacks[j].key = key;
+		return;
+	}
+	DEBUG_LOGF("MQTT setCallback: failed!");
 }
 
 void OSMqtt::setCallback(int key, MQTT_CALLBACK_SIGNATURE) {
-	registerCallback(key, callback);
+	sensor_mqtt_callback(key, callback);
 	mqtt_client->setCallback(key_callback);
 }
 
@@ -829,7 +823,7 @@ void subscribe_callback(struct mosquitto *mosq, void *obj, const struct mosquitt
 }
 
 int OSMqtt::_subscribe(void) {
-	mosquitto_message_callback_set(mqtt_client, subscribe_callback);
+	setCallback(1, subscribe_callback);
 	int rc = mosquitto_subscribe(mqtt_client, NULL, _sub_topic, 0);
 	if (rc != MOSQ_ERR_SUCCESS) {
 		DEBUG_LOGF("MQTT Subscribe: Failed (%s)\r\n", mosquitto_strerror(rc));
@@ -862,12 +856,15 @@ static KEY_CALLBACK_t key_callbacks[MAX_CALLBACKS] = {0};
 
 static void sensor_mqtt_callback(struct mosquitto *mosq, void *obj, const struct mosquitto_message *msg) {
 	for (int i = 0; i < MAX_CALLBACKS; i++) {
-		if (key_callbacks[i].callback)
-			key_callbacks[i].callback(mosq, obj, msg);
+		if (key_callbacks[i].callback) {
+			DEBUG_PRINT("Callback exec: ");
+			DEBUG_PRINTLN(key_callbacks[i].key);
+				key_callbacks[i].callback(mosq, obj, msg);
+		}
 	}
 }
 
-static void registerCallback(int key, void (*callback)(struct mosquitto *, void *, const struct mosquitto_message *)) {
+static void sensor_mqtt_callback(int key, void (*callback)(struct mosquitto *, void *, const struct mosquitto_message *)) {
 	boolean ok = false;
 	for (int i = 0; i < MAX_CALLBACKS; i++) {
 		if (callback) {
@@ -892,8 +889,8 @@ static void registerCallback(int key, void (*callback)(struct mosquitto *, void 
 
 
 void OSMqtt::setCallback(int key, void (*callback)(struct mosquitto *, void *, const struct mosquitto_message *)) {
-	registerCallback(key, callback);
-	mosquitto_message_callback_set(mqtt_client, callback);
+	sensor_mqtt_callback(key, callback);
+	mosquitto_message_callback_set(mqtt_client, sensor_mqtt_callback);
 }
 
 const char * OSMqtt::_state_string(int error) {

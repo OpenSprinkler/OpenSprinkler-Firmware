@@ -248,8 +248,9 @@ void sensor_save_all() {
  * 
  */
 void sensor_api_free() {
+  DEBUG_PRINTLN("sensor_api_free1");
   apiInit = false;
-
+  current_sensor = NULL;
   os.mqtt.setCallback(2, NULL);
 
   while (progSensorAdjusts) {
@@ -258,6 +259,8 @@ void sensor_api_free() {
     progSensorAdjusts = next;
   }
 
+  DEBUG_PRINTLN("sensor_api_free2");
+
   while (sensorUrls) {
     SensorUrl_t* next = sensorUrls->next;
     free(sensorUrls->urlstr);
@@ -265,11 +268,15 @@ void sensor_api_free() {
     sensorUrls = next;
   }
 
+  DEBUG_PRINTLN("sensor_api_free3");
+
   while (monitors) {
     Monitor_t* next = monitors->next;
     delete monitors;
     monitors = next;
   }
+
+  DEBUG_PRINTLN("sensor_api_free4");
 
   while (sensors) {
     Sensor_t* next = sensors->next;
@@ -281,6 +288,7 @@ void sensor_api_free() {
   #ifdef ESP8266
   memset(i2c_rs485_allocated, 0, sizeof(i2c_rs485_allocated));
   #endif
+  DEBUG_PRINTLN("sensor_api_free5");
 }
 
 /*
@@ -588,9 +596,6 @@ bool sensorlog_add(uint8_t log, SensorLog_t *sensorlog) {
 bool sensorlog_add(uint8_t log, Sensor_t *sensor, ulong time) {
 
   if (sensor->flags.data_ok && sensor->flags.log && time > 1000) {
-
-    if (log == LOG_STD)
-      add_influx_data(sensor);
 
     // Write to log file only if necessary
     if (time-sensor->last_logged_time > 86400 || abs(sensor->last_data - sensor->last_logged_data) > 0.00999) {
@@ -976,7 +981,7 @@ void push_message(Sensor_t *sensor) {
     strcat_P(postval, PSTR("\"}"));
 
     // char postBuffer[1500];
-    BufferFiller bf = BufferFiller(ether_buffer, ETHER_BUFFER_SIZE*2);
+    BufferFiller bf = BufferFiller(ether_buffer, ETHER_BUFFER_SIZE_L);
     bf.emit_p(PSTR("POST /trigger/sprinkler/with/key/$O HTTP/1.0\r\n"
                    "Host: $S\r\n"
                    "Accept: */*\r\n"
@@ -987,6 +992,8 @@ void push_message(Sensor_t *sensor) {
     os.send_http_request(DEFAULT_IFTTT_URL, 80, ether_buffer, sensor_remote_http_callback);
     DEBUG_PRINTLN("push ifttt2");
   }
+
+  add_influx_data(sensor);
 }
 
 void read_all_sensors(boolean online) {
@@ -2530,8 +2537,14 @@ void SensorUrl_load() {
     }
     sensorUrl->urlstr = (char *)malloc(sensorUrl->length + 1);
     pos += SENSORURL_STORE_SIZE;
-    file_read_block(SENSORURL_FILENAME, sensorUrl->urlstr, pos,
+    ulong result = file_read_block(SENSORURL_FILENAME, sensorUrl->urlstr, pos,
                     sensorUrl->length);
+    if (result != sensorUrl->length) {
+      free(sensorUrl->urlstr);
+      delete sensorUrl;
+      break;
+    }
+                
     sensorUrl->urlstr[sensorUrl->length] = 0;
     pos += sensorUrl->length;
 
@@ -2540,6 +2553,7 @@ void SensorUrl_load() {
     DEBUG_PRINT(sensorUrl->type);
     DEBUG_PRINT(": ");
     DEBUG_PRINTLN(sensorUrl->urlstr);
+
     if (!last)
       sensorUrls = sensorUrl;
     else
@@ -3030,6 +3044,23 @@ void check_monitors() {
       case MONITOR_NOT:
         mon->active = get_monitor(mon->m.mnot.monitor, true, false);
         break;
+      case MONITOR_TIME: {
+        time_os_t timeNow = os.now_tz();
+        uint16_t time = hour(timeNow) * 100 + minute(timeNow); //HHMM
+#if defined(ARDUINO)       
+        uint8_t wday = (weekday(timeNow)+5)%7; //Monday = 0
+#else
+        time_os_t ct = timeNow;
+	struct tm *ti = gmtime(&ct);
+	uint8_t wday = (ti->tm_wday+1)%7; 
+#endif
+        mon->active  = (mon->m.mtime.weekdays >> wday) & 0x01;
+        if (mon->m.mtime.time_from > mon->m.mtime.time_to) // FROM > TO ? Over night value
+          mon->active &= time >= mon->m.mtime.time_from || time <= mon->m.mtime.time_to;
+        else
+          mon->active &= time >= mon->m.mtime.time_from && time <= mon->m.mtime.time_to;
+        break;
+      }
       case MONITOR_REMOTE:
         mon->active = get_remote_monitor(mon, wasActive);
         break;

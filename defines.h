@@ -29,13 +29,14 @@
 typedef unsigned long ulong;
 
 #define TMP_BUFFER_SIZE      320   // scratch buffer size
+#define TMP_BUFFER_SIZE_L      TMP_BUFFER_SIZE+100   // scratch buffer size
 
 /** Firmware version, hardware version, and maximal values */
 #define OS_FW_VERSION  233  // Firmware version: 220 means 2.2.0
 														// if this number is different from the one stored in non-volatile memory
 														// a device reset will be automatically triggered
 
-#define OS_FW_MINOR      174  // Firmware minor version
+#define OS_FW_MINOR      175  // Firmware minor version
 
 /** Hardware version base numbers */
 #define OS_HW_VERSION_BASE   0x00 // OpenSprinkler
@@ -342,6 +343,7 @@ enum {
 	#define PIN_CURR_DIGITAL  24    // digital pin index for A7
 
 	#define ETHER_BUFFER_SIZE   2048
+	#define ETHER_BUFFER_SIZE_L   ETHER_BUFFER_SIZE+100
 
 	#define 	wdt_reset()   __asm__ __volatile__ ("wdr")  // watchdog timer reset
 
@@ -368,6 +370,7 @@ enum {
 	#define PIN_LATCH_VOLT_SENSE A0 // latch voltage sensing pin
 	#define PIN_FREE_LIST     {} // no free GPIO pin at the moment
 	#define ETHER_BUFFER_SIZE   2048
+	#define ETHER_BUFFER_SIZE_L   ETHER_BUFFER_SIZE+100
 
 	#define PIN_ETHER_CS       16 // Ethernet CS (chip select pin) is 16 on OS 3.2 and above
 
@@ -455,6 +458,7 @@ enum {
 
 	#define PIN_FREE_LIST       {5,6,7,8,9,11,12,13,16,19,20,21,23,25,26}  // free GPIO pins
 	#define ETHER_BUFFER_SIZE   16384
+	#define ETHER_BUFFER_SIZE_L   ETHER_BUFFER_SIZE+100
 
 	#define SDA 0
 	#define SCL 0
@@ -478,6 +482,7 @@ enum {
 	#define PIN_RFTX        0
 	#define PIN_FREE_LIST  {}
 	#define ETHER_BUFFER_SIZE   16384
+	#define ETHER_BUFFER_SIZE_L   ETHER_BUFFER_SIZE+100
 
 #endif
 

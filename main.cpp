@@ -92,8 +92,8 @@ void remote_http_callback(char*);
 #define CLIENT_READ_TIMEOUT       5     // client read timeout (in seconds)
 #define DHCP_CHECKLEASE_INTERVAL  3600L // DHCP check lease interval (in seconds)
 // Define buffers: need them to be sufficiently large to cover string option reading
-char ether_buffer[ETHER_BUFFER_SIZE*2]; // ethernet buffer, make it twice as large to allow overflow
-char tmp_buffer[TMP_BUFFER_SIZE*2]; // scratch buffer, make it twice as large to allow overflow
+char ether_buffer[ETHER_BUFFER_SIZE_L]; // ethernet buffer, make it twice as large to allow overflow
+char tmp_buffer[TMP_BUFFER_SIZE_L]; // scratch buffer, make it twice as large to allow overflow
 
 // ====== Object defines ======
 OpenSprinkler os; // OpenSprinkler object
