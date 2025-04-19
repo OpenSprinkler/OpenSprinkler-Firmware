@@ -663,7 +663,7 @@ void registerCallback(int key, MQTT_CALLBACK_SIGNATURE) {
 }
 
 void OSMqtt::setCallback(int key, MQTT_CALLBACK_SIGNATURE) {
-	sensor_mqtt_callback(key, callback);
+	registerCallback(key, callback);
 	mqtt_client->setCallback(key_callback);
 }
 
@@ -859,12 +859,12 @@ static void sensor_mqtt_callback(struct mosquitto *mosq, void *obj, const struct
 		if (key_callbacks[i].callback) {
 			DEBUG_PRINT("Callback exec: ");
 			DEBUG_PRINTLN(key_callbacks[i].key);
-				key_callbacks[i].callback(mosq, obj, msg);
+			key_callbacks[i].callback(mosq, obj, msg);
 		}
 	}
 }
 
-static void sensor_mqtt_callback(int key, void (*callback)(struct mosquitto *, void *, const struct mosquitto_message *)) {
+static void registerCallback(int key, void (*callback)(struct mosquitto *, void *, const struct mosquitto_message *)) {
 	boolean ok = false;
 	for (int i = 0; i < MAX_CALLBACKS; i++) {
 		if (callback) {
@@ -889,7 +889,7 @@ static void sensor_mqtt_callback(int key, void (*callback)(struct mosquitto *, v
 
 
 void OSMqtt::setCallback(int key, void (*callback)(struct mosquitto *, void *, const struct mosquitto_message *)) {
-	sensor_mqtt_callback(key, callback);
+	registerCallback(key, callback);
 	mosquitto_message_callback_set(mqtt_client, sensor_mqtt_callback);
 }
 
