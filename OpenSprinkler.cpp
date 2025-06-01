@@ -569,7 +569,7 @@ bool init_W5500(boolean initSPI) {
 		SPI.begin();
 		SPI.setBitOrder(MSBFIRST);
 		SPI.setDataMode(SPI_MODE0);
-		SPI.setFrequency(32000000);
+		SPI.setFrequency(40000000); // 40MHz is the maximum SPI clock for W5500
 	}
 	
 		pinMode(PIN_ETHER_CS, OUTPUT);
@@ -612,7 +612,7 @@ bool init_ENC28J60() {
 	SPI.begin();
 	SPI.setBitOrder(MSBFIRST);
 	SPI.setDataMode(SPI_MODE0);
-	SPI.setFrequency(4000000);
+	SPI.setFrequency(20000000); //ENC28J60 maximum SPI clock is 20MHz
 
 		// ==> setregbank(MAADRX_BANK);
 		pinMode(PIN_ETHER_CS, OUTPUT);

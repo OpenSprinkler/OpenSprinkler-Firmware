@@ -127,7 +127,7 @@ static void sensor_mqtt_callback(struct mosquitto *mosq, void *obj, const struct
 					char buf[30];
 					p = strpbrk(p, "0123456789.-+nullNULL");
 					uint i = 0;
-					while (p && i < sizeof(buf)) {
+					while (p && i < sizeof(buf) && p < (char*)payload+length) {
 						char ch = *p++;
 						if ((ch >= '0' && ch <= '9') || ch == '.' || ch == '-' || ch == '+') {
 							buf[i++] = ch;
@@ -139,7 +139,7 @@ static void sensor_mqtt_callback(struct mosquitto *mosq, void *obj, const struct
 
 					double value = -9999;
 					int ok = sscanf(buf, "%lf", &value);
-					if (ok && value >= -1000 && value <= 1000 && (value != sensor->last_data || !sensor->flags.data_ok || now-sensor->last_read > 6000)) {
+					if (ok && value >= -10000 && value <= 10000 && (value != sensor->last_data || !sensor->flags.data_ok || now-sensor->last_read > 6000)) {
 						sensor->last_data = value;
 						sensor->flags.data_ok = true;
 						sensor->last_read = now;	

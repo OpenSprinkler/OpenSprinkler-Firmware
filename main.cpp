@@ -2317,10 +2317,6 @@ static void check_network() {
 					// mark for safe restart
 					os.nvdata.reboot_cause = REBOOT_CAUSE_NETWORK_FAIL;
 					os.status.safe_reboot = 1;
-				} else if (os.status.network_fails>2) {
-					// if failed more than twice, try to reconnect
-					if (os.start_network())
-						os.status.network_fails=0;
 				}
 
     			return true; 
@@ -2335,7 +2331,19 @@ static void check_network() {
 			return;
 		}
 			
-		if(!pinger->Ping(useEth?eth.gatewayIP() : WiFi.gatewayIP())) {
+		boolean ping_ok = false;
+		switch(os.status.network_fails % 3) {
+			case 0:
+				ping_ok = pinger->Ping(useEth?eth.gatewayIP() : WiFi.gatewayIP());
+				break;
+			case 1:
+				ping_ok = pinger->Ping("google.com");
+				break;
+			case 2:
+				ping_ok = pinger->Ping("opensprinkler.com");
+				break;
+		}
+		if(!ping_ok) {
 			os.status.network_fails++;
 #if defined(ENABLE_DEBUG)
     		Serial.println("Error during last ping command.");
