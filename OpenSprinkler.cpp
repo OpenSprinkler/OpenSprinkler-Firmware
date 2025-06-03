@@ -569,7 +569,7 @@ bool init_W5500(boolean initSPI) {
 		SPI.begin();
 		SPI.setBitOrder(MSBFIRST);
 		SPI.setDataMode(SPI_MODE0);
-		SPI.setFrequency(40000000); // 40MHz is the maximum SPI clock for W5500
+		SPI.setFrequency(80000000); // 80MHz is the maximum SPI clock for W5500
 	}
 	
 		pinMode(PIN_ETHER_CS, OUTPUT);
