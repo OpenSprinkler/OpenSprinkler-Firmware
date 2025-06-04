@@ -95,10 +95,11 @@ NotifQueue notif; // NotifQueue object
  * flow_stop - time when valve turns off (last rising edge pulse detected before off)
  * flow_gallons - total # of gallons+1 from flow_start to flow_stop
  * flow_last_gpm - last flow rate measured (averaged over flow_gallons) from last valve stopped (used to write to log file). */
-ulong flow_begin, flow_start, flow_stop, flow_gallons;
+ulong flow_begin, flow_start, flow_stop, flow_gallons, flow_rt_reset, last_flow_rt;
 ulong flow_count = 0;
 unsigned char prev_flow_state = HIGH;
 float flow_last_gpm=0;
+float flow_rt_period=0;
 
 uint32_t reboot_timer = 0;
 
@@ -106,19 +107,53 @@ void flow_poll() {
 	#if defined(ESP8266)
 	if(os.hw_rev>=2) pinModeExt(PIN_SENSOR1, INPUT_PULLUP); // this seems necessary for OS 3.2
 	#endif
+
+    ulong curr = millis();
+
+    if (curr > flow_rt_reset) {
+        os.flowcount_rt = 0;
+        last_flow_rt = curr;
+        flow_rt_period = -1;
+    }
+
 	unsigned char curr_flow_state = digitalReadExt(PIN_SENSOR1);
 	if(!(prev_flow_state==HIGH && curr_flow_state==LOW)) { // only record on falling edge
 		prev_flow_state = curr_flow_state;
 		return;
 	}
 	prev_flow_state = curr_flow_state;
-	ulong curr = millis();
 	flow_count++;
 
 	/* RAH implementation of flow sensor */
-	if (flow_start==0) { flow_gallons=0; flow_start=curr;} // if first pulse, record time
-	if ((curr-flow_start)<90000) { flow_gallons=0; } // wait 90 seconds before recording flow_begin
-	else {	if (flow_gallons==1)	{  flow_begin = curr;}}
+	if (flow_start==0) { 
+        flow_gallons=0; flow_start=curr;
+    } // if first pulse, record time
+
+	if ((curr-flow_start)<90000) {
+        flow_gallons=0;
+    } // wait 90 seconds before recording flow_begin
+	else {
+        if (flow_gallons==1) {
+            flow_begin = curr;
+        }
+    }
+
+    if (flow_rt_period == -1) {
+        flow_rt_period = (float) (curr - last_flow_rt);
+    } else {
+        flow_rt_period = (((float) (curr - last_flow_rt) * 3.0) / 4.0) + (flow_rt_period / 4.0);
+    }
+
+    if (flow_rt_period > 0) {
+        os.flowcount_rt = (ulong) (FLOWCOUNT_RT_WINDOW * 1000.0 / flow_rt_period);
+    } else {
+        os.flowcount_rt = 0;
+    }
+    
+    flow_rt_reset = curr + (curr - flow_stop) * 3.0;
+
+    last_flow_rt = curr;
+
 	flow_stop = curr; // get time in ms for stop
 	flow_gallons++;  // increment gallon count for each poll
 	/* End of RAH implementation of flow sensor */
@@ -1043,10 +1078,10 @@ void do_loop()
 		// real-time flow count
 		static ulong flowcount_rt_start = 0;
 		if (os.iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_FLOW) {
-			if (curr_time % FLOWCOUNT_RT_WINDOW == 0) {
-				os.flowcount_rt = (flow_count > flowcount_rt_start) ? flow_count - flowcount_rt_start: 0;
-				flowcount_rt_start = flow_count;
-			}
+			// if (curr_time % FLOWCOUNT_RT_WINDOW == 0) {
+			// 	os.flowcount_rt = (flow_count > flowcount_rt_start) ? flow_count - flowcount_rt_start: 0;
+			// 	flowcount_rt_start = flow_count;
+			// }
 		}
 
 		// perform ntp sync

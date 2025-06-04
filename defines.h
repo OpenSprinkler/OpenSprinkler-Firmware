@@ -93,7 +93,7 @@ typedef unsigned long ulong;
 #define SENSOR_TYPE_PSWITCH 0xF0  // program switch sensor
 #define SENSOR_TYPE_OTHER   0xFF
 
-#define FLOWCOUNT_RT_WINDOW   30  // flow count window (for computing real-time flow rate), 30 seconds
+#define FLOWCOUNT_RT_WINDOW   100000  // flow count window (for computing real-time flow rate), 30 seconds
 
 /** Reboot cause */
 #define REBOOT_CAUSE_NONE   0
