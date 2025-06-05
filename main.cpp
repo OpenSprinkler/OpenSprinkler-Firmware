@@ -67,6 +67,12 @@
 	#endif
 #endif
 
+#define TOSTRING(x) #x
+
+#define RAW_UA_STR "OpenSprinkler/" TOSTRING(OS_FW_VERSION) "#" TOSTRING(OS_FW_MINOR)
+
+static const char *user_agent_string = RAW_UA_STR;
+
 void manual_start_program(unsigned char, unsigned char);
 
 // Small variations have been added to the timing values below

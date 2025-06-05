@@ -36,6 +36,8 @@ char wt_rawData[TMP_BUFFER_SIZE];
 int wt_errCode = HTTP_RQT_NOT_RECEIVED;
 unsigned char wt_monthly[12] = {100,100,100,100,100,100,100,100,100,100,100,100};
 
+extern const char *user_agent_string;
+
 unsigned char findKeyVal (const char *str,char *strbuf, uint16_t maxlen,const char *key,bool key_in_pgm=false,uint8_t *keyfound=NULL);
 
 // The weather function calls getweather.py on remote server to retrieve weather data
@@ -174,6 +176,8 @@ void GetWeather() {
 
 	strcat(ether_buffer, " HTTP/1.0\r\nHOST: ");
 	strcat(ether_buffer, host);
+	strcat(ether_buffer, "\r\nUser-Agent: ");
+	strcat(ether_buffer, user_agent_string);
 	strcat(ether_buffer, "\r\n\r\n");
 
 	wt_errCode = HTTP_RQT_NOT_RECEIVED;
