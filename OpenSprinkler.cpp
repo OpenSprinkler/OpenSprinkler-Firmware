@@ -77,7 +77,7 @@ extern char tmp_buffer[];
 extern char ether_buffer[];
 extern ProgramData pd;
 
-extern const char *user_agent_string;
+extern const char* user_agent_string;
 
 #if defined(USE_SSD1306)
 	SSD1306Display OpenSprinkler::lcd(0x3c, SDA, SCL);

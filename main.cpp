@@ -67,11 +67,10 @@
 	#endif
 #endif
 
-#define TOSTRING(x) #x
+#define STRINGIFY(x) #x
+#define TOSTRING(x) STRINGIFY(x)
 
-#define RAW_UA_STR "OpenSprinkler/" TOSTRING(OS_FW_VERSION) "#" TOSTRING(OS_FW_MINOR)
-
-static const char *user_agent_string = RAW_UA_STR;
+const char *user_agent_string = "OpenSprinkler/" TOSTRING(OS_FW_VERSION) "#" TOSTRING(OS_FW_MINOR);
 
 void manual_start_program(unsigned char, unsigned char);
 
