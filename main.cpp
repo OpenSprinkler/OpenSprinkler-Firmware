@@ -1075,15 +1075,6 @@ void do_loop()
 			os.reboot_dev(REBOOT_CAUSE_TIMER);
 		}
 
-		// real-time flow count
-		static ulong flowcount_rt_start = 0;
-		if (os.iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_FLOW) {
-			// if (curr_time % FLOWCOUNT_RT_WINDOW == 0) {
-			// 	os.flowcount_rt = (flow_count > flowcount_rt_start) ? flow_count - flowcount_rt_start: 0;
-			// 	flowcount_rt_start = flow_count;
-			// }
-		}
-
 		// perform ntp sync
 		// instead of using curr_time, which may change due to NTP sync itself
 		// we use Arduino's millis() method
