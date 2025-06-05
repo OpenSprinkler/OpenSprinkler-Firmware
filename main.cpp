@@ -110,6 +110,7 @@ void flow_poll() {
 
     ulong curr = millis();
 
+    // Resets counter if timeout occurs
     if (curr > flow_rt_reset) {
         os.flowcount_rt = 0;
         last_flow_rt = curr;
@@ -138,20 +139,22 @@ void flow_poll() {
         }
     }
 
-    if (flow_rt_period == -1) {
-        flow_rt_period = (float) (curr - last_flow_rt);
-    } else {
+    // Use weighted average if flow has been previosuly calculated, otherwise just set the value
+    if (flow_rt_period > 0) {
         flow_rt_period = (((float) (curr - last_flow_rt) * 3.0) / 4.0) + (flow_rt_period / 4.0);
+    } else {
+        flow_rt_period = (float) (curr - last_flow_rt);
     }
 
+    // calculates the flow rate scaled by the window size to simulated a fixed point number
     if (flow_rt_period > 0) {
         os.flowcount_rt = (ulong) (FLOWCOUNT_RT_WINDOW * 1000.0 / flow_rt_period);
     } else {
         os.flowcount_rt = 0;
     }
     
-    flow_rt_reset = curr + (curr - flow_stop) * 3.0;
-
+    // Sets the timeout to be 3x the last period
+    flow_rt_reset = curr + (curr - last_flow_rt) * 3.0;
     last_flow_rt = curr;
 
 	flow_stop = curr; // get time in ms for stop
