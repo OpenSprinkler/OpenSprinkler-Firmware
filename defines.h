@@ -35,7 +35,7 @@ typedef unsigned long ulong;
 														// if this number is different from the one stored in non-volatile memory
 														// a device reset will be automatically triggered
 
-#define OS_FW_MINOR      1  // Firmware minor version
+#define OS_FW_MINOR      2  // Firmware minor version
 
 /** Hardware version base numbers */
 #define OS_HW_VERSION_BASE   0x00 // OpenSprinkler
@@ -80,10 +80,10 @@ typedef unsigned long ulong;
 
 /** HTTP request macro defines */
 #define HTTP_RQT_SUCCESS       0
-#define HTTP_RQT_NOT_RECEIVED  1
-#define HTTP_RQT_CONNECT_ERR   2
-#define HTTP_RQT_TIMEOUT       3
-#define HTTP_RQT_EMPTY_RETURN  4
+#define HTTP_RQT_NOT_RECEIVED  -1
+#define HTTP_RQT_CONNECT_ERR   -2
+#define HTTP_RQT_TIMEOUT       -3
+#define HTTP_RQT_EMPTY_RETURN  -4
 
 /** Sensor macro defines */
 #define SENSOR_TYPE_NONE    0x00

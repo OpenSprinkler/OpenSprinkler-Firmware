@@ -910,8 +910,10 @@ void OpenSprinkler::begin() {
 			PIN_SENSOR1 = V1_PIN_SENSOR1;
 			PIN_SENSOR2 = V1_PIN_SENSOR2;
 		} else {
-			// revision 2 and 3
-			if(detect_i2c(EEPROM_I2CADDR)) { // revision 3 has a I2C EEPROM
+			// revision 2 and above
+			if(detect_i2c(EEPROM_I2CADDR+2)) { // revision 4 has an I2C EEPROM at this address; skipping +1 due to addr conflict with PCF8563
+				hw_rev = 4;
+			} else if(detect_i2c(EEPROM_I2CADDR)) { // revision 3 has an I2C EEPROM at this address
 				hw_rev = 3;
 			} else {
 				hw_rev = 2;
