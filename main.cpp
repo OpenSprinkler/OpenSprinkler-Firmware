@@ -67,6 +67,11 @@
 	#endif
 #endif
 
+#define STRINGIFY(x) #x
+#define TOSTRING(x) STRINGIFY(x)
+
+const char *user_agent_string = "OpenSprinkler/" TOSTRING(OS_FW_VERSION) "#" TOSTRING(OS_FW_MINOR);
+
 void manual_start_program(unsigned char, unsigned char);
 
 // Small variations have been added to the timing values below
