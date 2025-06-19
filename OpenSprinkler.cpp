@@ -561,7 +561,7 @@ unsigned char OpenSprinkler::start_ether() {
 	SPI.begin();
 	SPI.setBitOrder(MSBFIRST);
 	SPI.setDataMode(SPI_MODE0);
-	SPI.setFrequency(4000000);
+	SPI.setFrequency(10000000L); // set 10MHz SPI frequency
 
 	if(eth.isW5500) {
 		DEBUG_PRINTLN(F("detect existence of W5500"));

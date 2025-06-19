@@ -554,7 +554,7 @@ static unsigned char h2int(char c) {
 		return(0);
 }
 
-/** Decode a url string e.g "hello%20joe" or "hello+joe" becomes "hello joe" */
+/** Decode a url string in place, e.g "hello%20joe" or "hello+joe" becomes "hello joe"*/
 void urlDecode (char *urlbuf) {
 	if(!urlbuf) return;
 	char c;
@@ -570,6 +570,42 @@ void urlDecode (char *urlbuf) {
 	}
 	*dst = '\0';
 }
+
+/** Encode a url string in place, e.g "hello joe" to "hello%20joe"
+  * IMPORTANT: assume the buffer is large enough to fit the output
+  */
+void urlEncode(char *urlbuf) {
+	if(!urlbuf) return;
+
+	// First, find the original length
+	size_t len = strlen(urlbuf);
+
+	// Compute new length
+	size_t extra = 0;
+	for (size_t i = 0; i < len; i++) {
+		unsigned char c = urlbuf[i];
+		if (c == ' ' || c == '\"' || c == '\'' || c == '<' || c == '>' || c > 127) {
+			extra += 2; // encoded, extra 2
+		}
+	}
+
+	size_t newlen = len + extra;
+	urlbuf[newlen] = 0; // Null-terminate the new string
+
+	// Process in reverse to avoid overwriting
+	for (ssize_t i = len - 1, j = newlen - 1; i >= 0; i--) {
+		unsigned char c = urlbuf[i];
+		if (c == ' ' || c == '\"' || c == '\'' || c == '<' || c == '>' || c > 127) {
+			static const char hex[] = "0123456789ABCDEF";
+			urlbuf[j--] = hex[c & 0xF];
+			urlbuf[j--] = hex[(c >> 4) & 0xF];
+			urlbuf[j--] = '%';
+		} else {
+			urlbuf[j--] = c;
+		}
+	}
+}
+
 
 void peel_http_header(char* buffer) { // remove the HTTP header
 	uint16_t i=0;

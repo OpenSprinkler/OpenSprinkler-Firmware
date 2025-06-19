@@ -146,29 +146,14 @@ void GetWeather() {
 								SOPT_WEATHER_OPTS,
 								(int)os.iopts[IOPT_FW_VERSION]);
 
-	char *src=tmp_buffer+strlen(tmp_buffer);
-	char *dst=tmp_buffer+TMP_BUFFER_SIZE-12;
 
-	char c;
-	// url encode. convert SPACE to %20
-	// copy reversely from the end because we are potentially expanding
-	// the string size
-	while(src!=tmp_buffer) {
-		c = *src--;
-		if(c==' ') {
-			*dst-- = '0';
-			*dst-- = '2';
-			*dst-- = '%';
-		} else {
-			*dst-- = c;
-		}
-	};
-	*dst = *src;
+	urlEncode(tmp_buffer);
 
 	strcpy(ether_buffer, "GET /");
-	strcat(ether_buffer, dst);
-	// because dst is part of tmp_buffer,
-	// must load weather url AFTER dst is copied to ether_buffer
+	strcat(ether_buffer, tmp_buffer);
+	// because we are using tmp_buffer both for encoding the string
+	// and for loading weather url, we will load weather url AFTER
+	// the encoded string has been copied into ether_buffer
 
 	// load weather url to tmp_buffer
 	char *host = tmp_buffer;
@@ -181,6 +166,7 @@ void GetWeather() {
 	strcat(ether_buffer, "\r\n\r\n");
 
 	wt_errCode = HTTP_RQT_NOT_RECEIVED;
+	DEBUG_PRINTLN(ether_buffer);
 	int ret = os.send_http_request(host, ether_buffer, getweather_callback_with_peel_header);
 	if(ret!=HTTP_RQT_SUCCESS) {
 		if(wt_errCode < 0) wt_errCode = ret;

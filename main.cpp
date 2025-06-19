@@ -159,8 +159,8 @@ void flow_poll() {
 	// calculates the flow rate scaled by the window size to simulated a fixed point number
 	if (flow_rt_period > 0) {
 		os.flowcount_rt = (ulong) (FLOWCOUNT_RT_WINDOW * 1000.0 / flow_rt_period);
-		// Sets the timeout to be 3x the last period
-		flow_rt_reset = curr + (curr - last_flow_rt) * 3.0;
+		// Sets the timeout to be 10x the last period
+		flow_rt_reset = curr + (curr - last_flow_rt) * 10.0;
 	} else {
 		os.flowcount_rt = 0;
 		flow_rt_reset = 0;
