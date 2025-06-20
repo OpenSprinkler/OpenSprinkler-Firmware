@@ -407,8 +407,52 @@ void ui_state_machine() {
 // ======================
 // Setup Function
 // ======================
+#include <ch224.hpp>
+CH224 usb_pd;
 #if defined(ARDUINO)
 void do_setup() {
+    // put your setup code here, to run once:
+  Wire.begin();        // join i2c bus (address optional for master)
+  Serial.begin(115200);  // start serial for output
+  delay(1000);
+    Serial.println("Testing");
+  Serial.print("Supports PD: ");
+  Serial.println(usb_pd.get_status().pd_activation);
+  Serial.print("Supports BC: ");
+  Serial.println(usb_pd.get_status().bc_activation);
+  Serial.print("Supports QC2: ");
+  Serial.println(usb_pd.get_status().qc2_activation);
+  Serial.print("Supports QC3: ");
+  Serial.println(usb_pd.get_status().qc3_activation);
+  Serial.println(usb_pd.get_current_ma());
+  usb_pd.update_power_data();
+  Serial.println("Support fixed voltages:");
+  for (size_t i = 0; i < CH224_PDO_COUNT; i++) {
+        Serial.print(i);
+        Serial.print(": ");
+        Serial.print(usb_pd.supported_voltages[i].voltage);
+        Serial.print("mV, ");
+        Serial.print(usb_pd.supported_voltages[i].max_current);
+        Serial.print("mA");
+        Serial.print("\n");
+  }
+
+  Serial.println("Support PPS ranges:");
+  for (size_t i = 0; i < CH224_PDO_COUNT; i++) {
+        Serial.print(i);
+        Serial.print(": [");
+        Serial.print(usb_pd.supported_pps_ranges[i].min_voltage);
+        Serial.print("mV, ");
+        Serial.print(usb_pd.supported_pps_ranges[i].max_voltage);
+        Serial.print("mV], ");
+        Serial.print(usb_pd.supported_pps_ranges[i].max_current);
+        Serial.print("mA");
+        Serial.print("\n");
+  }
+
+  while (true) {
+    ESP.wdtFeed();
+  }
 	/* Clear WDT reset flag. */
 #if defined(ESP8266)
 	WiFi.persistent(false);
