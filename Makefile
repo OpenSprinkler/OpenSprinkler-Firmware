@@ -1,7 +1,7 @@
 CXX=g++
 # -std=gnu++17
 VERSION=OSPI
-CXXFLAGS=-std=gnu++14 -D$(VERSION) -DSMTP_OPENSSL -Wall -include string.h -Iexternal/TinyWebsockets/tiny_websockets_lib/include -Iexternal/OpenThings-Framework-Firmware-Library/
+CXXFLAGS=-std=gnu++14 -D$(VERSION) -DSMTP_OPENSSL -Wall -include string.h -Iexternal/TinyWebsockets/tiny_websockets_lib/include -Iexternal/OpenThings-Framework-Firmware-Library/ -Iexternal/influxdb-cpp/
 LD=$(CXX)
 LIBS=pthread mosquitto ssl crypto i2c
 LDFLAGS=$(addprefix -l,$(LIBS))
