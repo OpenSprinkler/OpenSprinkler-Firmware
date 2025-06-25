@@ -416,18 +416,27 @@ void do_setup() {
   Serial.begin(115200);  // start serial for output
   delay(1000);
     Serial.println("Testing");
-  Serial.print("Supports PD: ");
-  Serial.println(usb_pd.get_status().pd_activation);
   Serial.print("Supports BC: ");
   Serial.println(usb_pd.get_status().bc_activation);
   Serial.print("Supports QC2: ");
   Serial.println(usb_pd.get_status().qc2_activation);
   Serial.print("Supports QC3: ");
   Serial.println(usb_pd.get_status().qc3_activation);
+  Serial.print("Supports PD: ");
+  Serial.println(usb_pd.get_status().pd_activation);
+  Serial.print("Supports EPR: ");
+  Serial.println(usb_pd.get_status().epr_activation);
+  Serial.print("EPR Exists: ");
+  Serial.println(usb_pd.get_status().epr_exists);
+  Serial.print("AVS Exists: ");
+  Serial.println(usb_pd.get_status().avs_exists);
+  Serial.print("Reserved: ");
+  Serial.println(usb_pd.get_status().reserved);
+  Serial.print("mA: ");
   Serial.println(usb_pd.get_current_ma());
   usb_pd.update_power_data();
   Serial.println("Support fixed voltages:");
-  for (size_t i = 0; i < CH224_PDO_COUNT; i++) {
+  for (size_t i = 0; i < CH224_MAX_PDO_COUNT; i++) {
         Serial.print(i);
         Serial.print(": ");
         Serial.print(usb_pd.supported_voltages[i].voltage);
@@ -438,9 +447,11 @@ void do_setup() {
   }
 
   Serial.println("Support PPS ranges:");
-  for (size_t i = 0; i < CH224_PDO_COUNT; i++) {
+  for (size_t i = 0; i < CH224_MAX_PDO_COUNT; i++) {
         Serial.print(i);
-        Serial.print(": [");
+        Serial.print(": power_limited: ");
+        Serial.print(usb_pd.supported_pps_ranges[i].power_limited);
+        Serial.print(", [");
         Serial.print(usb_pd.supported_pps_ranges[i].min_voltage);
         Serial.print("mV, ");
         Serial.print(usb_pd.supported_pps_ranges[i].max_voltage);

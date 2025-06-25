@@ -14,12 +14,40 @@ typedef struct {
    bool bc_activation;
 } ch224_status_t;
 
+enum class CH224PortPowerRole {
+    Sink = 0,
+    Source = 1,
+};
+
+enum class CH224PortDataRole {
+    UFP = 0,
+    DFP = 1,
+};
+
+enum class CH224PDRevision {
+    Revision1 = 0,
+    Revision2 = 1,
+    Revision3 = 2,
+    Reserved = 3,
+};
+
+typedef struct {
+   bool extended;
+   uint8_t number_of_data_objects;
+   uint8_t message_id;
+   CH224PortPowerRole port_power_role;
+   CH224PDRevision revision;
+   CH224PortDataRole port_data_role;
+   uint8_t message_type;
+} ch224_pd_header_t;
+
 typedef struct {
    uint16_t voltage;
    uint16_t max_current;
 } ch224_fixed_data_t;
 
 typedef struct {
+    bool power_limited;
     uint16_t max_voltage;
     uint16_t min_voltage;
     uint16_t max_current;
@@ -36,7 +64,8 @@ enum class CH224VoltageMode {
     Voltage_AVS = 7,
 };
 
-#define CH224_PDO_COUNT (0x30 / 4)
+#define CH224_SRC_CAP_SIZE 0x30
+#define CH224_MAX_PDO_COUNT 7
 
 class CH224 {
 public:
@@ -60,12 +89,13 @@ public:
   void set_pps_voltage_mv(uint16_t voltage);
   // high: 0x60
   void update_power_data();
-  ch224_fixed_data_t supported_voltages[CH224_PDO_COUNT];
-  ch224_pps_data_t supported_pps_ranges[CH224_PDO_COUNT];
+  ch224_fixed_data_t supported_voltages[CH224_MAX_PDO_COUNT];
+  ch224_pps_data_t supported_pps_ranges[CH224_MAX_PDO_COUNT];
 
 private:
   void send_byte(uint8_t address, uint8_t data);
   uint8_t read_byte(uint8_t address);
   uint8_t _address;
   TwoWire *_wire;
+  uint8_t _src_cap[CH224_SRC_CAP_SIZE];
 };
