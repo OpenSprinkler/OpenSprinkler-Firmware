@@ -33,7 +33,6 @@
         echo "Compiling firmware..."
         ws=$(ls external/TinyWebsockets/tiny_websockets_lib/src/*.cpp)
         otf=$(ls external/OpenThings-Framework-Firmware-Library/*.cpp)
-        ifx=$(ls external/influxdb-cpp/*.hpp)
         g++ -o OpenSprinkler -DOSPI $USEGPIO $ADS1115 $PCF8591 -DSMTP_OPENSSL $DEBUG -std=c++17 -include string.h main.cpp \
                 OpenSprinkler.cpp program.cpp opensprinkler_server.cpp utils.cpp weather.cpp gpio.cpp mqtt.cpp \
                 smtp.c RCSwitch.cpp sensor*.cpp \
@@ -42,7 +41,8 @@
                 $ws \
                 -Iexternal/OpenThings-Framework-Firmware-Library/ \
                 $otf \
-                $ifx osinfluxdb.cpp -Iexternal/influxdb-cpp/ \
+                -Iexternal/influxdb-cpp/ \
+                osinfluxdb.cpp \
                 -lpthread -lmosquitto -lssl -lcrypto -li2c -lmodbus $GPIOLIB
 
 

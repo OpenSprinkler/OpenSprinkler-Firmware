@@ -69,7 +69,6 @@ if [ "$1" == "demo" ]; then
 
     	ws=$(ls external/TinyWebsockets/tiny_websockets_lib/src/*.cpp)
     	otf=$(ls external/OpenThings-Framework-Firmware-Library/*.cpp)
-    	ifx=$(ls external/influxdb-cpp/*.cpp)
     	g++ -o OpenSprinkler -DDEMO -DSMTP_OPENSSL $DEBUG -std=c++14 -include string.h main.cpp \
     		OpenSprinkler.cpp program.cpp opensprinkler_server.cpp utils.cpp weather.cpp gpio.cpp \
     		mqtt.cpp smtp.c RCSwitch.cpp \
@@ -77,7 +76,7 @@ if [ "$1" == "demo" ]; then
     		$ws \
     		-Iexternal/OpenThings-Framework-Firmware-Library/ \
     		$otf \
-    		$ifx \
+    		-Iexternal/influxdb-cpp/ \
     		-lpthread -lmosquitto -lssl -lcrypto
 else
 	echo "Installing required libraries..."
