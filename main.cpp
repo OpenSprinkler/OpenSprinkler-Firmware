@@ -41,7 +41,7 @@
 
 #if defined(ARDUINO)
 	#if defined(ESP8266)
-		#include <pinger.h>
+		#include <Pinger.h>
 		#include <lwip/icmp.h>
 		//extern "C" struct netif* eagle_lwip_getif (int netif_index);
 		Pinger *pinger = NULL;
