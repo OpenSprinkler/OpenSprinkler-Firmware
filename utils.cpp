@@ -31,6 +31,7 @@ extern OpenSprinkler os;
 	#if defined(ESP8266)
 		#include <FS.h>
 		#include <LittleFS.h>
+		#include <Esp.h>
 	#else
 		#include <avr/eeprom.h>
 		#include "SdFat.h"
@@ -312,7 +313,13 @@ void remove_file(const char *fn) {
 bool file_exists(const char *fn) {
 #if defined(ESP8266)
 
-	return LittleFS.exists(fn);
+	//return LittleFS.exists(fn);
+	File f = LittleFS.open(fn, "r");
+	if (f) {
+		f.close();
+		return true;
+	}
+	return false;
 
 #elif defined(ARDUINO)
 
@@ -330,14 +337,60 @@ bool file_exists(const char *fn) {
 }
 
 // file functions
-void file_read_block(const char *fn, void *dst, ulong pos, ulong len) {
+ulong file_size(const char *fn) {
+	ulong size = 0;
+#if defined(ESP8266)
+
+	// do not use File.readBytes or readBytesUntil because it's very slow  
+	File f = LittleFS.open(fn, "r");
+	if(f) {
+		size = f.size();
+		f.close();
+	}
+
+#elif defined(ARDUINO)
+
+	sd.chdir("/");
+	SdFile file;
+	if(file.open(fn, O_READ)) {
+		size = file.size();
+		file.close();
+	}
+
+#else
+
+	FILE *fp = fopen(get_filename_fullpath(fn), "rb");
+	if(fp) {
+		fseek(fp, 0, SEEK_END);
+		size = ftell(fp);
+		fclose(fp);
+	}  
+
+#endif
+	return size;
+}
+
+bool rename_file(const char *fn_old, const char *fn_new) {
+#if defined(ESP8266)
+	return LittleFS.rename(fn_old, fn_new);
+#elif defined(ARDUINO)
+	SdFile file(fn_old, O_READ);
+	return file.rename(fn_new);
+#else
+	return rename(fn_old, fn_new) == 0;
+#endif
+}
+
+// file functions
+ulong file_read_block(const char *fn, void *dst, ulong pos, ulong len) {
+	ulong result = 0;
 #if defined(ESP8266)
 
 	// do not use File.read_byte or read_byteUntil because it's very slow
 	File f = LittleFS.open(fn, "r");
 	if(f) {
 		f.seek(pos, SeekSet);
-		f.read((unsigned char*)dst, len);
+		result = f.read((unsigned char*)dst, len);
 		f.close();
 	}
 
@@ -347,7 +400,7 @@ void file_read_block(const char *fn, void *dst, ulong pos, ulong len) {
 	SdFile file;
 	if(file.open(fn, O_READ)) {
 		file.seekSet(pos);
-		file.read(dst, len);
+		result = file.read(dst, len);
 		file.close();
 	}
 
@@ -356,11 +409,12 @@ void file_read_block(const char *fn, void *dst, ulong pos, ulong len) {
 	FILE *fp = fopen(get_filename_fullpath(fn), "rb");
 	if(fp) {
 		fseek(fp, pos, SEEK_SET);
-		fread(dst, 1, len, fp);
+		result = fread(dst, 1, len, fp);
 		fclose(fp);
 	}
 
 #endif
+	return result;
 }
 
 void file_write_block(const char *fn, const void *src, ulong pos, ulong len) {
@@ -392,6 +446,43 @@ void file_write_block(const char *fn, const void *src, ulong pos, ulong len) {
 	}
 	if(fp) {
 		fseek(fp, pos, SEEK_SET); //this fails silently without the above change
+		fwrite(src, 1, len, fp);
+		fclose(fp);
+	}
+
+#endif
+
+}
+
+void file_append_block(const char *fn, const void *src, ulong len) {
+#if defined(ESP8266)
+
+	File f = LittleFS.open(fn, "r+");
+	if(!f) f = LittleFS.open(fn, "w");
+	if(f) {
+		f.seek(0, SeekEnd);
+		f.write((byte*)src, len);
+		f.close();
+	}
+
+#elif defined(ARDUINO)
+
+	sd.chdir("/");
+	SdFile file;
+	int ret = file.open(fn, O_CREAT | O_RDWR);
+	if(!ret) return;
+	file.seekEnd(0);
+	file.write(src, len);
+	file.close();
+
+#else
+
+	FILE *fp = fopen(get_filename_fullpath(fn), "rb+");
+	if(!fp) {
+		fp = fopen(get_filename_fullpath(fn), "wb+");
+	}
+	if(fp) {
+		fseek(fp, 0, SEEK_END); //this fails silently without the above change
 		fwrite(src, 1, len, fp);
 		fclose(fp);
 	}
@@ -612,7 +703,7 @@ void strReplaceQuoteBackslash(char *buf) {
 static const unsigned char month_days[] = {31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
 
 bool isLastDayofMonth(unsigned char month, unsigned char day) {
-	return day == month_days[month-1];
+	return day == month_days[month];
 }
 
 bool isValidDate(unsigned char m, unsigned char d) {
@@ -628,10 +719,6 @@ bool isValidDate(uint16_t date) {
 	unsigned char month = date >> 5;
 	unsigned char day = date & 31;
 	return isValidDate(month, day);
-}
-
-bool isLeapYear(uint16_t y){ // Accepts 4 digit year and returns if leap year
-	return (y%400==0) || ((y%4==0) && (y%100!=0));
 }
 
 #if defined(ESP8266)
@@ -681,5 +768,17 @@ void str2mac(const char *_str, unsigned char mac[]) {
 		mac[count++] = hex2dec(hex);
 		yield();
 	}
+}
+#endif
+
+#ifdef ARDUINO
+
+size_t freeMemory() {
+	return ESP.getFreeHeap();
+}
+#else
+
+size_t freeMemory() {
+	return -1;
 }
 #endif
