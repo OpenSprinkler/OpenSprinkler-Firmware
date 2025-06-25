@@ -28,7 +28,7 @@
 #include <InfluxDbClient.h>
 #include <InfluxDbCloud.h>
 #else
-#include "influxdb.hpp"
+#include <influxdb.hpp>
 
 #endif
 
