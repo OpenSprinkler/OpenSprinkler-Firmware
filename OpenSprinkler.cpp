@@ -69,9 +69,11 @@ unsigned char OpenSprinkler::attrib_igrd[MAX_NUM_BOARDS];
 unsigned char OpenSprinkler::attrib_dis[MAX_NUM_BOARDS];
 unsigned char OpenSprinkler::attrib_spe[MAX_NUM_BOARDS];
 unsigned char OpenSprinkler::attrib_grp[MAX_NUM_STATIONS];
+uint16_t OpenSprinkler::attrib_fas[MAX_NUM_STATIONS];
+uint16_t OpenSprinkler::attrib_favg[MAX_NUM_STATIONS];
 unsigned char OpenSprinkler::masters[NUM_MASTER_ZONES][NUM_MASTER_OPTS];
-time_os_t OpenSprinkler::masters_last_on[NUM_MASTER_ZONES];
 RCSwitch OpenSprinkler::rfswitch;
+OSInfluxDB OpenSprinkler::influxdb;
 
 extern char tmp_buffer[];
 extern char ether_buffer[];
@@ -256,7 +258,7 @@ const char iopt_prompts[] PROGMEM =
 	"Force wired?    "
 	"Latch On Volt.  "
 	"Latch Off Volt. "
-	"Notif 2 Enable  "
+	"Notif2 Enable:  "
 	"Reserved 4      "
 	"Reserved 5      "
 	"Reserved 6      "
@@ -418,7 +420,7 @@ unsigned char OpenSprinkler::iopts[] = {
 	1,  // force wired connection
 	0,  // latch on volt
 	0,  // latch off volt
-	0,  // notif enable bits 2
+	0,  // notif enable bits - part 2
 	0,  // reserved 4
 	0,  // reserved 5
 	0,  // reserved 6
@@ -551,17 +553,7 @@ unsigned char OpenSprinkler::start_network() {
 #endif
 }
 
-unsigned char OpenSprinkler::start_ether() {
-#if defined(ESP8266)
-	if(hw_rev<2) return 0;  // ethernet capability is only available when hw_rev>=2
-	eth.isW5500 = (hw_rev==2)?false:true; // os 3.2 uses enc28j60 and 3.3 uses w5500
-
-	SPI.begin();
-	SPI.setBitOrder(MSBFIRST);
-	SPI.setDataMode(SPI_MODE0);
-	SPI.setFrequency(4000000);
-
-	if(eth.isW5500) {
+bool init_W5500(boolean initSPI) {
 		DEBUG_PRINTLN(F("detect existence of W5500"));
 		/* this is copied from w5500.cpp wizchip_sw_reset
 		 * perform a software reset and see if we get a correct response
@@ -572,7 +564,16 @@ unsigned char OpenSprinkler::start_ether() {
 		static const uint8_t AccessModeRead = (0x00 << 2);
 		static const uint8_t AccessModeWrite = (0x01 << 2);
 		static const uint8_t BlockSelectCReg = (0x00 << 3);
+
+	if (initSPI) {
+		SPI.begin();
+		SPI.setBitOrder(MSBFIRST);
+		SPI.setDataMode(SPI_MODE0);
+		SPI.setFrequency(80000000); // 80MHz is the maximum SPI clock for W5500
+	}
+	
 		pinMode(PIN_ETHER_CS, OUTPUT);
+	
 		// ==> setMR(MR_RST)
 		digitalWrite(PIN_ETHER_CS, LOW);
 		SPI.transfer((0x00 & 0xFF00) >> 8);
@@ -589,8 +590,17 @@ unsigned char OpenSprinkler::start_ether() {
 		SPI.transfer(BlockSelectCReg | AccessModeRead);
 		ret = SPI.transfer(0);
 		digitalWrite(PIN_ETHER_CS, HIGH);
-		if(ret!=0) return 0; // ret is expected to be 0
-	} else {
+
+	if(ret!=0) { // ret is expected to be 0
+		return false;
+	}  
+		
+	eth.isW5500 = true;
+	DEBUG_PRINTLN(F("found W5500"));
+	return true;
+}
+
+bool init_ENC28J60() {
 		/* this is copied from enc28j60.cpp geterevid
 		 * check to see if the hardware revision number if expected
 		 * */
@@ -599,12 +609,22 @@ unsigned char OpenSprinkler::start_ether() {
 		#define EREVID 0x12
 		#define ECON1 0x1f
 
+	SPI.begin();
+	SPI.setBitOrder(MSBFIRST);
+	SPI.setDataMode(SPI_MODE0);
+	SPI.setFrequency(20000000); //ENC28J60 maximum SPI clock is 20MHz
+
 		// ==> setregbank(MAADRX_BANK);
 		pinMode(PIN_ETHER_CS, OUTPUT);
 		uint8_t r;
 		digitalWrite(PIN_ETHER_CS, LOW);
 		SPI.transfer(0x00 | (ECON1 & 0x1f));
 		r = SPI.transfer(0);
+	DEBUG_PRINT("ECON1=")
+	DEBUG_PRINTLN(r);
+	if (r == 2) {
+		return false;
+	}
 		digitalWrite(PIN_ETHER_CS, HIGH);
 
 		digitalWrite(PIN_ETHER_CS, LOW);
@@ -616,8 +636,28 @@ unsigned char OpenSprinkler::start_ether() {
 		digitalWrite(PIN_ETHER_CS, LOW);
 		SPI.transfer(0x00 | (EREVID & 0x1f));
 		r = SPI.transfer(0);
+	DEBUG_PRINTLN(r);
 		digitalWrite(PIN_ETHER_CS, HIGH);
-		if(r==0 || r==255) return 0; // r is expected to be a non-255 revision number
+	if(r==0 || r==255) { // r is expected to be a non-255 revision number
+		return false;
+	} 
+
+	eth.isW5500 = false;
+	DEBUG_PRINTLN(F("found ENC28J60"));
+	return true;
+}
+
+byte OpenSprinkler::start_ether() {
+#if defined(ESP8266)
+	if(hw_rev<2) return 0;  // ethernet capability is only available when hw_rev>=2
+	
+	// os 3.2 uses enc28j60 and 3.3 uses w5500
+	if (hw_rev==2) {
+		if (!init_ENC28J60() && !init_W5500(false))
+			return 0;
+	} else {
+		if (!init_W5500(true))
+			return 0;
 	}
 
 	load_hardware_mac((uint8_t*)tmp_buffer, true);
@@ -737,12 +777,11 @@ unsigned char OpenSprinkler::start_network() {
 #endif
 	if(otc.en>0 && otc.token.length()>=DEFAULT_OTC_TOKEN_LENGTH) {
 		otf = new OTF::OpenThingsFramework(port, otc.server.c_str(), otc.port, otc.token.c_str(), false, ether_buffer, ETHER_BUFFER_SIZE);
-		DEBUG_PRINT(F("Started OTF with remote connection. Local port is: "));
+		DEBUG_PRINTLN(F("Started OTF with remote connection"));
 	} else {
 		otf = new OTF::OpenThingsFramework(port, ether_buffer, ETHER_BUFFER_SIZE);
-		DEBUG_PRINT(F("Started OTF with just local connection. Local port is: "));
+		DEBUG_PRINTLN(F("Started OTF with just local connection"));
 	}
-	DEBUG_PRINTLN(port);
 
 	return 1;
 }
@@ -968,8 +1007,6 @@ pinModeExt(PIN_BUTTON_2, INPUT_PULLUP);
 pinModeExt(PIN_BUTTON_3, INPUT_PULLUP);
 #endif
 
-	// init masters_last_on array
-	memset(masters_last_on, 0, sizeof(masters_last_on));
 	// Reset all stations
 	clear_all_station_bits();
 	apply_all_station_bits();
@@ -1157,7 +1194,7 @@ void OpenSprinkler::latch_setallzonepins(unsigned char value) {
 	}
 }
 
-void OpenSprinkler::latch_disable_alloutputs_v2() {
+void OpenSprinkler::latch_disable_alloutputs_v2(unsigned char expvalue) {
 	digitalWriteExt(PIN_LATCH_COMA, LOW);
 	digitalWriteExt(PIN_LATCH_COMK, LOW);
 
@@ -1166,7 +1203,12 @@ void OpenSprinkler::latch_disable_alloutputs_v2() {
 	// latch v2 has a 74hc595 which controls all h-bridge cathode pins
 	drio->shift_out(V2_PIN_SRLAT, V2_PIN_SRCLK, V2_PIN_SRDAT, 0x00);
 
-	// todo: handle expander
+	// Handle all expansion boards
+	for(byte i=0;i<MAX_EXT_BOARDS/2;i++) {
+		if(expanders[i]->type==IOEXP_TYPE_9555) {
+			expanders[i]->i2c_write(NXP_OUTPUT_REG, expvalue?0xFFFF:0x0000);
+		}
+	}
 }
 
 /** Set one zone (for LATCH controller)
@@ -1205,8 +1247,15 @@ void OpenSprinkler::latch_setzoneoutput_v2(unsigned char sid, unsigned char A, u
 
 		drio->shift_out(V2_PIN_SRLAT, V2_PIN_SRCLK, V2_PIN_SRDAT, K ? (1<<sid) : 0);
 
-	} else { // on expander
-		// todo: handle expander
+	} else { // for expander
+		byte bid=(sid-8)>>4;
+		uint16_t s=(sid-8)&0x0F;
+		if(expanders[bid]->type==IOEXP_TYPE_9555) {
+			uint16_t reg = expanders[bid]->i2c_read(NXP_OUTPUT_REG);  // read current output reg value
+			if(A==HIGH && K==LOW) reg |= (1<<s);
+			else if(K==HIGH && A==LOW) reg &= (~(1<<s));
+			expanders[bid]->i2c_write(NXP_OUTPUT_REG, reg);
+		}
 	}
 }
 
@@ -1216,7 +1265,7 @@ void OpenSprinkler::latch_setzoneoutput_v2(unsigned char sid, unsigned char A, u
 void OpenSprinkler::latch_open(unsigned char sid) {
 	if(hw_rev>=2) {
 		DEBUG_PRINTLN(F("latch_open_v2"));
-		latch_disable_alloutputs_v2(); // disable all output pins
+		latch_disable_alloutputs_v2(HIGH); // disable all output pins; set expanders all to HIGH
 		DEBUG_PRINTLN(F("boost on voltage: "));
 		DEBUG_PRINTLN(iopts[IOPT_LATCH_ON_VOLTAGE]);
 		latch_boost(iopts[IOPT_LATCH_ON_VOLTAGE]); // generate boost voltage
@@ -1225,7 +1274,7 @@ void OpenSprinkler::latch_open(unsigned char sid) {
 		digitalWriteExt(PIN_BOOST_EN, HIGH); // enable output path
 		delay(150);
 		digitalWriteExt(PIN_BOOST_EN, LOW); // disabled output boosted voltage path
-		latch_disable_alloutputs_v2(); // disable all output pins
+		latch_disable_alloutputs_v2(HIGH); // disable all output pins; set expanders all to HIGH
 	} else {
 		latch_boost();  // boost voltage
 		latch_setallzonepins(HIGH);  // set all switches to HIGH, including COM
@@ -1241,7 +1290,7 @@ void OpenSprinkler::latch_open(unsigned char sid) {
 void OpenSprinkler::latch_close(unsigned char sid) {
 	if(hw_rev>=2) {
 		DEBUG_PRINTLN(F("latch_close_v2"));
-		latch_disable_alloutputs_v2(); // disable all output pins
+		latch_disable_alloutputs_v2(LOW); // disable all output pins; set expanders all to LOW
 		DEBUG_PRINTLN(F("boost off voltage: "));
 		DEBUG_PRINTLN(iopts[IOPT_LATCH_OFF_VOLTAGE]);
 		latch_boost(iopts[IOPT_LATCH_OFF_VOLTAGE]); // generate boost voltage
@@ -1250,7 +1299,7 @@ void OpenSprinkler::latch_close(unsigned char sid) {
 		digitalWriteExt(PIN_BOOST_EN, HIGH); // enable output path
 		delay(150);
 		digitalWriteExt(PIN_BOOST_EN, LOW); // disable output boosted voltage path
-		latch_disable_alloutputs_v2(); // disable all output pins
+		latch_disable_alloutputs_v2(HIGH); // disable all output pins; set expanders all to HIGH
 	} else {
 		latch_boost();  // boost voltage
 		latch_setallzonepins(LOW);  // set all switches to LOW, including COM
@@ -1409,7 +1458,7 @@ void OpenSprinkler::detect_binarysensor_status(time_os_t curr_time) {
 	if(iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_RAIN || iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_SOIL) {
 		if(hw_rev>=2)	pinModeExt(PIN_SENSOR1, INPUT_PULLUP); // this seems necessary for OS 3.2
 		unsigned char val = digitalReadExt(PIN_SENSOR1);
-		status.sensor1 = (val == iopts[IOPT_SENSOR1_OPTION]) ? 0 : 1;
+		status.sensor1 = status.forced_sensor1 || ((val == iopts[IOPT_SENSOR1_OPTION]) ? 0 : 1);
 		if(status.sensor1) {
 			if(!sensor1_on_timer) {
 				// add minimum of 5 seconds on delay
@@ -1439,7 +1488,7 @@ void OpenSprinkler::detect_binarysensor_status(time_os_t curr_time) {
 	if(iopts[IOPT_SENSOR2_TYPE]==SENSOR_TYPE_RAIN || iopts[IOPT_SENSOR2_TYPE]==SENSOR_TYPE_SOIL) {
 		if(hw_rev>=2)	pinModeExt(PIN_SENSOR2, INPUT_PULLUP); // this seems necessary for OS 3.2
 		unsigned char val = digitalReadExt(PIN_SENSOR2);
-		status.sensor2 = (val == iopts[IOPT_SENSOR2_OPTION]) ? 0 : 1;
+		status.sensor2 = status.forced_sensor2 || ((val == iopts[IOPT_SENSOR2_OPTION]) ? 0 : 1);
 		if(status.sensor2) {
 			if(!sensor2_on_timer) {
 				// add minimum of 5 seconds on delay
@@ -1657,6 +1706,25 @@ unsigned char OpenSprinkler::is_sequential_station(unsigned char sid) {
 	return attrib_grp[sid] != PARALLEL_GROUP_ID;
 }
 
+uint16_t OpenSprinkler::get_flow_alert_setpoint(unsigned char sid) {
+	return attrib_fas[sid];
+}
+
+void OpenSprinkler::set_flow_alert_setpoint(unsigned char sid, uint16_t value) {
+	attrib_fas[sid] = value;
+}
+
+uint16_t OpenSprinkler::get_flow_avg_value(unsigned char sid) {
+	return attrib_favg[sid];
+}
+
+void OpenSprinkler::set_flow_avg_value(unsigned char sid, uint16_t value) {
+	if (value != attrib_favg[sid]) {
+		attrib_favg[sid] = value;
+		file_write_block(STATIONS3_FILENAME, &value, (uint16_t)sid * sizeof(uint16_t), sizeof(uint16_t));
+	}
+}
+
 unsigned char OpenSprinkler::is_master_station(unsigned char sid) {
 	for (unsigned char mas = 0; mas < NUM_MASTER_ZONES; mas++) {
 		if (get_master_id(mas) && (get_master_id(mas) - 1 == sid)) {
@@ -1742,6 +1810,8 @@ void OpenSprinkler::attribs_save() {
 			}
 		}
 	}
+	file_write_block(STATIONS2_FILENAME, attrib_fas, 0, sizeof(attrib_fas));
+	file_write_block(STATIONS3_FILENAME, attrib_favg, 0, sizeof(attrib_favg));
 }
 
 /** Load all station attribs from file (backward compatibility) */
@@ -1758,6 +1828,10 @@ void OpenSprinkler::attribs_load() {
 	memset(attrib_dis, 0, nboards);
 	memset(attrib_spe, 0, nboards);
 	memset(attrib_grp, 0, MAX_NUM_STATIONS);
+	memset(attrib_fas, 0, sizeof(attrib_fas));
+	memset(attrib_favg, 0, sizeof(attrib_favg));
+	file_read_block(STATIONS2_FILENAME, attrib_fas, 0, sizeof(attrib_fas));
+	file_read_block(STATIONS3_FILENAME, attrib_favg, 0, sizeof(attrib_favg));
 
 	for(bid=0;bid<MAX_NUM_BOARDS;bid++) {
 		for(s=0;s<8;s++,sid++) {
@@ -1935,6 +2009,7 @@ int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char*
 	Client *client = NULL;
 	#if defined(ESP8266)
 		if(usessl) {
+			free_tmp_memory();
 			WiFiClientSecure *_c = new WiFiClientSecure();
 			_c->setInsecure();
   		bool mfln = _c->probeMaxFragmentLength(server, port, 512);
@@ -1944,6 +2019,7 @@ int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char*
 			} else {
 				_c->setBufferSizes(2048, 2048);
 			}
+			restore_tmp_memory();
 			client = _c;
 		} else {
 			client = new WiFiClient();
@@ -2076,7 +2152,7 @@ void OpenSprinkler::switch_remotestation(RemoteIPStationData *data, bool turnon,
 	ip[3] = ip4&0xff;
 
 	char *p = tmp_buffer;
-    BufferFiller bf = BufferFiller(p, TMP_BUFFER_SIZE*2);
+    BufferFiller bf = BufferFiller(p, TMP_BUFFER_SIZE_L);
 	// if turning on the zone and duration is defined, give duration as the timer value
 	// otherwise:
 	//   if autorefresh is defined, we give a fixed duration each time, and auto refresh will renew it periodically
@@ -2113,7 +2189,7 @@ void OpenSprinkler::switch_remotestation(RemoteOTCStationData *data, bool turnon
 	memcpy((char*)&copy, (char*)data, sizeof(RemoteOTCStationData));
 	copy.token[sizeof(copy.token)-1] = 0; // ensure the string ends properly
 	char *p = tmp_buffer;
-	BufferFiller bf = BufferFiller(p, TMP_BUFFER_SIZE*2);
+	BufferFiller bf = BufferFiller(p, TMP_BUFFER_SIZE_L);
 	// if turning on the zone and duration is defined, give duration as the timer value
 	// otherwise:
 	//   if autorefresh is defined, we give a fixed duration each time, and auto refresh will renew it periodically
@@ -2152,7 +2228,7 @@ void OpenSprinkler::switch_httpstation(HTTPStationData *data, bool turnon, bool 
 	char * cmd = turnon ? on_cmd : off_cmd;
 
 	char *p = tmp_buffer;
-	BufferFiller bf = BufferFiller(p, TMP_BUFFER_SIZE*2);
+	BufferFiller bf = BufferFiller(p, TMP_BUFFER_SIZE_L);
 
 	if(cmd==NULL || server==NULL) return; // proceed only if cmd and server are valid
 

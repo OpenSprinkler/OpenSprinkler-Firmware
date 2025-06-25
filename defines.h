@@ -29,13 +29,14 @@
 typedef unsigned long ulong;
 
 #define TMP_BUFFER_SIZE      320   // scratch buffer size
+#define TMP_BUFFER_SIZE_L      TMP_BUFFER_SIZE+100   // scratch buffer size
 
 /** Firmware version, hardware version, and maximal values */
-#define OS_FW_VERSION  221  // Firmware version: 221 means 2.2.1
+#define OS_FW_VERSION  233  // Firmware version: 220 means 2.2.0
 														// if this number is different from the one stored in non-volatile memory
 														// a device reset will be automatically triggered
 
-#define OS_FW_MINOR      1  // Firmware minor version
+#define OS_FW_MINOR      176  // Firmware minor version
 
 /** Hardware version base numbers */
 #define OS_HW_VERSION_BASE   0x00 // OpenSprinkler
@@ -52,6 +53,8 @@ typedef unsigned long ulong;
 #define IOPTS_FILENAME        "iopts.dat"   // integer options data file
 #define SOPTS_FILENAME        "sopts.dat"   // string options data file
 #define STATIONS_FILENAME     "stns.dat"    // stations data file
+#define STATIONS2_FILENAME    "stns2.dat"   // stations data file 2 - flow alert values
+#define STATIONS3_FILENAME    "stns3.dat"   // stations data file 3 - flow avg values
 #define NVCON_FILENAME        "nvcon.dat"   // non-volatile controller data file, see OpenSprinkler.h --> struct NVConData
 #define PROG_FILENAME         "prog.dat"    // program data file
 #define DONE_FILENAME         "done.dat"    // used to indicate the completion of all files
@@ -77,6 +80,9 @@ typedef unsigned long ulong;
 #define NOTIFY_RAINDELAY       0x0080
 #define NOTIFY_STATION_ON      0x0100
 #define NOTIFY_FLOW_ALERT      0x0200
+#define NOTIFY_MONITOR_LOW     0x0400
+#define NOTIFY_MONITOR_MID     0x0800
+#define NOTIFY_MONITOR_HIGH    0x1000
 
 /** HTTP request macro defines */
 #define HTTP_RQT_SUCCESS       0
@@ -140,8 +146,8 @@ typedef unsigned long ulong;
 
 /** Default string option values */
 #define DEFAULT_PASSWORD          "a6d82bced638de3def1e9bbb4983225c"  // md5 of 'opendoor'
-#define DEFAULT_LOCATION          "42.36,-71.06"  // Boston,MA
-#define DEFAULT_JAVASCRIPT_URL    "https://ui.opensprinkler.com/js"
+#define DEFAULT_LOCATION          "49.484018,8.475593"  // Mannheim,Germany
+#define DEFAULT_JAVASCRIPT_URL    "https://ui.opensprinklershop.de/js"
 #define DEFAULT_WEATHER_URL       "weather.opensprinkler.com"
 #define DEFAULT_IFTTT_URL         "maker.ifttt.com"
 #define DEFAULT_OTC_SERVER_DEV     "ws.cloud.openthings.io"
@@ -257,7 +263,7 @@ enum {
 	IOPT_FORCE_WIRED,
 	IOPT_LATCH_ON_VOLTAGE,
 	IOPT_LATCH_OFF_VOLTAGE,
-	IOPT_NOTIF2_ENABLE,
+	IOPT_NOTIF2_ENABLE, // Notification part 2
 	IOPT_RESERVE_4,
 	IOPT_RESERVE_5,
 	IOPT_RESERVE_6,
@@ -337,6 +343,7 @@ enum {
 	#define PIN_CURR_DIGITAL  24    // digital pin index for A7
 
 	#define ETHER_BUFFER_SIZE   2048
+	#define ETHER_BUFFER_SIZE_L   ETHER_BUFFER_SIZE+100
 
 	#define 	wdt_reset()   __asm__ __volatile__ ("wdr")  // watchdog timer reset
 
@@ -357,11 +364,13 @@ enum {
 	#define EXP_I2CADDR_BASE 0x24 // base of expander I2C address
 	#define LCD_I2CADDR      0x3C // 128x64 OLED display I2C address
 	#define EEPROM_I2CADDR   0x50 // 24C02 EEPROM I2C address
+	#define EEPROM_I2CADDR   0x50 // 24C02 EEPROM I2C address
 
 	#define PIN_CURR_SENSE    A0    // current sensing pin
 	#define PIN_LATCH_VOLT_SENSE A0 // latch voltage sensing pin
 	#define PIN_FREE_LIST     {} // no free GPIO pin at the moment
 	#define ETHER_BUFFER_SIZE   2048
+	#define ETHER_BUFFER_SIZE_L   ETHER_BUFFER_SIZE+100
 
 	#define PIN_ETHER_CS       16 // Ethernet CS (chip select pin) is 16 on OS 3.2 and above
 
@@ -449,6 +458,7 @@ enum {
 
 	#define PIN_FREE_LIST       {5,6,7,8,9,11,12,13,16,19,20,21,23,25,26}  // free GPIO pins
 	#define ETHER_BUFFER_SIZE   16384
+	#define ETHER_BUFFER_SIZE_L   ETHER_BUFFER_SIZE+100
 
 	#define SDA 0
 	#define SCL 0
@@ -472,6 +482,7 @@ enum {
 	#define PIN_RFTX        0
 	#define PIN_FREE_LIST  {}
 	#define ETHER_BUFFER_SIZE   16384
+	#define ETHER_BUFFER_SIZE_L   ETHER_BUFFER_SIZE+100
 
 #endif
 
@@ -506,6 +517,8 @@ enum {
 	#include <stdlib.h>
 	#include <string.h>
 	#include <stddef.h>
+	inline void itoa(int v,char *s,int b)   {sprintf(s,"%d",v);}
+	inline void ultoa(unsigned long v,char *s,int b) {sprintf(s,"%lu",v);}
 	#define pgm_read_byte(x) *(x)
 	#define PSTR(x)      x
 	#define F(x)         x

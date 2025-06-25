@@ -2,12 +2,15 @@ logs/**
 OpenSprinkler
 wtopts.txt
 *.dat
-*.sh
+*.bak
 testmode.h
 build-1284/*
 .vscode
 .pio
+influx.json
+*~
 *.o
 !build.sh
 !startOpenSprinkler.sh
 !updater.sh
+DEADJOE

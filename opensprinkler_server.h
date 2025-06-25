@@ -27,6 +27,13 @@
 #if !defined(ARDUINO)
 #include <stdarg.h>
 #include <unistd.h>
+#include <cmath>
+#else
+#include <math.h>
+#endif
+
+#if defined(ESP8266) || defined(OSPI)
+#define OTF_ENABLED
 #endif
 
 char dec2hexchar(unsigned char dec);
@@ -61,12 +68,20 @@ public:
 			c = pgm_read_byte(fmt++);
 			switch (c) {
 			case 'D':
-				// itoa(va_arg(ap, int), (char*) ptr, 10);  // ray
-				snprintf((char*) ptr, len - position(),  "%d", va_arg(ap, int));
+				//wtoa(va_arg(ap, uint16_t), (char*) ptr);
+				itoa(va_arg(ap, int), (char*) ptr, 10);  // ray
 				break;
+			case 'E': //Double
+				sprintf((char*) ptr, "%10.6lf", va_arg(ap, double));
+				break;				
 			case 'L':
-				// ultoa(va_arg(ap, uint32_t), (char*) ptr, 10);
-				snprintf((char*) ptr, len - position(), "%lu", (unsigned long) va_arg(ap, uint32_t));
+				//ltoa(va_arg(ap, long), (char*) ptr, 10);
+				//ultoa(va_arg(ap, long), (char*) ptr, 10); // ray
+				#if defined(OSPI)
+					sprintf((char*) ptr, "%" PRIu32, va_arg(ap, long));
+				#else
+					sprintf((char*) ptr, "%lu", va_arg(ap, long));
+				#endif	
 				break;
 			case 'S':
 				strcpy((char*) ptr, va_arg(ap, const char*));
@@ -100,5 +115,12 @@ public:
 	}
 };
 
+void server_influx_get_main();
+void free_tmp_memory();
+void restore_tmp_memory();
 
+char* urlDecodeAndUnescape(char *buf);
+#if defined(OTF_ENABLED)
+void start_otf();
+#endif
 #endif // _OPENSPRINKLER_SERVER_H

@@ -1,0 +1,14 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "..\\libs"
+		},
+		{
+			"path": "..\\esp8266_3.0.2\\libraries"
+		}
+	],
+	"settings": {}
+}

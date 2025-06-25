@@ -4,3 +4,6 @@
 [submodule "external/TinyWebsockets"]
 	path = external/TinyWebsockets
 	url = https://github.com/gilmaimon/TinyWebsockets.git
+[submodule "external/influxdb-cpp"]
+	path = external/influxdb-cpp
+	url = https://github.com/orca-zhang/influxdb-cpp.git
