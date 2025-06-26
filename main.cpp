@@ -672,26 +672,25 @@ void do_loop()
 	EthernetClient client = m_server->available();
 	if (client) {
 		ulong cli_timeout = now() + CLIENT_READ_TIMEOUT;
+		size_t size = 0;
 		while(client.connected() && now() < cli_timeout) {
-			size_t size = client.available();
-			if(size>0) {
-				if(size>ETHER_BUFFER_SIZE) size=ETHER_BUFFER_SIZE;
-				int len = client.read((uint8_t*) ether_buffer, size);
-				// Hack: see if we may have another packet, in case there is an overly large packet
-				// This really should be implemented more gracefully
-				size = client.available();
-				if(size>0) {
-					// There is still more data to read
-					if(size+len > ETHER_BUFFER_SIZE) size = ETHER_BUFFER_SIZE - len; // cap read size
-					len += client.read((uint8_t*) ether_buffer+len, size);
-				}
-				if(len>0) {
-					m_client = &client;
-					ether_buffer[len] = 0;  // properly end the buffer
-					handle_web_request(ether_buffer);
-					m_client = NULL;
-					break;
-				}
+			size = client.available();	// wait till we have client data available
+			if(size>0) break;
+		}
+		if(size>0) {
+			size_t len = 0;
+			while (client.available() && now()<cli_timeout) {
+				size_t read = client.readBytesUntil('\n', ether_buffer+len, min((int) (ETHER_BUFFER_SIZE - len - 1), ETHER_BUFFER_SIZE));
+				char rc = ether_buffer[len];
+				len += read;
+				ether_buffer[len++] = '\n';
+				if(read==1 && rc=='\r') { break; }
+			}
+			if(len>0) {
+				m_client = &client;
+				ether_buffer[len] = 0;  // properly end the buffer
+				handle_web_request(ether_buffer);
+				m_client = NULL;
 			}
 		}
 		client.stop();
