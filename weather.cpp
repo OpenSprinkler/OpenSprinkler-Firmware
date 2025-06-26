@@ -28,17 +28,25 @@
 #include "weather.h"
 #include "main.h"
 #include "types.h"
+#include <vector>
+#include <sstream>
+#include <string>
 
 extern OpenSprinkler os; // OpenSprinkler object
 extern char tmp_buffer[];
 extern char ether_buffer[];
+std::vector<float> scaleVector;
 char wt_rawData[TMP_BUFFER_SIZE];
+char wt_scales[TMP_BUFFER_SIZE];
+float scales[TMP_BUFFER_SIZE];
 int wt_errCode = HTTP_RQT_NOT_RECEIVED;
 unsigned char wt_monthly[12] = {100,100,100,100,100,100,100,100,100,100,100,100};
 
 extern const char *user_agent_string;
 
 unsigned char findKeyVal (const char *str,char *strbuf, uint16_t maxlen,const char *key,bool key_in_pgm=false,uint8_t *keyfound=NULL);
+
+std::vector<float> parseEToArray (const char* input);
 
 // The weather function calls getweather.py on remote server to retrieve weather data
 // the default script is WEATHER_SCRIPT_HOST/weather?.py
@@ -124,6 +132,11 @@ static void getweather_callback(char* buffer) {
 		wt_rawData[TMP_BUFFER_SIZE-1]=0;  // make sure the buffer ends properly
 	}
 
+	if (findKeyVal(p, wt_scales, TMP_BUFFER_SIZE, PSTR("scales"), true)) {
+		Serial.print(wt_scales);
+		scaleVector = parseEToArray(wt_scales);
+	}
+
 	if(save_nvdata) os.nvdata_save();
 	write_log(LOGDATA_WATERLEVEL, os.checkwt_success_lasttime);
 }
@@ -201,4 +214,23 @@ void apply_monthly_adjustment(time_os_t curr_time) {
 				os.iopts_save();
 			}
 		}
+}
+
+std::vector<float> parseEToArray (const char* input) {
+    static std::vector<float> result;
+    std::string str(input);
+
+    if (!str.empty() && str.front() == '[') str.erase(0, 1);
+    if (!str.empty() && str.back() == ']') str.pop_back();
+
+    std::stringstream ss(str);
+    std::string next;
+
+	result.clear();
+
+    while (std::getline(ss, next, ',')) {
+        result.push_back(std::stof(next));
+    }
+
+    return result;
 }

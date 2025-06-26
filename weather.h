@@ -31,11 +31,13 @@
 #define WEATHER_UPDATE_WL       0x08
 #define WEATHER_UPDATE_TZ       0x10
 #define WEATHER_UPDATE_RD       0x20
+#include <vector>
 
 void GetWeather();
 
 extern char wt_rawData[];
 extern int wt_errCode;
+extern std::vector<float> scaleVector;
 extern unsigned char wt_monthly[];
 void load_wt_monthly(char* wto);
 void apply_monthly_adjustment(time_os_t curr_time);

@@ -22,6 +22,7 @@
  */
 
 #include <limits.h>
+#include <vector>
 
 #include "types.h"
 #include "OpenSprinkler.h"
@@ -842,7 +843,16 @@ void do_loop()
 							ulong water_time = water_time_resolve(prog.durations[sid]);
 							// if the program is set to use weather scaling
 							if (prog.use_weather) {
+								//TODO: Replace these two variables with options stored by sprinkler
+								bool useHist = true;
+								unsigned int days = 2;
 								unsigned char wl = os.iopts[IOPT_WATER_PERCENTAGE];
+								
+								// If historical data is enabled, overwrite watering percentage with historical one.
+								if (useHist && ((days-1) < scaleVector.size())) {
+									wl = (unsigned char)scaleVector[days-1];
+								}
+								
 								water_time = water_time * wl / 100;
 								if (wl < 20 && water_time < 10) // if water_percentage is less than 20% and water_time is less than 10 seconds
 																								// do not water
