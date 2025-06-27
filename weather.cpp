@@ -31,11 +31,13 @@
 #include <vector>
 #include <sstream>
 #include <string>
+#include "ArduinoJson.hpp"
 
 extern OpenSprinkler os; // OpenSprinkler object
 extern char tmp_buffer[];
 extern char ether_buffer[];
 std::vector<float> scaleVector;
+unsigned int hwt;
 char wt_rawData[TMP_BUFFER_SIZE];
 char wt_scales[TMP_BUFFER_SIZE];
 float scales[TMP_BUFFER_SIZE];
@@ -47,6 +49,7 @@ extern const char *user_agent_string;
 unsigned char findKeyVal (const char *str,char *strbuf, uint16_t maxlen,const char *key,bool key_in_pgm=false,uint8_t *keyfound=NULL);
 
 std::vector<float> parseEToArray (const char* input);
+void parseHWT ();
 
 // The weather function calls getweather.py on remote server to retrieve weather data
 // the default script is WEATHER_SCRIPT_HOST/weather?.py
@@ -133,7 +136,6 @@ static void getweather_callback(char* buffer) {
 	}
 
 	if (findKeyVal(p, wt_scales, TMP_BUFFER_SIZE, PSTR("scales"), true)) {
-		Serial.print(wt_scales);
 		scaleVector = parseEToArray(wt_scales);
 	}
 
@@ -185,6 +187,8 @@ void GetWeather() {
 		if(wt_errCode < 0) wt_errCode = ret;
 		// if wt_errCode > 0, the call is successful but weather script may return error
 	}
+	// Update the hwt flag according to new weather data
+	parseHWT();
 }
 
 void load_wt_monthly(char* wto) {
@@ -233,4 +237,30 @@ std::vector<float> parseEToArray (const char* input) {
     }
 
     return result;
+}
+
+void parseHWT () {
+	char* buff = tmp_buffer+1;
+	ArduinoJson::JsonDocument doc;
+	os.sopt_load(SOPT_WEATHER_OPTS, buff);
+
+	if (buff != 0) {
+		buff = tmp_buffer;
+		buff[0] = '{';
+		int len = strlen(buff);
+		buff[len] = '}';
+		buff[len+1] = 0;
+
+		ArduinoJson::DeserializationError error = ArduinoJson::deserializeJson(doc, buff);
+
+		if (error) {
+			DEBUG_PRINT(F("hwt: deserializeJson() failed: "));
+			DEBUG_PRINTLN(error.c_str());
+		} else {
+			unsigned int h = doc["hwt"];
+			if(h){
+				hwt = h;
+			}
+		}
+	}
 }

@@ -841,16 +841,18 @@ void do_loop()
 						if (prog.durations[sid] && !(os.attrib_dis[bid]&(1<<s))) {
 							// water time is scaled by watering percentage
 							ulong water_time = water_time_resolve(prog.durations[sid]);
-							// if the program is set to use weather scaling
+							// if the interval program is set to use weather scaling
 							if (prog.use_weather) {
-								//TODO: Replace these two variables with options stored by sprinkler
-								bool useHist = true;
-								unsigned int days = 2;
 								unsigned char wl = os.iopts[IOPT_WATER_PERCENTAGE];
-								
-								// If historical data is enabled, overwrite watering percentage with historical one.
-								if (useHist && ((days-1) < scaleVector.size())) {
-									wl = (unsigned char)scaleVector[days-1];
+
+								// If historical data is enabled and interval program, overwrite watering percentage with historical one.
+								if (hwt == 100 && prog.type == PROGRAM_TYPE_INTERVAL && scaleVector.size() > 0) {
+									// Use interval length unless longer than available data
+									if ((unsigned int)prog.days[1]-1 < scaleVector.size()){
+										wl = (unsigned char)scaleVector[prog.days[1]-1];
+									} else {
+										wl = (unsigned char)scaleVector[scaleVector.size()-1];
+									}
 								}
 								
 								water_time = water_time * wl / 100;
@@ -1174,8 +1176,9 @@ void check_weather() {
 		unsigned char method = os.iopts[IOPT_USE_WEATHER];
 		if(!(method==WEATHER_METHOD_MANUAL || method==WEATHER_METHOD_AUTORAINDELY || method==WEATHER_METHOD_MONTHLY)) {
 			os.iopts[IOPT_WATER_PERCENTAGE] = 100; // reset watering percentage to 100%
-			wt_rawData[0] = 0; 		// reset wt_rawData and errCode
+			wt_rawData[0] = 0; 		// reset wt_rawData, errCode, and scaleVector
 			wt_errCode = HTTP_RQT_NOT_RECEIVED;
+			scaleVector.clear();
 		}
 	} else if (!os.checkwt_lasttime || (ntz > os.checkwt_lasttime + CHECK_WEATHER_TIMEOUT)) {
 		os.checkwt_lasttime = ntz;
