@@ -48,7 +48,7 @@ extern const char *user_agent_string;
 
 unsigned char findKeyVal (const char *str,char *strbuf, uint16_t maxlen,const char *key,bool key_in_pgm=false,uint8_t *keyfound=NULL);
 
-std::vector<float> parseEToArray (const char* input);
+std::vector<float> parseScalesArray (const char* input);
 void parseHWT ();
 
 // The weather function calls getweather.py on remote server to retrieve weather data
@@ -136,7 +136,7 @@ static void getweather_callback(char* buffer) {
 	}
 
 	if (findKeyVal(p, wt_scales, TMP_BUFFER_SIZE, PSTR("scales"), true)) {
-		scaleVector = parseEToArray(wt_scales);
+		scaleVector = parseScalesArray(wt_scales);
 	}
 
 	if(save_nvdata) os.nvdata_save();
@@ -220,7 +220,7 @@ void apply_monthly_adjustment(time_os_t curr_time) {
 		}
 }
 
-std::vector<float> parseEToArray (const char* input) {
+std::vector<float> parseScalesArray (const char* input) {
     static std::vector<float> result;
     std::string str(input);
 
