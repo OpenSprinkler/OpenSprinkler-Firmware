@@ -1105,9 +1105,9 @@ pinModeExt(PIN_BUTTON_3, INPUT_PULLUP);
 
 	// set button pins
 	// enable internal pullup
-	pinMode(PIN_BUTTON_1, INPUT_PULLUP);
-	pinMode(PIN_BUTTON_2, INPUT_PULLUP);
-	pinMode(PIN_BUTTON_3, INPUT_PULLUP);
+	pinModeExt(PIN_BUTTON_1, INPUT_PULLUP);
+	pinModeExt(PIN_BUTTON_2, INPUT_PULLUP);
+	pinModeExt(PIN_BUTTON_3, INPUT_PULLUP);
 
 	// detect and check RTC type
 	RTC.detect();
