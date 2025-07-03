@@ -1826,8 +1826,8 @@ static void perform_ntp_sync() {
 
 #if !defined(ARDUINO) // main function for RPI/LINUX
 int main(int argc, char *argv[]) {
-    // Disable buffering to work with systemctl journal
-    setvbuf(stdout, NULL, _IOLBF, 0);
+	// Disable buffering to work with systemctl journal
+	setvbuf(stdout, NULL, _IOLBF, 0);
 	printf("Starting OpenSprinkler\n");
 
 	int opt;

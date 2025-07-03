@@ -460,9 +460,9 @@ static const char days_str[] PROGMEM =
 
 #if !defined(ARDUINO)
 static inline int32_t now() {
-    time_t rawtime;
-    time(&rawtime);
-    return rawtime;
+	time_t rawtime;
+	time(&rawtime);
+	return rawtime;
 }
 #endif
 /** Calculate local time (UTC time plus time zone offset) */
@@ -561,7 +561,7 @@ unsigned char OpenSprinkler::start_ether() {
 	SPI.begin();
 	SPI.setBitOrder(MSBFIRST);
 	SPI.setDataMode(SPI_MODE0);
-	SPI.setFrequency(10000000L); // set 10MHz SPI frequency
+	SPI.setFrequency(ETHER_SPI_CLOCK); // set SPI frequency
 
 	if(eth.isW5500) {
 		DEBUG_PRINTLN(F("detect existence of W5500"));
@@ -1128,16 +1128,16 @@ void OpenSprinkler::latch_boost(unsigned char volt) {
 		delay((int)iopts[IOPT_BOOST_TIME]<<2); // wait for booster to charge
 		digitalWriteExt(PIN_BOOST, LOW);       // disable boost converter
 	} else {
-    // boost to specified volt, up to time specified by BOOST_TIME
-    uint16_t top = (uint16_t)(volt * 19.25f); // ADC = 1024 * volt * 1.5k / 79.8k
+		// boost to specified volt, up to time specified by BOOST_TIME
+		uint16_t top = (uint16_t)(volt * 19.25f); // ADC = 1024 * volt * 1.5k / 79.8k
 		if(analogRead(PIN_CURR_SENSE)>=top) return; // if the voltage has already reached top, return right away
-    uint32_t boost_timeout = millis() + (iopts[IOPT_BOOST_TIME]<<2);
-    digitalWriteExt(PIN_BOOST, HIGH);
-    // boost until either top voltage is reached or boost timeout is reached
-    while(millis()<boost_timeout && analogRead(PIN_CURR_SENSE)<top) {
-      delay(5);
-    }
-    digitalWriteExt(PIN_BOOST, LOW);
+		uint32_t boost_timeout = millis() + (iopts[IOPT_BOOST_TIME]<<2);
+		digitalWriteExt(PIN_BOOST, HIGH);
+		// boost until either top voltage is reached or boost timeout is reached
+		while(millis()<boost_timeout && analogRead(PIN_CURR_SENSE)<top) {
+			delay(5);
+		}
+		digitalWriteExt(PIN_BOOST, LOW);
 	}
 }
 
@@ -2080,7 +2080,7 @@ void OpenSprinkler::switch_remotestation(RemoteIPStationData *data, bool turnon,
 	ip[3] = ip4&0xff;
 
 	char *p = tmp_buffer;
-    BufferFiller bf = BufferFiller(p, TMP_BUFFER_SIZE*2);
+	BufferFiller bf = BufferFiller(p, TMP_BUFFER_SIZE*2);
 	// if turning on the zone and duration is defined, give duration as the timer value
 	// otherwise:
 	//   if autorefresh is defined, we give a fixed duration each time, and auto refresh will renew it periodically
@@ -2100,7 +2100,7 @@ void OpenSprinkler::switch_remotestation(RemoteIPStationData *data, bool turnon,
 	bf.emit_p(PSTR(" HTTP/1.0\r\nHOST: $D.$D.$D.$D\r\n"),
 						ip[0],ip[1],ip[2],ip[3]);
 
-    bf.emit_p(PSTR(" User-Agent: $S\r\n\r\n"), user_agent_string);
+	bf.emit_p(PSTR(" User-Agent: $S\r\n\r\n"), user_agent_string);
 
 	char server[20];
 	snprintf(server, 20, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
@@ -2139,9 +2139,9 @@ void OpenSprinkler::switch_remotestation(RemoteOTCStationData *data, bool turnon
 						turnon, timer);
 	bf.emit_p(PSTR(" HTTP/1.0\r\nHOST: $S\r\nConnection:close\r\n"), DEFAULT_OTC_SERVER_APP);
 
-    bf.emit_p(PSTR(" User-Agent: $S\r\n\r\n"), user_agent_string);
+	bf.emit_p(PSTR(" User-Agent: $S\r\n\r\n"), user_agent_string);
 
-	int x = send_http_request(DEFAULT_OTC_SERVER_APP, DEFAULT_OTC_PORT_APP, p, remote_http_callback, true);
+	send_http_request(DEFAULT_OTC_SERVER_APP, DEFAULT_OTC_PORT_APP, p, remote_http_callback, true);
 }
 
 /** Switch http(s) station
@@ -2165,7 +2165,7 @@ void OpenSprinkler::switch_httpstation(HTTPStationData *data, bool turnon, bool 
 	if(cmd==NULL || server==NULL) return; // proceed only if cmd and server are valid
 
 	bf.emit_p(PSTR("GET /$S HTTP/1.0\r\nHOST: $S\r\n"), cmd, server);
-    bf.emit_p(PSTR(" User-Agent: $S\r\n\r\n"), user_agent_string);
+	bf.emit_p(PSTR(" User-Agent: $S\r\n\r\n"), user_agent_string);
 
 	send_http_request(server, atoi(port), p, remote_http_callback, usessl);
 }
@@ -2668,15 +2668,15 @@ void OpenSprinkler::lcd_print_mac(const unsigned char *mac) {
 		lcd.print((mac[i]&0x0F), HEX);
 		if(i==4) lcd.setCursor(0, 1);
 	}
-    #if defined(ARDUINO)
+	#if defined(ARDUINO)
 	if(useEth) {
 		lcd_print_pgm(PSTR(" (Ether MAC)"));
 	} else {
 		lcd_print_pgm(PSTR(" (WiFi MAC)"));
 	}
-    #else
-        lcd_print_pgm(PSTR(" (MAC)"));
-    #endif
+	#else
+		lcd_print_pgm(PSTR(" (MAC)"));
+	#endif
 
 	#if defined(USE_SSD1306)
 		lcd.display();
@@ -2768,18 +2768,19 @@ void OpenSprinkler::lcd_print_screen(char c) {
 	if(useEth) {
 		lcd.write(eth.connected()?ICON_ETHER_CONNECTED:ICON_ETHER_DISCONNECTED);
 	}
-	else
+	else {
 		lcd.write(WiFi.status()==WL_CONNECTED?ICON_WIFI_CONNECTED:ICON_WIFI_DISCONNECTED);
+	}
 #else
 	lcd.write(status.network_fails>2?ICON_ETHER_DISCONNECTED:ICON_ETHER_CONNECTED);  // if network failure detection is more than 2, display disconnect icon
 #endif
 
 #if defined(USE_SSD1306)
-    #if defined(ESP8266)
-    if(useEth || (get_wifi_mode()==WIFI_MODE_STA && WiFi.status()==WL_CONNECTED && WiFi.localIP())) {
-    #else
-    {
-    #endif
+	#if defined(ESP8266)
+	if(useEth || (get_wifi_mode()==WIFI_MODE_STA && WiFi.status()==WL_CONNECTED && WiFi.localIP())) {
+	#else
+	{
+	#endif
 		lcd.setCursor(0, -1);
 		if(status.rain_delayed) {
 			lcd.print(F("<Rain Delay On> "));
@@ -2791,16 +2792,16 @@ void OpenSprinkler::lcd_print_screen(char c) {
 			lcd.print(F(" (System Idle)  "));
 		}
 
-    #if defined(ESP8266)
+	#if defined(ESP8266)
 		lcd.setCursor(2, 2);
 		if(status.program_busy && !status.pause_state) {
 			//lcd.print(F("Curr: "));
 			lcd.print(read_current());
 			lcd.print(F(" mA      "));
 		} else {
-    #else
-        {
-    #endif
+	#else
+		{
+	#endif
 			lcd.clear(2, 2);
 		}
 	}
