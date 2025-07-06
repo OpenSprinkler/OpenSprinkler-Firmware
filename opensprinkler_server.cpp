@@ -28,6 +28,8 @@
 #include "weather.h"
 #include "mqtt.h"
 #include "main.h"
+#include "sensors.h"
+#include "osinfluxdb.h"
 
 // External variables defined in main ion file
 #if defined(USE_OTF)
@@ -206,9 +208,19 @@ unsigned char findKeyVal (const char *str,char *strbuf, uint16_t maxlen,const ch
 }
 
 void rewind_ether_buffer() {
-	bfill = BufferFiller(ether_buffer, ETHER_BUFFER_SIZE*2);
+    bfill = BufferFiller(ether_buffer, ETHER_BUFFER_SIZE_L);
 	ether_buffer[0] = 0;
 }
+
+#if defined(USE_OTF)
+boolean buffer_available() {
+	return bfill.position() < RESPONSE_BUFFER_SIZE/2 && available_ether_buffer() > 0;
+}
+#else
+boolean buffer_available() {
+	return available_ether_buffer() > 0;
+}
+#endif
 
 void send_packet(OTF_PARAMS_DEF) {
 #if defined(USE_OTF)
@@ -216,6 +228,7 @@ void send_packet(OTF_PARAMS_DEF) {
 #else
 	m_client->write((const uint8_t *)ether_buffer, strlen(ether_buffer));
 #endif
+
 	rewind_ether_buffer();
 }
 
@@ -237,6 +250,24 @@ void print_header(OTF_PARAMS_DEF, bool isJson=true, int len=0) {
 #else
 void print_header(bool isJson=true)  {
 	bfill.emit_p(PSTR("$F$F$F$F\r\n"), html200OK, isJson?htmlContentJSON:htmlContentHTML, htmlAccessControl, htmlNoCache);
+}
+#endif
+
+#if defined(USE_OTF)
+void print_header_download(OTF_PARAMS_DEF, int len=0) {
+	res.writeStatus(200, F("OK"));
+	res.writeHeader(F("Content-Type"), F("text/plain"));
+	res.writeHeader(F("Content-Disposition"), F("attachment; filename=\"log.csv\";"));
+	if(
+	len>0)
+		res.writeHeader(F("Content-Length"), len);
+	res.writeHeader(F("Access-Control-Allow-Origin"), F("*"));
+	res.writeHeader(F("Cache-Control"), F("max-age=0, no-cache, no-store, must-revalidate"));
+	res.writeHeader(F("Connection"), F("close"));
+}
+#else
+void print_header_download()  {
+	bfill.emit_p(PSTR("$F$F$F$F$F\r\n"), html200OK, "Content-Type: text/plain", "Content-Disposition: attachment; filename=\"log.txt\";", htmlAccessControl, htmlNoCache);
 }
 #endif
 
@@ -270,6 +301,7 @@ void otf_send_result(OTF_PARAMS_DEF, unsigned char code, const char *item = NULL
 	print_header(OTF_PARAMS, true, json.length());
 	res.writeBodyChunk((char *)"%s",json.c_str());
 }
+#endif
 
 #if defined(ESP8266)
 void update_server_send_result(unsigned char code, const char* item = NULL) {
@@ -366,8 +398,6 @@ void on_ap_try_connect(OTF_PARAMS_DEF) {
 	}
 }
 #endif
-#endif
-
 
 /** Check and verify password */
 #if defined(USE_OTF)
@@ -436,6 +466,20 @@ void server_json_stations_attrib(const char* name, unsigned char *attrib)
 	bfill.emit_p(PSTR("],"));
 }
 
+void server_json_stations_attrib16(const char* name, uint16_t *attrib)
+{
+	bfill.emit_p(PSTR("\"$F\":["), name);
+	for(unsigned char bid=0;bid<os.nboards;bid++) {
+		for (unsigned char s = 0; s < 8; s++) {
+			bfill.emit_p(PSTR("$D"), attrib[bid * 8 + s]);
+			if(bid != os.nboards-1 || s < 7) {
+				bfill.emit_p(PSTR(","));
+			}
+		}
+	}
+	bfill.emit_p(PSTR("],"));
+}
+
 void server_json_stations_main(OTF_PARAMS_DEF) {
 	server_json_board_attrib(PSTR("masop"), os.attrib_mas);
 	server_json_board_attrib(PSTR("masop2"), os.attrib_mas2);
@@ -445,6 +489,8 @@ void server_json_stations_main(OTF_PARAMS_DEF) {
 	server_json_board_attrib(PSTR("stn_dis"), os.attrib_dis);
 	server_json_board_attrib(PSTR("stn_spe"), os.attrib_spe);
 	server_json_stations_attrib(PSTR("stn_grp"), os.attrib_grp);
+	server_json_stations_attrib16(PSTR("stn_fas"), os.attrib_fas);
+	server_json_stations_attrib16(PSTR("stn_favg"), os.attrib_favg);
 
 	bfill.emit_p(PSTR("\"snames\":["));
 	unsigned char sid;
@@ -453,7 +499,7 @@ void server_json_stations_main(OTF_PARAMS_DEF) {
 		bfill.emit_p(PSTR("\"$S\""), tmp_buffer);
 		if(sid!=os.nstations-1)
 			bfill.emit_p(PSTR(","));
-		if (available_ether_buffer() <=0 ) {
+		if (!buffer_available() ) {
 			send_packet(OTF_PARAMS);
 		}
 	}
@@ -498,7 +544,7 @@ void server_json_station_special(OTF_PARAMS_DEF) {
 			else {comma=1;}
 			bfill.emit_p(PSTR("\"$D\":{\"st\":$D,\"sd\":\"$S\"}"), sid, data->type, data->sped);
 		}
-		if (available_ether_buffer() <=0 ) {
+		if (!buffer_available() ) {
 			send_packet(OTF_PARAMS);
 		}
 	}
@@ -543,6 +589,26 @@ void server_change_stations_attrib(char *p, char header, unsigned char *attrib)
 	}
 }
 
+#if defined(USE_OTF)
+void server_change_stations_attrib16(const OTF::Request &req, char header, uint16_t *attrib)
+#else
+void server_change_stations_attrib16(char *p, char header, uint16_t *attrib)
+#endif
+{
+	char tbuf2[6] = {0, 0, 0, 0, 0, 0};
+	unsigned char bid, s, sid;
+	tbuf2[0]=header;
+	for(bid=0;bid<os.nboards;bid++) {
+		for(s=0;s<8;s++) {
+			sid=bid*8+s;
+			snprintf(tbuf2+1, 3, "%d", sid);
+			if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, tbuf2)) {
+				attrib[sid] = atoi(tmp_buffer);
+			}
+		}
+	}
+}
+
 /**Change Station Name and Attributes
  * Command: /cs?pw=xxx&s?=x&m?=x&i?=x&n?=x&d?=x
  *
@@ -555,6 +621,7 @@ void server_change_stations_attrib(char *p, char header, unsigned char *attrib)
  * q?: station sequential bit field
  * p?: station special flag bit field
  * g?: sequential group id
+ * f?: flow alert setpoint value
  */
 void server_change_stations(OTF_PARAMS_DEF) {
 #if defined(USE_OTF)
@@ -584,12 +651,14 @@ void server_change_stations(OTF_PARAMS_DEF) {
 	server_change_board_attrib(FKV_SOURCE, 'n', os.attrib_mas2); // master2
 	server_change_board_attrib(FKV_SOURCE, 'd', os.attrib_dis); // disable
 	server_change_stations_attrib(FKV_SOURCE, 'g', os.attrib_grp); // sequential groups
+	server_change_stations_attrib16(FKV_SOURCE, 'f', os.attrib_fas); // flow alert setpoint
+	server_change_stations_attrib16(FKV_SOURCE, 'a', os.attrib_favg); // flow avg values
 	/* handle special data */
 	if(findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("sid"), true)) {
 		sid = atoi(tmp_buffer);
 		if(sid<0 || sid>os.nstations) handle_return(HTML_DATA_OUTOFBOUND);
 		if(findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("st"), true) &&
-			 findKeyVal(FKV_SOURCE, tmp_buffer+1, TMP_BUFFER_SIZE-1, PSTR("sd"), true)) {
+			findKeyVal(FKV_SOURCE, tmp_buffer+1, TMP_BUFFER_SIZE-1, PSTR("sd"), true)) {
 
 			tmp_buffer[0]-='0';
 			tmp_buffer[STATION_SPECIAL_DATA_SIZE] = 0;
@@ -761,7 +830,7 @@ void server_change_runonce(OTF_PARAMS_DEF) {
 			prog.days[0] = (epoch_t >> 8) & 0b11111111; //one interval past current day in epoch time
 			prog.days[1] = epoch_t & 0b11111111; //one interval past current day in epoch time
 			prog.starttimes[0] = curr_time % 1440; //one interval past current time
-			strcpy_P(prog.name, PSTR("Run-Once with repeat"));
+			strcpy_P(prog.name, "Run Once (Repeat)"); //TODO: Change name
 
 			//if no more repeats, remove interval to flag for deletion
 			if(prog.starttimes[1] == 0){
@@ -1053,8 +1122,8 @@ void server_json_options_main() {
 		}
 		#endif
 #else
-		// for Linux-based platforms, we can't adjust contrast or backlight
-		if(oid==IOPT_LCD_CONTRAST || oid==IOPT_LCD_BACKLIGHT) continue;
+		// for Linux-based platforms, there is no LCD currently
+		if(oid==IOPT_LCD_CONTRAST || oid==IOPT_LCD_BACKLIGHT || oid==IOPT_LCD_DIMMING) continue;
 #endif
 
 		// each json name takes 5 characters
@@ -1063,6 +1132,9 @@ void server_json_options_main() {
 		if(oid!=NUM_IOPTS-1)
 			bfill.emit_p(PSTR(","));
 	}
+
+	//feature flag Analog Sensor API
+	bfill.emit_p(PSTR(",\"feature\":\"ASB\""));
 
 	bfill.emit_p(PSTR(",\"dexp\":$D,\"mexp\":$D,\"hwt\":$D,"), os.detect_exp(), MAX_EXT_BOARDS, os.hw_type);
 	// print master array
@@ -1123,7 +1195,7 @@ void server_json_programs_main(OTF_PARAMS_DEF) {
 		}
 		// push out a packet if available
 		// buffer size is getting small
-		if (available_ether_buffer() <= 0) {
+		if (!buffer_available()) {
 			send_packet(OTF_PARAMS);
 		}
 	}
@@ -1209,16 +1281,27 @@ void server_json_controller_main(OTF_PARAMS_DEF) {
 #else
 	os.load_hardware_mac(mac, true);
 #endif
+	char mqtt_opt[MAX_SOPTS_SIZE];
+	os.sopt_load(SOPT_MQTT_OPTS, mqtt_opt);
+	//DEBUG_PRINTLN(mqtt_opt);
+
+	//Test for invalid mqtt options:
+	int l = strlen(mqtt_opt);
+	if (l > 0 && mqtt_opt[l-1] != '"') { //first+last char
+		mqtt_opt[l] = '"';
+		mqtt_opt[l+1] = 0;
+	}
+	//DEBUG_PRINTLN(mqtt_opt);
 
 	bfill.emit_p(PSTR("\"mac\":\"$X:$X:$X:$X:$X:$X\","), mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 
-	bfill.emit_p(PSTR("\"loc\":\"$O\",\"jsp\":\"$O\",\"wsp\":\"$O\",\"wto\":{$O},\"ifkey\":\"$O\",\"mqtt\":{$O},\"wtdata\":$S,\"wterr\":$D,\"dname\":\"$O\","),
+	bfill.emit_p(PSTR("\"loc\":\"$O\",\"jsp\":\"$O\",\"wsp\":\"$O\",\"wto\":{$O},\"ifkey\":\"$O\",\"mqtt\":{$S},\"wtdata\":$S,\"wterr\":$D,\"dname\":\"$O\","),
 							 SOPT_LOCATION,
 							 SOPT_JAVASCRIPTURL,
 							 SOPT_WEATHERURL,
 							 SOPT_WEATHER_OPTS,
 							 SOPT_IFTTT_KEY,
-							 SOPT_MQTT_OPTS,
+							 mqtt_opt,
 							 strlen(wt_rawData)==0?"{}":wt_rawData,
 							 wt_errCode,
 							 SOPT_DEVICE_NAME);
@@ -1247,7 +1330,7 @@ void server_json_controller_main(OTF_PARAMS_DEF) {
 	for(sid=0;sid<os.nstations;sid++) {
 		// if available ether buffer is getting small
 		// send out a packet
-		if(available_ether_buffer() <= 0) {
+		if(!buffer_available()) {
 			send_packet(OTF_PARAMS);
 		}
 		unsigned long rem = 0;
@@ -1273,6 +1356,15 @@ void server_json_controller_main(OTF_PARAMS_DEF) {
 		}
 	}
 	bfill.emit_p(PSTR("]"));
+
+	//influxdb
+	if(!buffer_available()) {
+		send_packet(OTF_PARAMS);
+	}
+	bfill.emit_p(PSTR(",\"influxdb\":"));
+	server_influx_get_main();
+	//end influxdb
+
 
 	bfill.emit_p(PSTR("}"));
 }
@@ -1497,6 +1589,11 @@ void server_change_options(OTF_PARAMS_DEF)
 			if(oid==IOPT_BOOST_TIME) {
 				 v>>=2;
 			}
+			if (oid==IOPT_NOTIF_ENABLE) {
+				set_notif_enabled(v);
+				continue;
+			}
+
 			if (v>=0 && v<=max_value) {
 				os.iopts[oid] = v;
 			} else {
@@ -1563,6 +1660,8 @@ void server_change_options(OTF_PARAMS_DEF)
 		#if !defined(USE_OTF)
 		urlDecode(tmp_buffer);
 		#endif
+		DEBUG_PRINTLN("MQTT:");
+		DEBUG_PRINTLN(tmp_buffer);
 		os.sopt_save(SOPT_MQTT_OPTS, tmp_buffer);
 		os.status.req_mqtt_restart = true;
 	} else if (keyfound) {
@@ -1570,6 +1669,19 @@ void server_change_options(OTF_PARAMS_DEF)
 		os.sopt_save(SOPT_MQTT_OPTS, tmp_buffer);
 		os.status.req_mqtt_restart = true;
 	}
+
+	//influxdb set
+	keyfound = 0;
+	if(findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("influxdb"), true, &keyfound)) {
+		#if !defined(USE_OTF)
+		urlDecode(tmp_buffer);
+		#endif
+		os.influxdb.set_influx_config(tmp_buffer);
+	} else if (keyfound) {
+		tmp_buffer[0]=0;
+		os.influxdb.set_influx_config(tmp_buffer);
+	}
+	//end influxdb set
 
 	keyfound = 0;
 	if(findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("email"), true, &keyfound)) {
@@ -1734,12 +1846,12 @@ void server_change_manual(OTF_PARAMS_DEF) {
 			RuntimeQueueStruct *q = NULL;
 			unsigned char sqi = pd.station_qid[sid];
 			// check if the station already has a schedule
-			if (sqi!=0xFF) { // if so, do nothing
-
+			if (sqi!=0xFF) {  // if so, we will overwrite the schedule
+				q = pd.queue+sqi;
 			} else {  // otherwise create a new queue element
 				q = pd.enqueue();
 			}
-			// if the queue is not full (and the station doesn't already have a schedule
+			// if the queue is not full
 			if (q) {
 				q->st = 0;
 				q->dur = timer;
@@ -1843,7 +1955,7 @@ void server_json_log(OTF_PARAMS_DEF) {
 
 	bool comma = 0;
 	for(unsigned int i=start;i<=end;i++) {
-		snprintf(tmp_buffer, TMP_BUFFER_SIZE*2 , "%d", i);
+		snprintf(tmp_buffer, TMP_BUFFER_SIZE_L , "%d", i);
 		make_logfile_name(tmp_buffer);
 
 #if defined(ESP8266)
@@ -1907,7 +2019,7 @@ void server_json_log(OTF_PARAMS_DEF) {
 			bfill.emit_p(PSTR("$S"), tmp_buffer);
 			// if the available ether buffer size is getting small
 			// push out a packet
-			if (available_ether_buffer() <= 0) {
+			if (!buffer_available()) {
 				send_packet(OTF_PARAMS);
 			}
 		}
@@ -2074,7 +2186,7 @@ void server_fill_files(OTF_PARAMS_DEF) {
 	ether_buffer[75] = 0;
 	FSInfo fs_info;
 	for(int index=1;index<64;index++) {
-		snprintf(tmp_buffer, TMP_BUFFER_SIZE*2 , "%d", index);
+		snprintf(tmp_buffer, TMP_BUFFER_SIZE_L , "%d", index);
 		make_logfile_name(tmp_buffer);
 		DEBUG_PRINT(F("creating "));
 		DEBUG_PRINT(tmp_buffer);
@@ -2088,6 +2200,1786 @@ void server_fill_files(OTF_PARAMS_DEF) {
 	handle_return(HTML_SUCCESS);
 }
 */
+
+char* urlDecodeAndUnescape(char *buf) {
+	#if !defined(USE_OTF)
+	urlDecode(buf);
+	#endif
+	strReplace(buf, '\"', '\'');
+	strReplace(buf, '\\', '/');
+	return buf;
+}
+
+/**
+ * si
+ * Sensor config User Defined
+ * {"nr":1,"fac":100,"div":1,"unit":"bar"}
+ */
+void server_sensor_config_userdef(OTF_PARAMS_DEF)
+{
+#if defined(USE_OTF)
+	if(!process_password(OTF_PARAMS)) return;
+#else
+	char *p = get_buffer;
+#endif
+
+	DEBUG_PRINTLN(F("server_sensor_config userdef"));
+
+	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("nr"), true))
+		handle_return(HTML_DATA_MISSING);
+	uint nr = strtoul(tmp_buffer, NULL, 0); // Sensor nr
+	if (nr == 0) handle_return(HTML_DATA_MISSING);
+
+	int16_t factor = 0;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("fac"), true))
+		factor = strtol(tmp_buffer, NULL, 0); // factor
+
+	int16_t divider = 0;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("div"), true))
+		divider = strtol(tmp_buffer, NULL, 0); // divider
+
+	char userdef_unit[8];
+	memset(userdef_unit, 0, sizeof(userdef_unit));
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("unit"), true)) {
+		strncpy(userdef_unit, urlDecodeAndUnescape(tmp_buffer), sizeof(userdef_unit)-1); // unit
+	}
+	int16_t assigned_unitid = -1;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("unitid"), true))
+		assigned_unitid = strtol(tmp_buffer, NULL, 0); // divider
+
+	int16_t offset_mv = 0;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("offset"), true))
+		offset_mv = strtol(tmp_buffer, NULL, 0); // offset in millivolt
+	int16_t offset2 = 0;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("offset2"), true))
+		offset2 = strtol(tmp_buffer, NULL, 0); // offset unit value
+
+	int ret = sensor_define_userdef(nr, factor, divider, userdef_unit, offset_mv, offset2, assigned_unitid);
+	ret = ret == HTTP_RQT_SUCCESS?HTML_SUCCESS:HTML_DATA_MISSING;
+	handle_return(ret);
+}
+
+/**
+ * sj
+ * get sensorurl
+ * {"nr":1,"type":1}
+ * return { "value": "text"}
+ */
+void server_sensorurl_get(OTF_PARAMS_DEF)
+{
+#if defined(USE_OTF)
+	if(!process_password(OTF_PARAMS)) return;
+#else
+	char *p = get_buffer;
+#endif
+	DEBUG_PRINTLN(F("sensorUrl_get"));
+
+	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("nr"), true))
+		handle_return(HTML_DATA_MISSING);
+	uint nr = strtoul(tmp_buffer, NULL, 0); // Sensor nr
+	if (nr == 0) handle_return(HTML_DATA_MISSING);
+
+	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("type"), true))
+		handle_return(HTML_DATA_MISSING);
+	uint type = strtoul(tmp_buffer, NULL, 0); // Sensor type
+
+	char *value = SensorUrl_get(nr, type);
+	bfill.emit_p(PSTR("{\"value\":\"$S\"}"), value?value:"");
+	handle_return(HTML_OK);
+}
+
+/**
+ * sk
+ * MQTT and other URL configuration
+ * type = 0 URL, 1=MQTT Subscription, 2=JSON Filter
+ * {"nr":1,"type":1,"value":abc}
+ */
+void server_sensorurl_config(OTF_PARAMS_DEF)
+{
+#if defined(USE_OTF)
+	if(!process_password(OTF_PARAMS)) return;
+#else
+	char *p = get_buffer;
+#endif
+	DEBUG_PRINTLN(F("serverUrl_config"));
+
+	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("nr"), true))
+		handle_return(HTML_DATA_MISSING);
+	uint nr = strtoul(tmp_buffer, NULL, 0); // Sensor nr
+	if (nr == 0) handle_return(HTML_DATA_MISSING);
+
+	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("type"), true))
+		handle_return(HTML_DATA_MISSING);
+	uint type = strtoul(tmp_buffer, NULL, 0); // Sensor type
+
+	char *value = NULL;
+	uint8_t value_found = 0;
+	findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("value"), true, &value_found);
+	if (!value_found)
+		handle_return(HTML_DATA_MISSING);
+	DEBUG_PRINTLN(tmp_buffer);
+	urlDecodeAndUnescape(tmp_buffer);
+	DEBUG_PRINTLN(tmp_buffer);
+	value = strdup(tmp_buffer);
+
+	bool ok = SensorUrl_add(nr, type, value);
+	free(value);
+	handle_return(ok?HTML_SUCCESS:HTML_DATA_MISSING);
+}
+
+/**
+ * sc
+ * Sensor config
+ * {"nr":1,"type":1,"group":0,"name":"myname","ip":123456789,"port":3000,"id":1,"ri":1000,"enable":1,"log":1}
+ */
+void server_sensor_config(OTF_PARAMS_DEF)
+{
+#if defined(USE_OTF)
+	if(!process_password(OTF_PARAMS)) return;
+#else
+	char *p = get_buffer;
+#endif
+
+	DEBUG_PRINTLN(F("server_sensor_config"));
+
+	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("nr"), true))
+		handle_return(HTML_DATA_MISSING);
+	uint nr = strtoul(tmp_buffer, NULL, 0); // Sensor nr
+	if (nr == 0) handle_return(HTML_DATA_MISSING);
+
+	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("type"), true))
+		handle_return(HTML_DATA_MISSING);
+	uint type = strtoul(tmp_buffer, NULL, 0); // Sensor type
+
+	if (type == 0) {
+		sensor_delete(nr);
+		handle_return(HTML_SUCCESS);
+	}
+
+	DEBUG_PRINTLN(F("server_sensor_config2"));
+
+	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("group"), true))
+		handle_return(HTML_DATA_MISSING);
+	uint group = strtoul(tmp_buffer, NULL, 0); // Sensor group
+
+	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("name"), true))
+		handle_return(HTML_DATA_MISSING);
+	char name[30];
+	strncpy(name, urlDecodeAndUnescape(tmp_buffer), sizeof(name)-1); // Sensor name
+
+	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("ip"), true))
+		handle_return(HTML_DATA_MISSING);
+	uint32_t ip = strtoul(tmp_buffer, NULL, 0); // Sensor ip
+
+	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("port"), true))
+		handle_return(HTML_DATA_MISSING);
+	uint port = strtoul(tmp_buffer, NULL, 0); // Sensor port
+
+	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("id"), true))
+		handle_return(HTML_DATA_MISSING);
+	uint id = strtoul(tmp_buffer, NULL, 0); // Sensor modbus id
+
+	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("ri"), true))
+		handle_return(HTML_DATA_MISSING);
+	uint ri = strtoul(tmp_buffer, NULL, 0); // Read Interval (s)
+
+	int16_t factor = 0;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("fac"), true))
+		factor = strtol(tmp_buffer, NULL, 0); // factor
+
+	int16_t divider = 0;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("div"), true))
+		divider = strtol(tmp_buffer, NULL, 0); // divider
+
+	DEBUG_PRINTLN(F("server_sensor_config3"));
+
+	char userdef_unit[8];
+	memset(userdef_unit, 0, sizeof(userdef_unit));
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("unit"), true)) {
+		DEBUG_PRINTLN(tmp_buffer)
+		urlDecodeAndUnescape(tmp_buffer);
+		DEBUG_PRINTLN(tmp_buffer)
+		strncpy(userdef_unit, tmp_buffer, sizeof(userdef_unit)-1); // unit
+	}
+	int16_t assigned_unitid = -1;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("unitid"), true))
+		assigned_unitid = strtol(tmp_buffer, NULL, 0); // divider
+
+	int16_t offset_mv = 0;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("offset"), true))
+		offset_mv = strtol(tmp_buffer, NULL, 0); // offset in millivolt
+
+	int16_t offset2 = 0;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("offset2"), true))
+		offset2 = strtol(tmp_buffer, NULL, 0); // offset2
+
+	uint enable = 1;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("enable"), true))
+		enable = strtoul(tmp_buffer, NULL, 0); // 1=enable/0=disable
+
+	uint log = 1;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("log"), true))
+		log = strtoul(tmp_buffer, NULL, 0); // 1=logging enabled/0=logging disabled
+
+	uint show = 0;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("show"), true))
+		show = strtoul(tmp_buffer, NULL, 0); // 1=show enabled/0=show disabled
+	
+	//mqtt and other:
+	char* url = NULL;
+	uint8_t url_found = 0;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("url"), true, &url_found))
+		url = strdup(urlDecodeAndUnescape(tmp_buffer));
+	char* topic = NULL;
+	uint8_t topic_found = 0;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("topic"), true, &topic_found)) {
+		DEBUG_PRINTLN(tmp_buffer)
+		urlDecodeAndUnescape(tmp_buffer);
+		DEBUG_PRINTLN(tmp_buffer)
+		topic = strdup(tmp_buffer);
+	}
+	char* filter = NULL;
+	uint8_t filter_found = 0;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("filter"), true, &filter_found))
+		filter = strdup(urlDecodeAndUnescape(tmp_buffer));
+
+	DEBUG_PRINTLN(F("server_sensor_config4"));
+
+	SensorFlags_t flags = {.enable=enable, .log=log, .show=show};
+	int ret = sensor_define(nr, name, type, group, ip, port, id, ri, factor, divider, userdef_unit, offset_mv, offset2, flags, assigned_unitid);
+	if (url_found) {
+		SensorUrl_add(nr, SENSORURL_TYPE_URL, url);
+		free(url);
+	}
+	if (topic_found) {
+		SensorUrl_add(nr, SENSORURL_TYPE_TOPIC, topic);
+		free(topic);
+	}
+	if (filter_found) {
+		SensorUrl_add(nr, SENSORURL_TYPE_FILTER, filter);
+		free(filter);
+	}
+	
+	ret = ret == HTTP_RQT_SUCCESS?HTML_SUCCESS:HTML_DATA_MISSING;
+	handle_return(ret);
+
+	DEBUG_PRINTLN(F("server_sensor_config5"));
+
+}
+
+/**
+ * sa
+ * Modus RS485 Sensor set address help function
+ * {"nr":1,"id":1}
+ */
+void server_set_sensor_address(OTF_PARAMS_DEF) {
+#if defined(USE_OTF)
+	if(!process_password(OTF_PARAMS)) return;
+#else
+	char *p = get_buffer;
+#endif
+
+	DEBUG_PRINTLN(F("server_set_sensor_address"));
+
+	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("nr"), true))
+		handle_return(HTML_DATA_MISSING);
+	uint nr = strtoul(tmp_buffer, NULL, 0); // Sensor nr
+
+	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("id"), true))
+		handle_return(HTML_DATA_MISSING);
+	uint id = strtoul(tmp_buffer, NULL, 0); // Sensor modbus id
+
+	int ret = set_sensor_address(sensor_by_nr(nr), id);
+	ret = ret == HTTP_RQT_SUCCESS?HTML_SUCCESS:HTML_DATA_MISSING;
+	handle_return(ret);
+}
+
+/**
+ * sg
+ * @brief return one or all last sensor values
+ *
+ */
+void server_sensor_get(OTF_PARAMS_DEF) {
+#if defined(USE_OTF)
+	if(!process_password(OTF_PARAMS)) return;
+#else
+	char *p = get_buffer;
+#endif
+
+	DEBUG_PRINTLN(F("server_sensor_get"));
+
+	uint nr = 0;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("nr"), true))
+		nr = strtoul(tmp_buffer, NULL, 0); // Sensor nr
+
+#if defined(USE_OTF)
+	// as the log data can be large, we will use ESP8266's sendContent function to
+	// send multiple packets of data, instead of the standard way of using send().
+	rewind_ether_buffer();
+	print_header(OTF_PARAMS);
+#else
+	print_header();
+#endif
+
+	bfill.emit_p(PSTR("{\"datas\":["));
+	uint count = sensor_count();
+	bool first = true;
+	for (uint i = 0; i < count; i++) {
+
+		Sensor_t *sensor = sensor_by_idx(i);
+		if (!sensor || (nr != 0 && nr != sensor->nr))
+			continue;
+
+		if (first) first = false; else bfill.emit_p(PSTR(","));
+
+		bfill.emit_p(PSTR("{\"nr\":$D,\"nativedata\":$L,\"data\":$E,\"unit\":\"$S\",\"unitid\":$D,\"last\":$L}"),
+			sensor->nr,
+			sensor->last_native_data,
+			sensor->last_data,
+			getSensorUnit(sensor),
+			getSensorUnitId(sensor),
+			sensor->last_read);
+		send_packet(OTF_PARAMS);
+	}
+	bfill.emit_p(PSTR("]}"));
+	handle_return(HTML_OK);
+}
+
+/**
+ * sr
+ * @brief read now and return status and last data
+ *
+ */
+void server_sensor_readnow(OTF_PARAMS_DEF) {
+#if defined(USE_OTF)
+	if(!process_password(OTF_PARAMS)) return;
+#else
+	char *p = get_buffer;
+#endif
+
+	DEBUG_PRINTLN(F("server_sensor_readnow"));
+
+	uint nr = 0;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("nr"), true))
+		nr = strtoul(tmp_buffer, NULL, 0); // Sensor nr
+
+#if defined(USE_OTF)
+	// as the log data can be large, we will use ESP8266's sendContent function to
+	// send multiple packets of data, instead of the standard way of using send().
+	rewind_ether_buffer();
+	print_header(OTF_PARAMS);
+#else
+	print_header();
+#endif
+
+	bfill.emit_p(PSTR("{\"datas\":["));
+	uint count = sensor_count();
+	bool first = true;
+	ulong time = os.now_tz();
+
+	for (uint i = 0; i < count; i++) {
+
+		Sensor_t *sensor = sensor_by_idx(i);
+		if (!sensor || (nr != 0 && nr != sensor->nr))
+			continue;
+
+		sensor->last_read = time - sensor->read_interval - 1;
+		int status = read_sensor(sensor, time);
+
+		if (first) first = false; else bfill.emit_p(PSTR(","));
+
+		bfill.emit_p(PSTR("{\"nr\":$D,\"status\":$D,\"nativedata\":$L,\"data\":$E,\"unit\":\"$S\",\"unitid\":$D}"),
+			sensor->nr,
+			status,
+			sensor->last_native_data,
+			sensor->last_data,
+			getSensorUnit(sensor),
+			getSensorUnitId(sensor));
+
+		send_packet(OTF_PARAMS);
+	}
+	bfill.emit_p(PSTR("]}"));
+	handle_return(HTML_OK);
+}
+
+void sensorconfig_json(OTF_PARAMS_DEF) {
+	int count = sensor_count();
+	bool first = true;
+	for (int i = 0; i < count; i++) {
+		Sensor_t *sensor = sensor_by_idx(i);
+
+		if (first) first = false; else bfill.emit_p(PSTR(","));
+
+		char* url = SensorUrl_get(sensor->nr, SENSORURL_TYPE_URL);
+		char* topic = SensorUrl_get(sensor->nr, SENSORURL_TYPE_TOPIC);
+		char* filter = SensorUrl_get(sensor->nr, SENSORURL_TYPE_FILTER);
+
+		bfill.emit_p(PSTR("{\"nr\":$D,\"type\":$D,\"group\":$D,\"name\":\"$S\",\"ip\":$L,\"port\":$D,\"id\":$D,\"ri\":$D,\"fac\":$D,\"div\":$D,\"offset\":$D,\"offset2\":$D,\"nativedata\":$L,\"data\":$E,\"unit\":\"$S\",\"unitid\":$D,\"enable\":$D,\"log\":$D,\"show\":$D,\"data_ok\":$D,\"last\":$L,\"url\":\"$S\",\"topic\":\"$S\",\"filter\":\"$S\"}"),
+			sensor->nr,
+			sensor->type,
+			sensor->group,
+			sensor->name,
+			sensor->ip,
+			sensor->port,
+			sensor->id,
+			sensor->read_interval,
+			sensor->factor,
+			sensor->divider,
+			sensor->offset_mv,
+			sensor->offset2,
+			sensor->last_native_data,
+			sensor->last_data,
+			getSensorUnit(sensor),
+			getSensorUnitId(sensor),
+			sensor->flags.enable,
+			sensor->flags.log,
+			sensor->flags.show,
+			sensor->flags.data_ok,
+			sensor->last_read,
+			url?url:"", topic?topic:"", filter?filter:"");
+		send_packet(OTF_PARAMS);
+	}
+}
+
+/**
+ * sl
+ * @brief Lists all sensors
+ *
+ */
+void server_sensor_list(OTF_PARAMS_DEF) {
+#if defined(USE_OTF)
+	if(!process_password(OTF_PARAMS)) return;
+#else
+	char *p = get_buffer;
+#endif
+
+	//DEBUG_PRINTLN(F("server_sensor_list"));
+	//DEBUG_PRINT(F("server_count: "));
+	//DEBUG_PRINTLN(sensor_count());
+
+	uint test = 0;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("test"), true))
+		test = strtoul(tmp_buffer, NULL, 0); // Sensor nr
+
+#if defined(USE_OTF)
+	// as the log data can be large, we will use ESP8266's sendContent function to
+	// send multiple packets of data, instead of the standard way of using send().
+	rewind_ether_buffer();
+	print_header(OTF_PARAMS);
+#else
+	print_header();
+#endif
+
+	if (test) {
+		bfill.emit_p(PSTR("{\"test\":$D,"), test);
+		bfill.emit_p(PSTR("\"detected\":$D}"), get_asb_detected_boards());
+	} else {
+		int count = sensor_count();
+		bfill.emit_p(PSTR("{\"count\":$D,"), count);
+		bfill.emit_p(PSTR("\"detected\":$D,"), get_asb_detected_boards());
+		bfill.emit_p(PSTR("\"sensors\":["));
+		sensorconfig_json(OTF_PARAMS);
+		bfill.emit_p(PSTR("]"));
+		bfill.emit_p(PSTR("}"));
+	}
+	handle_return(HTML_OK);
+}
+
+/**
+ * so
+ * @brief output sensorlog
+ *
+ */
+void server_sensorlog_list(OTF_PARAMS_DEF) {
+#if defined(USE_OTF)
+	if(!process_password(OTF_PARAMS)) return;
+#else
+	char *p = get_buffer;
+#endif
+
+	DEBUG_PRINTLN(F("server_sensorlog_list"));
+
+	uint8_t log = LOG_STD;
+
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("log"), true)) // Log type 0=DAY 1=WEEK 2=MONTH
+		log = strtoul(tmp_buffer, NULL, 0);
+	if (log > LOG_MONTH)
+		log = LOG_STD;
+	ulong log_size = sensorlog_size(log);
+
+	//start / max:
+	ulong startAt = 0;
+	ulong maxResults = log_size;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("start"), true)) // Log start
+		startAt = strtoul(tmp_buffer, NULL, 0);
+
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("max"), true)) // Log Lines count
+		maxResults = strtoul(tmp_buffer, NULL, 0);
+
+	//Filters:
+	uint nr = 0;
+	uint type = 0;
+	ulong after = 0;
+	ulong before = 0;
+	ulong lastHours = 0;
+	bool isjson = true;
+	bool shortcsv = false;
+
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("nr"), true)) // Filter log for sensor-nr
+		nr = strtoul(tmp_buffer, NULL, 0);
+
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("type"), true)) // Filter log for sensor-type
+		type = strtoul(tmp_buffer, NULL, 0);
+
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("after"), true)) // Filter time after
+		after = strtoul(tmp_buffer, NULL, 0);
+
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("before"), true)) // Filter time before
+		before = strtoul(tmp_buffer, NULL, 0);
+
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("lasthours"), true)) // Filter last hours
+		lastHours = strtoul(tmp_buffer, NULL, 0);
+
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("lastdays"), true)) // Filter last days
+		lastHours = strtoul(tmp_buffer, NULL, 0) * 24 + lastHours;
+
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("csv"), true)) { // Filter last days
+		int csv = atoi(tmp_buffer);
+		isjson = csv == 0;
+		shortcsv = csv == 2;
+	}
+
+#if defined(USE_OTF)
+	// as the log data can be large, we will use ESP8266's sendContent function to
+	// send multiple packets of data, instead of the standard way of using send().
+	rewind_ether_buffer();
+	if (isjson)	print_header(OTF_PARAMS); else print_header_download(OTF_PARAMS);
+#else
+	if (isjson)	print_header(); else print_header_download();
+#endif
+
+	if (isjson) {
+		bfill.emit_p(PSTR("{\"logtype\":$D,\"logsize\":$D,\"filesize\":$D,\"log\":["),
+			log, log_size, sensorlog_filesize(log));
+	} else {
+		if (shortcsv)
+			bfill.emit_p(PSTR("nr;time;data\r\n"));
+		else
+			bfill.emit_p(PSTR("nr;type;time;nativedata;data;unit;unitid\r\n"));
+	}
+
+	#define BLOCKSIZE 64
+	ulong count = 0;
+ 	SensorLog_t *sensorlog = (SensorLog_t*)malloc(sizeof(SensorLog_t)*BLOCKSIZE);
+	Sensor_t *sensor = NULL;
+
+	//lastHours: find limit for this
+	if (lastHours > 0 && log_size > 0) {
+		after = os.now_tz() - lastHours * 60 * 60; //seconds
+		DEBUG_PRINT(F("lastHours="));
+		DEBUG_PRINTLN(lastHours);
+
+		ulong a = 0;
+		ulong b = log_size-1;
+		ulong lastIdx = 0;
+		while (true) {
+			ulong idx = (b-a)/2+a;
+			sensorlog_load(log, idx, sensorlog);
+			if (sensorlog->time < after) {
+				a = idx;
+			} else if (sensorlog->time > after) {
+				b = idx;
+			}
+			if (a >= b || idx == lastIdx) break;
+			lastIdx = idx;
+		}
+		startAt = lastIdx;
+	}
+	if (maxResults > 0 && maxResults < log_size)
+	{
+		DEBUG_PRINT(F("max="));
+		DEBUG_PRINTLN(maxResults);
+		ulong startAt2 = log_size-maxResults;
+		if (startAt2 > startAt)
+			startAt = startAt2;
+	}
+
+	uint sensor_type = 0;
+
+	DEBUG_PRINTLN(F("start so"));
+	ulong idx = startAt;
+	while (idx < log_size) {
+		int n = sensorlog_load2(log, idx, BLOCKSIZE, sensorlog);
+		if (n <= 0) break;
+
+		for (int i = 0; i < n; i++) {
+			idx++;
+			if (nr && sensorlog[i].nr != nr)
+				continue;
+
+			if (after && sensorlog[i].time <= after)
+				continue;
+
+			if (before && sensorlog[i].time >= before)
+				continue;
+
+			if (!shortcsv || type) {
+				if (!sensor || sensor->nr != sensorlog[i].nr)
+					sensor = sensor_by_nr(sensorlog[i].nr);
+				sensor_type = sensor?sensor->type:0;
+				if (type && sensor_type != type)
+					continue;
+			}
+
+			if (count > 0 && isjson) {
+				bfill.emit_p(PSTR(","));
+			}
+
+			if (isjson) {
+				bfill.emit_p(PSTR("{\"nr\":$D,\"type\":$D,\"time\":$L,\"nativedata\":$L,\"data\":$E,\"unit\":\"$S\",\"unitid\":$D}"),
+				sensorlog[i].nr,          //sensor-nr
+				sensor_type,           //sensor-type
+				sensorlog[i].time,        //timestamp
+				sensorlog[i].native_data, //native data
+				sensorlog[i].data,
+				getSensorUnit(sensor),
+				getSensorUnitId(sensor));
+			} else {
+				if (shortcsv)
+					bfill.emit_p(PSTR("$D;$L;$E\r\n"),
+						sensorlog[i].nr,          //sensor-nr
+						sensorlog[i].time,        //timestamp
+						sensorlog[i].data);
+				else
+					bfill.emit_p(PSTR("$D;$D;$L;$L;$E;$S;$D\r\n"),
+						sensorlog[i].nr,          //sensor-nr
+						sensor_type,           //sensor-type
+						sensorlog[i].time,        //timestamp
+						sensorlog[i].native_data, //native data
+						sensorlog[i].data,
+						getSensorUnit(sensor),
+						getSensorUnitId(sensor));
+			}
+			// if available ether buffer is getting small
+			// send out a packet
+			if (!buffer_available() ) {
+				send_packet(OTF_PARAMS);
+			}
+			if (++count >= maxResults) {
+				break;
+			}
+		}
+		if (count >= maxResults)
+			break;
+	}
+	DEBUG_PRINTLN(F("end so"));
+
+	if (isjson)
+		bfill.emit_p(PSTR("]}"));
+	else
+		bfill.emit_p(PSTR("\r\n"));
+	free(sensorlog);
+
+	DEBUG_PRINTLN(F("finish so"));
+
+	handle_return(HTML_OK);
+}
+
+/**
+ * sn
+ * @brief Delete/Clear Sensor log
+ *
+ */
+void server_sensorlog_clear(OTF_PARAMS_DEF) {
+#if defined(USE_OTF)
+	if(!process_password(OTF_PARAMS)) return;
+#else
+	char *p = get_buffer;
+#endif
+	int log = -1;
+	uint nr = 0;
+	double under = 0;
+	bool use_under = false;
+	double over = 0;
+	bool use_over = false;
+	ulong before = 0;
+	ulong after = 0;
+
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("log"), true)) // Filter log for sensor-nr
+		log = atoi(tmp_buffer);
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("nr"), true)) // Filter log for sensor-nr
+		nr = strtoul(tmp_buffer, NULL, 0);
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("under"), true)) // values lower than 
+		use_under = sscanf(tmp_buffer, "%lf", &under) == 1;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("over"), true)) // values higher than 
+		use_over = sscanf(tmp_buffer, "%lf", &over) == 1;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("before"), true)) // values higher than 
+		sscanf(tmp_buffer, "%lu", &before);
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("after"), true)) // values higher than 
+		sscanf(tmp_buffer, "%lu", &after);
+
+	DEBUG_PRINTLN(F("server_sensorlog_clear"));
+
+#if defined(USE_OTF)
+	// as the log data can be large, we will use ESP8266's sendContent function to
+	// send multiple packets of data, instead of the standard way of using send().
+	rewind_ether_buffer();
+	print_header(OTF_PARAMS);
+#else
+	print_header();
+#endif
+
+	DEBUG_PRINTLN(F("start log cleaning"));
+	if (nr > 0 || use_under || use_over || before || after) {
+		ulong n = 0;
+		if (log == -1) {
+			n += sensorlog_clear_sensor(nr, LOG_STD, use_under, under, use_over, over, before, after);
+			n += sensorlog_clear_sensor(nr, LOG_WEEK, use_under, under, use_over, over, before, after);
+			n += sensorlog_clear_sensor(nr, LOG_MONTH, use_under, under, use_over, over, before, after);
+		} else {
+			n += sensorlog_clear_sensor(nr, log, use_under, under, use_over, over, before, after);
+		}
+		bfill.emit_p(PSTR("{\"deleted\":$L}"), n);
+	} else {
+		ulong log_size = sensorlog_size(LOG_STD);
+		ulong log_sizeW = sensorlog_size(LOG_WEEK);
+		ulong log_sizeM = sensorlog_size(LOG_MONTH);
+
+		if (log == -1) {
+			sensorlog_clear_all();
+			bfill.emit_p(PSTR("{\"deleted\":$L,\"deleted_week\":$L,\"deleted_month\":$L}"), log_size, log_sizeW, log_sizeM);
+		}
+		else {
+			sensorlog_clear(log==LOG_STD, log==LOG_WEEK, log==LOG_MONTH);
+			bfill.emit_p(PSTR("{\"deleted\":$L}"), log==LOG_STD?log_size:log=LOG_WEEK?log_sizeW:log_sizeM);
+		}
+	}
+	DEBUG_PRINTLN(F("end log cleaning"));
+	handle_return(HTML_OK);
+}
+
+/**
+ * mt
+ * supported monitor types
+ */
+void server_monitor_types(OTF_PARAMS_DEF) {
+#if defined(USE_OTF)
+	if(!process_password(OTF_PARAMS)) return;
+#else
+	char *p = get_buffer;
+#endif
+
+	DEBUG_PRINTLN(F("server_monitor_types"));
+
+#if defined(USE_OTF)
+	// as the log data can be large, we will use ESP8266's sendContent function to
+	// send multiple packets of data, instead of the standard way of using send().
+	rewind_ether_buffer();
+	print_header(OTF_PARAMS);
+#else
+	print_header();
+#endif
+
+	bfill.emit_p(PSTR("{\"monitortypes\": ["));
+	bfill.emit_p(PSTR("{\"name\":\"Min\",\"type\":$D},"), MONITOR_MIN);
+	bfill.emit_p(PSTR("{\"name\":\"Max\",\"type\":$D},"), MONITOR_MAX);
+	bfill.emit_p(PSTR("{\"name\":\"SN 1/2\",\"type\":$D},"), MONITOR_SENSOR12);
+	bfill.emit_p(PSTR("{\"name\":\"SET SN 1/2\",\"type\":$D},"), MONITOR_SET_SENSOR12);
+	bfill.emit_p(PSTR("{\"name\":\"AND\",\"type\":$D},"), MONITOR_AND);
+	bfill.emit_p(PSTR("{\"name\":\"OR\",\"type\":$D},"), MONITOR_OR);
+	bfill.emit_p(PSTR("{\"name\":\"XOR\",\"type\":$D},"), MONITOR_XOR);
+	bfill.emit_p(PSTR("{\"name\":\"NOT\",\"type\":$D}," ), MONITOR_NOT);
+	bfill.emit_p(PSTR("{\"name\":\"TIME\",\"type\":$D}," ), MONITOR_TIME);
+	bfill.emit_p(PSTR("{\"name\":\"REMOTE\",\"type\":$D}" ), MONITOR_REMOTE);
+	bfill.emit_p(PSTR("]}"));
+	handle_return(HTML_OK);
+}
+
+/**
+ * mc
+ * define a monitor
+ */
+void server_monitor_config(OTF_PARAMS_DEF) {
+#if defined(USE_OTF)
+	if(!process_password(OTF_PARAMS)) return;
+#else
+	char *p = get_buffer;
+#endif
+
+	DEBUG_PRINTLN(F("server_monitor_config"));
+
+	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("nr"), true))
+		handle_return(HTML_DATA_MISSING);
+	uint16_t nr = strtoul(tmp_buffer, NULL, 0); // Adjustment nr
+	if (nr == 0)
+		handle_return(HTML_DATA_MISSING);
+
+	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("type"), true))
+		handle_return(HTML_DATA_MISSING);
+	uint16_t type = strtoul(tmp_buffer, NULL, 0); // Adjustment type
+
+	if (type == 0) {
+		monitor_delete(nr);
+		handle_return(HTML_SUCCESS);
+	}
+
+	uint16_t sensor = 0;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("sensor"), true))
+		sensor = strtoul(tmp_buffer, NULL, 0); // Sensor nr
+
+	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("prog"), true))
+		handle_return(HTML_DATA_MISSING);
+	uint16_t prog = strtoul(tmp_buffer, NULL, 0); // Program nr
+
+	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("zone"), true))
+		handle_return(HTML_DATA_MISSING);
+	uint16_t zone = strtoul(tmp_buffer, NULL, 0); // Zone
+
+	char name[30] = {0};
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("name"), true))
+		strncpy(name, tmp_buffer, sizeof(name)-1);
+
+	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("maxrun"), true))
+		handle_return(HTML_DATA_MISSING);
+	ulong maxRuntime = strtoul(tmp_buffer, NULL, 0); // Zone
+
+	uint8_t prio = 0;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("prio"), true))
+		prio = strtoul(tmp_buffer, NULL, 0); // prio
+
+	//type-dependend parameters:
+	//type = MIN/MAX of sensor value:
+	double value1 = 0;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("value1"), true))
+		value1 = atof(tmp_buffer); // Value 1
+
+	double value2 = 0;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("value2"), true))
+		value2 = atof(tmp_buffer); // Value 2
+
+	//type = SENSOR12
+	uint16_t sensor12 = 0;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("sensor12"), true))
+		sensor12 = strtoul(tmp_buffer, NULL, 0); 
+	bool invers = 0;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("invers"), true))
+		invers = strtoul(tmp_buffer, NULL, 0) > 0; 
+
+	//type = AND/OR/XOR:
+	uint16_t monitor1 = 0;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("monitor1"), true))
+		monitor1 = strtoul(tmp_buffer, NULL, 0); 
+	uint16_t monitor2 = 0;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("monitor2"), true))
+		monitor2 = strtoul(tmp_buffer, NULL, 0); 
+	uint16_t monitor3 = 0;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("monitor3"), true))
+		monitor3 = strtoul(tmp_buffer, NULL, 0); 
+	uint16_t monitor4 = 0;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("monitor4"), true))
+		monitor4 = strtoul(tmp_buffer, NULL, 0); 
+
+	bool invers1 = 0;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("invers1"), true))
+		invers1 = strtoul(tmp_buffer, NULL, 0) > 0; 
+	bool invers2 = 0;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("invers2"), true))
+		invers2 = strtoul(tmp_buffer, NULL, 0) > 0; 
+	bool invers3 = 0;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("invers3"), true))
+		invers3 = strtoul(tmp_buffer, NULL, 0) > 0; 
+	bool invers4 = 0;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("invers4"), true))
+		invers4 = strtoul(tmp_buffer, NULL, 0) > 0; 
+
+	//type = NOT 
+	uint16_t monitor = 0;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("monitor"), true))
+		monitor = strtoul(tmp_buffer, NULL, 0); 
+
+	//type = TIME
+	uint16_t time_from = 0000;
+	uint16_t time_to = 2400;
+	uint8_t wdays = 0xFF;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("from"), true)) //Format: HHMM
+		time_from = strtoul(tmp_buffer, NULL, 0); 
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("to"), true)) //Format: HHMM
+		time_to = strtoul(tmp_buffer, NULL, 0); 
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("wdays"), true)) //0=Monday
+		wdays = strtoul(tmp_buffer, NULL, 0); 
+
+	//type = REMOTE ip
+	uint16_t rmonitor = 0;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("rmonitor"), true))
+		rmonitor = strtoul(tmp_buffer, NULL, 0); 
+	uint32_t ip = 0;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("ip"), true))
+		ip = strtoul(tmp_buffer, NULL, 0); 
+	uint16_t port = 0;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("port"), true))
+		port = strtoul(tmp_buffer, NULL, 0); 
+
+	Monitor_Union_t m; 
+	switch (type) {
+		case MONITOR_MIN:
+		case MONITOR_MAX:
+			m = (Monitor_Union_t){.minmax = {.value1 = value1, .value2 = value2}};
+			break;
+		case MONITOR_SENSOR12:
+			m = (Monitor_Union_t){.sensor12 = {.sensor12 = sensor12, .invers = invers}};
+			break;
+		case MONITOR_SET_SENSOR12:
+			m = (Monitor_Union_t){.set_sensor12 = {.monitor = monitor, .sensor12 = sensor12}};
+			break;
+		case MONITOR_AND:
+		case MONITOR_OR:
+		case MONITOR_XOR:
+			m = (Monitor_Union_t){.andorxor = {.monitor1 = monitor1, .monitor2 = monitor2, .monitor3 = monitor3, .monitor4 = monitor4,
+				.invers1 = invers1, .invers2 = invers2, .invers3 = invers3, .invers4 = invers4}};
+			break;
+		case MONITOR_NOT:
+			m = (Monitor_Union_t){.mnot = {.monitor = monitor}};
+			break;
+		case MONITOR_TIME:
+			m = (Monitor_Union_t){.mtime = {.time_from = time_from, .time_to = time_to, .weekdays = wdays}};
+			break;
+		case MONITOR_REMOTE:
+			m = (Monitor_Union_t){.remote = {.rmonitor = rmonitor, .ip = ip, .port = port}};
+			break;
+		default: handle_return(HTML_DATA_FORMATERROR);
+	}
+	int ret = monitor_define(nr, type, sensor, prog, zone, m, name, maxRuntime, prio);
+	ret = ret >= HTTP_RQT_SUCCESS?HTML_SUCCESS:HTML_DATA_MISSING;
+	handle_return(ret);
+}
+
+void monitorconfig_json(Monitor_t *mon) {
+	bfill.emit_p(PSTR("{\"nr\":$D,\"type\":$D,\"sensor\":$D,\"prog\":$D,\"zone\":$D,\"name\":\"$S\",\"maxrun\":$L,\"prio\":$D,\"active\":$D,\"time\":$L,"),
+				mon->nr,
+				mon->type,
+				mon->sensor,
+				mon->prog,
+				mon->zone,
+				mon->name,
+				mon->maxRuntime,
+				mon->prio,
+				mon->active,
+				mon->time);
+
+	switch(mon->type) {
+		case MONITOR_MIN:
+		case MONITOR_MAX:
+			bfill.emit_p(PSTR("\"value1\":$E,\"value2\":$E}"),
+				isnan(mon->m.minmax.value1)?0:mon->m.minmax.value1,
+				isnan(mon->m.minmax.value2)?0:mon->m.minmax.value2);
+			break;
+		case MONITOR_SENSOR12:
+			bfill.emit_p(PSTR("\"sensor12\":$D,\"invers\":$D}"),
+				mon->m.sensor12.sensor12,
+				mon->m.sensor12.invers);
+			break;
+		case MONITOR_SET_SENSOR12:
+			bfill.emit_p(PSTR("\"monitor\":$D,\"sensor12\":$D}"),
+				mon->m.set_sensor12.monitor,
+				mon->m.set_sensor12.sensor12);
+			break;
+		case MONITOR_AND:
+		case MONITOR_OR:
+		case MONITOR_XOR:
+			bfill.emit_p(PSTR("\"monitor1\":$D,\"monitor2\":$D,\"monitor3\":$D,\"monitor4\":$D,\"invers1\":$D,\"invers2\":$D,\"invers3\":$D,\"invers4\":$D}"),
+				mon->m.andorxor.monitor1, mon->m.andorxor.monitor2, mon->m.andorxor.monitor3, mon->m.andorxor.monitor4,
+				mon->m.andorxor.invers1, mon->m.andorxor.invers2,  mon->m.andorxor.invers3,  mon->m.andorxor.invers4); 
+			break;
+		case MONITOR_NOT:
+			bfill.emit_p(PSTR("\"monitor\":$D}"),
+				mon->m.mnot.monitor);
+			break;
+		case MONITOR_TIME:
+			bfill.emit_p(PSTR("\"from\":$D,\"to\":$D,\"wdays\":$D}"), mon->m.mtime.time_from, mon->m.mtime.time_to, mon->m.mtime.weekdays);
+			break;
+		case MONITOR_REMOTE:
+			bfill.emit_p(PSTR("\"rmonitor\":$D,\"ip\":$L,\"port\":$D}"),
+				mon->m.remote.rmonitor,
+				mon->m.remote.ip,
+				mon->m.remote.port);
+			break;
+
+	}
+}
+
+void monitorconfig_json() {
+	uint count = monitor_count();
+	for (uint i = 0; i < count; i++) {
+		Monitor_t *mon = monitor_by_idx(i);
+		if (i > 0) bfill.emit_p(PSTR(","));
+		monitorconfig_json(mon);
+	}
+}
+
+/**
+ * ml
+ * list monitors
+ */
+void server_monitor_list(OTF_PARAMS_DEF) {
+#if defined(USE_OTF)
+	if(!process_password(OTF_PARAMS)) return;
+#else
+	char *p = get_buffer;
+#endif
+
+	DEBUG_PRINTLN(F("server_monitor_list"));
+
+	uint nr = 0;
+	int prog = -1;
+	uint sensor_nr = 0;
+
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("nr"), true))
+		nr = strtoul(tmp_buffer, NULL, 0);
+
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("prog"), true))
+		prog = strtoul(tmp_buffer, NULL, 0);
+
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("sensor"), true))
+		 sensor_nr = strtoul(tmp_buffer, NULL, 0);
+
+#if defined(USE_OTF)
+	// as the log data can be large, we will use ESP8266's sendContent function to
+	// send multiple packets of data, instead of the standard way of using send().
+	rewind_ether_buffer();
+	print_header(OTF_PARAMS);
+#else
+	print_header();
+#endif
+
+	bfill.emit_p(PSTR("{\"monitors\": ["));
+	uint8_t idx = 0;
+	uint8_t count = monitor_count();
+	bool first = true;
+
+	while (idx < count) {
+		Monitor_t *mon = monitor_by_idx(idx++);
+		if (nr > 0 && mon->nr != nr)
+			continue;
+		if (prog >= 0 && mon->prog != (uint)prog)
+			continue;
+		if (sensor_nr > 0 && mon->sensor != sensor_nr)
+			continue;
+
+		if (!first)
+			bfill.emit_p(PSTR(","));
+		first = false;
+		monitorconfig_json(mon);
+		send_packet(OTF_PARAMS);
+	}
+	bfill.emit_p(PSTR("]}"));
+	handle_return(HTML_OK);
+}
+
+
+
+/**
+ * sb
+ * define a program adjustment
+*/
+void server_sensorprog_config(OTF_PARAMS_DEF) {
+#if defined(USE_OTF)
+	if(!process_password(OTF_PARAMS)) return;
+#else
+	char *p = get_buffer;
+#endif
+
+	DEBUG_PRINTLN(F("server_sensorprog_config"));
+	//uint nr, uint type, uint sensor, uint prog, double factor1, double factor2, double min, double max
+
+	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("nr"), true))
+		handle_return(HTML_DATA_MISSING);
+	uint nr = strtoul(tmp_buffer, NULL, 0); // Adjustment nr
+	if (nr == 0)
+		handle_return(HTML_DATA_MISSING);
+
+	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("type"), true))
+		handle_return(HTML_DATA_MISSING);
+	uint type = strtoul(tmp_buffer, NULL, 0); // Adjustment type
+
+	if (type == 0) {
+		prog_adjust_delete(nr);
+		handle_return(HTML_SUCCESS);
+	}
+
+	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("sensor"), true))
+		handle_return(HTML_DATA_MISSING);
+	uint sensor = strtoul(tmp_buffer, NULL, 0); // Sensor nr
+
+	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("prog"), true))
+		handle_return(HTML_DATA_MISSING);
+	uint prog = strtoul(tmp_buffer, NULL, 0); // Program nr
+
+	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("factor1"), true))
+		handle_return(HTML_DATA_MISSING);
+	double factor1 = atof(tmp_buffer); // Factor 1
+
+	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("factor2"), true))
+		handle_return(HTML_DATA_MISSING);
+	double factor2 = atof(tmp_buffer); // Factor 2
+
+	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("min"), true))
+		handle_return(HTML_DATA_MISSING);
+	double min = atof(tmp_buffer); // Min value
+
+	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("max"), true))
+		handle_return(HTML_DATA_MISSING);
+	double max = atof(tmp_buffer); // Max value
+
+	char name[30] = {0};
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("name"), true))
+		strncpy(name, tmp_buffer, sizeof(name)-1);
+
+	int ret = prog_adjust_define(nr, type, sensor, prog, factor1, factor2, min, max, name);
+	ret = ret >= HTTP_RQT_SUCCESS?HTML_SUCCESS:HTML_DATA_MISSING;
+	handle_return(ret);
+}
+
+void progconfig_json(ProgSensorAdjust_t *p, double current) {
+	bfill.emit_p(PSTR("{\"nr\":$D,\"type\":$D,\"sensor\":$D,\"prog\":$D,\"factor1\":$E,\"factor2\":$E,\"min\":$E,\"max\":$E,\"name\":\"$S\",\"current\":$E}"),
+		p->nr,
+		p->type,
+		p->sensor,
+		p->prog,
+		p->factor1,
+		p->factor2,
+		p->min,
+		p->max,
+		(p->name[0] < 0x20 || p->name[0] > 0xEE || p->name[0] == 0x90) ? "" : p->name,
+		current);
+}
+
+void progconfig_json() {
+	uint count = prog_adjust_count();
+	bool first = true;
+	for (uint i = 0; i < count; i++) {
+		ProgSensorAdjust_t *p = prog_adjust_by_idx(i);
+		double current = calc_sensor_watering_by_nr(p->nr);
+
+		if (first) first = false; else bfill.emit_p(PSTR(","));
+
+		progconfig_json(p, current);
+	}
+}
+
+/**
+ * se
+ * define a program adjustment
+*/
+void server_sensorprog_list(OTF_PARAMS_DEF) {
+#if defined(USE_OTF)
+	if(!process_password(OTF_PARAMS)) return;
+#else
+	char *p = get_buffer;
+#endif
+
+	DEBUG_PRINTLN(F("server_sensorprog_list"));
+
+	uint nr = 0;
+	int prog = -1;
+	uint sensor_nr = 0;
+	
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("nr"), true))
+		nr = strtoul(tmp_buffer, NULL, 0);
+
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("prog"), true))
+		prog = strtoul(tmp_buffer, NULL, 0);
+
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("sensor"), true))
+		 sensor_nr = strtoul(tmp_buffer, NULL, 0);
+
+#if defined(USE_OTF)
+	// as the log data can be large, we will use ESP8266's sendContent function to
+	// send multiple packets of data, instead of the standard way of using send().
+	rewind_ether_buffer();
+	print_header(OTF_PARAMS);
+#else
+	print_header();
+#endif
+
+	uint n = prog_adjust_count();
+	uint idx = 0;
+	uint count = 0;
+	while (idx < n) {
+		ProgSensorAdjust_t *p = prog_adjust_by_idx(idx++);
+		if (nr > 0 && p->nr != nr)
+			continue;
+		if (prog >= 0 && p->prog != (uint)prog)
+			continue;
+		if (sensor_nr > 0 && p->sensor != sensor_nr)
+			continue;
+		count++;
+	}
+
+	bfill.emit_p(PSTR("{\"count\": $D,"), count);
+
+	bfill.emit_p(PSTR("\"progAdjust\": ["));
+	idx = 0;
+	count = 0;
+
+	while (idx < n) {
+		ProgSensorAdjust_t *p = prog_adjust_by_idx(idx++);
+		if (nr > 0 && p->nr != nr)
+			continue;
+		if (prog >= 0 && p->prog != (uint)prog)
+			continue;
+		if (sensor_nr > 0 && p->sensor != sensor_nr)
+			continue;
+
+		double current = calc_sensor_watering_by_nr(p->nr);
+
+		if (count++ > 0)
+			bfill.emit_p(PSTR(","));
+		progconfig_json(p, current);
+		send_packet(OTF_PARAMS);
+	}
+	bfill.emit_p(PSTR("]}"));
+	handle_return(HTML_OK);
+}
+
+static const int sensor_types[] = {
+	SENSOR_SMT100_MOIS,
+	SENSOR_SMT100_TEMP,
+	SENSOR_SMT100_PMTY,
+	SENSOR_TH100_MOIS,
+	SENSOR_TH100_TEMP,
+
+#if defined(ESP8266)
+	SENSOR_ANALOG_EXTENSION_BOARD,
+	SENSOR_ANALOG_EXTENSION_BOARD_P,
+	SENSOR_SMT50_MOIS,
+	SENSOR_SMT50_TEMP,
+	SENSOR_SMT100_ANALOG_MOIS,
+	SENSOR_SMT100_ANALOG_TEMP,
+	SENSOR_VH400,
+	SENSOR_THERM200,
+	SENSOR_AQUAPLUMB,
+	SENSOR_USERDEF,
+#endif
+#if defined ADS1115||PCF8591
+	SENSOR_OSPI_ANALOG,
+	SENSOR_OSPI_ANALOG_P,
+	SENSOR_OSPI_ANALOG_SMT50_MOIS,
+	SENSOR_OSPI_ANALOG_SMT50_TEMP,
+#endif
+#if defined(OSPI)
+    SENSOR_OSPI_INTERNAL_TEMP,
+#endif
+	SENSOR_MQTT,
+	SENSOR_REMOTE,
+	SENSOR_WEATHER_TEMP_F,
+	SENSOR_WEATHER_TEMP_C,
+	SENSOR_WEATHER_HUM,
+	SENSOR_WEATHER_PRECIP_IN,
+	SENSOR_WEATHER_PRECIP_MM,
+	SENSOR_WEATHER_WIND_MPH,
+	SENSOR_WEATHER_WIND_KMH,
+	SENSOR_GROUP_MIN,
+	SENSOR_GROUP_MAX,
+	SENSOR_GROUP_AVG,
+	SENSOR_GROUP_SUM,
+#if defined(ESP8266)	
+	SENSOR_FREE_MEMORY,
+	SENSOR_FREE_STORE,
+#endif
+};
+
+static const char* sensor_names[] = {
+	"Truebner SMT100 RS485 Modbus, moisture mode",
+	"Truebner SMT100 RS485 Modbus, temperature mode",
+	"Truebner SMT100 RS485 Modbus, permittivity mode",
+	"Truebner TH100 RS485 Modbus, humidity mode",
+	"Truebner TH100 RS485 Modbus, temperature mode",
+ #if defined(ESP8266)
+	"ASB - voltage mode 0..5V",
+	"ASB - 0..3.3V to 0..100%",
+	"ASB - SMT50 moisture mode",
+	"ASB - SMT50 temperature mode",
+	"ASB - SMT100-analog moisture mode",
+	"ASB - SMT100-analog temperature mode",
+
+	"ASB - Vegetronix VH400",
+	"ASB - Vegetronix THERM200",
+	"ASB - Vegetronix AquaPlumb",
+
+	"ASB - user defined sensor",
+#endif
+#if defined ADS1115||PCF8591
+	"OSPi analog input - voltage mode 0..3.3V",
+	"OSPi analog input - 0.3.3V to 0..100%",
+	"OSPi analog input - SMT50 moisture mode",
+	"OSPi analog input - SMT50 temperature mode",
+#endif
+#if defined(OSPI)
+    "Internal Raspbery Pi temperature",
+#endif
+	"MQTT subscription",
+	"Remote opensprinkler sensor",
+	"Weather data - temperature (°F)",
+	"Weather data - temperature (°C)",
+	"Weather data - humidity (%)",
+	"Weather data - precip (inch)",
+	"Weather data - precip (mm)",
+	"Weather data - wind (mph)",
+	"Weather data - wind (kmh)",
+	"Sensor group with min value",
+	"Sensor group with max value",
+	"Sensor group with avg value",
+	"Sensor group with sum value",
+#if defined(ESP8266)
+	"Free Memory",
+	"Free Storage",
+#endif
+};
+
+void free_tmp_memory() {
+#if defined(ESP8266)
+	DEBUG_PRINT(F("freememory start: "));
+	DEBUG_PRINTLN(freeMemory());
+
+	sensor_save_all();
+	sensor_api_free();
+
+	DEBUG_PRINT(F("freememory now: "));
+	DEBUG_PRINTLN(freeMemory());
+#endif
+}
+
+void restore_tmp_memory() {
+#if defined(ESP8266)
+	sensor_api_init(false);
+
+	DEBUG_PRINT(F("freememory restore: "));
+	DEBUG_PRINTLN(freeMemory());
+#endif
+}
+
+/**
+ * sf
+ * List supported sensor types
+ **/
+void server_sensor_types(OTF_PARAMS_DEF) {
+#if defined(USE_OTF)
+	if(!process_password(OTF_PARAMS)) return;
+#else
+	char *p = get_buffer;
+#endif
+
+	DEBUG_PRINTLN(F("server_sensor_types"));
+
+#if defined(USE_OTF)
+	// as the log data can be large, we will use ESP8266's sendContent function to
+	// send multiple packets of data, instead of the standard way of using send().
+	rewind_ether_buffer();
+	print_header(OTF_PARAMS);
+#else
+	print_header();
+#endif
+
+	int count = sizeof(sensor_types)/sizeof(int);
+	boolean use_asb = get_asb_detected_boards() > 0;
+	if (!use_asb) count -= 10;
+
+	bfill.emit_p(PSTR("{\"count\":$D,\"detected\":$D,\"sensorTypes\":["), count, get_asb_detected_boards());
+
+	for (uint i = 0; i < sizeof(sensor_types)/sizeof(int); i++)
+	{
+		int type = sensor_types[i];
+		if (!use_asb && type >= SENSOR_ANALOG_EXTENSION_BOARD && type <= SENSOR_USERDEF)
+			continue;
+		if (i > 0)
+			bfill.emit_p(PSTR(","));
+		unsigned char unitid = getSensorUnitId(type);
+		bfill.emit_p(PSTR("{\"type\":$D,\"name\":\"$S\",\"unit\":\"$S\",\"unitid\":$D}"),
+			type, sensor_names[i], getSensorUnit(unitid), unitid);
+		send_packet(OTF_PARAMS);
+	}
+	bfill.emit_p(PSTR("]}"));
+
+	handle_return(HTML_OK);
+}
+
+/**
+ * du
+ * system resources status
+ **/
+void server_usage(OTF_PARAMS_DEF) {
+#if defined(USE_OTF)
+	if(!process_password(OTF_PARAMS)) return;
+#else
+	char *p = get_buffer;
+#endif
+
+	DEBUG_PRINTLN(F("server_usage"));
+
+#if defined(USE_OTF)
+	// as the log data can be large, we will use ESP8266's sendContent function to
+	// send multiple packets of data, instead of the standard way of using send().
+	rewind_ether_buffer();
+	print_header(OTF_PARAMS);
+#else
+	print_header();
+#endif
+
+extern uint32_t ping_ok;
+
+#if defined(ESP8266)
+
+	struct FSInfo fsinfo;
+
+	boolean ok = LittleFS.info(fsinfo);
+
+	bfill.emit_p(PSTR("{\"status\":$D,\"freeMemory\":$D,\"totalBytes\":$D,\"usedBytes\":$D,\"freeBytes\":$D,\"blockSize\":$D,\"pageSize\":$D,\"maxOpenFiles\":$D,\"maxPathLength\":$D,\"pingok\":$D,\"mqtt\":$D,\"ifttt\":$D"),
+		ok,
+		freeMemory(),
+		fsinfo.totalBytes,
+		fsinfo.usedBytes,
+		fsinfo.totalBytes-fsinfo.usedBytes,
+		fsinfo.blockSize,
+		fsinfo.pageSize,
+		fsinfo.maxOpenFiles,
+		fsinfo.maxPathLength,
+		ping_ok,
+		os.mqtt.connected(),
+		get_notif_enabled());
+
+#else
+	bfill.emit_p(PSTR("{\"status\":$D,\"mqtt\":$D,\"ifttt\":$D"), 1, os.mqtt.connected(), get_notif_enabled());
+
+#endif
+
+	bfill.emit_p(PSTR(",\"logfiles\":{\"l01\":$D,\"l02\":$D,\"l11\":$D,\"l12\":$D,\"l21\":$D,\"l22\":$D}"), 
+		file_size(SENSORLOG_FILENAME1) / sizeof(SensorLog_t),
+		file_size(SENSORLOG_FILENAME2) / sizeof(SensorLog_t),
+		file_size(SENSORLOG_FILENAME_WEEK1) / sizeof(SensorLog_t),
+		file_size(SENSORLOG_FILENAME_WEEK2) / sizeof(SensorLog_t),
+		file_size(SENSORLOG_FILENAME_MONTH1) / sizeof(SensorLog_t),
+		file_size(SENSORLOG_FILENAME_MONTH2) / sizeof(SensorLog_t));
+
+	bfill.emit_p(PSTR("}"));
+
+
+	handle_return(HTML_OK);
+}
+
+/**
+ * sd
+ * Program calc
+ **/
+void server_sensorprog_calc(OTF_PARAMS_DEF) {
+#if defined(USE_OTF)
+	if(!process_password(OTF_PARAMS)) return;
+#else
+	char *p = get_buffer;
+#endif
+
+	DEBUG_PRINTLN(F("server_sensorprog_calc"));
+	//uint nr or uint prog
+
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("nr"), true)) {
+		uint nr = strtoul(tmp_buffer, NULL, 0); // Adjustment nr
+		double adj = calc_sensor_watering_by_nr(nr);
+		bfill.emit_p(PSTR("{\"adjustment\":$E}"), adj);
+		handle_return(HTML_OK);
+	}
+
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("prog"), true)) {
+		uint prog = strtoul(tmp_buffer, NULL, 0); // Adjustment nr
+    	double adj = calc_sensor_watering(prog);
+		bfill.emit_p(PSTR("{\"adjustment\":$E}"), adj);
+		handle_return(HTML_OK);
+	}
+
+	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("type"), true))
+		handle_return(HTML_DATA_MISSING);
+	uint type = strtoul(tmp_buffer, NULL, 0); // Adjustment type
+	if (type == 0) {
+		handle_return(HTML_DATA_MISSING);
+	}
+
+	//methods for visual calculation:
+	ProgSensorAdjust_t progAdj;
+	memset(&progAdj, 0, sizeof(progAdj));
+	progAdj.type = type;	
+	
+	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("sensor"), true))
+		handle_return(HTML_DATA_MISSING);
+	progAdj.sensor = strtoul(tmp_buffer, NULL, 0);
+	Sensor_t *sensor = sensor_by_nr(progAdj.sensor); // Sensor nr
+	if (!sensor)
+		handle_return(HTML_DATA_MISSING);
+	
+	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("factor1"), true))
+		handle_return(HTML_DATA_MISSING);
+	progAdj.factor1 = atof(tmp_buffer); // Factor 1
+
+	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("factor2"), true))
+		handle_return(HTML_DATA_MISSING);
+	progAdj.factor2 = atof(tmp_buffer); // Factor 2
+
+	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("min"), true))
+		handle_return(HTML_DATA_MISSING);
+	progAdj.min = atof(tmp_buffer); // Min value
+
+	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("max"), true))
+		handle_return(HTML_DATA_MISSING);
+	progAdj.max = atof(tmp_buffer); // Max value
+
+	unsigned char unitId = getSensorUnitId(sensor);
+
+	int diff = progAdj.max-progAdj.min;
+	int minEx = progAdj.min - diff/2;
+	if (minEx < 0 && (unitId == UNIT_PERCENT || (unitId >= UNIT_VOLT && unitId < UNIT_USERDEF)))
+		minEx = 0;
+	int maxEx = progAdj.max + diff/2;
+
+#if defined(USE_OTF)
+	// as the log data can be large, we will use ESP8266's sendContent function to
+	// send multiple packets of data, instead of the standard way of using send().
+	rewind_ether_buffer();
+	print_header(OTF_PARAMS);
+#else
+	print_header();
+#endif
+
+	bfill.emit_p(PSTR("{\"adjustment\":{\"min\":$D,\"max\":$D,\"current\":$E,\"adjust\":$E,\"unit\":\"$S\","), minEx, maxEx, 
+		sensor->last_data, calc_sensor_watering_int(&progAdj, sensor->last_data), getSensorUnit(sensor));
+
+	int nvalues = max(11, maxEx-minEx+1);
+	double inVal[nvalues];
+	double outVal[nvalues];
+	for (int i = 0; i < nvalues; i++) {
+		inVal[i] = (double)(maxEx - minEx) * (double)i / (nvalues-1) + minEx;
+		outVal[i] = calc_sensor_watering_int(&progAdj, inVal[i]);
+	}
+
+	bfill.emit_p(PSTR("\"inval\":["));
+	for (int i = 0; i < nvalues; i++) {
+		if(i > 0) bfill.emit_p(PSTR(","));
+		bfill.emit_p(PSTR("$E"), inVal[i]);
+	}
+	bfill.emit_p(PSTR("],\"outval\":["));
+	for (int i = 0; i < nvalues; i++) {
+		if(i > 0) bfill.emit_p(PSTR(","));
+		bfill.emit_p(PSTR("$E"), outVal[i]);
+	}
+	bfill.emit_p(PSTR("]}}"));
+	
+	handle_return(HTML_OK);
+}
+
+const int prog_types[] = {
+	PROG_NONE,
+	PROG_LINEAR,
+	PROG_DIGITAL_MIN,
+	PROG_DIGITAL_MAX,
+	PROG_DIGITAL_MINMAX,
+};
+
+const char* prog_names[] = {
+	"No Adjustment",
+	"Linear scaling",
+	"Digital under min",
+	"Digital over max",
+	"Digital under min or over max",
+};
+
+/**
+ * sh
+ * List supported adjustment types
+ */
+void server_sensorprog_types(OTF_PARAMS_DEF) {
+#if defined(USE_OTF)
+	if(!process_password(OTF_PARAMS)) return;
+#else
+	char *p = get_buffer;
+#endif
+
+	DEBUG_PRINTLN(F("server_sensorprog_types"));
+
+#if defined(USE_OTF)
+	// as the log data can be large, we will use ESP8266's sendContent function to
+	// send multiple packets of data, instead of the standard way of using send().
+	rewind_ether_buffer();
+	print_header(OTF_PARAMS);
+#else
+	print_header();
+#endif
+
+	bfill.emit_p(PSTR("{\"count\":$D,\"progTypes\":["), sizeof(prog_types)/sizeof(int));
+
+	for (uint i = 0; i < sizeof(prog_types)/sizeof(int); i++)
+	{
+
+		if (i > 0)
+			bfill.emit_p(PSTR(","));
+		bfill.emit_p(PSTR("{\"type\":$D,\"name\":\"$S\"}"), prog_types[i], prog_names[i]);
+
+		send_packet(OTF_PARAMS);
+	}
+	bfill.emit_p(PSTR("]}"));
+
+	handle_return(HTML_OK);
+}
+
+/**
+ * sx
+ * @brief backup sensor configuration
+ *
+ */
+void server_sensorconfig_backup(OTF_PARAMS_DEF) {
+#if defined(USE_OTF)
+	if(!process_password(OTF_PARAMS)) return;
+#else
+	char *p = get_buffer;
+#endif
+
+#define BACKUP_SENSORS 1
+#define BACKUP_ADJUSTMENTS 2
+#define BACKUP_MONITORS 4
+
+	//Backup type: 0=no backup 1=Sensors 2=Adjustments 3=Sensors+Adjustments
+	int backup = BACKUP_SENSORS|BACKUP_ADJUSTMENTS|BACKUP_MONITORS;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("backup"), true)) {
+		backup = strtol(tmp_buffer, NULL, 0); 
+	}
+
+
+#if defined(USE_OTF)
+	// as the log data can be large, we will use ESP8266's sendContent function to
+	// send multiple packets of data, instead of the standard way of using send().
+	rewind_ether_buffer();
+	print_header(OTF_PARAMS);
+#else
+	print_header();
+#endif
+
+	ulong time = os.now_tz();
+	bfill.emit_p(PSTR("{\"backup\":$D,\"time\":$L,\"os-version\":$D,\"minor\":$D"), backup, time, OS_FW_VERSION, OS_FW_MINOR);
+	if (backup & BACKUP_SENSORS) {
+		bfill.emit_p(PSTR(",\"sensors\":["));
+		sensorconfig_json(OTF_PARAMS);
+		bfill.emit_p(PSTR("]"));
+		send_packet(OTF_PARAMS);
+	}
+	if (backup & BACKUP_ADJUSTMENTS)  {
+		bfill.emit_p(PSTR(",\"progadjust\":["));
+		progconfig_json();
+		bfill.emit_p(PSTR("]"));
+		send_packet(OTF_PARAMS);
+	}
+	send_packet(OTF_PARAMS);
+	if (backup & BACKUP_MONITORS)  {
+		bfill.emit_p(PSTR(",\"monitors\":["));
+		monitorconfig_json();
+		bfill.emit_p(PSTR("]"));
+	}
+	bfill.emit_p(PSTR("}"));
+	send_packet(OTF_PARAMS);
+
+	handle_return(HTML_OK);
+}
+
+/**
+ * is
+ * @brief influx set config
+ *
+ */
+void server_influx_set(OTF_PARAMS_DEF) {
+#if defined(USE_OTF)
+	if(!process_password(OTF_PARAMS)) return;
+#else
+	char *p = get_buffer;
+#endif
+
+	int enabled = 0;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("en"), true)) {
+		enabled = strtol(tmp_buffer, NULL, 0); 
+	}
+
+	char *url = NULL;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("url"), true)) {
+		urlDecodeAndUnescape(tmp_buffer);
+		DEBUG_PRINTLN(tmp_buffer);
+		url = strdup(tmp_buffer);
+	}
+
+	int port = 8086;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("port"), true)) {
+		DEBUG_PRINTLN(tmp_buffer);
+		port = strtol(tmp_buffer, NULL, 0); 
+	}
+
+	char *org = NULL;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("org"), true)) {
+		urlDecodeAndUnescape(tmp_buffer);
+		DEBUG_PRINTLN(tmp_buffer);
+		org = strdup(tmp_buffer);
+	}
+
+	char *bucket = NULL;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("bucket"), true)) {
+		urlDecodeAndUnescape(tmp_buffer);
+		DEBUG_PRINTLN(tmp_buffer);
+		bucket = strdup(tmp_buffer);
+	}
+
+	char *token = NULL;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("token"), true)) {
+		urlDecodeAndUnescape(tmp_buffer);
+		DEBUG_PRINTLN(tmp_buffer);
+		token = strdup(tmp_buffer);
+	}
+
+#if defined(USE_OTF)
+	// as the log data can be large, we will use ESP8266's sendContent function to
+	// send multiple packets of data, instead of the standard way of using send().
+	rewind_ether_buffer();
+	print_header(OTF_PARAMS);
+#else
+	print_header();
+#endif
+
+	os.influxdb.set_influx_config(enabled, url, port, org, bucket, token);
+
+	handle_return(HTML_OK);
+}
+
+
+/**
+ * ig
+ * @brief influx get config
+ *
+ */
+void server_influx_get(OTF_PARAMS_DEF) {
+#if defined(USE_OTF)
+	if(!process_password(OTF_PARAMS)) return;
+#else
+	char *p = get_buffer;
+#endif
+
+#if defined(USE_OTF)
+	// as the log data can be large, we will use ESP8266's sendContent function to
+	// send multiple packets of data, instead of the standard way of using send().
+	rewind_ether_buffer();
+	print_header(OTF_PARAMS);
+#else
+	print_header();
+#endif
+	server_influx_get_main();
+
+	send_packet(OTF_PARAMS);
+	handle_return(HTML_OK);
+}
+
+void server_influx_get_main() {
+	os.influxdb.get_influx_config(tmp_buffer);
+	bfill.emit_p(tmp_buffer);
+}
 
 typedef void (*URLHandler)(OTF_PARAMS_DEF);
 
@@ -2120,7 +4012,29 @@ const char _url_keys[] PROGMEM =
 	"cu"
 	"ja"
 	"pq"
+	"si"
+	"sj"
+	"sk"
+	"sc"
+	"sl"
+	"sg"
+	"sr"
+	"sa"
+	"so"
+	"sn"
+	"sb"
+	"sd"
+	"se"
+	"sf"
+	"du"
+	"sh"
+	"sx"
     "db"
+	"is"
+	"ig"
+	"mc"
+	"ml"
+	"mt"
 #if defined(ARDUINO)
 	//"ff"
 #endif
@@ -2150,10 +4064,30 @@ URLHandler urls[] = {
 	server_change_scripturl,// cu
 	server_json_all,        // ja
 	server_pause_queue,     // pq
+	server_sensor_config_userdef,//si
+	server_sensorurl_get,//sj
+	server_sensorurl_config,//sk
+	server_sensor_config,//sc
+	server_sensor_list,//sl
+	server_sensor_get,//sg
+	server_sensor_readnow,//sr
+	server_set_sensor_address,//sa
+	server_sensorlog_list,//so
+	server_sensorlog_clear,//sn
+	server_sensorprog_config,//sb
+	server_sensorprog_calc,//sd
+	server_sensorprog_list,//se
+	server_sensor_types,//sf
+	server_usage,//du
+	server_sensorprog_types,//sh
+	server_sensorconfig_backup,//sx
 	server_json_debug,      // db
-#if defined(ARDUINO)
+	server_influx_set,// is
+	server_influx_get,// ig
+	server_monitor_config, // mc
+	server_monitor_list, // ml
+	server_monitor_types, // mt
 	//server_fill_files,
-#endif
 };
 
 // handle Ethernet request
@@ -2172,9 +4106,7 @@ void on_sta_update(OTF_PARAMS_DEF) {
 }
 
 void on_sta_upload_fin() {
-	if (os.iopts[IOPT_IGNORE_PASSWORD]) {
-		// don't check password
-	} else if(!(update_server->hasArg("pw") && os.password_verify(update_server->arg("pw").c_str()))) {
+	if(!(update_server->hasArg("pw") && os.password_verify(update_server->arg("pw").c_str()))) {
 		update_server_send_result(HTML_UNAUTHORIZED);
 		Update.end(false);
 		return;

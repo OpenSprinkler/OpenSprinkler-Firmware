@@ -36,4 +36,8 @@ void delete_log(char *name);
 void write_log(unsigned char type, time_os_t curr_time);
 void make_logfile_name(char *name);
 
+bool is_notif_enabled(uint16_t type);
+uint16_t get_notif_enabled();
+void set_notif_enabled(uint16_t notif);
+
 #endif // _MAIN_H

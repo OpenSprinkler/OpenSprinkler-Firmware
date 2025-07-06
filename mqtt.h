@@ -23,6 +23,11 @@
 
 #ifndef _MQTT_H
 #define _MQTT_H
+#if defined(ARDUINO)
+	#include <PubSubClient.h>
+#else
+	#include <mosquitto.h>
+#endif
 
 class OSMqtt {
 private:
@@ -55,6 +60,16 @@ private:
     static void loop(void);
     static char* get_pub_topic() { return _pub_topic; }
     static char* get_sub_topic() { return _sub_topic; }
+
+    static bool connected();
+    static bool subscribe(const char *topic);
+    static bool unsubscribe(const char *topic);
+    static bool reconnect();
+#if defined(ARDUINO)
+    static void setCallback(int key, MQTT_CALLBACK_SIGNATURE);
+#else
+	static void setCallback(int key, void (*on_message)(struct mosquitto *, void *, const struct mosquitto_message *));
+#endif
 };
 
 #endif	// _MQTT_H

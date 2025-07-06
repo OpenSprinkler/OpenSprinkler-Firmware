@@ -1,0 +1,194 @@
+Sensor API
+This api documentation is part of the opensprinkler 
+
+<ip> the ip-address, for example 192.168.0.55
+<pw> the MD5 encrypted password, opendoor=a6d82bced638de3def1e9bbb4983225c
+
+
+Create Sensors (sc):
+creates, modifies or deletes a sensor.
+"nr" for a unique number >= 1
+"type" for the sensor-type, see sf. type=0 deletes the sensor
+"group" for group assignment, a nr of another sensor with type=SENSOR_GROUP_YXZ
+"name" a name
+"ip" for the ip-address, only for network connected sensors. All others use ip=0
+"port" for the ip-port-address, only for network connected sensors. All others use port=0
+"id" sub-id, e.a. modbus address or subid, for ADC Sensors 0..7
+"ri" read interval in seconds
+"fac" factor for user defined sensors
+"div" divider for user defined sensors
+"unit" unit for user defined sensors (unitid=99)
+"enable" 0=sensor disabled, 1=sensor enabled
+"log" 0=logging disabled, 1=logging enabled
+"show" 0=hide 1=show current value on main screen
+"offset", "offset2" Offset for user defined sensor
+"url", "topic", "filter" mqtt/external sensor (url currently not used)
+
+examples:
+http://<ip>/sc?pw=<pw>&nr=1&type=1&group=0&name=SMT100-Mois&ip=4261456064&port=8899&id=253&ri=60&enable=1&log=1
+http://<ip>/sc?pw=<pw>&nr=2&type=2&group=0&name=SMT100-Temp&ip=4261456064&port=8899&id=253&ri=60&enable=1&log=1
+http://<ip>/sc?pw=<pw>&nr=3&type=11&group=0&name=SMT50-Mois&ip=0&id=0&ri=60&enable=1&log=1
+http://<ip>/sc?pw=<pw>&nr=4&type=12&group=0&name=SMT50-Temp&ip=0&id=1&ri=60&enable=1&log=1
+
+ip: dec=4261456064 = hex=FE00A8C0 = 
+FE = 254
+00 = 000
+A8 = 168
+C0 = 192
+   = 192.168.000.254
+
+For the Truebner SMT100 RS485 Modbus you need the Truebner RS485 Adapter for OpenSprinkler.
+Set ip/port for the converter, e.a PUSR USR-W610 in transparent modus.
+
+For the analog ports of the extension board (including SMT50) use id 0..7
+
+// Sensor types:
+SENSOR_NONE 0                       // None or deleted sensor
+SENSOR_SMT100_MOIS 1                // Truebner SMT100 RS485, moisture mode
+SENSOR_SMT100_TEMP 2                // Truebner SMT100 RS485, temperature mode
+SENSOR_SMT100_PMTY 3                // Truebner SMT100 RS485, permittivity mode
+SENSOR_TH100_MOIS  4                // Truebner TH100 RS485, humidity mode 
+SENSOR_TH100_TEMP  5                // Truebner TH100 RS485, temperature mode
+
+SENSOR_ANALOG_EXTENSION_BOARD 10    // New OpenSprinkler analog extension board x8 - voltage mode 0..4V
+SENSOR_ANALOG_EXTENSION_BOARD_P 11  // New OpenSprinkler analog extension board x8 - percent 0..3.3V to 0..100%
+SENSOR_SMT50_MOIS 15                // New OpenSprinkler analog extension board x8 - SMT50 VWC [%] = (U * 50) : 3
+SENSOR_SMT50_TEMP 16                // New OpenSprinkler analog extension board x8 - SMT50 T [°C] = (U – 0,5) * 100
+SENSOR_SMT100_ANALOG_MOIS 17        // New OpenSprinkler analog extension board x8 - SMT100 VWC [%] = (U * 100) : 3
+SENSOR_SMT100_ANALOG_TEMP 18        // New OpenSprinkler analog extension board x8 - SMT50 T [°C] = (U * 100) : 3 - 40
+
+SENSOR_VH400 30                     // New OpenSprinkler analog extension board x8 - Vegetronix VH400
+SENSOR_THERM200 31                  // New OpenSprinkler analog extension board x8 - Vegetronix THERM200
+SENSOR_AQUAPLUMB 32                 // New OpenSprinkler analog extension board x8 - Vegetronix Aquaplumb
+
+SENSOR_USERDEF 49                   // New OpenSprinkler analog extension board x8 - User defined sensor
+
+SENSOR_OSPI_ANALOG 50               // Old OSPi analog input - voltage mode 0..3.3V
+SENSOR_OSPI_ANALOG_P 51             // Old OSPi analog input - percent 0..3.3V to 0...100%
+SENSOR_OSPI_ANALOG_SMT50_MOIS 52    // Old OSPi analog input - SMT50 VWC [%] = (U * 50) : 3
+SENSOR_OSPI_ANALOG_SMT50_TEMP 53    // Old OSPi analog input - SMT50 T [°C] = (U – 0,5) * 100
+SENSOR_OSPI_INTERNAL_TEMP     54    // Internal OSPI Temperature
+
+SENSOR_MQTT 90                      // subscribe to a MQTT server and query a value
+
+SENSOR_REMOTE 100                   // Remote sensor of an remote opensprinkler
+SENSOR_WEATHER_TEMP_F 101           // Weather service - temperature (Fahrenheit)
+SENSOR_WEATHER_TEMP_C 102           // Weather service - temperature (Celcius)
+SENSOR_WEATHER_HUM 103              // Weather service - humidity (%)
+SENSOR_WEATHER_PRECIP_IN 105        // Weather service - precip (inch)
+SENSOR_WEATHER_PRECIP_MM 106        // Weather service - precip (mm)
+SENSOR_WEATHER_WIND_MPH 107         // Weather service - wind (mph)
+SENSOR_WEATHER_WIND_KMH 108         // Weather service - wind (kmh)
+
+SENSOR_GROUP_MIN 1000  // Sensor group with min value
+SENSOR_GROUP_MAX 1001  // Sensor group with max value
+SENSOR_GROUP_AVG 1002  // Sensor group with avg value
+SENSOR_GROUP_SUM 1003  // Sensor group with sum value
+
+//Diagnostic
+SENSOR_FREE_MEMORY 10000 //Free memory
+SENSOR_FREE_STORE 10001 //Free storage
+List Sensors (sl):
+lists the current sensors
+examples:
+http://<ip>/sl?pw=<pw>
+
+Get last Sensor values (sg):
+returns last read sensor values
+examples:
+http://<ip>/sg?pw=<pw>
+http://<ip>/sg?pw=<pw>&nr=1
+
+Read sensor now (sr):
+executes sensor read and returns the values
+examples:
+http://<ip>/sr?pw=<pw>
+http://<ip>/sr?pw=<pw>&nr=1
+
+Set sensor address for SMT100 (sa): 
+Only for SMT100: Set modbus address
+Disconnect all other modbus sensors, so that only one sensor is connected. Sets the modbus address for sensor nr to id
+examples:
+http://<ip>/sa?pw=<pw>&nr=1&id=1
+
+Dump Sensor Log (so):
+dumps the sensor log
+examples:
+http://<ip>/so?pw=<pw>
+http://<ip>/so?pw=<pw>&start=0&max=100&nr=1&type=1&before=1666915277&after=1666915277
+
+Clear Sensor Log (sn):
+clears the sensor log
+examples:
+http://<ip>/sn?pw=<pw>
+http://<ip>/sn?pw=<pw>&log=1
+
+Parameters:
+log=[1|2|3]: 0=Std log, 1=Week log, 2=Month log
+nr=n: Sensor-nr
+under=v: delete only records with values under v
+over=v: delete only records with values over v
+before=t: delete only records with timestamp before t
+after=t: delete only records with timestamp after t
+  v is a float value with point as decimal separator
+  t is a long integer value with an unix timestamp, use this to decode:
+  https://www.epochconverter.com/
+
+Program adjustments (sb):
+defines program adjustments
+"nr" adjustment-nr
+"type" adjustment-type (0=delete, 1=linear, 2=digital min, 3=digital max)
+"sensor" sensor-nr
+"prog" program-nr
+"factor1", "factor2", "min", "max" formula-values
+examples:
+http://<ip>/sb?pw=<pw>&nr=1&type=1&sensor=4&prog=1&factor1=0&factor2=2&min=0&max=50
+
+type:
+PROG_DELETE      	0 //deleted
+PROG_LINEAR      	1 //formula see above
+PROG_DIGITAL_MIN 	2 //under or equal min : factor1 else factor2
+PROG_DIGITAL_MAX 	3 //over or equal max  : factor2 else factor1
+PROG_DIGITAL_MINMAX 4 //under min or over max : factor1 else factor2
+PROG_NONE        	99 //No adjustment
+
+formula:
+   min max  factor1 factor2
+   10..90 -> 5..1 factor1 > factor2
+    a   b    c  d
+   (b-sensorData) / (b-a) * (c-d) + d
+
+   10..90 -> 1..5 factor1 < factor2
+    a   b    c  d
+   (sensorData-a) / (b-a) * (d-c) + c
+
+min/max is the used range of the sensor (for example min=10 max=80)
+factor1/factor2 is the calculated adjustment (for example factor1=2 factor2=0)
+So a sensordata of 10 will be a adjustment of factor 2 (200%) or
+a sensordata of 80 will be a adjustment of factor 0 (0%)
+everything between will be linear scaled in the range of 0..2
+
+List Program adjustments (se):
+lists the current program adjustments
+examples:
+http://<ip>/se?pw=<pw>
+&nr=1&prog=1
+
+List supported sensor types (sf):
+lists supported sensor types
+examples:
+http://<ip>/sf?pw=<pw>
+
+List supported program adjustments (sh):
+http://<ip>/sh?pw=<pw>
+
+System used and free space (du):
+examples:
+http://<ip>/du?pw=<pw>
+
+Sensor config User Defined (si):
+Updates the user config values of a sensor
+examples:
+http://<ip>/si?pw=<pw>&nr=1&fac=100&div=10&unit='bar'
+
+

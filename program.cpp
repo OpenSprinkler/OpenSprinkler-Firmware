@@ -231,14 +231,12 @@ unsigned char ProgramStruct::check_day_match(time_os_t t) {
 	unsigned char weekday_t = weekday(t);  // weekday ranges from [0,6] within Sunday being 1
 	unsigned char day_t = day(t);
 	unsigned char month_t = month(t);
-	unsigned char year_t = year(t);
 #else // get current time from RPI/LINUX
 	time_os_t ct = t;
 	struct tm *ti = gmtime(&ct);
 	unsigned char weekday_t = (ti->tm_wday+1)%7;  // tm_wday ranges from [0,6] with Sunday being 0
 	unsigned char day_t = ti->tm_mday;
 	unsigned char month_t = ti->tm_mon+1;  // tm_mon ranges from [0,11]
-	unsigned char year_t = ti->tm_year+1900; // tm_year is years since 1900
 #endif // get current time
 
 	int epoch_t = (t / 86400);
@@ -272,14 +270,8 @@ unsigned char ProgramStruct::check_day_match(time_os_t t) {
 
 		case PROGRAM_TYPE_MONTHLY:
 			if ((days[0]&0b11111) == 0) {
-				if(month_t == 2){
-					if((isLeapYear(year_t) && dt != 29) || (!isLeapYear(year_t) && dt != 28)){
-						return 0;
-					}
-				}else{
-					if(!isLastDayofMonth(month_t, dt))
-						return 0;
-				}
+				if(!isLastDayofMonth(month_t, dt))
+					return 0;
 			} else if (dt != (days[0]&0b11111)){
 				return 0;
 			}
@@ -428,12 +420,11 @@ void ProgramStruct::gen_station_runorder(uint16_t runcount, unsigned char *order
 			case 'I':	// descending by index
 			case 'a': // alternating: odd-numbered runs ascending by index, even-numbered runs descending.
 			case 'A': // odd-numbered runs descending by index, even-numbered runs ascending
-			{
-				if((anno=='I') || ((anno=='a') && (runcount%2==0)) || ((anno=='A') && (runcount%2==1)))  {
-					// reverse the order
-					for(i=0;i<ns;i++) {
-						order[i] = ns-1-i;
-					}
+
+			if(anno=='I' || (anno=='a' && (runcount%2==0)) || (anno=='A' && (runcount%2==1)))  {
+				// reverse the order
+				for(i=0;i<ns;i++) {
+					order[i] = ns-1-i;
 				}
 			}
 			break;
@@ -449,7 +440,7 @@ void ProgramStruct::gen_station_runorder(uint16_t runcount, unsigned char *order
 					os.get_station_name(i,tmp_buffer);
 					elems[i].name=strdup(tmp_buffer);
 				}
-				if((anno=='n') || ((anno=='t') && (runcount%2==1)) || ((anno=='T') && (runcount%2==0))) {
+				if(anno=='n' || (anno=='t' && (runcount%2==0)) || (anno='T' && (runcount%2==1))) {
 					qsort(elems, ns, sizeof(StationNameSortElem), StationNameSortAscendCmp);
 				} else {
 					qsort(elems, ns, sizeof(StationNameSortElem), StationNameSortDescendCmp);

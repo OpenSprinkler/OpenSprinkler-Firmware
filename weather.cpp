@@ -132,9 +132,12 @@ static void getweather_callback_with_peel_header(char* buffer) {
 }
 
 void GetWeather() {
-	if(!os.network_connected()) return;
+#if defined(ESP8266)
+	if (!useEth)
+		if (os.state!=OS_STATE_CONNECTED || WiFi.status()!=WL_CONNECTED) return;
+#endif
 	// use temp buffer to construct get command
-	BufferFiller bf = BufferFiller(tmp_buffer, TMP_BUFFER_SIZE*2);
+	BufferFiller bf = BufferFiller(tmp_buffer, TMP_BUFFER_SIZE_L);
 	int method = os.iopts[IOPT_USE_WEATHER];
 	// use manual adjustment call for monthly adjustment -- a bit ugly, but does not involve weather server changes
 	if(method==WEATHER_METHOD_MONTHLY) method=WEATHER_METHOD_MANUAL;
