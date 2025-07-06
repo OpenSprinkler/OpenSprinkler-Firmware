@@ -1211,6 +1211,11 @@ void turn_off_station(unsigned char sid, time_os_t curr_time, unsigned char shif
 		if (!station_bit) { return; }
 	} //else { return; }
 
+	#if defined(ARDUINO)
+	float curr_alert_value = os.read_current();
+	notif.add(NOTIFY_CURR_ALERT, sid, curr_alert_value);
+	#endif
+
 	os.set_station_bit(sid, 0);
 
 	// RAH implementation of flow sensor

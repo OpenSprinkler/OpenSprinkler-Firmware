@@ -178,7 +178,7 @@ const char iopt_json_names[] PROGMEM =
 	"laton"
 	"latof"
 	"ife2\0"
-	"resv4"
+	"imin\0"
 	"resv5"
 	"resv6"
 	"resv7"
@@ -257,7 +257,7 @@ const char iopt_prompts[] PROGMEM =
 	"Latch On Volt.  "
 	"Latch Off Volt. "
 	"Notif 2 Enable  "
-	"Reserved 4      "
+	"I min threshold "
 	"Reserved 5      "
 	"Reserved 6      "
 	"Reserved 7      "
@@ -335,7 +335,7 @@ const unsigned char iopt_max[] PROGMEM = {
 	24,
 	24,
 	255,
-	255,
+	250,
 	255,
 	255,
 	255,
@@ -2881,6 +2881,14 @@ void OpenSprinkler::lcd_print_option(int i) {
 			lcd.print((int)iopts[i]*4);
 			lcd_print_pgm(PSTR(" ms"));
 		}
+		#else
+		lcd.print('-');
+		#endif
+		break;
+	case IOPT_I_MIN_THRESHOLD:
+		#if defined(ARDUINO)
+		lcd.print((int)iopts[i]*4);
+		lcd_print_pgm(PSTR(" mA"));
 		#else
 		lcd.print('-');
 		#endif
