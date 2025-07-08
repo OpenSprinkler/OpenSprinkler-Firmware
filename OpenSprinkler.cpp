@@ -846,8 +846,8 @@ void OpenSprinkler::begin() {
 #if defined(ESP8266) // ESP8266 specific initializations
 
 	/* check hardware type */
-	if(detect_i2c(ACDR_I2CADDR)) hw_type = HW_TYPE_AC;
-	else if(detect_i2c(DCDR_I2CADDR)) hw_type = HW_TYPE_DC;
+	if(detect_i2c(DCDR_I2CADDR)) hw_type = HW_TYPE_DC;
+	else if(detect_i2c(ACDR_I2CADDR)) hw_type = HW_TYPE_AC;
 	else if(detect_i2c(LADR_I2CADDR)) hw_type = HW_TYPE_LATCH;
 
 	/* detect hardware revision type */
