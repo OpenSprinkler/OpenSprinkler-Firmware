@@ -495,7 +495,8 @@ enum {
 #else
 
 	#if defined(ARDUINO)
-	#define DEBUG_BEGIN(x)   {Serial.begin(115200);Serial.end();}
+	// work-around for PIN_SENSOR1 on OS3.2 and above
+	#define DEBUG_BEGIN(x)   {Serial.begin(115200); Serial.end();}
 	#else
 	#define DEBUG_BEGIN(x)   {}
 	#endif

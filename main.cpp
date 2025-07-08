@@ -108,10 +108,6 @@ int32_t flow_rt_period = 0;
 uint32_t reboot_timer = 0;
 
 void flow_poll() {
-	#if defined(ESP8266)
-	if(os.hw_rev>=2) pinMode(PIN_SENSOR1, INPUT_PULLUP); // TODO: is this still necessary?
-	#endif
-
 	ulong curr = millis();
 
 	// Resets counter if timeout occurs
@@ -124,6 +120,14 @@ void flow_poll() {
 	if (flow_rt_period < 0) {
 		last_flow_rt = curr;
 	}
+
+	#if defined(ESP8266)
+	if(os.hw_rev>=2) {
+		pinMode(PIN_SENSOR1, INPUT); // Work-around for PIN_SENSOR1 on OS3.2 and above
+		pinMode(PIN_SENSOR1, INPUT_PULLUP);
+	}
+	#endif
+
 
 	unsigned char curr_flow_state = digitalReadExt(PIN_SENSOR1);
 	if((!prev_flow_state) || curr_flow_state) { // only record on falling edge
