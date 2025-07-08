@@ -779,6 +779,11 @@ void server_change_runonce(OTF_PARAMS_DEF) {
 	boolean match_found = false;
 	for(sid=0;sid<os.nstations;sid++) {
 		dur=prog.durations[sid];
+		if(findKeyVal(FKV_SOURCE,tmp_buffer,TMP_BUFFER_SIZE,PSTR("uwt"),true)){
+			if((uint16_t)atol(tmp_buffer)){
+				dur = dur * os.iopts[IOPT_WATER_PERCENTAGE] / 100;
+			}
+		}
 		bid=sid>>3;
 		s=sid&0x07;
 		// if non-zero duration is given
@@ -2036,14 +2041,13 @@ void server_json_debug(OTF_PARAMS_DEF) {
 	(unsigned long)ESP.getFreeHeap());
 	FSInfo fs_info;
 	LittleFS.info(fs_info);
-	bfill.emit_p(PSTR(",\"flash\":$D,\"used\":$D,"), fs_info.totalBytes, fs_info.usedBytes);
+	bfill.emit_p(PSTR(",\"flash\":$D,\"used\":$D,\"devip\":\"$S\","), fs_info.totalBytes, fs_info.usedBytes, (useEth?eth.localIP():WiFi.localIP()).toString().c_str());
 	if(useEth) {
-		bfill.emit_p(PSTR("\"isW5500\":$D}"), eth.isW5500);
+		bfill.emit_p(PSTR("\"isW5500\":$D,\"spi_clock\":$L,\"arp_size\":$D}"), eth.isW5500, ETHER_SPI_CLOCK, ARP_TABLE_SIZE);
 	} else {
 		bfill.emit_p(PSTR("\"rssi\":$D,\"bssid\":\"$S\",\"bssidchl\":\"$O\"}"),
 		WiFi.RSSI(), WiFi.BSSIDstr().c_str(), SOPT_STA_BSSID_CHL);
 	}
-
 /*
 // print out all log files and all files in the main folder with file sizes
 	DEBUG_PRINTLN(F("List Files:"));
@@ -2120,7 +2124,7 @@ const char _url_keys[] PROGMEM =
 	"cu"
 	"ja"
 	"pq"
-    "db"
+	"db"
 #if defined(ARDUINO)
 	//"ff"
 #endif

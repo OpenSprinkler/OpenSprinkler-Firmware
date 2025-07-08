@@ -593,7 +593,7 @@ void urlEncode(char *urlbuf) {
 	urlbuf[newlen] = 0; // Null-terminate the new string
 
 	// Process in reverse to avoid overwriting
-	for (ssize_t i = len - 1, j = newlen - 1; i >= 0; i--) {
+	for (int i = len - 1, j = newlen - 1; i >= 0; i--) {
 		unsigned char c = urlbuf[i];
 		if (c == ' ' || c == '\"' || c == '\'' || c == '<' || c == '>' || c > 127) {
 			static const char hex[] = "0123456789ABCDEF";

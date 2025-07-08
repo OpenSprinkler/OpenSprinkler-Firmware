@@ -187,18 +187,18 @@ void load_wt_monthly(char* wto) {
 }
 
 void apply_monthly_adjustment(time_os_t curr_time) {
-		// ====== Check monthly water percentage ======
-		if(os.iopts[IOPT_USE_WEATHER]==WEATHER_METHOD_MONTHLY) {
+	// ====== Check monthly water percentage ======
+	if(os.iopts[IOPT_USE_WEATHER]==WEATHER_METHOD_MONTHLY) {
 #if defined(ARDUINO)
-			unsigned char m = month(curr_time)-1;
+		unsigned char m = month(curr_time)-1;
 #else
-			time_os_t ct = curr_time;
-			struct tm *ti = gmtime(&ct);
-			unsigned char m = ti->tm_mon;  // tm_mon ranges from [0,11]
+		time_os_t ct = curr_time;
+		struct tm *ti = gmtime(&ct);
+		unsigned char m = ti->tm_mon;  // tm_mon ranges from [0,11]
 #endif
-			if(os.iopts[IOPT_WATER_PERCENTAGE]!=wt_monthly[m]) {
-				os.iopts[IOPT_WATER_PERCENTAGE]=wt_monthly[m];
-				os.iopts_save();
-			}
+		if(os.iopts[IOPT_WATER_PERCENTAGE]!=wt_monthly[m]) {
+			os.iopts[IOPT_WATER_PERCENTAGE]=wt_monthly[m];
+			os.iopts_save();
 		}
+	}
 }
