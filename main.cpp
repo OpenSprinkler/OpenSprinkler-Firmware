@@ -460,10 +460,8 @@ void do_setup() {
         Serial.print("mA");
         Serial.print("\n");
   }
-
-  while (true) {
-    ESP.wdtFeed();
-  }
+  usb_pd.set_pps_voltage_mv(7500);
+  usb_pd.set_voltage_mode(CH224VoltageMode::Voltage_PPS);
 	/* Clear WDT reset flag. */
 #if defined(ESP8266)
 	WiFi.persistent(false);
