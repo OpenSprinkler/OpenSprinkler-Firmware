@@ -109,7 +109,7 @@ uint32_t reboot_timer = 0;
 
 void flow_poll() {
 	#if defined(ESP8266)
-	//if(os.hw_rev>=2) pinModeExt(PIN_SENSOR1, INPUT_PULLUP); // TODO: is this still necessary?
+	if(os.hw_rev>=2) pinMode(PIN_SENSOR1, INPUT_PULLUP); // TODO: is this still necessary?
 	#endif
 
 	ulong curr = millis();
@@ -148,10 +148,10 @@ void flow_poll() {
 		}
 	}
 
-	// Use exponential moving average (alpha=1/2) if flow has been previosuly calculated, otherwise just set the value
+	// Use exponential moving average (alpha=0.2) if flow has been previosuly calculated, otherwise just set the value
 	ulong curr_period = curr - last_flow_rt;
 	if (flow_rt_period > 0) {
-		flow_rt_period = (curr_period + flow_rt_period) >> 1;
+		flow_rt_period = (curr_period  / 5 + flow_rt_period * 4 / 5);
 	} else {
 		flow_rt_period = curr_period;
 	}
@@ -726,8 +726,8 @@ void do_loop()
 
 		#if defined(ESP8266)
 		if(os.hw_rev>=2) {
-			pinModeExt(PIN_SENSOR1, INPUT_PULLUP); // this seems necessary for OS 3.2
-			pinModeExt(PIN_SENSOR2, INPUT_PULLUP);
+			pinMode(PIN_SENSOR1, INPUT_PULLUP); // this seems necessary for OS 3.2
+			pinMode(PIN_SENSOR2, INPUT_PULLUP);
 		}
 		#endif
 

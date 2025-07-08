@@ -494,7 +494,11 @@ enum {
 
 #else
 
+	#if defined(ARDUINO)
+	#define DEBUG_BEGIN(x)   {Serial.begin(115200);Serial.end();}
+	#else
 	#define DEBUG_BEGIN(x)   {}
+	#endif
 	#define DEBUG_PRINT(x)   {}
 	#define DEBUG_PRINTLN(x) {}
 	#define DEBUG_PRINTF(x, ...)  {}
