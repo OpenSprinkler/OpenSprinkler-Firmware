@@ -36,6 +36,8 @@ char wt_rawData[TMP_BUFFER_SIZE];
 int wt_errCode = HTTP_RQT_NOT_RECEIVED;
 unsigned char wt_monthly[12] = {100,100,100,100,100,100,100,100,100,100,100,100};
 
+extern const char *user_agent_string;
+
 unsigned char findKeyVal (const char *str,char *strbuf, uint16_t maxlen,const char *key,bool key_in_pgm=false,uint8_t *keyfound=NULL);
 
 // The weather function calls getweather.py on remote server to retrieve weather data
@@ -144,29 +146,14 @@ void GetWeather() {
 								SOPT_WEATHER_OPTS,
 								(int)os.iopts[IOPT_FW_VERSION]);
 
-	char *src=tmp_buffer+strlen(tmp_buffer);
-	char *dst=tmp_buffer+TMP_BUFFER_SIZE-12;
 
-	char c;
-	// url encode. convert SPACE to %20
-	// copy reversely from the end because we are potentially expanding
-	// the string size
-	while(src!=tmp_buffer) {
-		c = *src--;
-		if(c==' ') {
-			*dst-- = '0';
-			*dst-- = '2';
-			*dst-- = '%';
-		} else {
-			*dst-- = c;
-		}
-	};
-	*dst = *src;
+	urlEncode(tmp_buffer);
 
 	strcpy(ether_buffer, "GET /");
-	strcat(ether_buffer, dst);
-	// because dst is part of tmp_buffer,
-	// must load weather url AFTER dst is copied to ether_buffer
+	strcat(ether_buffer, tmp_buffer);
+	// because we are using tmp_buffer both for encoding the string
+	// and for loading weather url, we will load weather url AFTER
+	// the encoded string has been copied into ether_buffer
 
 	// load weather url to tmp_buffer
 	char *host = tmp_buffer;
@@ -174,9 +161,12 @@ void GetWeather() {
 
 	strcat(ether_buffer, " HTTP/1.0\r\nHOST: ");
 	strcat(ether_buffer, host);
+	strcat(ether_buffer, "\r\nUser-Agent: ");
+	strcat(ether_buffer, user_agent_string);
 	strcat(ether_buffer, "\r\n\r\n");
 
 	wt_errCode = HTTP_RQT_NOT_RECEIVED;
+	DEBUG_PRINT(ether_buffer);
 	int ret = os.send_http_request(host, ether_buffer, getweather_callback_with_peel_header);
 	if(ret!=HTTP_RQT_SUCCESS) {
 		if(wt_errCode < 0) wt_errCode = ret;
@@ -197,18 +187,18 @@ void load_wt_monthly(char* wto) {
 }
 
 void apply_monthly_adjustment(time_os_t curr_time) {
-		// ====== Check monthly water percentage ======
-		if(os.iopts[IOPT_USE_WEATHER]==WEATHER_METHOD_MONTHLY) {
+	// ====== Check monthly water percentage ======
+	if(os.iopts[IOPT_USE_WEATHER]==WEATHER_METHOD_MONTHLY) {
 #if defined(ARDUINO)
-			unsigned char m = month(curr_time)-1;
+		unsigned char m = month(curr_time)-1;
 #else
-			time_os_t ct = curr_time;
-			struct tm *ti = gmtime(&ct);
-			unsigned char m = ti->tm_mon;  // tm_mon ranges from [0,11]
+		time_os_t ct = curr_time;
+		struct tm *ti = gmtime(&ct);
+		unsigned char m = ti->tm_mon;  // tm_mon ranges from [0,11]
 #endif
-			if(os.iopts[IOPT_WATER_PERCENTAGE]!=wt_monthly[m]) {
-				os.iopts[IOPT_WATER_PERCENTAGE]=wt_monthly[m];
-				os.iopts_save();
-			}
+		if(os.iopts[IOPT_WATER_PERCENTAGE]!=wt_monthly[m]) {
+			os.iopts[IOPT_WATER_PERCENTAGE]=wt_monthly[m];
+			os.iopts_save();
 		}
+	}
 }

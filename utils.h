@@ -56,6 +56,7 @@ ulong water_time_resolve(uint16_t v);
 unsigned char water_time_encode_signed(int16_t i);
 int16_t water_time_decode_signed(unsigned char i);
 void urlDecode(char *);
+void urlEncode(char *);
 void strReplaceQuoteBackslash(char *);
 void peel_http_header(char*);
 void strReplace(char *, char c, char r);
@@ -79,8 +80,8 @@ void str2mac(const char *_str, unsigned char mac[]);
 	const char* get_data_dir();
 	void set_data_dir(const char *new_data_dir);
 	char* get_filename_fullpath(const char *filename);
-    void delay(ulong ms);
-    void delayMicroseconds(ulong us);
+	void delay(ulong ms);
+	void delayMicroseconds(ulong us);
 	void delayMicrosecondsHard(ulong us);
 	ulong millis();
 	ulong micros();
@@ -99,17 +100,17 @@ void str2mac(const char *_str, unsigned char mac[]);
 	in_addr_t get_ip_address(char *iface);
 	#endif
 
-    enum BoardType {
-        Unknown,
-        RaspberryPi_Unknown,
-        RaspberryPi_bcm2712,
-        RaspberryPi_bcm2711,
-        RaspberryPi_bcm2837,
-        RaspberryPi_bcm2836,
-        RaspberryPi_bcm2835,
-    };
+	enum BoardType {
+		Unknown,
+		RaspberryPi_Unknown,
+		RaspberryPi_bcm2712,
+		RaspberryPi_bcm2711,
+		RaspberryPi_bcm2837,
+		RaspberryPi_bcm2836,
+		RaspberryPi_bcm2835,
+	};
 
-    BoardType get_board_type();
+	BoardType get_board_type();
 #endif
 
 #endif // _UTILS_H

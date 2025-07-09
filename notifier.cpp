@@ -35,6 +35,9 @@ extern ProgramData pd;
 extern char tmp_buffer[];
 extern char ether_buffer[];
 extern float flow_last_gpm;
+
+extern const char *user_agent_string;
+
 void remote_http_callback(char*);
 
 bool is_notif_enabled(uint16_t type) {
@@ -507,10 +510,11 @@ void push_message(uint16_t type, uint32_t lval, float fval, uint8_t bval) {
 		BufferFiller bf = BufferFiller(ether_buffer, TMP_BUFFER_SIZE);
 		bf.emit_p(PSTR("POST /trigger/sprinkler/with/key/$O HTTP/1.0\r\n"
 						"Host: $S\r\n"
+						"User-Agent: $S\r\n"
 						"Accept: */*\r\n"
 						"Content-Length: $D\r\n"
 						"Content-Type: application/json\r\n\r\n$S"),
-						SOPT_IFTTT_KEY, DEFAULT_IFTTT_URL, strlen(postval), postval);
+						SOPT_IFTTT_KEY, DEFAULT_IFTTT_URL, user_agent_string, strlen(postval), postval);
 
 		os.send_http_request(DEFAULT_IFTTT_URL, 80, ether_buffer, remote_http_callback);
 	}
