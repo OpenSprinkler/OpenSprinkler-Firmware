@@ -58,7 +58,7 @@ void ADS1115::_write_register(uint8_t reg, uint16_t value) {
 uint16_t ADS1115::_read_register(uint8_t reg) {
     uint8_t values[2];
     this->i2c.read(reg, 2, values);
-    return values[0] << 8 | values[1]
+    return values[0] << 8 | values[1];
 }
 #endif
 
