@@ -407,7 +407,7 @@ void ui_state_machine() {
 // ======================
 // Setup Function
 // ======================
-#include "ads1115.hpp"
+#include "ads1115.h"
 ADS1115 adc(0x48);
 #if defined(ARDUINO)
 void do_setup() {
@@ -555,17 +555,9 @@ void do_loop()
 	}
 
     int16_t val = adc.get_pin_value(0);
-    Serial.print("Pin 0: ");
-    Serial.print(val);
-    Serial.print("  -  ");
-    Serial.print(((float) val) * adc.get_scale_factor(0));
-    Serial.println("mV.");
+    printf("Pin 0: " PRId16 "  -  %fmV.", val, ((float) val) * adc.get_scale_factor(0));
     val = adc.get_pin_value(1);
-    Serial.print("Pin 1: ");
-    Serial.print(val);
-    Serial.print("  -  ");
-    Serial.print(((float) val) * adc.get_scale_factor(0));
-    Serial.println("mV.");
+    printf("Pin 0: " PRId16 "  -  %fmV.", val, ((float) val) * adc.get_scale_factor(0));
 
 
 	static time_os_t last_time = 0;
