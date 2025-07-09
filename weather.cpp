@@ -166,7 +166,7 @@ void GetWeather() {
 	strcat(ether_buffer, "\r\n\r\n");
 
 	wt_errCode = HTTP_RQT_NOT_RECEIVED;
-	DEBUG_PRINTLN(ether_buffer);
+	DEBUG_PRINT(ether_buffer);
 	int ret = os.send_http_request(host, ether_buffer, getweather_callback_with_peel_header);
 	if(ret!=HTTP_RQT_SUCCESS) {
 		if(wt_errCode < 0) wt_errCode = ret;

@@ -2093,7 +2093,7 @@ void OpenSprinkler::switch_remotestation(RemoteIPStationData *data, bool turnon,
 	bf.emit_p(PSTR(" HTTP/1.0\r\nHOST: $D.$D.$D.$D\r\n"),
 						ip[0],ip[1],ip[2],ip[3]);
 
-	bf.emit_p(PSTR(" User-Agent: $S\r\n\r\n"), user_agent_string);
+	bf.emit_p(PSTR("User-Agent: $S\r\n\r\n"), user_agent_string);
 
 	char server[20];
 	snprintf(server, 20, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
@@ -2132,7 +2132,7 @@ void OpenSprinkler::switch_remotestation(RemoteOTCStationData *data, bool turnon
 						turnon, timer);
 	bf.emit_p(PSTR(" HTTP/1.0\r\nHOST: $S\r\nConnection:close\r\n"), DEFAULT_OTC_SERVER_APP);
 
-	bf.emit_p(PSTR(" User-Agent: $S\r\n\r\n"), user_agent_string);
+	bf.emit_p(PSTR("User-Agent: $S\r\n\r\n"), user_agent_string);
 
 	send_http_request(DEFAULT_OTC_SERVER_APP, DEFAULT_OTC_PORT_APP, p, remote_http_callback, true);
 }
@@ -2158,7 +2158,7 @@ void OpenSprinkler::switch_httpstation(HTTPStationData *data, bool turnon, bool 
 	if(cmd==NULL || server==NULL) return; // proceed only if cmd and server are valid
 
 	bf.emit_p(PSTR("GET /$S HTTP/1.0\r\nHOST: $S\r\n"), cmd, server);
-	bf.emit_p(PSTR(" User-Agent: $S\r\n\r\n"), user_agent_string);
+	bf.emit_p(PSTR("User-Agent: $S\r\n\r\n"), user_agent_string);
 
 	send_http_request(server, atoi(port), p, remote_http_callback, usessl);
 }
