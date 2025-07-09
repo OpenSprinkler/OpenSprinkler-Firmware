@@ -67,6 +67,30 @@ public:
     }
   }
 
+  int send(unsigned char reg, unsigned char data) {
+    if (transaction) {
+      if (reg != transaction_id) {
+        return -1;
+      }
+
+      int res = 0;
+      if (transaction_buffer_length >= sizeof(transaction_buffer)) {
+        res = send_transaction();
+        transaction_buffer_length = 0;
+      }
+
+      transaction_buffer[transaction_buffer_length] = data;
+      transaction_buffer_length++;
+      return res;
+    } else {
+      return i2c_smbus_write_byte_data(_file, reg, data);
+    }
+  }
+
+  int read(unsigned char reg, unsigned char length, unsigned char *values) {
+    return i2c_smbus_read_i2c_block_data_or_emulated(_file, reg, length, values);
+  }
+
 private:
   int _file = -1;
   bool transaction = false;

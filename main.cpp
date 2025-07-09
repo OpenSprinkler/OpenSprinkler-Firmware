@@ -407,6 +407,8 @@ void ui_state_machine() {
 // ======================
 // Setup Function
 // ======================
+#include "ads1115.hpp"
+ADS1115 adc(0x48);
 #if defined(ARDUINO)
 void do_setup() {
 	/* Clear WDT reset flag. */
@@ -461,6 +463,7 @@ void do_setup() {
 		os.switch_special_station(sid, 0);
 	}
 
+    adc.begin();
 	os.button_timeout = LCD_BACKLIGHT_TIMEOUT;
 }
 
@@ -550,6 +553,10 @@ void do_loop()
 			flow_poll();
 		}
 	}
+
+    Serial.print("Pin 0: ");
+    Serial.print(adc.get_pin_value(0));
+    Serial.println(".");
 
 
 	static time_os_t last_time = 0;
