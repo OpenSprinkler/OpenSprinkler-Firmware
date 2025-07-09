@@ -8,19 +8,36 @@ extern "C" {
 #include <i2c/smbus.h>
 #include <linux/i2c-dev.h>
 }
-#include <string.h>
+#include <map>
+#include <string>
+#include <mutex>
 #include "utils.h"
 
 
 class I2CDevice {
 public:
-  I2CDevice() {}
+  I2CDevice() = default;
+  ~I2CDevice() {
+    closeBusIfUnused();
+  }
 
   int begin(const char *bus, unsigned char addr) {
-    _file = open(bus, O_RDWR);
-    if (_file < 0) {
-      return _file;
+    std::lock_guard<std::mutex> lock(_bus_mutex);
+
+    _bus = bus;
+    _addr = addr;
+
+    // Open bus if not already opened
+    if (_bus_fds.count(bus) == 0) {
+      int fd = open(bus, O_RDWR);
+      if (fd < 0) return fd;
+      _bus_fds[bus] = fd;
+      _bus_refcount[bus] = 1;
+    } else {
+      _bus_refcount[bus]++;
     }
+
+    _file = _bus_fds[bus];
 
     return ioctl(_file, I2C_SLAVE, addr);
   }
@@ -49,6 +66,9 @@ public:
   }
 
   int send(unsigned char reg, unsigned char data) {
+    std::lock_guard<std::mutex> lock(_bus_mutex);
+    int res = ioctl(_file, I2C_SLAVE, _addr);
+    if (res < 0) return res;
     if (transaction) {
       if (reg != transaction_id) {
         return -1;
@@ -69,11 +89,22 @@ public:
   }
 
   int read(unsigned char reg, unsigned char length, unsigned char *values) {
+    std::lock_guard<std::mutex> lock(_bus_mutex);
+    int res = ioctl(_file, I2C_SLAVE, _addr);
+    if (res < 0) return res;
     return i2c_smbus_read_i2c_block_data(_file, reg, length, values);
   }
 
 private:
   int _file = -1;
+  const char *_bus = nullptr;
+  unsigned char _addr = 0;
+
+  // Static map of open bus file descriptors
+  static std::map<std::string, int> _bus_fds;
+  static std::map<std::string, int> _bus_refcount;
+  static std::mutex _bus_mutex;
+
   bool transaction = false;
   unsigned char transaction_id = 0;
   unsigned char transaction_buffer[32];
@@ -98,6 +129,25 @@ private:
     return i2c_smbus_write_i2c_block_data(
         _file, transaction_id, transaction_buffer_length, transaction_buffer);
   }
+
+  void closeBusIfUnused() {
+    std::lock_guard<std::mutex> lock(_bus_mutex);
+    if (!_bus) return;
+    auto it = _bus_refcount.find(_bus);
+    if (it != _bus_refcount.end()) {
+      it->second--;
+      if (it->second <= 0) {
+        close(_bus_fds[_bus]);
+        _bus_fds.erase(_bus);
+        _bus_refcount.erase(it);
+      }
+    }
+  }
 };
+
+// Static members initialization
+std::map<std::string, int> I2CDevice::_bus_fds;
+std::map<std::string, int> I2CDevice::_bus_refcount;
+std::mutex I2CDevice::_bus_mutex;
 
 #endif // I2CD_H
