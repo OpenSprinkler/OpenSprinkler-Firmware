@@ -36,28 +36,26 @@ uint16_t ADS1115::_read_register(uint8_t reg) {
 }
 
 #else // OSPI
-ADS1115::ADS1115(uint8_t address) {
-    this->_address = address;
-    this->i2c = I2CDevice();
-}
+ADS1115::ADS1115(uint8_t address, I2CBus& bus) : _address(address), i2c(&bus, address) {}
+ADS1115::ADS1115(uint8_t address) : ADS1115(address, Bus) {}
 
 bool ADS1115::begin() {
-    if (this->i2c.begin(_address) < 0) {
-        return false;
-    }
+    // if (this->_i2c.begin(_address) < 0) {
+    //     return false;
+    // }
     return true;
 }
 
 void ADS1115::_write_register(uint8_t reg, uint16_t value) {
-    this->i2c.begin_transaction(reg);
-    this->i2c.send(reg, value >> 8);
-    this->i2c.send(reg, value & 0xFF);
-    this->i2c.end_transaction();
+    this->_i2c.begin_transaction(reg);
+    this->_i2c.send(reg, value >> 8);
+    this->_i2c.send(reg, value & 0xFF);
+    this->_i2c.end_transaction();
 }
 
 uint16_t ADS1115::_read_register(uint8_t reg) {
     uint8_t values[2];
-    this->i2c.read(reg, 2, values);
+    printf("res: %d \n", this->_i2c.read(reg, 2, values));
     return values[0] << 8 | values[1];
 }
 #endif

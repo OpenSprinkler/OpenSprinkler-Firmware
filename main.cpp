@@ -408,7 +408,8 @@ void ui_state_machine() {
 // Setup Function
 // ======================
 #include "ads1115.h"
-ADS1115 adc(0x48);
+I2CBus bus();
+ADS1115 adc(bus, 0x48);
 #if defined(ARDUINO)
 void do_setup() {
 	/* Clear WDT reset flag. */
@@ -463,7 +464,6 @@ void do_setup() {
 		os.switch_special_station(sid, 0);
 	}
 
-    adc.begin();
 	os.button_timeout = LCD_BACKLIGHT_TIMEOUT;
 }
 
@@ -488,6 +488,7 @@ ISR(WDT_vect)
 void initialize_otf();
 
 void do_setup() {
+    bus.begin()
 	initialiseEpoch();   // initialize time reference for millis() and micros()
 	os.begin();          // OpenSprinkler init
 	os.options_setup();  // Setup options

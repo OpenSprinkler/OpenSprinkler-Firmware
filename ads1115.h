@@ -16,8 +16,10 @@ class ADS1115 : AnalogSensor {
 public:
 #if defined(ARDUINO)
   ADS1115(uint8_t address, TwoWire& wire);
+#else
+  ADS1115(uint8_t address, I2CBus& bus);
 #endif
-  ADS1115(uint8_t address);
+ADS1115(uint8_t address);
   int16_t get_pin_value(uint8_t pin);
   bool begin();
 
@@ -48,7 +50,7 @@ public:
 #if defined(ARDUINO)
   TwoWire *_wire;
 #else
-  I2CDevice i2c;
+  I2CDevice _i2c;
 #endif
 
   void _write_register(uint8_t reg, uint16_t value);

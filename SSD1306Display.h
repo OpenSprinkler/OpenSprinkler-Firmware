@@ -174,7 +174,6 @@ public:
   SSD1306Display(uint8_t addr, uint8_t _sda, uint8_t _scl) {
     cx = 0;
     cy = 0;
-    _addr = addr;
     for (uint8_t i = 0; i < NUM_CUSTOM_ICONS; i++)
       custom_chars[i] = 0;
 
@@ -183,7 +182,7 @@ public:
     height = 64;
     width = 128;
 
-    i2c = I2CDevice();
+    i2c = I2CDevice(Bus, addr);
   }
 
   ~SSD1306Display() {
@@ -194,8 +193,6 @@ public:
   void init() {} // Dummy function to match ESP8266
 
   int begin() {
-    i2c.begin(_addr);
-
     setFont(Monospaced_plain_13);
     fontWidth = 8;
     fontHeight = 16;
@@ -541,7 +538,6 @@ private:
   uint8_t *font;
 
   I2CDevice i2c;
-  unsigned char _addr;
 
   unsigned char height;
   unsigned char width;
