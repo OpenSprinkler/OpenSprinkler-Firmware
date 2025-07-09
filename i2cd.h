@@ -2,6 +2,7 @@
 #define I2CD_H
 
 #include <fcntl.h>
+#include <unistd.h>
 #include <sys/ioctl.h>
 
 extern "C" {
@@ -144,10 +145,4 @@ private:
     }
   }
 };
-
-// Static members initialization
-std::map<std::string, int> I2CDevice::_bus_fds;
-std::map<std::string, int> I2CDevice::_bus_refcount;
-std::mutex I2CDevice::_bus_mutex;
-
 #endif // I2CD_H

@@ -6,7 +6,7 @@ LD=$(CXX)
 LIBS=pthread mosquitto ssl crypto i2c gpiod
 LDFLAGS=$(addprefix -l,$(LIBS))
 BINARY=OpenSprinkler
-SOURCES=main.cpp OpenSprinkler.cpp notifier.cpp program.cpp opensprinkler_server.cpp utils.cpp weather.cpp gpio.cpp mqtt.cpp smtp.c RCSwitch.cpp ads1115.cpp $(wildcard external/TinyWebsockets/tiny_websockets_lib/src/*.cpp) $(wildcard external/OpenThings-Framework-Firmware-Library/*.cpp)
+SOURCES=main.cpp OpenSprinkler.cpp notifier.cpp program.cpp opensprinkler_server.cpp utils.cpp weather.cpp gpio.cpp mqtt.cpp smtp.c RCSwitch.cpp i2cd.cpp ads1115.cpp $(wildcard external/TinyWebsockets/tiny_websockets_lib/src/*.cpp) $(wildcard external/OpenThings-Framework-Firmware-Library/*.cpp)
 HEADERS=$(wildcard *.h) $(wildcard *.hpp)
 OBJECTS=$(addsuffix .o,$(basename $(SOURCES)))
 
