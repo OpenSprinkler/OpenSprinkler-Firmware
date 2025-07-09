@@ -104,7 +104,7 @@ ulong flow_begin, flow_start, flow_stop, flow_gallons, flow_rt_reset, last_flow_
 ulong flow_count = 0;
 unsigned char prev_flow_state = HIGH;
 float flow_last_gpm = 0;
-int32_t flow_rt_period = 0;
+int32_t flow_rt_period = -1;
 uint32_t reboot_timer = 0;
 
 void flow_poll() {
