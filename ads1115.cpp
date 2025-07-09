@@ -1,4 +1,4 @@
-#include <ads1115.hpp>
+#include "ads1115.h"
 
 #if defined(ARDUINO)
 ADS1115::ADS1115(uint8_t address, TwoWire& wire) : _address(address), _wire(&wire) {}
