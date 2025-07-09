@@ -5,7 +5,6 @@
 
 class AnalogSensor {
 public:
-  virtual void poll();
   virtual uint8_t pin_count();
   virtual int16_t get_pin_value(uint8_t pin);
   virtual float get_scale_constant(uint8_t pin);

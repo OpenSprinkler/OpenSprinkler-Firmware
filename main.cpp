@@ -554,9 +554,18 @@ void do_loop()
 		}
 	}
 
+    int16_t val = adc.get_pin_value(0);
     Serial.print("Pin 0: ");
-    Serial.print(adc.get_pin_value(0));
-    Serial.println(".");
+    Serial.print(val);
+    Serial.print("  -  ");
+    Serial.print(((float) val) * adc.get_scale_factor(0));
+    Serial.println("mV.");
+    val = adc.get_pin_value(1);
+    Serial.print("Pin 1: ");
+    Serial.print(val);
+    Serial.print("  -  ");
+    Serial.print(((float) val) * adc.get_scale_factor(0));
+    Serial.println("mV.");
 
 
 	static time_os_t last_time = 0;
