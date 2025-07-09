@@ -885,7 +885,11 @@ void OpenSprinkler::begin() {
 	} else {
 
 		if(hw_type==HW_TYPE_DC) {
-			drio = new PCA9555(DCDR_I2CADDR);
+            if (detect_i2c(ACDR_I2CADDR)) {
+                drio = new PCA9555(ACDR_I2CADDR);    // 3.4 with USB PD
+            } else {
+                drio = new PCA9555(DCDR_I2CADDR);
+            }
 		} else if(hw_type==HW_TYPE_LATCH) {
 			drio = new PCA9555(LADR_I2CADDR);
 		} else {
