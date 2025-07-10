@@ -8,7 +8,7 @@ bool ADS1115::begin() {
     if ((this->_address < 0x48) || (this->_address > 0x4B)) {
         return false;
     }
-   this-> _wire->beginTransmission(_address);
+    this->_wire->beginTransmission(_address);
     return (this->_wire->endTransmission() == 0);
 }
 
@@ -16,8 +16,8 @@ bool ADS1115::begin() {
 void ADS1115::_write_register(uint8_t reg, uint16_t value) {
     this->_wire->beginTransmission(this->_address);
     this->_wire->write(reg);
-    this->_wire->write((uint8_t) (value >> 8));
-    this->_wire->write((uint8_t) (value & 0xFF));
+    this->_wire->write((uint8_t)(value >> 8));
+    this->_wire->write((uint8_t)(value & 0xFF));
     this->_wire->endTransmission();
 }
 
@@ -25,9 +25,9 @@ uint16_t ADS1115::_read_register(uint8_t reg) {
     this->_wire->beginTransmission(this->_address);
     this->_wire->write(reg);
     if (!this->_wire->endTransmission()) {
-        if (this->_wire->requestFrom((int) _address, (int) 2) == 2) {
-            uint16_t val = ((uint16_t) this->_wire->read()) << 8;
-            val += (uint16_t) this->_wire->read();
+        if (this->_wire->requestFrom((int)_address, (int)2) == 2) {
+            uint16_t val = ((uint16_t)this->_wire->read()) << 8;
+            val += (uint16_t)this->_wire->read();
             return val;
         }
     }
@@ -54,33 +54,44 @@ void ADS1115::_write_register(uint8_t reg, uint16_t value) {
 }
 
 uint16_t ADS1115::_read_register(uint8_t reg) {
-    return this->swap_reg((uint16_t) (this->_i2c.read_word(reg) & 0xFFFF));
+    return this->swap_reg((uint16_t)(this->_i2c.read_word(reg) & 0xFFFF));
 }
 #endif
 
 int16_t ADS1115::get_pin_value(uint8_t pin) {
-    #if defined(ARDUINO)
-    uint32_t start;
-    #else
-    ulong start;
-    #endif
     this->request_pin(pin);
-    start = millis();
+    ulong start = millis();
     while (this->is_busy()) {
         // if ((millis() - start) > 11) {
         if ((millis() - start) > 18) {
             return 0;
         }
 
-        #if defined(ARDUINO)
+#if defined(ARDUINO)
         yield();
-        #endif
+#endif
     }
 
     return this->get_value();
 }
 
 void ADS1115::request_pin(uint8_t pin) {
-    uint16_t config = 0x8000 | ((4 + ((uint16_t) pin)) << 12) | 0x0100 | (4 << 5);
+    uint16_t config = 0x8000 | ((4 + ((uint16_t)pin)) << 12) | 0x0100 | (4 << 5);
     this->_write_register(0x01, config);
 }
+
+ADS1115Sensor::ADS1115Sensor(unsigned long interval, float min, float max, float scale, float offset, char* name, SensorUnit unit, ADS1115** sensors, uint8_t sensor_index, uint8_t pin) : 
+Sensor(interval, min, max, scale, offset, name, unit), 
+sensors(sensors), 
+sensor_index(sensor_index), 
+pin(pin) {}
+
+void ADS1115Sensor::_update_raw_value() {
+    if (this->sensors[sensor_index] == nullptr) {
+        this->value = 0.0;
+    }
+    else {
+        this->value = ((float)this->sensors[sensor_index]->get_pin_value(this->pin)) * ADS1115_SCALE_FACTOR;
+    }
+}
+
