@@ -556,12 +556,9 @@ void do_loop()
 		}
 	}
 
-    int16_t val = adc.get_pin_value(0);
-    Serial.printf("Pin 0: %" PRId16 "  -  %fmV.\n", val, ((float) val) * adc.get_scale_factor(0));
-    // printf("Pin 0: %" PRId16 "  -  %fmV.\n", val, ((float) val) * adc.get_scale_factor(0));
-    val = adc.get_pin_value(1);
-    Serial.printf("Pin 1: %" PRId16 "  -  %fmV.\n", val, ((float) val) * adc.get_scale_factor(1));
-    // printf("Pin 1: %" PRId16 "  -  %fmV.\n", val, ((float) val) * adc.get_scale_factor(1));
+    float temp = (((float)adc.get_pin_value(0)) * adc.get_scale_factor(0) * 0.1) - 50.0;
+    float moisture = ((float)adc.get_pin_value(1)) * adc.get_scale_factor(1) * (50.0/3000.0);
+    Serial.printf("Temp: %f - moisture: %f\n", temp, moisture);
 
 
 	static time_os_t last_time = 0;
