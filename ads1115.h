@@ -51,6 +51,9 @@ ADS1115(uint8_t address);
   TwoWire *_wire;
 #else
   I2CDevice _i2c;
+  uint16_t swap_reg(uint16_t val) {
+    return (val << 8) | (val >> 8);
+  }
 #endif
 
   void _write_register(uint8_t reg, uint16_t value);

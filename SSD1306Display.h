@@ -171,7 +171,7 @@ private:
 
 class SSD1306Display {
 public:
-  SSD1306Display(uint8_t addr, uint8_t _sda, uint8_t _scl) {
+  SSD1306Display(uint8_t addr, uint8_t _sda, uint8_t _scl) : i2c(Bus, addr) {
     cx = 0;
     cy = 0;
     for (uint8_t i = 0; i < NUM_CUSTOM_ICONS; i++)
@@ -181,8 +181,6 @@ public:
 
     height = 64;
     width = 128;
-
-    i2c = I2CDevice(Bus, addr);
   }
 
   ~SSD1306Display() {

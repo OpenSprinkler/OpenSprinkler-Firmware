@@ -408,10 +408,10 @@ void ui_state_machine() {
 // Setup Function
 // ======================
 #include "ads1115.h"
-I2CBus bus();
-ADS1115 adc(bus, 0x48);
+ADS1115 adc(0x48);
 #if defined(ARDUINO)
 void do_setup() {
+    adc.begin();
 	/* Clear WDT reset flag. */
 #if defined(ESP8266)
 	WiFi.persistent(false);
@@ -488,7 +488,8 @@ ISR(WDT_vect)
 void initialize_otf();
 
 void do_setup() {
-    bus.begin()
+    Bus.begin();
+    adc.begin();
 	initialiseEpoch();   // initialize time reference for millis() and micros()
 	os.begin();          // OpenSprinkler init
 	os.options_setup();  // Setup options
@@ -556,9 +557,11 @@ void do_loop()
 	}
 
     int16_t val = adc.get_pin_value(0);
-    printf("Pin 0: " PRId16 "  -  %fmV.", val, ((float) val) * adc.get_scale_factor(0));
+    Serial.printf("Pin 0: %" PRId16 "  -  %fmV.\n", val, ((float) val) * adc.get_scale_factor(0));
+    // printf("Pin 0: %" PRId16 "  -  %fmV.\n", val, ((float) val) * adc.get_scale_factor(0));
     val = adc.get_pin_value(1);
-    printf("Pin 0: " PRId16 "  -  %fmV.", val, ((float) val) * adc.get_scale_factor(0));
+    Serial.printf("Pin 1: %" PRId16 "  -  %fmV.\n", val, ((float) val) * adc.get_scale_factor(1));
+    // printf("Pin 1: %" PRId16 "  -  %fmV.\n", val, ((float) val) * adc.get_scale_factor(1));
 
 
 	static time_os_t last_time = 0;

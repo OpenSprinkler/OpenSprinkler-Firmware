@@ -32,7 +32,7 @@ public:
     return i2c_smbus_write_byte_data(_file, reg, data);
   }
 
-  int send_transaction(unsigned char addr, unsigned char transaction_id, unsigned char *transaction_buffer, unsigned char transaction_buffer_length) {
+  int send_transaction(unsigned char addr, unsigned char transaction_id, unsigned char transaction_buffer_length, unsigned char *transaction_buffer) {
     int res = ioctl(_file, I2C_SLAVE, addr);
     if (res < 0) return -1;
     return i2c_smbus_write_i2c_block_data(
@@ -43,6 +43,30 @@ public:
     int res = ioctl(_file, I2C_SLAVE, addr);
     if (res < 0) return -1;
     return i2c_smbus_read_i2c_block_data(_file, reg, length, values);
+  }
+
+  int send_word(unsigned char addr, unsigned char reg, unsigned short data) {
+    int res = ioctl(_file, I2C_SLAVE, addr);
+    if (res < 0) return -1;
+    return i2c_smbus_write_word_data(_file, reg, data);
+  }
+
+  int read_word(unsigned char addr, unsigned char reg) {
+    int res = ioctl(_file, I2C_SLAVE, addr);
+    if (res < 0) return -1;
+    return i2c_smbus_read_word_data(_file, reg);
+  }
+
+  int detect(unsigned char addr) {
+    int res = ioctl(_file, I2C_SLAVE, addr);
+    if (res < 0) return -1;
+    
+    res = i2c_smbus_read_byte(_file);
+    if (res < 0) {
+        return res;
+    } else {
+        return 0;
+    }
   }
 
 private:
@@ -67,6 +91,10 @@ private:
 class I2CDevice {
 public:
   I2CDevice(I2CBus &bus, unsigned char addr) : _addr(addr), _bus(&bus) {}
+
+  bool detect() {
+    return _bus->detect(_addr);
+  }
 
   int begin_transaction(unsigned char id) {
     if (transaction) {
@@ -113,6 +141,14 @@ public:
     return _bus->read(_addr, reg, length, values);
   }
 
+  int send_word(unsigned char reg, unsigned short data) {
+    return _bus->send_word(_addr, reg, data);
+  }
+
+  int read_word(unsigned char reg) {
+    return _bus->read_word(_addr, reg);
+  }
+
 private:
   I2CBus *_bus;
   unsigned char _addr;
@@ -143,6 +179,6 @@ private:
   }
 };
 
-static I2CBus Bus;
+extern I2CBus Bus;
 
 #endif // I2CD_H

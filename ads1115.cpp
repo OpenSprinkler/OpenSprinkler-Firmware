@@ -36,34 +36,36 @@ uint16_t ADS1115::_read_register(uint8_t reg) {
 }
 
 #else // OSPI
-ADS1115::ADS1115(uint8_t address, I2CBus& bus) : _address(address), i2c(&bus, address) {}
+ADS1115::ADS1115(uint8_t address, I2CBus& bus) : _address(address), _i2c(bus, address) {}
 ADS1115::ADS1115(uint8_t address) : ADS1115(address, Bus) {}
 
 bool ADS1115::begin() {
-    // if (this->_i2c.begin(_address) < 0) {
-    //     return false;
-    // }
+    if ((this->_address < 0x48) || (this->_address > 0x4B)) {
+        return false;
+    }
+    if (this->_i2c.detect() < 0) {
+        return false;
+    }
     return true;
 }
 
 void ADS1115::_write_register(uint8_t reg, uint16_t value) {
-    this->_i2c.begin_transaction(reg);
-    this->_i2c.send(reg, value >> 8);
-    this->_i2c.send(reg, value & 0xFF);
-    this->_i2c.end_transaction();
+    this->_i2c.send_word(reg, this->swap_reg(value));
 }
 
 uint16_t ADS1115::_read_register(uint8_t reg) {
-    uint8_t values[2];
-    printf("res: %d \n", this->_i2c.read(reg, 2, values));
-    return values[0] << 8 | values[1];
+    return this->swap_reg((uint16_t) (this->_i2c.read_word(reg) & 0xFFFF));
 }
 #endif
 
 int16_t ADS1115::get_pin_value(uint8_t pin) {
+    #if defined(ARDUINO)
+    uint32_t start;
+    #else
+    ulong start;
+    #endif
     this->request_pin(pin);
-
-    uint32_t start = millis();
+    start = millis();
     while (this->is_busy()) {
         // if ((millis() - start) > 11) {
         if ((millis() - start) > 18) {
