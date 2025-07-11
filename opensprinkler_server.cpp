@@ -2003,6 +2003,10 @@ void server_json_all(OTF_PARAMS_DEF) {
 	send_packet(OTF_PARAMS);
 	bfill.emit_p(PSTR(",\"stations\":{"));
 	server_json_stations_main(OTF_PARAMS);
+    #if defined(USE_SENSORS)
+	bfill.emit_p(PSTR(",\"sensors\":{"));
+	server_json_sensors_main(OTF_PARAMS);
+    #endif
 	bfill.emit_p(PSTR("}"));
 	handle_return(HTML_OK);
 }
@@ -2071,7 +2075,8 @@ void server_json_debug(OTF_PARAMS_DEF) {
 	handle_return(HTML_OK);
 }
 
-void server_json_sensor_main() {
+#if defined(USE_SENSORS)
+void server_json_sensors_main(OTF_PARAMS_DEF) {
 	bfill.emit_p(PSTR("\"sn\":["));
 	unsigned char i;
 
@@ -2100,7 +2105,7 @@ void server_json_sensors(OTF_PARAMS_DEF)
 #endif
 
 	bfill.emit_p(PSTR("{"));
-	server_json_sensor_main();
+	server_json_sensors_main(OTF_PARAMS);
 	handle_return(HTML_OK);
 }
 
@@ -2140,6 +2145,7 @@ void server_delete_sensor(OTF_PARAMS_DEF) {
 
 	handle_return(HTML_SUCCESS);
 }
+#endif
 
 /*
 // fill ESP8266 flash with some dummy files
@@ -2197,9 +2203,11 @@ const char *uris[] PROGMEM = {
     "ja",
     "pq",
     "db",
-    "jsn"
-    "csn"
-    "dsn"
+    #if defined(USE_SENSORS)
+    "jsn",
+    "csn",
+    "dsn",
+    #endif
 };
 
 // Server function handlers
@@ -2227,9 +2235,11 @@ URLHandler urls[] = {
 	server_json_all,        // ja
 	server_pause_queue,     // pq
 	server_json_debug,      // db
+    #if defined(USE_SENSORS)
     server_json_sensors,      // jsn
-    server_change_sensor,      // csn
-    server_delete_sensor      // dsn
+    server_change_sensor,     // csn
+    server_delete_sensor,     // dsn
+    #endif
 };
 #else
 const char _url_keys[] PROGMEM =

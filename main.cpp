@@ -551,7 +551,9 @@ void do_loop()
 		}
 	}
 
+    #if defined(USE_SENSORS)
     os.poll_sensors();
+    #endif
 
 	static time_os_t last_time = 0;
 	static ulong last_minute = 0;

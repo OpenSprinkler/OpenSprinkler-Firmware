@@ -29,7 +29,9 @@
 #include "ArduinoJson.hpp"
 
 /** Declare static data members */
+#if defined(USE_SENSORS)
 Sensor *OpenSprinkler::sensors[64] = {nullptr};
+#endif
 OSMqtt OpenSprinkler::mqtt;
 NVConData OpenSprinkler::nvdata;
 ConStatus OpenSprinkler::status;
@@ -2562,6 +2564,7 @@ void OpenSprinkler::raindelay_stop() {
 	nvdata_save();
 }
 
+#if defined(USE_SENSORS)
 /** Sensor functions */
 void OpenSprinkler::poll_sensors() {
     for (size_t i = 0; i < MAX_SENSORS; i++) {
@@ -2571,6 +2574,7 @@ void OpenSprinkler::poll_sensors() {
     }
     
 }
+#endif
 
 /** LCD and button functions */
 #if defined(USE_DISPLAY)

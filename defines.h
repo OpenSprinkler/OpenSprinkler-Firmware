@@ -436,6 +436,7 @@ enum {
 	#define USE_SSD1306
     
     #define USE_ADS1115
+    #define USE_SENSORS
 
 #elif defined(OSPI) // for OSPi
 
@@ -462,6 +463,7 @@ enum {
 	#define USE_SSD1306
 
     #define USE_ADS1115
+    #define USE_SENSORS
 
 #else // for demo / simulation
 	// use fake hardware pins
