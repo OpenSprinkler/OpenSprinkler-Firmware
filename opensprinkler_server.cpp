@@ -2089,7 +2089,7 @@ void server_json_sensor_main() {
 }
 
 /** Sensor status */
-void server_json_sensor(OTF_PARAMS_DEF)
+void server_json_sensors(OTF_PARAMS_DEF)
 {
 #if defined(USE_OTF)
 	if(!process_password(OTF_PARAMS)) return;
@@ -2102,6 +2102,43 @@ void server_json_sensor(OTF_PARAMS_DEF)
 	bfill.emit_p(PSTR("{"));
 	server_json_sensor_main();
 	handle_return(HTML_OK);
+}
+
+/**
+ * Delete a sensor
+ * Command: /dsn?pw=xxx&sid=xxx
+ *
+ * pw: password
+ * sid:staiton index (-1 will delete all programs)
+ */
+void server_delete_sensor(OTF_PARAMS_DEF) {
+#if defined(USE_OTF)
+	if(!process_password(OTF_PARAMS)) return;
+#else
+	char *p = get_buffer;
+#endif
+	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("sid"), true))
+		handle_return(HTML_DATA_MISSING);
+
+	int sid=atoi(tmp_buffer);
+	if (sid == -1) {
+        uint8_t i;
+        for (i=0;i<MAX_SENSORS;i++) {
+            if (os.sensors[i]) {
+                delete os.sensors[i];
+                os.sensors[i] = nullptr;
+            }
+        }
+	} else if (sid < MAX_SENSORS) {
+		if (os.sensors[sid]) {
+            delete os.sensors[sid];
+            os.sensors[sid] = nullptr;
+        }
+	} else {
+		handle_return(HTML_DATA_OUTOFBOUND);
+	}
+
+	handle_return(HTML_SUCCESS);
 }
 
 /*
@@ -2160,7 +2197,9 @@ const char *uris[] PROGMEM = {
     "ja",
     "pq",
     "db",
-    "jsr"
+    "jsn"
+    "csn"
+    "dsn"
 };
 
 // Server function handlers
@@ -2188,7 +2227,9 @@ URLHandler urls[] = {
 	server_json_all,        // ja
 	server_pause_queue,     // pq
 	server_json_debug,      // db
-    server_json_sensor      // jsr
+    server_json_sensors,      // jsn
+    server_change_sensor,      // csn
+    server_delete_sensor      // dsn
 };
 #else
 const char _url_keys[] PROGMEM =
