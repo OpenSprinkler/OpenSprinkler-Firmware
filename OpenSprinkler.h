@@ -76,6 +76,12 @@
 	#include "SSD1306Display.h"
 #endif
 
+#include "sensor.h"
+
+#if defined(USE_ADS1115)
+	#include "ads1115.h"
+#endif
+
 #if defined(ARDUINO)
 	#if defined(ESP8266)
 	extern ESP8266WebServer *update_server;
@@ -245,6 +251,12 @@ public:
 	static LiquidCrystal lcd;   // 16x2 character LCD
 #endif
 
+#if defined(USE_ADS1115)
+    static ADS1115 *ads1115_devices[4];
+#endif
+
+    static Sensor *sensors[MAX_SENSORS];
+
 #if defined(OSPI)
 	static unsigned char pin_sr_data;  // RPi shift register data pin to handle RPi rev. 1
 #endif
@@ -371,6 +383,9 @@ public:
 	#if defined(USE_OTF)
 	static OTCConfig otc;
 	#endif
+
+    // -- Sensor functions
+    static void poll_sensors();
 
 	// -- LCD functions
 #if defined(USE_DISPLAY)

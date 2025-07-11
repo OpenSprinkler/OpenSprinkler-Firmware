@@ -49,9 +49,9 @@ ADS1115(uint8_t address);
 };
 
 
-class ADS1115Sensor : Sensor {
+class ADS1115Sensor : public Sensor {
     public:
-    ADS1115Sensor(unsigned long interval, float min, float max, float scale, float offset, char *name, SensorUnit unit, ADS1115 **sensors, uint8_t sensor_index, uint8_t pin);
+    ADS1115Sensor(unsigned long interval, float min, float max, float scale, float offset, const char *name, SensorUnit unit, ADS1115 **sensors, uint8_t sensor_index, uint8_t pin);
 
     SensorType get_sensor_type() {
         return SensorType::ADS1115;

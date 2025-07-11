@@ -52,7 +52,7 @@ enum class SensorUnit {
 
 class Sensor {
 public:
-  Sensor(unsigned long interval, float min, float max, float scale, float offset, char *name, SensorUnit unit);
+  Sensor(unsigned long interval, float min, float max, float scale, float offset, const char *name, SensorUnit unit);
   void poll();
 
   unsigned long interval = 1;
@@ -61,7 +61,7 @@ public:
   float max = 0.0;
   float scale = 0.0;
   float offset = 0.0;
-  char name[32] = {0};
+  char name[33] = {0};
   SensorUnit unit = SensorUnit::None;
   
   SensorType virtual get_sensor_type() = 0;
@@ -79,9 +79,9 @@ enum class EnsembleAction {
 };
 
 
-class EnsembleSensor : Sensor {
+class EnsembleSensor : public Sensor {
     public:
-    EnsembleSensor(unsigned long interval, float min, float max, float scale, float offset, char *name, SensorUnit unit, Sensor **sensors, uint64_t sensor_mask, EnsembleAction action);
+    EnsembleSensor(unsigned long interval, float min, float max, float scale, float offset, const char *name, SensorUnit unit, Sensor **sensors, uint64_t sensor_mask, EnsembleAction action);
 
     SensorType get_sensor_type() {
         return SensorType::Ensemble;

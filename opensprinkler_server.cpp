@@ -2071,6 +2071,39 @@ void server_json_debug(OTF_PARAMS_DEF) {
 	handle_return(HTML_OK);
 }
 
+void server_json_sensor_main() {
+	bfill.emit_p(PSTR("\"sn\":["));
+	unsigned char i;
+
+    uint8_t sensor_count = 0;
+
+	for (i=0;i<MAX_SENSORS;i++) {
+        Sensor *sensor = os.sensors[i];
+        if (sensor) {
+            if (sensor_count) bfill.emit_p(PSTR(","));
+            bfill.emit_p(PSTR("{\"id\":$D,\"name\":\"$S\",\"unit\":$D,\"interval\":$L,\"max\":$E,\"min\":$E,\"scale\":$E,\"offset\":$E,\"value\":$E}"), i, sensor->name, sensor->unit, sensor->interval, sensor->max, sensor->min, sensor->scale, sensor->offset, sensor->value);
+            sensor_count += 1;
+        }
+	}
+	bfill.emit_p(PSTR("],\"count\":$D}"), sensor_count);
+}
+
+/** Sensor status */
+void server_json_sensor(OTF_PARAMS_DEF)
+{
+#if defined(USE_OTF)
+	if(!process_password(OTF_PARAMS)) return;
+	rewind_ether_buffer();
+	print_header(OTF_PARAMS);
+#else
+	print_header();
+#endif
+
+	bfill.emit_p(PSTR("{"));
+	server_json_sensor_main();
+	handle_return(HTML_OK);
+}
+
 /*
 // fill ESP8266 flash with some dummy files
 void server_fill_files(OTF_PARAMS_DEF) {
@@ -2101,6 +2134,63 @@ typedef void (*URLHandler)(OTF_PARAMS_DEF);
  * The order must exactly match the order of the
  * handler functions below
  */
+
+#if defined(USE_OTF)
+const char *uris[] PROGMEM = {
+    "cv",
+    "jc",
+    "dp",
+    "cp",
+    "cr",
+    "mp",
+    "up",
+    "jp",
+    "co",
+    "jo",
+    "sp",
+    "js",
+    "cm",
+    "cs",
+    "jn",
+    "je",
+    "jl",
+    "dl",
+    "su",
+    "cu",
+    "ja",
+    "pq",
+    "db",
+    "jsr"
+};
+
+// Server function handlers
+URLHandler urls[] = {
+	server_change_values,   // cv
+	server_json_controller, // jc
+	server_delete_program,  // dp
+	server_change_program,  // cp
+	server_change_runonce,  // cr
+	server_manual_program,  // mp
+	server_moveup_program,  // up
+	server_json_programs,   // jp
+	server_change_options,  // co
+	server_json_options,    // jo
+	server_change_password, // sp
+	server_json_status,     // js
+	server_change_manual,   // cm
+	server_change_stations, // cs
+	server_json_stations,   // jn
+	server_json_station_special,// je
+	server_json_log,        // jl
+	server_delete_log,      // dl
+	server_view_scripturl,  // su
+	server_change_scripturl,// cu
+	server_json_all,        // ja
+	server_pause_queue,     // pq
+	server_json_debug,      // db
+    server_json_sensor      // jsr
+};
+#else
 const char _url_keys[] PROGMEM =
 	"cv"
 	"jc"
@@ -2129,7 +2219,6 @@ const char _url_keys[] PROGMEM =
 	//"ff"
 #endif
 	;
-
 // Server function handlers
 URLHandler urls[] = {
 	server_change_values,   // cv
@@ -2159,6 +2248,7 @@ URLHandler urls[] = {
 	//server_fill_files,
 #endif
 };
+#endif
 
 // handle Ethernet request
 #if defined(ESP8266)
@@ -2238,14 +2328,14 @@ void start_server_client() {
 		otf->on("/update", on_sta_update, OTF::HTTP_GET); // handle firmware update
 		update_server->on("/update", HTTP_POST, on_sta_upload_fin, on_sta_upload);
 
+        char uri_buf[10] = {0};
+        uri_buf[0] = '/';
+
 		// set up all other handlers
-		char uri[4];
-		uri[0]='/';
-		uri[3]=0;
 		for(unsigned char i=0;i<sizeof(urls)/sizeof(URLHandler);i++) {
-			uri[1]=pgm_read_byte(_url_keys+2*i);
-			uri[2]=pgm_read_byte(_url_keys+2*i+1);
-			otf->on(uri, urls[i]);
+            strncpy_P(uri_buf+1, uris[i], 9);
+            uri_buf[9] = 0;
+			otf->on(uri_buf, urls[i]);
 		}
 		callback_initialized = true;
 	}
@@ -2268,15 +2358,15 @@ void start_server_ap() {
 	otf->onMissingPage(on_ap_home);
 	update_server->begin();
 
-	// set up all other handlers
-	char uri[4];
-	uri[0]='/';
-	uri[3]=0;
-	for(unsigned char i=0;i<sizeof(urls)/sizeof(URLHandler);i++) {
-		uri[1]=pgm_read_byte(_url_keys+2*i);
-		uri[2]=pgm_read_byte(_url_keys+2*i+1);
-		otf->on(uri, urls[i]);
-	}
+	char uri_buf[10] = {0};
+    uri_buf[0] = '/';
+
+    // set up all other handlers
+    for(unsigned char i=0;i<sizeof(urls)/sizeof(URLHandler);i++) {
+        strncpy(uri_buf+1, uris[i], 9);
+        uri_buf[9] = 0;
+        otf->on(uri_buf, urls[i]);
+    }
 
 	os.lcd.setCursor(0, -1);
 	os.lcd.print(F("OSAP:"));
@@ -2296,14 +2386,14 @@ void initialize_otf() {
 		otf->on("/", server_home);  // handle home page
 		otf->on("/index.html", server_home);
 
+		char uri_buf[10] = {0};
+        uri_buf[0] = '/';
+
 		// set up all other handlers
-		char uri[4];
-		uri[0]='/';
-		uri[3]=0;
 		for(unsigned char i=0;i<sizeof(urls)/sizeof(URLHandler);i++) {
-			uri[1]=pgm_read_byte(_url_keys+2*i);
-			uri[2]=pgm_read_byte(_url_keys+2*i+1);
-			otf->on(uri, urls[i]);
+            strncpy(uri_buf+1, uris[i], 9);
+            uri_buf[9] = 0;
+			otf->on(uri_buf, urls[i]);
 		}
 		callback_initialized = true;
 	}

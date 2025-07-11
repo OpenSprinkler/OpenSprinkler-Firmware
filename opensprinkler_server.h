@@ -64,6 +64,9 @@ public:
 				// itoa(va_arg(ap, int), (char*) ptr, 10);  // ray
 				snprintf((char*) ptr, len - position(),  "%d", va_arg(ap, int));
 				break;
+            case 'E': //Double
+				sprintf((char*) ptr, "%10.6lf", va_arg(ap, double));
+				break;		
 			case 'L':
 				// ultoa(va_arg(ap, uint32_t), (char*) ptr, 10);
 				snprintf((char*) ptr, len - position(), "%lu", (unsigned long) va_arg(ap, uint32_t));

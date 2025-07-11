@@ -29,6 +29,7 @@
 #include "ArduinoJson.hpp"
 
 /** Declare static data members */
+Sensor *OpenSprinkler::sensors[64] = {nullptr};
 OSMqtt OpenSprinkler::mqtt;
 NVConData OpenSprinkler::nvdata;
 ConStatus OpenSprinkler::status;
@@ -83,6 +84,10 @@ extern const char* user_agent_string;
 	SSD1306Display OpenSprinkler::lcd(0x3c, SDA, SCL);
 #elif defined(USE_LCD)
 	LiquidCrystal OpenSprinkler::lcd;
+#endif
+
+#if defined(USE_ADS1115)
+    ADS1115 *OpenSprinkler::ads1115_devices[4] = {nullptr};
 #endif
 
 #if defined(ESP8266)
@@ -838,7 +843,24 @@ void OpenSprinkler::begin() {
 
 #if defined(ARDUINO)
 	Wire.begin(); // init I2C
+#else
+    Bus.begin(); // init I2C for OSPI
 #endif
+
+#if defined(USE_ADS1115)
+    for (size_t i = 0; i < 4; i++) {
+        uint8_t address = 0x48 + i;
+        if (detect_i2c(address)) {
+            ads1115_devices[i] = new ADS1115(address);
+        }
+    }
+#endif
+
+// TODO: remove testing
+    sensors[0] = new ADS1115Sensor(5000, -10.0, 30.0, 0.1, -50.0, "Temperature", SensorUnit::Celsius, ads1115_devices, 0, 0);
+    sensors[1] = new ADS1115Sensor(5000, 0.0, 100.0, 50.0/3000.0, 0, "Moisture", SensorUnit::Percent, ads1115_devices, 0, 1);
+    sensors[2] = new EnsembleSensor(5000, 0.0, 100000000.0, 1.0, 0, "VS1", SensorUnit::None, sensors, 0b110011, EnsembleAction::Product);
+    sensors[3] = new EnsembleSensor(5000, 20.0, 100000000.0, 1.0, 0, "VS2", SensorUnit::None, sensors, 0b110000, EnsembleAction::Product);
 
 	hw_type = HW_TYPE_UNKNOWN;
 	hw_rev = 0;
@@ -2538,6 +2560,16 @@ void OpenSprinkler::raindelay_stop() {
 	status.rain_delayed = 0;
 	nvdata.rd_stop_time = 0;
 	nvdata_save();
+}
+
+/** Sensor functions */
+void OpenSprinkler::poll_sensors() {
+    for (size_t i = 0; i < MAX_SENSORS; i++) {
+        if (sensors[i]) {
+            sensors[i]->poll();
+        }
+    }
+    
 }
 
 /** LCD and button functions */

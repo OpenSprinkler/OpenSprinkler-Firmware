@@ -407,11 +407,8 @@ void ui_state_machine() {
 // ======================
 // Setup Function
 // ======================
-#include "ads1115.h"
-ADS1115 adc(0x48);
 #if defined(ARDUINO)
 void do_setup() {
-    adc.begin();
 	/* Clear WDT reset flag. */
 #if defined(ESP8266)
 	WiFi.persistent(false);
@@ -488,8 +485,6 @@ ISR(WDT_vect)
 void initialize_otf();
 
 void do_setup() {
-    Bus.begin();
-    adc.begin();
 	initialiseEpoch();   // initialize time reference for millis() and micros()
 	os.begin();          // OpenSprinkler init
 	os.options_setup();  // Setup options
@@ -556,10 +551,7 @@ void do_loop()
 		}
 	}
 
-    float temp = (((float)adc.get_pin_value(0)) * adc.get_scale_factor(0) * 0.1) - 50.0;
-    float moisture = ((float)adc.get_pin_value(1)) * adc.get_scale_factor(1) * (50.0/3000.0);
-    Serial.printf("Temp: %f - moisture: %f\n", temp, moisture);
-
+    os.poll_sensors();
 
 	static time_os_t last_time = 0;
 	static ulong last_minute = 0;

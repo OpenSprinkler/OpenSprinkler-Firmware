@@ -136,6 +136,8 @@ typedef unsigned long ulong;
 #define STATION_NAME_SIZE 32    // maximum number of characters in each station name
 #define MAX_SOPTS_SIZE    320   // maximum string option size
 
+#define MAX_SENSORS 64
+
 #define STATION_SPECIAL_DATA_SIZE  (TMP_BUFFER_SIZE - STATION_NAME_SIZE - 12)
 
 /** Default string option values */
@@ -432,6 +434,8 @@ enum {
 
 	#define USE_DISPLAY
 	#define USE_SSD1306
+    
+    #define USE_ADS1115
 
 #elif defined(OSPI) // for OSPi
 
@@ -456,6 +460,8 @@ enum {
 
 	#define USE_DISPLAY
 	#define USE_SSD1306
+
+    #define USE_ADS1115
 
 #else // for demo / simulation
 	// use fake hardware pins

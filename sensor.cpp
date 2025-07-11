@@ -1,21 +1,22 @@
 #include <sensor.h>
 
-Sensor::Sensor(unsigned long interval, float min, float max, float scale, float offset, char *name, SensorUnit unit) :
+Sensor::Sensor(unsigned long interval, float min, float max, float scale, float offset, const char *name, SensorUnit unit) :
 interval(interval), min(min), max(max), scale(scale), offset(offset), unit(unit) {
     strncpy(this->name, name, 32);
+    this->name[33] = 0;
 }
 
 void Sensor::poll() {
-    if ((this->_last_update - millis()) > this->interval) {
+    if ((millis() - this->_last_update) > this->interval) {
         this->_update_raw_value();
+        this->value = (this->value * this->scale) + this->offset;
         if (this->value < this->min) this->value = this->min;
         if (this->value > this->max) this->value = this->max;
-        this->value = (this->value * this->scale) + this->offset;
         this->_last_update = millis();
     }
 }
 
-EnsembleSensor::EnsembleSensor(unsigned long interval, float min, float max, float scale, float offset, char* name, SensorUnit unit, Sensor **sensors, uint64_t sensor_mask, EnsembleAction action) : 
+EnsembleSensor::EnsembleSensor(unsigned long interval, float min, float max, float scale, float offset, const char* name, SensorUnit unit, Sensor **sensors, uint64_t sensor_mask, EnsembleAction action) : 
 Sensor(interval, min, max, scale, offset, name, unit), 
 sensors(sensors),
 sensor_mask(sensor_mask), 
