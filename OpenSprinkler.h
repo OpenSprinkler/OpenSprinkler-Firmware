@@ -390,6 +390,8 @@ public:
 
     // -- Sensor functions
     #if defined(USE_SENSORS)
+    static void load_sensors();
+    static void save_sensors();
     static void poll_sensors();
     #endif
 

@@ -9,11 +9,13 @@
 #endif
 #include <defines.h>
 
+#define SENSOR_NAME_LEN 33
+
 enum class SensorType {
-    Constant,
     Ensemble,
     ADS1115,
     Weather,
+    MAX_VALUE,
 };
 
 enum class SensorUnit {
@@ -48,26 +50,29 @@ enum class SensorUnit {
     Pascal,
     LitersPerSecond,
     GallonsPerSecond,
+    MAX_VALUE,
 };
 
 class Sensor {
 public:
-  Sensor(unsigned long interval, float min, float max, float scale, float offset, const char *name, SensorUnit unit);
+  Sensor(unsigned long interval, double min, double max, double scale, double offset, const char *name, SensorUnit unit);
   void poll();
+  int serialize(char *buf);
 
   unsigned long interval = 1;
-  float value = 0.0;
-  float min = 0.0;
-  float max = 0.0;
-  float scale = 0.0;
-  float offset = 0.0;
-  char name[33] = {0};
+  double value = 0.0;
+  double min = 0.0;
+  double max = 0.0;
+  double scale = 0.0;
+  double offset = 0.0;
+  char name[SENSOR_NAME_LEN] = {0};
   SensorUnit unit = SensorUnit::None;
   
   SensorType virtual get_sensor_type() = 0;
 private:
   unsigned long _last_update = 0;
   void virtual _update_raw_value() = 0;
+  int virtual _serialize_internal(char *buf) = 0;
 };
 
 enum class EnsembleAction {
@@ -76,25 +81,44 @@ enum class EnsembleAction {
     Average,
     Sum,
     Product,
+    MAX_VALUE,
 };
 
 
 class EnsembleSensor : public Sensor {
     public:
-    EnsembleSensor(unsigned long interval, float min, float max, float scale, float offset, const char *name, SensorUnit unit, Sensor **sensors, uint64_t sensor_mask, EnsembleAction action);
+    EnsembleSensor(unsigned long interval, double min, double max, double scale, double offset, const char *name, SensorUnit unit, Sensor **sensors, uint64_t sensor_mask, EnsembleAction action);
 
     SensorType get_sensor_type() {
         return SensorType::Ensemble;
     }
 
-    private:
-    void _update_raw_value();
-    
-    Sensor **sensors;
     uint64_t sensor_mask;
     EnsembleAction action;
+
+    private:
+    void _update_raw_value();
+    int _serialize_internal(char *buf);
+    
+    Sensor **sensors;
 };
 
+class WeatherSensor : public Sensor {
+    public:
+    WeatherSensor(unsigned long interval, double min, double max, double scale, double offset, const char *name, SensorUnit unit, Sensor **sensors, uint64_t sensor_mask, EnsembleAction action);
 
+    SensorType get_sensor_type() {
+        return SensorType::Weather;
+    }
+
+    uint64_t sensor_mask;
+    EnsembleAction action;
+
+    private:
+    void _update_raw_value();
+    int _serialize_internal(char *buf);
+    
+    Sensor **sensors;
+};
 
 #endif //SENSOR_H

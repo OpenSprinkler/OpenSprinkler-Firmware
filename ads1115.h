@@ -51,16 +51,18 @@ ADS1115(uint8_t address);
 
 class ADS1115Sensor : public Sensor {
     public:
-    ADS1115Sensor(unsigned long interval, float min, float max, float scale, float offset, const char *name, SensorUnit unit, ADS1115 **sensors, uint8_t sensor_index, uint8_t pin);
+    ADS1115Sensor(unsigned long interval, double min, double max, double scale, double offset, const char *name, SensorUnit unit, ADS1115 **sensors, uint8_t sensor_index, uint8_t pin);
 
     SensorType get_sensor_type() {
         return SensorType::ADS1115;
     }
 
-    private:
-    void _update_raw_value();
-    
-    ADS1115 **sensors;
     uint8_t sensor_index;
     uint8_t pin;
+
+    private:
+    void _update_raw_value();
+    int _serialize_internal(char *buf);
+    
+    ADS1115 **sensors;
 };

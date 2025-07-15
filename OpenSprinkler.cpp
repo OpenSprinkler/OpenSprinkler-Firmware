@@ -2566,6 +2566,25 @@ void OpenSprinkler::raindelay_stop() {
 
 #if defined(USE_SENSORS)
 /** Sensor functions */
+void OpenSprinkler::load_sensors() {
+    for (size_t i = 0; i < MAX_SENSORS; i++) {
+        if (sensors[i]) {
+            sensors[i]->poll();
+        }
+    }
+    
+}
+
+void OpenSprinkler::save_sensors() {
+    for (size_t i = 0; i < MAX_SENSORS; i++) {
+        if (sensors[i]) {
+			file_write_block(SENSORS_FILENAME, tmp_buffer,
+				(uint32_t)sid*sizeof(StationData)+offsetof(StationData,type), STATION_SPECIAL_DATA_SIZE+1);
+        }
+    }
+    
+}
+
 void OpenSprinkler::poll_sensors() {
     for (size_t i = 0; i < MAX_SENSORS; i++) {
         if (sensors[i]) {
