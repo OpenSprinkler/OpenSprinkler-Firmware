@@ -849,21 +849,6 @@ void OpenSprinkler::begin() {
     Bus.begin(); // init I2C for OSPI
 #endif
 
-#if defined(USE_ADS1115)
-    for (size_t i = 0; i < 4; i++) {
-        uint8_t address = 0x48 + i;
-        if (detect_i2c(address)) {
-            ads1115_devices[i] = new ADS1115(address);
-        }
-    }
-#endif
-
-// TODO: remove testing
-    sensors[0] = new ADS1115Sensor(5000, -10.0, 30.0, 0.1, -50.0, "Temperature", SensorUnit::Celsius, ads1115_devices, 0, 0);
-    sensors[1] = new ADS1115Sensor(5000, 0.0, 100.0, 50.0/3000.0, 0, "Moisture", SensorUnit::Percent, ads1115_devices, 0, 1);
-    sensors[2] = new EnsembleSensor(5000, 0.0, 100000000.0, 1.0, 0, "VS1", SensorUnit::None, sensors, 0b110011, EnsembleAction::Product);
-    sensors[3] = new EnsembleSensor(5000, 20.0, 100000000.0, 1.0, 0, "VS2", SensorUnit::None, sensors, 0b110000, EnsembleAction::Product);
-
 	hw_type = HW_TYPE_UNKNOWN;
 	hw_rev = 0;
 
@@ -1138,6 +1123,22 @@ pinModeExt(PIN_BUTTON_3, INPUT_PULLUP);
 
 #else
 	//DEBUG_PRINTLN(get_runtime_path());
+#endif
+
+#if defined(USE_ADS1115)
+    for (size_t i = 0; i < 4; i++) {
+        uint8_t address = 0x48 + i;
+        if (detect_i2c(address)) {
+            ads1115_devices[i] = new ADS1115(address);
+        }
+    }
+#endif
+
+#if defined(USE_SENSORS)
+    lcd.clear();
+    lcd.setCursor(0,0);
+    lcd.print(F("Init sensors"));
+    os.load_sensors();
 #endif
 }
 
@@ -2567,28 +2568,89 @@ void OpenSprinkler::raindelay_stop() {
 #if defined(USE_SENSORS)
 /** Sensor functions */
 void OpenSprinkler::load_sensors() {
-    for (size_t i = 0; i < MAX_SENSORS; i++) {
-        if (sensors[i]) {
-            sensors[i]->poll();
+    ulong pos = 0;
+    uint8_t index;
+
+    while (true) {
+        index = 0;
+        file_read_block(SENSORS_FILENAME, &index, pos++, 1);
+        if (index >= MAX_SENSORS) break;
+        uint32_t len = 0;
+        file_read_block(SENSORS_FILENAME, &len, pos, sizeof(len));
+        pos += sizeof(len);
+
+        if (len == 0 || len > TMP_BUFFER_SIZE) break;
+
+        file_read_block(SENSORS_FILENAME, tmp_buffer, pos, len);
+
+        if ((uint8_t)(*tmp_buffer) >= (uint8_t)SensorType::MAX_VALUE) {
+            os.sensors[index] = nullptr;
+            continue;
         }
-    }
     
+        SensorType sensor_type = static_cast<SensorType>(*tmp_buffer);
+
+        switch (sensor_type) {
+            case SensorType::Ensemble:
+                os.sensors[index] = new EnsembleSensor(os.sensors, (char*)tmp_buffer);
+                break;
+            case SensorType::ADS1115:
+                os.sensors[index] = new ADS1115Sensor(os.ads1115_devices, (char*)tmp_buffer);
+                break;
+            case SensorType::Weather:
+                os.sensors[index] = new WeatherSensor(os.sensors, (char*)tmp_buffer);
+                break;
+            default:
+            case SensorType::MAX_VALUE:
+                break;
+        };
+
+        pos += len;
+    }
 }
 
 void OpenSprinkler::save_sensors() {
-    for (size_t i = 0; i < MAX_SENSORS; i++) {
+    ulong pos = 0;
+    for (uint8_t i = 0; i < MAX_SENSORS; i++) {
         if (sensors[i]) {
-			file_write_block(SENSORS_FILENAME, tmp_buffer,
-				(uint32_t)sid*sizeof(StationData)+offsetof(StationData,type), STATION_SPECIAL_DATA_SIZE+1);
+            file_write_byte(SENSORS_FILENAME, pos++, i);
+            uint32_t len = sensors[i]->serialize(tmp_buffer);
+            file_write_block(SENSORS_FILENAME, &len, pos, sizeof(len));
+            pos += sizeof(len);
+            file_write_block(SENSORS_FILENAME, tmp_buffer, pos, len);
+            pos += len;
         }
     }
-    
+
+    file_write_byte(SENSORS_FILENAME, pos++, 0xFF);
+
+    file_read_block(SENSORS_FILENAME, tmp_buffer, 0, 79);
+}
+
+void OpenSprinkler::log_sensor(uint8_t sid, float value) {
+    uint16_t next = 0;
+    file_read_block(SENSORS_LOG_FILENAME, &next, 0, sizeof(next));
+
+    time_os_t timestamp = now();
+    tmp_buffer[0] = sid;
+    char *ptr = tmp_buffer + 1;
+    memcpy(ptr, &timestamp, sizeof(timestamp));
+    ptr += sizeof(timestamp);
+    memcpy(ptr, &value, sizeof(value));
+
+    uint32_t pos = sizeof(next) + (next * SENSOR_LOG_ITEM_SIZE);
+    file_write_block(SENSORS_LOG_FILENAME, tmp_buffer, pos, SENSOR_LOG_ITEM_SIZE);
+
+    next = (next + 1) % MAX_SENSOR_LOG_COUNT;
+    file_write_block(SENSORS_LOG_FILENAME, &next, 0, sizeof(next));   
 }
 
 void OpenSprinkler::poll_sensors() {
     for (size_t i = 0; i < MAX_SENSORS; i++) {
         if (sensors[i]) {
-            sensors[i]->poll();
+            if (sensors[i]->poll()) {
+                os.log_sensor(i, sensors[i]->value);
+            }
         }
     }
     

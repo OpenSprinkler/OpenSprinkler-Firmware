@@ -1,7 +1,7 @@
 #pragma once
 
 #include <stdint.h>
-#include <sensor.h>
+#include "sensor.h"
 
 #define ADS1115_SCALE_FACTOR (6144.0 / 32768.0)
 
@@ -52,6 +52,7 @@ ADS1115(uint8_t address);
 class ADS1115Sensor : public Sensor {
     public:
     ADS1115Sensor(unsigned long interval, double min, double max, double scale, double offset, const char *name, SensorUnit unit, ADS1115 **sensors, uint8_t sensor_index, uint8_t pin);
+    ADS1115Sensor(ADS1115 **sensors, char *buf);
 
     SensorType get_sensor_type() {
         return SensorType::ADS1115;
@@ -62,7 +63,7 @@ class ADS1115Sensor : public Sensor {
 
     private:
     void _update_raw_value();
-    int _serialize_internal(char *buf);
+    uint32_t _serialize_internal(char *buf);
     
     ADS1115 **sensors;
 };

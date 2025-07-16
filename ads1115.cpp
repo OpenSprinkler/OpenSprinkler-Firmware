@@ -82,9 +82,9 @@ void ADS1115::request_pin(uint8_t pin) {
 
 ADS1115Sensor::ADS1115Sensor(unsigned long interval, double min, double max, double scale, double offset, const char* name, SensorUnit unit, ADS1115** sensors, uint8_t sensor_index, uint8_t pin) : 
 Sensor(interval, min, max, scale, offset, name, unit), 
-sensors(sensors), 
 sensor_index(sensor_index), 
-pin(pin) {}
+pin(pin),
+sensors(sensors) {}
 
 void ADS1115Sensor::_update_raw_value() {
     if (this->sensors[sensor_index] == nullptr) {
@@ -95,6 +95,16 @@ void ADS1115Sensor::_update_raw_value() {
     }
 }
 
-int ADS1115Sensor::_serialize_internal(char *buf) {
-    return 0;
+uint32_t ADS1115Sensor::_serialize_internal(char *buf) {
+    uint32_t i = 0;
+    buf[i++] = static_cast<uint8_t>(this->sensor_index);
+    buf[i++] = static_cast<uint8_t>(this->pin);
+    return i;
+}
+
+ADS1115Sensor::ADS1115Sensor(ADS1115 **sensors, char *buf) {
+    uint32_t i = Sensor::_deserialize(buf);
+    this->sensor_index = static_cast<uint8_t>(buf[i++]);
+    this->pin = static_cast<uint8_t>(buf[i++]);
+    this->sensors = sensors;
 }

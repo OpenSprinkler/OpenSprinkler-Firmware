@@ -392,6 +392,7 @@ public:
     #if defined(USE_SENSORS)
     static void load_sensors();
     static void save_sensors();
+    void log_sensor(uint8_t sid, float value);
     static void poll_sensors();
     #endif
 

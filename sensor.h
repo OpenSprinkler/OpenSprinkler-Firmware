@@ -56,8 +56,11 @@ enum class SensorUnit {
 class Sensor {
 public:
   Sensor(unsigned long interval, double min, double max, double scale, double offset, const char *name, SensorUnit unit);
-  void poll();
-  int serialize(char *buf);
+  Sensor();
+  virtual ~Sensor() {}
+  
+  bool poll();
+  uint32_t serialize(char *buf);
 
   unsigned long interval = 1;
   double value = 0.0;
@@ -72,7 +75,14 @@ public:
 private:
   unsigned long _last_update = 0;
   void virtual _update_raw_value() = 0;
-  int virtual _serialize_internal(char *buf) = 0;
+protected:
+  uint32_t _deserialize(char *buf);
+  template <typename T>
+  uint32_t write_buf(char *buf, T val);
+  template <typename T>
+  T read_buf(char *buf, uint32_t *i);
+
+  uint32_t virtual _serialize_internal(char *buf) = 0;
 };
 
 enum class EnsembleAction {
@@ -88,6 +98,7 @@ enum class EnsembleAction {
 class EnsembleSensor : public Sensor {
     public:
     EnsembleSensor(unsigned long interval, double min, double max, double scale, double offset, const char *name, SensorUnit unit, Sensor **sensors, uint64_t sensor_mask, EnsembleAction action);
+    EnsembleSensor(Sensor **sensors, char *buf);
 
     SensorType get_sensor_type() {
         return SensorType::Ensemble;
@@ -98,7 +109,7 @@ class EnsembleSensor : public Sensor {
 
     private:
     void _update_raw_value();
-    int _serialize_internal(char *buf);
+    uint32_t _serialize_internal(char *buf);
     
     Sensor **sensors;
 };
@@ -106,6 +117,8 @@ class EnsembleSensor : public Sensor {
 class WeatherSensor : public Sensor {
     public:
     WeatherSensor(unsigned long interval, double min, double max, double scale, double offset, const char *name, SensorUnit unit, Sensor **sensors, uint64_t sensor_mask, EnsembleAction action);
+    WeatherSensor(Sensor **sensors, char *buf);
+
 
     SensorType get_sensor_type() {
         return SensorType::Weather;
@@ -116,7 +129,7 @@ class WeatherSensor : public Sensor {
 
     private:
     void _update_raw_value();
-    int _serialize_internal(char *buf);
+    uint32_t _serialize_internal(char *buf);
     
     Sensor **sensors;
 };
