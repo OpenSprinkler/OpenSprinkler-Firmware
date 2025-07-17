@@ -2323,7 +2323,6 @@ void server_log_sensor(OTF_PARAMS_DEF) {
         next = (next + 1) % MAX_SENSOR_LOG_COUNT;
 
         uint8_t sid = tmp_buffer[0];
-        Serial.printf("sid: %d\n", sid);
         if (sid > MAX_SENSORS) continue;
 
         if (target_sid > -1 && sid != target_sid) continue;
@@ -2332,7 +2331,6 @@ void server_log_sensor(OTF_PARAMS_DEF) {
         memcpy(&timestamp, tmp_buffer+1, sizeof(timestamp));
         float value;
         memcpy(&value, tmp_buffer+(1 + sizeof(time_os_t)), sizeof(value));
-        Serial.printf("sid: %l\n", timestamp);
 
         if (timestamp > before || timestamp < after) continue;
 
