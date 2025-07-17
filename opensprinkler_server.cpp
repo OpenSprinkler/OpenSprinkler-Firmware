@@ -2278,11 +2278,13 @@ void server_log_sensor(OTF_PARAMS_DEF) {
         if (max_count > 1000) handle_return(HTML_DATA_OUTOFBOUND);
     }
 
-    ulong skip = 0;
-    if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("skip"), true)) {
-        skip = strtoul(tmp_buffer, &end, 10);
+    uint16_t cursorv;
+    file_read_block(SENSORS_LOG_FILENAME, &cursorv, 0, sizeof(cursorv));
+    ulong cursor = (cursorv + 1) % MAX_SENSOR_LOG_COUNT;
+    if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("cursor"), true)) {
+        cursor = strtoul(tmp_buffer, &end, 10);
         if (*end != '\0') handle_return(HTML_DATA_FORMATERROR);
-        if (skip > MAX_SENSOR_LOG_COUNT) handle_return(HTML_DATA_OUTOFBOUND);
+        if (cursor > MAX_SENSOR_LOG_COUNT) handle_return(HTML_DATA_OUTOFBOUND);
     }
 
     time_os_t before = std::numeric_limits<time_os_t>::max();
@@ -2308,19 +2310,14 @@ void server_log_sensor(OTF_PARAMS_DEF) {
 
     bfill.emit_p(PSTR("{\"log\":["));
 
-    uint16_t next;
-    file_read_block(SENSORS_LOG_FILENAME, &next, 0, sizeof(next));
-
-    next = (next + skip + 1) % MAX_SENSOR_LOG_COUNT;
-
     // Clear out buffer
     memset(tmp_buffer, 0, SENSOR_LOG_ITEM_SIZE);
 
 	for (i=0;i<max_count;i++) {
         // Ensure a new value is read
         tmp_buffer[0] = 0xFF;
-        file_read_block(SENSORS_LOG_FILENAME, tmp_buffer, 2 + (next * SENSOR_LOG_ITEM_SIZE), SENSOR_LOG_ITEM_SIZE);
-        next = (next + 1) % MAX_SENSOR_LOG_COUNT;
+        file_read_block(SENSORS_LOG_FILENAME, tmp_buffer, 2 + (cursor * SENSOR_LOG_ITEM_SIZE), SENSOR_LOG_ITEM_SIZE);
+        cursor = (cursor + 1) % MAX_SENSOR_LOG_COUNT;
 
         uint8_t sid = tmp_buffer[0];
         if (sid > MAX_SENSORS) continue;
@@ -2344,7 +2341,7 @@ void server_log_sensor(OTF_PARAMS_DEF) {
 			send_packet(OTF_PARAMS);
 		}
 	}
-	bfill.emit_p(PSTR("],\"count\":$D}"), count);
+	bfill.emit_p(PSTR("],\"total\":$D,\"count\":$D,\"next_cursor\":$D}"), MAX_SENSOR_LOG_COUNT, count, cursor);
 
 	handle_return(HTML_OK);
 }
