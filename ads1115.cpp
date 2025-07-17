@@ -86,12 +86,12 @@ sensor_index(sensor_index),
 pin(pin),
 sensors(sensors) {}
 
-void ADS1115Sensor::_update_raw_value() {
+double ADS1115Sensor::_get_raw_value() {
     if (this->sensors[sensor_index] == nullptr) {
-        this->value = 0.0;
+        return 0.0;
     }
     else {
-        this->value = ((double)this->sensors[sensor_index]->get_pin_value(this->pin)) * ADS1115_SCALE_FACTOR;
+        return ((double)this->sensors[sensor_index]->get_pin_value(this->pin)) * ADS1115_SCALE_FACTOR;
     }
 }
 

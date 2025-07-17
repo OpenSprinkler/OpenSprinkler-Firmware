@@ -258,7 +258,7 @@ public:
 #endif
 
 #if defined(USE_SENSORS)
-    static Sensor *sensors[MAX_SENSORS];
+    static sensor_memory_t sensors[MAX_SENSORS];
 #endif
 
 #if defined(OSPI)
@@ -391,9 +391,12 @@ public:
     // -- Sensor functions
     #if defined(USE_SENSORS)
     static void load_sensors();
-    static void save_sensors();
+    static Sensor *get_sensor(uint8_t index);
+    static void write_sensor(Sensor *sensor, uint8_t index);
     void log_sensor(uint8_t sid, float value);
     static void poll_sensors();
+
+    static double get_sensor_weather_data(WeatherAction action);
     #endif
 
 	// -- LCD functions

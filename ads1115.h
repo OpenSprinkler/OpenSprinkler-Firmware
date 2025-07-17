@@ -62,7 +62,7 @@ class ADS1115Sensor : public Sensor {
     uint8_t pin;
 
     private:
-    void _update_raw_value();
+    double _get_raw_value();
     uint32_t _serialize_internal(char *buf);
     
     ADS1115 **sensors;

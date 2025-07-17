@@ -9,16 +9,13 @@ interval(interval), min(min), max(max), scale(scale), offset(offset), unit(unit)
 
 Sensor::Sensor() {}
 
-bool Sensor::poll() {
-    if ((millis() - this->_last_update) > this->interval) {
-        this->_update_raw_value();
-        this->value = (this->value * this->scale) + this->offset;
-        if (this->value < this->min) this->value = this->min;
-        if (this->value > this->max) this->value = this->max;
-        this->_last_update = millis();
-        return true;
-    }
-    return false;
+double Sensor::get_new_value() {
+    double value = this->_get_raw_value();
+    value = (value * this->scale) + this->offset;
+    if (value < this->min) value = this->min;
+    if (value > this->max) value = this->max;
+
+    return value;
 }
 
 template <typename T>
@@ -68,13 +65,13 @@ uint32_t Sensor::_deserialize(char *buf) {
     return i;
 }
 
-EnsembleSensor::EnsembleSensor(unsigned long interval, double min, double max, double scale, double offset, const char* name, SensorUnit unit, Sensor **sensors, uint64_t sensor_mask, EnsembleAction action) : 
+EnsembleSensor::EnsembleSensor(unsigned long interval, double min, double max, double scale, double offset, const char* name, SensorUnit unit, sensor_memory_t *sensors, uint64_t sensor_mask, EnsembleAction action) : 
 Sensor(interval, min, max, scale, offset, name, unit), 
 sensor_mask(sensor_mask), 
 action(action),
 sensors(sensors) {}
 
-void EnsembleSensor::_update_raw_value() {
+double EnsembleSensor::_get_raw_value() {
     double inital;
     uint8_t count = 0;
     switch (this->action) {
@@ -92,14 +89,16 @@ void EnsembleSensor::_update_raw_value() {
             inital = 1;
             break;
         default:
-            return;
+            // Unreachable
+            return 0.0;
     }
 
     uint64_t mask = this->sensor_mask;
     uint8_t i = 0;
+    Sensor *sensor;
     while (mask) {
-        if ((mask & 1) && (sensors[i])) {
-            double value = sensors[i]->value;
+        if ((mask & 1) && sensors[i].interval) {
+            double value = sensors[i].value;
 
             switch (this->action) {
                 case EnsembleAction::Min:
@@ -116,7 +115,8 @@ void EnsembleSensor::_update_raw_value() {
                     inital *= value;
                     break;
                 default:
-                    return;
+                    // Unreachable
+                    return 0.0;
             }
 
             count += 1;
@@ -127,11 +127,11 @@ void EnsembleSensor::_update_raw_value() {
     }
 
     if (count == 0) {
-        this->value = 0.0;
+        return 0.0;
     } else if (this->action == EnsembleAction::Average) {
-        this->value = inital / (double) count;
+        return inital / (double) count;
     } else {
-        this->value = inital;
+        return inital;
     }
 }
 
@@ -142,7 +142,7 @@ uint32_t EnsembleSensor::_serialize_internal(char *buf) {
     return i;
 }
 
-EnsembleSensor::EnsembleSensor(Sensor **sensors, char *buf) {
+EnsembleSensor::EnsembleSensor(sensor_memory_t *sensors, char *buf) {
     uint32_t i = Sensor::_deserialize(buf);
     this->sensor_mask = read_buf<uint64_t>(buf, &i);
     this->action = static_cast<EnsembleAction>(buf[i++]);
@@ -150,77 +150,22 @@ EnsembleSensor::EnsembleSensor(Sensor **sensors, char *buf) {
 }
 
 
-WeatherSensor::WeatherSensor(unsigned long interval, double min, double max, double scale, double offset, const char* name, SensorUnit unit, Sensor **sensors, uint64_t sensor_mask, EnsembleAction action) : 
+WeatherSensor::WeatherSensor(unsigned long interval, double min, double max, double scale, double offset, const char* name, SensorUnit unit, WeatherGetter weather_getter, WeatherAction action) : 
 Sensor(interval, min, max, scale, offset, name, unit), 
-sensor_mask(sensor_mask), 
 action(action),
-sensors(sensors) {}
+weather_getter(weather_getter) {}
 
-void WeatherSensor::_update_raw_value() {
-    double inital;
-    uint8_t count = 0;
-    switch (this->action) {
-        case EnsembleAction::Min:
-            inital = this->max;
-            break;
-        case EnsembleAction::Max:
-            inital = this->min;
-            break;
-        case EnsembleAction::Average:
-        case EnsembleAction::Sum:
-            inital = 0;
-            break;
-        case EnsembleAction::Product:
-            inital = 1;
-            break;
-        default:
-            return;
-    }
-
-    uint64_t mask = this->sensor_mask;
-    uint8_t i = 0;
-    while (mask) {
-        if ((mask & 1) && (sensors[i])) {
-            double value = sensors[i]->value;
-
-            switch (this->action) {
-                case EnsembleAction::Min:
-                    if (value < inital) inital = value;
-                    break;
-                case EnsembleAction::Max:
-                    if (value > inital) inital = value;
-                    break;
-                case EnsembleAction::Average:
-                case EnsembleAction::Sum:
-                    inital += value;
-                    break;
-                case EnsembleAction::Product:
-                    inital *= value;
-                    break;
-                default:
-                    return;
-            }
-
-            count += 1;
-        }
-
-        i += 1;
-        mask >>= 1;
-    }
-
-    if (count == 0) {
-        this->value = 0.0;
-    } else if (this->action == EnsembleAction::Average) {
-        this->value = inital / (double) count;
-    } else {
-        this->value = inital;
-    }
+double WeatherSensor::_get_raw_value() {
+    return this->weather_getter(this->action);
 }
 
 uint32_t WeatherSensor::_serialize_internal(char *buf) {
-    return 0;
+    uint32_t i = 0;
+    buf[i++] = static_cast<uint8_t>(this->action);
+    return i;
 }
 
-WeatherSensor::WeatherSensor(Sensor **sensors, char *buf) {
+WeatherSensor::WeatherSensor(WeatherGetter weather_getter, char *buf) {
     uint32_t i = Sensor::_deserialize(buf);
+    this->action = static_cast<WeatherAction>(buf[i++]);
 }
