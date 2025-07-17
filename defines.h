@@ -55,6 +55,8 @@ typedef unsigned long ulong;
 #define NVCON_FILENAME        "nvcon.dat"   // non-volatile controller data file, see OpenSprinkler.h --> struct NVConData
 #define PROG_FILENAME         "prog.dat"    // program data file
 #define DONE_FILENAME         "done.dat"    // used to indicate the completion of all files
+#define SENSORS_FILENAME      "sens.dat"    // used to indicate the completion of all files
+#define SENSORS_LOG_FILENAME  "senslog.dat"    // used to indicate the completion of all files
 
 /** Station macro defines */
 #define STN_TYPE_STANDARD    0x00 // standard solenoid station
@@ -135,6 +137,10 @@ typedef unsigned long ulong;
 #define MAX_NUM_STATIONS  (MAX_NUM_BOARDS*8)  // maximum number of stations
 #define STATION_NAME_SIZE 32    // maximum number of characters in each station name
 #define MAX_SOPTS_SIZE    320   // maximum string option size
+
+#define MAX_SENSORS 64
+#define MAX_SENSOR_LOG_COUNT 32768
+#define SENSOR_LOG_ITEM_SIZE (sizeof(time_os_t) + sizeof(float) + 1)
 
 #define STATION_SPECIAL_DATA_SIZE  (TMP_BUFFER_SIZE - STATION_NAME_SIZE - 12)
 
@@ -432,6 +438,9 @@ enum {
 
 	#define USE_DISPLAY
 	#define USE_SSD1306
+    
+    #define USE_ADS1115
+    #define USE_SENSORS
 
 #elif defined(OSPI) // for OSPi
 
@@ -456,6 +465,9 @@ enum {
 
 	#define USE_DISPLAY
 	#define USE_SSD1306
+
+    #define USE_ADS1115
+    #define USE_SENSORS
 
 #else // for demo / simulation
 	// use fake hardware pins
