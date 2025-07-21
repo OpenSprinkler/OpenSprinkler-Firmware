@@ -329,6 +329,90 @@ bool file_exists(const char *fn) {
 #endif
 }
 
+os_file_type file_open(const char *fn, FileOpenMode mode) {
+    #if defined(ARDUINO)
+    switch (mode) {
+        default:
+        case FileOpenMode::Read:
+            return LittleFS.open(fn, "r");
+            break;
+        case FileOpenMode::ReadWrite:
+            if (!LittleFS.exists(fn)) {
+                File f = LittleFS.open(fn, "w");
+                if (!f) return f;
+                f.close();
+            }
+            return LittleFS.open(fn, "r+");
+            break;
+        case FileOpenMode::WriteTruncate:
+            return LittleFS.open(fn, "w");
+            break;
+        case FileOpenMode::ReadWriteTruncate:
+            return LittleFS.open(fn, "w+");
+            break;
+        case FileOpenMode::Append:
+            return LittleFS.open(fn, "a");
+            break;
+        case FileOpenMode::ReadAppend:
+            return LittleFS.open(fn, "a+");
+            break;
+    }
+    #else
+    //TODO
+    // return file.open(fn, O_READ);
+    #endif
+}
+
+void file_close(os_file_type f) {
+    #if defined(ARDUINO)
+    f.close();
+    #else
+    //TODO
+    file.close(fn);
+    // return file.open(fn, O_READ);
+    #endif
+}
+
+bool file_seek(os_file_type f, uint32_t position, FileSeekMode mode) {
+    #if defined(ARDUINO)
+    switch (mode) {
+        case FileSeekMode::Set:
+            return f.seek(position, fs::SeekMode::SeekSet);
+        case FileSeekMode::Current:
+            return f.seek(position, fs::SeekMode::SeekCur);
+        case FileSeekMode::End:
+            return f.seek(position, fs::SeekMode::SeekEnd);
+    }
+    #else
+    //TODO
+    // return file.open(fn, O_READ);
+    #endif
+
+    return false;
+}
+
+bool file_seek(os_file_type f, uint32_t position) {
+    return file_seek(f, position, FileSeekMode::Set);
+}
+
+int file_read(os_file_type f, void *target, uint32_t len) {
+    #if defined(ARDUINO)
+    return f.read((uint8_t*)target, len);
+    #else
+    //TODO
+    // return file.open(fn, O_READ);
+    #endif
+}
+
+int file_write(os_file_type f, const void *source, uint32_t len) {
+    #if defined(ARDUINO)
+    return f.write((const uint8_t*)source, len);
+    #else
+    //TODO
+    // return file.open(fn, O_READ);
+    #endif
+}
+
 // file functions
 void file_read_block(const char *fn, void *dst, ulong pos, ulong len) {
 #if defined(ESP8266)

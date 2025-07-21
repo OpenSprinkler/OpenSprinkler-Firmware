@@ -391,6 +391,7 @@ public:
     // -- Sensor functions
     #if defined(USE_SENSORS)
     static void load_sensors();
+    static Sensor *parse_sensor(os_file_type file);
     static Sensor *get_sensor(uint8_t index);
     static void write_sensor(Sensor *sensor, uint8_t index);
     void log_sensor(uint8_t sid, float value);

@@ -1983,25 +1983,33 @@ void server_pause_queue(OTF_PARAMS_DEF) {
 #if defined(USE_SENSORS)
 void server_json_sensors_main(OTF_PARAMS_DEF) {
 	bfill.emit_p(PSTR("\"sn\":["));
-	unsigned char i;
-
     uint8_t sensor_count = 0;
 
-	for (i=0;i<MAX_SENSORS;i++) {
-        Sensor *sensor;
-        if (os.sensors[i].interval && (sensor = os.get_sensor(i))) {
-            if (sensor_count) bfill.emit_p(PSTR(","));
-            bfill.emit_p(PSTR("{\"id\":$D,\"name\":\"$S\",\"unit\":$D,\"interval\":$L,\"max\":$E,\"min\":$E,\"scale\":$E,\"offset\":$E,\"value\":$E}"), i, sensor->name, sensor->unit, sensor->interval, sensor->max, sensor->min, sensor->scale, sensor->offset, os.sensors[i].value);
-            sensor_count += 1;
-            delete sensor;
+    Sensor *sensor;
+    os_file_type file = file_open(SENSORS_FILENAME, FileOpenMode::Read);
+    if (file) {
+        for (size_t i = 0; i < MAX_SENSORS; i++) {
+            if (os.sensors[i].interval && (sensor = os.parse_sensor(file))) {
+                if (sensor_count) bfill.emit_p(PSTR(","));
+                bfill.emit_p(PSTR("{\"id\":$D,\"name\":\"$S\",\"unit\":$D,\"interval\":$L,\"max\":$E,\"min\":$E,\"scale\":$E,\"offset\":$E,\"value\":$E}"), i, sensor->name, sensor->unit, sensor->interval, sensor->max, sensor->min, sensor->scale, sensor->offset, os.sensors[i].value);
+                sensor_count += 1;
+                delete sensor;
+
+
+                // push out a packet if available
+                // buffer size is getting small
+                if (available_ether_buffer() <= 0) {
+                    send_packet(OTF_PARAMS);
+                }
+            }
         }
 
-        // push out a packet if available
-		// buffer size is getting small
-		if (available_ether_buffer() <= 0) {
-			send_packet(OTF_PARAMS);
-		}
-	}
+        file_close(file);
+    } else {
+        DEBUG_PRINT("Failed to open file: ");
+        DEBUG_PRINTLN(SENSORS_FILENAME);
+    }
+
 	bfill.emit_p(PSTR("],\"count\":$D}"), sensor_count);
 }
 
@@ -2275,12 +2283,12 @@ void server_log_sensor(OTF_PARAMS_DEF) {
     if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("count"), true)) {
         max_count = strtoul(tmp_buffer, &end, 10);
         if (*end != '\0') handle_return(HTML_DATA_FORMATERROR);
-        if (max_count > 1000) handle_return(HTML_DATA_OUTOFBOUND);
+        if (max_count > 10000) handle_return(HTML_DATA_OUTOFBOUND);
     }
 
-    uint16_t cursorv;
-    file_read_block(SENSORS_LOG_FILENAME, &cursorv, 0, sizeof(cursorv));
-    ulong cursor = (cursorv + 1) % MAX_SENSOR_LOG_COUNT;
+    uint16_t cursor_v;
+    file_read_block(SENSORS_LOG_FILENAME, &cursor_v, 0, sizeof(cursor_v));
+    ulong cursor = (cursor_v + 1) % MAX_SENSOR_LOG_COUNT;
     if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("cursor"), true)) {
         cursor = strtoul(tmp_buffer, &end, 10);
         if (*end != '\0') handle_return(HTML_DATA_FORMATERROR);
@@ -2308,39 +2316,54 @@ void server_log_sensor(OTF_PARAMS_DEF) {
         if (target_sid >= MAX_SENSORS || target_sid < -1) handle_return(HTML_DATA_OUTOFBOUND);
     }
 
-    bfill.emit_p(PSTR("{\"log\":["));
-
     // Clear out buffer
     memset(tmp_buffer, 0, SENSOR_LOG_ITEM_SIZE);
 
-	for (i=0;i<max_count;i++) {
-        // Ensure a new value is read
-        tmp_buffer[0] = 0xFF;
-        file_read_block(SENSORS_LOG_FILENAME, tmp_buffer, 2 + (cursor * SENSOR_LOG_ITEM_SIZE), SENSOR_LOG_ITEM_SIZE);
-        cursor = (cursor + 1) % MAX_SENSOR_LOG_COUNT;
+    os_file_type file = file_open(SENSORS_LOG_FILENAME, FileOpenMode::Read);
+    if (file) {
+        bfill.emit_p(PSTR("{\"log\":["));
+        
+        file_seek(file, 2 + (cursor * SENSOR_LOG_ITEM_SIZE));
 
-        uint8_t sid = tmp_buffer[0];
-        if (sid > MAX_SENSORS) continue;
+        for (i=0;i<max_count;i++) {
+            // Ensure a new value is read
+            tmp_buffer[0] = 0xFF;
+            file_read(file, tmp_buffer, SENSOR_LOG_ITEM_SIZE);
+            cursor = (cursor + 1) % MAX_SENSOR_LOG_COUNT;
+            if (cursor == 0) {
+                file_seek(file, 2);
+            }
 
-        if (target_sid > -1 && sid != target_sid) continue;
+            uint8_t sid = tmp_buffer[0];
+            if (sid > MAX_SENSORS) continue;
 
-        time_os_t timestamp;
-        memcpy(&timestamp, tmp_buffer+1, sizeof(timestamp));
-        float value;
-        memcpy(&value, tmp_buffer+(1 + sizeof(time_os_t)), sizeof(value));
+            if (target_sid > -1 && sid != target_sid) continue;
 
-        if (timestamp > before || timestamp < after) continue;
+            time_os_t timestamp;
+            memcpy(&timestamp, tmp_buffer+1, sizeof(timestamp));
+            float value;
+            memcpy(&value, tmp_buffer+(1 + sizeof(time_os_t)), sizeof(value));
 
-        if (count) bfill.emit_p(PSTR(","));
-        bfill.emit_p(PSTR("{\"sid\":$D,\"timestamp\":$L,\"value\":$E}"), sid, timestamp, value);
-        count += 1;
+            if (timestamp > before || timestamp < after) continue;
 
-        // push out a packet if available
-		// buffer size is getting small
-		if (available_ether_buffer() <= 0) {
-			send_packet(OTF_PARAMS);
-		}
-	}
+            if (count) bfill.emit_p(PSTR(","));
+            bfill.emit_p(PSTR("{\"sid\":$D,\"timestamp\":$L,\"value\":$E}"), sid, timestamp, value);
+            count += 1;
+
+            // push out a packet if available
+            // buffer size is getting small
+            if (available_ether_buffer() <= 0) {
+                send_packet(OTF_PARAMS);
+            }
+        }
+        
+        file_close(file);
+    } else {
+        DEBUG_PRINT("Failed to open file: ");
+        DEBUG_PRINTLN(SENSORS_LOG_FILENAME);
+        handle_return(HTML_RFCODE_ERROR) // TODO error code
+    }
+
 	bfill.emit_p(PSTR("],\"total\":$D,\"count\":$D,\"next_cursor\":$D}"), MAX_SENSOR_LOG_COUNT, count, cursor);
 
 	handle_return(HTML_OK);
