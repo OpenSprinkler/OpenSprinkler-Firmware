@@ -259,6 +259,7 @@ public:
 
 #if defined(USE_SENSORS)
     static sensor_memory_t sensors[MAX_SENSORS];
+    static os_file_type log_sensor_file;
 #endif
 
 #if defined(OSPI)
