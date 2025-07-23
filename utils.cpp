@@ -352,25 +352,24 @@ os_file_type file_open(const char *fn, FileOpenMode mode) {
             return LittleFS.open(fn, "a+");
     }
     #else
+    char *full_file = get_filename_fullpath(fn);
     switch (mode) {
         default:
         case FileOpenMode::Read:
-            return fopen(get_filename_fullpath(fn), "rb");
-        case FileOpenMode::ReadWrite:
-            if (!LittleFS.exists(fn)) {
-                FILE *fp = fopen(get_filename_fullpath(fn), "wb");
-                if (!fp) return fp;
-                fclose(fp);
-            }
-            return fopen(get_filename_fullpath(fn), "rb+");
+            return fopen(full_file, "rb");
+        case FileOpenMode::ReadWrite: {
+            int fd = open(full_file, O_RDWR | O_CREAT, 0644);
+            if (fd == -1) return nullptr;
+            return fdopen(fd, "rb+");
+        }
         case FileOpenMode::WriteTruncate:
-            return fopen(get_filename_fullpath(fn), "wb");
+            return fopen(full_file, "wb");
         case FileOpenMode::ReadWriteTruncate:
-            return fopen(get_filename_fullpath(fn), "wb+");
+            return fopen(full_file, "wb+");
         case FileOpenMode::Append:
-            return fopen(get_filename_fullpath(fn), "ab");
+            return fopen(full_file, "ab");
         case FileOpenMode::ReadAppend:
-            return fopen(get_filename_fullpath(fn), "ab+");
+            return fopen(full_file, "ab+");
     }
     
     #endif
