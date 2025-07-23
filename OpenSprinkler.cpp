@@ -761,6 +761,10 @@ bool OpenSprinkler::network_connected(void) {
 	return true;
 }
 
+bool detect_i2c(int addr) {
+    Bus.detect(addr);
+}
+
 // Return mac of first recognised interface and fallback to software mac
 // Note: on OSPi, operating system handles interface allocation so 'wired' ignored
 bool OpenSprinkler::load_hardware_mac(unsigned char* mac, bool wired) {
