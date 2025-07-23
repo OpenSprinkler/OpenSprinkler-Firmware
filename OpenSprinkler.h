@@ -259,7 +259,7 @@ public:
 
 #if defined(USE_SENSORS)
     static sensor_memory_t sensors[MAX_SENSORS];
-    static os_file_type log_sensor_file;
+    static uint16_t sensor_file_no;
 #endif
 
 #if defined(OSPI)
@@ -391,6 +391,7 @@ public:
 
     // -- Sensor functions
     #if defined(USE_SENSORS)
+    static os_file_type open_sensor_log(uint16_t file_no, FileOpenMode mode);
     static void load_sensors();
     static Sensor *parse_sensor(os_file_type file);
     static Sensor *get_sensor(uint8_t index);

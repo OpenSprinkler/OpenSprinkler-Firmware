@@ -95,7 +95,6 @@ double EnsembleSensor::_get_raw_value() {
 
     uint64_t mask = this->sensor_mask;
     uint8_t i = 0;
-    Sensor *sensor;
     while (mask) {
         if ((mask & 1) && sensors[i].interval) {
             double value = sensors[i].value;

@@ -2283,16 +2283,37 @@ void server_log_sensor(OTF_PARAMS_DEF) {
     if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("count"), true)) {
         max_count = strtoul(tmp_buffer, &end, 10);
         if (*end != '\0') handle_return(HTML_DATA_FORMATERROR);
-        if (max_count > 10000) handle_return(HTML_DATA_OUTOFBOUND);
+        if (max_count > 10000 || max_count > MAX_SENSOR_LOG_COUNT) handle_return(HTML_DATA_OUTOFBOUND);
     }
 
-    uint16_t cursor_v;
-    file_read_block(SENSORS_LOG_FILENAME, &cursor_v, 0, sizeof(cursor_v));
-    ulong cursor = (cursor_v + 1) % MAX_SENSOR_LOG_COUNT;
+    uint16_t file_no = os.sensor_file_no;
+    uint16_t next;
+    // file_read_block(SENSORS_LOG_FILENAME, &next, 0, sizeof(next));
+
+    os_file_type file = os.open_sensor_log(file_no, FileOpenMode::Read);
+    if (file) {
+        file_read(file, &next, sizeof(next));
+        file_close(file);
+    } else {
+        DEBUG_PRINT("Failed to open sensor log file: ");
+        DEBUG_PRINTLN(file_no);
+        handle_return(HTML_DATA_OUTOFBOUND); // TODO: INTERNAL ERROR
+    }
+
+    if (next == SENSOR_LOG_PER_FILE) {
+        next = 0;
+        file_no = (file_no + 1) % SENSOR_LOG_FILE_COUNT;
+    } else {
+        next += 1;
+    }
+
+    ulong cursor = (file_no * SENSOR_LOG_PER_FILE) + next;
     if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("cursor"), true)) {
         cursor = strtoul(tmp_buffer, &end, 10);
         if (*end != '\0') handle_return(HTML_DATA_FORMATERROR);
         if (cursor > MAX_SENSOR_LOG_COUNT) handle_return(HTML_DATA_OUTOFBOUND);
+        next = cursor % SENSOR_LOG_PER_FILE;
+        file_no = (cursor - next) / SENSOR_LOG_PER_FILE;
     }
 
     time_os_t before = std::numeric_limits<time_os_t>::max();
@@ -2319,30 +2340,61 @@ void server_log_sensor(OTF_PARAMS_DEF) {
     // Clear out buffer
     memset(tmp_buffer, 0, SENSOR_LOG_ITEM_SIZE);
 
-    os_file_type file = file_open(SENSORS_LOG_FILENAME, FileOpenMode::Read);
+    // os_file_type file = file_open(SENSORS_LOG_FILENAME, FileOpenMode::Read);
+    file = os.open_sensor_log(file_no, FileOpenMode::Read);
     if (file) {
-        bfill.emit_p(PSTR("{\"log\":["));
-        
-        file_seek(file, 2 + (cursor * SENSOR_LOG_ITEM_SIZE));
+        file_seek(file, sizeof(next) + (next * SENSOR_LOG_ITEM_SIZE), FileSeekMode::Current);
+    } else {
+        DEBUG_PRINT("Failed to sensor log file: ");
+        DEBUG_PRINTLN(file_no);
+        handle_return(HTML_RFCODE_ERROR); // TODO: INTERNAL SERVER ERROR
+    }
 
-        for (i=0;i<max_count;i++) {
+    bfill.emit_p(PSTR("{\"log\":["));
+    
+    for (i=0;i<max_count;i++) {
+        if (next == SENSOR_LOG_PER_FILE) {
+            if (file) {
+                file_close(file);
+                file_no = (file_no + 1) % SENSOR_LOG_FILE_COUNT;
+                next = 0;
+                file = os.open_sensor_log(file_no, FileOpenMode::Read);
+                if (file) {
+                    file_seek(file, sizeof(next), FileSeekMode::Current);
+                } else {
+                    DEBUG_PRINT("Failed to sensor log file: ");
+                    DEBUG_PRINTLN(file_no);
+                    break;
+                }
+            } else {
+                DEBUG_PRINT("Failed to sensor log file: ");
+                DEBUG_PRINTLN(file_no);
+                break;
+            }
+        }
+
+        if (file) {
             // Ensure a new value is read
-            tmp_buffer[0] = 0xFF;
+            tmp_buffer[0] = 0;
             file_read(file, tmp_buffer, SENSOR_LOG_ITEM_SIZE);
             cursor = (cursor + 1) % MAX_SENSOR_LOG_COUNT;
-            if (cursor == 0) {
-                file_seek(file, 2);
-            }
+            next += 1;
+            char *buf_ptr = tmp_buffer;
+            if (!(*buf_ptr & 1)) continue;
+            buf_ptr += 1;
 
-            uint8_t sid = tmp_buffer[0];
+            uint8_t sid = *buf_ptr;
             if (sid > MAX_SENSORS) continue;
+            buf_ptr += 1;
 
             if (target_sid > -1 && sid != target_sid) continue;
 
             time_os_t timestamp;
-            memcpy(&timestamp, tmp_buffer+1, sizeof(timestamp));
+            memcpy(&timestamp, buf_ptr, sizeof(timestamp));
+            buf_ptr += sizeof(timestamp);
             float value;
-            memcpy(&value, tmp_buffer+(1 + sizeof(time_os_t)), sizeof(value));
+            memcpy(&value, buf_ptr, sizeof(value));
+            buf_ptr += sizeof(value);
 
             if (timestamp > before || timestamp < after) continue;
 
@@ -2355,14 +2407,14 @@ void server_log_sensor(OTF_PARAMS_DEF) {
             if (available_ether_buffer() <= 0) {
                 send_packet(OTF_PARAMS);
             }
+        } else {
+            DEBUG_PRINT("Failed to sensor log file: ");
+            DEBUG_PRINTLN(file_no);
+            break;
         }
-        
-        file_close(file);
-    } else {
-        DEBUG_PRINT("Failed to open file: ");
-        DEBUG_PRINTLN(SENSORS_LOG_FILENAME);
-        handle_return(HTML_RFCODE_ERROR) // TODO error code
     }
+
+    if (file) file_close(file);
 
 	bfill.emit_p(PSTR("],\"total\":$D,\"count\":$D,\"next_cursor\":$D}"), MAX_SENSOR_LOG_COUNT, count, cursor);
 

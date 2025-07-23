@@ -139,8 +139,11 @@ typedef unsigned long ulong;
 #define MAX_SOPTS_SIZE    320   // maximum string option size
 
 #define MAX_SENSORS 64
-#define MAX_SENSOR_LOG_COUNT 32768
-#define SENSOR_LOG_ITEM_SIZE (sizeof(time_os_t) + sizeof(float) + 1)
+// #define SENSOR_LOG_PER_FILE 1024
+#define SENSOR_LOG_PER_FILE 1024
+#define SENSOR_LOG_FILE_COUNT 32
+#define MAX_SENSOR_LOG_COUNT (SENSOR_LOG_PER_FILE * SENSOR_LOG_FILE_COUNT)
+#define SENSOR_LOG_ITEM_SIZE (sizeof(time_os_t) + sizeof(float) + 1 + 1)
 
 #define STATION_SPECIAL_DATA_SIZE  (TMP_BUFFER_SIZE - STATION_NAME_SIZE - 12)
 
