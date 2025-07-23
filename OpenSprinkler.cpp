@@ -1138,49 +1138,6 @@ pinModeExt(PIN_BUTTON_3, INPUT_PULLUP);
     lcd.setCursor(0,0);
     lcd.print(F("Init sensors"));
 
-    {
-    //     //TODO!
-    //     //     remove_file(SENSORS_FILENAME);
-    //     remove_file(SENSORS_LOG_FILENAME);
-
-    //     // os_file_type file = file_open(SENSORS_FILENAME, FileOpenMode::WriteTruncate);
-    //     // if (file) {
-    //     //     for (size_t i = 0; i < MAX_SENSORS; i++) {
-    //     //         file_write(file, tmp_buffer, sizeof(uint32_t));
-    //     //         file_write(file, tmp_buffer, TMP_BUFFER_SIZE);
-    //     //     }
-            
-    //     //     file_close(file);
-    //     // } else {
-    //     //     DEBUG_PRINT("Failed to open file: ");
-    //     //     DEBUG_PRINTLN(SENSORS_FILENAME);
-    //     // }
-
-        os_file_type file;
-        uint16_t next = SENSOR_LOG_PER_FILE;
-        for (size_t f = 0; f < SENSOR_LOG_FILE_COUNT; f++) {
-            {
-            char sensor_log_name_buf[sizeof(SENSORS_LOG_FILENAME) + 3];
-            sensor_log_name_buf[sizeof(SENSORS_LOG_FILENAME) + 2] = 0;
-            memcpy(sensor_log_name_buf, SENSORS_LOG_FILENAME, sizeof(SENSORS_LOG_FILENAME));
-            snprintf(sensor_log_name_buf + sizeof(SENSORS_LOG_FILENAME) - 1, 4, "%03d", f);
-            remove_file(sensor_log_name_buf);
-        }
-            file = open_sensor_log(f, FileOpenMode::WriteTruncate);
-            if (file) {
-                file_write(file, &next, sizeof(next));
-                for (size_t i = 0; i < SENSOR_LOG_PER_FILE; i++) {
-                    file_write(file, tmp_buffer, SENSOR_LOG_ITEM_SIZE);
-                }
-                
-                file_close(file);
-            } else {
-                DEBUG_PRINT("Failed to open sensor log file: ");
-                DEBUG_PRINTLN(f);
-            }
-        }
-    }
-
     os_file_type file;
     uint16_t next = 0;
     size_t f;

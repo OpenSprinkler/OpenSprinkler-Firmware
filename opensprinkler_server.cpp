@@ -93,6 +93,7 @@ int available_ether_buffer() {
 #define HTML_PAGE_NOT_FOUND   0x20
 #define HTML_NOT_PERMITTED    0x30
 #define HTML_UPLOAD_FAILED    0x40
+#define HTML_INTERNAL_ERROR   0x50
 #define HTML_REDIRECT_HOME    0xFF
 
 #if !defined(USE_OTF)
@@ -2297,7 +2298,7 @@ void server_log_sensor(OTF_PARAMS_DEF) {
     } else {
         DEBUG_PRINT("Failed to open sensor log file: ");
         DEBUG_PRINTLN(file_no);
-        handle_return(HTML_DATA_OUTOFBOUND); // TODO: INTERNAL ERROR
+        handle_return(HTML_INTERNAL_ERROR);
     }
 
     if (next == SENSOR_LOG_PER_FILE) {
@@ -2345,9 +2346,9 @@ void server_log_sensor(OTF_PARAMS_DEF) {
     if (file) {
         file_seek(file, sizeof(next) + (next * SENSOR_LOG_ITEM_SIZE), FileSeekMode::Current);
     } else {
-        DEBUG_PRINT("Failed to sensor log file: ");
+        DEBUG_PRINT("Failed to open sensor log file: ");
         DEBUG_PRINTLN(file_no);
-        handle_return(HTML_RFCODE_ERROR); // TODO: INTERNAL SERVER ERROR
+        handle_return(HTML_INTERNAL_ERROR);
     }
 
     bfill.emit_p(PSTR("{\"log\":["));
@@ -2362,12 +2363,12 @@ void server_log_sensor(OTF_PARAMS_DEF) {
                 if (file) {
                     file_seek(file, sizeof(next), FileSeekMode::Current);
                 } else {
-                    DEBUG_PRINT("Failed to sensor log file: ");
+                    DEBUG_PRINT("Failed to open sensor log file: ");
                     DEBUG_PRINTLN(file_no);
                     break;
                 }
             } else {
-                DEBUG_PRINT("Failed to sensor log file: ");
+                DEBUG_PRINT("Failed to open sensor log file: ");
                 DEBUG_PRINTLN(file_no);
                 break;
             }
@@ -2408,7 +2409,7 @@ void server_log_sensor(OTF_PARAMS_DEF) {
                 send_packet(OTF_PARAMS);
             }
         } else {
-            DEBUG_PRINT("Failed to sensor log file: ");
+            DEBUG_PRINT("Failed to open sensor log file: ");
             DEBUG_PRINTLN(file_no);
             break;
         }
