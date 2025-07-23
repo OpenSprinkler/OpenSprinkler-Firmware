@@ -335,7 +335,6 @@ os_file_type file_open(const char *fn, FileOpenMode mode) {
         default:
         case FileOpenMode::Read:
             return LittleFS.open(fn, "r");
-            break;
         case FileOpenMode::ReadWrite:
             if (!LittleFS.exists(fn)) {
                 File f = LittleFS.open(fn, "w");
@@ -343,23 +342,37 @@ os_file_type file_open(const char *fn, FileOpenMode mode) {
                 f.close();
             }
             return LittleFS.open(fn, "r+");
-            break;
         case FileOpenMode::WriteTruncate:
             return LittleFS.open(fn, "w");
-            break;
         case FileOpenMode::ReadWriteTruncate:
             return LittleFS.open(fn, "w+");
-            break;
         case FileOpenMode::Append:
             return LittleFS.open(fn, "a");
-            break;
         case FileOpenMode::ReadAppend:
             return LittleFS.open(fn, "a+");
-            break;
     }
     #else
-    //TODO
-    // return file.open(fn, O_READ);
+    switch (mode) {
+        default:
+        case FileOpenMode::Read:
+            return fopen(get_filename_fullpath(fn), "rb");
+        case FileOpenMode::ReadWrite:
+            if (!LittleFS.exists(fn)) {
+                FILE *fp = fopen(get_filename_fullpath(fn), "wb");
+                if (!fp) return fp;
+                fclose(fp);
+            }
+            return fopen(get_filename_fullpath(fn), "rb+");
+        case FileOpenMode::WriteTruncate:
+            return fopen(get_filename_fullpath(fn), "wb");
+        case FileOpenMode::ReadWriteTruncate:
+            return fopen(get_filename_fullpath(fn), "wb+");
+        case FileOpenMode::Append:
+            return fopen(get_filename_fullpath(fn), "ab");
+        case FileOpenMode::ReadAppend:
+            return fopen(get_filename_fullpath(fn), "ab+");
+    }
+    
     #endif
 }
 
@@ -367,9 +380,7 @@ void file_close(os_file_type f) {
     #if defined(ARDUINO)
     f.close();
     #else
-    //TODO
-    file.close(fn);
-    // return file.open(fn, O_READ);
+    fclose(f);
     #endif
 }
 
@@ -384,8 +395,14 @@ bool file_seek(os_file_type f, uint32_t position, FileSeekMode mode) {
             return f.seek(position, fs::SeekMode::SeekEnd);
     }
     #else
-    //TODO
-    // return file.open(fn, O_READ);
+    switch (mode) {
+        case FileSeekMode::Set:
+            return fseek(f, position, SEEK_SET);
+        case FileSeekMode::Current:
+            return fseek(f, position, SEEK_CUR);
+        case FileSeekMode::End:
+            return fseek(f, position, SEEK_END);
+    }
     #endif
 
     return false;
@@ -399,8 +416,7 @@ int file_read(os_file_type f, void *target, uint32_t len) {
     #if defined(ARDUINO)
     return f.read((uint8_t*)target, len);
     #else
-    //TODO
-    // return file.open(fn, O_READ);
+    return fread(target, 1, len, f);
     #endif
 }
 
@@ -408,8 +424,7 @@ int file_write(os_file_type f, const void *source, uint32_t len) {
     #if defined(ARDUINO)
     return f.write((const uint8_t*)source, len);
     #else
-    //TODO
-    // return file.open(fn, O_READ);
+    return fwrite(target, 1, len, f);
     #endif
 }
 
