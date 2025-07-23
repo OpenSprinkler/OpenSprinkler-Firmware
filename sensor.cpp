@@ -1,4 +1,4 @@
-#include <sensor.h>
+#include "sensor.h"
 #include "OpenSprinkler.h"
 
 Sensor::Sensor(unsigned long interval, double min, double max, double scale, double offset, const char *name, SensorUnit unit) :

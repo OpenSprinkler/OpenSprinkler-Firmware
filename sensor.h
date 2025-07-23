@@ -7,7 +7,7 @@
 #else
 #include "utils.h"
 #endif
-#include <defines.h>
+#include "defines.h"
 
 #define SENSOR_NAME_LEN 33
 #define SENSOR_CUSTOM_UNIT_LEN 9
