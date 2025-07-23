@@ -27,6 +27,7 @@
 #if !defined(ARDUINO)
 #include <stdarg.h>
 #include <unistd.h>
+#include <limits>
 #endif
 
 char dec2hexchar(unsigned char dec);
