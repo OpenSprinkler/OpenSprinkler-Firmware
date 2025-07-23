@@ -761,9 +761,11 @@ bool OpenSprinkler::network_connected(void) {
 	return true;
 }
 
+#if defined(OSPI)
 bool detect_i2c(int addr) {
     Bus.detect(addr);
 }
+#endif
 
 // Return mac of first recognised interface and fallback to software mac
 // Note: on OSPi, operating system handles interface allocation so 'wired' ignored
@@ -850,7 +852,7 @@ void OpenSprinkler::begin() {
 
 #if defined(ARDUINO)
 	Wire.begin(); // init I2C
-#else
+#elif defined(OSPI)
     Bus.begin(); // init I2C for OSPI
 #endif
 
