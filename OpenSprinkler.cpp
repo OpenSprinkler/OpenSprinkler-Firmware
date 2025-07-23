@@ -2307,7 +2307,7 @@ void OpenSprinkler::factory_reset() {
             char sensor_log_name_buf[sizeof(SENSORS_LOG_FILENAME) + 3];
             sensor_log_name_buf[sizeof(SENSORS_LOG_FILENAME) + 2] = 0;
             memcpy(sensor_log_name_buf, SENSORS_LOG_FILENAME, sizeof(SENSORS_LOG_FILENAME));
-            snprintf(sensor_log_name_buf + sizeof(SENSORS_LOG_FILENAME) - 1, 4, "%03d", f);
+            snprintf(sensor_log_name_buf + sizeof(SENSORS_LOG_FILENAME) - 1, 4, "%03u", f);
             remove_file(sensor_log_name_buf);
         }
         file = open_sensor_log(f, FileOpenMode::WriteTruncate);
@@ -2675,7 +2675,7 @@ os_file_type OpenSprinkler::open_sensor_log(uint16_t file_no, FileOpenMode mode)
     char sensor_log_name_buf[sizeof(SENSORS_LOG_FILENAME) + 3];
     sensor_log_name_buf[sizeof(SENSORS_LOG_FILENAME) + 2] = 0;
     memcpy(sensor_log_name_buf, SENSORS_LOG_FILENAME, sizeof(SENSORS_LOG_FILENAME));
-    snprintf(sensor_log_name_buf + sizeof(SENSORS_LOG_FILENAME) - 1, 4, "%03d", file_no);
+    snprintf(sensor_log_name_buf + sizeof(SENSORS_LOG_FILENAME) - 1, 4, "%03u", file_no);
 
     return file_open(sensor_log_name_buf, mode);
 }
