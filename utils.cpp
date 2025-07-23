@@ -423,7 +423,7 @@ int file_write(os_file_type f, const void *source, uint32_t len) {
     #if defined(ARDUINO)
     return f.write((const uint8_t*)source, len);
     #else
-    return fwrite(target, 1, len, f);
+    return fwrite(source, 1, len, f);
     #endif
 }
 
