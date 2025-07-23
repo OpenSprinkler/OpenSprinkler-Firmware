@@ -29,6 +29,10 @@
 #include "ArduinoJson.hpp"
 
 /** Declare static data members */
+#if defined(USE_SENSORS)
+sensor_memory_t OpenSprinkler::sensors[64] = {0};
+uint16_t OpenSprinkler::sensor_file_no = 0;
+#endif
 OSMqtt OpenSprinkler::mqtt;
 NVConData OpenSprinkler::nvdata;
 ConStatus OpenSprinkler::status;
@@ -83,6 +87,10 @@ extern const char* user_agent_string;
 	SSD1306Display OpenSprinkler::lcd(0x3c, SDA, SCL);
 #elif defined(USE_LCD)
 	LiquidCrystal OpenSprinkler::lcd;
+#endif
+
+#if defined(USE_ADS1115)
+    ADS1115 *OpenSprinkler::ads1115_devices[4] = {nullptr};
 #endif
 
 #if defined(ESP8266)
@@ -747,6 +755,12 @@ bool OpenSprinkler::network_connected(void) {
 	return true;
 }
 
+#if defined(OSPI)
+bool detect_i2c(int addr) {
+    Bus.detect(addr);
+}
+#endif
+
 // Return mac of first recognised interface and fallback to software mac
 // Note: on OSPi, operating system handles interface allocation so 'wired' ignored
 bool OpenSprinkler::load_hardware_mac(unsigned char* mac, bool wired) {
@@ -832,6 +846,8 @@ void OpenSprinkler::begin() {
 
 #if defined(ARDUINO)
 	Wire.begin(); // init I2C
+#elif defined(OSPI)
+    Bus.begin(); // init I2C for OSPI
 #endif
 
 	hw_type = HW_TYPE_UNKNOWN;
@@ -934,7 +950,6 @@ void OpenSprinkler::begin() {
 	for(unsigned char i=0;i<(MAX_NUM_BOARDS)/2;i++)
 		expanders[i] = NULL;
 	detect_expanders();
-
 #else
 
 	// shift register setup
@@ -1081,7 +1096,6 @@ pinModeExt(PIN_BUTTON_3, INPUT_PULLUP);
 		}
 
 		state = OS_STATE_INITIAL;
-
 	#else
 
 		// set sd cs pin high to release SD
@@ -1108,6 +1122,41 @@ pinModeExt(PIN_BUTTON_3, INPUT_PULLUP);
 
 #else
 	//DEBUG_PRINTLN(get_runtime_path());
+#endif
+
+#if defined(USE_ADS1115)
+    for (size_t i = 0; i < 4; i++) {
+        uint8_t address = 0x48 + i;
+        if (detect_i2c(address)) {
+            ads1115_devices[i] = new ADS1115(address);
+        }
+    }
+#endif
+
+#if defined(USE_SENSORS)
+    lcd.clear();
+    lcd.setCursor(0,0);
+    lcd.print(F("Init sensors"));
+
+    os_file_type file;
+    uint16_t next = 0;
+    size_t f;
+    for (f = 0; f < SENSOR_LOG_FILE_COUNT; f++) {
+        file = open_sensor_log(f, FileOpenMode::Read);
+        if (file) {
+            file_read(file, &next, sizeof(next));
+            file_close(file);
+
+            if (next < SENSOR_LOG_PER_FILE) break;
+        } else {
+            DEBUG_PRINT("Failed to open sensor log file: ");
+            DEBUG_PRINTLN(f);
+        }
+    }
+    if (f == SENSOR_LOG_FILE_COUNT) f -= 1;
+    sensor_file_no = f;
+    
+    os.load_sensors();
 #endif
 }
 
@@ -2232,6 +2281,49 @@ void OpenSprinkler::factory_reset() {
 	// 4. write program data: just need to write a program counter: 0
 	file_write_byte(PROG_FILENAME, 0, 0);
 
+    #if defined(USE_SENSORS)
+    // Initalize the senor file
+    memset(tmp_buffer, 0, TMP_BUFFER_SIZE);
+   
+    remove_file(SENSORS_FILENAME);
+    os_file_type file = file_open(SENSORS_FILENAME, FileOpenMode::WriteTruncate);
+    if (file) {
+        for (size_t i = 0; i < MAX_SENSORS; i++) {
+            file_write(file, tmp_buffer, sizeof(uint32_t));
+            file_write(file, tmp_buffer, TMP_BUFFER_SIZE);
+        }
+        
+        file_close(file);
+    } else {
+        DEBUG_PRINT("Failed to open file: ");
+        DEBUG_PRINTLN(SENSORS_FILENAME);
+    }
+
+
+    uint16_t next = SENSOR_LOG_PER_FILE;
+    for (uint16_t f = 0; f < SENSOR_LOG_FILE_COUNT; f++) {
+        {
+            char sensor_log_name_buf[sizeof(SENSORS_LOG_FILENAME) + 3];
+            sensor_log_name_buf[sizeof(SENSORS_LOG_FILENAME) + 2] = 0;
+            memcpy(sensor_log_name_buf, SENSORS_LOG_FILENAME, sizeof(SENSORS_LOG_FILENAME));
+            snprintf(sensor_log_name_buf + sizeof(SENSORS_LOG_FILENAME) - 1, 4, "%03u", f);
+            remove_file(sensor_log_name_buf);
+        }
+        file = open_sensor_log(f, FileOpenMode::WriteTruncate);
+        if (file) {
+            file_write(file, &next, sizeof(next));
+            for (size_t i = 0; i < SENSOR_LOG_PER_FILE; i++) {
+                file_write(file, tmp_buffer, SENSOR_LOG_ITEM_SIZE);
+            }
+            
+            file_close(file);
+        } else {
+            DEBUG_PRINT("Failed to open sensor log file: ");
+            DEBUG_PRINTLN(f);
+        }
+    }
+    #endif
+
 	// 5. write 'done' file
 	file_write_byte(DONE_FILENAME, 0, 1);
 }
@@ -2532,6 +2624,166 @@ void OpenSprinkler::raindelay_stop() {
 	nvdata.rd_stop_time = 0;
 	nvdata_save();
 }
+
+#if defined(USE_SENSORS)
+/** Sensor functions */
+Sensor *OpenSprinkler::parse_sensor(os_file_type file) {
+    uint32_t len = 0;
+    file_read(file, &len, sizeof(len));
+
+    if (len == 0 || len > TMP_BUFFER_SIZE) return nullptr;
+    
+    file_read(file, tmp_buffer, len);
+
+    if ((uint8_t)(tmp_buffer[0]) >= (uint8_t)SensorType::MAX_VALUE) {
+        return nullptr;
+    }
+
+    SensorType sensor_type = static_cast<SensorType>(*tmp_buffer);
+
+    switch (sensor_type) {
+        case SensorType::Ensemble:
+            return new EnsembleSensor(os.sensors, (char*)tmp_buffer);
+        case SensorType::ADS1115:
+            return new ADS1115Sensor(os.ads1115_devices, (char*)tmp_buffer);
+        case SensorType::Weather:
+            return new WeatherSensor(os.get_sensor_weather_data, (char*)tmp_buffer);
+        default:
+            return nullptr;
+    };
+}
+
+Sensor *OpenSprinkler::get_sensor(uint8_t index) {
+    ulong pos = (TMP_BUFFER_SIZE + sizeof(uint32_t)) * index;
+    
+    os_file_type file = file_open(SENSORS_FILENAME, FileOpenMode::Read);
+    if (file) {
+        file_seek(file, pos, FileSeekMode::Current);
+
+        Sensor *result = parse_sensor(file);
+        file_close(file);
+        return result;
+    } else {
+        DEBUG_PRINT("Failed to open file: ");
+        DEBUG_PRINTLN(SENSORS_FILENAME);
+        return nullptr;
+    }
+}
+
+os_file_type OpenSprinkler::open_sensor_log(uint16_t file_no, FileOpenMode mode) {
+    char sensor_log_name_buf[sizeof(SENSORS_LOG_FILENAME) + 3];
+    sensor_log_name_buf[sizeof(SENSORS_LOG_FILENAME) + 2] = 0;
+    memcpy(sensor_log_name_buf, SENSORS_LOG_FILENAME, sizeof(SENSORS_LOG_FILENAME));
+    snprintf(sensor_log_name_buf + sizeof(SENSORS_LOG_FILENAME) - 1, 4, "%03u", file_no);
+
+    return file_open(sensor_log_name_buf, mode);
+}
+
+void OpenSprinkler::load_sensors() {
+    Sensor *sensor;
+    os_file_type file = file_open(SENSORS_FILENAME, FileOpenMode::Read);
+    if (file) {
+        for (size_t i = 0; i < MAX_SENSORS; i++) {
+            if ((sensor = parse_sensor(file))) {
+                sensors[i].interval = sensor->interval;
+                sensors[i].next_update = 0;
+                sensors[i].value = 0.0;
+                delete sensor;
+            }
+        }
+
+        file_close(file);
+    } else {
+        DEBUG_PRINT("Failed to open file: ");
+        DEBUG_PRINTLN(SENSORS_FILENAME);
+    }
+}
+
+void OpenSprinkler::write_sensor(Sensor *sensor, uint8_t index) {
+    ulong pos = (TMP_BUFFER_SIZE + sizeof(uint32_t)) * index;
+    uint32_t len = 0;
+
+    os_file_type file = file_open(SENSORS_FILENAME, FileOpenMode::ReadWrite);
+    if (file) {
+        if (sensor) {
+            len = sensor->serialize(tmp_buffer);
+        }
+
+        file_seek(file, pos, FileSeekMode::Current);
+        file_write(file, &len, sizeof(len));
+        if (sensor) {
+            file_write(file, tmp_buffer, len);
+        }
+
+        file_close(file);
+    } else {
+        DEBUG_PRINT("Failed to open file: ");
+        DEBUG_PRINTLN(SENSORS_FILENAME);
+    }
+}
+
+void OpenSprinkler::log_sensor(uint8_t sid, float value) {
+    os_file_type file = open_sensor_log(sensor_file_no, FileOpenMode::ReadWrite);
+    if (file) {
+        uint16_t next = 0;
+        file_read(file, &next, sizeof(next));
+        if (next == SENSOR_LOG_PER_FILE) next -= 1;
+        
+        time_os_t timestamp = now();
+        tmp_buffer[0] = 1;
+        tmp_buffer[1] = sid;
+        char *ptr = tmp_buffer + 2;
+        memcpy(ptr, &timestamp, sizeof(timestamp));
+        ptr += sizeof(timestamp);
+        memcpy(ptr, &value, sizeof(value));
+
+        uint32_t pos = (next * SENSOR_LOG_ITEM_SIZE);
+
+
+        if (next > 0) {
+            next -= 1;
+        } else {
+            next = SENSOR_LOG_PER_FILE;
+            if (sensor_file_no > 0) {
+                sensor_file_no -= 1;
+            } else {
+                sensor_file_no = SENSOR_LOG_FILE_COUNT - 1;
+            }
+        }
+
+        file_seek(file, 0);
+        file_write(file, &next, sizeof(next));
+
+        file_seek(file, pos, FileSeekMode::Current);
+        file_write(file, tmp_buffer, SENSOR_LOG_ITEM_SIZE);
+
+        file_close(file);
+    } else {
+        DEBUG_PRINT("Failed to open file: ");
+        DEBUG_PRINTLN(SENSORS_LOG_FILENAME);
+    }
+}
+
+void OpenSprinkler::poll_sensors() {
+    for (uint8_t i = 0; i < MAX_SENSORS; i++) {
+        if (sensors[i].interval) {
+            if (millis() >= sensors[i].next_update) {
+                Sensor *sensor = get_sensor(i);
+                if (sensor) {
+                    sensors[i].value = sensor->get_new_value();
+                    delete sensor;
+                    sensors[i].next_update = millis() + sensors[i].interval;
+                    os.log_sensor(i, sensors[i].value);
+                }
+            }
+        }
+    }
+}
+
+double OpenSprinkler::get_sensor_weather_data(WeatherAction action) {
+    return NAN; // TODO make function for WeatherSensor
+}
+#endif
 
 /** LCD and button functions */
 #if defined(USE_DISPLAY)
