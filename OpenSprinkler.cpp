@@ -2302,7 +2302,7 @@ void OpenSprinkler::factory_reset() {
 
 
     uint16_t next = SENSOR_LOG_PER_FILE;
-    for (size_t f = 0; f < SENSOR_LOG_FILE_COUNT; f++) {
+    for (uint16_t f = 0; f < SENSOR_LOG_FILE_COUNT; f++) {
         {
             char sensor_log_name_buf[sizeof(SENSORS_LOG_FILENAME) + 3];
             sensor_log_name_buf[sizeof(SENSORS_LOG_FILENAME) + 2] = 0;
