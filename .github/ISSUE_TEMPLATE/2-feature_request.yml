@@ -1,0 +1,21 @@
+name: Feature Request
+description: Suggest a new feature or improvement for the OpenSprinkler firmware (NOT hardware, weather, or UI/app, as those have their own repos)
+title: "[Feature] <brief summary here>"
+labels: [feature]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting a feature! Please provide as much detail as possible so we can evaluate it effectively.
+
+  - type: textarea
+    id: feature-description
+    attributes:
+      label: What feature do you want to see?
+      description: Clearly describe the feature or improvement you'd like to see.
+      placeholder: "Describe the feature and what it would do."
+
+
+

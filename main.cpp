@@ -105,15 +105,10 @@ ulong flow_begin, flow_start, flow_stop, flow_gallons, flow_rt_reset, last_flow_
 ulong flow_count = 0;
 unsigned char prev_flow_state = HIGH;
 float flow_last_gpm = 0;
-float flow_rt_period = 0;
-
+int32_t flow_rt_period = -1;
 uint32_t reboot_timer = 0;
 
 void flow_poll() {
-	#if defined(ESP8266)
-	if(os.hw_rev>=2) pinModeExt(PIN_SENSOR1, INPUT_PULLUP); // this seems necessary for OS 3.2
-	#endif
-
 	ulong curr = millis();
 
 	// Resets counter if timeout occurs
@@ -127,8 +122,16 @@ void flow_poll() {
 		last_flow_rt = curr;
 	}
 
+	#if defined(ESP8266)
+	if(os.hw_rev>=2) {
+		pinMode(PIN_SENSOR1, INPUT); // Work-around for PIN_SENSOR1 on OS3.2 and above
+		pinMode(PIN_SENSOR1, INPUT_PULLUP);
+	}
+	#endif
+
+
 	unsigned char curr_flow_state = digitalReadExt(PIN_SENSOR1);
-	if(!(prev_flow_state==HIGH && curr_flow_state==LOW)) { // only record on falling edge
+	if((!prev_flow_state) || curr_flow_state) { // only record on falling edge
 		prev_flow_state = curr_flow_state;
 		return;
 	}
@@ -150,18 +153,19 @@ void flow_poll() {
 		}
 	}
 
-	// Use weighted average if flow has been previosuly calculated, otherwise just set the value
+	// Use exponential moving average (alpha=0.2) if flow has been previosuly calculated, otherwise just set the value
+	ulong curr_period = curr - last_flow_rt;
 	if (flow_rt_period > 0) {
-		flow_rt_period = (((float) (curr - last_flow_rt) * 3.0) / 4.0) + (flow_rt_period / 4.0);
+		flow_rt_period = (curr_period  / 5 + flow_rt_period * 4 / 5);
 	} else {
-		flow_rt_period = (float) (curr - last_flow_rt);
+		flow_rt_period = curr_period;
 	}
 
 	// calculates the flow rate scaled by the window size to simulated a fixed point number
 	if (flow_rt_period > 0) {
-		os.flowcount_rt = (ulong) (FLOWCOUNT_RT_WINDOW * 1000.0 / flow_rt_period);
+		os.flowcount_rt = (ulong) (FLOWCOUNT_RT_WINDOW * 1000L / flow_rt_period);
 		// Sets the timeout to be 10x the last period
-		flow_rt_reset = curr + (curr - last_flow_rt) * 10.0;
+		flow_rt_reset = curr + (curr - last_flow_rt) * 10;
 	} else {
 		os.flowcount_rt = 0;
 		flow_rt_reset = 0;
@@ -526,6 +530,7 @@ bool delete_log_oldest();
 void start_server_ap();
 void start_server_client();
 static Ticker reboot_ticker;
+
 void reboot_in(uint32_t ms) {
 	if(os.state != OS_STATE_WAIT_REBOOT) {
 		os.state = OS_STATE_WAIT_REBOOT;
@@ -542,14 +547,15 @@ void handle_web_request(char *p);
 void do_loop()
 {
 	static ulong flowpoll_timeout=0;
-	// handle flow sensor using polling every 1ms (maximum freq 1/(2*1ms)=500Hz)
 	if(os.iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_FLOW) {
+	// handle flow sensor using polling every 1ms (maximum freq 1/(2*1ms)=500Hz)
 		ulong curr = millis();
 		if(curr!=flowpoll_timeout) {
 			flowpoll_timeout = curr;
 			flow_poll();
 		}
 	}
+
 
 	static time_os_t last_time = 0;
 	static ulong last_minute = 0;
@@ -673,26 +679,25 @@ void do_loop()
 	EthernetClient client = m_server->available();
 	if (client) {
 		ulong cli_timeout = now() + CLIENT_READ_TIMEOUT;
+		size_t size = 0;
 		while(client.connected() && now() < cli_timeout) {
-			size_t size = client.available();
-			if(size>0) {
-				if(size>ETHER_BUFFER_SIZE) size=ETHER_BUFFER_SIZE;
-				int len = client.read((uint8_t*) ether_buffer, size);
-				// Hack: see if we may have another packet, in case there is an overly large packet
-				// This really should be implemented more gracefully
-				size = client.available();
-				if(size>0) {
-					// There is still more data to read
-					if(size+len > ETHER_BUFFER_SIZE) size = ETHER_BUFFER_SIZE - len; // cap read size
-					len += client.read((uint8_t*) ether_buffer+len, size);
-				}
-				if(len>0) {
-					m_client = &client;
-					ether_buffer[len] = 0;  // properly end the buffer
-					handle_web_request(ether_buffer);
-					m_client = NULL;
-					break;
-				}
+			size = client.available();	// wait till we have client data available
+			if(size>0) break;
+		}
+		if(size>0) {
+			size_t len = 0;
+			while (client.available() && now()<cli_timeout) {
+				size_t read = client.readBytesUntil('\n', ether_buffer+len, min((int) (ETHER_BUFFER_SIZE - len - 1), ETHER_BUFFER_SIZE));
+				char rc = ether_buffer[len];
+				len += read;
+				ether_buffer[len++] = '\n';
+				if(read==1 && rc=='\r') { break; }
+			}
+			if(len>0) {
+				m_client = &client;
+				ether_buffer[len] = 0;  // properly end the buffer
+				handle_web_request(ether_buffer);
+				m_client = NULL;
 			}
 		}
 		client.stop();
@@ -726,8 +731,8 @@ void do_loop()
 
 		#if defined(ESP8266)
 		if(os.hw_rev>=2) {
-			pinModeExt(PIN_SENSOR1, INPUT_PULLUP); // this seems necessary for OS 3.2
-			pinModeExt(PIN_SENSOR2, INPUT_PULLUP);
+			pinMode(PIN_SENSOR1, INPUT_PULLUP); // this seems necessary for OS 3.2
+			pinMode(PIN_SENSOR2, INPUT_PULLUP);
 		}
 		#endif
 
@@ -1840,8 +1845,8 @@ static void perform_ntp_sync() {
 
 #if !defined(ARDUINO) // main function for RPI/LINUX
 int main(int argc, char *argv[]) {
-    // Disable buffering to work with systemctl journal
-    setvbuf(stdout, NULL, _IOLBF, 0);
+	// Disable buffering to work with systemctl journal
+	setvbuf(stdout, NULL, _IOLBF, 0);
 	printf("Starting OpenSprinkler\n");
 
 	int opt;
