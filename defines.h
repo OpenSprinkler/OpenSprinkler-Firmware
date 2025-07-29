@@ -64,7 +64,14 @@ typedef unsigned long ulong;
 #define STN_TYPE_HTTP        0x04	// HTTP station
 #define STN_TYPE_HTTPS       0x05	// HTTPS station
 #define STN_TYPE_REMOTE_OTC  0x06 // Remote OpenSprinkler station (by OTC)
+#define STN_TYPE_FERTIGATION 0x07 // Fertigation station type
 #define STN_TYPE_OTHER       0xFF
+
+/** Fertigation macro defines */
+#define FERT_MODE_TIME       0x00  // Time-based fertigation
+#define FERT_MODE_PERCENTAGE 0x01  // Percentage-based fertigation
+#define FERT_MAX_DURATION    3600  // Maximum fertigation duration in seconds
+#define FERT_MAX_PERCENTAGE  100   // Maximum fertigation percentage
 
 /** Notification macro defines */
 #define NOTIFY_PROGRAM_SCHED   0x0001

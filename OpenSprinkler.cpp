@@ -42,6 +42,9 @@ unsigned char OpenSprinkler::station_bits[MAX_NUM_BOARDS];
 unsigned char OpenSprinkler::engage_booster;
 uint16_t OpenSprinkler::baseline_current;
 
+// Fertigation queue
+OpenSprinkler::FertigationQueue OpenSprinkler::fertigation_queue[MAX_NUM_STATIONS];
+
 time_os_t OpenSprinkler::sensor1_on_timer;
 time_os_t OpenSprinkler::sensor1_off_timer;
 time_os_t OpenSprinkler::sensor1_active_lasttime;
@@ -1623,11 +1626,9 @@ void OpenSprinkler::get_station_data(unsigned char sid, StationData* data) {
 }
 
 /** Set station data */
-/*
 void OpenSprinkler::set_station_data(unsigned char sid, StationData* data) {
 	file_write_block(STATIONS_FILENAME, data, (uint32_t)sid*sizeof(StationData), sizeof(StationData));
 }
-*/
 
 /** Get station name */
 void OpenSprinkler::get_station_name(unsigned char sid, char tmp[]) {
@@ -1658,6 +1659,19 @@ unsigned char OpenSprinkler::is_sequential_station(unsigned char sid) {
 unsigned char OpenSprinkler::is_master_station(unsigned char sid) {
 	for (unsigned char mas = 0; mas < NUM_MASTER_ZONES; mas++) {
 		if (get_master_id(mas) && (get_master_id(mas) - 1 == sid)) {
+			return 1;
+		}
+	}
+	return 0;
+}
+
+/** Check if a station is used as a fertigation station by any other station */
+unsigned char OpenSprinkler::is_fertigation_station(unsigned char sid) {
+	// Check if this station is used as a fertigation valve by any other station
+	for (unsigned char i = 0; i < nstations; i++) {
+		FertigationStationData fdata;
+		get_fertigation_data(i, &fdata);
+		if (fdata.enabled && fdata.fertigation_sid == sid) {
 			return 1;
 		}
 	}
@@ -1843,6 +1857,15 @@ void OpenSprinkler::switch_special_station(unsigned char sid, unsigned char valu
  * (which results in physical actions of opening/closing valves).
  */
 unsigned char OpenSprinkler::set_station_bit(unsigned char sid, unsigned char value, uint16_t dur) {
+	// Prevent manual activation of master stations and fertigation stations
+	if (value && (is_master_station(sid) || is_fertigation_station(sid))) {
+		// Allow system-controlled activation (when dur is 0, it's typically system-controlled)
+		// or when it's being turned off (value == 0)
+		if (dur > 0) {
+			return 0; // Prevent manual activation of master/fertigation stations
+		}
+	}
+	
 	unsigned char *data = station_bits+(sid>>3);  // pointer to the station byte
 	unsigned char mask = (unsigned char)1<<(sid&0x07); // mask
 	if (value) {
@@ -1851,6 +1874,21 @@ unsigned char OpenSprinkler::set_station_bit(unsigned char sid, unsigned char va
 			(*data) = (*data) | mask;
 			engage_booster = true; // if bit is changing from 0 to 1, set engage_booster
 			switch_special_station(sid, 1, dur); // handle special stations
+			
+			// Check if this station has fertigation enabled
+			FertigationStationData fdata;
+			get_fertigation_data(sid, &fdata);
+			if (fdata.enabled) {
+				// Calculate fertigation duration
+				uint16_t fert_duration = fdata.duration;
+				if (fdata.mode == FERT_MODE_PERCENTAGE && dur > 0) {
+					// For percentage mode, calculate based on station runtime
+					fert_duration = (dur * fdata.percentage) / 100;
+				}
+				// Schedule fertigation (use program ID 255 for manual runs)
+				schedule_fertigation(sid, 255, fert_duration, dur);
+			}
+			
 			return 1;
 		}
 	} else {
@@ -1861,6 +1899,10 @@ unsigned char OpenSprinkler::set_station_bit(unsigned char sid, unsigned char va
 				engage_booster = true;  // if LATCH controller, engage booster when bit changes
 			}
 			switch_special_station(sid, 0); // handle special stations
+			
+			// Stop fertigation for this station
+			stop_fertigation(sid);
+			
 			return 255;
 		}
 	}
@@ -2701,6 +2743,8 @@ void OpenSprinkler::lcd_print_screen(char c) {
 				lcd.print((bitvalue&1) ? c : 'M'); // print master station
 			} else if (sid == iopts[IOPT_MASTER_STATION_2]) {
 				lcd.print((bitvalue&1) ? c : 'N'); // print master2 station
+			} else if (is_fertigation_station(sid-1)) {
+				lcd.print((bitvalue&1) ? c : 'F'); // print fertigation station
 			} else {
 				lcd.print((bitvalue&1) ? c : '_');
 			}
@@ -3169,3 +3213,148 @@ void OpenSprinkler::detect_expanders() {
 	}
 }
 #endif
+
+// ==========================================
+// ====== FERTIGATION FUNCTIONS ===========
+// ==========================================
+
+/** Get fertigation data for a station */
+void OpenSprinkler::get_fertigation_data(unsigned char sid, FertigationStationData* data) {
+	StationData sdata;
+	get_station_data(sid, &sdata);
+	
+	// If station type is not fertigation-enabled, return default values
+	if (sdata.type != STN_TYPE_FERTIGATION) {
+		memset(data, 0, sizeof(FertigationStationData));
+		return;
+	}
+	
+	// Copy fertigation data from station special data
+	memcpy(data, sdata.sped, sizeof(FertigationStationData));
+}
+
+/** Set fertigation data for a station */
+void OpenSprinkler::set_fertigation_data(unsigned char sid, FertigationStationData* data) {
+	StationData sdata;
+	get_station_data(sid, &sdata);
+	
+	// Set station type to fertigation if enabled
+	if (data->enabled) {
+		sdata.type = STN_TYPE_FERTIGATION;
+	} else if (sdata.type == STN_TYPE_FERTIGATION) {
+		sdata.type = STN_TYPE_STANDARD; // Reset to standard if fertigation disabled
+	}
+	
+	// Copy fertigation data to station special data
+	memcpy(sdata.sped, data, sizeof(FertigationStationData));
+	
+	set_station_data(sid, &sdata);
+}
+
+/** Calculate fertigation time for a station and program */
+uint16_t OpenSprinkler::calculate_fertigation_time(unsigned char sid, unsigned char pid) {
+	FertigationStationData fdata;
+	get_fertigation_data(sid, &fdata);
+	
+	if (!fdata.enabled) return 0;
+	
+	// Check for program-level override
+	if (pid < pd.nprograms) {
+		ProgramStruct prog;
+		pd.read(pid, &prog);
+		if (prog.fertigation_durations[sid] > 0) {
+			return prog.fertigation_durations[sid];
+		}
+	}
+	
+	// Use station-level settings
+	if (fdata.mode == FERT_MODE_TIME) {
+		// Time-based: fixed duration
+		return fdata.duration;
+	} else {
+		// Percentage-based: calculate from main station runtime
+		// For now, we'll use a default duration since we don't have access to runtime here
+		// This should be calculated when scheduling
+		return (fdata.percentage * 60) / 100; // Assume 60 seconds base for percentage calculation
+	}
+}
+
+/** Schedule fertigation for a station */
+void OpenSprinkler::schedule_fertigation(unsigned char sid, unsigned char pid, uint16_t duration, uint16_t station_duration) {
+	FertigationStationData fdata;
+	get_fertigation_data(sid, &fdata);
+	
+	if (!fdata.enabled || fdata.fertigation_sid >= nstations) return;
+	
+	// Calculate start time to center fertigation in the middle of station runtime
+	time_os_t current_time = now_tz();
+	time_os_t fertigation_start_time;
+	
+	if (station_duration > 0 && duration < station_duration) {
+		// Calculate delay to start fertigation in the middle
+		uint16_t delay_before_fertigation = (station_duration - duration) / 2;
+		fertigation_start_time = current_time + delay_before_fertigation;
+	} else {
+		// If fertigation duration >= station duration, start immediately
+		fertigation_start_time = current_time;
+		// Limit fertigation duration to station duration
+		if (duration > station_duration) {
+			duration = station_duration;
+		}
+	}
+	
+	// Find available slot in fertigation queue
+	for (unsigned char i = 0; i < MAX_NUM_STATIONS; i++) {
+		if (!fertigation_queue[i].active) {
+			fertigation_queue[i].station_id = sid;
+			fertigation_queue[i].fertigation_sid = fdata.fertigation_sid;
+			fertigation_queue[i].start_time = fertigation_start_time;
+			fertigation_queue[i].duration = duration;
+			fertigation_queue[i].active = 1;
+			fertigation_queue[i].program_id = pid;
+			break;
+		}
+	}
+}
+
+/** Stop fertigation for a station */
+void OpenSprinkler::stop_fertigation(unsigned char sid) {
+	for (unsigned char i = 0; i < MAX_NUM_STATIONS; i++) {
+		if (fertigation_queue[i].active && fertigation_queue[i].station_id == sid) {
+			// Turn off fertigation station
+			set_station_bit(fertigation_queue[i].fertigation_sid, 0);
+			fertigation_queue[i].active = 0;
+		}
+	}
+}
+
+/** Process fertigation queue - call this from main loop */
+void OpenSprinkler::process_fertigation() {
+	time_os_t curr_time = now_tz();
+	
+	for (unsigned char i = 0; i < MAX_NUM_STATIONS; i++) {
+		if (fertigation_queue[i].active) {
+			FertigationQueue* fq = &fertigation_queue[i];
+			
+			// Check if main station is still running
+			if (!get_station_bit(fq->station_id)) {
+				// Main station stopped, stop fertigation
+				set_station_bit(fq->fertigation_sid, 0);
+				fq->active = 0;
+				continue;
+			}
+			
+			// Check fertigation timing
+			if (curr_time >= fq->start_time + fq->duration) {
+				// Fertigation time expired
+				set_station_bit(fq->fertigation_sid, 0);
+				fq->active = 0;
+			} else if (curr_time >= fq->start_time) {
+				// Activate fertigation station if not already active
+				if (!get_station_bit(fq->fertigation_sid)) {
+					set_station_bit(fq->fertigation_sid, 1);
+				}
+			}
+		}
+	}
+}
