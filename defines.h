@@ -35,7 +35,7 @@ typedef unsigned long ulong;
 														// if this number is different from the one stored in non-volatile memory
 														// a device reset will be automatically triggered
 
-#define OS_FW_MINOR      2  // Firmware minor version
+#define OS_FW_MINOR      3  // Firmware minor version
 
 /** Hardware version base numbers */
 #define OS_HW_VERSION_BASE   0x00 // OpenSprinkler
@@ -260,7 +260,7 @@ enum {
 	IOPT_LATCH_OFF_VOLTAGE,
 	IOPT_NOTIF2_ENABLE,
 	IOPT_I_MIN_THRESHOLD,
-	IOPT_RESERVE_5,
+	IOPT_I_MAX_LIMIT,
 	IOPT_RESERVE_6,
 	IOPT_RESERVE_7,
 	IOPT_RESERVE_8,
