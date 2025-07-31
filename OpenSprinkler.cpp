@@ -337,7 +337,7 @@ const unsigned char iopt_max[] PROGMEM = {
 	24,
 	24,
 	255,
-	250,
+	100,
 	250,
 	255,
 	255,
@@ -421,8 +421,8 @@ unsigned char OpenSprinkler::iopts[] = {
 	0,  // latch on volt
 	0,  // latch off volt
 	0,  // notif enable bits 2
-	0,  // imin threshold
-	150,// imax limit
+	10,  // imin threshold scaled down by 10 (default 100mA)
+	120,// imax limit scaled down by 10 (default 1200mA)
 	0,  // reserved 6
 	0,  // reserved 7
 	0,  // reserved 8
@@ -1515,8 +1515,8 @@ void OpenSprinkler::sensor_resetall() {
  */
 #if defined(ARDUINO)
 uint16_t OpenSprinkler::read_current() {
-	float scale = 1.0f;
-	if(status.has_curr_sense) {
+	static float scale = -1;
+	if(scale < 0) { // assign scale upon first call of this function
 		if (hw_type == HW_TYPE_DC) {
 			#if defined(ESP8266)
 			scale = 4.88;
@@ -1532,14 +1532,7 @@ uint16_t OpenSprinkler::read_current() {
 		} else {
 			scale = 0.0;  // for other controllers, current is 0
 		}
-		/* do an average */
-		const unsigned char K = 8;
-		uint16_t sum = 0;
-		for(unsigned char i=0;i<K;i++) {
-			sum += analogRead(PIN_CURR_SENSE);
-			delay(1);
-		}
-		return (uint16_t)((sum/K)*scale);
+		return analogRead(PIN_CURR_SENSE)*scale;
 	} else {
 		return 0;
 	}
@@ -2889,16 +2882,9 @@ void OpenSprinkler::lcd_print_option(int i) {
 		#endif
 		break;
 	case IOPT_I_MIN_THRESHOLD:
-		#if defined(ARDUINO)
-		lcd.print((int)iopts[i]<<2);
-		lcd_print_pgm(PSTR(" mA"));
-		#else
-		lcd.print('-');
-		#endif
-		break;
 	case IOPT_I_MAX_LIMIT:
 		#if defined(ARDUINO)
-		lcd.print((int)iopts[i]<<3);
+		lcd.print((int)iopts[i]*10);
 		lcd_print_pgm(PSTR(" mA"));
 		#else
 		lcd.print('-');

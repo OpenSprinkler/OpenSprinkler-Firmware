@@ -24,7 +24,7 @@
 #ifndef _DEFINES_H
 #define _DEFINES_H
 
-//#define ENABLE_DEBUG  // enable serial debug
+#define ENABLE_DEBUG  // enable serial debug
 
 typedef unsigned long ulong;
 
@@ -78,6 +78,12 @@ typedef unsigned long ulong;
 #define NOTIFY_STATION_ON      0x0100
 #define NOTIFY_FLOW_ALERT      0x0200
 #define NOTIFY_CURR_ALERT      0x0400
+
+enum {
+	CURR_ALERT_TYPE_UNDER = 0,		// undercurrent when running a station
+	CURR_ALERT_TYPE_OVER_STATION,	// overcurrent when turning on a station
+	CURR_ALERT_TYPE_OVER_SYSTEM		// overcurrent while system is running
+};
 
 /** HTTP request macro defines */
 #define HTTP_RQT_SUCCESS       0

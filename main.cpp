@@ -541,7 +541,6 @@ void reboot_in(uint32_t ms) {
 void handle_web_request(char *p);
 #endif
 
-
 /** Main Loop */
 void do_loop()
 {
@@ -1257,8 +1256,14 @@ void turn_off_station(unsigned char sid, time_os_t curr_time, unsigned char shif
 	} //else { return; }
 
 	#if defined(ARDUINO)
-	float curr_alert_value = os.read_current();
-	notif.add(NOTIFY_CURR_ALERT, sid, curr_alert_value);
+	uint16_t current = os.read_current();
+	uint16_t imin = os.iopts[IOPT_I_MIN_THRESHOLD]*10;
+	// if current is less than imin threshold and hardware type is AC or DC
+	// send an station undercurrent alert
+	if(current < imin && (os.hw_type==HW_TYPE_AC || os.hw_type==HW_TYPE_DC)) {
+		// TODO: also display this on the LCD screen
+		notif.add(NOTIFY_CURR_ALERT, sid, current, CURR_ALERT_TYPE_UNDER);
+	}
 	#endif
 
 	os.set_station_bit(sid, 0);

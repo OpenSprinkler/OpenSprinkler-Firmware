@@ -1028,16 +1028,21 @@ void server_json_options_main() {
 		}
 
 		#if defined(ARDUINO)
-		if (oid==IOPT_BOOST_TIME || oid==IOPT_I_MIN_THRESHOLD) {
-			if ((oid==IOPT_BOOST_TIME && os.hw_type==HW_TYPE_AC) || os.hw_type==HW_TYPE_UNKNOWN) continue;
+		if (oid==IOPT_BOOST_TIME) {
+			if (os.hw_type==HW_TYPE_AC || os.hw_type==HW_TYPE_UNKNOWN) continue;
 			else v<<=2;
+		}
+
+		if (oid==IOPT_I_MIN_THRESHOLD || oid==IOPT_I_MAX_LIMIT) {
+			if (os.hw_type==HW_TYPE_AC || os.hw_type==HW_TYPE_DC ) v*=10;
+			else continue;
 		}
 
 		if (oid==IOPT_LATCH_ON_VOLTAGE || oid==IOPT_LATCH_OFF_VOLTAGE) {
 			if (os.hw_type!=HW_TYPE_LATCH) continue;
 		}
 		#else
-		if (oid==IOPT_BOOST_TIME || oid==IOPT_I_MIN_THRESHOLD || oid==IOPT_LATCH_ON_VOLTAGE || oid==IOPT_LATCH_OFF_VOLTAGE) continue;
+		if (oid==IOPT_BOOST_TIME || oid==IOPT_I_MIN_THRESHOLD || oid==IOPT_I_MAX_LIMIT || oid==IOPT_LATCH_ON_VOLTAGE || oid==IOPT_LATCH_OFF_VOLTAGE) continue;
 		#endif
 
 		#if defined(ESP8266)
@@ -1234,11 +1239,9 @@ void server_json_controller_main(OTF_PARAMS_DEF) {
 #endif
 
 #if defined(ARDUINO)
-	if(os.status.has_curr_sense) {
-		uint16_t current = os.read_current();
-		if((!os.status.program_busy) && (current<os.baseline_current)) current=0;
-		bfill.emit_p(PSTR("\"curr\":$D,"), current);
-	}
+	uint16_t current = os.read_current();
+	if((!os.status.program_busy) && (current<os.baseline_current)) current=0;
+	bfill.emit_p(PSTR("\"curr\":$D,"), current);
 #endif
 	if(os.iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_FLOW) {
 		bfill.emit_p(PSTR("\"flcrt\":$L,\"flwrt\":$D,"), os.flowcount_rt, FLOWCOUNT_RT_WINDOW);
@@ -1500,8 +1503,11 @@ void server_change_options(OTF_PARAMS_DEF)
 					oid==IOPT_STATION_DELAY_TIME) {
 				v=water_time_encode_signed(v);
 			} // encode station delay time
-			if(oid==IOPT_BOOST_TIME || oid==IOPT_I_MIN_THRESHOLD) {
+			if(oid==IOPT_BOOST_TIME) {
 				 v>>=2;
+			}
+			if(oid==IOPT_I_MIN_THRESHOLD || oid==IOPT_I_MAX_LIMIT) {
+				v/=10;
 			}
 			if (v>=0 && v<=max_value) {
 				os.iopts[oid] = v;

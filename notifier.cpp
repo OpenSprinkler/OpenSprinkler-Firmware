@@ -450,61 +450,70 @@ void push_message(uint16_t type, uint32_t lval, float fval, uint8_t bval) {
 
 		case NOTIFY_CURR_ALERT:
 			{
-				// Determine if a current Alert should be sent based on soleniod current level and minimum cutrrent threshold
-				bool curr_alert_flag = false;
+				uint16_t curr = (uint16_t)fval;
+				uint16_t imin = os.iopts[IOPT_I_MIN_THRESHOLD]*10;
+				uint16_t imax = os.iopts[IOPT_I_MAX_LIMIT]*10;
 
-				// Added variable for curr_alert_threshold and set default value to 100mA
-				uint16_t curr_alert_theshold = 100u;
-				uint16_t curr_alert_value = (uint16_t)fval;
-				curr_alert_theshold = os.iopts[IOPT_I_MIN_THRESHOLD]<<2;
-					
-				// Alert Check
-				if (curr_alert_value < curr_alert_theshold) {
-					curr_alert_flag = true;
-				} else {
-					curr_alert_flag = false;
-				}
-
-				// If curr_alert_flag is true, format the appropriate messages, else don't send alert
-				if (curr_alert_flag == true) {
-					if (os.mqtt.enabled()) {
-						//Format mqtt message
-						snprintf_P(topic, PUSH_TOPIC_LEN, PSTR("station/%d/alert/curr"), lval);
-						snprintf_P(payload, PUSH_PAYLOAD_LEN, PSTR("{\"curr_value\":%d,\"alert_threshold\":%d}"), curr_alert_value, curr_alert_theshold);
+				if (os.mqtt.enabled()) {
+					//Format mqtt message
+					switch(bval) {
+						case CURR_ALERT_TYPE_UNDER:
+						case CURR_ALERT_TYPE_OVER_STATION:
+							snprintf_P(topic, PUSH_TOPIC_LEN, PSTR("station/%d/alert/curr"), lval);
+							if(bval==CURR_ALERT_TYPE_UNDER)
+								snprintf_P(payload, PUSH_PAYLOAD_LEN, PSTR("{\"curr_value\":%d,\"imin_threshold\":%d}"), curr, imin);
+							else
+								snprintf_P(payload, PUSH_PAYLOAD_LEN, PSTR("{\"curr_value\":%d,\"imax_limit\":%d}"), curr, imax);
+							break;
+						case CURR_ALERT_TYPE_OVER_SYSTEM:
+							strcpy_P(topic, PSTR("overcurrent"));
+							snprintf_P(payload, PUSH_PAYLOAD_LEN, PSTR("{\"curr_value\":%d,\"imax_limit\":%d}"), curr, imax);
+							break;
 					}
-					if (ifttt_enabled || email_enabled) {
-						//Format ifttt\email message
+				}
+				if (ifttt_enabled || email_enabled) {
+					//Format ifttt\email message
 
-						// Get and format current local time as "YYYY-MM-DD hh:mm:ss AM/PM"
-						strcat_P(postval, PSTR("at "));
-						time_os_t curr_time = os.now_tz();
-						#if defined(ARDUINO)
-						tmElements_t tm;
-						breakTime(curr_time, tm);
-						snprintf_P(postval+strlen(postval), TMP_BUFFER_SIZE, PSTR("%04d-%02d-%02d %02d:%02d:%02d"),
-							1970+tm.Year, tm.Month, tm.Day, tm.Hour, tm.Minute, tm.Second);
-						#else
-						struct tm *ti = gmtime(&curr_time);
-						snprintf_P(postval+strlen(postval), TMP_BUFFER_SIZE, PSTR("%04d-%02d-%02d %02d:%02d:%02d"),
-							ti->tm_year+1900, ti->tm_mon+1, ti->tm_mday, ti->tm_hour, ti->tm_min, ti->tm_sec);
-						#endif
+					// Get and format current local time as "YYYY-MM-DD hh:mm:ss AM/PM"
+					strcat_P(postval, PSTR("at "));
+					time_os_t curr_time = os.now_tz();
+					#if defined(ARDUINO)
+					tmElements_t tm;
+					breakTime(curr_time, tm);
+					snprintf_P(postval+strlen(postval), TMP_BUFFER_SIZE, PSTR("%04d-%02d-%02d %02d:%02d:%02d"),
+						1970+tm.Year, tm.Month, tm.Day, tm.Hour, tm.Minute, tm.Second);
+					#else
+					struct tm *ti = gmtime(&curr_time);
+					snprintf_P(postval+strlen(postval), TMP_BUFFER_SIZE, PSTR("%04d-%02d-%02d %02d:%02d:%02d"),
+						ti->tm_year+1900, ti->tm_mon+1, ti->tm_mday, ti->tm_hour, ti->tm_min, ti->tm_sec);
+					#endif
 
+					if(bval==CURR_ALERT_TYPE_UNDER || bval==CURR_ALERT_TYPE_OVER_STATION) {
+						// the current alert is associated with a specific station
 						char tmp_station_name[STATION_NAME_SIZE];
 						os.get_station_name(lval, tmp_station_name);
 						strcat_P(postval, PSTR(", Station ["));
 						strcat_P(postval, tmp_station_name);
 						strcat_P(postval, PSTR("]"));
-
-						strcat_P(postval, PSTR(" SOLENOID LOW CURRENT ALERT!"));
-						snprintf_P(postval+strlen(postval), TMP_BUFFER_SIZE, PSTR(" | Current value: %dmA < Current alert threshold: %dmA"),
-							curr_alert_value, curr_alert_theshold);
-
-						if(email_enabled) { email_message.subject += PSTR("- CURRENT ALERT"); }
+					} else {
+						strcat_P(postval, PSTR(", System"));
 					}
-				} else {
-					//Do not send an alert.
-					ifttt_enabled=false;
-					email_enabled=false;
+
+					switch(bval) {
+						case CURR_ALERT_TYPE_UNDER:
+							strcat_P(postval, PSTR(" UNDERCURRENT DETECTED!"));
+							snprintf_P(postval+strlen(postval), TMP_BUFFER_SIZE, PSTR(" | Current value: %dmA < imin threshold: %dmA"),
+								curr, imin);
+							break;
+						case CURR_ALERT_TYPE_OVER_STATION:
+						case CURR_ALERT_TYPE_OVER_SYSTEM:
+							strcat_P(postval, PSTR(" OVERCURRENT DETECTED!"));
+							snprintf_P(postval+strlen(postval), TMP_BUFFER_SIZE, PSTR(" | Current value: %dmA > imax limit: %dmA"),
+								curr, imax);
+							break;
+					}
+
+					if(email_enabled) { email_message.subject += PSTR("- CURRENT ALERT"); }
 				}
 			}
 			break;
