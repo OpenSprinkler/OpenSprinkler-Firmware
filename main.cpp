@@ -564,8 +564,11 @@ void do_loop()
 			if(curr > imax) {
 				reset_all_stations_immediate();
 				notif.add(NOTIFY_CURR_ALERT, 0, curr, CURR_ALERT_TYPE_OVER_SYSTEM);
+				DEBUG_PRINTLN(curr);
+				currpoll_timeout = tn+1000; // pause currpoll for a second to give time for solenoids to stop
+			} else {
+				currpoll_timeout = tn+20; // every 20 ms
 			}
-			currpoll_timeout = tn+20; // every 20 ms
 		}
 	}
 	
@@ -1393,7 +1396,7 @@ void handle_master_adjustments(time_os_t curr_time, RuntimeQueueStruct *q, unsig
 
 	// in case of negative master on adjustment
 	// push back station's start time to allow sufficient time to turn on master
-	if (q->st - curr_time < abs(start_adj)) {
+	if (q->st - curr_time <= abs(start_adj)) {
 		q->st += abs(start_adj);
 		seq_start_times[gid] += abs(start_adj);
 	}
@@ -1440,7 +1443,7 @@ void schedule_all_stations(time_os_t curr_time) {
 			// otherwise, concurrent scheduling
 			q->st = con_start_time;
 			// stagger concurrent stations by 1 second
-			con_start_time++;
+			con_start_time+=1;
 		}
 
 		handle_master_adjustments(curr_time, q, gid, seq_start_times);

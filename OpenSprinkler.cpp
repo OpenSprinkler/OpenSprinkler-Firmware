@@ -422,7 +422,7 @@ unsigned char OpenSprinkler::iopts[] = {
 	0,  // latch off volt
 	0,  // notif enable bits 2
 	10,  // imin threshold scaled down by 10 (default 100mA)
-	120,// imax limit scaled down by 10 (default 1200mA)
+	150, // imax limit scaled down by 10 (default 1500mA)
 	0,  // reserved 6
 	0,  // reserved 7
 	0,  // reserved 8
@@ -1664,11 +1664,13 @@ unsigned char OpenSprinkler::get_master_id(unsigned char mas) {
 }
 
 int16_t OpenSprinkler::get_on_adj(unsigned char mas) {
-	return water_time_decode_signed(masters[mas][MASOPT_ON_ADJ]);
+	int16_t onadj = water_time_decode_signed(masters[mas][MASOPT_ON_ADJ]);
+	return onadj ? onadj : -1; // if on adj is 0, modify it to -1 to stagger with station
 }
 
 int16_t OpenSprinkler::get_off_adj(unsigned char mas) {
-	return water_time_decode_signed(masters[mas][MASOPT_OFF_ADJ]);
+	int16_t offadj = water_time_decode_signed(masters[mas][MASOPT_OFF_ADJ]);
+	return offadj ? offadj : 1; // if off adj is 0, modify it to +1 to stagger with station
 }
 
 unsigned char OpenSprinkler::bound_to_master(unsigned char sid, unsigned char mas) {
