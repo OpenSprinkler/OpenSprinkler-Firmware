@@ -1532,10 +1532,8 @@ uint16_t OpenSprinkler::read_current() {
 		} else {
 			scale = 0.0;  // for other controllers, current is 0
 		}
-		return analogRead(PIN_CURR_SENSE)*scale;
-	} else {
-		return 0;
 	}
+	return analogRead(PIN_CURR_SENSE)*scale;
 }
 #endif
 

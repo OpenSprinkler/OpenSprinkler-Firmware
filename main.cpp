@@ -544,7 +544,7 @@ void handle_web_request(char *p);
 /** Main Loop */
 void do_loop()
 {
-	static ulong flowpoll_timeout=0;
+	static ulong flowpoll_timeout = 0;
 	if(os.iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_FLOW) {
 	// handle flow sensor using polling every 1ms (maximum freq 1/(2*1ms)=500Hz)
 		ulong curr = millis();
@@ -554,6 +554,22 @@ void do_loop()
 		}
 	}
 
+#if defined(ARDUINO)
+	{
+		static ulong currpoll_timeout = 0;
+		ulong tn = millis();
+		if(tn >= currpoll_timeout) {
+			uint16_t curr = os.read_current();
+			uint16_t imax = os.iopts[IOPT_I_MAX_LIMIT]*10;
+			if(curr > imax) {
+				reset_all_stations_immediate();
+				notif.add(NOTIFY_CURR_ALERT, 0, curr, CURR_ALERT_TYPE_OVER_SYSTEM);
+			}
+			currpoll_timeout = tn+20; // every 20 ms
+		}
+	}
+	
+#endif
 
 	static time_os_t last_time = 0;
 	static ulong last_minute = 0;
@@ -1260,7 +1276,7 @@ void turn_off_station(unsigned char sid, time_os_t curr_time, unsigned char shif
 	uint16_t imin = os.iopts[IOPT_I_MIN_THRESHOLD]*10;
 	// if current is less than imin threshold and hardware type is AC or DC
 	// send an station undercurrent alert
-	if(current < imin && (os.hw_type==HW_TYPE_AC || os.hw_type==HW_TYPE_DC)) {
+	if((current < imin) && (os.hw_type==HW_TYPE_AC || os.hw_type==HW_TYPE_DC)) {
 		// TODO: also display this on the LCD screen
 		notif.add(NOTIFY_CURR_ALERT, sid, current, CURR_ALERT_TYPE_UNDER);
 	}

@@ -501,14 +501,14 @@ void push_message(uint16_t type, uint32_t lval, float fval, uint8_t bval) {
 
 					switch(bval) {
 						case CURR_ALERT_TYPE_UNDER:
-							strcat_P(postval, PSTR(" UNDERCURRENT DETECTED!"));
-							snprintf_P(postval+strlen(postval), TMP_BUFFER_SIZE, PSTR(" | Current value: %dmA < imin threshold: %dmA"),
+							strcat_P(postval, PSTR(" UNDERCURRENT detected!"));
+							snprintf_P(postval+strlen(postval), TMP_BUFFER_SIZE, PSTR(" | Current: %dmA < imin threshold: %dmA"),
 								curr, imin);
 							break;
 						case CURR_ALERT_TYPE_OVER_STATION:
 						case CURR_ALERT_TYPE_OVER_SYSTEM:
-							strcat_P(postval, PSTR(" OVERCURRENT DETECTED!"));
-							snprintf_P(postval+strlen(postval), TMP_BUFFER_SIZE, PSTR(" | Current value: %dmA > imax limit: %dmA"),
+							strcat_P(postval, PSTR(" OVERCURRENT detected!"));
+							snprintf_P(postval+strlen(postval), TMP_BUFFER_SIZE, PSTR(" | Current: %dmA > imax limit: %dmA"),
 								curr, imax);
 							break;
 					}
