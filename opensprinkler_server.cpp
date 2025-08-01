@@ -1071,6 +1071,9 @@ void server_json_options_main() {
 
 	bfill.emit_p(PSTR(",\"dexp\":$D,\"mexp\":$D,\"hwt\":$D,"), os.detect_exp(), MAX_EXT_BOARDS, os.hw_type);
 	bfill.emit_p(PSTR("\"wls\":["));
+	if (scaleVector.size() == 0) {
+		bfill.emit_p(PSTR("],"));
+	}
 	unsigned char idx;
 	for (idx = 0; idx < scaleVector.size(); idx++) {
 		bfill.emit_p(PSTR("$D"), (int)scaleVector[idx]);
