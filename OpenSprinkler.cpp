@@ -2641,6 +2641,7 @@ Sensor *OpenSprinkler::parse_sensor(os_file_type file) {
     if (len == 0 || len > TMP_BUFFER_SIZE) return nullptr;
     
     file_read(file, tmp_buffer, len);
+    file_seek(file, TMP_BUFFER_SIZE - len, FileSeekMode::Current);
 
     if ((uint8_t)(tmp_buffer[0]) >= (uint8_t)SensorType::MAX_VALUE) {
         return nullptr;
@@ -2694,7 +2695,7 @@ void OpenSprinkler::load_sensors() {
             if ((sensor = parse_sensor(file))) {
                 sensors[i].interval = sensor->interval;
                 sensors[i].next_update = 0;
-                sensors[i].value = 0.0;
+                sensors[i].value = sensor->get_inital_value();
                 delete sensor;
             }
         }
@@ -2774,7 +2775,7 @@ void OpenSprinkler::log_sensor(uint8_t sid, float value) {
 void OpenSprinkler::poll_sensors() {
     for (uint8_t i = 0; i < MAX_SENSORS; i++) {
         if (sensors[i].interval) {
-            if (millis() >= sensors[i].next_update) {
+            if ((long)(millis() - sensors[i].next_update) > 0) {
                 Sensor *sensor = get_sensor(i);
                 if (sensor) {
                     sensors[i].value = sensor->get_new_value();

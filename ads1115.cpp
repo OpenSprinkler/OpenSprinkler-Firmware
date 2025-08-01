@@ -86,6 +86,10 @@ sensor_index(sensor_index),
 pin(pin),
 sensors(sensors) {}
 
+double ADS1115Sensor::get_inital_value() {
+    return 0.0;
+}
+
 double ADS1115Sensor::_get_raw_value() {
     if (this->sensors[sensor_index] == nullptr) {
         return 0.0;

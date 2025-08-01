@@ -2137,21 +2137,47 @@ void server_change_sensor(OTF_PARAMS_DEF) {
     Sensor *result_sensor;
     switch (sensor_type) {
         case SensorType::Ensemble: {
-            uint64_t sensor_mask = 0;
+            ensemble_children_t children[ENSEMBLE_SENSOR_CHILDREN_COUNT];
+            for (size_t i = 0; i < ENSEMBLE_SENSOR_CHILDREN_COUNT; i++) {
+                children[i].sensor_id = 255;
+            }
+
             EnsembleAction action = EnsembleAction::Min;
 
             if (sensor_type == original_sensor_type) {
                 if ((sensor = os.get_sensor(sid))) {
                     EnsembleSensor* e = static_cast<EnsembleSensor*>(sensor);
-                    sensor_mask = e->sensor_mask;
+                    for (size_t i = 0; i < ENSEMBLE_SENSOR_CHILDREN_COUNT; i++) {
+                        children[i] = e->children[i];
+                    }
+                    
                     action = e->action;
                     delete sensor;
                 }
             }
 
-            if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("mask"), true)) {
-                sensor_mask = strtoull(tmp_buffer, &end, 10);
-                if (*end != '\0') handle_return(HTML_DATA_FORMATERROR);
+            if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("children"), true)) {
+                unsigned int i = 0;
+                unsigned int u;
+                double d1, d2, d3, d4;
+                const char *ptr = tmp_buffer;
+                int result;
+
+                while (*ptr != '\0') {
+                    if (i >= ENSEMBLE_SENSOR_CHILDREN_COUNT) handle_return(HTML_DATA_FORMATERROR);
+
+                    result = sscanf(ptr, "%u,%lf,%lf,%lf,%lf;", &u, &d1, &d2, &d3, &d4);
+
+                    if (result != 5) {
+                        handle_return(HTML_DATA_FORMATERROR);
+                    }
+
+                    if (u >= MAX_SENSORS) handle_return(HTML_DATA_FORMATERROR);
+
+                    children[i++] = ensemble_children_t {(uint8_t)u, d1, d2, d3, d4};
+
+                    while (*(ptr++) != ';') {}
+                }   
             }
             
             if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("action"), true)) {
@@ -2161,7 +2187,7 @@ void server_change_sensor(OTF_PARAMS_DEF) {
                 action = static_cast<EnsembleAction>(action_raw);
             }
 
-            result_sensor = new EnsembleSensor(interval, min, max, scale, offset, (const char*)&name, unit, os.sensors, sensor_mask, action);
+            result_sensor = new EnsembleSensor(interval, min, max, scale, offset, (const char*)&name, unit, os.sensors, children, ENSEMBLE_SENSOR_CHILDREN_COUNT, action);
             break;
         }
         case SensorType::ADS1115: {
@@ -2222,7 +2248,7 @@ void server_change_sensor(OTF_PARAMS_DEF) {
 
     os.sensors[sid].interval = interval;
     os.sensors[sid].next_update = 0;
-    os.sensors[sid].value = 0.0;
+    os.sensors[sid].value = result_sensor->get_inital_value();
     os.write_sensor(result_sensor, sid);
 
     delete result_sensor;

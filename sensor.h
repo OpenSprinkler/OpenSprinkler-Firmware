@@ -79,6 +79,8 @@ public:
   SensorUnit unit = SensorUnit::None;
   
   SensorType virtual get_sensor_type() = 0;
+  double virtual get_inital_value() = 0;
+
 private:
   double virtual _get_raw_value() = 0;
 protected:
@@ -102,17 +104,29 @@ enum class EnsembleAction {
 
 typedef Sensor* (*SensorGetter)(uint8_t);
 
+typedef struct {
+    uint8_t sensor_id;
+    double min;
+    double max;
+    double scale;
+    double offset;
+} ensemble_children_t;
+
+#define ENSEMBLE_SENSOR_CHILDREN_COUNT 4
+
 class EnsembleSensor : public Sensor {
     public:
-    EnsembleSensor(unsigned long interval, double min, double max, double scale, double offset, const char *name, SensorUnit unit, sensor_memory_t *sensors, uint64_t sensor_mask, EnsembleAction action);
+    EnsembleSensor(unsigned long interval, double min, double max, double scale, double offset, const char *name, SensorUnit unit, sensor_memory_t *sensors, ensemble_children_t *children, uint8_t children_count, EnsembleAction action);
     EnsembleSensor(sensor_memory_t *sensors, char *buf);
 
     SensorType get_sensor_type() {
         return SensorType::Ensemble;
     }
 
-    uint64_t sensor_mask;
+    ensemble_children_t children[ENSEMBLE_SENSOR_CHILDREN_COUNT];
     EnsembleAction action;
+
+    double get_inital_value();
 
     private:
     double _get_raw_value();
@@ -138,6 +152,8 @@ class WeatherSensor : public Sensor {
     }
 
     WeatherAction action;
+
+    double get_inital_value();
 
     private:
     double _get_raw_value();
