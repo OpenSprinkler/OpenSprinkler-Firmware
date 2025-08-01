@@ -1409,26 +1409,39 @@ void handle_master_adjustments(time_os_t curr_time, RuntimeQueueStruct *q, unsig
  * and schedules the start time of each station
  */
 void schedule_all_stations(time_os_t curr_time) {
-	ulong con_start_time = curr_time + 1;   // concurrent start time
+	ulong con_start_time = curr_time;   // concurrent start time
 	// if the queue is paused, make sure the start time is after the scheduled pause ends
 	if (os.status.pause_state) {
 		con_start_time += os.pause_timer;
 	}
 	int16_t station_delay = water_time_decode_signed(os.iopts[IOPT_STATION_DELAY_TIME]);
+
+	RuntimeQueueStruct *q = NULL;
+	unsigned char gid;
+	unsigned char stagger[NUM_SEQ_GROUPS]; // different sequential groups will be staggered by 1 second from each other
+	memset(stagger, 0, NUM_SEQ_GROUPS);
+	// go through the queue and see if there is any scheduled zone for each sequential group
+	for(q=pd.queue;q<pd.queue+pd.nqueue;q++) {
+		if(q->st || (!q->dur)) continue; // if this element already has a start time or is marked for reset, skip
+		gid = os.get_station_gid(q->sid);
+		stagger[gid] = 1; // mark this group
+	}
+	for(unsigned char i=1;i<NUM_SEQ_GROUPS;i++) {
+		stagger[i] += stagger[i-1]; // accumulate stagger time
+	}
 	ulong seq_start_times[NUM_SEQ_GROUPS];  // sequential start times
 	for(unsigned char i=0;i<NUM_SEQ_GROUPS;i++) {
-		seq_start_times[i] = con_start_time;
+		seq_start_times[i] = con_start_time+stagger[i];
 		// if the sequential queue already has stations running
 		if (pd.last_seq_stop_times[i] > curr_time) {
 			seq_start_times[i] = pd.last_seq_stop_times[i] + station_delay;
 		}
 	}
-	RuntimeQueueStruct *q = pd.queue;
-	unsigned char re = os.iopts[IOPT_REMOTE_EXT_MODE];
-	unsigned char gid;
+	con_start_time += (stagger[NUM_SEQ_GROUPS-1] + 1); // shift con_start_time to be 1 second after accumulated stagger time
 
+	unsigned char re = os.iopts[IOPT_REMOTE_EXT_MODE];
 	// go through runtime queue and calculate start time of each station
-	for(;q<pd.queue+pd.nqueue;q++) {
+	for(q=pd.queue;q<pd.queue+pd.nqueue;q++) {
 		if(q->st) continue; // if this queue element has already been scheduled, skip
 		if(!q->dur) continue; // if the element has been marked to reset, skip
 		gid = os.get_station_gid(q->sid);
