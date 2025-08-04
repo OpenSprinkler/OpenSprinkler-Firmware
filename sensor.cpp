@@ -81,6 +81,7 @@ sensors(sensors) {
 void EnsembleSensor::emit_extra_json(BufferFiller *bfill) {
     bfill->emit_p(PSTR("{\"action\":$D,\"children\":["), this->action);
     for (size_t i = 0; i < ENSEMBLE_SENSOR_CHILDREN_COUNT; i++) {
+        if (i) bfill->emit_p(PSTR(","));
         ensemble_children_t *child = &this->children[i];
         bfill->emit_p(PSTR("{\"sid\":$D,\"max\":$E,\"min\":$E,\"scale\":$E,\"offset\":$E}"), child->max, child->min, child->scale, child->offset);
     }
