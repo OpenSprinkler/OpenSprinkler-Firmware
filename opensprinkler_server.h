@@ -24,6 +24,7 @@
 #ifndef _OPENSPRINKLER_SERVER_H
 #define _OPENSPRINKLER_SERVER_H
 
+#include "types.h"
 #include <limits>
 #include "bfiller.h"
 
