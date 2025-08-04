@@ -2346,6 +2346,7 @@ void server_log_sensor(OTF_PARAMS_DEF) {
         file_no = (cursor - next) / SENSOR_LOG_PER_FILE;
     }
 
+    using std::numeric_limits;
     time_os_t before = std::numeric_limits<time_os_t>::max();
     if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("before"), true)) {
         before = (time_os_t)strtoul(tmp_buffer, &end, 10);
