@@ -829,7 +829,13 @@ void server_delete_program(OTF_PARAMS_DEF) {
 	if (pid == -1) {
 		pd.eraseall();
 	} else if (pid < pd.nprograms) {
-		pd.del(pid);
+		if (pd.del(pid)) {
+            #if defined(USE_SENSORS)
+            for (size_t i = pid; i < pd.nprograms; i++) {
+                file_copy_block(SENADJ_FILENAME, SENSOR_ADJUSTMENT_SIZE * (i+1), SENSOR_ADJUSTMENT_SIZE * i, SENSOR_ADJUSTMENT_SIZE, tmp_buffer);
+            }
+            #endif
+        }
 	} else {
 		handle_return(HTML_DATA_OUTOFBOUND);
 	}
@@ -2447,6 +2453,177 @@ void server_log_sensor(OTF_PARAMS_DEF) {
 
 	handle_return(HTML_OK);
 }
+
+void server_json_sen_adj_main(OTF_PARAMS_DEF) {
+	bfill.emit_p(PSTR("\"adj\":["));
+    uint8_t adj_count = 0;
+
+    SensorAdjustment *adj;
+    os_file_type file = file_open(SENADJ_FILENAME, FileOpenMode::Read);
+    if (file) {
+        for (size_t i = 0; i < pd.nprograms; i++) {
+            if ((adj = os.get_sensor_adjust(i))) {
+                if (adj_count) bfill.emit_p(PSTR(","));
+                bfill.emit_p(PSTR("{\"pid\":$D,\"flags\":$D,\"sid\":$D,\"splits\":$D,\"points\":["), i, adj->flags, adj->sid, adj->splits);
+                for (size_t j = 0; j < adj->splits; j++) {
+                    if (j) bfill.emit_p(PSTR(","));
+                    bfill.emit_p(PSTR("$E"), adj->split_points[j]);
+                }
+                bfill.emit_p(PSTR("],\"parts\":["), i, adj->flags, adj->sid, adj->splits);
+                for (int j = 0; j < adj->splits+1; j++) {
+                    if (j) bfill.emit_p(PSTR(","));
+                    bfill.emit_p(PSTR("{\"scale\":$E,\"offset\":$E}"), adj->piecewise_parts[j].scale, adj->piecewise_parts[j].offset);
+                }
+                bfill.emit_p(PSTR("]}"), i, adj->flags, adj->sid, adj->splits);
+                adj_count += 1;
+                delete adj;
+
+
+                // push out a packet if available
+                // buffer size is getting small
+                if (available_ether_buffer() <= 0) {
+                    send_packet(OTF_PARAMS);
+                }
+            }
+        }
+
+        file_close(file);
+    } else {
+        DEBUG_PRINT("Failed to open file: ");
+        DEBUG_PRINTLN(SENADJ_FILENAME);
+    }
+
+	bfill.emit_p(PSTR("],\"count\":$D}"), adj_count);
+}
+
+/** Sensor status */
+void server_json_sen_adj(OTF_PARAMS_DEF)
+{
+#if defined(USE_OTF)
+	if(!process_password(OTF_PARAMS)) return;
+	rewind_ether_buffer();
+	print_header(OTF_PARAMS);
+#else
+	print_header();
+#endif
+
+	bfill.emit_p(PSTR("{"));
+	server_json_sen_adj_main(OTF_PARAMS);
+	handle_return(HTML_OK);
+}
+
+void server_change_sen_adj(OTF_PARAMS_DEF) {
+#if defined(USE_OTF)
+	if(!process_password(OTF_PARAMS)) return;
+#else
+	char *p = get_buffer;
+#endif
+	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("pid"), true)) handle_return(HTML_DATA_MISSING);
+
+    char *end;
+	long pid = strtoul(tmp_buffer, &end, 10);
+    if (*end != '\0') handle_return(HTML_DATA_FORMATERROR);
+
+	if (pid < 0 || pid >= pd.nprograms) handle_return(HTML_DATA_OUTOFBOUND);
+    
+    SensorAdjustment *adj = nullptr;
+    unsigned long flags = 0;
+    unsigned long sid = 255;
+    unsigned long splits = 255;
+    double split_points[SENSOR_ADJUSTMENT_PARTS-1] = {0};
+    sensor_adjustment_piecewise_t piecewise_parts[SENSOR_ADJUSTMENT_PARTS] = {0.0, 0.0};
+    
+    if ((adj = os.get_sensor_adjust(pid))) {
+        flags = adj->flags;
+        sid = adj->sid;
+        splits = adj->splits;
+
+        for (size_t i = 0; i <= splits; i++) {
+        if (i < splits) {
+            split_points[i] = adj->split_points[i];
+        }
+
+        piecewise_parts[i] = adj->piecewise_parts[i];
+    }
+        delete adj;
+    }
+    
+    if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("flags"), true)) {
+		flags=strtoul(tmp_buffer, &end, 10);
+        if (*end != '\0') handle_return(HTML_DATA_FORMATERROR);
+	}
+
+    if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("sid"), true)) {
+		sid=strtoul(tmp_buffer, &end, 10);
+        if (*end != '\0') handle_return(HTML_DATA_FORMATERROR);
+        if (sid >= MAX_SENSORS) sid = 255;
+	}
+
+    if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("splits"), true)) {
+		splits=strtoul(tmp_buffer, &end, 10);
+        if (*end != '\0') handle_return(HTML_DATA_FORMATERROR);
+        if (splits > SENSOR_ADJUSTMENT_PARTS - 1) handle_return(HTML_DATA_FORMATERROR);
+
+
+        if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("points"), true)) {
+            int i = 0;
+            double d;
+            const char *ptr = tmp_buffer;
+            int result;
+
+            while (*ptr != '\0') {
+                if (i >= splits) handle_return(HTML_DATA_FORMATERROR);
+
+                result = sscanf(ptr, "%lf;", &d);
+
+                if (result != 1) {
+                    handle_return(HTML_DATA_FORMATERROR);
+                }
+
+                split_points[i++] = d;
+
+                while (*(ptr++) != ';') {}
+            }
+
+            if (i != splits) handle_return(HTML_DATA_MISSING);
+        } else if (splits > 0) {
+            handle_return(HTML_DATA_MISSING);
+        }
+
+        if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("parts"), true)) {
+            int i = 0;
+            double d1, d2;
+            const char *ptr = tmp_buffer;
+            int result;
+
+            while (*ptr != '\0') {
+                if (i >= splits+1) handle_return(HTML_DATA_FORMATERROR);
+
+                result = sscanf(ptr, "%lf,%lf;", &d1, &d2);
+
+                if (result != 2) {
+                    handle_return(HTML_DATA_FORMATERROR);
+                }
+
+                piecewise_parts[i++] = sensor_adjustment_piecewise_t {d1, d2};
+
+                while (*(ptr++) != ';') {}
+            }
+
+            if (i != splits+1) handle_return(HTML_DATA_MISSING);
+        } else {
+            handle_return(HTML_DATA_MISSING);
+        }
+	}
+
+    if (splits == 255) handle_return(HTML_DATA_MISSING);    
+
+    adj = new SensorAdjustment(flags, sid, splits, split_points, piecewise_parts);
+    os.write_sensor_adjust(adj, pid);
+    delete adj;
+
+	handle_return(HTML_SUCCESS);
+}
 #endif
 
 /** Output all JSON data, including jc, jp, jo, js, jn */
@@ -2475,6 +2652,8 @@ void server_json_all(OTF_PARAMS_DEF) {
     #if defined(USE_SENSORS)
 	bfill.emit_p(PSTR(",\"sensors\":{"));
 	server_json_sensors_main(OTF_PARAMS);
+	bfill.emit_p(PSTR(",\"senadj\":{"));
+	server_json_sen_adj_main(OTF_PARAMS);
     #endif
 	bfill.emit_p(PSTR("}"));
 	handle_return(HTML_OK);
@@ -2605,6 +2784,9 @@ const char *uris[] PROGMEM = {
     "csn",
     "dsn",
     "lsn",
+    "jsa",
+    "csa",
+    "dsa",
     #endif
 };
 
@@ -2638,6 +2820,8 @@ URLHandler urls[] = {
     server_change_sensor,     // csn
     server_delete_sensor,     // dsn
     server_log_sensor,        // lsn
+    server_json_sen_adj,      // jsa
+    server_change_sen_adj,    // csa
     #endif
 };
 #else

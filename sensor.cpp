@@ -19,13 +19,13 @@ double Sensor::get_new_value() {
 }
 
 template <typename T>
-uint32_t Sensor::write_buf(char *buf, T val) {
+uint32_t write_buf(char *buf, T val) {
     std::memcpy(buf, &val, sizeof(val));
     return sizeof(val);
 }
 
 template <typename T>
-T Sensor::read_buf(char *buf, uint32_t *i) {
+T read_buf(char *buf, uint32_t *i) {
     T val;
     std::memcpy(&val, buf + (*i), sizeof(T));
     *i += sizeof(T);
@@ -193,4 +193,77 @@ uint32_t WeatherSensor::_serialize_internal(char *buf) {
 WeatherSensor::WeatherSensor(WeatherGetter weather_getter, char *buf) {
     uint32_t i = Sensor::_deserialize(buf);
     this->action = static_cast<WeatherAction>(buf[i++]);
+}
+
+SensorAdjustment::SensorAdjustment(uint8_t flags, uint8_t sid, uint8_t splits, double *split_points, sensor_adjustment_piecewise_t *piecewise_parts) {
+    this->flags = flags;
+    this->sid = sid;
+    if (splits > SENSOR_ADJUSTMENT_PARTS - 1) splits = SENSOR_ADJUSTMENT_PARTS - 1;
+    this->splits = splits;
+    for (size_t i = 0; i <= splits; i++) {
+        if (i < splits) {
+            this->split_points[i] = split_points[i];
+        }
+
+        this->piecewise_parts[i] = piecewise_parts[i];
+    }
+    
+}
+
+SensorAdjustment::SensorAdjustment(char *buf) {
+    uint32_t i = 0;
+    this->flags = buf[i++];
+    this->sid = buf[i++];
+    this->splits = buf[i++];
+
+    for (size_t j = 0; j < SENSOR_ADJUSTMENT_PARTS; j++) {
+        this->piecewise_parts[j].scale = read_buf<double>(buf, &i);
+        this->piecewise_parts[j].offset = read_buf<double>(buf, &i);
+    }
+
+    for (size_t j = 0; j < SENSOR_ADJUSTMENT_PARTS-1; j++) {
+        this->split_points[j] = read_buf<double>(buf, &i);
+    }
+}
+
+double SensorAdjustment::get_adjustment_factor(sensor_memory_t *sensors) {
+    if (this->flags & 1 && sensors[this->sid].interval) {
+        double value = sensors[1].value;
+        uint8_t i;
+        double split_point = 0;
+        for (i = 0; i < this->splits; i++) {
+            if (this->split_points[i] > value) {
+                break;
+            }
+
+            split_point = this->split_points[i];
+        }
+
+        sensor_adjustment_piecewise_t part = this->piecewise_parts[i];
+        value -= split_point;
+        value = (value * part.scale) + part.offset;
+        if (value < 0.0) value = 0.0;
+
+        return value;
+    } else {
+        return 1.0;
+    }
+}
+
+uint32_t SensorAdjustment::serialize(char *buf) {
+    uint32_t i = 0;
+    buf[i++] = this->flags;
+    buf[i++] = this->sid;
+    buf[i++] = this->splits;
+
+    for (size_t j = 0; j < SENSOR_ADJUSTMENT_PARTS; j++) {
+        i += write_buf<double>(buf+i, this->piecewise_parts[j].scale);
+        i += write_buf<double>(buf+i, this->piecewise_parts[j].offset);
+    }
+
+    for (size_t j = 0; j < SENSOR_ADJUSTMENT_PARTS-1; j++) {
+        i += write_buf<double>(buf+i, this->split_points[j]);
+    }
+
+    return i;
 }

@@ -2305,8 +2305,7 @@ void OpenSprinkler::factory_reset() {
         DEBUG_PRINT("Failed to open file: ");
         DEBUG_PRINTLN(SENSORS_FILENAME);
     }
-
-
+    
     uint16_t next = SENSOR_LOG_PER_FILE;
     for (uint16_t f = 0; f < SENSOR_LOG_FILE_COUNT; f++) {
         {
@@ -2328,6 +2327,23 @@ void OpenSprinkler::factory_reset() {
             DEBUG_PRINT("Failed to open sensor log file: ");
             DEBUG_PRINTLN(f);
         }
+    }
+
+    remove_file(SENADJ_FILENAME);
+    file = file_open(SENADJ_FILENAME, FileOpenMode::WriteTruncate);
+    if (file) {
+        sensor_adjustment_piecewise_t parts = sensor_adjustment_piecewise_t {0.0, 0.0};
+        SensorAdjustment adj = SensorAdjustment(0, 0, 0, nullptr, &parts);
+
+        uint32_t size = adj.serialize(tmp_buffer);
+        for (size_t i = 0; i < MAX_NUM_PROGRAMS; i++) {
+            file_write(file, tmp_buffer, size);
+        }
+        
+        file_close(file);
+    } else {
+        DEBUG_PRINT("Failed to open file: ");
+        DEBUG_PRINTLN(SENADJ_FILENAME);
     }
     #endif
 
@@ -2785,6 +2801,54 @@ void OpenSprinkler::poll_sensors() {
                 }
             }
         }
+    }
+}
+
+SensorAdjustment *OpenSprinkler::get_sensor_adjust(uint8_t index) {
+    if (index > MAX_NUM_PROGRAMS) return nullptr;
+    ulong pos = SENSOR_ADJUSTMENT_SIZE * index;
+    
+    os_file_type file = file_open(SENADJ_FILENAME, FileOpenMode::Read);
+    if (file) {
+        file_seek(file, pos, FileSeekMode::Current);
+
+        file_read(file, tmp_buffer, SENSOR_ADJUSTMENT_SIZE);
+
+        SensorAdjustment *result = new SensorAdjustment(tmp_buffer);
+        file_close(file);
+
+        if (result->sid == 255) {
+            delete result;
+            return nullptr;
+        } else {
+            return result;
+        }
+    } else {
+        DEBUG_PRINT("Failed to open file: ");
+        DEBUG_PRINTLN(SENADJ_FILENAME);
+        return nullptr;
+    }
+}
+
+void OpenSprinkler::write_sensor_adjust(SensorAdjustment *adj, uint8_t index) {
+    ulong pos = SENSOR_ADJUSTMENT_SIZE * index;
+    
+    os_file_type file = file_open(SENADJ_FILENAME, FileOpenMode::ReadWrite);
+    if (file) {
+        file_seek(file, pos, FileSeekMode::Current);
+
+        if (adj) {
+            ulong len = adj->serialize(tmp_buffer);
+            file_write(file, tmp_buffer, len);
+        } else {
+            tmp_buffer[0] = 0;
+            file_write(file, tmp_buffer, 1);
+        }
+
+        file_close(file);
+    } else {
+        DEBUG_PRINT("Failed to open file: ");
+        DEBUG_PRINTLN(SENADJ_FILENAME);
     }
 }
 

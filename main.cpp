@@ -821,6 +821,9 @@ void do_loop()
 			// check through all programs
 			for(pid=0; pid<pd.nprograms; pid++) {
 				pd.read(pid, &prog);	// todo future: reduce load time
+                SensorAdjustment *adj = os.get_sensor_adjust(pid);
+                double adjustment = adj->get_adjustment_factor(os.sensors);
+                delete adj;
 				bool will_delete = false;
 				unsigned char runcount = prog.check_match(curr_time, &will_delete);
 				if(runcount>0) {
@@ -840,10 +843,11 @@ void do_loop()
 						if ((os.status.mas==sid+1) || (os.status.mas2==sid+1))
 							continue;
 
+                        ulong dur = (ulong)((double)prog.durations[sid] * adjustment);
 						// if station has non-zero water time and the station is not disabled
-						if (prog.durations[sid] && !(os.attrib_dis[bid]&(1<<s))) {
+						if (dur && !(os.attrib_dis[bid]&(1<<s))) {
 							// water time is scaled by watering percentage
-							ulong water_time = water_time_resolve(prog.durations[sid]);
+							ulong water_time = water_time_resolve(dur);
 							// if the program is set to use weather scaling
 							if (prog.use_weather) {
 								unsigned char wl = os.iopts[IOPT_WATER_PERCENTAGE];
@@ -1464,9 +1468,13 @@ void manual_start_program(unsigned char pid, unsigned char uwt) {
 	reset_all_stations_immediate();
 	ProgramStruct prog;
 	ulong dur;
+    double adjustment = 1.0;
 	unsigned char sid, bid, s;
 	if ((pid>0)&&(pid<255)) {
 		pd.read(pid-1, &prog);
+        SensorAdjustment *adj = os.get_sensor_adjust(pid-1);
+        adjustment = adj->get_adjustment_factor(os.sensors);
+        delete adj;
 		notif.add(NOTIFY_PROGRAM_SCHED, pid-1, uwt?os.iopts[IOPT_WATER_PERCENTAGE]:100, 1);
 	}
 	for(sid=0;sid<os.nstations;sid++) {
@@ -1476,9 +1484,13 @@ void manual_start_program(unsigned char pid, unsigned char uwt) {
 		if ((os.status.mas==sid+1) || (os.status.mas2==sid+1))
 			continue;
 		dur = 60;
-		if(pid==255)  dur=2;
-		else if(pid>0)
+		if(pid==255) {
+            dur=2;
+        } else if (pid>0) {
 			dur = water_time_resolve(prog.durations[sid]);
+            dur = (ulong)((double)dur * adjustment);
+        }
+
 		if(uwt) {
 			dur = dur * os.iopts[IOPT_WATER_PERCENTAGE] / 100;
 		}

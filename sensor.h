@@ -85,11 +85,6 @@ private:
   double virtual _get_raw_value() = 0;
 protected:
   uint32_t _deserialize(char *buf);
-  template <typename T>
-  uint32_t write_buf(char *buf, T val);
-  template <typename T>
-  T read_buf(char *buf, uint32_t *i);
-
   uint32_t virtual _serialize_internal(char *buf) = 0;
 };
 
@@ -161,5 +156,29 @@ class WeatherSensor : public Sensor {
     
     WeatherGetter weather_getter;
 };
+
+typedef struct {
+    double scale;
+    double offset;
+} sensor_adjustment_piecewise_t;
+
+#define SENSOR_ADJUSTMENT_PARTS 4
+
+class SensorAdjustment {
+public:
+  SensorAdjustment(uint8_t flags, uint8_t sid, uint8_t splits, double *split_points, sensor_adjustment_piecewise_t *piecewise_parts);
+  SensorAdjustment(char *buf);
+  
+  double get_adjustment_factor(sensor_memory_t *sensors);
+  uint32_t serialize(char *buf);
+
+  uint8_t flags;
+  uint8_t sid;
+  uint8_t splits;
+  double split_points[SENSOR_ADJUSTMENT_PARTS-1];
+  sensor_adjustment_piecewise_t piecewise_parts[SENSOR_ADJUSTMENT_PARTS];
+};
+
+#define SENSOR_ADJUSTMENT_SIZE (3 + (SENSOR_ADJUSTMENT_PARTS * sizeof(sensor_adjustment_piecewise_t)) + ((SENSOR_ADJUSTMENT_PARTS - 1) * sizeof(double)))
 
 #endif //SENSOR_H

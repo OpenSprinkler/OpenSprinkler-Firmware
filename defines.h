@@ -55,8 +55,9 @@ typedef unsigned long ulong;
 #define NVCON_FILENAME        "nvcon.dat"   // non-volatile controller data file, see OpenSprinkler.h --> struct NVConData
 #define PROG_FILENAME         "prog.dat"    // program data file
 #define DONE_FILENAME         "done.dat"    // used to indicate the completion of all files
-#define SENSORS_FILENAME      "sens.dat"    // used to indicate the completion of all files
-#define SENSORS_LOG_FILENAME  "senslog.dat"    // used to indicate the completion of all files
+#define SENSORS_FILENAME      "sens.dat"    // sensor data file
+#define SENSORS_LOG_FILENAME  "senslog.dat" // name base for all sensor files
+#define SENADJ_FILENAME       "senadj.dat"  // sensor adjustment data for programs file
 
 /** Station macro defines */
 #define STN_TYPE_STANDARD    0x00 // standard solenoid station
@@ -139,7 +140,6 @@ typedef unsigned long ulong;
 #define MAX_SOPTS_SIZE    320   // maximum string option size
 
 #define MAX_SENSORS 64
-// #define SENSOR_LOG_PER_FILE 1024
 #define SENSOR_LOG_PER_FILE 1024
 #define SENSOR_LOG_FILE_COUNT 32
 #define MAX_SENSOR_LOG_COUNT (SENSOR_LOG_PER_FILE * SENSOR_LOG_FILE_COUNT)

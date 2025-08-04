@@ -399,6 +399,8 @@ public:
     static void write_sensor(Sensor *sensor, uint8_t index);
     void log_sensor(uint8_t sid, float value);
     static void poll_sensors();
+    static SensorAdjustment *get_sensor_adjust(uint8_t index);
+    static void write_sensor_adjust(SensorAdjustment *adj, uint8_t index);
 
     static double get_sensor_weather_data(WeatherAction action);
     #endif
