@@ -24,12 +24,12 @@
 #ifndef _OPENSPRINKLER_SERVER_H
 #define _OPENSPRINKLER_SERVER_H
 
+#include <limits>
 #include "bfiller.h"
 
 #if !defined(ARDUINO)
 #include <stdarg.h>
 #include <unistd.h>
-#include <limits>
 #endif
 
 #endif // _OPENSPRINKLER_SERVER_H
