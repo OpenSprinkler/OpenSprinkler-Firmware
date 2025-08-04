@@ -24,7 +24,7 @@
 #include "types.h"
 #include "OpenSprinkler.h"
 #include "program.h"
-#include "opensprinkler_server.h"
+#include "bfiller.h"
 #include "weather.h"
 #include "mqtt.h"
 #include "main.h"
@@ -218,11 +218,6 @@ void send_packet(OTF_PARAMS_DEF) {
 	m_client->write((const uint8_t *)ether_buffer, strlen(ether_buffer));
 #endif
 	rewind_ether_buffer();
-}
-
-char dec2hexchar(unsigned char dec) {
-	if(dec<10) return '0'+dec;
-	else return 'A'+(dec-10);
 }
 
 #if defined(USE_OTF)
@@ -1998,7 +1993,9 @@ void server_json_sensors_main(OTF_PARAMS_DEF) {
         for (size_t i = 0; i < MAX_SENSORS; i++) {
             if (os.sensors[i].interval && (sensor = os.parse_sensor(file))) {
                 if (sensor_count) bfill.emit_p(PSTR(","));
-                bfill.emit_p(PSTR("{\"sid\":$D,\"name\":\"$S\",\"unit\":$D,\"interval\":$L,\"max\":$E,\"min\":$E,\"scale\":$E,\"offset\":$E,\"value\":$E}"), i, sensor->name, sensor->unit, sensor->interval, sensor->max, sensor->min, sensor->scale, sensor->offset, os.sensors[i].value);
+                bfill.emit_p(PSTR("{\"sid\":$D,\"name\":\"$S\",\"unit\":$D,\"interval\":$L,\"max\":$E,\"min\":$E,\"scale\":$E,\"offset\":$E,\"value\":$E,\"extra\":"), i, sensor->name, sensor->unit, sensor->interval, sensor->max, sensor->min, sensor->scale, sensor->offset, os.sensors[i].value);
+                sensor->emit_extra_json(&bfill);
+                bfill.emit_p(PSTR("}"));
                 sensor_count += 1;
                 delete sensor;
 
@@ -2566,7 +2563,7 @@ void server_change_sen_adj(OTF_PARAMS_DEF) {
 
 
         if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("points"), true)) {
-            int i = 0;
+            unsigned long i = 0;
             double d;
             const char *ptr = tmp_buffer;
             int result;
@@ -2591,7 +2588,7 @@ void server_change_sen_adj(OTF_PARAMS_DEF) {
         }
 
         if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("parts"), true)) {
-            int i = 0;
+            unsigned long i = 0;
             double d1, d2;
             const char *ptr = tmp_buffer;
             int result;

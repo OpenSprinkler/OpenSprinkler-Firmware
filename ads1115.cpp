@@ -86,6 +86,10 @@ sensor_index(sensor_index),
 pin(pin),
 sensors(sensors) {}
 
+void ADS1115Sensor::emit_extra_json(BufferFiller *bfill) {
+    bfill->emit_p(PSTR("{\"index\":$D,\"pin\":$D}"), this->sensor_index, this->pin);
+}
+
 double ADS1115Sensor::get_inital_value() {
     return 0.0;
 }

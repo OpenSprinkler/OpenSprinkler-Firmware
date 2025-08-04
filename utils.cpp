@@ -817,3 +817,8 @@ void str2mac(const char *_str, unsigned char mac[]) {
 	}
 }
 #endif
+
+char dec2hexchar(unsigned char dec) {
+	if(dec<10) return '0'+dec;
+	else return 'A'+(dec-10);
+}

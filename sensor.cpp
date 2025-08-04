@@ -78,6 +78,15 @@ sensors(sensors) {
     }
 }
 
+void EnsembleSensor::emit_extra_json(BufferFiller *bfill) {
+    bfill->emit_p(PSTR("{\"action\":$D,\"children\":["), this->action);
+    for (size_t i = 0; i < ENSEMBLE_SENSOR_CHILDREN_COUNT; i++) {
+        ensemble_children_t *child = &this->children[i];
+        bfill->emit_p(PSTR("{\"sid\":$D,\"max\":$E,\"min\":$E,\"scale\":$E,\"offset\":$E}"), child->max, child->min, child->scale, child->offset);
+    }
+    bfill->emit_p(PSTR("]}"));
+}
+
 double EnsembleSensor::get_inital_value() {
     switch (this->action) {
         case EnsembleAction::Min:
@@ -175,6 +184,10 @@ WeatherSensor::WeatherSensor(unsigned long interval, double min, double max, dou
 Sensor(interval, min, max, scale, offset, name, unit), 
 action(action),
 weather_getter(weather_getter) {}
+
+void WeatherSensor::emit_extra_json(BufferFiller *bfill) {
+    bfill->emit_p(PSTR("{\"action\":$D}"), this->action);
+}
 
 double WeatherSensor::get_inital_value() {
     return 0.0;

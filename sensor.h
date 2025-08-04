@@ -8,6 +8,7 @@
 #include "utils.h"
 #endif
 #include "defines.h"
+#include "bfiller.h"
 
 #define SENSOR_NAME_LEN 33
 #define SENSOR_CUSTOM_UNIT_LEN 9
@@ -70,6 +71,8 @@ public:
   double get_new_value();
   uint32_t serialize(char *buf);
 
+  void virtual emit_extra_json(BufferFiller *bfill) = 0;
+
   unsigned long interval = 1;
   double min = 0.0;
   double max = 0.0;
@@ -114,6 +117,8 @@ class EnsembleSensor : public Sensor {
     EnsembleSensor(unsigned long interval, double min, double max, double scale, double offset, const char *name, SensorUnit unit, sensor_memory_t *sensors, ensemble_children_t *children, uint8_t children_count, EnsembleAction action);
     EnsembleSensor(sensor_memory_t *sensors, char *buf);
 
+    void emit_extra_json(BufferFiller *bfill);
+
     SensorType get_sensor_type() {
         return SensorType::Ensemble;
     }
@@ -141,6 +146,7 @@ class WeatherSensor : public Sensor {
     WeatherSensor(unsigned long interval, double min, double max, double scale, double offset, const char *name, SensorUnit unit, WeatherGetter weather_getter, WeatherAction action);
     WeatherSensor(WeatherGetter weather_getter, char *buf);
 
+    void emit_extra_json(BufferFiller *bfill);
 
     SensorType get_sensor_type() {
         return SensorType::Weather;

@@ -54,6 +54,8 @@ class ADS1115Sensor : public Sensor {
     ADS1115Sensor(unsigned long interval, double min, double max, double scale, double offset, const char *name, SensorUnit unit, ADS1115 **sensors, uint8_t sensor_index, uint8_t pin);
     ADS1115Sensor(ADS1115 **sensors, char *buf);
 
+    void emit_extra_json(BufferFiller *bfill);
+
     SensorType get_sensor_type() {
         return SensorType::ADS1115;
     }
