@@ -1998,7 +1998,7 @@ void server_json_sensors_main(OTF_PARAMS_DEF) {
         for (size_t i = 0; i < MAX_SENSORS; i++) {
             if (os.sensors[i].interval && (sensor = os.parse_sensor(file))) {
                 if (sensor_count) bfill.emit_p(PSTR(","));
-                bfill.emit_p(PSTR("{\"id\":$D,\"name\":\"$S\",\"unit\":$D,\"interval\":$L,\"max\":$E,\"min\":$E,\"scale\":$E,\"offset\":$E,\"value\":$E}"), i, sensor->name, sensor->unit, sensor->interval, sensor->max, sensor->min, sensor->scale, sensor->offset, os.sensors[i].value);
+                bfill.emit_p(PSTR("{\"sid\":$D,\"name\":\"$S\",\"unit\":$D,\"interval\":$L,\"max\":$E,\"min\":$E,\"scale\":$E,\"offset\":$E,\"value\":$E}"), i, sensor->name, sensor->unit, sensor->interval, sensor->max, sensor->min, sensor->scale, sensor->offset, os.sensors[i].value);
                 sensor_count += 1;
                 delete sensor;
 
@@ -2786,7 +2786,6 @@ const char *uris[] PROGMEM = {
     "lsn",
     "jsa",
     "csa",
-    "dsa",
     #endif
 };
 
