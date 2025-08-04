@@ -462,6 +462,7 @@ private:
 	static unsigned char prev_station_bits[];
 #endif // LCD functions
 	static unsigned char engage_booster;
+	static unsigned char curr_alert_sid;
 	static RCSwitch rfswitch;
 
 	#if defined(USE_OTF)

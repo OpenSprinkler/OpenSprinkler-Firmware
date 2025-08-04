@@ -40,6 +40,7 @@ unsigned char OpenSprinkler::nboards;
 unsigned char OpenSprinkler::nstations;
 unsigned char OpenSprinkler::station_bits[MAX_NUM_BOARDS];
 unsigned char OpenSprinkler::engage_booster;
+unsigned char OpenSprinkler::curr_alert_sid;
 uint16_t OpenSprinkler::baseline_current;
 
 time_os_t OpenSprinkler::sensor1_on_timer;
@@ -637,7 +638,7 @@ unsigned char OpenSprinkler::start_ether() {
 	
 	ulong timeout = millis()+60000; // 60 seconds time out
 	unsigned char timecount = 1;
-	while (!eth.connected() && millis()<timeout) {
+	while (!eth.connected() && (long)(millis()-timeout)<0) { // overflow proof
 		DEBUG_PRINT(".");
 		lcd.setCursor(13, 2);
 		lcd.print(timecount);
@@ -1128,7 +1129,7 @@ void OpenSprinkler::latch_boost(unsigned char volt) {
 		uint32_t boost_timeout = millis() + (iopts[IOPT_BOOST_TIME]<<2);
 		digitalWriteExt(PIN_BOOST, HIGH);
 		// boost until either top voltage is reached or boost timeout is reached
-		while(millis()<boost_timeout && analogRead(PIN_CURR_SENSE)<top) {
+		while((long)(millis()-boost_timeout)<0 && analogRead(PIN_CURR_SENSE)<top) { // overflow proof
 			delay(5);
 		}
 		digitalWriteExt(PIN_BOOST, LOW);
@@ -1372,6 +1373,11 @@ void OpenSprinkler::apply_all_station_bits() {
 	#endif
 #endif
 
+	// If a zone turned on, do overcurrent monitor here for 40ms
+	if (curr_alert_sid) {
+		
+		curr_alert_sid = 0;
+	}
 	if(iopts[IOPT_SPE_AUTO_REFRESH]) {
 		// handle refresh of RF and remote stations
 		// we refresh the station that's next in line
@@ -1843,6 +1849,7 @@ unsigned char OpenSprinkler::set_station_bit(unsigned char sid, unsigned char va
 		else {
 			(*data) = (*data) | mask;
 			engage_booster = true; // if bit is changing from 0 to 1, set engage_booster
+			curr_alert_sid = sid+1; // record the zone that's turning on (starting from 1)
 			switch_special_station(sid, 1, dur); // handle special stations
 			return 1;
 		}
@@ -2005,7 +2012,7 @@ int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char*
 			client->read((uint8_t*)ether_buffer+pos, nbytes);
 			pos+=nbytes;
 		}
-		if(millis()>stoptime) {
+		if((long)(millis()-stoptime)>0) { // overflow proof
 			DEBUG_PRINTLN(F("host timeout occured"));
 			//return HTTP_RQT_TIMEOUT; // instead of returning with timeout, we'll work with data received so far
 			break;

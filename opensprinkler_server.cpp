@@ -2514,7 +2514,7 @@ ulong getNtpTime() {
 
 		// process response
 		ulong timeout = millis()+2000;
-		while(millis() < timeout) {
+		while((long)(millis()-timeout)<0) {
 			if(udp->parsePacket()) {
 				udp->read(packetBuffer, NTP_PACKET_SIZE);
 				ulong highWord = word(packetBuffer[40], packetBuffer[41]);

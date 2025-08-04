@@ -85,6 +85,8 @@ void manual_start_program(unsigned char, unsigned char);
 #define UI_STATE_MACHINE_INTERVAL 50    // how often does ui_state_machine run (in ms)
 #define CLIENT_READ_TIMEOUT       5     // client read timeout (in seconds)
 #define DHCP_CHECKLEASE_INTERVAL  3600L // DHCP check lease interval (in seconds)
+#define FLOWPOLL_INTERVAL         3     // flow poll interval (in milli-seconds)
+#define CURRPOLL_INTERVAL         20    // current poll interval (in milli-seconds)
 // Define buffers: need them to be sufficiently large to cover string option reading
 char ether_buffer[ETHER_BUFFER_SIZE*2]; // ethernet buffer, make it twice as large to allow overflow
 char tmp_buffer[TMP_BUFFER_SIZE*2]; // scratch buffer, make it twice as large to allow overflow
@@ -212,11 +214,12 @@ void ui_state_machine() {
 
 #if defined(USE_SSD1306)
 	// process screen led
-	static ulong led_toggle_timeout = 0;
+	static ulong led_toggle_prev = 0;
 	if(led_blink_ms) {
-		if(millis()>led_toggle_timeout) {
+		ulong tm = millis();
+		if(tm - led_toggle_prev > led_blink_ms) { // overflow proof timeout
 			os.toggle_screen_led();
-			led_toggle_timeout = millis() + led_blink_ms;
+			led_toggle_prev = tm;
 		}
 	}
 #endif
@@ -546,10 +549,11 @@ void do_loop()
 {
 	static ulong flowpoll_timeout = 0;
 	if(os.iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_FLOW) {
-	// handle flow sensor using polling every 1ms (maximum freq 1/(2*1ms)=500Hz)
-		ulong curr = millis();
-		if(curr!=flowpoll_timeout) {
-			flowpoll_timeout = curr;
+	// handle flow sensor using polling. Maximum freq is 1/(2*FLOWPOLL_INTERVAL)
+	// e.g. if FLOWPOLL_INTERVAL is 3ms, maximum freq is 166Hz
+		ulong tm = millis();
+		if((long)(tm-flowpoll_timeout) > 0) { // overflow proof timeout
+			flowpoll_timeout = tm+FLOWPOLL_INTERVAL;
 			flow_poll();
 		}
 	}
@@ -558,16 +562,15 @@ void do_loop()
 	{
 		static ulong currpoll_timeout = 0;
 		ulong tn = millis();
-		if(tn >= currpoll_timeout) {
+		if((long)(tn-currpoll_timeout) > 0) { // overflow proof timeout
 			uint16_t curr = os.read_current();
 			uint16_t imax = os.iopts[IOPT_I_MAX_LIMIT]*10;
 			if(curr > imax) {
 				reset_all_stations_immediate();
 				notif.add(NOTIFY_CURR_ALERT, 0, curr, CURR_ALERT_TYPE_OVER_SYSTEM);
-				DEBUG_PRINTLN(curr);
-				currpoll_timeout = tn+1000; // pause currpoll for a second to give time for solenoids to stop
+				currpoll_timeout = tn+1000; // pause currpoll for a second to give time for solenoids to reset
 			} else {
-				currpoll_timeout = tn+20; // every 20 ms
+				currpoll_timeout = tn+CURRPOLL_INTERVAL;
 			}
 		}
 	}
@@ -642,7 +645,7 @@ void do_loop()
 			os.state = OS_STATE_CONNECTED;
 			connecting_timeout = 0;
 		} else {
-			if(millis()>connecting_timeout) {
+			if((long)(millis()-connecting_timeout)>0) {
 				os.state = OS_STATE_INITIAL;
 				WiFi.disconnect(true);
 				DEBUG_PRINTLN(F("timeout"));
@@ -1815,7 +1818,7 @@ static void check_network() {
 				failed = false;
 				break;
 			}
-		} while(millis() - start < PING_TIMEOUT);*/
+		} while((long)(millis() - start) < PING_TIMEOUT);*/
 		if (failed)  {
 			if(os.status.network_fails<3)  os.status.network_fails++;
 			// clamp it to 6
