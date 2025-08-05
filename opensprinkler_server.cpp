@@ -1183,7 +1183,7 @@ void server_json_controller_main(OTF_PARAMS_DEF) {
 	time_os_t curr_time = os.now_tz();
 	bfill.emit_p(PSTR("\"devt\":$L,\"nbrd\":$D,\"en\":$D,\"sn1\":$D,\"sn2\":$D,\"rd\":$D,\"rdst\":$L,"
 										"\"sunrise\":$D,\"sunset\":$D,\"eip\":$L,\"lwc\":$L,\"lswc\":$L,"
-										"\"lupt\":$L,\"lrbtc\":$D,\"lrun\":[$D,$D,$D,$L],\"pq\":$D,\"pt\":$L,\"nq\":$D,"),
+										"\"lupt\":$L,\"lrbtc\":$D,\"lrun\":[$D,$D,$D,$L],\"pq\":$D,\"pt\":$L,\"nq\":$D,\"ocs\":$D,"),
 							curr_time,
 							os.nboards,
 							os.status.enabled,
@@ -1204,7 +1204,8 @@ void server_json_controller_main(OTF_PARAMS_DEF) {
 							pd.lastrun.endtime,
 							os.status.pause_state,
 							os.pause_timer,
-							pd.nqueue);
+							pd.nqueue,
+							os.status.overcurrent_sid);
 
 #if defined(ESP8266)
 	bfill.emit_p(PSTR("\"RSSI\":$D,"), (int16_t)WiFi.RSSI());
@@ -1322,10 +1323,11 @@ void server_home(OTF_PARAMS_DEF)
 
 /**
  * Change controller variables
- * Command: /cv?pw=xxx&rsn=x&rbt=x&en=x&rd=x&re=x&ap=x
+ * Command: /cv?pw=xxx&rsn=x&rrsn=x&rbt=x&en=x&rd=x&re=x&ap=x
  *
  * pw:	password
  * rsn: reset all stations (0 or 1)
+ * rrsn:reset all running stations (0 or 1)
  * rbt: reboot controller (0 or 1)
  * en:	enable (0 or 1)
  * rd:	rain delay hours (0 turns off rain delay)
@@ -1343,6 +1345,10 @@ void server_change_values(OTF_PARAMS_DEF)
 #endif
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("rsn"), true)) {
 		reset_all_stations();
+	}
+
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("rrsn"), true)) {
+		reset_all_stations(true);
 	}
 
 #if !defined(ARDUINO)
@@ -1770,9 +1776,14 @@ void server_change_manual(OTF_PARAMS_DEF) {
 			ssta = atoi(tmp_buffer);
 		}
 		// mark station for removal
-		RuntimeQueueStruct *q = pd.queue + pd.station_qid[sid];
-		q->deque_time = curr_time;
-		turn_off_station(sid, curr_time, ssta);
+		if(pd.station_qid[sid]==255) {
+			// return error message if turning off a zone that's not currently in the queue
+			handle_return(HTML_DATA_OUTOFBOUND);
+		} else {
+			RuntimeQueueStruct *q = pd.queue + pd.station_qid[sid];
+			q->deque_time = curr_time;
+			turn_off_station(sid, curr_time, ssta);
+		}
 	}
 	handle_return(HTML_SUCCESS);
 }

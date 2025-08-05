@@ -40,7 +40,6 @@ unsigned char OpenSprinkler::nboards;
 unsigned char OpenSprinkler::nstations;
 unsigned char OpenSprinkler::station_bits[MAX_NUM_BOARDS];
 unsigned char OpenSprinkler::engage_booster;
-unsigned char OpenSprinkler::curr_alert_sid;
 uint16_t OpenSprinkler::baseline_current;
 
 time_os_t OpenSprinkler::sensor1_on_timer;
@@ -77,8 +76,8 @@ RCSwitch OpenSprinkler::rfswitch;
 extern char tmp_buffer[];
 extern char ether_buffer[];
 extern ProgramData pd;
-
 extern const char* user_agent_string;
+extern unsigned char curr_alert_sid;
 
 #if defined(USE_SSD1306)
 	SSD1306Display OpenSprinkler::lcd(0x3c, SDA, SCL);
@@ -1289,7 +1288,7 @@ void OpenSprinkler::latch_apply_all_station_bits() {
 /** Apply all station bits
  * !!! This will activate/deactivate valves !!!
  */
-void OpenSprinkler::apply_all_station_bits() {
+void OpenSprinkler::apply_all_station_bits(void (*post_activation_callback)()) {
 
 #if defined(ESP8266)
 	if(hw_type==HW_TYPE_LATCH) {
@@ -1373,11 +1372,9 @@ void OpenSprinkler::apply_all_station_bits() {
 	#endif
 #endif
 
-	// If a zone turned on, do overcurrent monitor here for 40ms
-	if (curr_alert_sid) {
-		
-		curr_alert_sid = 0;
-	}
+	// If a post activation callback function is defined, call it here
+	if(post_activation_callback) post_activation_callback();
+
 	if(iopts[IOPT_SPE_AUTO_REFRESH]) {
 		// handle refresh of RF and remote stations
 		// we refresh the station that's next in line
@@ -2775,7 +2772,9 @@ void OpenSprinkler::lcd_print_screen(char c) {
 	{
 	#endif
 		lcd.setCursor(0, -1);
-		if(status.rain_delayed) {
+		if(status.overcurrent_sid > 0) {
+			lcd.print(F("<!OVERCURRENT!> "));
+		} else if(status.rain_delayed) {
 			lcd.print(F("<Rain Delay On> "));
 		} else if(status.pause_state) {
 			lcd.print(F("<Program Paused>"));

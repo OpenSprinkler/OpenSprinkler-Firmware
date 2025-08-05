@@ -108,6 +108,7 @@ unsigned char prev_flow_state = HIGH;
 float flow_last_gpm = 0;
 int32_t flow_rt_period = -1;
 uint32_t reboot_timer = 0;
+unsigned char curr_alert_sid = 0;
 
 void flow_poll() {
 	ulong curr = millis();
@@ -544,6 +545,31 @@ void reboot_in(uint32_t ms) {
 void handle_web_request(char *p);
 #endif
 
+ulong currpoll_timeout = 0;
+void overcurrent_monitor() {
+#if defined(ARDUINO)
+	// If a zone is turning on, do immediate overcurrent monitoring here for ~50ms
+	if (curr_alert_sid) {
+		time_os_t tn = os.now_tz();
+		uint16_t imax = os.iopts[IOPT_I_MAX_LIMIT]*10;
+		unsigned char sid = curr_alert_sid - 1;
+		for(unsigned char i = 0; i < 5; i++) {
+			uint16_t curr = os.read_current();
+			if(curr > imax) {
+				turn_off_running_station_immediate(sid, tn);
+				notif.add(NOTIFY_CURR_ALERT, sid, curr, CURR_ALERT_TYPE_OVER_STATION);
+				os.status.overcurrent_sid = curr_alert_sid;
+				currpoll_timeout += 1000; // delay currpoll_timeout by 1 second to give time for solenoid to reset
+				break;
+			} else {
+				delay(10);
+			}
+		}
+		curr_alert_sid = 0;
+	}
+#endif
+}
+
 /** Main Loop */
 void do_loop()
 {
@@ -560,14 +586,14 @@ void do_loop()
 
 #if defined(ARDUINO)
 	{
-		static ulong currpoll_timeout = 0;
 		ulong tn = millis();
 		if((long)(tn-currpoll_timeout) > 0) { // overflow proof timeout
 			uint16_t curr = os.read_current();
 			uint16_t imax = os.iopts[IOPT_I_MAX_LIMIT]*10;
 			if(curr > imax) {
-				reset_all_stations_immediate();
+				reset_all_stations_immediate(true);
 				notif.add(NOTIFY_CURR_ALERT, 0, curr, CURR_ALERT_TYPE_OVER_SYSTEM);
+				os.status.overcurrent_sid = 255; // 255 indicates system overcurrent
 				currpoll_timeout = tn+1000; // pause currpoll for a second to give time for solenoids to reset
 			} else {
 				currpoll_timeout = tn+CURRPOLL_INTERVAL;
@@ -978,7 +1004,7 @@ void do_loop()
 			process_dynamic_events(curr_time);
 
 			// activate / deactivate valves
-			os.apply_all_station_bits();
+			os.apply_all_station_bits(overcurrent_monitor);
 
 			// check through runtime queue, calculate the last stop time of sequential stations
 			memset(pd.last_seq_stop_times, 0, sizeof(ulong)*NUM_SEQ_GROUPS);
@@ -1085,7 +1111,7 @@ void do_loop()
 		}
 
 		// activate/deactivate valves
-		os.apply_all_station_bits();
+		os.apply_all_station_bits(overcurrent_monitor);
 
 #if defined(USE_DISPLAY)
 		// process LCD display
@@ -1244,6 +1270,31 @@ void handle_shift_remaining_stations(RuntimeQueueStruct* q, unsigned char gid, t
 	pd.last_seq_stop_times[gid] += 1;
 }
 
+/** Turn off a running station immediately
+ * Similar turn_off_station but assuming the station is currently running,
+ * and this function does not perform logging, current detection, or notifications
+ * Meant to be called in overcurrent situations to turn off a running zone right away
+ */
+void turn_off_running_station_immediate(unsigned char sid, time_os_t curr_time, unsigned char shift) {
+	os.set_station_bit(sid, 0);
+	os.apply_all_station_bits();
+
+	unsigned char qid = pd.station_qid[sid];
+	RuntimeQueueStruct *q = pd.queue + qid;
+	unsigned char gid = os.get_station_gid(q->sid);
+
+	if (shift && os.is_sequential_station(sid) && !os.iopts[IOPT_REMOTE_EXT_MODE]) {
+		handle_shift_remaining_stations(q, gid, curr_time);
+	}
+
+	int16_t station_delay = water_time_decode_signed(os.iopts[IOPT_STATION_DELAY_TIME]);
+	if (q->st + q->dur + station_delay == pd.last_seq_stop_times[gid]) { // if removing last station in group
+		pd.last_seq_stop_times[gid] = 0;
+	}
+	pd.dequeue(qid);
+	pd.station_qid[sid] = 0xFF;
+}
+
 /** Turn off a station
  * This function turns off a scheduled station
  * writes a log record and determines if
@@ -1283,7 +1334,6 @@ void turn_off_station(unsigned char sid, time_os_t curr_time, unsigned char shif
 	// if current is less than imin threshold and hardware type is AC or DC
 	// send an station undercurrent alert
 	if((current < imin) && (os.hw_type==HW_TYPE_AC || os.hw_type==HW_TYPE_DC)) {
-		// TODO: also display this on the LCD screen
 		notif.add(NOTIFY_CURR_ALERT, sid, current, CURR_ALERT_TYPE_UNDER);
 	}
 	#endif
@@ -1477,28 +1527,62 @@ void schedule_all_stations(time_os_t curr_time) {
 
 /** Immediately reset all stations
  * No log records will be written
+ * This function is similar to reset_all_stations but is meant for
+ * overcurrent situation to quickly turn off zones that are affected
  */
-void reset_all_stations_immediate() {
-	os.clear_all_station_bits();
-	os.apply_all_station_bits();
-	pd.reset_runtime();
-	pd.clear_pause();
-}
-
-/** Reset all stations
- * This function sets the duration of
- * every station to 0, which causes
- * all stations to turn off in the next processing cycle.
- * Stations will be logged
- */
-void reset_all_stations() {
-	RuntimeQueueStruct *q = pd.queue;
-	// go through runtime queue and assign water time to 0
-	for(;q<pd.queue+pd.nqueue;q++) {
-		q->dur = 0;
+void reset_all_stations_immediate(bool running_ones_only) {
+	if(running_ones_only) {
+		RuntimeQueueStruct *q = NULL;
+		time_os_t currtime = os.now_tz();
+		// first round, quickly turn off the zones and mark them for dequeue
+		for(q=pd.queue;q<pd.queue+pd.nqueue;q++) {
+			unsigned char sid = q->sid;
+			if(os.is_running(sid)) { // only turn off running stations
+				q->deque_time = currtime;
+				os.set_station_bit(sid, 0);
+			}
+			os.apply_all_station_bits();
+		}
+		// second round, properly dequeu the marked ones
+		// for removing selected elements, must traverse the queue backward
+		for(q=pd.queue+pd.nqueue-1;q>=pd.queue;q--) {
+			if(q->deque_time == currtime) {
+				// shift remaining stations (ssta=1)
+				turn_off_running_station_immediate(q->sid, currtime, 0);
+			}
+		}
+	} else {
+		os.clear_all_station_bits();
+		os.apply_all_station_bits();
+		pd.reset_runtime();
+		pd.clear_pause();
 	}
 }
 
+/** Reset all stations
+ * Stations will be logged
+ */
+void reset_all_stations(bool running_ones_only) {
+	if(running_ones_only) {
+		RuntimeQueueStruct *q;
+		time_os_t currtime = os.now_tz();
+		// for removing selected elements, must traverse the queue backward
+		for(q=pd.queue+pd.nqueue-1;q>=pd.queue;q--) {
+			if(os.is_running(q->sid)) { // only reset running stations
+				q->deque_time = currtime;
+				// shift remaining stations (ssta=1)
+				turn_off_station(q->sid, currtime, 0);
+			}
+		}
+	} else {
+		// traverse runtime queue and assign every station's duration to 0
+		// which causes them to be dequeued in the next processing cycle
+		RuntimeQueueStruct *q;
+		for(q=pd.queue;q<pd.queue+pd.nqueue;q++) {
+			q->dur = 0;
+		}
+	}
+}
 
 /** Manually start a program
  * If pid==0, this is a test program (1 minute per station)

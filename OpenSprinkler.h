@@ -222,6 +222,7 @@ struct ConStatus {
 	unsigned char sensor2_active:1;  // sensor2 active bit (when set, sensor2 is activated)
 	unsigned char req_mqtt_restart:1;// request mqtt restart
 	unsigned char pause_state:1;     // pause station runs
+	unsigned char overcurrent_sid:8; // overcurrent sid (0: no overcurrent; 1~254: overcurrent caused by opening zone; 255: system overcurrent)
 };
 
 /** OTF configuration */
@@ -362,7 +363,7 @@ public:
 	static unsigned char get_station_bit(unsigned char sid); // get station bit of one station (sid->station index)
 	static void switch_special_station(unsigned char sid, unsigned char value, uint16_t dur=0); // swtich special station
 	static void clear_all_station_bits(); // clear all station bits
-	static void apply_all_station_bits(); // apply all station bits (activate/deactive values)
+	static void apply_all_station_bits(void (*post_activation_callback)()=NULL); // apply all station bits (activate/deactive values)
 
 	static int8_t send_http_request(uint32_t ip4, uint16_t port, char* p, void(*callback)(char*)=NULL, bool usessl=false, uint16_t timeout=5000);
 	static int8_t send_http_request(const char* server, uint16_t port, char* p, void(*callback)(char*)=NULL, bool usessl=false, uint16_t timeout=5000);
@@ -462,7 +463,6 @@ private:
 	static unsigned char prev_station_bits[];
 #endif // LCD functions
 	static unsigned char engage_booster;
-	static unsigned char curr_alert_sid;
 	static RCSwitch rfswitch;
 
 	#if defined(USE_OTF)
