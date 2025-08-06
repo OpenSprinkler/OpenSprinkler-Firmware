@@ -2553,7 +2553,7 @@ void server_change_sen_adj(OTF_PARAMS_DEF) {
         double x, y;
         const char *ptr = tmp_buffer;
         int result;
-        double last_x = -infinity();
+        double last_x = -std::numeric_limits<double>::infinity();;
 
         while (*ptr != '\0') {
             if (i >= SENSOR_ADJUSTMENT_POINTS) handle_return(HTML_DATA_FORMATERROR);
