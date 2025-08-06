@@ -2553,17 +2553,20 @@ void server_change_sen_adj(OTF_PARAMS_DEF) {
         double x, y;
         const char *ptr = tmp_buffer;
         int result;
+        double last_x = -infinity();
 
         while (*ptr != '\0') {
             if (i >= SENSOR_ADJUSTMENT_POINTS) handle_return(HTML_DATA_FORMATERROR);
 
             result = sscanf(ptr, "%lf,%lf;", &x, &y);
 
-            if (result != 2) {
+            if (result != 2 || x < last_x) {
                 handle_return(HTML_DATA_FORMATERROR);
             }
 
             points[i++] = sensor_adjustment_point_t {x, y};
+
+            last_x = x;
 
             while (*(ptr++) != ';') {}
         }
