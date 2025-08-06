@@ -2332,8 +2332,8 @@ void OpenSprinkler::factory_reset() {
     remove_file(SENADJ_FILENAME);
     file = file_open(SENADJ_FILENAME, FileOpenMode::WriteTruncate);
     if (file) {
-        sensor_adjustment_piecewise_t parts = sensor_adjustment_piecewise_t {0.0, 0.0};
-        SensorAdjustment adj = SensorAdjustment(0, 0, 0, nullptr, &parts);
+        sensor_adjustment_point_t point = sensor_adjustment_point_t {0.0, 0.0};
+        SensorAdjustment adj = SensorAdjustment(0, 0, 0, &point);
 
         uint32_t size = adj.serialize(tmp_buffer);
         for (size_t i = 0; i < MAX_NUM_PROGRAMS; i++) {

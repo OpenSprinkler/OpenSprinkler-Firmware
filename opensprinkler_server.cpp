@@ -2463,17 +2463,12 @@ void server_json_sen_adj_main(OTF_PARAMS_DEF) {
         for (size_t i = 0; i < pd.nprograms; i++) {
             if ((adj = os.get_sensor_adjust(i))) {
                 if (adj_count) bfill.emit_p(PSTR(","));
-                bfill.emit_p(PSTR("{\"pid\":$D,\"flags\":$D,\"sid\":$D,\"splits\":$D,\"points\":["), i, adj->flags, adj->sid, adj->splits);
-                for (size_t j = 0; j < adj->splits; j++) {
+                bfill.emit_p(PSTR("{\"pid\":$D,\"flags\":$D,\"sid\":$D,\"point_count\":$D,\"splits\":["), i, adj->flags, adj->sid, adj->point_count);
+                for (int j = 0; j < adj->point_count; j++) {
                     if (j) bfill.emit_p(PSTR(","));
-                    bfill.emit_p(PSTR("$E"), adj->split_points[j]);
+                    bfill.emit_p(PSTR("{\"x\":$E,\"y\":$E}"), adj->points[j].x, adj->points[j].y);
                 }
-                bfill.emit_p(PSTR("],\"parts\":["), i, adj->flags, adj->sid, adj->splits);
-                for (int j = 0; j < adj->splits+1; j++) {
-                    if (j) bfill.emit_p(PSTR(","));
-                    bfill.emit_p(PSTR("{\"scale\":$E,\"offset\":$E}"), adj->piecewise_parts[j].scale, adj->piecewise_parts[j].offset);
-                }
-                bfill.emit_p(PSTR("]}"), i, adj->flags, adj->sid, adj->splits);
+                bfill.emit_p(PSTR("]}"));
                 adj_count += 1;
                 delete adj;
 
@@ -2528,21 +2523,16 @@ void server_change_sen_adj(OTF_PARAMS_DEF) {
     SensorAdjustment *adj = nullptr;
     unsigned long flags = 0;
     unsigned long sid = 255;
-    unsigned long splits = 255;
-    double split_points[SENSOR_ADJUSTMENT_PARTS-1] = {0};
-    sensor_adjustment_piecewise_t piecewise_parts[SENSOR_ADJUSTMENT_PARTS] = {0.0, 0.0};
+    unsigned long point_count = 0;
+    sensor_adjustment_point_t points[SENSOR_ADJUSTMENT_POINTS] = {0.0, 0.0};
     
     if ((adj = os.get_sensor_adjust(pid))) {
         flags = adj->flags;
         sid = adj->sid;
-        splits = adj->splits;
+        point_count = adj->point_count;
 
-        for (size_t i = 0; i <= splits; i++) {
-        if (i < splits) {
-            split_points[i] = adj->split_points[i];
-        }
-
-        piecewise_parts[i] = adj->piecewise_parts[i];
+        for (size_t i = 0; i <= point_count; i++) {
+        points[i] = adj->points[i];
     }
         delete adj;
     }
@@ -2558,66 +2548,32 @@ void server_change_sen_adj(OTF_PARAMS_DEF) {
         if (sid >= MAX_SENSORS) sid = 255;
 	}
 
-    if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("splits"), true)) {
-		splits=strtoul(tmp_buffer, &end, 10);
-        if (*end != '\0') handle_return(HTML_DATA_FORMATERROR);
-        if (splits > SENSOR_ADJUSTMENT_PARTS - 1) handle_return(HTML_DATA_FORMATERROR);
+    if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("points"), true)) {
+        unsigned long i = 0;
+        double x, y;
+        const char *ptr = tmp_buffer;
+        int result;
 
+        while (*ptr != '\0') {
+            if (i >= SENSOR_ADJUSTMENT_POINTS) handle_return(HTML_DATA_FORMATERROR);
 
-        if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("points"), true)) {
-            unsigned long i = 0;
-            double d;
-            const char *ptr = tmp_buffer;
-            int result;
+            result = sscanf(ptr, "%lf,%lf;", &x, &y);
 
-            while (*ptr != '\0') {
-                if (i >= splits) handle_return(HTML_DATA_FORMATERROR);
-
-                result = sscanf(ptr, "%lf;", &d);
-
-                if (result != 1) {
-                    handle_return(HTML_DATA_FORMATERROR);
-                }
-
-                split_points[i++] = d;
-
-                while (*(ptr++) != ';') {}
+            if (result != 2) {
+                handle_return(HTML_DATA_FORMATERROR);
             }
 
-            if (i != splits) handle_return(HTML_DATA_MISSING);
-        } else if (splits > 0) {
-            handle_return(HTML_DATA_MISSING);
+            points[i++] = sensor_adjustment_point_t {x, y};
+
+            while (*(ptr++) != ';') {}
         }
 
-        if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("parts"), true)) {
-            unsigned long i = 0;
-            double d1, d2;
-            const char *ptr = tmp_buffer;
-            int result;
+        point_count = i;
+    }
 
-            while (*ptr != '\0') {
-                if (i >= splits+1) handle_return(HTML_DATA_FORMATERROR);
+    if (point_count == 0) handle_return(HTML_DATA_MISSING);
 
-                result = sscanf(ptr, "%lf,%lf;", &d1, &d2);
-
-                if (result != 2) {
-                    handle_return(HTML_DATA_FORMATERROR);
-                }
-
-                piecewise_parts[i++] = sensor_adjustment_piecewise_t {d1, d2};
-
-                while (*(ptr++) != ';') {}
-            }
-
-            if (i != splits+1) handle_return(HTML_DATA_MISSING);
-        } else {
-            handle_return(HTML_DATA_MISSING);
-        }
-	}
-
-    if (splits == 255) handle_return(HTML_DATA_MISSING);    
-
-    adj = new SensorAdjustment(flags, sid, splits, split_points, piecewise_parts);
+    adj = new SensorAdjustment(flags, sid, point_count, points);
     os.write_sensor_adjust(adj, pid);
     delete adj;
 

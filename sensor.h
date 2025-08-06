@@ -164,15 +164,15 @@ class WeatherSensor : public Sensor {
 };
 
 typedef struct {
-    double scale;
-    double offset;
-} sensor_adjustment_piecewise_t;
+    double x;
+    double y;
+} sensor_adjustment_point_t;
 
-#define SENSOR_ADJUSTMENT_PARTS 4
+#define SENSOR_ADJUSTMENT_POINTS 8
 
 class SensorAdjustment {
 public:
-  SensorAdjustment(uint8_t flags, uint8_t sid, uint8_t splits, double *split_points, sensor_adjustment_piecewise_t *piecewise_parts);
+  SensorAdjustment(uint8_t flags, uint8_t sid, uint8_t point_count, sensor_adjustment_point_t *points);
   SensorAdjustment(char *buf);
   
   double get_adjustment_factor(sensor_memory_t *sensors);
@@ -180,11 +180,10 @@ public:
 
   uint8_t flags;
   uint8_t sid;
-  uint8_t splits;
-  double split_points[SENSOR_ADJUSTMENT_PARTS-1];
-  sensor_adjustment_piecewise_t piecewise_parts[SENSOR_ADJUSTMENT_PARTS];
+  uint8_t point_count;
+  sensor_adjustment_point_t points[SENSOR_ADJUSTMENT_POINTS];
 };
 
-#define SENSOR_ADJUSTMENT_SIZE (3 + (SENSOR_ADJUSTMENT_PARTS * sizeof(sensor_adjustment_piecewise_t)) + ((SENSOR_ADJUSTMENT_PARTS - 1) * sizeof(double)))
+#define SENSOR_ADJUSTMENT_SIZE (3 + (SENSOR_ADJUSTMENT_POINTS * sizeof(sensor_adjustment_point_t)))
 
 #endif //SENSOR_H
