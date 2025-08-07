@@ -2710,6 +2710,7 @@ void OpenSprinkler::load_sensors() {
         for (size_t i = 0; i < MAX_SENSORS; i++) {
             if ((sensor = parse_sensor(file))) {
                 sensors[i].interval = sensor->interval;
+                sensors[i].flags = sensor->flags;
                 sensors[i].next_update = 0;
                 sensors[i].value = sensor->get_inital_value();
                 delete sensor;
@@ -2790,14 +2791,16 @@ void OpenSprinkler::log_sensor(uint8_t sid, float value) {
 
 void OpenSprinkler::poll_sensors() {
     for (uint8_t i = 0; i < MAX_SENSORS; i++) {
-        if (sensors[i].interval) {
+        if (sensors[i].interval && sensors[i].flags & (1 << SENSOR_FLAG_ENABLE)) {
             if ((long)(millis() - sensors[i].next_update) > 0) {
                 Sensor *sensor = get_sensor(i);
                 if (sensor) {
                     sensors[i].value = sensor->get_new_value();
                     delete sensor;
                     sensors[i].next_update = millis() + sensors[i].interval;
-                    os.log_sensor(i, sensors[i].value);
+                    if (sensors[i].flags & (1 << SENSOR_FLAG_LOG)) {
+                        os.log_sensor(i, sensors[i].value);
+                    }
                 }
             }
         }

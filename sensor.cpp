@@ -1,8 +1,8 @@
 #include "sensor.h"
 #include "OpenSprinkler.h"
 
-Sensor::Sensor(unsigned long interval, double min, double max, double scale, double offset, const char *name, SensorUnit unit) :
-interval(interval), min(min), max(max), scale(scale), offset(offset), unit(unit) {
+Sensor::Sensor(unsigned long interval, double min, double max, double scale, double offset, const char *name, SensorUnit unit, uint32_t flags) :
+interval(interval), min(min), max(max), scale(scale), offset(offset), unit(unit), flags(flags) {
     strncpy(this->name, name, SENSOR_NAME_LEN);
     this->name[SENSOR_NAME_LEN-1] = 0;
 }
@@ -41,6 +41,7 @@ uint32_t Sensor::serialize(char *buf) {
     i += SENSOR_NAME_LEN;
     buf[i++] = static_cast<uint8_t>(this->unit);
     i += write_buf<ulong>(buf+i, this->interval);
+    i += write_buf<uint32_t>(buf+i, this->flags);
     i += write_buf<double>(buf+i, this->scale);
     i += write_buf<double>(buf+i, this->offset);
     i += write_buf<double>(buf+i, this->min);
@@ -57,6 +58,7 @@ uint32_t Sensor::_deserialize(char *buf) {
     i += SENSOR_NAME_LEN;
     this->unit = static_cast<SensorUnit>(buf[i++]);
     this->interval = read_buf<ulong>(buf, &i);
+    this->flags = read_buf<uint32_t>(buf, &i);
     this->scale = read_buf<double>(buf, &i);
     this->offset = read_buf<double>(buf, &i);
     this->min = read_buf<double>(buf, &i);
@@ -65,15 +67,15 @@ uint32_t Sensor::_deserialize(char *buf) {
     return i;
 }
 
-EnsembleSensor::EnsembleSensor(unsigned long interval, double min, double max, double scale, double offset, const char* name, SensorUnit unit, sensor_memory_t *sensors, ensemble_children_t *children, uint8_t children_count, EnsembleAction action) : 
-Sensor(interval, min, max, scale, offset, name, unit), 
+EnsembleSensor::EnsembleSensor(unsigned long interval, double min, double max, double scale, double offset, const char* name, SensorUnit unit, uint32_t flags, sensor_memory_t *sensors, ensemble_children_t *children, uint8_t children_count, EnsembleAction action) : 
+Sensor(interval, min, max, scale, offset, name, unit, flags), 
 action(action),
 sensors(sensors) {
     for (size_t i = 0; i < ENSEMBLE_SENSOR_CHILDREN_COUNT; i++) {
         if (i < children_count) {
             this->children[i] = children[i];
         } else {
-            this->children[i].sensor_id = 255;
+            this->children[i] = ensemble_children_t { sensor_id: 255, min: 0.0, max: 0.0, scale: 0.0, offset: 0.0 };
         }
     }
 }
@@ -83,7 +85,7 @@ void EnsembleSensor::emit_extra_json(BufferFiller *bfill) {
     for (size_t i = 0; i < ENSEMBLE_SENSOR_CHILDREN_COUNT; i++) {
         if (i) bfill->emit_p(PSTR(","));
         ensemble_children_t *child = &this->children[i];
-        bfill->emit_p(PSTR("{\"sid\":$D,\"max\":$E,\"min\":$E,\"scale\":$E,\"offset\":$E}"), child->max, child->min, child->scale, child->offset);
+        bfill->emit_p(PSTR("{\"sid\":$D,\"max\":$E,\"min\":$E,\"scale\":$E,\"offset\":$E}"), child->sensor_id, child->max, child->min, child->scale, child->offset);
     }
     bfill->emit_p(PSTR("]}"));
 }
@@ -176,13 +178,14 @@ EnsembleSensor::EnsembleSensor(sensor_memory_t *sensors, char *buf) {
         this->children[j].scale = read_buf<double>(buf, &i);
         this->children[j].offset = read_buf<double>(buf, &i);
     }
+
     this->action = static_cast<EnsembleAction>(buf[i++]);
     this->sensors = sensors;
 }
 
 
-WeatherSensor::WeatherSensor(unsigned long interval, double min, double max, double scale, double offset, const char* name, SensorUnit unit, WeatherGetter weather_getter, WeatherAction action) : 
-Sensor(interval, min, max, scale, offset, name, unit), 
+WeatherSensor::WeatherSensor(unsigned long interval, double min, double max, double scale, double offset, const char* name, SensorUnit unit, uint32_t flags, WeatherGetter weather_getter, WeatherAction action) : 
+Sensor(interval, min, max, scale, offset, name, unit, flags), 
 action(action),
 weather_getter(weather_getter) {}
 
@@ -233,7 +236,7 @@ SensorAdjustment::SensorAdjustment(char *buf) {
 }
 
 double SensorAdjustment::get_adjustment_factor(sensor_memory_t *sensors) {
-    if (this->flags & 1 && this->sid < MAX_SENSORS && sensors[this->sid].interval) {
+    if (this->flags & (1 << SENADJ_FLAG_ENABLE) && this->sid < MAX_SENSORS && sensors[this->sid].interval) {
         double value = sensors[this->sid].value;
         if (value <= this->points[0].x) return this->points[0].y;
         if (value >= this->points[this->point_count-1].x) return this->points[this->point_count-1].y;

@@ -15,6 +15,7 @@
 
 typedef struct {
     ulong interval;
+    uint32_t flags;
     ulong next_update;
     double value;
 } sensor_memory_t;
@@ -62,9 +63,20 @@ enum class SensorUnit {
     MAX_VALUE,
 };
 
+// typedef struct {
+//     unsigned int enabled    : 1;
+//     unsigned int log        : 1;
+//     unsigned int reserved   : 30;
+// } sensor_flags_t;
+
+typedef enum {
+    SENSOR_FLAG_ENABLE = 0,
+    SENSOR_FLAG_LOG,
+} sensor_flags;
+
 class Sensor {
 public:
-  Sensor(unsigned long interval, double min, double max, double scale, double offset, const char *name, SensorUnit unit);
+  Sensor(unsigned long interval, double min, double max, double scale, double offset, const char *name, SensorUnit unit, uint32_t flags);
   Sensor();
   virtual ~Sensor() {}
   
@@ -80,6 +92,8 @@ public:
   double offset = 0.0;
   char name[SENSOR_NAME_LEN] = {0};
   SensorUnit unit = SensorUnit::None;
+
+  uint32_t flags = 0;
   
   SensorType virtual get_sensor_type() = 0;
   double virtual get_inital_value() = 0;
@@ -114,7 +128,7 @@ typedef struct {
 
 class EnsembleSensor : public Sensor {
     public:
-    EnsembleSensor(unsigned long interval, double min, double max, double scale, double offset, const char *name, SensorUnit unit, sensor_memory_t *sensors, ensemble_children_t *children, uint8_t children_count, EnsembleAction action);
+    EnsembleSensor(unsigned long interval, double min, double max, double scale, double offset, const char *name, SensorUnit unit, uint32_t flags, sensor_memory_t *sensors, ensemble_children_t *children, uint8_t children_count, EnsembleAction action);
     EnsembleSensor(sensor_memory_t *sensors, char *buf);
 
     void emit_extra_json(BufferFiller *bfill);
@@ -143,7 +157,7 @@ typedef double (*WeatherGetter)(WeatherAction);
 
 class WeatherSensor : public Sensor {
     public:
-    WeatherSensor(unsigned long interval, double min, double max, double scale, double offset, const char *name, SensorUnit unit, WeatherGetter weather_getter, WeatherAction action);
+    WeatherSensor(unsigned long interval, double min, double max, double scale, double offset, const char *name, SensorUnit unit, uint32_t flags, WeatherGetter weather_getter, WeatherAction action);
     WeatherSensor(WeatherGetter weather_getter, char *buf);
 
     void emit_extra_json(BufferFiller *bfill);
@@ -169,6 +183,10 @@ typedef struct {
 } sensor_adjustment_point_t;
 
 #define SENSOR_ADJUSTMENT_POINTS 8
+
+typedef enum {
+    SENADJ_FLAG_ENABLE = 0,
+} senadj_flags;
 
 class SensorAdjustment {
 public:

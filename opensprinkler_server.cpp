@@ -1994,7 +1994,7 @@ void server_json_sensors_main(OTF_PARAMS_DEF) {
         for (size_t i = 0; i < MAX_SENSORS; i++) {
             if (os.sensors[i].interval && (sensor = os.parse_sensor(file))) {
                 if (sensor_count) bfill.emit_p(PSTR(","));
-                bfill.emit_p(PSTR("{\"sid\":$D,\"name\":\"$S\",\"unit\":$D,\"interval\":$L,\"max\":$E,\"min\":$E,\"scale\":$E,\"offset\":$E,\"value\":$E,\"type\":$D,\"extra\":"), i, sensor->name, static_cast<uint8_t>(sensor->unit), sensor->interval, sensor->max, sensor->min, sensor->scale, sensor->offset, os.sensors[i].value, static_cast<uint8_t>(sensor->get_sensor_type()));
+                bfill.emit_p(PSTR("{\"sid\":$D,\"name\":\"$S\",\"unit\":$D,\"flags\":$D,\"interval\":$L,\"max\":$E,\"min\":$E,\"scale\":$E,\"offset\":$E,\"value\":$E,\"type\":$D,\"extra\":"), i, sensor->name, static_cast<uint8_t>(sensor->unit), sensor->flags, sensor->interval, sensor->max, sensor->min, sensor->scale, sensor->offset, os.sensors[i].value, static_cast<uint8_t>(sensor->get_sensor_type()));
                 sensor->emit_extra_json(&bfill);
                 bfill.emit_p(PSTR("}"));
                 sensor_count += 1;
@@ -2073,6 +2073,7 @@ void server_change_sensor(OTF_PARAMS_DEF) {
     double offset = 0;
     ulong interval = 1000;
     SensorUnit unit = SensorUnit::None;
+    uint32_t flags = 0;
 
     char name[SENSOR_NAME_LEN];
     snprintf(name, SENSOR_NAME_LEN, "Sensor: %d", (int)sid);
@@ -2088,6 +2089,7 @@ void server_change_sensor(OTF_PARAMS_DEF) {
             offset = sensor->offset;
             interval = sensor->interval;
             unit = sensor->unit;
+            flags = sensor->flags;
             delete sensor;
         }
     }
@@ -2137,10 +2139,16 @@ void server_change_sensor(OTF_PARAMS_DEF) {
         if (unit_raw >= (ulong)SensorUnit::MAX_VALUE) handle_return(HTML_DATA_OUTOFBOUND);
         unit = static_cast<SensorUnit>(unit_raw);
     }
+
+    if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("flags"), true)) {
+        flags = strtoul(tmp_buffer, &end, 10);
+        if (*end != '\0') handle_return(HTML_DATA_FORMATERROR);
+    }
     
     Sensor *result_sensor;
     switch (sensor_type) {
         case SensorType::Ensemble: {
+            uint8_t children_count = 0;
             ensemble_children_t children[ENSEMBLE_SENSOR_CHILDREN_COUNT];
             for (size_t i = 0; i < ENSEMBLE_SENSOR_CHILDREN_COUNT; i++) {
                 children[i].sensor_id = 255;
@@ -2181,7 +2189,9 @@ void server_change_sensor(OTF_PARAMS_DEF) {
                     children[i++] = ensemble_children_t {(uint8_t)u, d1, d2, d3, d4};
 
                     while (*(ptr++) != ';') {}
-                }   
+                }
+
+                children_count = i;
             }
             
             if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("action"), true)) {
@@ -2191,7 +2201,7 @@ void server_change_sensor(OTF_PARAMS_DEF) {
                 action = static_cast<EnsembleAction>(action_raw);
             }
 
-            result_sensor = new EnsembleSensor(interval, min, max, scale, offset, (const char*)&name, unit, os.sensors, children, ENSEMBLE_SENSOR_CHILDREN_COUNT, action);
+            result_sensor = new EnsembleSensor(interval, min, max, scale, offset, (const char*)&name, unit, flags, os.sensors, children, children_count, action);
             break;
         }
         case SensorType::ADS1115: {
@@ -2219,7 +2229,7 @@ void server_change_sensor(OTF_PARAMS_DEF) {
                 if (sensor_pin >= 4) handle_return(HTML_DATA_OUTOFBOUND);
             }
 
-            result_sensor = new ADS1115Sensor(interval, min, max, scale, offset, (const char*)&name, unit, os.ads1115_devices, sensor_index, sensor_pin);
+            result_sensor = new ADS1115Sensor(interval, min, max, scale, offset, (const char*)&name, unit, flags, os.ads1115_devices, sensor_index, sensor_pin);
             break;
         }
         case SensorType::Weather: {
@@ -2240,7 +2250,7 @@ void server_change_sensor(OTF_PARAMS_DEF) {
                 action = static_cast<WeatherAction>(action_raw);
             }
 
-            result_sensor = new WeatherSensor(interval, min, max, scale, offset, (const char*)&name, unit, os.get_sensor_weather_data, action);
+            result_sensor = new WeatherSensor(interval, min, max, scale, offset, (const char*)&name, unit, flags, os.get_sensor_weather_data, action);
 
             break;
         }
@@ -2251,6 +2261,7 @@ void server_change_sensor(OTF_PARAMS_DEF) {
     }
 
     os.sensors[sid].interval = interval;
+    os.sensors[sid].flags = flags;
     os.sensors[sid].next_update = 0;
     os.sensors[sid].value = result_sensor->get_inital_value();
     os.write_sensor(result_sensor, sid);
@@ -2452,6 +2463,9 @@ void server_log_sensor(OTF_PARAMS_DEF) {
 
 	handle_return(HTML_OK);
 }
+
+
+// TODO: delete sensor log delete
 
 void server_json_sen_adj_main(OTF_PARAMS_DEF) {
 	bfill.emit_p(PSTR("\"adj\":["));

@@ -80,8 +80,8 @@ void ADS1115::request_pin(uint8_t pin) {
     this->_write_register(0x01, config);
 }
 
-ADS1115Sensor::ADS1115Sensor(unsigned long interval, double min, double max, double scale, double offset, const char* name, SensorUnit unit, ADS1115** sensors, uint8_t sensor_index, uint8_t pin) : 
-Sensor(interval, min, max, scale, offset, name, unit), 
+ADS1115Sensor::ADS1115Sensor(unsigned long interval, double min, double max, double scale, double offset, const char* name, SensorUnit unit, uint32_t flags, ADS1115** sensors, uint8_t sensor_index, uint8_t pin) : 
+Sensor(interval, min, max, scale, offset, name, unit, flags), 
 sensor_index(sensor_index), 
 pin(pin),
 sensors(sensors) {}
