@@ -2466,6 +2466,38 @@ void server_log_sensor(OTF_PARAMS_DEF) {
 
 
 // TODO: delete sensor log delete
+void server_clear_sensor_log(OTF_PARAMS_DEF) {
+#if defined(USE_OTF)
+	if(!process_password(OTF_PARAMS)) return;
+#else
+	char *p = get_buffer;
+#endif
+    for (size_t i = 0; i < SENSOR_LOG_FILE_COUNT; i++) {
+        /* code */
+    }
+
+    os_file_type file;
+
+    uint16_t next = SENSOR_LOG_PER_FILE;
+    for (uint16_t f = 0; f < SENSOR_LOG_FILE_COUNT; f++) {
+        file = os.open_sensor_log(f, FileOpenMode::ReadWrite);
+        if (file) {
+            file_write(file, &next, sizeof(next));
+            for (size_t i = 0; i < SENSOR_LOG_PER_FILE; i++) {
+                file_write(file, tmp_buffer, SENSOR_LOG_ITEM_SIZE);
+            }
+            
+            file_close(file);
+        } else {
+            DEBUG_PRINT("Failed to open sensor log file: ");
+            DEBUG_PRINTLN(f);
+            handle_return(HTML_INTERNAL_ERROR);
+        }
+    }
+    
+
+	handle_return(HTML_SUCCESS);
+}
 
 void server_json_sen_adj_main(OTF_PARAMS_DEF) {
 	bfill.emit_p(PSTR("\"adj\":["));
@@ -2756,6 +2788,7 @@ const char *uris[] PROGMEM = {
     "csn",
     "dsn",
     "lsn",
+    "csl",
     "jsa",
     "csa",
     #endif
@@ -2791,6 +2824,7 @@ URLHandler urls[] = {
     server_change_sensor,     // csn
     server_delete_sensor,     // dsn
     server_log_sensor,        // lsn
+    server_clear_sensor_log,  // csl
     server_json_sen_adj,      // jsa
     server_change_sen_adj,    // csa
     #endif
