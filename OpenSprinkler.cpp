@@ -338,7 +338,7 @@ const unsigned char iopt_max[] PROGMEM = {
 	24,
 	255,
 	100,
-	250,
+	255,
 	255,
 	255,
 	255,
@@ -421,8 +421,8 @@ unsigned char OpenSprinkler::iopts[] = {
 	0,  // latch on volt
 	0,  // latch off volt
 	0,  // notif enable bits 2
-	10,  // imin threshold scaled down by 10 (default 100mA)
-	150, // imax limit scaled down by 10 (default 1500mA)
+	DEFAULT_UNDERCURRENT_THRESHOLD/10, // imin threshold scaled down by 10 (default 100mA)
+	DEFAULT_OVERCURRENT_LIMIT/10,      // imax limit scaled down by 10 (default 1500mA)
 	0,  // reserved 6
 	0,  // reserved 7
 	0,  // reserved 8
@@ -1674,6 +1674,15 @@ int16_t OpenSprinkler::get_on_adj(unsigned char mas) {
 int16_t OpenSprinkler::get_off_adj(unsigned char mas) {
 	int16_t offadj = water_time_decode_signed(masters[mas][MASOPT_OFF_ADJ]);
 	return offadj ? offadj : 1; // if off adj is 0, modify it to +1 to stagger with station
+}
+
+int16_t OpenSprinkler::get_imin() {
+	return iopts[IOPT_I_MIN_THRESHOLD]*10;
+}
+
+int16_t OpenSprinkler::get_imax() {
+	unsigned char i = iopts[IOPT_I_MAX_LIMIT];
+	return (i == 0) ? DEFAULT_OVERCURRENT_LIMIT : (i == 255 ? -1 : i*10);
 }
 
 unsigned char OpenSprinkler::bound_to_master(unsigned char sid, unsigned char mas) {

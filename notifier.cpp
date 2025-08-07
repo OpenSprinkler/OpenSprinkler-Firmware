@@ -450,9 +450,9 @@ void push_message(uint16_t type, uint32_t lval, float fval, uint8_t bval) {
 
 		case NOTIFY_CURR_ALERT:
 			{
-				uint16_t curr = (uint16_t)fval;
-				uint16_t imin = os.iopts[IOPT_I_MIN_THRESHOLD]*10;
-				uint16_t imax = os.iopts[IOPT_I_MAX_LIMIT]*10;
+				int16_t curr = (int16_t)fval;
+				int16_t imin = os.get_imin();
+				int16_t imax = os.get_imax();
 
 				if (os.mqtt.enabled()) {
 					//Format mqtt message

@@ -315,6 +315,8 @@ public:
 	static unsigned char get_master_id(unsigned char mas);
 	static int16_t get_on_adj(unsigned char mas);
 	static int16_t get_off_adj(unsigned char mas);
+	static int16_t get_imin();
+	static int16_t get_imax();
 	static unsigned char is_running(unsigned char sid);
 	static unsigned char get_station_gid(unsigned char sid);
 	static void set_station_gid(unsigned char sid, unsigned char gid);

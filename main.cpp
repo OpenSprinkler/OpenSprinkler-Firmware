@@ -550,19 +550,21 @@ void overcurrent_monitor() {
 #if defined(ARDUINO)
 	// If a zone is turning on, do immediate overcurrent monitoring here for ~50ms
 	if (curr_alert_sid) {
-		time_os_t tn = os.now_tz();
-		uint16_t imax = os.iopts[IOPT_I_MAX_LIMIT]*10;
-		unsigned char sid = curr_alert_sid - 1;
-		for(unsigned char i = 0; i < 5; i++) {
-			uint16_t curr = os.read_current();
-			if(curr > imax) {
-				turn_off_running_station_immediate(sid, tn);
-				notif.add(NOTIFY_CURR_ALERT, sid, curr, CURR_ALERT_TYPE_OVER_STATION);
-				os.status.overcurrent_sid = curr_alert_sid;
-				currpoll_timeout += 1000; // delay currpoll_timeout by 1 second to give time for solenoid to reset
-				break;
-			} else {
-				delay(10);
+		int16_t imax = os.get_imax();
+		if(imax > 0) { // disable overcurrent checking if imax==0
+			time_os_t tn = os.now_tz();
+			unsigned char sid = curr_alert_sid - 1;
+			for(unsigned char i = 0; i < 10; i++) {
+				uint16_t curr = os.read_current();
+				if(curr > imax) {
+					turn_off_running_station_immediate(sid, tn);
+					notif.add(NOTIFY_CURR_ALERT, sid, curr, CURR_ALERT_TYPE_OVER_STATION);
+					os.status.overcurrent_sid = curr_alert_sid;
+					currpoll_timeout += 1000; // delay currpoll_timeout by 1 second to give time for solenoid to reset
+					break;
+				} else {
+					delay(5);
+				}
 			}
 		}
 		curr_alert_sid = 0;
@@ -588,9 +590,9 @@ void do_loop()
 	{
 		ulong tn = millis();
 		if((long)(tn-currpoll_timeout) > 0) { // overflow proof timeout
-			uint16_t curr = os.read_current();
-			uint16_t imax = os.iopts[IOPT_I_MAX_LIMIT]*10;
-			if(curr > imax) {
+			int16_t curr = (int16_t)os.read_current();
+			int16_t imax = os.get_imax();
+			if((imax > 0) && (curr > imax)) {
 				reset_all_stations_immediate(true);
 				notif.add(NOTIFY_CURR_ALERT, 0, curr, CURR_ALERT_TYPE_OVER_SYSTEM);
 				os.status.overcurrent_sid = 255; // 255 indicates system overcurrent
@@ -1329,8 +1331,8 @@ void turn_off_station(unsigned char sid, time_os_t curr_time, unsigned char shif
 	} //else { return; }
 
 	#if defined(ARDUINO)
-	uint16_t current = os.read_current();
-	uint16_t imin = os.iopts[IOPT_I_MIN_THRESHOLD]*10;
+	int16_t current = (int16_t)os.read_current();
+	int16_t imin = os.get_imin();
 	// if current is less than imin threshold and hardware type is AC or DC
 	// send an station undercurrent alert
 	if((current < imin) && (os.hw_type==HW_TYPE_AC || os.hw_type==HW_TYPE_DC)) {
