@@ -24,7 +24,7 @@ else:
 
 Import("env")
 
-if upload_url != "" and upload_password != "":
+if data["upload"]["url"] != "" and data["upload"]["pw"] != "":
     env.Replace(
         UPLOAD_PROTOCOL="custom",
         UPLOAD_FLAGS=[],
