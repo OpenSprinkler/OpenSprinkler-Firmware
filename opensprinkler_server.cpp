@@ -2606,7 +2606,7 @@ void server_change_sen_adj(OTF_PARAMS_DEF) {
 
             result = sscanf(ptr, "%lf,%lf;", &x, &y);
 
-            if (result != 2 || x < last_x) {
+            if (result != 2 || x <= last_x) {
                 handle_return(HTML_DATA_FORMATERROR);
             }
 
