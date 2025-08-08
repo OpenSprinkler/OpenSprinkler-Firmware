@@ -1,3 +1,5 @@
+Import("env")
+
 import os
 import json
 
@@ -22,13 +24,11 @@ else:
     with open("extra_env.json", "r") as f:
         data = json.load(f)
 
-Import("env")
-
 if data["upload"]["url"] != "" and data["upload"]["pw"] != "":
     env.Replace(
         UPLOAD_PROTOCOL="custom",
-        UPLOAD_FLAGS=[],
-        UPLOAD_COMMAND="curl -X POST {url} -F \"file=@$SOURCE\" -F \"pw={pw}\"".format(
+        UPLOADERFLAGS=[],
+        UPLOADCMD="curl -X POST {url} -F \"file=@$SOURCE\" -F \"pw={pw}\"".format(
             url=data["upload"]["url"],
             pw=data["upload"]["pw"]
         )
