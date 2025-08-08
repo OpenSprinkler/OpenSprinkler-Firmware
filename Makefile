@@ -10,10 +10,6 @@ SOURCES=main.cpp OpenSprinkler.cpp notifier.cpp program.cpp opensprinkler_server
 HEADERS=$(wildcard *.h) $(wildcard *.hpp)
 OBJECTS=$(addsuffix .o,$(basename $(SOURCES)))
 
-testmode.h:
-	@echo "Creating missing file: testmode.h"
-	@touch testmode.h
-
 .PHONY: all
 all: testmode.h $(BINARY)
 
@@ -30,3 +26,7 @@ clean:
 .PHONY: container
 container: testmode.h
 	docker build .
+
+testmode.h:
+	@echo "Creating missing file: testmode.h"
+	@touch testmode.h
