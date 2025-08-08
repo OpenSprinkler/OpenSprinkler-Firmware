@@ -11,9 +11,9 @@ HEADERS=$(wildcard *.h) $(wildcard *.hpp)
 OBJECTS=$(addsuffix .o,$(basename $(SOURCES)))
 
 .PHONY: all
-all: $(BINARY)
+all: testmode.h $(BINARY)
 
-%.o: %.cpp %.c $(HEADERS)
+%.o: %.cpp %.c $(HEADERS) testmode.h
 	$(CXX) -c -o "$@" $(CXXFLAGS) "$<"
 
 $(BINARY): $(OBJECTS)
@@ -24,5 +24,9 @@ clean:
 	rm -f $(OBJECTS) $(BINARY)
 
 .PHONY: container
-container:
+container: testmode.h
 	docker build .
+
+testmode.h:
+	@echo "Creating missing file: testmode.h"
+	@touch testmode.h

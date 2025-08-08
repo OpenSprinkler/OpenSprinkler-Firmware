@@ -1,6 +1,8 @@
 #!/bin/bash
 set -e
 
+[ -f testmode.h ] || touch testmode.h
+
 function enable_i2c {
     if command -v raspi-config &> /dev/null; then
     if [[ $(sudo raspi-config nonint get_i2c) -eq 1 ]] ; then

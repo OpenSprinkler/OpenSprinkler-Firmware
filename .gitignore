@@ -10,3 +10,5 @@ build-1284/*
 !build.sh
 !startOpenSprinkler.sh
 !updater.sh
+testmode.h
+extra_env.json
