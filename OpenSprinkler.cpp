@@ -421,8 +421,8 @@ unsigned char OpenSprinkler::iopts[] = {
 	0,  // latch on volt
 	0,  // latch off volt
 	0,  // notif enable bits 2
-	DEFAULT_UNDERCURRENT_THRESHOLD/10, // imin threshold scaled down by 10 (default 100mA)
-	DEFAULT_OVERCURRENT_LIMIT/10,      // imax limit scaled down by 10 (default 1500mA)
+	DEFAULT_UNDERCURRENT_THRESHOLD/10, // imin threshold scaled down by 10
+	DEFAULT_OVERCURRENT_LIMIT/10,      // imax limit scaled down by 10
 	0,  // reserved 6
 	0,  // reserved 7
 	0,  // reserved 8

@@ -453,7 +453,6 @@ void push_message(uint16_t type, uint32_t lval, float fval, uint8_t bval) {
 				int16_t curr = (int16_t)fval;
 				int16_t imin = os.get_imin();
 				int16_t imax = os.get_imax();
-
 				if (os.mqtt.enabled()) {
 					//Format mqtt message
 					switch(bval) {
@@ -463,7 +462,7 @@ void push_message(uint16_t type, uint32_t lval, float fval, uint8_t bval) {
 							if(bval==CURR_ALERT_TYPE_UNDER)
 								snprintf_P(payload, PUSH_PAYLOAD_LEN, PSTR("{\"curr_value\":%d,\"imin_threshold\":%d}"), curr, imin);
 							else
-								snprintf_P(payload, PUSH_PAYLOAD_LEN, PSTR("{\"curr_value\":%d,\"imax_limit\":%d}"), curr, imax);
+								snprintf_P(payload, PUSH_PAYLOAD_LEN, PSTR("{\"curr_value\":%d,\"imax_limit\":%d}"), curr, (imax+OVERCURRENT_INRUSH_EXTRA));
 							break;
 						case CURR_ALERT_TYPE_OVER_SYSTEM:
 							strcpy_P(topic, PSTR("overcurrent"));
@@ -509,7 +508,7 @@ void push_message(uint16_t type, uint32_t lval, float fval, uint8_t bval) {
 						case CURR_ALERT_TYPE_OVER_SYSTEM:
 							strcat_P(postval, PSTR(" OVERCURRENT detected!"));
 							snprintf_P(postval+strlen(postval), TMP_BUFFER_SIZE, PSTR(" | %dmA > imax limit: %dmA. The affected station(s) have been closed."),
-								curr, imax);
+								curr, imax+((bval==CURR_ALERT_TYPE_OVER_STATION)?OVERCURRENT_INRUSH_EXTRA:0));
 							break;
 					}
 

@@ -552,6 +552,7 @@ void overcurrent_monitor() {
 	if (curr_alert_sid) {
 		int16_t imax = os.get_imax();
 		if(imax > 0) { // disable overcurrent checking if imax==0
+			imax += OVERCURRENT_INRUSH_EXTRA; // extra margin for inrush current
 			time_os_t tn = os.now_tz();
 			unsigned char sid = curr_alert_sid - 1;
 			for(unsigned char i = 0; i < 10; i++) {
