@@ -32,6 +32,7 @@
 #include "images.h"
 #include "mqtt.h"
 #include "RCSwitch.h"
+#include <cmath>
 
 #if defined(ARDUINO) // headers for Arduino
 	#include <Arduino.h>
@@ -74,6 +75,14 @@
 
 #if defined(USE_SSD1306)
 	#include "SSD1306Display.h"
+#endif
+
+#if defined(USE_SENSORS)
+#include "sensor.h"
+#endif
+
+#if defined(USE_ADS1115)
+	#include "ads1115.h"
 #endif
 
 #if defined(ARDUINO)
@@ -245,6 +254,15 @@ public:
 	static LiquidCrystal lcd;   // 16x2 character LCD
 #endif
 
+#if defined(USE_ADS1115)
+    static ADS1115 *ads1115_devices[4];
+#endif
+
+#if defined(USE_SENSORS)
+    static sensor_memory_t sensors[MAX_SENSORS];
+    static uint16_t sensor_file_no;
+#endif
+
 #if defined(OSPI)
 	static unsigned char pin_sr_data;  // RPi shift register data pin to handle RPi rev. 1
 #endif
@@ -371,6 +389,21 @@ public:
 	#if defined(USE_OTF)
 	static OTCConfig otc;
 	#endif
+
+    // -- Sensor functions
+    #if defined(USE_SENSORS)
+    static os_file_type open_sensor_log(uint16_t file_no, FileOpenMode mode);
+    static void load_sensors();
+    static Sensor *parse_sensor(os_file_type file);
+    static Sensor *get_sensor(uint8_t index);
+    static void write_sensor(Sensor *sensor, uint8_t index);
+    void log_sensor(uint8_t sid, float value);
+    static void poll_sensors();
+    static SensorAdjustment *get_sensor_adjust(uint8_t index);
+    static void write_sensor_adjust(SensorAdjustment *adj, uint8_t index);
+
+    static double get_sensor_weather_data(WeatherAction action);
+    #endif
 
 	// -- LCD functions
 #if defined(USE_DISPLAY)

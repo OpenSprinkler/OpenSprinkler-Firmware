@@ -45,6 +45,7 @@
 class IOEXP {
 public:
 	IOEXP(uint8_t addr=255) { address = addr; type = IOEXP_TYPE_NONEXIST; }
+    virtual ~IOEXP() {}
 
 	virtual void pinMode(uint8_t pin, uint8_t IOMode) { }
 	virtual uint16_t i2c_read(uint8_t reg) { return 0xFFFF; }
