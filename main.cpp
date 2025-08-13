@@ -851,7 +851,7 @@ void do_loop()
 								unsigned char wl = os.iopts[IOPT_WATER_PERCENTAGE];
 
 								// If historical data is enabled and interval program, overwrite watering percentage with historical one.
-								if (hwt == 100 && prog.type == PROGRAM_TYPE_INTERVAL && scaleVector.size() > 0) {
+								if (mda == 100 && prog.type == PROGRAM_TYPE_INTERVAL && scaleVector.size() > 0) {
 									// Use interval length unless longer than available data
 									if ((unsigned int)prog.days[1]-1 < scaleVector.size()){
 										wl = (unsigned char)scaleVector[prog.days[1]-1];
