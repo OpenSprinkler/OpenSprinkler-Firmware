@@ -2442,7 +2442,7 @@ void OpenSprinkler::nvdata_save() {
 	file_write_block(NVCON_FILENAME, &nvdata, 0, sizeof(NVConData));
 }
 
-void load_wt_monthly(char* wto);
+void parse_wto(char* wto);
 
 /** Load integer options from file */
 void OpenSprinkler::iopts_load() {
@@ -2464,9 +2464,9 @@ void OpenSprinkler::iopts_load() {
 			iopts[IOPT_NTP_IP4] = 0;
 	}
 	populate_master();
-	sopt_load(SOPT_WEATHER_OPTS, tmp_buffer);
-	if(iopts[IOPT_USE_WEATHER]==WEATHER_METHOD_MONTHLY) {
-		load_wt_monthly(tmp_buffer);
+	sopt_load(SOPT_WEATHER_OPTS, tmp_buffer+1); // Leave room for curly brace
+	if(iopts[IOPT_USE_WEATHER]==WEATHER_METHOD_MONTHLY || iopts[IOPT_USE_WEATHER]==WEATHER_METHOD_MANUAL || iopts[IOPT_USE_WEATHER]==WEATHER_METHOD_AUTORAINDELAY){
+		parse_wto(tmp_buffer);
 	}
 }
 

@@ -43,6 +43,7 @@ char wt_scales[TMP_BUFFER_SIZE];
 float scales[TMP_BUFFER_SIZE];
 int wt_errCode = HTTP_RQT_NOT_RECEIVED;
 unsigned char wt_monthly[12] = {100,100,100,100,100,100,100,100,100,100,100,100};
+int dwl = 100;
 
 extern const char *user_agent_string;
 
@@ -80,6 +81,11 @@ static void getweather_callback(char* buffer) {
 			os.iopts_save();
 			os.weather_update_flag |= WEATHER_UPDATE_WL;
 		}
+	} else if (os.iopts[IOPT_USE_WEATHER]==WEATHER_METHOD_MANUAL ||  os.iopts[IOPT_USE_WEATHER]==WEATHER_METHOD_AUTORAINDELAY){
+		// no scale, but is manual or autoRain --> should change to dwl
+		os.iopts[IOPT_WATER_PERCENTAGE] = dwl;
+		os.iopts_save();
+		os.weather_update_flag |= WEATHER_UPDATE_WL;
 	}
 
 	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("sunrise"), true)) {
@@ -191,15 +197,34 @@ void GetWeather() {
 	parseMDA();
 }
 
-void load_wt_monthly(char* wto) {
-	unsigned char i;
-	int p[12];
-	for(i=0;i<12;i++) p[i]=100; // init all to 100
-	sscanf(wto, "\"scales\":[%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d]", p,p+1,p+2,p+3,p+4,p+5,p+6,p+7,p+8,p+9,p+10,p+11);
-	for(i=0;i<12;i++) {
-		if(p[i]<0) p[i]=0;
-		if(p[i]>250) p[i]=250;
-		wt_monthly[i]=p[i];
+void parse_wto(char* wto) {
+	ArduinoJson::JsonDocument doc;
+	if(*(wto+1)){
+		// Wrap in curly braces
+		wto[0] = '{';
+		int len = strlen(wto);
+		wto[len] = '}';
+		wto[len+1] = 0;
+
+		ArduinoJson::DeserializationError error = ArduinoJson::deserializeJson(doc, wto);
+		// Test and parse
+		if (error) {
+			DEBUG_PRINT(F("wto: deserializeJson() failed: "));
+			DEBUG_PRINTLN(error.c_str());
+		} else {
+			if(doc.containsKey("scales")){
+				int p[12];
+				for(unsigned char i=0;i<12;i++){
+					p[i]=doc["scales"][i];
+					if(p[i]<0) p[i]=0;
+					if(p[i]>250) p[i]=250;
+					wt_monthly[i]=p[i];
+				}
+			}
+			if(doc.containsKey("dwl")){
+				dwl = doc["dwl"];
+			}
+		}
 	}
 }
 

@@ -40,6 +40,7 @@ extern int wt_errCode;
 extern std::vector<float> scaleVector;
 extern unsigned int mda;
 extern unsigned char wt_monthly[];
-void load_wt_monthly(char* wto);
+extern int dwl;
+void parse_wto(char* wto);
 void apply_monthly_adjustment(time_os_t curr_time);
 #endif  // _WEATHER_H

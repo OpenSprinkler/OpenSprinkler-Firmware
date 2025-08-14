@@ -1179,11 +1179,13 @@ void check_weather() {
 		// todo: the firmware currently needs to be explicitly aware of which adjustment methods, this is not ideal
 		os.checkwt_success_lasttime = 0;
 		unsigned char method = os.iopts[IOPT_USE_WEATHER];
-		if(!(method==WEATHER_METHOD_MANUAL || method==WEATHER_METHOD_AUTORAINDELY || method==WEATHER_METHOD_MONTHLY)) {
+		if(!(method==WEATHER_METHOD_MANUAL || method==WEATHER_METHOD_AUTORAINDELAY || method==WEATHER_METHOD_MONTHLY)) {
 			os.iopts[IOPT_WATER_PERCENTAGE] = 100; // reset watering percentage to 100%
 			wt_rawData[0] = 0; 		// reset wt_rawData, errCode, and scaleVector
 			wt_errCode = HTTP_RQT_NOT_RECEIVED;
 			scaleVector.clear();
+		}else{
+			os.iopts[IOPT_WATER_PERCENTAGE] = dwl;
 		}
 	} else if (!os.checkwt_lasttime || (ntz > os.checkwt_lasttime + CHECK_WEATHER_TIMEOUT)) {
 		os.checkwt_lasttime = ntz;
