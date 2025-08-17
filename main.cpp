@@ -545,6 +545,15 @@ void handle_web_request(char *p);
 /** Main Loop */
 void do_loop()
 {
+	// Initialize fertigation queue on first run
+	static bool fertigation_initialized = false;
+	if (!fertigation_initialized) {
+		for (unsigned char i = 0; i < MAX_NUM_STATIONS; i++) {
+			os.fertigation_queue[i].active = 0;
+		}
+		fertigation_initialized = true;
+	}
+	
 	static ulong flowpoll_timeout=0;
 	if(os.iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_FLOW) {
 	// handle flow sensor using polling every 1ms (maximum freq 1/(2*1ms)=500Hz)
@@ -1066,6 +1075,9 @@ void do_loop()
 		// activate/deactivate valves
 		os.apply_all_station_bits();
 
+		// process fertigation queue
+		os.process_fertigation();
+
 #if defined(USE_DISPLAY)
 		// process LCD display
 		if (!ui_state) { os.lcd_print_screen(ui_anim_chars[(unsigned long)curr_time%3]); }
@@ -1194,6 +1206,24 @@ void turn_on_station(unsigned char sid, ulong duration) {
 
 	if (os.set_station_bit(sid, 1, duration)) {
 		notif.add(NOTIFY_STATION_ON, sid, duration);
+		
+		// Handle fertigation for programmed runs
+		if (pd.station_qid[sid] != 255) {
+			RuntimeQueueStruct* q = pd.queue + pd.station_qid[sid];
+			FertigationStationData fdata;
+			os.get_fertigation_data(sid, &fdata);
+			
+			if (fdata.enabled) {
+				// Calculate fertigation duration for this program
+				uint16_t fert_duration = os.calculate_fertigation_time(sid, q->pid);
+				if (fdata.mode == FERT_MODE_PERCENTAGE) {
+					// For percentage mode, calculate based on actual station runtime
+					fert_duration = (duration * fdata.percentage) / 100;
+				}
+				// Schedule fertigation with proper program ID
+				os.schedule_fertigation(sid, q->pid, fert_duration, duration);
+			}
+		}
 	}
 }
 

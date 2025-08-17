@@ -986,11 +986,35 @@ void server_change_program(OTF_PARAMS_DEF) {
 	}
 	pv++; // this should be a ']'
 	pv++; // this should be a ']'
+	
+	// parse fertigation durations (optional)
+	// Check if there's fertigation data in the request
+	if (*pv == ',' && *(pv+1) == '[') {
+		pv += 2; // skip ',['
+		for (i = 0; i < os.nstations; i++) {
+			prog.fertigation_durations[i] = parse_listdata(&pv);
+		}
+		pv++; // this should be a ']'
+	} else {
+		// Initialize fertigation durations to 0 if not provided
+		for (i = 0; i < MAX_NUM_STATIONS; i++) {
+			prog.fertigation_durations[i] = 0;
+		}
+	}
+	
 	// parse program name
 
 	// i should be equal to os.nstations at this point
 	for(;i<MAX_NUM_STATIONS;i++) {
 		prog.durations[i] = 0;		 // clear unused field
+		if (i < os.nstations) {
+			// Only clear fertigation_durations for unused stations if we parsed them
+			if (prog.fertigation_durations[i] == 0) {
+				prog.fertigation_durations[i] = 0;
+			}
+		} else {
+			prog.fertigation_durations[i] = 0;
+		}
 	}
 
 	if (pid==-1) {
@@ -1118,7 +1142,12 @@ void server_json_programs_main(OTF_PARAMS_DEF) {
 		for (i=0; i<os.nstations-1; i++) {
 			bfill.emit_p(PSTR("$L,"),(unsigned long)prog.durations[i]);
 		}
-		bfill.emit_p(PSTR("$L],\""),(unsigned long)prog.durations[i]); // this is the last element
+		bfill.emit_p(PSTR("$L],["),(unsigned long)prog.durations[i]); // this is the last element
+		// fertigation durations
+		for (i=0; i<os.nstations-1; i++) {
+			bfill.emit_p(PSTR("$D,"), prog.fertigation_durations[i]);
+		}
+		bfill.emit_p(PSTR("$D],\""), prog.fertigation_durations[i]); // this is the last element
 		// program name
 		strncpy(tmp_buffer, prog.name, PROGRAM_NAME_SIZE);
 		tmp_buffer[PROGRAM_NAME_SIZE] = 0;	// make sure the string ends
@@ -2029,6 +2058,164 @@ static unsigned long freeHeap() {
 }
 #endif
 
+// ==========================================
+// ====== FERTIGATION API FUNCTIONS =======
+// ==========================================
+
+/** Output fertigation data in JSON format */
+void server_json_fertigation(OTF_PARAMS_DEF) {
+#if defined(USE_OTF)
+	if(!process_password(OTF_PARAMS)) return;
+#else
+	if(!process_password()) return;
+#endif
+
+	rewind_ether_buffer();
+	bfill.emit_p(PSTR("{\"result\":1,\"fertigation\":["));
+	
+	for(unsigned char sid=0; sid<os.nstations; sid++) {
+		FertigationStationData fdata;
+		os.get_fertigation_data(sid, &fdata);
+		
+		if(sid>0) bfill.emit_p(PSTR(","));
+		bfill.emit_p(PSTR("{\"enabled\":$D,\"mode\":$D,\"duration\":$D,\"percentage\":$D,\"fert_sid\":$D}"),
+			fdata.enabled, fdata.mode, fdata.duration, fdata.percentage, fdata.fertigation_sid);
+	}
+	bfill.emit_p(PSTR("]}"));
+	
+#if defined(USE_OTF)
+	print_header(OTF_PARAMS, true, bfill.position());
+	res.writeBodyData(ether_buffer, bfill.position());
+#else
+	send_packet();
+#endif
+}
+
+/** Change fertigation settings
+ * Parameters:
+ * sid: station index
+ * en: enable fertigation (0 or 1)
+ * mode: fertigation mode (0=time, 1=percentage)
+ * dur: duration in seconds (for time mode)
+ * pct: percentage (for percentage mode)
+ * fsid: fertigation station ID
+ */
+void server_change_fertigation(OTF_PARAMS_DEF) {
+#if defined(USE_OTF)
+	if(!process_password(OTF_PARAMS)) return;
+#else
+	if(!process_password()) return;
+#endif
+
+	unsigned char sid = 255;
+	if(findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("sid"), true)) {
+		sid = (unsigned char)atoi(tmp_buffer);
+	}
+	
+	if(sid >= os.nstations) {
+		handle_return(HTML_DATA_OUTOFBOUND);
+		return;
+	}
+	
+	FertigationStationData fdata;
+	os.get_fertigation_data(sid, &fdata);
+	
+	// Update fertigation settings based on parameters
+	if(findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("en"), true)) {
+		fdata.enabled = (unsigned char)atoi(tmp_buffer);
+	}
+	
+	if(findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("mode"), true)) {
+		fdata.mode = (unsigned char)atoi(tmp_buffer);
+	}
+	
+	if(findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("dur"), true)) {
+		fdata.duration = (uint16_t)atoi(tmp_buffer);
+		if(fdata.duration > FERT_MAX_DURATION) fdata.duration = FERT_MAX_DURATION;
+	}
+	
+	if(findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("pct"), true)) {
+		fdata.percentage = (unsigned char)atoi(tmp_buffer);
+		if(fdata.percentage > FERT_MAX_PERCENTAGE) fdata.percentage = FERT_MAX_PERCENTAGE;
+	}
+	
+	if(findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("fsid"), true)) {
+		unsigned char new_fsid = (unsigned char)atoi(tmp_buffer);
+		if(new_fsid >= os.nstations) new_fsid = 0;
+		
+		// Prevent setting a station as its own fertigation station
+		if(new_fsid == sid) {
+			handle_return(HTML_DATA_OUTOFBOUND);
+			return;
+		}
+		
+		// Check if the target station is already a master station
+		if(os.is_master_station(new_fsid)) {
+			handle_return(HTML_DATA_OUTOFBOUND);
+			return;
+		}
+		
+		fdata.fertigation_sid = new_fsid;
+	}
+	
+	os.set_fertigation_data(sid, &fdata);
+	
+	handle_return(HTML_SUCCESS);
+}
+
+/** Manual fertigation run
+ * Parameters:
+ * sid: station index
+ * t: timer (duration in seconds)
+ * fert: enable fertigation (0 or 1)
+ */
+void server_manual_fertigation(OTF_PARAMS_DEF) {
+#if defined(USE_OTF)
+	if(!process_password(OTF_PARAMS)) return;
+#else
+	if(!process_password()) return;
+#endif
+
+	unsigned char sid = 255;
+	uint16_t timer = 0;
+	unsigned char enable_fert = 0;
+	
+	if(findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("sid"), true)) {
+		sid = (unsigned char)atoi(tmp_buffer);
+	}
+	
+	if(findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("t"), true)) {
+		timer = (uint16_t)atoi(tmp_buffer);
+	}
+	
+	if(findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("fert"), true)) {
+		enable_fert = (unsigned char)atoi(tmp_buffer);
+	}
+	
+	if(sid >= os.nstations || timer == 0) {
+		handle_return(HTML_DATA_OUTOFBOUND);
+		return;
+	}
+	
+	// Turn on the station
+	if(os.set_station_bit(sid, 1, timer)) {
+		// If fertigation is requested and station doesn't have fertigation enabled,
+		// temporarily enable it for this run
+		if(enable_fert) {
+			FertigationStationData fdata;
+			os.get_fertigation_data(sid, &fdata);
+			
+			if(!fdata.enabled && fdata.fertigation_sid < os.nstations) {
+				// Calculate fertigation duration (use 30% of runtime as default)
+				uint16_t fert_duration = (timer * 30) / 100;
+				os.schedule_fertigation(sid, 255, fert_duration, timer);
+			}
+		}
+	}
+	
+	handle_return(HTML_SUCCESS);
+}
+
 void server_json_debug(OTF_PARAMS_DEF) {
 #if defined(USE_OTF)
 	rewind_ether_buffer();
@@ -2125,6 +2312,9 @@ const char _url_keys[] PROGMEM =
 	"ja"
 	"pq"
 	"db"
+	"jf"  // json fertigation data
+	"cf"  // change fertigation settings
+	"mf"  // manual fertigation run
 #if defined(ARDUINO)
 	//"ff"
 #endif
@@ -2155,6 +2345,9 @@ URLHandler urls[] = {
 	server_json_all,        // ja
 	server_pause_queue,     // pq
 	server_json_debug,      // db
+	server_json_fertigation,// jf
+	server_change_fertigation,// cf
+	server_manual_fertigation,// mf
 #if defined(ARDUINO)
 	//server_fill_files,
 #endif

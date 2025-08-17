@@ -101,6 +101,9 @@ public:
 
 	uint16_t durations[MAX_NUM_STATIONS];  // duration / water time of each station
 
+	// fertigation overrides: per-program fertigation duration overrides (0 = use station default)
+	uint16_t fertigation_durations[MAX_NUM_STATIONS];
+
 	char name[PROGRAM_NAME_SIZE];
 
 	int16_t daterange[2] = {MIN_ENCODED_DATE, MAX_ENCODED_DATE}; // date range: start date, end date

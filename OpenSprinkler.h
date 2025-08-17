@@ -203,6 +203,16 @@ struct HTTPStationData {
 	unsigned char data[STATION_SPECIAL_DATA_SIZE];
 };
 
+/** Fertigation station data structures - Must fit in STATION_SPECIAL_DATA_SIZE */
+struct FertigationStationData {
+	unsigned char enabled;           // Fertigation enabled for this station
+	unsigned char mode;              // 0=time-based, 1=percentage-based
+	uint16_t duration;               // Duration in seconds (time mode)
+	unsigned char percentage;        // Percentage 0-100 (percentage mode)
+	unsigned char fertigation_sid;   // Station ID that acts as fertigation valve
+	unsigned char reserved[STATION_SPECIAL_DATA_SIZE-6]; // Reserved for future use
+};
+
 /** Volatile controller status bits */
 struct ConStatus {
 	unsigned char enabled:1;         // operation enable (when set, controller operation is enabled)
@@ -310,6 +320,7 @@ public:
 	static unsigned char get_station_type(unsigned char sid); // get station type
 	static unsigned char is_sequential_station(unsigned char sid);
 	static unsigned char is_master_station(unsigned char sid);
+	static unsigned char is_fertigation_station(unsigned char sid);
 	static unsigned char bound_to_master(unsigned char sid, unsigned char mas);
 	static unsigned char get_master_id(unsigned char mas);
 	static int16_t get_on_adj(unsigned char mas);
@@ -363,6 +374,24 @@ public:
 	static void switch_special_station(unsigned char sid, unsigned char value, uint16_t dur=0); // swtich special station
 	static void clear_all_station_bits(); // clear all station bits
 	static void apply_all_station_bits(); // apply all station bits (activate/deactive values)
+
+	// -- fertigation functions
+	struct FertigationQueue {
+		unsigned char station_id;           // Main station ID
+		unsigned char fertigation_sid;      // Fertigation station ID
+		time_os_t start_time;              // Fertigation start time
+		uint16_t duration;                 // Fertigation duration in seconds
+		unsigned char active;              // Queue entry active flag
+		unsigned char program_id;          // Program ID for logging
+	};
+	
+	static FertigationQueue fertigation_queue[MAX_NUM_STATIONS];
+	static void process_fertigation();                                    // Process fertigation queue
+	static void schedule_fertigation(unsigned char sid, unsigned char pid, uint16_t duration, uint16_t station_duration); // Schedule fertigation
+	static void stop_fertigation(unsigned char sid);                     // Stop fertigation for a station
+	static uint16_t calculate_fertigation_time(unsigned char sid, unsigned char pid); // Calculate fertigation time
+	static void get_fertigation_data(unsigned char sid, FertigationStationData* data); // Get fertigation data
+	static void set_fertigation_data(unsigned char sid, FertigationStationData* data); // Set fertigation data
 
 	static int8_t send_http_request(uint32_t ip4, uint16_t port, char* p, void(*callback)(char*)=NULL, bool usessl=false, uint16_t timeout=5000);
 	static int8_t send_http_request(const char* server, uint16_t port, char* p, void(*callback)(char*)=NULL, bool usessl=false, uint16_t timeout=5000);
