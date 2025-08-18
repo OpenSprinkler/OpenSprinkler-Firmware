@@ -1,7 +1,7 @@
 #include "sensor.h"
 #include "OpenSprinkler.h"
 
-const char *get_sensor_unit_group_name(SensorUnitGroup group) {
+const char *enum_string(SensorUnitGroup group) {
     switch (group) {
         case SensorUnitGroup::None:
             return PSTR("No Group");
@@ -24,6 +24,29 @@ const char *get_sensor_unit_group_name(SensorUnitGroup group) {
         case SensorUnitGroup::MAX_VALUE:
             return nullptr;
     }
+
+    return nullptr;
+}
+
+const char *enum_string(EnsembleAction action) {
+    switch (action) {
+        case EnsembleAction::Min: return PSTR("Min");
+        case EnsembleAction::Max: return PSTR("Max");
+        case EnsembleAction::Average: return PSTR("Average");
+        case EnsembleAction::Sum: return PSTR("Sum");
+        case EnsembleAction::Product: return PSTR("Product");
+        case EnsembleAction::MAX_VALUE: return nullptr;
+    }
+
+    return nullptr;
+}
+
+const char *enum_string(WeatherAction action) {
+    switch (action) {
+        case WeatherAction::MAX_VALUE: return nullptr;
+    }
+
+    return nullptr;
 }
 
 const char* get_sensor_unit_name(SensorUnit unit) {
@@ -95,6 +118,8 @@ const char* get_sensor_unit_name(SensorUnit unit) {
     case SensorUnit::MAX_VALUE:
         return nullptr;
     }
+
+    return nullptr;
 }
 
 const char* get_sensor_unit_short(SensorUnit unit) {
@@ -166,6 +191,8 @@ const char* get_sensor_unit_short(SensorUnit unit) {
     case SensorUnit::MAX_VALUE:
         return nullptr;
     }
+
+    return nullptr;
 }
 
 const SensorUnitGroup get_sensor_unit_group(SensorUnit unit) {
@@ -237,6 +264,8 @@ const SensorUnitGroup get_sensor_unit_group(SensorUnit unit) {
     case SensorUnit::MAX_VALUE:
         return SensorUnitGroup::MAX_VALUE;
     }
+
+    return SensorUnitGroup::MAX_VALUE;
 }
 
 const ulong get_sensor_unit_index(SensorUnit unit) {
@@ -308,6 +337,8 @@ const ulong get_sensor_unit_index(SensorUnit unit) {
     case SensorUnit::MAX_VALUE:
         return 0;
     }
+
+    return 0;
 }
 
 Sensor::Sensor(unsigned long interval, double min, double max, double scale, double offset, const char* name, SensorUnit unit, uint32_t flags) :

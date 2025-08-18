@@ -76,12 +76,6 @@ enum class SensorUnit {
     MAX_VALUE,
 };
 
-const char *get_sensor_unit_group_name(SensorUnitGroup group);
-const char* get_sensor_unit_name(SensorUnit unit);
-const char* get_sensor_unit_short(SensorUnit unit);
-const SensorUnitGroup get_sensor_unit_group(SensorUnit unit);
-const ulong get_sensor_unit_index(SensorUnit unit);
-
 typedef enum {
     SENSOR_FLAG_ENABLE = 0,
     SENSOR_FLAG_LOG,
@@ -218,5 +212,14 @@ public:
 };
 
 #define SENSOR_ADJUSTMENT_SIZE (3 + (SENSOR_ADJUSTMENT_POINTS * sizeof(sensor_adjustment_point_t)))
+
+const char *enum_string(SensorUnitGroup group);
+const char *enum_string(EnsembleAction action);
+const char *enum_string(WeatherAction action);
+
+const char* get_sensor_unit_name(SensorUnit unit);
+const char* get_sensor_unit_short(SensorUnit unit);
+const SensorUnitGroup get_sensor_unit_group(SensorUnit unit);
+const ulong get_sensor_unit_index(SensorUnit unit);
 
 #endif //SENSOR_H

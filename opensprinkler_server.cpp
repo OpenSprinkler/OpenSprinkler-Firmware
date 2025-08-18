@@ -2533,6 +2533,30 @@ void server_json_sen_adj_main(OTF_PARAMS_DEF) {
 	bfill.emit_p(PSTR("],\"count\":$D}"), adj_count);
 }
 
+template <typename T>
+void bfill_enum_values(const char *name) {
+    static_assert(std::is_enum_v<T>, "T must be an enum type");
+
+    bool needs_comma = false;
+
+    bfill.emit_p(PSTR("{\"name\":\"$S\",\"value\":["), name);
+
+    for (size_t i = 0; i < static_cast<size_t>(T::MAX_VALUE); ++i) {
+        if (needs_comma) {
+            bfill.emit_p(PSTR(","));
+            needs_comma = false;
+        }
+
+        const char* str = enum_string(static_cast<T>(i));
+        if (str) {
+            bfill.emit_p(PSTR("\"$S\""), str);
+            needs_comma = true;
+        }
+    }
+
+    bfill.emit_p(PSTR("]}"));
+}
+
 void server_json_sensor_description_main(OTF_PARAMS_DEF) {
 	bfill.emit_p(PSTR("\"sensor\":["));
     for (uint8_t i = 0; i < static_cast<uint8_t>(SensorType::MAX_VALUE)-1; i++) {
@@ -2560,13 +2584,12 @@ void server_json_sensor_description_main(OTF_PARAMS_DEF) {
     }
     
     bfill.emit_p(PSTR("],\"enums\":["));
-    bfill.emit_p(PSTR("{\"name\":\"SensorUnitGroup\",\"value\":["));
-    for (uint8_t i = 0; i < static_cast<uint8_t>(SensorUnitGroup::MAX_VALUE)-1; i++) {
-        if (i) bfill.emit_p(PSTR(","));
-        bfill.emit_p(PSTR("\"$S\""), get_sensor_unit_group_name(static_cast<SensorUnitGroup>(i)));
-    }
+    bfill_enum_values<SensorUnitGroup>(PSTR("SensorUnitGroup"));
+    bfill.emit_p(PSTR(","));
+    bfill_enum_values<EnsembleAction>(PSTR("EnsembleAction"));
+    bfill.emit_p(PSTR(","));
+    bfill_enum_values<WeatherAction>(PSTR("WeatherAction"));
 	bfill.emit_p(PSTR("]}"));
-	bfill.emit_p(PSTR("}"));
 }
 
 /** Sensor status */
