@@ -27,9 +27,21 @@ enum class SensorType {
     MAX_VALUE,
 };
 
+enum class SensorUnitGroup {
+    None,
+    Temperature,
+    Length,
+    Volume,
+    Light,
+    Energy,
+    Velocity,
+    Pressure,
+    Flow,
+    MAX_VALUE,
+};
+
 enum class SensorUnit {
     None,
-    UserDefined,
     Celsius,
     Fahrenheit,
     Kelvin,
@@ -44,30 +56,31 @@ enum class SensorUnit {
     Lumen,
     Milivolt,
     Volt,
-    Miliamp,
-    Amp,
+    Miliampere,
+    Ampere,
     Percent,
     MilesPerHour,
     KilometersPerHour,
-    MetersPerSection,
+    MetersPerSecond,
     DialetricConstant,
     PartsPerMillion,
     Ohm,
     Miliohm,
     Kiloohm,
-    Barr, // Pressure
+    Bar,
     Kilopascal,
     Pascal,
+    Torr,
     LitersPerSecond,
     GallonsPerSecond,
     MAX_VALUE,
 };
 
-// typedef struct {
-//     unsigned int enabled    : 1;
-//     unsigned int log        : 1;
-//     unsigned int reserved   : 30;
-// } sensor_flags_t;
+const char *get_sensor_unit_group_name(SensorUnitGroup group);
+const char* get_sensor_unit_name(SensorUnit unit);
+const char* get_sensor_unit_short(SensorUnit unit);
+const SensorUnitGroup get_sensor_unit_group(SensorUnit unit);
+const ulong get_sensor_unit_index(SensorUnit unit);
 
 typedef enum {
     SENSOR_FLAG_ENABLE = 0,
@@ -132,6 +145,7 @@ class EnsembleSensor : public Sensor {
     EnsembleSensor(sensor_memory_t *sensors, char *buf);
 
     void emit_extra_json(BufferFiller *bfill);
+    static void emit_description_json(BufferFiller *bfill);
 
     SensorType get_sensor_type() {
         return SensorType::Ensemble;
@@ -161,6 +175,7 @@ class WeatherSensor : public Sensor {
     WeatherSensor(WeatherGetter weather_getter, char *buf);
 
     void emit_extra_json(BufferFiller *bfill);
+    static void emit_description_json(BufferFiller *bfill);
 
     SensorType get_sensor_type() {
         return SensorType::Weather;

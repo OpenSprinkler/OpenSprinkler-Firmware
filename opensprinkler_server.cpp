@@ -2217,16 +2217,13 @@ void server_change_sensor(OTF_PARAMS_DEF) {
                 }
             }
 
-            if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("index"), true)) {
-                sensor_index = strtoul(tmp_buffer, &end, 10);
-                if (*end != '\0') handle_return(HTML_DATA_FORMATERROR);
-                if (sensor_index >= 4) handle_return(HTML_DATA_OUTOFBOUND);
-            }
-            
             if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("pin"), true)) {
-                sensor_pin = strtoul(tmp_buffer, &end, 10);
+                ulong raw_sensor_pin = strtoul(tmp_buffer, &end, 10);
                 if (*end != '\0') handle_return(HTML_DATA_FORMATERROR);
-                if (sensor_pin >= 4) handle_return(HTML_DATA_OUTOFBOUND);
+                if (raw_sensor_pin == 0 || raw_sensor_pin > 16) handle_return(HTML_DATA_OUTOFBOUND);
+                raw_sensor_pin -= 1;
+                sensor_index = raw_sensor_pin >> 2;
+                sensor_pin = raw_sensor_pin & 0b11;
             }
 
             result_sensor = new ADS1115Sensor(interval, min, max, scale, offset, (const char*)&name, unit, flags, os.ads1115_devices, sensor_index, sensor_pin);
@@ -2536,6 +2533,42 @@ void server_json_sen_adj_main(OTF_PARAMS_DEF) {
 	bfill.emit_p(PSTR("],\"count\":$D}"), adj_count);
 }
 
+void server_json_sensor_description_main(OTF_PARAMS_DEF) {
+	bfill.emit_p(PSTR("\"sensor\":["));
+    for (uint8_t i = 0; i < static_cast<uint8_t>(SensorType::MAX_VALUE)-1; i++) {
+        if (i) bfill.emit_p(PSTR(","));
+        switch (static_cast<SensorType>(i)) {
+            case SensorType::Ensemble:
+                EnsembleSensor::emit_description_json(&bfill);
+                break;
+            case SensorType::ADS1115:
+                ADS1115Sensor::emit_description_json(&bfill);
+                break;
+            case SensorType::Weather:
+                WeatherSensor::emit_description_json(&bfill);
+                break;
+            case SensorType::MAX_VALUE:
+                break;
+        }
+    }
+
+    bfill.emit_p(PSTR("],\"units\":["));
+    for (uint8_t i = 0; i < static_cast<uint8_t>(SensorUnit::MAX_VALUE)-1; i++) {
+        if (i) bfill.emit_p(PSTR(","));
+        SensorUnit unit = static_cast<SensorUnit>(i);
+        bfill.emit_p(PSTR("{\"name\":\"$S\",\"short\":\"$S\",\"group\":\"$D\",\"index\":\"$D\"}"), get_sensor_unit_name(unit), get_sensor_unit_short(unit), get_sensor_unit_group(unit), get_sensor_unit_index(unit));
+    }
+    
+    bfill.emit_p(PSTR("],\"enums\":["));
+    bfill.emit_p(PSTR("{\"name\":\"SensorUnitGroup\",\"value\":["));
+    for (uint8_t i = 0; i < static_cast<uint8_t>(SensorUnitGroup::MAX_VALUE)-1; i++) {
+        if (i) bfill.emit_p(PSTR(","));
+        bfill.emit_p(PSTR("\"$S\""), get_sensor_unit_group_name(static_cast<SensorUnitGroup>(i)));
+    }
+	bfill.emit_p(PSTR("]}"));
+	bfill.emit_p(PSTR("}"));
+}
+
 /** Sensor status */
 void server_json_sen_adj(OTF_PARAMS_DEF)
 {
@@ -2658,6 +2691,8 @@ void server_json_all(OTF_PARAMS_DEF) {
 	server_json_sensors_main(OTF_PARAMS);
 	bfill.emit_p(PSTR(",\"senadj\":{"));
 	server_json_sen_adj_main(OTF_PARAMS);
+	bfill.emit_p(PSTR(",\"sensor_desc\":{"));
+	server_json_sensor_description_main(OTF_PARAMS);
     #endif
 	bfill.emit_p(PSTR("}"));
 	handle_return(HTML_OK);

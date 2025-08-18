@@ -55,7 +55,9 @@ class ADS1115Sensor : public Sensor {
     ADS1115Sensor(ADS1115 **sensors, char *buf);
 
     void emit_extra_json(BufferFiller *bfill);
-
+    static void emit_description_json(BufferFiller *bfill);
+    
+    
     SensorType get_sensor_type() {
         return SensorType::ADS1115;
     }
