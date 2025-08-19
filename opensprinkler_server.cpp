@@ -2539,7 +2539,7 @@ void bfill_enum_values(const char *name) {
 
     bool needs_comma = false;
 
-    bfill.emit_p(PSTR("{\"name\":\"$S\",\"value\":["), name);
+    bfill.emit_p(PSTR("\"$S\":["), name);
 
     for (size_t i = 0; i < static_cast<size_t>(T::MAX_VALUE); ++i) {
         if (needs_comma) {
@@ -2554,7 +2554,7 @@ void bfill_enum_values(const char *name) {
         }
     }
 
-    bfill.emit_p(PSTR("]}"));
+    bfill.emit_p(PSTR("]"));
 }
 
 void server_json_sensor_description_main(OTF_PARAMS_DEF) {
@@ -2580,16 +2580,16 @@ void server_json_sensor_description_main(OTF_PARAMS_DEF) {
     for (uint8_t i = 0; i < static_cast<uint8_t>(SensorUnit::MAX_VALUE)-1; i++) {
         if (i) bfill.emit_p(PSTR(","));
         SensorUnit unit = static_cast<SensorUnit>(i);
-        bfill.emit_p(PSTR("{\"name\":\"$S\",\"short\":\"$S\",\"group\":\"$D\",\"index\":\"$D\"}"), get_sensor_unit_name(unit), get_sensor_unit_short(unit), get_sensor_unit_group(unit), get_sensor_unit_index(unit));
+        bfill.emit_p(PSTR("{\"name\":\"$S\",\"short\":\"$S\",\"group\":$D,\"index\":$D,\"value\":$D}"), get_sensor_unit_name(unit), get_sensor_unit_short(unit), get_sensor_unit_group(unit), get_sensor_unit_index(unit), i);
     }
     
-    bfill.emit_p(PSTR("],\"enums\":["));
+    bfill.emit_p(PSTR("],\"enums\":{"));
     bfill_enum_values<SensorUnitGroup>(PSTR("SensorUnitGroup"));
     bfill.emit_p(PSTR(","));
     bfill_enum_values<EnsembleAction>(PSTR("EnsembleAction"));
     bfill.emit_p(PSTR(","));
     bfill_enum_values<WeatherAction>(PSTR("WeatherAction"));
-	bfill.emit_p(PSTR("]}"));
+	bfill.emit_p(PSTR("}}"));
 }
 
 /** Sensor status */
