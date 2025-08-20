@@ -79,6 +79,7 @@ enum class SensorUnit {
 typedef enum {
     SENSOR_FLAG_ENABLE = 0,
     SENSOR_FLAG_LOG,
+    SENSOR_FLAG_COUNT
 } sensor_flags;
 
 class Sensor {
