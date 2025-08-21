@@ -91,7 +91,7 @@ void ADS1115Sensor::emit_extra_json(BufferFiller *bfill) {
 }
 
 void ADS1115Sensor::emit_description_json(BufferFiller* bfill) {
-    bfill->emit_p(PSTR("{\"name\":\"ADS1115 Sensor\",\"args\":[{\"name\":\"Pin Number\",\"arg\":\"pin\",\"type\":\"int::[1,16]\",\"extra\":[]}]}"));
+    bfill->emit_p(PSTR("{\"name\":\"ADS1115 Sensor\",\"args\":[{\"name\":\"Pin Number\",\"arg\":\"pin\",\"type\":\"int::[1,16]\",\"default\":\"1\",\"extra\":[]}]}"));
 }
 
 double ADS1115Sensor::get_inital_value() {
