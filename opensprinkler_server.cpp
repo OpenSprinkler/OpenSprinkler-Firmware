@@ -2610,7 +2610,7 @@ void server_json_sensor_description_main(OTF_PARAMS_DEF) {
     }
 
     static_assert(SENSOR_FLAG_COUNT == 2); // If this fails make sure that the json is updated and the count is updated here
-    bfill.emit_p(PSTR(",\"flags\":[\"Enable Sensor\",\"Enable Logging\"]"));
+    bfill.emit_p(PSTR(",\"flags\":[[\"Enable Sensor\",\"true\"],[\"Enable Logging\",\"true\"]"));
 
     if (available_ether_buffer() <= 0) {
         send_packet(OTF_PARAMS);
