@@ -2591,9 +2591,9 @@ void server_json_sensor_description_main(OTF_PARAMS_DEF) {
     bfill_enum_values<WeatherAction>(PSTR("WeatherAction"));
 	bfill.emit_p(PSTR("}"));
 
-    bfill.emit_p(PSTR(",base:[{\"name\":\"Sensor Information\",\"args\":[{\"name\":\"Name\",\"arg\":\"name\",\"type\":\"string::[1,32]\",\"extra\":[]},{\"name\":\"Update Interval\",\"arg\":\"interval\",\"type\":\"int::[1,any]\",\"extra\":[]},{\"name\":\"Unit\",\"arg\":\"unit\",\"type\":\"unit\",\"extra\":[]}]},{\"name\":\"Sensor Scaling\",\"args\":[{\"name\":\"Linear Scale\",\"arg\":\"scale\",\"type\":\"double\",\"extra\":[]},{\"name\":\"Value Offset\",\"arg\":\"offset\",\"type\":\"double\",\"extra\":[]},{\"name\":\"Minimum Value\",\"arg\":\"min\",\"type\":\"double\",\"extra\":[]},{\"name\":\"Maximum Value\",\"arg\":\"max\",\"type\":\"double\",\"extra\":[]}]}]"));
+    bfill.emit_p(PSTR(",\"base\":[{\"name\":\"Sensor Information\",\"args\":[{\"name\":\"Name\",\"arg\":\"name\",\"type\":\"string::[1,32]\",\"extra\":[]},{\"name\":\"Update Interval\",\"arg\":\"interval\",\"type\":\"int::[1,any]\",\"extra\":[]},{\"name\":\"Unit\",\"arg\":\"unit\",\"type\":\"unit\",\"extra\":[]}]},{\"name\":\"Sensor Scaling\",\"args\":[{\"name\":\"Linear Scale\",\"arg\":\"scale\",\"type\":\"double\",\"extra\":[]},{\"name\":\"Value Offset\",\"arg\":\"offset\",\"type\":\"double\",\"extra\":[]},{\"name\":\"Minimum Value\",\"arg\":\"min\",\"type\":\"double\",\"extra\":[]},{\"name\":\"Maximum Value\",\"arg\":\"max\",\"type\":\"double\",\"extra\":[]}]}]"));
     static_assert(SENSOR_FLAG_COUNT == 2); // If this fails make sure that the json is updated and the count is updated here
-    bfill.emit_p(PSTR(",flags:[\"Enable Sensor\",\"Enable Logging\"]"));
+    bfill.emit_p(PSTR(",\"flags\":[\"Enable Sensor\",\"Enable Logging\"]"));
 
     bfill.emit_p(PSTR("}"));
 }
