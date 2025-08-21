@@ -2576,11 +2576,19 @@ void server_json_sensor_description_main(OTF_PARAMS_DEF) {
         }
     }
 
+    if (available_ether_buffer() <= 0) {
+        send_packet(OTF_PARAMS);
+    }
+
     bfill.emit_p(PSTR("],\"units\":["));
     for (uint8_t i = 0; i < static_cast<uint8_t>(SensorUnit::MAX_VALUE)-1; i++) {
         if (i) bfill.emit_p(PSTR(","));
         SensorUnit unit = static_cast<SensorUnit>(i);
         bfill.emit_p(PSTR("{\"name\":\"$S\",\"short\":\"$S\",\"group\":$D,\"index\":$D,\"value\":$D}"), get_sensor_unit_name(unit), get_sensor_unit_short(unit), get_sensor_unit_group(unit), get_sensor_unit_index(unit), i);
+    }
+
+    if (available_ether_buffer() <= 0) {
+        send_packet(OTF_PARAMS);
     }
     
     bfill.emit_p(PSTR("],\"enums\":{"));
@@ -2591,9 +2599,22 @@ void server_json_sensor_description_main(OTF_PARAMS_DEF) {
     bfill_enum_values<WeatherAction>(PSTR("WeatherAction"));
 	bfill.emit_p(PSTR("}"));
 
+    if (available_ether_buffer() <= 0) {
+        send_packet(OTF_PARAMS);
+    }
+
     bfill.emit_p(PSTR(",\"base\":[{\"name\":\"Sensor Information\",\"args\":[{\"name\":\"Name\",\"arg\":\"name\",\"type\":\"string::[1,32]\",\"default\":\"\",\"extra\":[]},{\"name\":\"Update Interval\",\"arg\":\"interval\",\"type\":\"int::[1,any]\",\"default\":\"5\",\"extra\":[]},{\"name\":\"Unit\",\"arg\":\"unit\",\"type\":\"unit\",\"extra\":[]}]},{\"name\":\"Sensor Scaling\",\"args\":[{\"name\":\"Linear Scale\",\"arg\":\"scale\",\"type\":\"double\",\"default\":\"1\",\"extra\":[]},{\"name\":\"Value Offset\",\"arg\":\"offset\",\"type\":\"double\",\"default\":\"0\",\"extra\":[]},{\"name\":\"Minimum Value\",\"arg\":\"min\",\"type\":\"double\",\"default\":\"0\",\"extra\":[]},{\"name\":\"Maximum Value\",\"arg\":\"max\",\"type\":\"double\",\"default\":\"100\",\"extra\":[]}]},{\"name\":\"Sensor Type\",\"args\":[{\"name\":\"Sensor Type\",\"arg\":\"type\",\"type\":\"type\",\"default\":\"0\",\"extra\":[]}]}]"));
+
+    if (available_ether_buffer() <= 0) {
+        send_packet(OTF_PARAMS);
+    }
+
     static_assert(SENSOR_FLAG_COUNT == 2); // If this fails make sure that the json is updated and the count is updated here
     bfill.emit_p(PSTR(",\"flags\":[\"Enable Sensor\",\"Enable Logging\"]"));
+
+    if (available_ether_buffer() <= 0) {
+        send_packet(OTF_PARAMS);
+    }
 
     bfill.emit_p(PSTR("}"));
 }
