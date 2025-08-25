@@ -87,7 +87,7 @@ pin(pin),
 sensors(sensors) {}
 
 void ADS1115Sensor::emit_extra_json(BufferFiller *bfill) {
-    bfill->emit_p(PSTR("{\"index\":$D,\"pin\":$D}"), this->sensor_index, this->pin);
+    bfill->emit_p(PSTR("{\"pin\":$D}"), ((this->sensor_index << 2) + this->pin + 1));
 }
 
 void ADS1115Sensor::emit_description_json(BufferFiller* bfill) {
