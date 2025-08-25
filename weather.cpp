@@ -28,17 +28,29 @@
 #include "weather.h"
 #include "main.h"
 #include "types.h"
+#include <vector>
+#include <sstream>
+#include <string>
+#include "ArduinoJson.hpp"
 
 extern OpenSprinkler os; // OpenSprinkler object
 extern char tmp_buffer[];
 extern char ether_buffer[];
+std::vector<float> scaleVector;
+unsigned int mda;
 char wt_rawData[TMP_BUFFER_SIZE];
+char wt_scales[TMP_BUFFER_SIZE];
+float scales[TMP_BUFFER_SIZE];
 int wt_errCode = HTTP_RQT_NOT_RECEIVED;
 unsigned char wt_monthly[12] = {100,100,100,100,100,100,100,100,100,100,100,100};
+int dwl = 100;
 
 extern const char *user_agent_string;
 
 unsigned char findKeyVal (const char *str,char *strbuf, uint16_t maxlen,const char *key,bool key_in_pgm=false,uint8_t *keyfound=NULL);
+
+std::vector<float> parseScalesArray (const char* input);
+void parseMDA ();
 
 // The weather function calls getweather.py on remote server to retrieve weather data
 // the default script is WEATHER_SCRIPT_HOST/weather?.py
@@ -69,6 +81,11 @@ static void getweather_callback(char* buffer) {
 			os.iopts_save();
 			os.weather_update_flag |= WEATHER_UPDATE_WL;
 		}
+	} else if (os.iopts[IOPT_USE_WEATHER]==WEATHER_METHOD_MANUAL ||  os.iopts[IOPT_USE_WEATHER]==WEATHER_METHOD_AUTORAINDELAY){
+		// no scale, but is manual or autoRain --> should change to dwl
+		os.iopts[IOPT_WATER_PERCENTAGE] = dwl;
+		os.iopts_save();
+		os.weather_update_flag |= WEATHER_UPDATE_WL;
 	}
 
 	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("sunrise"), true)) {
@@ -124,6 +141,10 @@ static void getweather_callback(char* buffer) {
 		wt_rawData[TMP_BUFFER_SIZE-1]=0;  // make sure the buffer ends properly
 	}
 
+	if (findKeyVal(p, wt_scales, TMP_BUFFER_SIZE, PSTR("scales"), true)) {
+		scaleVector = parseScalesArray(wt_scales);
+	}
+
 	if(save_nvdata) os.nvdata_save();
 	write_log(LOGDATA_WATERLEVEL, os.checkwt_success_lasttime);
 }
@@ -172,17 +193,38 @@ void GetWeather() {
 		if(wt_errCode < 0) wt_errCode = ret;
 		// if wt_errCode > 0, the call is successful but weather script may return error
 	}
+	// Update the mda flag according to new weather data
+	parseMDA();
 }
 
-void load_wt_monthly(char* wto) {
-	unsigned char i;
-	int p[12];
-	for(i=0;i<12;i++) p[i]=100; // init all to 100
-	sscanf(wto, "\"scales\":[%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d]", p,p+1,p+2,p+3,p+4,p+5,p+6,p+7,p+8,p+9,p+10,p+11);
-	for(i=0;i<12;i++) {
-		if(p[i]<0) p[i]=0;
-		if(p[i]>250) p[i]=250;
-		wt_monthly[i]=p[i];
+void parse_wto(char* wto) {
+	ArduinoJson::JsonDocument doc;
+	if(*(wto+1)){
+		// Wrap in curly braces
+		wto[0] = '{';
+		int len = strlen(wto);
+		wto[len] = '}';
+		wto[len+1] = 0;
+
+		ArduinoJson::DeserializationError error = ArduinoJson::deserializeJson(doc, wto);
+		// Test and parse
+		if (error) {
+			DEBUG_PRINT(F("wto: deserializeJson() failed: "));
+			DEBUG_PRINTLN(error.c_str());
+		} else {
+			if(doc.containsKey("scales")){
+				int p[12];
+				for(unsigned char i=0;i<12;i++){
+					p[i]=doc["scales"][i];
+					if(p[i]<0) p[i]=0;
+					if(p[i]>250) p[i]=250;
+					wt_monthly[i]=p[i];
+				}
+			}
+			if(doc.containsKey("dwl")){
+				dwl = doc["dwl"];
+			}
+		}
 	}
 }
 
@@ -196,9 +238,54 @@ void apply_monthly_adjustment(time_os_t curr_time) {
 		struct tm *ti = gmtime(&ct);
 		unsigned char m = ti->tm_mon;  // tm_mon ranges from [0,11]
 #endif
-		if(os.iopts[IOPT_WATER_PERCENTAGE]!=wt_monthly[m]) {
-			os.iopts[IOPT_WATER_PERCENTAGE]=wt_monthly[m];
-			os.iopts_save();
+			if(os.iopts[IOPT_WATER_PERCENTAGE]!=wt_monthly[m]) {
+				os.iopts[IOPT_WATER_PERCENTAGE]=wt_monthly[m];
+				os.iopts_save();
+			}
+		}
+}
+
+std::vector<float> parseScalesArray (const char* input) {
+    static std::vector<float> result;
+    std::string str(input);
+
+    if (!str.empty() && str.front() == '[') str.erase(0, 1);
+    if (!str.empty() && str.back() == ']') str.pop_back();
+
+    std::stringstream ss(str);
+    std::string next;
+
+	result.clear();
+
+    while (std::getline(ss, next, ',')) {
+        result.push_back(std::stof(next));
+    }
+
+    return result;
+}
+
+void parseMDA () {
+	char* buff = tmp_buffer+1;
+	ArduinoJson::JsonDocument doc;
+	os.sopt_load(SOPT_WEATHER_OPTS, buff);
+
+	if (buff != 0) {
+		buff = tmp_buffer;
+		buff[0] = '{';
+		int len = strlen(buff);
+		buff[len] = '}';
+		buff[len+1] = 0;
+
+		ArduinoJson::DeserializationError error = ArduinoJson::deserializeJson(doc, buff);
+
+		if (error) {
+			DEBUG_PRINT(F("mda: deserializeJson() failed: "));
+			DEBUG_PRINTLN(error.c_str());
+		} else {
+			unsigned int h = doc["mda"];
+			if(h){
+				mda = h;
+			}
 		}
 	}
 }

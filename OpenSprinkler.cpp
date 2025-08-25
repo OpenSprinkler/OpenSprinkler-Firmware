@@ -457,6 +457,20 @@ static const char days_str[] PROGMEM =
 	"Sat\0"
 	"Sun\0";
 
+/** Month name strings (stored in PROGMEM to reduce RAM usage) */
+static const char months_str[] PROGMEM =
+	"Jan\0"
+	"Feb\0"
+	"Mar\0"
+	"Apr\0"
+	"May\0"
+	"Jun\0"
+	"Jul\0"
+	"Aug\0"
+	"Sep\0"
+	"Oct\0"
+	"Nov\0"
+	"Dec\0";
 
 #if !defined(ARDUINO)
 static inline int32_t now() {
@@ -2434,7 +2448,7 @@ void OpenSprinkler::nvdata_save() {
 	file_write_block(NVCON_FILENAME, &nvdata, 0, sizeof(NVConData));
 }
 
-void load_wt_monthly(char* wto);
+void parse_wto(char* wto);
 
 /** Load integer options from file */
 void OpenSprinkler::iopts_load() {
@@ -2456,9 +2470,9 @@ void OpenSprinkler::iopts_load() {
 			iopts[IOPT_NTP_IP4] = 0;
 	}
 	populate_master();
-	sopt_load(SOPT_WEATHER_OPTS, tmp_buffer);
-	if(iopts[IOPT_USE_WEATHER]==WEATHER_METHOD_MONTHLY) {
-		load_wt_monthly(tmp_buffer);
+	sopt_load(SOPT_WEATHER_OPTS, tmp_buffer+1); // Leave room for curly brace
+	if(iopts[IOPT_USE_WEATHER]==WEATHER_METHOD_MONTHLY || iopts[IOPT_USE_WEATHER]==WEATHER_METHOD_MANUAL || iopts[IOPT_USE_WEATHER]==WEATHER_METHOD_AUTORAINDELAY){
+		parse_wto(tmp_buffer);
 	}
 }
 
@@ -2611,14 +2625,14 @@ void OpenSprinkler::lcd_print_time(time_os_t t)
 
 	lcd_print_2digit(minute(t));
 
-	lcd_print_pgm(PSTR("  "));
+	lcd_print_pgm(PSTR(" "));
 
 	// each weekday string has 3 characters + ending 0
 	lcd_print_pgm(days_str+4*weekday_today());
 
 	lcd_print_pgm(PSTR(" "));
 
-	lcd_print_2digit(month(t));
+	lcd_print_pgm(months_str+4*(month(t)-1));
 
 	lcd_print_pgm(PSTR("-"));
 

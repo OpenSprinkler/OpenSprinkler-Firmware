@@ -22,6 +22,7 @@
  */
 
 #include <limits.h>
+#include <vector>
 
 #include "types.h"
 #include "OpenSprinkler.h"
@@ -895,9 +896,20 @@ void do_loop()
 						if (prog.durations[sid] && !(os.attrib_dis[bid]&(1<<s))) {
 							// water time is scaled by watering percentage
 							ulong water_time = water_time_resolve(prog.durations[sid]);
-							// if the program is set to use weather scaling
+							// if the interval program is set to use weather scaling
 							if (prog.use_weather) {
 								unsigned char wl = os.iopts[IOPT_WATER_PERCENTAGE];
+
+								// If historical data is enabled and interval program, overwrite watering percentage with historical one.
+								if (mda == 100 && prog.type == PROGRAM_TYPE_INTERVAL && scaleVector.size() > 0) {
+									// Use interval length unless longer than available data
+									if ((unsigned int)prog.days[1]-1 < scaleVector.size()){
+										wl = (unsigned char)scaleVector[prog.days[1]-1];
+									} else {
+										wl = (unsigned char)scaleVector[scaleVector.size()-1];
+									}
+								}
+								
 								water_time = water_time * wl / 100;
 								if (wl < 20 && water_time < 10) // if water_percentage is less than 20% and water_time is less than 10 seconds
 																								// do not water
@@ -1217,10 +1229,13 @@ void check_weather() {
 		// todo: the firmware currently needs to be explicitly aware of which adjustment methods, this is not ideal
 		os.checkwt_success_lasttime = 0;
 		unsigned char method = os.iopts[IOPT_USE_WEATHER];
-		if(!(method==WEATHER_METHOD_MANUAL || method==WEATHER_METHOD_AUTORAINDELY || method==WEATHER_METHOD_MONTHLY)) {
+		if(!(method==WEATHER_METHOD_MANUAL || method==WEATHER_METHOD_AUTORAINDELAY || method==WEATHER_METHOD_MONTHLY)) {
 			os.iopts[IOPT_WATER_PERCENTAGE] = 100; // reset watering percentage to 100%
-			wt_rawData[0] = 0; 		// reset wt_rawData and errCode
+			wt_rawData[0] = 0; 		// reset wt_rawData, errCode, and scaleVector
 			wt_errCode = HTTP_RQT_NOT_RECEIVED;
+			scaleVector.clear();
+		}else{
+			os.iopts[IOPT_WATER_PERCENTAGE] = dwl;
 		}
 	} else if (!os.checkwt_lasttime || (ntz > os.checkwt_lasttime + CHECK_WEATHER_TIMEOUT)) {
 		os.checkwt_lasttime = ntz;
