@@ -432,7 +432,7 @@ void EnsembleSensor::emit_extra_json(BufferFiller* bfill) {
 }
 
 void EnsembleSensor::emit_description_json(BufferFiller* bfill) {
-    bfill->emit_p(PSTR("{\"name\":\"Ensemble Sensor\",\"args\":[{\"name\":\"Argument Sensors\",\"arg\":\"children\",\"type\":\"array::4\",\"extra\":[{\"name\":\"Sensor ID\",\"arg\":\"sid\",\"type\":\"int::[0,63]\",\"default\":\"\",\"extra\":[]},{\"name\":\"Minimum Value\",\"arg\":\"min\",\"type\":\"double\",\"default\":\"\",\"extra\":[]},{\"name\":\"Maximum Value\",\"arg\":\"max\",\"type\":\"double\",\"default\":\"\",\"extra\":[]},{\"name\":\"Scale\",\"arg\":\"scale\",\"type\":\"double\",\"default\":\"\",\"extra\":[]},{\"name\":\"Offset\",\"arg\":\"offset\",\"type\":\"double\",\"default\":\"\",\"extra\":[]}]},{\"name\":\"Ensemble Action\",\"arg\":\"action\",\"type\":\"enum::EnsembleAction\",\"default\":\"0\",\"extra\":[]}]}"));
+    bfill->emit_p(PSTR("{\"name\":\"Ensemble Sensor\",\"args\":[{\"name\":\"Argument Sensors\",\"arg\":\"children\",\"type\":\"array::4\",\"extra\":[{\"name\":\"Sensor ID\",\"arg\":\"sid\",\"type\":\"sensor\",\"default\":\"\",\"extra\":[]},{\"name\":\"Minimum Value\",\"arg\":\"min\",\"type\":\"double\",\"default\":\"\",\"extra\":[]},{\"name\":\"Maximum Value\",\"arg\":\"max\",\"type\":\"double\",\"default\":\"\",\"extra\":[]},{\"name\":\"Scale\",\"arg\":\"scale\",\"type\":\"double\",\"default\":\"\",\"extra\":[]},{\"name\":\"Offset\",\"arg\":\"offset\",\"type\":\"double\",\"default\":\"\",\"extra\":[]}]},{\"name\":\"Ensemble Action\",\"arg\":\"action\",\"type\":\"enum::EnsembleAction\",\"default\":\"0\",\"extra\":[]}]}"));
 }
 
 double EnsembleSensor::get_inital_value() {
