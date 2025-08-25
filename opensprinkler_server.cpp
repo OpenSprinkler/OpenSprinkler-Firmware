@@ -1989,31 +1989,24 @@ void server_json_sensors_main(OTF_PARAMS_DEF) {
     uint8_t sensor_count = 0;
 
     Sensor *sensor;
-    os_file_type file = file_open(SENSORS_FILENAME, FileOpenMode::Read);
-    if (file) {
-        for (size_t i = 0; i < MAX_SENSORS; i++) {
-            if (os.sensors[i].interval && (sensor = os.parse_sensor(file))) {
-                if (sensor_count) bfill.emit_p(PSTR(","));
-                bfill.emit_p(PSTR("{\"sid\":$D,\"name\":\"$S\",\"unit\":$D,\"flags\":$D,\"interval\":$L,\"max\":$E,\"min\":$E,\"scale\":$E,\"offset\":$E,\"value\":$E,\"type\":$D,\"extra\":"), i, sensor->name, static_cast<uint8_t>(sensor->unit), sensor->flags, sensor->interval, sensor->max, sensor->min, sensor->scale, sensor->offset, os.sensors[i].value, static_cast<uint8_t>(sensor->get_sensor_type()));
-                sensor->emit_extra_json(&bfill);
-                bfill.emit_p(PSTR("}"));
-                sensor_count += 1;
-                delete sensor;
+    for (size_t i = 0; i < MAX_SENSORS; i++) {
+        if (os.sensors[i].interval && (sensor = os.get_sensor(i))) {
+            if (sensor_count) bfill.emit_p(PSTR(","));
+            bfill.emit_p(PSTR("{\"sid\":$D,\"name\":\"$S\",\"unit\":$D,\"flags\":$D,\"interval\":$L,\"max\":$E,\"min\":$E,\"scale\":$E,\"offset\":$E,\"value\":$E,\"type\":$D,\"extra\":"), i, sensor->name, static_cast<uint8_t>(sensor->unit), sensor->flags, sensor->interval, sensor->max, sensor->min, sensor->scale, sensor->offset, os.sensors[i].value, static_cast<uint8_t>(sensor->get_sensor_type()));
+            sensor->emit_extra_json(&bfill);
+            bfill.emit_p(PSTR("}"));
+            sensor_count += 1;
+            delete sensor;
 
 
-                // push out a packet if available
-                // buffer size is getting small
-                if (available_ether_buffer() <= 0) {
-                    send_packet(OTF_PARAMS);
-                }
+            // push out a packet if available
+            // buffer size is getting small
+            if (available_ether_buffer() <= 0) {
+                send_packet(OTF_PARAMS);
             }
         }
-
-        file_close(file);
-    } else {
-        DEBUG_PRINT("Failed to open file: ");
-        DEBUG_PRINTLN(SENSORS_FILENAME);
     }
+
 
 	bfill.emit_p(PSTR("],\"count\":$D}"), sensor_count);
 }
@@ -2131,7 +2124,7 @@ void server_change_sensor(OTF_PARAMS_DEF) {
         if (*end != '\0') handle_return(HTML_DATA_FORMATERROR);
 	}
 
-    if (interval < 1000) handle_return(HTML_DATA_OUTOFBOUND);
+    if (interval < 1) handle_return(HTML_DATA_OUTOFBOUND);
 
     if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("unit"), true)) {
         ulong unit_raw = strtol(tmp_buffer, &end, 10);
@@ -2170,7 +2163,7 @@ void server_change_sensor(OTF_PARAMS_DEF) {
 
             if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("children"), true)) {
                 unsigned int i = 0;
-                unsigned int u;
+                int d;
                 double d1, d2, d3, d4;
                 const char *ptr = tmp_buffer;
                 int result;
@@ -2178,15 +2171,16 @@ void server_change_sensor(OTF_PARAMS_DEF) {
                 while (*ptr != '\0') {
                     if (i >= ENSEMBLE_SENSOR_CHILDREN_COUNT) handle_return(HTML_DATA_FORMATERROR);
 
-                    result = sscanf(ptr, "%u,%lf,%lf,%lf,%lf;", &u, &d1, &d2, &d3, &d4);
+                    result = sscanf(ptr, "%d,%lf,%lf,%lf,%lf;", &d, &d1, &d2, &d3, &d4);
 
                     if (result != 5) {
                         handle_return(HTML_DATA_FORMATERROR);
                     }
 
-                    if (u >= MAX_SENSORS) handle_return(HTML_DATA_FORMATERROR);
+                    if (d >= MAX_SENSORS || d < -1) handle_return(HTML_DATA_FORMATERROR);
+                    if (d == -1) d = sid;
 
-                    children[i++] = ensemble_children_t {(uint8_t)u, d1, d2, d3, d4};
+                    children[i++] = ensemble_children_t {(uint8_t)d, d1, d2, d3, d4};
 
                     while (*(ptr++) != ';') {}
                 }
@@ -2610,7 +2604,7 @@ void server_json_sensor_description_main(OTF_PARAMS_DEF) {
     }
 
     static_assert(SENSOR_FLAG_COUNT == 2); // If this fails make sure that the json is updated and the count is updated here
-    bfill.emit_p(PSTR(",\"flags\":[[\"Enable Sensor\",\"true\"],[\"Enable Logging\",\"true\"]"));
+    bfill.emit_p(PSTR(",\"flags\":[[\"Enable Sensor\",\"true\"],[\"Enable Logging\",\"true\"]]"));
 
     if (available_ether_buffer() <= 0) {
         send_packet(OTF_PARAMS);
@@ -2710,6 +2704,21 @@ void server_change_sen_adj(OTF_PARAMS_DEF) {
     delete adj;
 
 	handle_return(HTML_SUCCESS);
+}
+
+void server_json_sen_desc(OTF_PARAMS_DEF)
+{
+#if defined(USE_OTF)
+	if(!process_password(OTF_PARAMS)) return;
+	rewind_ether_buffer();
+	print_header(OTF_PARAMS);
+#else
+	print_header();
+#endif
+
+	bfill.emit_p(PSTR("{"));
+	server_json_sensor_description_main(OTF_PARAMS);
+	handle_return(HTML_OK);
 }
 #endif
 
@@ -2876,6 +2885,7 @@ const char *uris[] PROGMEM = {
     "csl",
     "jsa",
     "csa",
+    "jsd",
     #endif
 };
 
@@ -2912,6 +2922,7 @@ URLHandler urls[] = {
     server_clear_sensor_log,  // csl
     server_json_sen_adj,      // jsa
     server_change_sen_adj,    // csa
+    server_json_sen_desc,     // jsd
     #endif
 };
 #else

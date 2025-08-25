@@ -2797,7 +2797,7 @@ void OpenSprinkler::poll_sensors() {
                 if (sensor) {
                     sensors[i].value = sensor->get_new_value();
                     delete sensor;
-                    sensors[i].next_update = millis() + sensors[i].interval;
+                    sensors[i].next_update = millis() + (sensors[i].interval * 1000 * 60);
                     if (sensors[i].flags & (1 << SENSOR_FLAG_LOG)) {
                         os.log_sensor(i, sensors[i].value);
                     }
