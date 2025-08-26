@@ -44,5 +44,5 @@ extern unsigned char mda;
 extern unsigned char wt_monthly[];
 extern unsigned char wt_restricted;
 void parse_wto(char* wto);
-bool apply_monthly_adjustment(time_os_t curr_time);
+void apply_monthly_adjustment(time_os_t curr_time);
 #endif  // _WEATHER_H

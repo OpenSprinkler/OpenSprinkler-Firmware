@@ -867,7 +867,7 @@ void do_loop()
 		if (curr_minute != last_minute) {
 			last_minute = curr_minute;
 
-			//apply_monthly_adjustment(curr_time); // check and apply monthly adjustment here, if it's selected
+			apply_monthly_adjustment(curr_time); // check and apply monthly adjustment here, if it's selected
 
 			// check through all programs
 			for(pid=0; pid<pd.nprograms; pid++) {
@@ -884,14 +884,20 @@ void do_loop()
 					prog.gen_station_runorder(runcount, order);
 
 					// prepare watering level
-					unsigned char wl = os.iopts[IOPT_WATER_PERCENTAGE];
-					// If historical data is enabled and interval program, overwrite watering percentage with historical one.
-					if (mda == 100 && prog.type == PROGRAM_TYPE_INTERVAL && md_N > 0) {
-						// Use interval length unless longer than available data
-						if ((unsigned int)prog.days[1]-1 < md_N){
-							wl = md_scales[prog.days[1]-1];
-						} else {
-							wl = md_scales[md_N-1];
+					unsigned char wl = 100; // default 100%
+					if (prog.use_weather) { 							// if program is set to use weather scaling
+						if (wt_restricted > 0) wl = 0; // if watering restriction is active
+						else {
+							wl = os.iopts[IOPT_WATER_PERCENTAGE];
+							// If historical data is enabled and interval program, overwrite watering percentage with historical one.
+							if (mda == 100 && prog.type == PROGRAM_TYPE_INTERVAL && md_N > 0) {
+								// Use interval length unless longer than available data
+								if ((unsigned int)prog.days[1]-1 < md_N){
+									wl = md_scales[prog.days[1]-1];
+								} else {
+									wl = md_scales[md_N-1];
+								}
+							}
 						}
 					}
 
@@ -908,12 +914,10 @@ void do_loop()
 						if (prog.durations[sid] && !(os.attrib_dis[bid]&(1<<s))) {
 							// water time is scaled by watering percentage
 							ulong water_time = water_time_resolve(prog.durations[sid]);
-							// if the interval program is set to use weather scaling
-							if (prog.use_weather) {
-								water_time = water_time * wl / 100;
-								if (wl < 20 && water_time < 10) // if water_percentage is less than 20% and water_time is less than 10 seconds
-																								// do not water
-									water_time = 0;
+
+							water_time = water_time * wl / 100;
+							if (wl < 20 && water_time < 10) { // if water_percentage is less than 20% and water_time is less than 10 seconds, skip watering
+								water_time = 0;
 							}
 
 							if (water_time) {
@@ -936,7 +940,7 @@ void do_loop()
 						notif.add(NOTIFY_PROGRAM_SCHED, pid, prog.use_weather?wl:100);
 					} else {
 						// program being skipped e.g. due to 0% watering level
-						notif.add(NOTIFY_PROGRAM_SCHED, pid, -1);
+						notif.add(NOTIFY_PROGRAM_SCHED, pid, -1, wt_restricted);
 					}
 					//delete run-once if on final runtime (stations have already been queued)
 					if(will_delete){
@@ -1234,7 +1238,8 @@ void check_weather() {
 		unsigned char method = os.iopts[IOPT_USE_WEATHER];
 		if(!(method==WEATHER_METHOD_MANUAL || method==WEATHER_METHOD_AUTORAINDELAY || method==WEATHER_METHOD_MONTHLY)) {
 			os.iopts[IOPT_WATER_PERCENTAGE] = 100; // reset watering percentage to 100%
-			wt_rawData[0] = 0; 		// reset wt_rawData, errCode, and md_scales array
+			wt_restricted = 0; // reset wt_rawData, errCode, and md_scales array
+			wt_rawData[0] = 0;
 			wt_errCode = HTTP_RQT_NOT_RECEIVED;
 			md_N = 0;
 		}

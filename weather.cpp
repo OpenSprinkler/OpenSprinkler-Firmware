@@ -77,11 +77,6 @@ static void getweather_callback(char* buffer) {
 			os.iopts_save();
 			os.weather_update_flag |= WEATHER_UPDATE_WL;
 		}
-	} else {
-		// got an error or did not receive scale, apply default watering level
-		if (apply_monthly_adjustment(tnow)) {
-			os.weather_update_flag |= WEATHER_UPDATE_WL;
-		}
 	}
 
 	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("restricted"), true)) {
@@ -198,10 +193,6 @@ void GetWeather() {
 	int ret = os.send_http_request(host, 443, ether_buffer, getweather_callback_with_peel_header, true);
 #endif
 	if(ret!=HTTP_RQT_SUCCESS) {
-		// if weather call is unsuccessful
-		if (apply_monthly_adjustment(os.now_tz())) {
-			os.weather_update_flag |= WEATHER_UPDATE_WL;
-		}
 		if(wt_errCode < 0) wt_errCode = ret;
 		// if wt_errCode > 0, the call is successful but weather script may return error
 	}
@@ -239,7 +230,7 @@ void parse_wto(char* wto) {
 	}
 }
 
-bool apply_monthly_adjustment(time_os_t curr_time) {
+void apply_monthly_adjustment(time_os_t curr_time) {
 	// ====== Check monthly water percentage ======
 	if(os.iopts[IOPT_USE_WEATHER]==WEATHER_METHOD_MONTHLY) {
 #if defined(ARDUINO)
@@ -252,10 +243,9 @@ bool apply_monthly_adjustment(time_os_t curr_time) {
 		if(os.iopts[IOPT_WATER_PERCENTAGE]!=wt_monthly[m]) {
 			os.iopts[IOPT_WATER_PERCENTAGE]=wt_monthly[m];
 			os.iopts_save();
-			return true;
+			os.weather_update_flag |= WEATHER_UPDATE_WL;
 		}
 	}
-	return false;
 }
 
 unsigned char parseMdScalesArray (const char* input) {

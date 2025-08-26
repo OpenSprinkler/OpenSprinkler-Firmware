@@ -376,7 +376,8 @@ void push_message(uint16_t type, uint32_t lval, float fval, uint8_t bval) {
 			if (os.mqtt.enabled()) {
 				snprintf_P(topic, PUSH_TOPIC_LEN, PSTR("program/%d"), lval);
 				if(fval<0) {
-					strcat_P(payload, PSTR("{\"state\":\"skipped\""));
+					strcat_P(payload, PSTR("{\"state\":\"skipped\",\"wtrestr\":"));
+					snprintf_P(payload+strlen(payload), PUSH_PAYLOAD_LEN, PSTR("%d"), (int)bval); // if a program is skipped, also output the wt_restricted variable
 				} else {
 					strcat_P(payload, PSTR("{\"state\":1,\"wl\":"));
 					snprintf_P(payload+strlen(payload), PUSH_PAYLOAD_LEN, PSTR("%d"), (int)fval);
@@ -386,6 +387,9 @@ void push_message(uint16_t type, uint32_t lval, float fval, uint8_t bval) {
 			if (ifttt_enabled || email_enabled) {
 				if(fval<0) {
 					strcat_P(postval, PSTR("skipped"));
+					if(bval>0) {
+						strcat_P(postval, PSTR(" due to weather restriction."));
+					}
 				} else {
 					if (bval) strcat_P(postval, PSTR("manually scheduled "));
 					else strcat_P(postval, PSTR("automatically scheduled "));

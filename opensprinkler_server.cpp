@@ -1234,7 +1234,7 @@ void server_json_controller_main(OTF_PARAMS_DEF) {
 
 	bfill.emit_p(PSTR("\"mac\":\"$X:$X:$X:$X:$X:$X\","), mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 
-	bfill.emit_p(PSTR("\"loc\":\"$O\",\"jsp\":\"$O\",\"wsp\":\"$O\",\"wto\":{$O},\"ifkey\":\"$O\",\"mqtt\":{$O},\"wtdata\":$S,\"wterr\":$D,\"dname\":\"$O\","),
+	bfill.emit_p(PSTR("\"loc\":\"$O\",\"jsp\":\"$O\",\"wsp\":\"$O\",\"wto\":{$O},\"ifkey\":\"$O\",\"mqtt\":{$O},\"wtdata\":$S,\"wterr\":$D,\"wtrestr\":$D,\"dname\":\"$O\","),
 							 SOPT_LOCATION,
 							 SOPT_JAVASCRIPTURL,
 							 SOPT_WEATHERURL,
@@ -1243,6 +1243,7 @@ void server_json_controller_main(OTF_PARAMS_DEF) {
 							 SOPT_MQTT_OPTS,
 							 strlen(wt_rawData)==0?"{}":wt_rawData,
 							 wt_errCode,
+							 wt_restricted,
 							 SOPT_DEVICE_NAME);
 
 #if defined(SUPPORT_EMAIL)
@@ -1556,7 +1557,8 @@ void server_change_options(OTF_PARAMS_DEF)
 		#endif
 		if (os.sopt_save(SOPT_WEATHER_OPTS, tmp_buffer)) {
 			os.sopt_load(SOPT_WEATHER_OPTS, tmp_buffer+1); // make room for the leading '{'
-			parse_wto(tmp_buffer);
+			parse_wto(tmp_buffer); // parse wto
+			apply_monthly_adjustment(os.now_tz());
 			weather_change = true;
 		}
 	}
@@ -1640,7 +1642,8 @@ void server_change_options(OTF_PARAMS_DEF)
 	if(weather_change) {
 		DEBUG_PRINTLN("weather change happened");
 		os.iopts[IOPT_WATER_PERCENTAGE] = 100;  // reset watering percentage to 100%
-		wt_rawData[0] = 0;  // reset wt_rawData and errCode
+		wt_restricted = 0; // reset wt_restrcited, wt_rawData and errCode
+		wt_rawData[0] = 0;
 		wt_errCode = HTTP_RQT_NOT_RECEIVED;
 		os.checkwt_lasttime = 0;  // force weather update
 	}
