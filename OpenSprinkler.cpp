@@ -1936,7 +1936,7 @@ void OpenSprinkler::switch_gpiostation(GPIOStationData *data, bool turnon) {
 }
 
 /** Callback function for switching remote station */
-void remote_http_callback(char* buffer) {
+void default_http_callback(char* buffer) {
 
 	DEBUG_PRINTLN(buffer);
 
@@ -2117,7 +2117,7 @@ void OpenSprinkler::switch_remotestation(RemoteIPStationData *data, bool turnon,
 
 	char server[20];
 	snprintf(server, 20, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
-	send_http_request(server, port, p, remote_http_callback);
+	send_http_request(server, port, p, default_http_callback);
 }
 
 /** Switch remote OTC station
@@ -2154,7 +2154,7 @@ void OpenSprinkler::switch_remotestation(RemoteOTCStationData *data, bool turnon
 
 	bf.emit_p(PSTR("User-Agent: $S\r\n\r\n"), user_agent_string);
 
-	send_http_request(DEFAULT_OTC_SERVER_APP, DEFAULT_OTC_PORT_APP, p, remote_http_callback, true);
+	send_http_request(DEFAULT_OTC_SERVER_APP, DEFAULT_OTC_PORT_APP, p, default_http_callback, true);
 }
 
 /** Switch http(s) station
@@ -2180,7 +2180,7 @@ void OpenSprinkler::switch_httpstation(HTTPStationData *data, bool turnon, bool 
 	bf.emit_p(PSTR("GET /$S HTTP/1.0\r\nHOST: $S\r\n"), cmd, server);
 	bf.emit_p(PSTR("User-Agent: $S\r\n\r\n"), user_agent_string);
 
-	send_http_request(server, atoi(port), p, remote_http_callback, usessl);
+	send_http_request(server, atoi(port), p, default_http_callback, usessl);
 }
 
 /** Prepare factory reset */
@@ -2471,9 +2471,7 @@ void OpenSprinkler::iopts_load() {
 	}
 	populate_master();
 	sopt_load(SOPT_WEATHER_OPTS, tmp_buffer+1); // Leave room for curly brace
-	if(iopts[IOPT_USE_WEATHER]==WEATHER_METHOD_MONTHLY || iopts[IOPT_USE_WEATHER]==WEATHER_METHOD_MANUAL || iopts[IOPT_USE_WEATHER]==WEATHER_METHOD_AUTORAINDELAY){
-		parse_wto(tmp_buffer);
-	}
+	parse_wto(tmp_buffer);
 }
 
 void OpenSprinkler::populate_master() {

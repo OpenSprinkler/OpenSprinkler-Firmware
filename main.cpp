@@ -22,7 +22,6 @@
  */
 
 #include <limits.h>
-#include <vector>
 
 #include "types.h"
 #include "OpenSprinkler.h"
@@ -868,7 +867,7 @@ void do_loop()
 		if (curr_minute != last_minute) {
 			last_minute = curr_minute;
 
-			apply_monthly_adjustment(curr_time); // check and apply monthly adjustment here, if it's selected
+			//apply_monthly_adjustment(curr_time); // check and apply monthly adjustment here, if it's selected
 
 			// check through all programs
 			for(pid=0; pid<pd.nprograms; pid++) {
@@ -901,12 +900,12 @@ void do_loop()
 								unsigned char wl = os.iopts[IOPT_WATER_PERCENTAGE];
 
 								// If historical data is enabled and interval program, overwrite watering percentage with historical one.
-								if (mda == 100 && prog.type == PROGRAM_TYPE_INTERVAL && scaleVector.size() > 0) {
+								if (mda == 100 && prog.type == PROGRAM_TYPE_INTERVAL && md_N > 0) {
 									// Use interval length unless longer than available data
-									if ((unsigned int)prog.days[1]-1 < scaleVector.size()){
-										wl = (unsigned char)scaleVector[prog.days[1]-1];
+									if ((unsigned int)prog.days[1]-1 < md_N){
+										wl = md_scales[prog.days[1]-1];
 									} else {
-										wl = (unsigned char)scaleVector[scaleVector.size()-1];
+										wl = md_scales[md_N-1];
 									}
 								}
 								
@@ -1231,11 +1230,11 @@ void check_weather() {
 		unsigned char method = os.iopts[IOPT_USE_WEATHER];
 		if(!(method==WEATHER_METHOD_MANUAL || method==WEATHER_METHOD_AUTORAINDELAY || method==WEATHER_METHOD_MONTHLY)) {
 			os.iopts[IOPT_WATER_PERCENTAGE] = 100; // reset watering percentage to 100%
-			wt_rawData[0] = 0; 		// reset wt_rawData, errCode, and scaleVector
+			wt_rawData[0] = 0; 		// reset wt_rawData, errCode, and md_scales array
 			wt_errCode = HTTP_RQT_NOT_RECEIVED;
-			scaleVector.clear();
-		}else{
-			os.iopts[IOPT_WATER_PERCENTAGE] = dwl;
+			md_N = 0;
+		} else {
+			if(dwl >= 0) os.iopts[IOPT_WATER_PERCENTAGE] = dwl;
 		}
 	} else if (!os.checkwt_lasttime || (ntz > os.checkwt_lasttime + CHECK_WEATHER_TIMEOUT)) {
 		os.checkwt_lasttime = ntz;

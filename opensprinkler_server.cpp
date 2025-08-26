@@ -1077,13 +1077,13 @@ void server_json_options_main() {
 
 	bfill.emit_p(PSTR(",\"dexp\":$D,\"mexp\":$D,\"hwt\":$D,"), os.detect_exp(), MAX_EXT_BOARDS, os.hw_type);
 	bfill.emit_p(PSTR("\"wls\":["));
-	if (scaleVector.size() == 0) {
+	if (md_N == 0) {
 		bfill.emit_p(PSTR("],"));
 	}
 	unsigned char idx;
-	for (idx = 0; idx < scaleVector.size(); idx++) {
-		bfill.emit_p(PSTR("$D"), (int)scaleVector[idx]);
-		bfill.emit_p((idx == scaleVector.size() - 1) ? PSTR("],") : PSTR(","));
+	for (idx = 0; idx < md_N; idx++) {
+		bfill.emit_p(PSTR("$D"), (int)md_scales[idx]);
+		bfill.emit_p((idx == md_N-1) ? PSTR("],") : PSTR(","));
 	}
 	// print master array
 	unsigned char masid, optidx;
@@ -1554,13 +1554,8 @@ void server_change_options(OTF_PARAMS_DEF)
 		urlDecode(tmp_buffer);
 		#endif
 		if (os.sopt_save(SOPT_WEATHER_OPTS, tmp_buffer)) {
-			if (os.iopts[IOPT_USE_WEATHER]==WEATHER_METHOD_AUTORAINDELAY || os.iopts[IOPT_USE_WEATHER]==WEATHER_METHOD_MANUAL || os.iopts[IOPT_USE_WEATHER]==WEATHER_METHOD_MONTHLY){
-				os.sopt_load(SOPT_WEATHER_OPTS, tmp_buffer+1);
-				parse_wto(tmp_buffer);
-				if(os.iopts[IOPT_USE_WEATHER]==WEATHER_METHOD_MONTHLY){
-					apply_monthly_adjustment(os.now_tz());
-				}
-			}
+			os.sopt_load(SOPT_WEATHER_OPTS, tmp_buffer+1); // make room for the leading '{'
+			parse_wto(tmp_buffer);
 			weather_change = true;
 		}
 	}
@@ -1642,6 +1637,7 @@ void server_change_options(OTF_PARAMS_DEF)
 	}
 
 	if(weather_change) {
+		DEBUG_PRINTLN("weather change happened");
 		os.iopts[IOPT_WATER_PERCENTAGE] = 100;  // reset watering percentage to 100%
 		wt_rawData[0] = 0;  // reset wt_rawData and errCode
 		wt_errCode = HTTP_RQT_NOT_RECEIVED;

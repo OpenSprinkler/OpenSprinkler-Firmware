@@ -31,16 +31,18 @@
 #define WEATHER_UPDATE_WL       0x08
 #define WEATHER_UPDATE_TZ       0x10
 #define WEATHER_UPDATE_RD       0x20
-#include <vector>
+
+#define MAX_N_MD_SCALES 32 // maximum number of days that can be stored in md_scales array
 
 void GetWeather();
 
 extern char wt_rawData[];
 extern int wt_errCode;
-extern std::vector<float> scaleVector;
-extern unsigned int mda;
+extern unsigned char md_scales[]; // multiday watering scales
+extern unsigned char md_N; // number of elements in the md_scales array
+extern unsigned char mda;
 extern unsigned char wt_monthly[];
-extern int dwl;
+extern int16_t dwl;
 void parse_wto(char* wto);
-void apply_monthly_adjustment(time_os_t curr_time);
+bool apply_monthly_adjustment(time_os_t curr_time);
 #endif  // _WEATHER_H

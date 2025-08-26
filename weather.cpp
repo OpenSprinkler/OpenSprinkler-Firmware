@@ -28,7 +28,6 @@
 #include "weather.h"
 #include "main.h"
 #include "types.h"
-#include <vector>
 #include <sstream>
 #include <string>
 #include "ArduinoJson.hpp"
@@ -36,22 +35,34 @@
 extern OpenSprinkler os; // OpenSprinkler object
 extern char tmp_buffer[];
 extern char ether_buffer[];
-std::vector<float> scaleVector;
-unsigned int mda;
+unsigned char md_scales[MAX_N_MD_SCALES];
+unsigned char md_N = 0;
+unsigned char mda = 0;
 char wt_rawData[TMP_BUFFER_SIZE];
-char wt_scales[TMP_BUFFER_SIZE];
-float scales[TMP_BUFFER_SIZE];
 int wt_errCode = HTTP_RQT_NOT_RECEIVED;
 unsigned char wt_monthly[12] = {100,100,100,100,100,100,100,100,100,100,100,100};
-int dwl = 100;
+int16_t dwl = -1;
 
 extern const char *user_agent_string;
 
 unsigned char findKeyVal (const char *str,char *strbuf, uint16_t maxlen,const char *key,bool key_in_pgm=false,uint8_t *keyfound=NULL);
 
-std::vector<float> parseScalesArray (const char* input);
-void parseMDA ();
+unsigned char parseMdScalesArray (const char* input);
 
+static void apply_default_watering_level() {
+	unsigned char uwt = os.iopts[IOPT_USE_WEATHER];
+	if (uwt==WEATHER_METHOD_MANUAL ||  uwt==WEATHER_METHOD_AUTORAINDELAY) {
+		if (dwl>=0 && (os.iopts[IOPT_WATER_PERCENTAGE] != dwl)) {
+			os.iopts[IOPT_WATER_PERCENTAGE] = dwl;
+			os.iopts_save();
+			os.weather_update_flag |= WEATHER_UPDATE_WL;
+		}
+	} else {
+		if (apply_monthly_adjustment(os.now_tz())) {
+			os.weather_update_flag |= WEATHER_UPDATE_WL;
+		}
+	}
+}
 // The weather function calls getweather.py on remote server to retrieve weather data
 // the default script is WEATHER_SCRIPT_HOST/weather?.py
 //static char website[] PROGMEM = DEFAULT_WEATHER_URL ;
@@ -81,11 +92,9 @@ static void getweather_callback(char* buffer) {
 			os.iopts_save();
 			os.weather_update_flag |= WEATHER_UPDATE_WL;
 		}
-	} else if (os.iopts[IOPT_USE_WEATHER]==WEATHER_METHOD_MANUAL ||  os.iopts[IOPT_USE_WEATHER]==WEATHER_METHOD_AUTORAINDELAY){
-		// no scale, but is manual or autoRain --> should change to dwl
-		os.iopts[IOPT_WATER_PERCENTAGE] = dwl;
-		os.iopts_save();
-		os.weather_update_flag |= WEATHER_UPDATE_WL;
+	} else {
+		// got an error or did not receive scale, use default watering level
+		apply_default_watering_level();
 	}
 
 	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("sunrise"), true)) {
@@ -141,8 +150,10 @@ static void getweather_callback(char* buffer) {
 		wt_rawData[TMP_BUFFER_SIZE-1]=0;  // make sure the buffer ends properly
 	}
 
-	if (findKeyVal(p, wt_scales, TMP_BUFFER_SIZE, PSTR("scales"), true)) {
-		scaleVector = parseScalesArray(wt_scales);
+	#define _STR_SCALES_SIZE (MAX_N_MD_SCALES*4+4)
+	char _str_scales[_STR_SCALES_SIZE];
+	if (findKeyVal(p, _str_scales, _STR_SCALES_SIZE, PSTR("scales"), true)) {
+		parseMdScalesArray(_str_scales);
 	}
 
 	if(save_nvdata) os.nvdata_save();
@@ -190,15 +201,15 @@ void GetWeather() {
 	DEBUG_PRINT(ether_buffer);
 	int ret = os.send_http_request(host, ether_buffer, getweather_callback_with_peel_header);
 	if(ret!=HTTP_RQT_SUCCESS) {
+		apply_default_watering_level();
 		if(wt_errCode < 0) wt_errCode = ret;
 		// if wt_errCode > 0, the call is successful but weather script may return error
 	}
 	// Update the mda flag according to new weather data
-	parseMDA();
+	//parse_wto(); ? should mda be updated here? it's stored in wto
 }
 
 void parse_wto(char* wto) {
-	ArduinoJson::JsonDocument doc;
 	if(*(wto+1)){
 		// Wrap in curly braces
 		wto[0] = '{';
@@ -206,29 +217,43 @@ void parse_wto(char* wto) {
 		wto[len] = '}';
 		wto[len+1] = 0;
 
+		ArduinoJson::JsonDocument doc;
 		ArduinoJson::DeserializationError error = ArduinoJson::deserializeJson(doc, wto);
+
+#if defined(ENABLE_DEBUG)
+		DEBUG_PRINTLN("Parsing wto:");
+		DEBUG_PRINTLN(wto);
+		ArduinoJson::JsonObject obj = doc.as<ArduinoJson::JsonObject>();
+		for (ArduinoJson::JsonPair kv : obj) {
+			DEBUG_PRINT(kv.key().c_str());
+			DEBUG_PRINT(": ");
+			DEBUG_PRINTLN(kv.value().as<String>());
+		}
+#endif
+
 		// Test and parse
 		if (error) {
 			DEBUG_PRINT(F("wto: deserializeJson() failed: "));
 			DEBUG_PRINTLN(error.c_str());
 		} else {
 			if(doc.containsKey("scales")){
-				int p[12];
 				for(unsigned char i=0;i<12;i++){
-					p[i]=doc["scales"][i];
-					if(p[i]<0) p[i]=0;
-					if(p[i]>250) p[i]=250;
-					wt_monthly[i]=p[i];
+					int p=doc["scales"][i];
+					p = (p<0) ? 0 : ((p>250) ? 250 : p); // clamp to [0, 250]
+					wt_monthly[i]=p;
 				}
 			}
 			if(doc.containsKey("dwl")){
 				dwl = doc["dwl"];
 			}
+			if(doc.containsKey("mda")){
+				mda = doc["mda"];
+			}
 		}
 	}
 }
 
-void apply_monthly_adjustment(time_os_t curr_time) {
+bool apply_monthly_adjustment(time_os_t curr_time) {
 	// ====== Check monthly water percentage ======
 	if(os.iopts[IOPT_USE_WEATHER]==WEATHER_METHOD_MONTHLY) {
 #if defined(ARDUINO)
@@ -238,54 +263,37 @@ void apply_monthly_adjustment(time_os_t curr_time) {
 		struct tm *ti = gmtime(&ct);
 		unsigned char m = ti->tm_mon;  // tm_mon ranges from [0,11]
 #endif
-			if(os.iopts[IOPT_WATER_PERCENTAGE]!=wt_monthly[m]) {
-				os.iopts[IOPT_WATER_PERCENTAGE]=wt_monthly[m];
-				os.iopts_save();
-			}
-		}
-}
-
-std::vector<float> parseScalesArray (const char* input) {
-    static std::vector<float> result;
-    std::string str(input);
-
-    if (!str.empty() && str.front() == '[') str.erase(0, 1);
-    if (!str.empty() && str.back() == ']') str.pop_back();
-
-    std::stringstream ss(str);
-    std::string next;
-
-	result.clear();
-
-    while (std::getline(ss, next, ',')) {
-        result.push_back(std::stof(next));
-    }
-
-    return result;
-}
-
-void parseMDA () {
-	char* buff = tmp_buffer+1;
-	ArduinoJson::JsonDocument doc;
-	os.sopt_load(SOPT_WEATHER_OPTS, buff);
-
-	if (buff != 0) {
-		buff = tmp_buffer;
-		buff[0] = '{';
-		int len = strlen(buff);
-		buff[len] = '}';
-		buff[len+1] = 0;
-
-		ArduinoJson::DeserializationError error = ArduinoJson::deserializeJson(doc, buff);
-
-		if (error) {
-			DEBUG_PRINT(F("mda: deserializeJson() failed: "));
-			DEBUG_PRINTLN(error.c_str());
-		} else {
-			unsigned int h = doc["mda"];
-			if(h){
-				mda = h;
-			}
+		if(os.iopts[IOPT_WATER_PERCENTAGE]!=wt_monthly[m]) {
+			os.iopts[IOPT_WATER_PERCENTAGE]=wt_monthly[m];
+			os.iopts_save();
+			return true;
 		}
 	}
+	return false;
+}
+
+unsigned char parseMdScalesArray (const char* input) {
+	if (!input) return 0;
+	const char* p = input;
+	if (*p != '[') return 0;   // must start with [
+	++p;                       // skip '['
+
+	DEBUG_PRINT("parseing md_scales:[");
+	int count = 0;
+	while (*p && *p != ']' && count < MAX_N_MD_SCALES) {
+		char* endptr;
+		long val = strtol(p, &endptr, 10);   // parse number
+		md_scales[count] = static_cast<unsigned char>(val);
+		DEBUG_PRINT(md_scales[count]);
+		DEBUG_PRINT(",");
+		count++;
+		p = endptr;
+		if (*p == ',') {
+			++p;  // skip comma
+		}
+	}
+	md_N = count;
+	DEBUG_PRINT("],total=");
+	DEBUG_PRINTLN(md_N);
+	return count;
 }
