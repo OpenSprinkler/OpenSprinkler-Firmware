@@ -225,17 +225,6 @@ void parse_wto(char* wto) {
 		ArduinoJson::JsonDocument doc;
 		ArduinoJson::DeserializationError error = ArduinoJson::deserializeJson(doc, wto);
 
-#if defined(ENABLE_DEBUG)
-		DEBUG_PRINTLN("Parsing wto:");
-		DEBUG_PRINTLN(wto);
-		ArduinoJson::JsonObject obj = doc.as<ArduinoJson::JsonObject>();
-		for (ArduinoJson::JsonPair kv : obj) {
-			DEBUG_PRINT(kv.key().c_str());
-			DEBUG_PRINT(": ");
-			DEBUG_PRINTLN(kv.value().as<String>());
-		}
-#endif
-
 		// Test and parse
 		if (error) {
 			DEBUG_PRINT(F("wto: deserializeJson() failed: "));
