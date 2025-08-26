@@ -28,8 +28,6 @@
 #include "weather.h"
 #include "main.h"
 #include "types.h"
-#include <sstream>
-#include <string>
 #include "ArduinoJson.hpp"
 
 extern OpenSprinkler os; // OpenSprinkler object
@@ -199,7 +197,11 @@ void GetWeather() {
 
 	wt_errCode = HTTP_RQT_NOT_RECEIVED;
 	DEBUG_PRINT(ether_buffer);
+#if defined(OS_AVR)
+	int ret = os.send_http_request(host, ether_buffer, getweather_callback_with_peel_header);
+#else
 	int ret = os.send_http_request(host, 443, ether_buffer, getweather_callback_with_peel_header, true);
+#endif
 	if(ret!=HTTP_RQT_SUCCESS) {
 		apply_default_watering_level();
 		if(wt_errCode < 0) wt_errCode = ret;

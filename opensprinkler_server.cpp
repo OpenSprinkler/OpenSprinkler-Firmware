@@ -608,6 +608,9 @@ void server_change_stations(OTF_PARAMS_DEF) {
 					handle_return(HTML_DATA_OUTOFBOUND);
 				}
 			} else if ((tmp_buffer[0] == STN_TYPE_HTTP) || (tmp_buffer[0] == STN_TYPE_HTTPS) || (tmp_buffer[0] == STN_TYPE_REMOTE_OTC)) {
+				#if !defined(USE_OTF)
+				urlDecode(tmp_buffer+1); // decode the string for OS_AVR
+				#endif
 				if (strlen(tmp_buffer+1) > sizeof(HTTPStationData)) {
 					handle_return(HTML_DATA_OUTOFBOUND);
 				}
@@ -701,9 +704,7 @@ void server_change_runonce(OTF_PARAMS_DEF) {
 	char *p = get_buffer;
 
 	// decode url first
-	#if !defined(USE_OTF)
 	if(p) urlDecode(p);
-	#endif
 	// search for the start of t=[
 	char *pv;
 	boolean found=false;
@@ -1638,7 +1639,7 @@ void server_change_options(OTF_PARAMS_DEF)
 
 	if(weather_change) {
 		DEBUG_PRINTLN("weather change happened");
-		os.iopts[IOPT_WATER_PERCENTAGE] = 100;  // reset watering percentage to 100%
+		//os.iopts[IOPT_WATER_PERCENTAGE] = 100;  // reset watering percentage to 100%
 		wt_rawData[0] = 0;  // reset wt_rawData and errCode
 		wt_errCode = HTTP_RQT_NOT_RECEIVED;
 		os.checkwt_lasttime = 0;  // force weather update
