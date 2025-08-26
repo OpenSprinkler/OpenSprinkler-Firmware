@@ -199,7 +199,7 @@ void GetWeather() {
 
 	wt_errCode = HTTP_RQT_NOT_RECEIVED;
 	DEBUG_PRINT(ether_buffer);
-	int ret = os.send_http_request(host, ether_buffer, getweather_callback_with_peel_header);
+	int ret = os.send_http_request(host, 443, ether_buffer, getweather_callback_with_peel_header, true);
 	if(ret!=HTTP_RQT_SUCCESS) {
 		apply_default_watering_level();
 		if(wt_errCode < 0) wt_errCode = ret;
@@ -210,6 +210,9 @@ void GetWeather() {
 }
 
 void parse_wto(char* wto) {
+	// reset variables to default values before parsing
+	dwl = -1;
+	mda = 0;
 	if(*(wto+1)){
 		// Wrap in curly braces
 		wto[0] = '{';
