@@ -39,7 +39,7 @@ unsigned char mda = 0;
 char wt_rawData[TMP_BUFFER_SIZE];
 int wt_errCode = HTTP_RQT_NOT_RECEIVED;
 unsigned char wt_monthly[12] = {100,100,100,100,100,100,100,100,100,100,100,100};
-int16_t dwl = -1;
+unsigned char wt_restricted = 0;
 
 extern const char *user_agent_string;
 
@@ -47,20 +47,6 @@ unsigned char findKeyVal (const char *str,char *strbuf, uint16_t maxlen,const ch
 
 unsigned char parseMdScalesArray (const char* input);
 
-static void apply_default_watering_level() {
-	unsigned char uwt = os.iopts[IOPT_USE_WEATHER];
-	if (uwt==WEATHER_METHOD_MANUAL ||  uwt==WEATHER_METHOD_AUTORAINDELAY) {
-		if (dwl>=0 && (os.iopts[IOPT_WATER_PERCENTAGE] != dwl)) {
-			os.iopts[IOPT_WATER_PERCENTAGE] = dwl;
-			os.iopts_save();
-			os.weather_update_flag |= WEATHER_UPDATE_WL;
-		}
-	} else {
-		if (apply_monthly_adjustment(os.now_tz())) {
-			os.weather_update_flag |= WEATHER_UPDATE_WL;
-		}
-	}
-}
 // The weather function calls getweather.py on remote server to retrieve weather data
 // the default script is WEATHER_SCRIPT_HOST/weather?.py
 //static char website[] PROGMEM = DEFAULT_WEATHER_URL ;
@@ -75,10 +61,11 @@ static void getweather_callback(char* buffer) {
 	if (*p != '&')	return;
 	int v;
 	bool save_nvdata = false;
+	time_os_t tnow = os.now_tz();
 	// first check errCode, only update lswc timestamp if errCode is 0
 	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("errCode"), true)) {
 		wt_errCode = atoi(tmp_buffer);
-		if(wt_errCode==0) os.checkwt_success_lasttime = os.now_tz();
+		if(wt_errCode==0) os.checkwt_success_lasttime = tnow;
 	}
 
 	// then only parse scale if errCode is 0
@@ -91,8 +78,16 @@ static void getweather_callback(char* buffer) {
 			os.weather_update_flag |= WEATHER_UPDATE_WL;
 		}
 	} else {
-		// got an error or did not receive scale, use default watering level
-		apply_default_watering_level();
+		// got an error or did not receive scale, apply default watering level
+		if (apply_monthly_adjustment(tnow)) {
+			os.weather_update_flag |= WEATHER_UPDATE_WL;
+		}
+	}
+
+	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("restricted"), true)) {
+		wt_restricted = atoi(tmp_buffer);
+	} else {
+		wt_restricted = 0;
 	}
 
 	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("sunrise"), true)) {
@@ -137,7 +132,7 @@ static void getweather_callback(char* buffer) {
 	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("rd"), true)) {
 		v = atoi(tmp_buffer);
 		if (v>0) {
-			os.nvdata.rd_stop_time = os.now_tz() + (unsigned long) v * 3600;
+			os.nvdata.rd_stop_time = tnow + (unsigned long) v * 3600;
 			os.raindelay_start();
 		} else if (v==0) {
 			os.raindelay_stop();
@@ -203,17 +198,17 @@ void GetWeather() {
 	int ret = os.send_http_request(host, 443, ether_buffer, getweather_callback_with_peel_header, true);
 #endif
 	if(ret!=HTTP_RQT_SUCCESS) {
-		apply_default_watering_level();
+		// if weather call is unsuccessful
+		if (apply_monthly_adjustment(os.now_tz())) {
+			os.weather_update_flag |= WEATHER_UPDATE_WL;
+		}
 		if(wt_errCode < 0) wt_errCode = ret;
 		// if wt_errCode > 0, the call is successful but weather script may return error
 	}
-	// Update the mda flag according to new weather data
-	//parse_wto(); ? should mda be updated here? it's stored in wto
 }
 
 void parse_wto(char* wto) {
 	// reset variables to default values before parsing
-	dwl = -1;
 	mda = 0;
 	if(*(wto+1)){
 		// Wrap in curly braces
@@ -236,9 +231,6 @@ void parse_wto(char* wto) {
 					p = (p<0) ? 0 : ((p>250) ? 250 : p); // clamp to [0, 250]
 					wt_monthly[i]=p;
 				}
-			}
-			if(doc.containsKey("dwl")){
-				dwl = doc["dwl"];
 			}
 			if(doc.containsKey("mda")){
 				mda = doc["mda"];

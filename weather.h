@@ -32,7 +32,7 @@
 #define WEATHER_UPDATE_TZ       0x10
 #define WEATHER_UPDATE_RD       0x20
 
-#define MAX_N_MD_SCALES 32 // maximum number of days that can be stored in md_scales array
+#define MAX_N_MD_SCALES 14 // maximum number of days that can be stored in md_scales array
 
 void GetWeather();
 
@@ -42,7 +42,7 @@ extern unsigned char md_scales[]; // multiday watering scales
 extern unsigned char md_N; // number of elements in the md_scales array
 extern unsigned char mda;
 extern unsigned char wt_monthly[];
-extern int16_t dwl;
+extern unsigned char wt_restricted;
 void parse_wto(char* wto);
 bool apply_monthly_adjustment(time_os_t curr_time);
 #endif  // _WEATHER_H

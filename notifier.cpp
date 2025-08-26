@@ -224,7 +224,8 @@ void push_message(uint16_t type, uint32_t lval, float fval, uint8_t bval) {
 					snprintf_P(postval+strlen(postval), TMP_BUFFER_SIZE, PSTR(" %d minutes %d seconds."), (int)fval/60, (int)fval%60);
 				}
 				if(email_enabled) { email_message.subject += PSTR("station event"); }
-			}			break;
+			}
+			break;
 
 		case NOTIFY_STATION_OFF:
 
@@ -372,17 +373,32 @@ void push_message(uint16_t type, uint32_t lval, float fval, uint8_t bval) {
 		}
  
 		case NOTIFY_PROGRAM_SCHED:
-
+			if (os.mqtt.enabled()) {
+				snprintf_P(topic, PUSH_TOPIC_LEN, PSTR("program/%d"), lval);
+				if(fval<0) {
+					strcat_P(payload, PSTR("{\"state\":\"skipped\""));
+				} else {
+					strcat_P(payload, PSTR("{\"state\":1,\"wl\":"));
+					snprintf_P(payload+strlen(payload), PUSH_PAYLOAD_LEN, PSTR("%d"), (int)fval);
+				}
+				strcat_P(payload, PSTR("}"));
+			}
 			if (ifttt_enabled || email_enabled) {
-				if (bval) strcat_P(postval, PSTR("manually"));
-				else strcat_P(postval, PSTR("automatically"));
-				strcat_P(postval, PSTR(" scheduled Program "));
+				if(fval<0) {
+					strcat_P(postval, PSTR("skipped"));
+				} else {
+					if (bval) strcat_P(postval, PSTR("manually scheduled "));
+					else strcat_P(postval, PSTR("automatically scheduled "));
+				}
 				{
 					ProgramStruct prog;
 					pd.read(lval, &prog);
 					if(lval<pd.nprograms) strcat(postval, prog.name);
 				}
-				snprintf_P(postval+strlen(postval), TMP_BUFFER_SIZE, PSTR(" with %d%% water level."), (int)fval);
+				if(fval>0) {
+					snprintf_P(postval+strlen(postval), TMP_BUFFER_SIZE, PSTR(" with %d%% water level."), (int)fval);
+				}
+
 				if(email_enabled) { email_message.subject += PSTR("program event"); }
 			}
 			break;

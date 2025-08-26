@@ -1639,7 +1639,7 @@ void server_change_options(OTF_PARAMS_DEF)
 
 	if(weather_change) {
 		DEBUG_PRINTLN("weather change happened");
-		//os.iopts[IOPT_WATER_PERCENTAGE] = 100;  // reset watering percentage to 100%
+		os.iopts[IOPT_WATER_PERCENTAGE] = 100;  // reset watering percentage to 100%
 		wt_rawData[0] = 0;  // reset wt_rawData and errCode
 		wt_errCode = HTTP_RQT_NOT_RECEIVED;
 		os.checkwt_lasttime = 0;  // force weather update

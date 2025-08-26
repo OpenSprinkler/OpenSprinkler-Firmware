@@ -882,6 +882,19 @@ void do_loop()
 					// get station ordering
 					unsigned char order[os.nstations];
 					prog.gen_station_runorder(runcount, order);
+
+					// prepare watering level
+					unsigned char wl = os.iopts[IOPT_WATER_PERCENTAGE];
+					// If historical data is enabled and interval program, overwrite watering percentage with historical one.
+					if (mda == 100 && prog.type == PROGRAM_TYPE_INTERVAL && md_N > 0) {
+						// Use interval length unless longer than available data
+						if ((unsigned int)prog.days[1]-1 < md_N){
+							wl = md_scales[prog.days[1]-1];
+						} else {
+							wl = md_scales[md_N-1];
+						}
+					}
+
 					// process all selected stations
 					for(unsigned char oi=0;oi<os.nstations;oi++) {
 						sid=order[oi];
@@ -897,18 +910,6 @@ void do_loop()
 							ulong water_time = water_time_resolve(prog.durations[sid]);
 							// if the interval program is set to use weather scaling
 							if (prog.use_weather) {
-								unsigned char wl = os.iopts[IOPT_WATER_PERCENTAGE];
-
-								// If historical data is enabled and interval program, overwrite watering percentage with historical one.
-								if (mda == 100 && prog.type == PROGRAM_TYPE_INTERVAL && md_N > 0) {
-									// Use interval length unless longer than available data
-									if ((unsigned int)prog.days[1]-1 < md_N){
-										wl = md_scales[prog.days[1]-1];
-									} else {
-										wl = md_scales[md_N-1];
-									}
-								}
-								
 								water_time = water_time * wl / 100;
 								if (wl < 20 && water_time < 10) // if water_percentage is less than 20% and water_time is less than 10 seconds
 																								// do not water
@@ -932,7 +933,10 @@ void do_loop()
 						}// if prog.durations[sid]
 					}// for sid
 					if(match_found) {
-						notif.add(NOTIFY_PROGRAM_SCHED, pid, prog.use_weather?os.iopts[IOPT_WATER_PERCENTAGE]:100);
+						notif.add(NOTIFY_PROGRAM_SCHED, pid, prog.use_weather?wl:100);
+					} else {
+						// program being skipped e.g. due to 0% watering level
+						notif.add(NOTIFY_PROGRAM_SCHED, pid, -1);
 					}
 					//delete run-once if on final runtime (stations have already been queued)
 					if(will_delete){
@@ -1233,8 +1237,6 @@ void check_weather() {
 			wt_rawData[0] = 0; 		// reset wt_rawData, errCode, and md_scales array
 			wt_errCode = HTTP_RQT_NOT_RECEIVED;
 			md_N = 0;
-		} else {
-			if(dwl >= 0) os.iopts[IOPT_WATER_PERCENTAGE] = dwl;
 		}
 	} else if (!os.checkwt_lasttime || (ntz > os.checkwt_lasttime + CHECK_WEATHER_TIMEOUT)) {
 		os.checkwt_lasttime = ntz;
