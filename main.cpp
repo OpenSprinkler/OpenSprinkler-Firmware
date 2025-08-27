@@ -557,7 +557,7 @@ void overcurrent_monitor() {
 			unsigned char sid = curr_alert_sid - 1;
 			for(unsigned char i = 0; i < 10; i++) {
 				uint16_t curr = os.read_current();
-				if(curr > imax) {
+				if(curr > (uint16_t)imax) {
 					turn_off_running_station_immediate(sid, tn);
 					notif.add(NOTIFY_CURR_ALERT, sid, curr, CURR_ALERT_TYPE_OVER_STATION);
 					os.status.overcurrent_sid = curr_alert_sid;

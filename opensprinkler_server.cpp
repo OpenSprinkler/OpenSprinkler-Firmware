@@ -1641,7 +1641,7 @@ void server_change_options(OTF_PARAMS_DEF)
 
 	if(weather_change) {
 		DEBUG_PRINTLN("weather change happened");
-		os.iopts[IOPT_WATER_PERCENTAGE] = 100;  // reset watering percentage to 100%
+		//os.iopts[IOPT_WATER_PERCENTAGE] = 100;  // reset watering percentage to 100%
 		wt_restricted = 0; // reset wt_restrcited, wt_rawData and errCode
 		wt_rawData[0] = 0;
 		wt_errCode = HTTP_RQT_NOT_RECEIVED;
@@ -2470,7 +2470,7 @@ ulong getNtpTime() {
 
 	uint16_t port = (uint16_t)(os.iopts[IOPT_HTTPPORT_1]<<8) + (uint16_t)os.iopts[IOPT_HTTPPORT_0];
 	port = (port==8000) ? 8888:8000; // use a different port than http port
-	UDP *udp = new EthernetUDP();
+	EthernetUDP udp;
 
 	#define NTP_PACKET_SIZE 48
 	#define NTP_PORT 123
@@ -2491,11 +2491,10 @@ ulong getNtpTime() {
 		os.iopts[IOPT_NTP_IP3],
 		os.iopts[IOPT_NTP_IP4]};
 	unsigned char tries=0;
-	ulong gt = 0;
 	ulong startt = millis();
 	while(tries<NTP_NTRIES) {
 		// sendNtpPacket
-		udp->begin(port);
+		udp.begin(port);
 
 		memset(packetBuffer, 0, NTP_PACKET_SIZE);
 		packetBuffer[0] = 0b11100011;  // LI, Version, Mode
@@ -2514,31 +2513,31 @@ ulong getNtpTime() {
 		int ret;
 		if (!os.iopts[IOPT_NTP_IP1] || os.iopts[IOPT_NTP_IP1] == '0') {
 			DEBUG_PRINT(public_ntp_servers[sidx]);
-			ret = udp->beginPacket(public_ntp_servers[sidx], NTP_PORT);
+			ret = udp.beginPacket(public_ntp_servers[sidx], NTP_PORT);
 		} else {
 			DEBUG_PRINTLN(IPAddress(ntpip[0],ntpip[1],ntpip[2],ntpip[3]));
-			ret = udp->beginPacket(ntpip, NTP_PORT);
+			ret = udp.beginPacket(ntpip, NTP_PORT);
 		}
 		if(ret!=1) {
 			DEBUG_PRINT(F(" not available (ret: "));
 			DEBUG_PRINT(ret);
 			DEBUG_PRINTLN(")");
-			udp->stop();
+			udp.stop();
 			tries++;
 			sidx=(sidx+1)%N_PUBLIC_SERVERS;
 			continue;
 		} else {
 			DEBUG_PRINTLN(F(" connected"));
 		}
-		udp->write(packetBuffer, NTP_PACKET_SIZE);
-		udp->endPacket();
+		udp.write(packetBuffer, NTP_PACKET_SIZE);
+		udp.endPacket();
 		// end of sendNtpPacket
 
 		// process response
 		ulong timeout = millis()+2000;
 		while((long)(millis()-timeout)<0) {
-			if(udp->parsePacket()) {
-				udp->read(packetBuffer, NTP_PACKET_SIZE);
+			if(udp.parsePacket()) {
+				udp.read(packetBuffer, NTP_PACKET_SIZE);
 				ulong highWord = word(packetBuffer[40], packetBuffer[41]);
 				ulong lowWord = word(packetBuffer[42], packetBuffer[43]);
 				ulong secsSince1900 = highWord << 16 | lowWord;
@@ -2546,8 +2545,7 @@ ulong getNtpTime() {
 				ulong gt = secsSince1900 - seventyYears;
 				// check validity: has to be larger than 1/1/2020 12:00:00
 				if(gt>1577836800UL) {
-					udp->stop();
-					delete udp;
+					udp.stop();
 					DEBUG_PRINT(F("took "));
 					DEBUG_PRINT(millis()-startt);
 					DEBUG_PRINTLN(F("ms"));
@@ -2556,12 +2554,11 @@ ulong getNtpTime() {
 			}
 		}
 		tries++;
-		udp->stop();
+		udp.stop();
 		sidx=(sidx+1)%N_PUBLIC_SERVERS;
 	}
 	if(tries==NTP_NTRIES) {DEBUG_PRINTLN(F("NTP failed!!"));}
-	udp->stop();
-	delete udp;
+	udp.stop();
 	return 0;
 }
 #endif

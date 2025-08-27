@@ -536,7 +536,7 @@ int OSMqtt::_publish(const char *topic, const char *payload) {
 	return MQTT_SUCCESS;
 }
 
-void subscribe_callback(const char *topic, unsigned char *payload, unsigned int length) {
+void subscribe_callback(char *topic, unsigned char *payload, unsigned int length) {
 	DEBUG_LOGF("Subscribe Callback\r\n");
 	payload[length] = 0; // properly end the message
 	char* message = (char*)payload;
