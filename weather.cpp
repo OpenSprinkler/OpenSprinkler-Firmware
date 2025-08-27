@@ -140,8 +140,12 @@ static void getweather_callback(char* buffer) {
 
 	#define _STR_SCALES_SIZE (MAX_N_MD_SCALES*4+4)
 	char _str_scales[_STR_SCALES_SIZE];
-	if (findKeyVal(p, _str_scales, _STR_SCALES_SIZE, PSTR("scales"), true)) {
-		parseMdScalesArray(_str_scales);
+	if (wt_errCode==0) {
+		if (findKeyVal(p, _str_scales, _STR_SCALES_SIZE, PSTR("scales"), true)) {
+			parseMdScalesArray(_str_scales);
+		} else {
+			md_N = 0; // clear the wt_scales array
+		}
 	}
 
 	if(save_nvdata) os.nvdata_save();
