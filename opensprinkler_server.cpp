@@ -1077,15 +1077,7 @@ void server_json_options_main() {
 	}
 
 	bfill.emit_p(PSTR(",\"dexp\":$D,\"mexp\":$D,\"hwt\":$D,"), os.detect_exp(), MAX_EXT_BOARDS, os.hw_type);
-	bfill.emit_p(PSTR("\"wls\":["));
-	if (md_N == 0) {
-		bfill.emit_p(PSTR("],"));
-	}
-	unsigned char idx;
-	for (idx = 0; idx < md_N; idx++) {
-		bfill.emit_p(PSTR("$D"), (int)md_scales[idx]);
-		bfill.emit_p((idx == md_N-1) ? PSTR("],") : PSTR(","));
-	}
+
 	// print master array
 	unsigned char masid, optidx;
 	bfill.emit_p(PSTR("\"ms\":["));
@@ -1249,6 +1241,15 @@ void server_json_controller_main(OTF_PARAMS_DEF) {
 #if defined(SUPPORT_EMAIL)
 	bfill.emit_p(PSTR("\"email\":{$O},"), SOPT_EMAIL_OPTS);
 #endif
+
+	bfill.emit_p(PSTR("\"wls\":["));
+	if (md_N == 0) {
+		bfill.emit_p(PSTR("],"));
+	}
+	for (unsigned char idx = 0; idx < md_N; idx++) {
+		bfill.emit_p(PSTR("$D"), (int)md_scales[idx]);
+		bfill.emit_p((idx == md_N-1) ? PSTR("],") : PSTR(","));
+	}
 
 #if defined(ARDUINO)
 	uint16_t current = os.read_current();
