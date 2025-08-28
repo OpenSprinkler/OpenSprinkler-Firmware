@@ -687,13 +687,14 @@ void server_manual_program(OTF_PARAMS_DEF) {
 
 /**
  * Change run-once program
- * Command: /cr?pw=xxx&t=[x,x,x...]&cnt?=xxx&int?=xxx&uwt?=xxx
+ * Command: /cr?pw=xxx&t=[x,x,x...]&cnt?=xxx&int?=xxx&uwt?=xxx&&anno?=xxx
  *
  * pw: password
  * t:  station water time
  * cnt?: repeat count
  * int?: repeat interval
  * uwt?: use weather adjustment
+ * anno?: annotation for station ordering (refer to program name annotation)
  */
 void server_change_runonce(OTF_PARAMS_DEF) {
 #if defined(USE_OTF)
@@ -721,13 +722,23 @@ void server_change_runonce(OTF_PARAMS_DEF) {
 	// reset all stations and prepare to run one-time program
 	reset_all_stations_immediate();
 
-	ProgramStruct prog;
+	ProgramStruct prog, annoprog;
+	unsigned char ns = os.nstations;
 
 	uint16_t dur;
-	for(int i=0;i<os.nstations;i++) {
+	for(int i=0;i<ns;i++) {
 		dur = parse_listdata(&pv);
 		prog.durations[i] = dur > 0 ? dur : 0;
 	}
+
+	unsigned char order[ns];
+	annoprog.name[0] = 0;
+	// check if anno parameter is provided
+	if(findKeyVal(FKV_SOURCE,tmp_buffer,PROGRAM_NAME_SIZE-1,PSTR("anno"),true)){
+		tmp_buffer[PROGRAM_NAME_SIZE-1] = 0; // make sure it ends properly
+		strcpy(annoprog.name, tmp_buffer);
+	}
+	annoprog.gen_station_runorder(1, order);
 
 	//check if repeat count is defined and create program to perform the repetitions
 	if(findKeyVal(FKV_SOURCE,tmp_buffer,TMP_BUFFER_SIZE,PSTR("cnt"),true)){
@@ -763,6 +774,8 @@ void server_change_runonce(OTF_PARAMS_DEF) {
 			prog.days[1] = epoch_t & 0b11111111; //one interval past current day in epoch time
 			prog.starttimes[0] = curr_time % 1440; //one interval past current time
 			strcpy_P(prog.name, PSTR("Run-Once with repeat"));
+			strncat(prog.name, annoprog.name, PROGRAM_NAME_SIZE-strlen(prog.name)-1);
+			prog.name[PROGRAM_NAME_SIZE-1]=0;
 
 			//if no more repeats, remove interval to flag for deletion
 			if(prog.starttimes[1] == 0){
@@ -778,7 +791,8 @@ void server_change_runonce(OTF_PARAMS_DEF) {
 	//No repeat count defined or first repeat --> use old API
 	unsigned char sid, bid, s;
 	boolean match_found = false;
-	for(sid=0;sid<os.nstations;sid++) {
+	for(unsigned char oi=0;oi<ns;oi++) {
+		sid=order[oi];
 		dur=prog.durations[sid];
 		if(findKeyVal(FKV_SOURCE,tmp_buffer,TMP_BUFFER_SIZE,PSTR("uwt"),true)){
 			if((uint16_t)atol(tmp_buffer)){
