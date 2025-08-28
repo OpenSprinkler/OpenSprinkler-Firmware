@@ -2472,6 +2472,8 @@ void OpenSprinkler::iopts_load() {
 	populate_master();
 	sopt_load(SOPT_WEATHER_OPTS, tmp_buffer+1); // Leave room for curly brace
 	parse_wto(tmp_buffer);
+	// California restriction is now indicated in wto and no longer by the highest bit of uwt. So we force that bit to 0
+	iopts[IOPT_USE_WEATHER] &= 0x7F;
 }
 
 void OpenSprinkler::populate_master() {

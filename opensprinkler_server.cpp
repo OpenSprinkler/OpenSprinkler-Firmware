@@ -1537,7 +1537,11 @@ void server_change_options(OTF_PARAMS_DEF)
 		if (os.iopts[oid] != prev_value) {	// if value has changed
 			if (oid==IOPT_TIMEZONE || oid==IOPT_USE_NTP)		time_change = true;
 			if (oid>=IOPT_NTP_IP1 && oid<=IOPT_NTP_IP4)			time_change = true;
-			if (oid==IOPT_USE_WEATHER) weather_change = true;
+			if (oid==IOPT_USE_WEATHER) {
+				weather_change = true;
+				// California restriction is now indicated in wto and no longer by the highest bit of uwt. So we force that bit to 0
+				os.iopts[oid] &= 0x7F;
+			}
 			if (oid>=IOPT_SENSOR1_TYPE && oid<=IOPT_SENSOR2_OFF_DELAY) sensor_change = true;
 		}
 	}
