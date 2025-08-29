@@ -1349,7 +1349,7 @@ void server_home(OTF_PARAMS_DEF)
 
 /**
  * Change controller variables
- * Command: /cv?pw=xxx&rsn=x&rrsn=x&rbt=x&en=x&rd=x&re=x&ap=x
+ * Command: /cv?pw=xxx&rsn=x&rrsn=x&rbt=x&en=x&rd=x&rocs=x&re=x&ap=x
  *
  * pw:	password
  * rsn: reset all stations (0 or 1)
@@ -1358,6 +1358,7 @@ void server_home(OTF_PARAMS_DEF)
  * en:	enable (0 or 1)
  * rd:	rain delay hours (0 turns off rain delay)
  * re:	remote extension mode
+ * rocs: reset overcurrent status (0 or 1)
  * ap:	reset to ap (ESP8266 only)
  * update: launch update script (for OSPi/Linux only)
  */
@@ -1369,15 +1370,19 @@ void server_change_values(OTF_PARAMS_DEF)
 #else
 	char *p = get_buffer;
 #endif
-	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("rsn"), true)) {
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("rsn"), true) && atoi(tmp_buffer) > 0) {
 		reset_all_stations();
 	}
 
-	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("rrsn"), true)) {
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("rrsn"), true) && atoi(tmp_buffer) > 0) {
 		reset_all_stations(true);
 	}
 
-#if !defined(ARDUINO)
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("rocs"), true) && atoi(tmp_buffer) > 0) {
+		os.status.overcurrent_sid = 0; // clear overcurrent status
+	}
+
+	#if !defined(ARDUINO)
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("update"), true) && atoi(tmp_buffer) > 0) {
 		os.update_dev();
 	}
