@@ -937,6 +937,66 @@ void server_change_program(OTF_PARAMS_DEF) {
 		}
 	}
 
+    char *end;
+
+    SensorAdjustment *adj = nullptr;
+    unsigned long flags = 0;
+    unsigned long sid = 255;
+    unsigned long point_count = 0;
+    sensor_adjustment_point_t points[SENSOR_ADJUSTMENT_POINTS] = {0.0, 0.0};
+    
+    if ((adj = os.get_sensor_adjust(pid))) {
+        flags = adj->flags;
+        sid = adj->sid;
+        point_count = adj->point_count;
+
+        for (size_t i = 0; i <= point_count; i++) {
+        points[i] = adj->points[i];
+    }
+        delete adj;
+    }
+    
+    if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("adj_flags"), true)) {
+		flags=strtoul(tmp_buffer, &end, 10);
+        if (*end != '\0') handle_return(HTML_DATA_FORMATERROR);
+	}
+
+    if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("adj_sid"), true)) {
+		sid=strtoul(tmp_buffer, &end, 10);
+        if (*end != '\0') handle_return(HTML_DATA_FORMATERROR);
+        if (sid >= MAX_SENSORS) sid = 255;
+	}
+
+    if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("adj_points"), true)) {
+        unsigned long i = 0;
+        double x, y;
+        const char *ptr = tmp_buffer;
+        int result;
+        double last_x = -std::numeric_limits<double>::infinity();;
+
+        while (*ptr != '\0') {
+            if (i >= SENSOR_ADJUSTMENT_POINTS) handle_return(HTML_DATA_FORMATERROR);
+
+            result = sscanf(ptr, "%lf,%lf;", &x, &y);
+
+            if (result != 2 || x <= last_x) {
+                handle_return(HTML_DATA_FORMATERROR);
+            }
+
+            points[i++] = sensor_adjustment_point_t {x, y};
+
+            last_x = x;
+
+            while (*(ptr++) != ';') {}
+        }
+
+        point_count = i;
+    }
+
+    adj = new SensorAdjustment(flags, sid, point_count, points);
+    os.write_sensor_adjust(adj, pid);
+    delete adj;
+
 
 #if !defined(USE_OTF)
 	if(p) urlDecode(p);
@@ -1135,6 +1195,40 @@ void server_json_programs_main(OTF_PARAMS_DEF) {
 			send_packet(OTF_PARAMS);
 		}
 	}
+
+    bfill.emit_p(PSTR("],\"adj\":["));
+    uint8_t adj_count = 0;
+
+    SensorAdjustment *adj;
+    os_file_type file = file_open(SENADJ_FILENAME, FileOpenMode::Read);
+    if (file) {
+        for (size_t i = 0; i < pd.nprograms; i++) {
+            if ((adj = os.get_sensor_adjust(i))) {
+                if (adj_count) bfill.emit_p(PSTR(","));
+                bfill.emit_p(PSTR("{\"pid\":$D,\"flags\":$D,\"sid\":$D,\"point_count\":$D,\"splits\":["), i, adj->flags, adj->sid, adj->point_count);
+                for (int j = 0; j < adj->point_count; j++) {
+                    if (j) bfill.emit_p(PSTR(","));
+                    bfill.emit_p(PSTR("{\"x\":$E,\"y\":$E}"), adj->points[j].x, adj->points[j].y);
+                }
+                bfill.emit_p(PSTR("]}"));
+                adj_count += 1;
+                delete adj;
+
+
+                // push out a packet if available
+                // buffer size is getting small
+                if (available_ether_buffer() <= 0) {
+                    send_packet(OTF_PARAMS);
+                }
+            }
+        }
+
+        file_close(file);
+    } else {
+        DEBUG_PRINT("Failed to open file: ");
+        DEBUG_PRINTLN(SENADJ_FILENAME);
+    }
+
 	bfill.emit_p(PSTR("]}"));
 }
 
@@ -2299,6 +2393,21 @@ void server_delete_sensor(OTF_PARAMS_DEF) {
 	handle_return(HTML_SUCCESS);
 }
 
+uint8_t write_buf_log(uint32_t num, char *buf) {
+    if (num) {
+        uint8_t index = 0;
+        while (num > 0) {
+            buf[index++] = (num%10) + '0';
+            num /= 10;
+        }
+
+        return index;
+    } else {
+        buf[0] = '0';
+        return 1;
+    }
+}
+
 void server_log_sensor(OTF_PARAMS_DEF) {
 #if defined(USE_OTF)
 	if(!process_password(OTF_PARAMS)) return;
@@ -2308,6 +2417,8 @@ void server_log_sensor(OTF_PARAMS_DEF) {
 	print_header();
 #endif
 
+    ulong start_time = millis();
+
     ulong count = 0;
     ulong i;
 
@@ -2316,12 +2427,11 @@ void server_log_sensor(OTF_PARAMS_DEF) {
     if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("count"), true)) {
         max_count = strtoul(tmp_buffer, &end, 10);
         if (*end != '\0') handle_return(HTML_DATA_FORMATERROR);
-        if (max_count > 10000 || max_count > MAX_SENSOR_LOG_COUNT) handle_return(HTML_DATA_OUTOFBOUND);
+        if (max_count > MAX_SENSOR_LOG_COUNT) handle_return(HTML_DATA_OUTOFBOUND);
     }
 
     uint16_t file_no = os.sensor_file_no;
     uint16_t next;
-    // file_read_block(SENSORS_LOG_FILENAME, &next, 0, sizeof(next));
 
     os_file_type file = os.open_sensor_log(file_no, FileOpenMode::Read);
     if (file) {
@@ -2374,7 +2484,6 @@ void server_log_sensor(OTF_PARAMS_DEF) {
     // Clear out buffer
     memset(tmp_buffer, 0, SENSOR_LOG_ITEM_SIZE);
 
-    // os_file_type file = file_open(SENSORS_LOG_FILENAME, FileOpenMode::Read);
     file = os.open_sensor_log(file_no, FileOpenMode::Read);
     if (file) {
         file_seek(file, sizeof(next) + (next * SENSOR_LOG_ITEM_SIZE), FileSeekMode::Current);
@@ -2384,7 +2493,9 @@ void server_log_sensor(OTF_PARAMS_DEF) {
         handle_return(HTML_INTERNAL_ERROR);
     }
 
-    bfill.emit_p(PSTR("{\"log\":["));
+    send_packet(OTF_PARAMS);
+
+    char print_buf[22] = "00,00000000,00000000\n";
     
     for (i=0;i<max_count;i++) {
         if (next == SENSOR_LOG_PER_FILE) {
@@ -2426,21 +2537,34 @@ void server_log_sensor(OTF_PARAMS_DEF) {
             time_os_t timestamp;
             memcpy(&timestamp, buf_ptr, sizeof(timestamp));
             buf_ptr += sizeof(timestamp);
-            float value;
+            uint32_t value;
             memcpy(&value, buf_ptr, sizeof(value));
             buf_ptr += sizeof(value);
 
             if (timestamp > before || timestamp < after) continue;
 
-            if (count) bfill.emit_p(PSTR(","));
-            bfill.emit_p(PSTR("{\"sid\":$D,\"timestamp\":$L,\"value\":$E}"), sid, timestamp, value);
-            count += 1;
+            print_buf[0] = dec2hexchar((sid >> 4) & 0xF);
+            print_buf[1] = dec2hexchar(sid & 0xF);
 
-            // push out a packet if available
-            // buffer size is getting small
-            if (available_ether_buffer() <= 0) {
-                send_packet(OTF_PARAMS);
-            }
+            print_buf[3] = dec2hexchar((timestamp >> 28) & 0xF);
+            print_buf[4] = dec2hexchar((timestamp >> 24) & 0xF);
+            print_buf[5] = dec2hexchar((timestamp >> 20) & 0xF);
+            print_buf[6] = dec2hexchar((timestamp >> 16) & 0xF);
+            print_buf[7] = dec2hexchar((timestamp >> 12) & 0xF);
+            print_buf[8] = dec2hexchar((timestamp >> 8) & 0xF);
+            print_buf[9] = dec2hexchar((timestamp >> 4) & 0xF);
+            print_buf[10] = dec2hexchar(timestamp & 0xF);
+
+            print_buf[12] = dec2hexchar((value >> 28) & 0xF);
+            print_buf[13] = dec2hexchar((value >> 24) & 0xF);
+            print_buf[14] = dec2hexchar((value >> 20) & 0xF);
+            print_buf[15] = dec2hexchar((value >> 16) & 0xF);
+            print_buf[16] = dec2hexchar((value >> 12) & 0xF);
+            print_buf[17] = dec2hexchar((value >> 8) & 0xF);
+            print_buf[18] = dec2hexchar((value >> 4) & 0xF);
+            print_buf[19] = dec2hexchar(value & 0xF);
+            res.write(print_buf, 21);
+            count += 1;
         } else {
             DEBUG_PRINT("Failed to open sensor log file: ");
             DEBUG_PRINTLN(file_no);
@@ -2449,8 +2573,6 @@ void server_log_sensor(OTF_PARAMS_DEF) {
     }
 
     if (file) file_close(file);
-
-	bfill.emit_p(PSTR("],\"total\":$D,\"count\":$D,\"next_cursor\":$D}"), MAX_SENSOR_LOG_COUNT, count, cursor);
 
 	handle_return(HTML_OK);
 }
@@ -2463,11 +2585,18 @@ void server_clear_sensor_log(OTF_PARAMS_DEF) {
 #else
 	char *p = get_buffer;
 #endif
-    for (size_t i = 0; i < SENSOR_LOG_FILE_COUNT; i++) {
-        /* code */
-    }
-
     os_file_type file;
+
+    int sid = -1;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("sid"), true)) {
+		sid = atoi(tmp_buffer);
+		if (sid<-1 || sid>=MAX_SENSORS) handle_return(HTML_DATA_OUTOFBOUND);
+	} else {
+		handle_return(HTML_DATA_MISSING);
+	}
+
+    tmp_buffer[0] = 0;
+    tmp_buffer[1] = 255;
 
     uint16_t next = SENSOR_LOG_PER_FILE;
     for (uint16_t f = 0; f < SENSOR_LOG_FILE_COUNT; f++) {
@@ -2488,43 +2617,6 @@ void server_clear_sensor_log(OTF_PARAMS_DEF) {
     
 
 	handle_return(HTML_SUCCESS);
-}
-
-void server_json_sen_adj_main(OTF_PARAMS_DEF) {
-	bfill.emit_p(PSTR("\"adj\":["));
-    uint8_t adj_count = 0;
-
-    SensorAdjustment *adj;
-    os_file_type file = file_open(SENADJ_FILENAME, FileOpenMode::Read);
-    if (file) {
-        for (size_t i = 0; i < pd.nprograms; i++) {
-            if ((adj = os.get_sensor_adjust(i))) {
-                if (adj_count) bfill.emit_p(PSTR(","));
-                bfill.emit_p(PSTR("{\"pid\":$D,\"flags\":$D,\"sid\":$D,\"point_count\":$D,\"splits\":["), i, adj->flags, adj->sid, adj->point_count);
-                for (int j = 0; j < adj->point_count; j++) {
-                    if (j) bfill.emit_p(PSTR(","));
-                    bfill.emit_p(PSTR("{\"x\":$E,\"y\":$E}"), adj->points[j].x, adj->points[j].y);
-                }
-                bfill.emit_p(PSTR("]}"));
-                adj_count += 1;
-                delete adj;
-
-
-                // push out a packet if available
-                // buffer size is getting small
-                if (available_ether_buffer() <= 0) {
-                    send_packet(OTF_PARAMS);
-                }
-            }
-        }
-
-        file_close(file);
-    } else {
-        DEBUG_PRINT("Failed to open file: ");
-        DEBUG_PRINTLN(SENADJ_FILENAME);
-    }
-
-	bfill.emit_p(PSTR("],\"count\":$D}"), adj_count);
 }
 
 template <typename T>
@@ -2613,99 +2705,6 @@ void server_json_sensor_description_main(OTF_PARAMS_DEF) {
     bfill.emit_p(PSTR("}"));
 }
 
-/** Sensor status */
-void server_json_sen_adj(OTF_PARAMS_DEF)
-{
-#if defined(USE_OTF)
-	if(!process_password(OTF_PARAMS)) return;
-	rewind_ether_buffer();
-	print_header(OTF_PARAMS);
-#else
-	print_header();
-#endif
-
-	bfill.emit_p(PSTR("{"));
-	server_json_sen_adj_main(OTF_PARAMS);
-	handle_return(HTML_OK);
-}
-
-void server_change_sen_adj(OTF_PARAMS_DEF) {
-#if defined(USE_OTF)
-	if(!process_password(OTF_PARAMS)) return;
-#else
-	char *p = get_buffer;
-#endif
-	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("pid"), true)) handle_return(HTML_DATA_MISSING);
-
-    char *end;
-	long pid = strtoul(tmp_buffer, &end, 10);
-    if (*end != '\0') handle_return(HTML_DATA_FORMATERROR);
-
-	if (pid < 0 || pid >= pd.nprograms) handle_return(HTML_DATA_OUTOFBOUND);
-    
-    SensorAdjustment *adj = nullptr;
-    unsigned long flags = 0;
-    unsigned long sid = 255;
-    unsigned long point_count = 0;
-    sensor_adjustment_point_t points[SENSOR_ADJUSTMENT_POINTS] = {0.0, 0.0};
-    
-    if ((adj = os.get_sensor_adjust(pid))) {
-        flags = adj->flags;
-        sid = adj->sid;
-        point_count = adj->point_count;
-
-        for (size_t i = 0; i <= point_count; i++) {
-        points[i] = adj->points[i];
-    }
-        delete adj;
-    }
-    
-    if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("flags"), true)) {
-		flags=strtoul(tmp_buffer, &end, 10);
-        if (*end != '\0') handle_return(HTML_DATA_FORMATERROR);
-	}
-
-    if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("sid"), true)) {
-		sid=strtoul(tmp_buffer, &end, 10);
-        if (*end != '\0') handle_return(HTML_DATA_FORMATERROR);
-        if (sid >= MAX_SENSORS) sid = 255;
-	}
-
-    if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("points"), true)) {
-        unsigned long i = 0;
-        double x, y;
-        const char *ptr = tmp_buffer;
-        int result;
-        double last_x = -std::numeric_limits<double>::infinity();;
-
-        while (*ptr != '\0') {
-            if (i >= SENSOR_ADJUSTMENT_POINTS) handle_return(HTML_DATA_FORMATERROR);
-
-            result = sscanf(ptr, "%lf,%lf;", &x, &y);
-
-            if (result != 2 || x <= last_x) {
-                handle_return(HTML_DATA_FORMATERROR);
-            }
-
-            points[i++] = sensor_adjustment_point_t {x, y};
-
-            last_x = x;
-
-            while (*(ptr++) != ';') {}
-        }
-
-        point_count = i;
-    }
-
-    if (point_count == 0) handle_return(HTML_DATA_MISSING);
-
-    adj = new SensorAdjustment(flags, sid, point_count, points);
-    os.write_sensor_adjust(adj, pid);
-    delete adj;
-
-	handle_return(HTML_SUCCESS);
-}
-
 void server_json_sen_desc(OTF_PARAMS_DEF)
 {
 #if defined(USE_OTF)
@@ -2748,8 +2747,6 @@ void server_json_all(OTF_PARAMS_DEF) {
     #if defined(USE_SENSORS)
 	bfill.emit_p(PSTR(",\"sensors\":{"));
 	server_json_sensors_main(OTF_PARAMS);
-	bfill.emit_p(PSTR(",\"senadj\":{"));
-	server_json_sen_adj_main(OTF_PARAMS);
 	bfill.emit_p(PSTR(",\"sensor_desc\":{"));
 	server_json_sensor_description_main(OTF_PARAMS);
     #endif
@@ -2883,8 +2880,6 @@ const char *uris[] PROGMEM = {
     "dsn",
     "lsn",
     "csl",
-    "jsa",
-    "csa",
     "jsd",
     #endif
 };
@@ -2920,8 +2915,6 @@ URLHandler urls[] = {
     server_delete_sensor,     // dsn
     server_log_sensor,        // lsn
     server_clear_sensor_log,  // csl
-    server_json_sen_adj,      // jsa
-    server_change_sen_adj,    // csa
     server_json_sen_desc,     // jsd
     #endif
 };

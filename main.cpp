@@ -822,9 +822,13 @@ void do_loop()
 			for(pid=0; pid<pd.nprograms; pid++) {
 				pd.read(pid, &prog);	// todo future: reduce load time
                 #if defined(USE_SENSORS)
+                double adjustment = 1.0;
+
                 SensorAdjustment *adj = os.get_sensor_adjust(pid);
-                double adjustment = adj->get_adjustment_factor(os.sensors);
-                delete adj;
+                if (adj) {
+                    adj->get_adjustment_factor(os.sensors);
+                    delete adj;
+                }
                 #else
                 double adjustment = 1.0;
                 #endif
@@ -1478,8 +1482,10 @@ void manual_start_program(unsigned char pid, unsigned char uwt) {
 		pd.read(pid-1, &prog);
         #if defined(USE_SENSORS)
         SensorAdjustment *adj = os.get_sensor_adjust(pid-1);
-        adjustment = adj->get_adjustment_factor(os.sensors);
-        delete adj;
+        if (adj) {
+            adjustment = adj->get_adjustment_factor(os.sensors);
+            delete adj;
+        }
         #endif
 		notif.add(NOTIFY_PROGRAM_SCHED, pid-1, uwt?os.iopts[IOPT_WATER_PERCENTAGE]:100, 1);
 	}
