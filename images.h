@@ -143,7 +143,7 @@ const unsigned char _iconimage_pswitch[] PROGMEM = {
 
 #elif defined(USE_LCD)
 
-const unsigned char _iconimage_connected[] PROGMEM = {
+const char _iconimage_connected[] PROGMEM = {
 	B00000,
 	B00000,
 	B00000,
@@ -154,7 +154,7 @@ const unsigned char _iconimage_connected[] PROGMEM = {
 	B10101
 };
 
-const unsigned char _iconimage_disconnected[] PROGMEM = {
+const char _iconimage_disconnected[] PROGMEM = {
 	B00000,
 	B10100,
 	B01000,
@@ -165,7 +165,7 @@ const unsigned char _iconimage_disconnected[] PROGMEM = {
 	B10101
 };
 
-const unsigned char _iconimage_remotext[] PROGMEM = {
+const char _iconimage_remotext[] PROGMEM = {
 	B00000,
 	B00000,
 	B00000,
@@ -176,7 +176,7 @@ const unsigned char _iconimage_remotext[] PROGMEM = {
 	B11110
 };
 
-const unsigned char _iconimage_raindelay[] PROGMEM = {
+const char _iconimage_raindelay[] PROGMEM = {
 	B00000,
 	B01110,
 	B10101,
@@ -187,7 +187,7 @@ const unsigned char _iconimage_raindelay[] PROGMEM = {
 	B01110
 };
 
-const unsigned char _iconimage_rain[] PROGMEM = {
+const char _iconimage_rain[] PROGMEM = {
 	B00000,
 	B00000,
 	B00110,
@@ -198,7 +198,7 @@ const unsigned char _iconimage_rain[] PROGMEM = {
 	B10101
 };
 
-const unsigned char _iconimage_soil[] PROGMEM = {
+const char _iconimage_soil[] PROGMEM = {
 	B00100,
 	B00100,
 	B01010,

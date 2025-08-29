@@ -38,7 +38,7 @@ extern float flow_last_gpm;
 
 extern const char *user_agent_string;
 
-void remote_http_callback(char*);
+void default_http_callback(char*);
 
 bool is_notif_enabled(uint16_t type) {
 	uint16_t notif = (uint16_t)os.iopts[IOPT_NOTIF_ENABLE] | ((uint16_t)os.iopts[IOPT_NOTIF2_ENABLE] << 8);
@@ -224,7 +224,8 @@ void push_message(uint16_t type, uint32_t lval, float fval, uint8_t bval) {
 					snprintf_P(postval+strlen(postval), TMP_BUFFER_SIZE, PSTR(" %d minutes %d seconds."), (int)fval/60, (int)fval%60);
 				}
 				if(email_enabled) { email_message.subject += PSTR("station event"); }
-			}			break;
+			}
+			break;
 
 		case NOTIFY_STATION_OFF:
 
@@ -277,7 +278,7 @@ void push_message(uint16_t type, uint32_t lval, float fval, uint8_t bval) {
 			//Added variable for tmp station name
 			char tmp_station_name[STATION_NAME_SIZE];
 
-			//Get satation name
+			//Get station name
 			os.get_station_name(lval, tmp_station_name);
 
 			// only proceed if flow rate is positive, and the station name has at least 5 characters
@@ -372,17 +373,36 @@ void push_message(uint16_t type, uint32_t lval, float fval, uint8_t bval) {
 		}
  
 		case NOTIFY_PROGRAM_SCHED:
-
+			if (os.mqtt.enabled()) {
+				snprintf_P(topic, PUSH_TOPIC_LEN, PSTR("program/%d"), lval);
+				if(fval<0) {
+					strcat_P(payload, PSTR("{\"state\":\"skipped\",\"wtrestr\":"));
+					snprintf_P(payload+strlen(payload), PUSH_PAYLOAD_LEN, PSTR("%d"), (int)bval); // if a program is skipped, also output the wt_restricted variable
+				} else {
+					strcat_P(payload, PSTR("{\"state\":1,\"wl\":"));
+					snprintf_P(payload+strlen(payload), PUSH_PAYLOAD_LEN, PSTR("%d"), (int)fval);
+				}
+				strcat_P(payload, PSTR("}"));
+			}
 			if (ifttt_enabled || email_enabled) {
-				if (bval) strcat_P(postval, PSTR("manually"));
-				else strcat_P(postval, PSTR("automatically"));
-				strcat_P(postval, PSTR(" scheduled Program "));
+				if(fval<0) {
+					strcat_P(postval, PSTR("skipped"));
+					if(bval>0) {
+						strcat_P(postval, PSTR(" due to weather restriction."));
+					}
+				} else {
+					if (bval) strcat_P(postval, PSTR("manually scheduled "));
+					else strcat_P(postval, PSTR("automatically scheduled "));
+				}
 				{
 					ProgramStruct prog;
 					pd.read(lval, &prog);
 					if(lval<pd.nprograms) strcat(postval, prog.name);
 				}
-				snprintf_P(postval+strlen(postval), TMP_BUFFER_SIZE, PSTR(" with %d%% water level."), (int)fval);
+				if(fval>0) {
+					snprintf_P(postval+strlen(postval), TMP_BUFFER_SIZE, PSTR(" with %d%% water level."), (int)fval);
+				}
+
 				if(email_enabled) { email_message.subject += PSTR("program event"); }
 			}
 			break;
@@ -438,12 +458,81 @@ void push_message(uint16_t type, uint32_t lval, float fval, uint8_t bval) {
 					#endif
 				}
 				if (ifttt_enabled || email_enabled) {
-					#if defined(OS_VAR)
+					#if defined(OS_AVR)
 					snprintf_P(postval+strlen(postval), TMP_BUFFER_SIZE, PSTR("Flow count: %d, volume: %d.%02d"), (int)lval, (int)vol, (int)(vol*100)%100);
 					#else
 					snprintf_P(postval+strlen(postval), TMP_BUFFER_SIZE, PSTR("Flow count: %d, volume: %.2f"), (int)lval, vol);
 					#endif
 					if(email_enabled) { email_message.subject += PSTR("flow sensor event"); }
+				}
+			}
+			break;
+
+		case NOTIFY_CURR_ALERT:
+			{
+				int16_t curr = (int16_t)fval;
+				int16_t imin = os.get_imin();
+				int16_t imax = os.get_imax();
+				if (os.mqtt.enabled()) {
+					//Format mqtt message
+					switch(bval) {
+						case CURR_ALERT_TYPE_UNDER:
+						case CURR_ALERT_TYPE_OVER_STATION:
+							snprintf_P(topic, PUSH_TOPIC_LEN, PSTR("station/%d/alert/curr"), lval);
+							if(bval==CURR_ALERT_TYPE_UNDER)
+								snprintf_P(payload, PUSH_PAYLOAD_LEN, PSTR("{\"curr_value\":%d,\"imin_threshold\":%d}"), curr, imin);
+							else
+								snprintf_P(payload, PUSH_PAYLOAD_LEN, PSTR("{\"curr_value\":%d,\"imax_limit\":%d}"), curr, (imax+OVERCURRENT_INRUSH_EXTRA));
+							break;
+						case CURR_ALERT_TYPE_OVER_SYSTEM:
+							strcpy_P(topic, PSTR("overcurrent"));
+							snprintf_P(payload, PUSH_PAYLOAD_LEN, PSTR("{\"curr_value\":%d,\"imax_limit\":%d}"), curr, imax);
+							break;
+					}
+				}
+				if (ifttt_enabled || email_enabled) {
+					//Format ifttt\email message
+
+					// Get and format current local time as "YYYY-MM-DD hh:mm:ss AM/PM"
+					strcat_P(postval, PSTR("at "));
+					time_os_t curr_time = os.now_tz();
+					#if defined(ARDUINO)
+					tmElements_t tm;
+					breakTime(curr_time, tm);
+					snprintf_P(postval+strlen(postval), TMP_BUFFER_SIZE, PSTR("%04d-%02d-%02d %02d:%02d:%02d"),
+						1970+tm.Year, tm.Month, tm.Day, tm.Hour, tm.Minute, tm.Second);
+					#else
+					struct tm *ti = gmtime(&curr_time);
+					snprintf_P(postval+strlen(postval), TMP_BUFFER_SIZE, PSTR("%04d-%02d-%02d %02d:%02d:%02d"),
+						ti->tm_year+1900, ti->tm_mon+1, ti->tm_mday, ti->tm_hour, ti->tm_min, ti->tm_sec);
+					#endif
+
+					if(bval==CURR_ALERT_TYPE_UNDER || bval==CURR_ALERT_TYPE_OVER_STATION) {
+						// the current alert is associated with a specific station
+						char tmp_station_name[STATION_NAME_SIZE];
+						os.get_station_name(lval, tmp_station_name);
+						strcat_P(postval, PSTR(", Station ["));
+						strcat_P(postval, tmp_station_name);
+						strcat_P(postval, PSTR("]"));
+					} else {
+						strcat_P(postval, PSTR(", System"));
+					}
+
+					switch(bval) {
+						case CURR_ALERT_TYPE_UNDER:
+							strcat_P(postval, PSTR(" UNDERCURRENT detected!"));
+							snprintf_P(postval+strlen(postval), TMP_BUFFER_SIZE, PSTR(" | %dmA < imin threshold: %dmA"),
+								curr, imin);
+							break;
+						case CURR_ALERT_TYPE_OVER_STATION:
+						case CURR_ALERT_TYPE_OVER_SYSTEM:
+							strcat_P(postval, PSTR(" OVERCURRENT detected!"));
+							snprintf_P(postval+strlen(postval), TMP_BUFFER_SIZE, PSTR(" | %dmA > imax limit: %dmA. The affected station(s) have been closed."),
+								curr, imax+((bval==CURR_ALERT_TYPE_OVER_STATION)?OVERCURRENT_INRUSH_EXTRA:0));
+							break;
+					}
+
+					if(email_enabled) { email_message.subject += PSTR("- CURRENT ALERT"); }
 				}
 			}
 			break;
@@ -516,7 +605,7 @@ void push_message(uint16_t type, uint32_t lval, float fval, uint8_t bval) {
 						"Content-Type: application/json\r\n\r\n$S"),
 						SOPT_IFTTT_KEY, DEFAULT_IFTTT_URL, user_agent_string, strlen(postval), postval);
 
-		os.send_http_request(DEFAULT_IFTTT_URL, 80, ether_buffer, remote_http_callback);
+		os.send_http_request(DEFAULT_IFTTT_URL, 80, ether_buffer, default_http_callback);
 	}
 
 	if(email_enabled){

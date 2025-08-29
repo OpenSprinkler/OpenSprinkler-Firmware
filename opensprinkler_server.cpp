@@ -605,6 +605,9 @@ void server_change_stations(OTF_PARAMS_DEF) {
 					handle_return(HTML_DATA_OUTOFBOUND);
 				}
 			} else if ((tmp_buffer[0] == STN_TYPE_HTTP) || (tmp_buffer[0] == STN_TYPE_HTTPS) || (tmp_buffer[0] == STN_TYPE_REMOTE_OTC)) {
+				#if !defined(USE_OTF)
+				urlDecode(tmp_buffer+1); // decode the string for OS_AVR
+				#endif
 				if (strlen(tmp_buffer+1) > sizeof(HTTPStationData)) {
 					handle_return(HTML_DATA_OUTOFBOUND);
 				}
@@ -681,13 +684,14 @@ void server_manual_program(OTF_PARAMS_DEF) {
 
 /**
  * Change run-once program
- * Command: /cr?pw=xxx&t=[x,x,x...]&cnt?=xxx&int?=xxx&uwt?=xxx
+ * Command: /cr?pw=xxx&t=[x,x,x...]&cnt?=xxx&int?=xxx&uwt?=xxx&&anno?=xxx
  *
  * pw: password
  * t:  station water time
  * cnt?: repeat count
  * int?: repeat interval
  * uwt?: use weather adjustment
+ * anno?: annotation for station ordering (refer to program name annotation)
  */
 void server_change_runonce(OTF_PARAMS_DEF) {
 #if defined(USE_OTF)
@@ -698,9 +702,7 @@ void server_change_runonce(OTF_PARAMS_DEF) {
 	char *p = get_buffer;
 
 	// decode url first
-	#if !defined(USE_OTF)
 	if(p) urlDecode(p);
-	#endif
 	// search for the start of t=[
 	char *pv;
 	boolean found=false;
@@ -717,13 +719,23 @@ void server_change_runonce(OTF_PARAMS_DEF) {
 	// reset all stations and prepare to run one-time program
 	reset_all_stations_immediate();
 
-	ProgramStruct prog;
+	ProgramStruct prog, annoprog;
+	unsigned char ns = os.nstations;
 
 	uint16_t dur;
-	for(int i=0;i<os.nstations;i++) {
+	for(int i=0;i<ns;i++) {
 		dur = parse_listdata(&pv);
 		prog.durations[i] = dur > 0 ? dur : 0;
 	}
+
+	unsigned char order[ns];
+	annoprog.name[0] = 0;
+	// check if anno parameter is provided
+	if(findKeyVal(FKV_SOURCE,tmp_buffer,PROGRAM_NAME_SIZE-1,PSTR("anno"),true)){
+		tmp_buffer[PROGRAM_NAME_SIZE-1] = 0; // make sure it ends properly
+		strcpy(annoprog.name, tmp_buffer);
+	}
+	annoprog.gen_station_runorder(1, order);
 
 	//check if repeat count is defined and create program to perform the repetitions
 	if(findKeyVal(FKV_SOURCE,tmp_buffer,TMP_BUFFER_SIZE,PSTR("cnt"),true)){
@@ -759,6 +771,8 @@ void server_change_runonce(OTF_PARAMS_DEF) {
 			prog.days[1] = epoch_t & 0b11111111; //one interval past current day in epoch time
 			prog.starttimes[0] = curr_time % 1440; //one interval past current time
 			strcpy_P(prog.name, PSTR("Run-Once with repeat"));
+			strncat(prog.name, annoprog.name, PROGRAM_NAME_SIZE-strlen(prog.name)-1);
+			prog.name[PROGRAM_NAME_SIZE-1]=0;
 
 			//if no more repeats, remove interval to flag for deletion
 			if(prog.starttimes[1] == 0){
@@ -774,7 +788,8 @@ void server_change_runonce(OTF_PARAMS_DEF) {
 	//No repeat count defined or first repeat --> use old API
 	unsigned char sid, bid, s;
 	boolean match_found = false;
-	for(sid=0;sid<os.nstations;sid++) {
+	for(unsigned char oi=0;oi<ns;oi++) {
+		sid=order[oi];
 		dur=prog.durations[sid];
 		if(findKeyVal(FKV_SOURCE,tmp_buffer,TMP_BUFFER_SIZE,PSTR("uwt"),true)){
 			if((uint16_t)atol(tmp_buffer)){
@@ -1095,11 +1110,17 @@ void server_json_options_main() {
 			if (os.hw_type==HW_TYPE_AC || os.hw_type==HW_TYPE_UNKNOWN) continue;
 			else v<<=2;
 		}
+
+		if (oid==IOPT_I_MIN_THRESHOLD || oid==IOPT_I_MAX_LIMIT) {
+			if (os.hw_type==HW_TYPE_AC || os.hw_type==HW_TYPE_DC ) v*=10;
+			else continue;
+		}
+
 		if (oid==IOPT_LATCH_ON_VOLTAGE || oid==IOPT_LATCH_OFF_VOLTAGE) {
 			if (os.hw_type!=HW_TYPE_LATCH) continue;
 		}
 		#else
-		if (oid==IOPT_BOOST_TIME || oid==IOPT_LATCH_ON_VOLTAGE || oid==IOPT_LATCH_OFF_VOLTAGE) continue;
+		if (oid==IOPT_BOOST_TIME || oid==IOPT_I_MIN_THRESHOLD || oid==IOPT_I_MAX_LIMIT || oid==IOPT_LATCH_ON_VOLTAGE || oid==IOPT_LATCH_OFF_VOLTAGE) continue;
 		#endif
 
 		#if defined(ESP8266)
@@ -1133,6 +1154,7 @@ void server_json_options_main() {
 	}
 
 	bfill.emit_p(PSTR(",\"dexp\":$D,\"mexp\":$D,\"hwt\":$D,"), os.detect_exp(), MAX_EXT_BOARDS, os.hw_type);
+
 	// print master array
 	unsigned char masid, optidx;
 	bfill.emit_p(PSTR("\"ms\":["));
@@ -1274,7 +1296,7 @@ void server_json_controller_main(OTF_PARAMS_DEF) {
 	time_os_t curr_time = os.now_tz();
 	bfill.emit_p(PSTR("\"devt\":$L,\"nbrd\":$D,\"en\":$D,\"sn1\":$D,\"sn2\":$D,\"rd\":$D,\"rdst\":$L,"
 										"\"sunrise\":$D,\"sunset\":$D,\"eip\":$L,\"lwc\":$L,\"lswc\":$L,"
-										"\"lupt\":$L,\"lrbtc\":$D,\"lrun\":[$D,$D,$D,$L],\"pq\":$D,\"pt\":$L,\"nq\":$D,"),
+										"\"lupt\":$L,\"lrbtc\":$D,\"lrun\":[$D,$D,$D,$L],\"pq\":$D,\"pt\":$L,\"nq\":$D,\"ocs\":$D,"),
 							curr_time,
 							os.nboards,
 							os.status.enabled,
@@ -1295,7 +1317,8 @@ void server_json_controller_main(OTF_PARAMS_DEF) {
 							pd.lastrun.endtime,
 							os.status.pause_state,
 							os.pause_timer,
-							pd.nqueue);
+							pd.nqueue,
+							os.status.overcurrent_sid);
 
 #if defined(ESP8266)
 	bfill.emit_p(PSTR("\"RSSI\":$D,"), (int16_t)WiFi.RSSI());
@@ -1314,7 +1337,7 @@ void server_json_controller_main(OTF_PARAMS_DEF) {
 
 	bfill.emit_p(PSTR("\"mac\":\"$X:$X:$X:$X:$X:$X\","), mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 
-	bfill.emit_p(PSTR("\"loc\":\"$O\",\"jsp\":\"$O\",\"wsp\":\"$O\",\"wto\":{$O},\"ifkey\":\"$O\",\"mqtt\":{$O},\"wtdata\":$S,\"wterr\":$D,\"dname\":\"$O\","),
+	bfill.emit_p(PSTR("\"loc\":\"$O\",\"jsp\":\"$O\",\"wsp\":\"$O\",\"wto\":{$O},\"ifkey\":\"$O\",\"mqtt\":{$O},\"wtdata\":$S,\"wterr\":$D,\"wtrestr\":$D,\"dname\":\"$O\","),
 							 SOPT_LOCATION,
 							 SOPT_JAVASCRIPTURL,
 							 SOPT_WEATHERURL,
@@ -1323,18 +1346,26 @@ void server_json_controller_main(OTF_PARAMS_DEF) {
 							 SOPT_MQTT_OPTS,
 							 strlen(wt_rawData)==0?"{}":wt_rawData,
 							 wt_errCode,
+							 wt_restricted,
 							 SOPT_DEVICE_NAME);
 
 #if defined(SUPPORT_EMAIL)
 	bfill.emit_p(PSTR("\"email\":{$O},"), SOPT_EMAIL_OPTS);
 #endif
 
-#if defined(ARDUINO)
-	if(os.status.has_curr_sense) {
-		uint16_t current = os.read_current();
-		if((!os.status.program_busy) && (current<os.baseline_current)) current=0;
-		bfill.emit_p(PSTR("\"curr\":$D,"), current);
+	bfill.emit_p(PSTR("\"wls\":["));
+	if (md_N == 0) {
+		bfill.emit_p(PSTR("],"));
 	}
+	for (unsigned char idx = 0; idx < md_N; idx++) {
+		bfill.emit_p(PSTR("$D"), (int)md_scales[idx]);
+		bfill.emit_p((idx == md_N-1) ? PSTR("],") : PSTR(","));
+	}
+
+#if defined(ARDUINO)
+	uint16_t current = os.read_current();
+	if((!os.status.program_busy) && (current<os.baseline_current)) current=0;
+	bfill.emit_p(PSTR("\"curr\":$D,"), current);
 #endif
 	if(os.iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_FLOW) {
 		bfill.emit_p(PSTR("\"flcrt\":$L,\"flwrt\":$D,"), os.flowcount_rt, FLOWCOUNT_RT_WINDOW);
@@ -1415,10 +1446,11 @@ void server_home(OTF_PARAMS_DEF)
 
 /**
  * Change controller variables
- * Command: /cv?pw=xxx&rsn=x&rbt=x&en=x&rd=x&re=x&ap=x
+ * Command: /cv?pw=xxx&rsn=x&rrsn=x&rbt=x&en=x&rd=x&re=x&ap=x
  *
  * pw:	password
  * rsn: reset all stations (0 or 1)
+ * rrsn:reset all running stations (0 or 1)
  * rbt: reboot controller (0 or 1)
  * en:	enable (0 or 1)
  * rd:	rain delay hours (0 turns off rain delay)
@@ -1436,6 +1468,10 @@ void server_change_values(OTF_PARAMS_DEF)
 #endif
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("rsn"), true)) {
 		reset_all_stations();
+	}
+
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("rrsn"), true)) {
+		reset_all_stations(true);
 	}
 
 #if !defined(ARDUINO)
@@ -1599,6 +1635,9 @@ void server_change_options(OTF_PARAMS_DEF)
 			if(oid==IOPT_BOOST_TIME) {
 				 v>>=2;
 			}
+			if(oid==IOPT_I_MIN_THRESHOLD || oid==IOPT_I_MAX_LIMIT) {
+				v/=10;
+			}
 			if (v>=0 && v<=max_value) {
 				os.iopts[oid] = v;
 			} else {
@@ -1609,7 +1648,11 @@ void server_change_options(OTF_PARAMS_DEF)
 		if (os.iopts[oid] != prev_value) {	// if value has changed
 			if (oid==IOPT_TIMEZONE || oid==IOPT_USE_NTP)		time_change = true;
 			if (oid>=IOPT_NTP_IP1 && oid<=IOPT_NTP_IP4)			time_change = true;
-			if (oid==IOPT_USE_WEATHER) weather_change = true;
+			if (oid==IOPT_USE_WEATHER) {
+				weather_change = true;
+				// California restriction is now indicated in wto and no longer by the highest bit of uwt. So we force that bit to 0
+				os.iopts[oid] &= 0x7F;
+			}
 			if (oid>=IOPT_SENSOR1_TYPE && oid<=IOPT_SENSOR2_OFF_DELAY) sensor_change = true;
 		}
 	}
@@ -1629,12 +1672,10 @@ void server_change_options(OTF_PARAMS_DEF)
 		urlDecode(tmp_buffer);
 		#endif
 		if (os.sopt_save(SOPT_WEATHER_OPTS, tmp_buffer)) {
-			if(os.iopts[IOPT_USE_WEATHER]==WEATHER_METHOD_MONTHLY) {
-				load_wt_monthly(tmp_buffer);
-				apply_monthly_adjustment(os.now_tz());
-			} else {
-				weather_change = true;	// if wto has changed
-			}
+			os.sopt_load(SOPT_WEATHER_OPTS, tmp_buffer+1); // make room for the leading '{'
+			parse_wto(tmp_buffer); // parse wto
+			apply_monthly_adjustment(os.now_tz());
+			weather_change = true;
 		}
 	}
 
@@ -1715,8 +1756,10 @@ void server_change_options(OTF_PARAMS_DEF)
 	}
 
 	if(weather_change) {
-		os.iopts[IOPT_WATER_PERCENTAGE] = 100;  // reset watering percentage to 100%
-		wt_rawData[0] = 0;  // reset wt_rawData and errCode
+		DEBUG_PRINTLN("weather change happened");
+		//os.iopts[IOPT_WATER_PERCENTAGE] = 100;  // reset watering percentage to 100%
+		wt_restricted = 0; // reset wt_restrcited, wt_rawData and errCode
+		wt_rawData[0] = 0;
 		wt_errCode = HTTP_RQT_NOT_RECEIVED;
 		os.checkwt_lasttime = 0;  // force weather update
 	}
@@ -1860,9 +1903,14 @@ void server_change_manual(OTF_PARAMS_DEF) {
 			ssta = atoi(tmp_buffer);
 		}
 		// mark station for removal
-		RuntimeQueueStruct *q = pd.queue + pd.station_qid[sid];
-		q->deque_time = curr_time;
-		turn_off_station(sid, curr_time, ssta);
+		if(pd.station_qid[sid]==255) {
+			// return error message if turning off a zone that's not currently in the queue
+			handle_return(HTML_DATA_OUTOFBOUND);
+		} else {
+			RuntimeQueueStruct *q = pd.queue + pd.station_qid[sid];
+			q->deque_time = curr_time;
+			turn_off_station(sid, curr_time, ssta);
+		}
 	}
 	handle_return(HTML_SUCCESS);
 }
@@ -3259,7 +3307,7 @@ ulong getNtpTime() {
 
 	uint16_t port = (uint16_t)(os.iopts[IOPT_HTTPPORT_1]<<8) + (uint16_t)os.iopts[IOPT_HTTPPORT_0];
 	port = (port==8000) ? 8888:8000; // use a different port than http port
-	UDP *udp = new EthernetUDP();
+	EthernetUDP udp;
 
 	#define NTP_PACKET_SIZE 48
 	#define NTP_PORT 123
@@ -3280,11 +3328,10 @@ ulong getNtpTime() {
 		os.iopts[IOPT_NTP_IP3],
 		os.iopts[IOPT_NTP_IP4]};
 	unsigned char tries=0;
-	ulong gt = 0;
 	ulong startt = millis();
 	while(tries<NTP_NTRIES) {
 		// sendNtpPacket
-		udp->begin(port);
+		udp.begin(port);
 
 		memset(packetBuffer, 0, NTP_PACKET_SIZE);
 		packetBuffer[0] = 0b11100011;  // LI, Version, Mode
@@ -3303,31 +3350,31 @@ ulong getNtpTime() {
 		int ret;
 		if (!os.iopts[IOPT_NTP_IP1] || os.iopts[IOPT_NTP_IP1] == '0') {
 			DEBUG_PRINT(public_ntp_servers[sidx]);
-			ret = udp->beginPacket(public_ntp_servers[sidx], NTP_PORT);
+			ret = udp.beginPacket(public_ntp_servers[sidx], NTP_PORT);
 		} else {
 			DEBUG_PRINTLN(IPAddress(ntpip[0],ntpip[1],ntpip[2],ntpip[3]));
-			ret = udp->beginPacket(ntpip, NTP_PORT);
+			ret = udp.beginPacket(ntpip, NTP_PORT);
 		}
 		if(ret!=1) {
 			DEBUG_PRINT(F(" not available (ret: "));
 			DEBUG_PRINT(ret);
 			DEBUG_PRINTLN(")");
-			udp->stop();
+			udp.stop();
 			tries++;
 			sidx=(sidx+1)%N_PUBLIC_SERVERS;
 			continue;
 		} else {
 			DEBUG_PRINTLN(F(" connected"));
 		}
-		udp->write(packetBuffer, NTP_PACKET_SIZE);
-		udp->endPacket();
+		udp.write(packetBuffer, NTP_PACKET_SIZE);
+		udp.endPacket();
 		// end of sendNtpPacket
 
 		// process response
 		ulong timeout = millis()+2000;
-		while(millis() < timeout) {
-			if(udp->parsePacket()) {
-				udp->read(packetBuffer, NTP_PACKET_SIZE);
+		while((long)(millis()-timeout)<0) {
+			if(udp.parsePacket()) {
+				udp.read(packetBuffer, NTP_PACKET_SIZE);
 				ulong highWord = word(packetBuffer[40], packetBuffer[41]);
 				ulong lowWord = word(packetBuffer[42], packetBuffer[43]);
 				ulong secsSince1900 = highWord << 16 | lowWord;
@@ -3335,8 +3382,7 @@ ulong getNtpTime() {
 				ulong gt = secsSince1900 - seventyYears;
 				// check validity: has to be larger than 1/1/2020 12:00:00
 				if(gt>1577836800UL) {
-					udp->stop();
-					delete udp;
+					udp.stop();
 					DEBUG_PRINT(F("took "));
 					DEBUG_PRINT(millis()-startt);
 					DEBUG_PRINTLN(F("ms"));
@@ -3345,12 +3391,11 @@ ulong getNtpTime() {
 			}
 		}
 		tries++;
-		udp->stop();
+		udp.stop();
 		sidx=(sidx+1)%N_PUBLIC_SERVERS;
 	}
 	if(tries==NTP_NTRIES) {DEBUG_PRINTLN(F("NTP failed!!"));}
-	udp->stop();
-	delete udp;
+	udp.stop();
 	return 0;
 }
 #endif

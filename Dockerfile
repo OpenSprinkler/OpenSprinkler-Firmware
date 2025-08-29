@@ -1,10 +1,10 @@
 FROM debian:bookworm-slim AS base
 
-ARG BUILD_VERSION="OSPI"
-
 ########################################
 ## 1st stage compiles OpenSprinkler code
 FROM base AS os-build
+
+ARG BUILD_VERSION="OSPI"
 
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y bash g++ make libmosquittopp-dev libssl-dev libi2c-dev libgpiod-dev libgpiod2 gpiod
