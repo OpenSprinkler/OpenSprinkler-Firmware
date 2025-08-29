@@ -24,7 +24,7 @@
 #ifndef _DEFINES_H
 #define _DEFINES_H
 
-//#define ENABLE_DEBUG  // enable serial debug
+#define ENABLE_DEBUG  // enable serial debug
 
 typedef unsigned long ulong;
 
@@ -35,7 +35,7 @@ typedef unsigned long ulong;
 														// if this number is different from the one stored in non-volatile memory
 														// a device reset will be automatically triggered
 
-#define OS_FW_MINOR      2  // Firmware minor version
+#define OS_FW_MINOR      3  // Firmware minor version
 
 /** Hardware version base numbers */
 #define OS_HW_VERSION_BASE   0x00 // OpenSprinkler
@@ -55,6 +55,9 @@ typedef unsigned long ulong;
 #define NVCON_FILENAME        "nvcon.dat"   // non-volatile controller data file, see OpenSprinkler.h --> struct NVConData
 #define PROG_FILENAME         "prog.dat"    // program data file
 #define DONE_FILENAME         "done.dat"    // used to indicate the completion of all files
+#define SENSORS_FILENAME      "sens.dat"    // sensor data file
+#define SENSORS_LOG_FILENAME  "senslog.dat" // name base for all sensor files
+#define SENADJ_FILENAME       "senadj.dat"  // sensor adjustment data for programs file
 
 /** Station macro defines */
 #define STN_TYPE_STANDARD    0x00 // standard solenoid station
@@ -77,6 +80,13 @@ typedef unsigned long ulong;
 #define NOTIFY_RAINDELAY       0x0080
 #define NOTIFY_STATION_ON      0x0100
 #define NOTIFY_FLOW_ALERT      0x0200
+#define NOTIFY_CURR_ALERT      0x0400
+
+enum {
+	CURR_ALERT_TYPE_UNDER = 0,		// undercurrent when running a station
+	CURR_ALERT_TYPE_OVER_STATION,	// overcurrent when turning on a station
+	CURR_ALERT_TYPE_OVER_SYSTEM		// overcurrent while system is running
+};
 
 /** HTTP request macro defines */
 #define HTTP_RQT_SUCCESS       0
@@ -136,6 +146,12 @@ typedef unsigned long ulong;
 #define STATION_NAME_SIZE 32    // maximum number of characters in each station name
 #define MAX_SOPTS_SIZE    320   // maximum string option size
 
+#define MAX_SENSORS 64
+#define SENSOR_LOG_PER_FILE 1024
+#define SENSOR_LOG_FILE_COUNT 32
+#define MAX_SENSOR_LOG_COUNT (SENSOR_LOG_PER_FILE * SENSOR_LOG_FILE_COUNT)
+#define SENSOR_LOG_ITEM_SIZE (sizeof(time_os_t) + sizeof(float) + 1 + 1)
+
 #define STATION_SPECIAL_DATA_SIZE  (TMP_BUFFER_SIZE - STATION_NAME_SIZE - 12)
 
 /** Default string option values */
@@ -151,6 +167,9 @@ typedef unsigned long ulong;
 #define DEFAULT_OTC_TOKEN_LENGTH   32
 #define DEFAULT_DEVICE_NAME       "My OpenSprinkler"
 #define DEFAULT_EMPTY_STRING      ""
+#define DEFAULT_UNDERCURRENT_THRESHOLD 100 // in mA
+#define DEFAULT_OVERCURRENT_LIMIT 1200 // in mA
+#define OVERCURRENT_INRUSH_EXTRA   600 // in mA
 
 #if (defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__))
 	#define OS_AVR
@@ -164,7 +183,7 @@ typedef unsigned long ulong;
 enum {
 	WEATHER_METHOD_MANUAL = 0,
 	WEATHER_METHOD_ZIMMERMAN,
-	WEATHER_METHOD_AUTORAINDELY,
+	WEATHER_METHOD_AUTORAINDELAY,
 	WEATHER_METHOD_ETO,
 	WEATHER_METHOD_MONTHLY,
 	NUM_WEATHER_METHODS
@@ -258,8 +277,8 @@ enum {
 	IOPT_LATCH_ON_VOLTAGE,
 	IOPT_LATCH_OFF_VOLTAGE,
 	IOPT_NOTIF2_ENABLE,
-	IOPT_RESERVE_4,
-	IOPT_RESERVE_5,
+	IOPT_I_MIN_THRESHOLD,
+	IOPT_I_MAX_LIMIT,
 	IOPT_RESERVE_6,
 	IOPT_RESERVE_7,
 	IOPT_RESERVE_8,
@@ -432,6 +451,9 @@ enum {
 
 	#define USE_DISPLAY
 	#define USE_SSD1306
+    
+    #define USE_ADS1115
+    #define USE_SENSORS
 
 #elif defined(OSPI) // for OSPi
 
@@ -456,6 +478,9 @@ enum {
 
 	#define USE_DISPLAY
 	#define USE_SSD1306
+
+    #define USE_ADS1115
+    #define USE_SENSORS
 
 #else // for demo / simulation
 	// use fake hardware pins

@@ -26,6 +26,8 @@
 
 #if defined(ARDUINO)
 	#include <Arduino.h>
+    #include <FS.h>
+    #include <LittleFS.h>
 #else // headers for RPI/LINUX
 	#include <stdio.h>
 	#include <limits.h>
@@ -37,11 +39,41 @@
 #endif
 #include "defines.h"
 
+
+#if defined(ARDUINO)
+typedef File os_file_type;
+#else
+typedef FILE* os_file_type;
+#endif
+
+enum class FileOpenMode {
+    Read,
+    ReadWrite,
+    WriteTruncate,
+    ReadWriteTruncate,
+    Append,
+    ReadAppend,
+};
+
+enum class FileSeekMode {
+    Set,
+    Current,
+    End
+};
+
+
 // File reading/writing functions
 //remove unused functions: void write_to_file(const char *fname, const char *data, ulong size, ulong pos=0, bool trunc=true);
 //remove unused functions: void read_from_file(const char *fname, char *data, ulong maxsize=TMP_BUFFER_SIZE, int pos=0);
 void remove_file(const char *fname);
 bool file_exists(const char *fname);
+
+os_file_type file_open(const char *fn, FileOpenMode mode);
+void file_close(os_file_type f);
+bool file_seek(os_file_type f, uint32_t position, FileSeekMode mode);
+bool file_seek(os_file_type f, uint32_t position);
+int file_read(os_file_type f, void *target, uint32_t len);
+int file_write(os_file_type f, const void *source, uint32_t len);
 
 void file_read_block (const char *fname, void *dst, ulong pos, ulong len);
 void file_write_block(const char *fname, const void *src, ulong pos, ulong len);
@@ -112,5 +144,7 @@ void str2mac(const char *_str, unsigned char mac[]);
 
 	BoardType get_board_type();
 #endif
+
+char dec2hexchar(unsigned char dec);
 
 #endif // _UTILS_H

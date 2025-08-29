@@ -1,0 +1,630 @@
+#include "sensor.h"
+#include "OpenSprinkler.h"
+
+const char *enum_string(SensorUnitGroup group) {
+    switch (group) {
+        case SensorUnitGroup::None:
+            return PSTR("No Group");
+        case SensorUnitGroup::Temperature:
+            return PSTR("Temperature");
+        case SensorUnitGroup::Length:
+            return PSTR("Length");
+        case SensorUnitGroup::Volume:
+            return PSTR("Volume");
+        case SensorUnitGroup::Light:
+            return PSTR("Light");
+        case SensorUnitGroup::Energy:
+            return PSTR("Energy");
+        case SensorUnitGroup::Velocity:
+            return PSTR("Velocity");
+        case SensorUnitGroup::Pressure:
+            return PSTR("Pressure");
+        case SensorUnitGroup::Flow:
+            return PSTR("Flow");
+        case SensorUnitGroup::MAX_VALUE:
+            return nullptr;
+    }
+
+    return nullptr;
+}
+
+const char *enum_string(EnsembleAction action) {
+    switch (action) {
+        case EnsembleAction::Min: return PSTR("Min");
+        case EnsembleAction::Max: return PSTR("Max");
+        case EnsembleAction::Average: return PSTR("Average");
+        case EnsembleAction::Sum: return PSTR("Sum");
+        case EnsembleAction::Product: return PSTR("Product");
+        case EnsembleAction::MAX_VALUE: return nullptr;
+    }
+
+    return nullptr;
+}
+
+const char *enum_string(WeatherAction action) {
+    switch (action) {
+        case WeatherAction::MAX_VALUE: return nullptr;
+    }
+
+    return nullptr;
+}
+
+const char* get_sensor_unit_name(SensorUnit unit) {
+    switch (unit) {
+    case SensorUnit::None:
+        return PSTR("None");
+    case SensorUnit::Celsius:
+        return PSTR("Celsius");
+    case SensorUnit::Fahrenheit:
+        return PSTR("Fahrenheit");
+    case SensorUnit::Kelvin:
+        return PSTR("Kelvin");
+    case SensorUnit::Milimeter:
+        return PSTR("Milimeter");
+    case SensorUnit::Centieter:
+        return PSTR("Centieter");
+    case SensorUnit::Meter:
+        return PSTR("Meter");
+    case SensorUnit::Kilometer:
+        return PSTR("Kilometer");
+    case SensorUnit::Inch:
+        return PSTR("Inch");
+    case SensorUnit::Foot:
+        return PSTR("Foot");
+    case SensorUnit::Mile:
+        return PSTR("Mile");
+    case SensorUnit::Lux:
+        return PSTR("Lux");
+    case SensorUnit::Lumen:
+        return PSTR("Lumen");
+    case SensorUnit::Milivolt:
+        return PSTR("Milivolt");
+    case SensorUnit::Volt:
+        return PSTR("Volt");
+    case SensorUnit::Miliampere:
+        return PSTR("Miliampere");
+    case SensorUnit::Ampere:
+        return PSTR("Ampere");
+    case SensorUnit::Percent:
+        return PSTR("Percent");
+    case SensorUnit::MilesPerHour:
+        return PSTR("Miles Per Hour");
+    case SensorUnit::KilometersPerHour:
+        return PSTR("Kilometers Per Hour");
+    case SensorUnit::MetersPerSecond:
+        return PSTR("Meters Per Second");
+    case SensorUnit::DialetricConstant:
+        return PSTR("Dialetric Constant");
+    case SensorUnit::PartsPerMillion:
+        return PSTR("Parts Per Million");
+    case SensorUnit::Ohm:
+        return PSTR("Ohm");
+    case SensorUnit::Miliohm:
+        return PSTR("Miliohm");
+    case SensorUnit::Kiloohm:
+        return PSTR("Kiloohm");
+    case SensorUnit::Bar:
+        return PSTR("Bar");
+    case SensorUnit::Kilopascal:
+        return PSTR("Kilopascal");
+    case SensorUnit::Pascal:
+        return PSTR("Pascal");
+    case SensorUnit::Torr:
+        return PSTR("Torr");
+    case SensorUnit::LitersPerSecond:
+        return PSTR("Liters Per Second");
+    case SensorUnit::GallonsPerSecond:
+        return PSTR("Gallons");
+    case SensorUnit::MAX_VALUE:
+        return nullptr;
+    }
+
+    return nullptr;
+}
+
+const char* get_sensor_unit_short(SensorUnit unit) {
+    switch (unit) {
+    case SensorUnit::None:
+        return PSTR("");
+    case SensorUnit::Celsius:
+        return PSTR("°C");
+    case SensorUnit::Fahrenheit:
+        return PSTR("°F");
+    case SensorUnit::Kelvin:
+        return PSTR("K");
+    case SensorUnit::Milimeter:
+        return PSTR("mm");
+    case SensorUnit::Centieter:
+        return PSTR("cm");
+    case SensorUnit::Meter:
+        return PSTR("m");
+    case SensorUnit::Kilometer:
+        return PSTR("km");
+    case SensorUnit::Inch:
+        return PSTR("in");
+    case SensorUnit::Foot:
+        return PSTR("ft");
+    case SensorUnit::Mile:
+        return PSTR("mi");
+    case SensorUnit::Lux:
+        return PSTR("lx");
+    case SensorUnit::Lumen:
+        return PSTR("lm");
+    case SensorUnit::Milivolt:
+        return PSTR("mV");
+    case SensorUnit::Volt:
+        return PSTR("V");
+    case SensorUnit::Miliampere:
+        return PSTR("mA");
+    case SensorUnit::Ampere:
+        return PSTR("A");
+    case SensorUnit::Percent:
+        return PSTR("%");
+    case SensorUnit::MilesPerHour:
+        return PSTR("mph");
+    case SensorUnit::KilometersPerHour:
+        return PSTR("km/h");
+    case SensorUnit::MetersPerSecond:
+        return PSTR("xxx");
+    case SensorUnit::DialetricConstant:
+        return PSTR("xxx");
+    case SensorUnit::PartsPerMillion:
+        return PSTR("ppm");
+    case SensorUnit::Ohm:
+        return PSTR("Ω");
+    case SensorUnit::Miliohm:
+        return PSTR("mΩ");
+    case SensorUnit::Kiloohm:
+        return PSTR("kΩ");
+    case SensorUnit::Bar:
+        return PSTR("bar");
+    case SensorUnit::Kilopascal:
+        return PSTR("kPa");
+    case SensorUnit::Pascal:
+        return PSTR("Pa");
+    case SensorUnit::Torr:
+        return PSTR("torr");
+    case SensorUnit::LitersPerSecond:
+        return PSTR("L/s");
+    case SensorUnit::GallonsPerSecond:
+        return PSTR("gal/s");
+    case SensorUnit::MAX_VALUE:
+        return nullptr;
+    }
+
+    return nullptr;
+}
+
+const SensorUnitGroup get_sensor_unit_group(SensorUnit unit) {
+    switch (unit) {
+    case SensorUnit::None:
+        return SensorUnitGroup::None;
+    case SensorUnit::Celsius:
+        return SensorUnitGroup::Temperature;
+    case SensorUnit::Fahrenheit:
+        return SensorUnitGroup::Temperature;
+    case SensorUnit::Kelvin:
+        return SensorUnitGroup::Temperature;
+    case SensorUnit::Milimeter:
+        return SensorUnitGroup::Length;
+    case SensorUnit::Centieter:
+        return SensorUnitGroup::Length;
+    case SensorUnit::Meter:
+        return SensorUnitGroup::Length;
+    case SensorUnit::Kilometer:
+        return SensorUnitGroup::Length;
+    case SensorUnit::Inch:
+        return SensorUnitGroup::Length;
+    case SensorUnit::Foot:
+        return SensorUnitGroup::Length;
+    case SensorUnit::Mile:
+        return SensorUnitGroup::Length;
+    case SensorUnit::Lux:
+        return SensorUnitGroup::Light;
+    case SensorUnit::Lumen:
+        return SensorUnitGroup::Light;
+    case SensorUnit::Milivolt:
+        return SensorUnitGroup::Energy;
+    case SensorUnit::Volt:
+        return SensorUnitGroup::Energy;
+    case SensorUnit::Miliampere:
+        return SensorUnitGroup::Energy;
+    case SensorUnit::Ampere:
+        return SensorUnitGroup::Energy;
+    case SensorUnit::Percent:
+        return SensorUnitGroup::None;
+    case SensorUnit::MilesPerHour:
+        return SensorUnitGroup::Velocity;
+    case SensorUnit::KilometersPerHour:
+        return SensorUnitGroup::Velocity;
+    case SensorUnit::MetersPerSecond:
+        return SensorUnitGroup::Velocity;
+    case SensorUnit::DialetricConstant:
+        return SensorUnitGroup::Energy;
+    case SensorUnit::PartsPerMillion:
+        return SensorUnitGroup::None;
+    case SensorUnit::Ohm:
+        return SensorUnitGroup::Energy;
+    case SensorUnit::Miliohm:
+        return SensorUnitGroup::Energy;
+    case SensorUnit::Kiloohm:
+        return SensorUnitGroup::Energy;
+    case SensorUnit::Bar:
+        return SensorUnitGroup::Pressure;
+    case SensorUnit::Kilopascal:
+        return SensorUnitGroup::Pressure;
+    case SensorUnit::Pascal:
+        return SensorUnitGroup::Pressure;
+    case SensorUnit::Torr:
+        return SensorUnitGroup::Pressure;
+    case SensorUnit::LitersPerSecond:
+        return SensorUnitGroup::Flow;
+    case SensorUnit::GallonsPerSecond:
+        return SensorUnitGroup::Flow;
+    case SensorUnit::MAX_VALUE:
+        return SensorUnitGroup::MAX_VALUE;
+    }
+
+    return SensorUnitGroup::MAX_VALUE;
+}
+
+const ulong get_sensor_unit_index(SensorUnit unit) {
+    switch (unit) {
+    case SensorUnit::None:
+        return 0;
+    case SensorUnit::Celsius:
+        return 0;
+    case SensorUnit::Fahrenheit:
+        return 0;
+    case SensorUnit::Kelvin:
+        return 0;
+    case SensorUnit::Milimeter:
+        return 0;
+    case SensorUnit::Centieter:
+        return 0;
+    case SensorUnit::Meter:
+        return 0;
+    case SensorUnit::Kilometer:
+        return 0;
+    case SensorUnit::Inch:
+        return 0;
+    case SensorUnit::Foot:
+        return 0;
+    case SensorUnit::Mile:
+        return 0;
+    case SensorUnit::Lux:
+        return 0;
+    case SensorUnit::Lumen:
+        return 0;
+    case SensorUnit::Milivolt:
+        return 0;
+    case SensorUnit::Volt:
+        return 0;
+    case SensorUnit::Miliampere:
+        return 0;
+    case SensorUnit::Ampere:
+        return 0;
+    case SensorUnit::Percent:
+        return 0;
+    case SensorUnit::MilesPerHour:
+        return 0;
+    case SensorUnit::KilometersPerHour:
+        return 0;
+    case SensorUnit::MetersPerSecond:
+        return 0;
+    case SensorUnit::DialetricConstant:
+        return 0;
+    case SensorUnit::PartsPerMillion:
+        return 0;
+    case SensorUnit::Ohm:
+        return 0;
+    case SensorUnit::Miliohm:
+        return 0;
+    case SensorUnit::Kiloohm:
+        return 0;
+    case SensorUnit::Bar:
+        return 0;
+    case SensorUnit::Kilopascal:
+        return 0;
+    case SensorUnit::Pascal:
+        return 0;
+    case SensorUnit::Torr:
+        return 0;
+    case SensorUnit::LitersPerSecond:
+        return 0;
+    case SensorUnit::GallonsPerSecond:
+        return 0;
+    case SensorUnit::MAX_VALUE:
+        return 0;
+    }
+
+    return 0;
+}
+
+Sensor::Sensor(unsigned long interval, double min, double max, double scale, double offset, const char* name, SensorUnit unit, uint32_t flags) :
+    interval(interval), min(min), max(max), scale(scale), offset(offset), unit(unit), flags(flags) {
+    strncpy(this->name, name, SENSOR_NAME_LEN);
+    this->name[SENSOR_NAME_LEN - 1] = 0;
+}
+
+Sensor::Sensor() {}
+
+double Sensor::get_new_value() {
+    double value = this->_get_raw_value();
+    value = (value * this->scale) + this->offset;
+    if (value < this->min) value = this->min;
+    if (value > this->max) value = this->max;
+
+    return value;
+}
+
+template <typename T>
+uint32_t write_buf(char* buf, T val) {
+    std::memcpy(buf, &val, sizeof(val));
+    return sizeof(val);
+}
+
+template <typename T>
+T read_buf(char* buf, uint32_t* i) {
+    T val;
+    std::memcpy(&val, buf + (*i), sizeof(T));
+    *i += sizeof(T);
+    return val;
+}
+
+
+uint32_t Sensor::serialize(char* buf) {
+    uint32_t i = 0;
+
+    buf[i++] = static_cast<uint8_t>(this->get_sensor_type());
+    memcpy(buf + i, this->name, SENSOR_NAME_LEN);
+    i += SENSOR_NAME_LEN;
+    buf[i++] = static_cast<uint8_t>(this->unit);
+    i += write_buf<ulong>(buf + i, this->interval);
+    i += write_buf<uint32_t>(buf + i, this->flags);
+    i += write_buf<double>(buf + i, this->scale);
+    i += write_buf<double>(buf + i, this->offset);
+    i += write_buf<double>(buf + i, this->min);
+    i += write_buf<double>(buf + i, this->max);
+
+    i += this->_serialize_internal(buf + i);
+    return i;
+}
+
+uint32_t Sensor::_deserialize(char* buf) {
+    uint32_t i = 1; // Skip sensor type
+
+    memcpy(this->name, buf + i, SENSOR_NAME_LEN);
+    i += SENSOR_NAME_LEN;
+    this->unit = static_cast<SensorUnit>(buf[i++]);
+    this->interval = read_buf<ulong>(buf, &i);
+    this->flags = read_buf<uint32_t>(buf, &i);
+    this->scale = read_buf<double>(buf, &i);
+    this->offset = read_buf<double>(buf, &i);
+    this->min = read_buf<double>(buf, &i);
+    this->max = read_buf<double>(buf, &i);
+
+    return i;
+}
+
+EnsembleSensor::EnsembleSensor(unsigned long interval, double min, double max, double scale, double offset, const char* name, SensorUnit unit, uint32_t flags, sensor_memory_t* sensors, ensemble_children_t* children, uint8_t children_count, EnsembleAction action) :
+    Sensor(interval, min, max, scale, offset, name, unit, flags),
+    action(action),
+    sensors(sensors) {
+    for (size_t i = 0; i < ENSEMBLE_SENSOR_CHILDREN_COUNT; i++) {
+        if (i < children_count) {
+            this->children[i] = children[i];
+        }
+        else {
+            this->children[i] = ensemble_children_t{ sensor_id: 255, min : 0.0, max : 0.0, scale : 0.0, offset : 0.0 };
+        }
+    }
+}
+
+void EnsembleSensor::emit_extra_json(BufferFiller* bfill) {
+    bfill->emit_p(PSTR("{\"action\":$D,\"children\":["), this->action);
+    for (size_t i = 0; i < ENSEMBLE_SENSOR_CHILDREN_COUNT; i++) {
+        if (i) bfill->emit_p(PSTR(","));
+        ensemble_children_t* child = &this->children[i];
+        bfill->emit_p(PSTR("{\"sid\":$D,\"max\":$E,\"min\":$E,\"scale\":$E,\"offset\":$E}"), child->sensor_id, child->max, child->min, child->scale, child->offset);
+    }
+    bfill->emit_p(PSTR("]}"));
+}
+
+void EnsembleSensor::emit_description_json(BufferFiller* bfill) {
+    bfill->emit_p(PSTR("{\"name\":\"Ensemble Sensor\",\"args\":[{\"name\":\"Argument Sensors\",\"arg\":\"children\",\"type\":\"array::4\",\"extra\":[{\"name\":\"Sensor ID\",\"arg\":\"sid\",\"type\":\"sensor\",\"default\":\"\",\"extra\":[]},{\"name\":\"Minimum Value\",\"arg\":\"min\",\"type\":\"double\",\"default\":\"\",\"extra\":[]},{\"name\":\"Maximum Value\",\"arg\":\"max\",\"type\":\"double\",\"default\":\"\",\"extra\":[]},{\"name\":\"Scale\",\"arg\":\"scale\",\"type\":\"double\",\"default\":\"\",\"extra\":[]},{\"name\":\"Offset\",\"arg\":\"offset\",\"type\":\"double\",\"default\":\"\",\"extra\":[]}]},{\"name\":\"Ensemble Action\",\"arg\":\"action\",\"type\":\"enum::EnsembleAction\",\"default\":\"0\",\"extra\":[]}]}"));
+}
+
+double EnsembleSensor::get_inital_value() {
+    switch (this->action) {
+    case EnsembleAction::Min:
+        return this->max;
+        break;
+    case EnsembleAction::Max:
+        return this->min;
+        break;
+    case EnsembleAction::Average:
+    case EnsembleAction::Sum:
+        return 0;
+        break;
+    case EnsembleAction::Product:
+        return 1;
+        break;
+    default:
+        // Unreachable
+        return 0.0;
+    }
+}
+
+double EnsembleSensor::_get_raw_value() {
+    double inital = this->get_inital_value();
+    uint8_t count = 0;
+
+    for (size_t i = 0; i < ENSEMBLE_SENSOR_CHILDREN_COUNT; i++) {
+        uint8_t sensor = this->children[i].sensor_id;
+        if (sensor < MAX_SENSORS && sensors[sensor].interval) {
+            double value = sensors[sensor].value;
+            value = (value * this->children[i].scale) + this->children[i].offset;
+            if (value < this->children[i].min) value = this->children[i].min;
+            if (value > this->children[i].max) value = this->children[i].max;
+
+            switch (this->action) {
+            case EnsembleAction::Min:
+                if (value < inital) inital = value;
+                break;
+            case EnsembleAction::Max:
+                if (value > inital) inital = value;
+                break;
+            case EnsembleAction::Average:
+            case EnsembleAction::Sum:
+                inital += value;
+                break;
+            case EnsembleAction::Product:
+                inital *= value;
+                break;
+            default:
+                // Unreachable
+                return 0.0;
+            }
+
+            count += 1;
+        }
+    }
+
+    if (count == 0) {
+        return 0.0;
+    }
+    else if (this->action == EnsembleAction::Average) {
+        return inital / (double)count;
+    }
+    else {
+        return inital;
+    }
+}
+
+uint32_t EnsembleSensor::_serialize_internal(char* buf) {
+    uint32_t i = 0;
+    for (size_t j = 0; j < ENSEMBLE_SENSOR_CHILDREN_COUNT; j++) {
+        i += write_buf<uint8_t>(buf + i, this->children[j].sensor_id);
+        i += write_buf<double>(buf + i, this->children[j].min);
+        i += write_buf<double>(buf + i, this->children[j].max);
+        i += write_buf<double>(buf + i, this->children[j].scale);
+        i += write_buf<double>(buf + i, this->children[j].offset);
+    }
+
+    buf[i++] = static_cast<uint8_t>(this->action);
+    return i;
+}
+
+EnsembleSensor::EnsembleSensor(sensor_memory_t* sensors, char* buf) {
+    uint32_t i = Sensor::_deserialize(buf);
+    for (size_t j = 0; j < ENSEMBLE_SENSOR_CHILDREN_COUNT; j++) {
+        this->children[j].sensor_id = read_buf<uint8_t>(buf, &i);
+        this->children[j].min = read_buf<double>(buf, &i);
+        this->children[j].max = read_buf<double>(buf, &i);
+        this->children[j].scale = read_buf<double>(buf, &i);
+        this->children[j].offset = read_buf<double>(buf, &i);
+    }
+
+    this->action = static_cast<EnsembleAction>(buf[i++]);
+    this->sensors = sensors;
+}
+
+
+WeatherSensor::WeatherSensor(unsigned long interval, double min, double max, double scale, double offset, const char* name, SensorUnit unit, uint32_t flags, WeatherGetter weather_getter, WeatherAction action) :
+    Sensor(interval, min, max, scale, offset, name, unit, flags),
+    action(action),
+    weather_getter(weather_getter) {
+}
+
+void WeatherSensor::emit_extra_json(BufferFiller* bfill) {
+    bfill->emit_p(PSTR("{\"action\":$D}"), this->action);
+}
+
+void WeatherSensor::emit_description_json(BufferFiller* bfill) {
+    bfill->emit_p(PSTR("{\"name\":\"Weather Sensor\",\"args\":[{\"name\":\"Weather Information\",\"arg\":\"action\",\"type\":\"enum::WeatherAction\",\"default\":\"0\",\"extra\":[]}]}"));
+}
+
+double WeatherSensor::get_inital_value() {
+    return 0.0;
+}
+
+double WeatherSensor::_get_raw_value() {
+    return this->weather_getter(this->action);
+}
+
+uint32_t WeatherSensor::_serialize_internal(char* buf) {
+    uint32_t i = 0;
+    buf[i++] = static_cast<uint8_t>(this->action);
+    return i;
+}
+
+WeatherSensor::WeatherSensor(WeatherGetter weather_getter, char* buf) {
+    uint32_t i = Sensor::_deserialize(buf);
+    this->action = static_cast<WeatherAction>(buf[i++]);
+}
+
+SensorAdjustment::SensorAdjustment(uint8_t flags, uint8_t sid, uint8_t point_count, sensor_adjustment_point_t* points) {
+    this->flags = flags;
+    this->sid = sid;
+    if (point_count > SENSOR_ADJUSTMENT_POINTS) point_count = SENSOR_ADJUSTMENT_POINTS;
+    this->point_count = point_count;
+    for (size_t i = 0; i < point_count; i++) {
+        this->points[i] = points[i];
+    }
+
+}
+
+SensorAdjustment::SensorAdjustment(char* buf) {
+    uint32_t i = 0;
+    this->flags = buf[i++];
+    this->sid = buf[i++];
+    this->point_count = buf[i++];
+
+    for (size_t j = 0; j < SENSOR_ADJUSTMENT_POINTS; j++) {
+        this->points[j].x = read_buf<double>(buf, &i);
+        this->points[j].y = read_buf<double>(buf, &i);
+    }
+}
+
+double SensorAdjustment::get_adjustment_factor(sensor_memory_t* sensors) {
+    if (this->flags & (1 << SENADJ_FLAG_ENABLE) && this->sid < MAX_SENSORS && sensors[this->sid].interval) {
+        double value = sensors[this->sid].value;
+        if (value <= this->points[0].x) return this->points[0].y;
+        if (value >= this->points[this->point_count - 1].x) return this->points[this->point_count - 1].y;
+
+        uint8_t i;
+
+        for (i = 0; i < this->point_count - 1; i++) {
+            if (value >= this->points[i].x) {
+                break;
+            }
+        }
+
+        sensor_adjustment_point_t left = this->points[i];
+        sensor_adjustment_point_t right = this->points[i + 1];
+        if (right.x == left.x) return left.y;
+
+        value = (value - left.x) / (right.x - left.x) * (right.y - left.y) + left.y;
+
+        if (value < 0) return 0;
+        return value;
+    }
+    else {
+        return 1.0;
+    }
+}
+
+uint32_t SensorAdjustment::serialize(char* buf) {
+    uint32_t i = 0;
+    buf[i++] = this->flags;
+    buf[i++] = this->sid;
+    buf[i++] = this->point_count;
+
+    for (size_t j = 0; j < SENSOR_ADJUSTMENT_POINTS; j++) {
+        i += write_buf<double>(buf + i, this->points[j].x);
+        i += write_buf<double>(buf + i, this->points[j].y);
+    }
+
+    return i;
+}

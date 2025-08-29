@@ -329,6 +329,104 @@ bool file_exists(const char *fn) {
 #endif
 }
 
+os_file_type file_open(const char *fn, FileOpenMode mode) {
+    #if defined(ARDUINO)
+    switch (mode) {
+        default:
+        case FileOpenMode::Read:
+            return LittleFS.open(fn, "r");
+        case FileOpenMode::ReadWrite:
+            if (!LittleFS.exists(fn)) {
+                File f = LittleFS.open(fn, "w");
+                if (!f) return f;
+                f.close();
+            }
+            return LittleFS.open(fn, "r+");
+        case FileOpenMode::WriteTruncate:
+            return LittleFS.open(fn, "w");
+        case FileOpenMode::ReadWriteTruncate:
+            return LittleFS.open(fn, "w+");
+        case FileOpenMode::Append:
+            return LittleFS.open(fn, "a");
+        case FileOpenMode::ReadAppend:
+            return LittleFS.open(fn, "a+");
+    }
+    #else
+    char *full_file = get_filename_fullpath(fn);
+    switch (mode) {
+        default:
+        case FileOpenMode::Read:
+            return fopen(full_file, "rb");
+        case FileOpenMode::ReadWrite: {
+            int fd = open(full_file, O_RDWR | O_CREAT, 0644);
+            if (fd == -1) return nullptr;
+            return fdopen(fd, "rb+");
+        }
+        case FileOpenMode::WriteTruncate:
+            return fopen(full_file, "wb");
+        case FileOpenMode::ReadWriteTruncate:
+            return fopen(full_file, "wb+");
+        case FileOpenMode::Append:
+            return fopen(full_file, "ab");
+        case FileOpenMode::ReadAppend:
+            return fopen(full_file, "ab+");
+    }
+    
+    #endif
+}
+
+void file_close(os_file_type f) {
+    #if defined(ARDUINO)
+    f.close();
+    #else
+    fclose(f);
+    #endif
+}
+
+bool file_seek(os_file_type f, uint32_t position, FileSeekMode mode) {
+    #if defined(ARDUINO)
+    switch (mode) {
+        case FileSeekMode::Set:
+            return f.seek(position, fs::SeekMode::SeekSet);
+        case FileSeekMode::Current:
+            return f.seek(position, fs::SeekMode::SeekCur);
+        case FileSeekMode::End:
+            return f.seek(position, fs::SeekMode::SeekEnd);
+    }
+    #else
+    switch (mode) {
+        case FileSeekMode::Set:
+            return fseek(f, position, SEEK_SET);
+        case FileSeekMode::Current:
+            return fseek(f, position, SEEK_CUR);
+        case FileSeekMode::End:
+            return fseek(f, position, SEEK_END);
+    }
+    #endif
+
+    return false;
+}
+
+bool file_seek(os_file_type f, uint32_t position) {
+    return file_seek(f, position, FileSeekMode::Set);
+}
+
+int file_read(os_file_type f, void *target, uint32_t len) {
+    #if defined(ARDUINO)
+    return f.read((uint8_t*)target, len);
+    #else
+    return fread(target, 1, len, f);
+    #endif
+}
+
+int file_write(os_file_type f, const void *source, uint32_t len) {
+    #if defined(ARDUINO)
+    return f.write((const uint8_t*)source, len);
+    #else
+    return fwrite(source, 1, len, f);
+    #endif
+}
+
 // file functions
 void file_read_block(const char *fn, void *dst, ulong pos, ulong len) {
 #if defined(ESP8266)
@@ -719,3 +817,8 @@ void str2mac(const char *_str, unsigned char mac[]) {
 	}
 }
 #endif
+
+char dec2hexchar(unsigned char dec) {
+	if(dec<10) return '0'+dec;
+	else return 'A'+(dec-10);
+}

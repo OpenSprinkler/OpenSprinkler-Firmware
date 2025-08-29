@@ -32,6 +32,7 @@
 #include "images.h"
 #include "mqtt.h"
 #include "RCSwitch.h"
+#include <cmath>
 
 #if defined(ARDUINO) // headers for Arduino
 	#include <Arduino.h>
@@ -74,6 +75,14 @@
 
 #if defined(USE_SSD1306)
 	#include "SSD1306Display.h"
+#endif
+
+#if defined(USE_SENSORS)
+#include "sensor.h"
+#endif
+
+#if defined(USE_ADS1115)
+	#include "ads1115.h"
 #endif
 
 #if defined(ARDUINO)
@@ -222,6 +231,7 @@ struct ConStatus {
 	unsigned char sensor2_active:1;  // sensor2 active bit (when set, sensor2 is activated)
 	unsigned char req_mqtt_restart:1;// request mqtt restart
 	unsigned char pause_state:1;     // pause station runs
+	unsigned char overcurrent_sid:8; // overcurrent sid (0: no overcurrent; 1~254: overcurrent caused by opening zone; 255: system overcurrent)
 };
 
 /** OTF configuration */
@@ -243,6 +253,15 @@ public:
 	static SSD1306Display lcd;  // 128x64 OLED display
 #elif defined(USE_LCD)
 	static LiquidCrystal lcd;   // 16x2 character LCD
+#endif
+
+#if defined(USE_ADS1115)
+    static ADS1115 *ads1115_devices[4];
+#endif
+
+#if defined(USE_SENSORS)
+    static sensor_memory_t sensors[MAX_SENSORS];
+    static uint16_t sensor_file_no;
 #endif
 
 #if defined(OSPI)
@@ -314,6 +333,8 @@ public:
 	static unsigned char get_master_id(unsigned char mas);
 	static int16_t get_on_adj(unsigned char mas);
 	static int16_t get_off_adj(unsigned char mas);
+	static int16_t get_imin();
+	static int16_t get_imax();
 	static unsigned char is_running(unsigned char sid);
 	static unsigned char get_station_gid(unsigned char sid);
 	static void set_station_gid(unsigned char sid, unsigned char gid);
@@ -362,7 +383,7 @@ public:
 	static unsigned char get_station_bit(unsigned char sid); // get station bit of one station (sid->station index)
 	static void switch_special_station(unsigned char sid, unsigned char value, uint16_t dur=0); // swtich special station
 	static void clear_all_station_bits(); // clear all station bits
-	static void apply_all_station_bits(); // apply all station bits (activate/deactive values)
+	static void apply_all_station_bits(void (*post_activation_callback)()=NULL); // apply all station bits (activate/deactive values)
 
 	static int8_t send_http_request(uint32_t ip4, uint16_t port, char* p, void(*callback)(char*)=NULL, bool usessl=false, uint16_t timeout=5000);
 	static int8_t send_http_request(const char* server, uint16_t port, char* p, void(*callback)(char*)=NULL, bool usessl=false, uint16_t timeout=5000);
@@ -371,6 +392,21 @@ public:
 	#if defined(USE_OTF)
 	static OTCConfig otc;
 	#endif
+
+    // -- Sensor functions
+    #if defined(USE_SENSORS)
+    static os_file_type open_sensor_log(uint16_t file_no, FileOpenMode mode);
+    static void load_sensors();
+    static Sensor *parse_sensor(os_file_type file);
+    static Sensor *get_sensor(uint8_t index);
+    static void write_sensor(Sensor *sensor, uint8_t index);
+    void log_sensor(uint8_t sid, float value);
+    static void poll_sensors();
+    static SensorAdjustment *get_sensor_adjust(uint8_t index);
+    static void write_sensor_adjust(SensorAdjustment *adj, uint8_t index);
+
+    static double get_sensor_weather_data(WeatherAction action);
+    #endif
 
 	// -- LCD functions
 #if defined(USE_DISPLAY)

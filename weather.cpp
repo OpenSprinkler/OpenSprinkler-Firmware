@@ -28,17 +28,24 @@
 #include "weather.h"
 #include "main.h"
 #include "types.h"
+#include "ArduinoJson.hpp"
 
 extern OpenSprinkler os; // OpenSprinkler object
 extern char tmp_buffer[];
 extern char ether_buffer[];
+unsigned char md_scales[MAX_N_MD_SCALES];
+unsigned char md_N = 0;
+unsigned char mda = 0;
 char wt_rawData[TMP_BUFFER_SIZE];
 int wt_errCode = HTTP_RQT_NOT_RECEIVED;
 unsigned char wt_monthly[12] = {100,100,100,100,100,100,100,100,100,100,100,100};
+unsigned char wt_restricted = 0;
 
 extern const char *user_agent_string;
 
 unsigned char findKeyVal (const char *str,char *strbuf, uint16_t maxlen,const char *key,bool key_in_pgm=false,uint8_t *keyfound=NULL);
+
+unsigned char parseMdScalesArray (const char* input);
 
 // The weather function calls getweather.py on remote server to retrieve weather data
 // the default script is WEATHER_SCRIPT_HOST/weather?.py
@@ -54,10 +61,11 @@ static void getweather_callback(char* buffer) {
 	if (*p != '&')	return;
 	int v;
 	bool save_nvdata = false;
+	time_os_t tnow = os.now_tz();
 	// first check errCode, only update lswc timestamp if errCode is 0
 	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("errCode"), true)) {
 		wt_errCode = atoi(tmp_buffer);
-		if(wt_errCode==0) os.checkwt_success_lasttime = os.now_tz();
+		if(wt_errCode==0) os.checkwt_success_lasttime = tnow;
 	}
 
 	// then only parse scale if errCode is 0
@@ -71,9 +79,15 @@ static void getweather_callback(char* buffer) {
 		}
 	}
 
+	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("restricted"), true)) {
+		wt_restricted = atoi(tmp_buffer);
+	} else {
+		wt_restricted = 0;
+	}
+
 	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("sunrise"), true)) {
 		v = atoi(tmp_buffer);
-		if (v>=0 && v<=1440 && v != os.nvdata.sunrise_time) {
+		if (v>=0 && v<=1440 && (uint16_t)v != os.nvdata.sunrise_time) {
 			os.nvdata.sunrise_time = v;
 			save_nvdata = true;
 			os.weather_update_flag |= WEATHER_UPDATE_SUNRISE;
@@ -82,7 +96,7 @@ static void getweather_callback(char* buffer) {
 
 	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("sunset"), true)) {
 		v = atoi(tmp_buffer);
-		if (v>=0 && v<=1440 && v != os.nvdata.sunset_time) {
+		if (v>=0 && v<=1440 && (uint16_t)v != os.nvdata.sunset_time) {
 			os.nvdata.sunset_time = v;
 			save_nvdata = true;
 			os.weather_update_flag |= WEATHER_UPDATE_SUNSET;
@@ -113,7 +127,7 @@ static void getweather_callback(char* buffer) {
 	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("rd"), true)) {
 		v = atoi(tmp_buffer);
 		if (v>0) {
-			os.nvdata.rd_stop_time = os.now_tz() + (unsigned long) v * 3600;
+			os.nvdata.rd_stop_time = tnow + (unsigned long) v * 3600;
 			os.raindelay_start();
 		} else if (v==0) {
 			os.raindelay_stop();
@@ -122,6 +136,16 @@ static void getweather_callback(char* buffer) {
 
 	if (findKeyVal(p, wt_rawData, TMP_BUFFER_SIZE, PSTR("rawData"), true)) {
 		wt_rawData[TMP_BUFFER_SIZE-1]=0;  // make sure the buffer ends properly
+	}
+
+	#define _STR_SCALES_SIZE (MAX_N_MD_SCALES*4+4)
+	char _str_scales[_STR_SCALES_SIZE];
+	if (wt_errCode==0) {
+		if (findKeyVal(p, _str_scales, _STR_SCALES_SIZE, PSTR("scales"), true)) {
+			parseMdScalesArray(_str_scales);
+		} else {
+			md_N = 0; // clear the wt_scales array
+		}
 	}
 
 	if(save_nvdata) os.nvdata_save();
@@ -167,22 +191,46 @@ void GetWeather() {
 
 	wt_errCode = HTTP_RQT_NOT_RECEIVED;
 	DEBUG_PRINT(ether_buffer);
+#if defined(OS_AVR)
 	int ret = os.send_http_request(host, ether_buffer, getweather_callback_with_peel_header);
+#else
+	int ret = os.send_http_request(host, 443, ether_buffer, getweather_callback_with_peel_header, true);
+#endif
 	if(ret!=HTTP_RQT_SUCCESS) {
 		if(wt_errCode < 0) wt_errCode = ret;
 		// if wt_errCode > 0, the call is successful but weather script may return error
 	}
 }
 
-void load_wt_monthly(char* wto) {
-	unsigned char i;
-	int p[12];
-	for(i=0;i<12;i++) p[i]=100; // init all to 100
-	sscanf(wto, "\"scales\":[%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d]", p,p+1,p+2,p+3,p+4,p+5,p+6,p+7,p+8,p+9,p+10,p+11);
-	for(i=0;i<12;i++) {
-		if(p[i]<0) p[i]=0;
-		if(p[i]>250) p[i]=250;
-		wt_monthly[i]=p[i];
+void parse_wto(char* wto) {
+	// reset variables to default values before parsing
+	mda = 0;
+	if(*(wto+1)){
+		// Wrap in curly braces
+		wto[0] = '{';
+		int len = strlen(wto);
+		wto[len] = '}';
+		wto[len+1] = 0;
+
+		ArduinoJson::JsonDocument doc;
+		ArduinoJson::DeserializationError error = ArduinoJson::deserializeJson(doc, wto);
+
+		// Test and parse
+		if (error) {
+			DEBUG_PRINT(F("wto: deserializeJson() failed: "));
+			DEBUG_PRINTLN(error.c_str());
+		} else {
+			if(doc.containsKey("scales")){
+				for(unsigned char i=0;i<12;i++){
+					int p=doc["scales"][i];
+					p = (p<0) ? 0 : ((p>250) ? 250 : p); // clamp to [0, 250]
+					wt_monthly[i]=p;
+				}
+			}
+			if(doc.containsKey("mda")){
+				mda = doc["mda"];
+			}
+		}
 	}
 }
 
@@ -199,6 +247,33 @@ void apply_monthly_adjustment(time_os_t curr_time) {
 		if(os.iopts[IOPT_WATER_PERCENTAGE]!=wt_monthly[m]) {
 			os.iopts[IOPT_WATER_PERCENTAGE]=wt_monthly[m];
 			os.iopts_save();
+			os.weather_update_flag |= WEATHER_UPDATE_WL;
 		}
 	}
+}
+
+unsigned char parseMdScalesArray (const char* input) {
+	if (!input) return 0;
+	const char* p = input;
+	if (*p != '[') return 0;   // must start with [
+	++p;                       // skip '['
+
+	DEBUG_PRINT("parseing md_scales:[");
+	int count = 0;
+	while (*p && *p != ']' && count < MAX_N_MD_SCALES) {
+		char* endptr;
+		long val = strtol(p, &endptr, 10);   // parse number
+		md_scales[count] = static_cast<unsigned char>(val);
+		DEBUG_PRINT(md_scales[count]);
+		DEBUG_PRINT(",");
+		count++;
+		p = endptr;
+		if (*p == ',') {
+			++p;  // skip comma
+		}
+	}
+	md_N = count;
+	DEBUG_PRINT("],total=");
+	DEBUG_PRINTLN(md_N);
+	return count;
 }
