@@ -28,10 +28,11 @@
 #define _MAIN_H 1
 
 void turn_off_station(unsigned char sid, time_os_t curr_time, unsigned char shift=0);
+void turn_off_running_station_immediate(unsigned char sid, time_os_t curr_time, unsigned char shift=0);
 void schedule_all_stations(time_os_t curr_time);
 void process_dynamic_events(time_os_t curr_time);
-void reset_all_stations();
-void reset_all_stations_immediate();
+void reset_all_stations(bool running_ones_only=false);
+void reset_all_stations_immediate(bool running_ones_only=false);
 void delete_log(char *name);
 void write_log(unsigned char type, time_os_t curr_time);
 void make_logfile_name(char *name);

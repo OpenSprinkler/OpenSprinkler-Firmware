@@ -35,7 +35,7 @@ typedef unsigned long ulong;
 														// if this number is different from the one stored in non-volatile memory
 														// a device reset will be automatically triggered
 
-#define OS_FW_MINOR      2  // Firmware minor version
+#define OS_FW_MINOR      3  // Firmware minor version
 
 /** Hardware version base numbers */
 #define OS_HW_VERSION_BASE   0x00 // OpenSprinkler
@@ -77,6 +77,13 @@ typedef unsigned long ulong;
 #define NOTIFY_RAINDELAY       0x0080
 #define NOTIFY_STATION_ON      0x0100
 #define NOTIFY_FLOW_ALERT      0x0200
+#define NOTIFY_CURR_ALERT      0x0400
+
+enum {
+	CURR_ALERT_TYPE_UNDER = 0,		// undercurrent when running a station
+	CURR_ALERT_TYPE_OVER_STATION,	// overcurrent when turning on a station
+	CURR_ALERT_TYPE_OVER_SYSTEM		// overcurrent while system is running
+};
 
 /** HTTP request macro defines */
 #define HTTP_RQT_SUCCESS       0
@@ -151,6 +158,9 @@ typedef unsigned long ulong;
 #define DEFAULT_OTC_TOKEN_LENGTH   32
 #define DEFAULT_DEVICE_NAME       "My OpenSprinkler"
 #define DEFAULT_EMPTY_STRING      ""
+#define DEFAULT_UNDERCURRENT_THRESHOLD 100 // in mA
+#define DEFAULT_OVERCURRENT_LIMIT 1200 // in mA
+#define OVERCURRENT_INRUSH_EXTRA   600 // in mA
 
 #if (defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__))
 	#define OS_AVR
@@ -164,7 +174,7 @@ typedef unsigned long ulong;
 enum {
 	WEATHER_METHOD_MANUAL = 0,
 	WEATHER_METHOD_ZIMMERMAN,
-	WEATHER_METHOD_AUTORAINDELY,
+	WEATHER_METHOD_AUTORAINDELAY,
 	WEATHER_METHOD_ETO,
 	WEATHER_METHOD_MONTHLY,
 	NUM_WEATHER_METHODS
@@ -258,8 +268,8 @@ enum {
 	IOPT_LATCH_ON_VOLTAGE,
 	IOPT_LATCH_OFF_VOLTAGE,
 	IOPT_NOTIF2_ENABLE,
-	IOPT_RESERVE_4,
-	IOPT_RESERVE_5,
+	IOPT_I_MIN_THRESHOLD,
+	IOPT_I_MAX_LIMIT,
 	IOPT_RESERVE_6,
 	IOPT_RESERVE_7,
 	IOPT_RESERVE_8,

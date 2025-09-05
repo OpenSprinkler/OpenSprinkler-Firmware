@@ -76,8 +76,8 @@ RCSwitch OpenSprinkler::rfswitch;
 extern char tmp_buffer[];
 extern char ether_buffer[];
 extern ProgramData pd;
-
 extern const char* user_agent_string;
+extern unsigned char curr_alert_sid;
 
 #if defined(USE_SSD1306)
 	SSD1306Display OpenSprinkler::lcd(0x3c, SDA, SCL);
@@ -180,8 +180,8 @@ const char iopt_json_names[] PROGMEM =
 	"laton"
 	"latof"
 	"ife2\0"
-	"resv4"
-	"resv5"
+	"imin\0"
+	"imax\0"
 	"resv6"
 	"resv7"
 	"resv8"
@@ -259,8 +259,8 @@ const char iopt_prompts[] PROGMEM =
 	"Latch On Volt.  "
 	"Latch Off Volt. "
 	"Notif 2 Enable  "
-	"Reserved 4      "
-	"Reserved 5      "
+	"I min threshold "
+	"I max limit     "
 	"Reserved 6      "
 	"Reserved 7      "
 	"Reserved 8      "
@@ -337,7 +337,7 @@ const unsigned char iopt_max[] PROGMEM = {
 	24,
 	24,
 	255,
-	255,
+	100,
 	255,
 	255,
 	255,
@@ -421,8 +421,8 @@ unsigned char OpenSprinkler::iopts[] = {
 	0,  // latch on volt
 	0,  // latch off volt
 	0,  // notif enable bits 2
-	0,  // reserved 4
-	0,  // reserved 5
+	DEFAULT_UNDERCURRENT_THRESHOLD/10, // imin threshold scaled down by 10
+	DEFAULT_OVERCURRENT_LIMIT/10,      // imax limit scaled down by 10
 	0,  // reserved 6
 	0,  // reserved 7
 	0,  // reserved 8
@@ -457,6 +457,20 @@ static const char days_str[] PROGMEM =
 	"Sat\0"
 	"Sun\0";
 
+/** Month name strings (stored in PROGMEM to reduce RAM usage) */
+static const char months_str[] PROGMEM =
+	"Jan\0"
+	"Feb\0"
+	"Mar\0"
+	"Apr\0"
+	"May\0"
+	"Jun\0"
+	"Jul\0"
+	"Aug\0"
+	"Sep\0"
+	"Oct\0"
+	"Nov\0"
+	"Dec\0";
 
 #if !defined(ARDUINO)
 static inline int32_t now() {
@@ -637,7 +651,7 @@ unsigned char OpenSprinkler::start_ether() {
 	
 	ulong timeout = millis()+60000; // 60 seconds time out
 	unsigned char timecount = 1;
-	while (!eth.connected() && millis()<timeout) {
+	while (!eth.connected() && (long)(millis()-timeout)<0) { // overflow proof
 		DEBUG_PRINT(".");
 		lcd.setCursor(13, 2);
 		lcd.print(timecount);
@@ -1128,7 +1142,7 @@ void OpenSprinkler::latch_boost(unsigned char volt) {
 		uint32_t boost_timeout = millis() + (iopts[IOPT_BOOST_TIME]<<2);
 		digitalWriteExt(PIN_BOOST, HIGH);
 		// boost until either top voltage is reached or boost timeout is reached
-		while(millis()<boost_timeout && analogRead(PIN_CURR_SENSE)<top) {
+		while((long)(millis()-boost_timeout)<0 && analogRead(PIN_CURR_SENSE)<top) { // overflow proof
 			delay(5);
 		}
 		digitalWriteExt(PIN_BOOST, LOW);
@@ -1288,7 +1302,7 @@ void OpenSprinkler::latch_apply_all_station_bits() {
 /** Apply all station bits
  * !!! This will activate/deactivate valves !!!
  */
-void OpenSprinkler::apply_all_station_bits() {
+void OpenSprinkler::apply_all_station_bits(void (*post_activation_callback)()) {
 
 #if defined(ESP8266)
 	if(hw_type==HW_TYPE_LATCH) {
@@ -1371,6 +1385,9 @@ void OpenSprinkler::apply_all_station_bits() {
 	digitalWrite(PIN_SR_LATCH, HIGH);
 	#endif
 #endif
+
+	// If a post activation callback function is defined, call it here
+	if(post_activation_callback) post_activation_callback();
 
 	if(iopts[IOPT_SPE_AUTO_REFRESH]) {
 		// handle refresh of RF and remote stations
@@ -1515,8 +1532,8 @@ void OpenSprinkler::sensor_resetall() {
  */
 #if defined(ARDUINO)
 uint16_t OpenSprinkler::read_current() {
-	float scale = 1.0f;
-	if(status.has_curr_sense) {
+	static float scale = -1;
+	if(scale < 0) { // assign scale upon first call of this function
 		if (hw_type == HW_TYPE_DC) {
 			#if defined(ESP8266)
 			scale = 4.88;
@@ -1532,17 +1549,8 @@ uint16_t OpenSprinkler::read_current() {
 		} else {
 			scale = 0.0;  // for other controllers, current is 0
 		}
-		/* do an average */
-		const unsigned char K = 8;
-		uint16_t sum = 0;
-		for(unsigned char i=0;i<K;i++) {
-			sum += analogRead(PIN_CURR_SENSE);
-			delay(1);
-		}
-		return (uint16_t)((sum/K)*scale);
-	} else {
-		return 0;
 	}
+	return analogRead(PIN_CURR_SENSE)*scale;
 }
 #endif
 
@@ -1673,11 +1681,22 @@ unsigned char OpenSprinkler::get_master_id(unsigned char mas) {
 }
 
 int16_t OpenSprinkler::get_on_adj(unsigned char mas) {
-	return water_time_decode_signed(masters[mas][MASOPT_ON_ADJ]);
+	int16_t onadj = water_time_decode_signed(masters[mas][MASOPT_ON_ADJ]);
+	return onadj ? onadj : -1; // if on adj is 0, modify it to -1 to stagger with station
 }
 
 int16_t OpenSprinkler::get_off_adj(unsigned char mas) {
-	return water_time_decode_signed(masters[mas][MASOPT_OFF_ADJ]);
+	int16_t offadj = water_time_decode_signed(masters[mas][MASOPT_OFF_ADJ]);
+	return offadj ? offadj : 1; // if off adj is 0, modify it to +1 to stagger with station
+}
+
+int16_t OpenSprinkler::get_imin() {
+	return iopts[IOPT_I_MIN_THRESHOLD]*10;
+}
+
+int16_t OpenSprinkler::get_imax() {
+	unsigned char i = iopts[IOPT_I_MAX_LIMIT];
+	return (i == 0) ? DEFAULT_OVERCURRENT_LIMIT : (i == 255 ? -1 : i*10);
 }
 
 unsigned char OpenSprinkler::bound_to_master(unsigned char sid, unsigned char mas) {
@@ -1850,6 +1869,7 @@ unsigned char OpenSprinkler::set_station_bit(unsigned char sid, unsigned char va
 		else {
 			(*data) = (*data) | mask;
 			engage_booster = true; // if bit is changing from 0 to 1, set engage_booster
+			curr_alert_sid = sid+1; // record the zone that's turning on (starting from 1)
 			switch_special_station(sid, 1, dur); // handle special stations
 			return 1;
 		}
@@ -1916,7 +1936,7 @@ void OpenSprinkler::switch_gpiostation(GPIOStationData *data, bool turnon) {
 }
 
 /** Callback function for switching remote station */
-void remote_http_callback(char* buffer) {
+void default_http_callback(char* buffer) {
 
 	DEBUG_PRINTLN(buffer);
 
@@ -2012,7 +2032,7 @@ int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char*
 			client->read((uint8_t*)ether_buffer+pos, nbytes);
 			pos+=nbytes;
 		}
-		if(millis()>stoptime) {
+		if((long)(millis()-stoptime)>0) { // overflow proof
 			DEBUG_PRINTLN(F("host timeout occured"));
 			//return HTTP_RQT_TIMEOUT; // instead of returning with timeout, we'll work with data received so far
 			break;
@@ -2097,7 +2117,7 @@ void OpenSprinkler::switch_remotestation(RemoteIPStationData *data, bool turnon,
 
 	char server[20];
 	snprintf(server, 20, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
-	send_http_request(server, port, p, remote_http_callback);
+	send_http_request(server, port, p, default_http_callback);
 }
 
 /** Switch remote OTC station
@@ -2134,7 +2154,7 @@ void OpenSprinkler::switch_remotestation(RemoteOTCStationData *data, bool turnon
 
 	bf.emit_p(PSTR("User-Agent: $S\r\n\r\n"), user_agent_string);
 
-	send_http_request(DEFAULT_OTC_SERVER_APP, DEFAULT_OTC_PORT_APP, p, remote_http_callback, true);
+	send_http_request(DEFAULT_OTC_SERVER_APP, DEFAULT_OTC_PORT_APP, p, default_http_callback, true);
 }
 
 /** Switch http(s) station
@@ -2160,7 +2180,7 @@ void OpenSprinkler::switch_httpstation(HTTPStationData *data, bool turnon, bool 
 	bf.emit_p(PSTR("GET /$S HTTP/1.0\r\nHOST: $S\r\n"), cmd, server);
 	bf.emit_p(PSTR("User-Agent: $S\r\n\r\n"), user_agent_string);
 
-	send_http_request(server, atoi(port), p, remote_http_callback, usessl);
+	send_http_request(server, atoi(port), p, default_http_callback, usessl);
 }
 
 /** Prepare factory reset */
@@ -2428,7 +2448,7 @@ void OpenSprinkler::nvdata_save() {
 	file_write_block(NVCON_FILENAME, &nvdata, 0, sizeof(NVConData));
 }
 
-void load_wt_monthly(char* wto);
+void parse_wto(char* wto);
 
 /** Load integer options from file */
 void OpenSprinkler::iopts_load() {
@@ -2450,10 +2470,10 @@ void OpenSprinkler::iopts_load() {
 			iopts[IOPT_NTP_IP4] = 0;
 	}
 	populate_master();
-	sopt_load(SOPT_WEATHER_OPTS, tmp_buffer);
-	if(iopts[IOPT_USE_WEATHER]==WEATHER_METHOD_MONTHLY) {
-		load_wt_monthly(tmp_buffer);
-	}
+	sopt_load(SOPT_WEATHER_OPTS, tmp_buffer+1); // Leave room for curly brace
+	parse_wto(tmp_buffer);
+	// California restriction is now indicated in wto and no longer by the highest bit of uwt. So we force that bit to 0
+	iopts[IOPT_USE_WEATHER] &= 0x7F;
 }
 
 void OpenSprinkler::populate_master() {
@@ -2605,14 +2625,14 @@ void OpenSprinkler::lcd_print_time(time_os_t t)
 
 	lcd_print_2digit(minute(t));
 
-	lcd_print_pgm(PSTR("  "));
+	lcd_print_pgm(PSTR(" "));
 
 	// each weekday string has 3 characters + ending 0
 	lcd_print_pgm(days_str+4*weekday_today());
 
 	lcd_print_pgm(PSTR(" "));
 
-	lcd_print_2digit(month(t));
+	lcd_print_pgm(months_str+4*(month(t)-1));
 
 	lcd_print_pgm(PSTR("-"));
 
@@ -2775,7 +2795,9 @@ void OpenSprinkler::lcd_print_screen(char c) {
 	{
 	#endif
 		lcd.setCursor(0, -1);
-		if(status.rain_delayed) {
+		if(status.overcurrent_sid > 0) {
+			lcd.print(F("<!OVERCURRENT!> "));
+		} else if(status.rain_delayed) {
 			lcd.print(F("<Rain Delay On> "));
 		} else if(status.pause_state) {
 			lcd.print(F("<Program Paused>"));
@@ -2884,6 +2906,15 @@ void OpenSprinkler::lcd_print_option(int i) {
 			lcd.print((int)iopts[i]*4);
 			lcd_print_pgm(PSTR(" ms"));
 		}
+		#else
+		lcd.print('-');
+		#endif
+		break;
+	case IOPT_I_MIN_THRESHOLD:
+	case IOPT_I_MAX_LIMIT:
+		#if defined(ARDUINO)
+		lcd.print((int)iopts[i]*10);
+		lcd_print_pgm(PSTR(" mA"));
 		#else
 		lcd.print('-');
 		#endif
