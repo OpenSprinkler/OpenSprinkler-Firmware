@@ -85,7 +85,7 @@ void manual_start_program(unsigned char, unsigned char);
 #define UI_STATE_MACHINE_INTERVAL 50    // how often does ui_state_machine run (in ms)
 #define CLIENT_READ_TIMEOUT       5     // client read timeout (in seconds)
 #define DHCP_CHECKLEASE_INTERVAL  3600L // DHCP check lease interval (in seconds)
-#define FLOWPOLL_INTERVAL         3     // flow poll interval (in milli-seconds)
+#define FLOWPOLL_INTERVAL         5     // flow poll interval (in milli-seconds)
 #define CURRPOLL_INTERVAL         20    // current poll interval (in milli-seconds)
 // Define buffers: need them to be sufficiently large to cover string option reading
 char ether_buffer[ETHER_BUFFER_SIZE*2]; // ethernet buffer, make it twice as large to allow overflow
