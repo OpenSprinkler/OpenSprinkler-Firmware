@@ -159,7 +159,7 @@ enum {
 #define DEFAULT_DEVICE_NAME       "My OpenSprinkler"
 #define DEFAULT_EMPTY_STRING      ""
 #define DEFAULT_UNDERCURRENT_THRESHOLD 100 // in mA
-#define DEFAULT_OVERCURRENT_LIMIT 1000 // in mA
+#define DEFAULT_OVERCURRENT_LIMIT 1200 // in mA
 #define OVERCURRENT_INRUSH_EXTRA   600 // in mA
 
 #if (defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega1284__))
