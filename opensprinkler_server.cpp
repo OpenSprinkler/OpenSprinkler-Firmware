@@ -1226,119 +1226,282 @@ function rst_wsp() {document.getElementById('wsp').value='$S';}</script>)"),
 void server_json_controller_main(OTF_PARAMS_DEF) {
 	unsigned char bid, sid;
 	time_os_t curr_time = os.now_tz();
-	bfill.emit_p(PSTR("\"devt\":$L,\"nbrd\":$D,\"en\":$D,\"sn1\":$D,\"sn2\":$D,\"rd\":$D,\"rdst\":$L,"
-										"\"sunrise\":$D,\"sunset\":$D,\"eip\":$L,\"lwc\":$L,\"lswc\":$L,"
-										"\"lupt\":$L,\"lrbtc\":$D,\"lrun\":[$D,$D,$D,$L],\"pq\":$D,\"pt\":$L,\"nq\":$D,\"ocs\":$D,"),
-							(uint32_t)curr_time,
-							os.nboards,
-							os.status.enabled,
-							os.status.sensor1_active,
-							os.status.sensor2_active,
-							os.status.rain_delayed,
-							(uint32_t)os.nvdata.rd_stop_time,
-							os.nvdata.sunrise_time,
-							os.nvdata.sunset_time,
-							os.nvdata.external_ip,
-							(uint32_t)os.checkwt_lasttime,
-							(uint32_t)os.checkwt_success_lasttime,
-							(uint32_t)os.powerup_lasttime,
-							os.last_reboot_cause,
-							pd.lastrun.station,
-							pd.lastrun.program,
-							pd.lastrun.duration,
-							pd.lastrun.endtime,
-							os.status.pause_state,
-							os.pause_timer,
-							pd.nqueue,
-							os.status.overcurrent_sid);
+
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("param"), true)) {
+
+		bfill.emit_p(PSTR("\"param\":1"));
+
+		if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("devt"), true)) 
+			bfill.emit_p(PSTR(",\"devt\":$L"),(uint32_t)curr_time);
+		if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("nbrd"), true)) 
+			bfill.emit_p(PSTR(",\"nbrd\":$D"),os.nboards);
+		if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("en"), true)) 
+			bfill.emit_p(PSTR(",\"en\":$D"),os.status.enabled);
+		if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("sn1"), true)) 
+			bfill.emit_p(PSTR(",\"sn1\":$D"),os.status.sensor1_active);
+		if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("sn2"), true)) 
+			bfill.emit_p(PSTR(",\"sn2\":$D"),os.status.sensor2_active);
+		if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("rd"), true)) 
+			bfill.emit_p(PSTR(",\"rd\":$D"),os.status.rain_delayed);
+		if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("rdst"), true)) 
+			bfill.emit_p(PSTR(",\"rdst\":$L"),(uint32_t)os.nvdata.rd_stop_time);
+		if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("sunrise"), true)) 
+			bfill.emit_p(PSTR(",\"sunrise\":$D"),os.nvdata.sunrise_time);
+		if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("sunset"), true)) 
+			bfill.emit_p(PSTR(",\"sunset\":$D"),os.nvdata.sunset_time);
+		if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("eip"), true)) 
+			bfill.emit_p(PSTR(",\"eip\":$L"),os.nvdata.external_ip);
+		if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("lwc"), true)) 
+			bfill.emit_p(PSTR(",\"lwc\":$L"),(uint32_t)os.checkwt_lasttime);
+		if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("lswc"), true)) 
+			bfill.emit_p(PSTR(",\"lswc\":$L"),(uint32_t)os.checkwt_success_lasttime);
+		if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("lupt"), true)) 
+			bfill.emit_p(PSTR(",\"lupt\":$L"),(uint32_t)os.powerup_lasttime);
+		if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("lrbtc"), true)) 
+			bfill.emit_p(PSTR(",\"lrbtc\":$D"),os.last_reboot_cause);
+		if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("lrun"), true)) 
+			bfill.emit_p(PSTR(",\"lrun\":[$D,$D,$D,$L]"),pd.lastrun.station,pd.lastrun.program,pd.lastrun.duration,pd.lastrun.endtime);
+		if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("pq"), true)) 
+			bfill.emit_p(PSTR(",\"pq\":$D"),os.status.pause_state);
+		if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("pt"), true)) 
+			bfill.emit_p(PSTR(",\"pt\":$L"),os.pause_timer);
+		if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("nq"), true)) 
+			bfill.emit_p(PSTR(",\"nq\":$D"),pd.nqueue);
+		if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("ocs"), true)) 
+			bfill.emit_p(PSTR(",\"ocs\":$D"),os.status.overcurrent_sid);
 
 #if defined(ESP8266)
-	bfill.emit_p(PSTR("\"RSSI\":$D,"), (int16_t)WiFi.RSSI());
-	bfill.emit_p(PSTR("\"apdv\":$D,"), os.actual_pd_voltage);
+		if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("RSSI"), true)) 
+			bfill.emit_p(PSTR(",\"RSSI\":$D"), (int16_t)WiFi.RSSI());
+		if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("apdv"), true)) 
+			bfill.emit_p(PSTR(",\"apdv\":$D"), os.actual_pd_voltage);
 #endif
 
 #if defined(USE_OTF)
-	bfill.emit_p(PSTR("\"otc\":{$O},\"otcs\":$D,"), SOPT_OTC_OPTS, otf->getCloudStatus());
+		if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("otc"), true)) 
+			bfill.emit_p(PSTR(",\"otc\":{$O}"), SOPT_OTC_OPTS);
+		if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("otcs"), true)) 
+			bfill.emit_p(PSTR(",\"otcs\":$D"), otf->getCloudStatus());
 #endif
 
-	unsigned char mac[6] = {0};
+			unsigned char mac[6] = {0};
 #if defined(ARDUINO)
-	os.load_hardware_mac(mac, useEth);
+			os.load_hardware_mac(mac, useEth);
 #else
-	os.load_hardware_mac(mac, true);
+			os.load_hardware_mac(mac, true);
 #endif
 
-	bfill.emit_p(PSTR("\"mac\":\"$X:$X:$X:$X:$X:$X\","), mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-
-	bfill.emit_p(PSTR("\"loc\":\"$O\",\"jsp\":\"$O\",\"wsp\":\"$O\",\"wto\":{$O},\"ifkey\":\"$O\",\"mqtt\":{$O},\"wtdata\":$S,\"wterr\":$D,\"wtrestr\":$D,\"dname\":\"$O\","),
-							 SOPT_LOCATION,
-							 SOPT_JAVASCRIPTURL,
-							 SOPT_WEATHERURL,
-							 SOPT_WEATHER_OPTS,
-							 SOPT_IFTTT_KEY,
-							 SOPT_MQTT_OPTS,
-							 strlen(wt_rawData)==0?"{}":wt_rawData,
-							 wt_errCode,
-							 wt_restricted,
-							 SOPT_DEVICE_NAME);
+		if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("mac"), true)) 
+			bfill.emit_p(PSTR(",\"mac\":\"$X:$X:$X:$X:$X:$X\""), mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+		if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("loc"), true)) 
+			bfill.emit_p(PSTR(",\"loc\":\"$O\""),SOPT_LOCATION);
+		if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("jsp"), true)) 
+			bfill.emit_p(PSTR(",\"jsp\":\"$O\""),SOPT_JAVASCRIPTURL);
+		if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("wsp"), true)) 
+			bfill.emit_p(PSTR(",\"wsp\":\"$O\""),SOPT_WEATHERURL);
+		if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("wto"), true)) 
+			bfill.emit_p(PSTR(",\"wto\":{$O}"),SOPT_WEATHER_OPTS);
+		if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("ifkey"), true)) 
+			bfill.emit_p(PSTR(",\"ifkey\":\"$O\""),SOPT_IFTTT_KEY);
+		if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("mqtt"), true)) 
+			bfill.emit_p(PSTR(",\"mqtt\":{$O}"),SOPT_MQTT_OPTS);
+		if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("wtdata"), true)) 
+			bfill.emit_p(PSTR(",\"wtdata\":$S"),strlen(wt_rawData)==0?"{}":wt_rawData);
+		if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("wterr"), true)) 
+			bfill.emit_p(PSTR(",\"wterr\":$D"),wt_errCode);
+		if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("wtrestr"), true)) 
+			bfill.emit_p(PSTR(",\"wtrestr\":$D"),wt_restricted);
+		if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("dname"), true)) 
+			bfill.emit_p(PSTR(",\"dname\":\"$O\""),SOPT_DEVICE_NAME);
 
 #if defined(SUPPORT_EMAIL)
-	bfill.emit_p(PSTR("\"email\":{$O},"), SOPT_EMAIL_OPTS);
+		if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("email"), true)) 
+			bfill.emit_p(PSTR(",\"email\":{$O}"), SOPT_EMAIL_OPTS);
 #endif
 
-	bfill.emit_p(PSTR("\"wls\":["));
-	if (md_N == 0) {
-		bfill.emit_p(PSTR("],"));
-	}
-	for (unsigned char idx = 0; idx < md_N; idx++) {
-		bfill.emit_p(PSTR("$D"), (int)md_scales[idx]);
-		bfill.emit_p((idx == md_N-1) ? PSTR("],") : PSTR(","));
-	}
+		if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("wls"), true)) {
+			bfill.emit_p(PSTR(",\"wls\":["));
+			if (md_N == 0) {
+					bfill.emit_p(PSTR("]"));
+			}
+			for (unsigned char idx = 0; idx < md_N; idx++) {
+					bfill.emit_p(PSTR("$D"), (int)md_scales[idx]);
+					bfill.emit_p((idx == md_N-1) ? PSTR("]") : PSTR(","));
+			}
+		}
 
 #if defined(ARDUINO)
-	uint16_t current = os.read_current(true);
-	if((!os.status.program_busy) && (current<os.baseline_current)) current=0;
-	bfill.emit_p(PSTR("\"curr\":$D,"), current);
+			uint16_t current = os.read_current(true);
+			if((!os.status.program_busy) && (current<os.baseline_current)) current=0;
+		if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("curr"), true)) 
+			bfill.emit_p(PSTR(",\"curr\":$D"), current);
 #endif
-	if(os.iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_FLOW) {
-		bfill.emit_p(PSTR("\"flcrt\":$L,\"flwrt\":$D,\"flcto\":$L,"), os.flowcount_rt, FLOWCOUNT_RT_WINDOW, flow_count);
-	}
+			if(os.iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_FLOW) {
+				if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("flcrt"), true)) 
+					bfill.emit_p(PSTR(",\"flcrt\":$L"), os.flowcount_rt);
+				if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("flwrt"), true)) 
+					bfill.emit_p(PSTR(",\"flwrt\":$D"), FLOWCOUNT_RT_WINDOW);
+				if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("flcto"), true)) 
+					bfill.emit_p(PSTR(",\"flcto\":$L"), flow_count);
+			}
 
-	bfill.emit_p(PSTR("\"sbits\":["));
-	// print sbits
-	for(bid=0;bid<os.nboards;bid++)
-		bfill.emit_p(PSTR("$D,"), os.station_bits[bid]);
-	bfill.emit_p(PSTR("0],\"ps\":["));
-	// print ps
-	for(sid=0;sid<os.nstations;sid++) {
-		// if available ether buffer is getting small
-		// send out a packet
-		if(available_ether_buffer() <= 0) {
-			send_packet(OTF_PARAMS);
-		}
-		unsigned long rem = 0;
-		unsigned char qid = pd.station_qid[sid];
-		RuntimeQueueStruct *q = pd.queue + qid;
-		if (qid<255) {
-			rem = (curr_time >= q->st) ? (q->st+q->dur-curr_time) : q->dur;
-			if(rem>65535) rem = 0;
-		}
-		bfill.emit_p(PSTR("[$D,$L,$L,$D]"),
-		(qid<255)?q->pid:0, (uint32_t)rem, (uint32_t)((qid<255)?q->st:0), os.attrib_grp[sid]);
-		bfill.emit_p((sid<os.nstations-1)?PSTR(","):PSTR("]"));
-	}
+			if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("sbits"), true)) {
+				bfill.emit_p(PSTR(",\"sbits\":["));
+				// print sbits
+				for(bid=0;bid<os.nboards;bid++)
+					bfill.emit_p(PSTR("$D,"), os.station_bits[bid]);
+				bfill.emit_p(PSTR("0]"));
+			}
+			if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("ps"), true)) {
+				bfill.emit_p(PSTR(",\"ps\":["));
+				// print ps
+				for(sid=0;sid<os.nstations;sid++) {
+					// if available ether buffer is getting small
+					// send out a packet
+					if(available_ether_buffer() <= 0) {
+					send_packet(OTF_PARAMS);
+				}
+				unsigned long rem = 0;
+				unsigned char qid = pd.station_qid[sid];
+				RuntimeQueueStruct *q = pd.queue + qid;
+				if (qid<255) {
+					rem = (curr_time >= q->st) ? (q->st+q->dur-curr_time) : q->dur;
+					if(rem>65535) rem = 0;
+				}
+				bfill.emit_p(PSTR("[$D,$L,$L,$D]"),
+							(qid<255)?q->pid:0, (uint32_t)rem, (uint32_t)((qid<255)?q->st:0), os.attrib_grp[sid]);
+				bfill.emit_p((sid<os.nstations-1)?PSTR(","):PSTR("]"));
+				}
+			}
+			if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("gpio"), true)) {
+				unsigned char gpioList[] = PIN_FREE_LIST;
+				bfill.emit_p(PSTR(",\"gpio\":["));
+				for (unsigned char i = 0; i < sizeof(gpioList); ++i) {
+					if(i != sizeof(gpioList) - 1) {
+						bfill.emit_p(PSTR("$D,"), gpioList[i]);
+					} else {
+						bfill.emit_p(PSTR("$D"), gpioList[i]);
+					}
+				}
+				bfill.emit_p(PSTR("]"));
+			}
 
-	unsigned char gpioList[] = PIN_FREE_LIST;
-	bfill.emit_p(PSTR(",\"gpio\":["));
-	for (unsigned char i = 0; i < sizeof(gpioList); ++i)
-	{
-		if(i != sizeof(gpioList) - 1) {
-			bfill.emit_p(PSTR("$D,"), gpioList[i]);
-		} else {
-			bfill.emit_p(PSTR("$D"), gpioList[i]);
-		}
 	}
-	bfill.emit_p(PSTR("]"));
+	else {	
+		bfill.emit_p(PSTR("\"devt\":$L,\"nbrd\":$D,\"en\":$D,\"sn1\":$D,\"sn2\":$D,\"rd\":$D,\"rdst\":$L,"
+								"\"sunrise\":$D,\"sunset\":$D,\"eip\":$L,\"lwc\":$L,\"lswc\":$L,"
+								"\"lupt\":$L,\"lrbtc\":$D,\"lrun\":[$D,$D,$D,$L],\"pq\":$D,\"pt\":$L,\"nq\":$D,\"ocs\":$D,"),
+						(uint32_t)curr_time,
+						os.nboards,
+						os.status.enabled,
+						os.status.sensor1_active,
+						os.status.sensor2_active,
+						os.status.rain_delayed,
+						(uint32_t)os.nvdata.rd_stop_time,
+						os.nvdata.sunrise_time,
+						os.nvdata.sunset_time,
+						os.nvdata.external_ip,
+						(uint32_t)os.checkwt_lasttime,
+						(uint32_t)os.checkwt_success_lasttime,
+						(uint32_t)os.powerup_lasttime,
+						os.last_reboot_cause,
+						pd.lastrun.station,
+						pd.lastrun.program,
+						pd.lastrun.duration,
+						pd.lastrun.endtime,
+						os.status.pause_state,
+						os.pause_timer,
+						pd.nqueue,
+						os.status.overcurrent_sid);
+
+#if defined(ESP8266)
+			bfill.emit_p(PSTR("\"RSSI\":$D,"), (int16_t)WiFi.RSSI());
+			bfill.emit_p(PSTR("\"apdv\":$D,"), os.actual_pd_voltage);
+#endif
+
+#if defined(USE_OTF)
+			bfill.emit_p(PSTR("\"otc\":{$O},\"otcs\":$D,"), SOPT_OTC_OPTS, otf->getCloudStatus());
+#endif
+
+			unsigned char mac[6] = {0};
+#if defined(ARDUINO)
+			os.load_hardware_mac(mac, useEth);
+#else
+			os.load_hardware_mac(mac, true);
+#endif
+
+			bfill.emit_p(PSTR("\"mac\":\"$X:$X:$X:$X:$X:$X\","), mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+
+			bfill.emit_p(PSTR("\"loc\":\"$O\",\"jsp\":\"$O\",\"wsp\":\"$O\",\"wto\":{$O},\"ifkey\":\"$O\",\"mqtt\":{$O},\"wtdata\":$S,\"wterr\":$D,\"wtrestr\":$D,\"dname\":\"$O\","),
+							SOPT_LOCATION,
+							SOPT_JAVASCRIPTURL,
+							SOPT_WEATHERURL,
+							SOPT_WEATHER_OPTS,
+							SOPT_IFTTT_KEY,
+							SOPT_MQTT_OPTS,
+							strlen(wt_rawData)==0?"{}":wt_rawData,
+							wt_errCode,
+							wt_restricted,
+							SOPT_DEVICE_NAME);
+
+#if defined(SUPPORT_EMAIL)
+			bfill.emit_p(PSTR("\"email\":{$O},"), SOPT_EMAIL_OPTS);
+#endif
+
+			bfill.emit_p(PSTR("\"wls\":["));
+			if (md_N == 0) {
+					bfill.emit_p(PSTR("],"));
+			}
+			for (unsigned char idx = 0; idx < md_N; idx++) {
+					bfill.emit_p(PSTR("$D"), (int)md_scales[idx]);
+					bfill.emit_p((idx == md_N-1) ? PSTR("],") : PSTR(","));
+			}
+
+#if defined(ARDUINO)
+			uint16_t current = os.read_current(true);
+			if((!os.status.program_busy) && (current<os.baseline_current)) current=0;
+			bfill.emit_p(PSTR("\"curr\":$D,"), current);
+#endif
+			if(os.iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_FLOW) {
+					bfill.emit_p(PSTR("\"flcrt\":$L,\"flwrt\":$D,\"flcto\":$L,"), os.flowcount_rt, FLOWCOUNT_RT_WINDOW, flow_count);
+			}
+
+			bfill.emit_p(PSTR("\"sbits\":["));
+			// print sbits
+			for(bid=0;bid<os.nboards;bid++)
+					bfill.emit_p(PSTR("$D,"), os.station_bits[bid]);
+			bfill.emit_p(PSTR("0],\"ps\":["));
+			// print ps
+			for(sid=0;sid<os.nstations;sid++) {
+					// if available ether buffer is getting small
+					// send out a packet
+					if(available_ether_buffer() <= 0) {
+							send_packet(OTF_PARAMS);
+					}
+					unsigned long rem = 0;
+					unsigned char qid = pd.station_qid[sid];
+					RuntimeQueueStruct *q = pd.queue + qid;
+					if (qid<255) {
+							rem = (curr_time >= q->st) ? (q->st+q->dur-curr_time) : q->dur;
+							if(rem>65535) rem = 0;
+					}
+					bfill.emit_p(PSTR("[$D,$L,$L,$D]"),
+									(qid<255)?q->pid:0, (uint32_t)rem, (uint32_t)((qid<255)?q->st:0), os.attrib_grp[sid]);
+					bfill.emit_p((sid<os.nstations-1)?PSTR(","):PSTR("]"));
+			}
+
+			unsigned char gpioList[] = PIN_FREE_LIST;
+			bfill.emit_p(PSTR(",\"gpio\":["));
+			for (unsigned char i = 0; i < sizeof(gpioList); ++i)
+			{
+					if(i != sizeof(gpioList) - 1) {
+							bfill.emit_p(PSTR("$D,"), gpioList[i]);
+					} else {
+							bfill.emit_p(PSTR("$D"), gpioList[i]);
+					}
+			}
+		bfill.emit_p(PSTR("]"));
+	}
 
 	bfill.emit_p(PSTR("}"));
 }
