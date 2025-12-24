@@ -1090,6 +1090,7 @@ void server_change_program(OTF_PARAMS_DEF) {
 
 	// Parse date range enable flag AFTER parsing v=[...] so it can override the flag byte
 	// This ensures endr parameter takes precedence over the flag byte in v=[...]
+	// Always parse endr if provided, and if not provided, ensure en_daterange matches flag byte bit 7
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("endr"), true)) {
 		unsigned char endr = atoi(tmp_buffer);
 		prog.en_daterange = (endr == 1) ? 1 : 0;
@@ -1099,8 +1100,21 @@ void server_change_program(OTF_PARAMS_DEF) {
 			flag |= (1 << 7);  // Set bit 7
 		} else {
 			flag &= ~(1 << 7);  // Clear bit 7
+			// Clear date range values when disabled to avoid confusion
+			prog.daterange[0] = 33;  // Default: Jan 1
+			prog.daterange[1] = 415; // Default: Dec 31
 		}
 		*(char*)(&prog) = flag;
+	} else {
+		// If endr parameter not provided, sync en_daterange with flag byte bit 7
+		// This ensures consistency between the flag byte and the en_daterange field
+		unsigned char flag = *(char*)(&prog);
+		prog.en_daterange = (flag & (1 << 7)) ? 1 : 0;
+		// If date range is disabled but dates are still set, clear them
+		if (!prog.en_daterange) {
+			prog.daterange[0] = 33;  // Default: Jan 1
+			prog.daterange[1] = 415; // Default: Dec 31
+		}
 	}
 
 	if (pid==-1) {

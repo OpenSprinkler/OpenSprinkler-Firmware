@@ -103,6 +103,16 @@ void ProgramData::read(unsigned char pid, ProgramStruct *buf) {
 	// first unsigned char is program counter, so 1+
 	file_read_block(PROG_FILENAME, buf, 1+(ulong)pid*PROGRAMSTRUCT_SIZE, PROGRAMSTRUCT_SIZE);
 	
+	// Sync en_daterange with flag byte bit 7 to ensure consistency
+	// This is important because the flag byte is the source of truth
+	unsigned char flag = *(char*)(buf);
+	buf->en_daterange = (flag & (1 << 7)) ? 1 : 0;
+	// If date range is disabled but dates are still set, clear them to avoid confusion
+	if (!buf->en_daterange) {
+		buf->daterange[0] = 33;  // Default: Jan 1
+		buf->daterange[1] = 415; // Default: Dec 31
+	}
+	
 	// Validate fertigation fields for backward compatibility
 	// If file was written by old firmware, fert fields will be zero, which is correct default
 	for(unsigned char i = 0; i < MAX_NUM_STATIONS; i++) {
