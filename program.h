@@ -101,6 +101,14 @@ public:
 
 	uint16_t durations[MAX_NUM_STATIONS];  // duration / water time of each station
 
+	// fertigation settings per station
+	struct FertigationConfig {
+		unsigned char enabled:1;     // fertigation enabled for this station
+		unsigned char mode:1;        // 0: time-based, 1: percentage-based
+		unsigned char fert_sid:8;    // fertigation station id (0-255, limited by MAX_NUM_STATIONS)
+		uint16_t value;              // duration in seconds (time mode) or percentage (percentage mode)
+	} fert[MAX_NUM_STATIONS];
+
 	char name[PROGRAM_NAME_SIZE];
 
 	int16_t daterange[2] = {MIN_ENCODED_DATE, MAX_ENCODED_DATE}; // date range: start date, end date

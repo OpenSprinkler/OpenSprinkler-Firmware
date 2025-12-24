@@ -64,6 +64,7 @@ unsigned char    OpenSprinkler::weather_update_flag;
 unsigned char OpenSprinkler::attrib_mas[MAX_NUM_BOARDS];
 unsigned char OpenSprinkler::attrib_igs[MAX_NUM_BOARDS];
 unsigned char OpenSprinkler::attrib_mas2[MAX_NUM_BOARDS];
+unsigned char OpenSprinkler::fert_station = 255;  // 255 = not configured
 unsigned char OpenSprinkler::attrib_igs2[MAX_NUM_BOARDS];
 unsigned char OpenSprinkler::attrib_igrd[MAX_NUM_BOARDS];
 unsigned char OpenSprinkler::attrib_dis[MAX_NUM_BOARDS];
@@ -71,6 +72,7 @@ unsigned char OpenSprinkler::attrib_spe[MAX_NUM_BOARDS];
 unsigned char OpenSprinkler::attrib_grp[MAX_NUM_STATIONS];
 unsigned char OpenSprinkler::masters[NUM_MASTER_ZONES][NUM_MASTER_OPTS];
 time_os_t OpenSprinkler::masters_last_on[NUM_MASTER_ZONES];
+OpenSprinkler::StationFertigation OpenSprinkler::station_fertigation[MAX_NUM_STATIONS];
 RCSwitch OpenSprinkler::rfswitch;
 
 extern char tmp_buffer[];
@@ -1862,6 +1864,33 @@ unsigned char OpenSprinkler::password_verify(const char *pw) {
 	return (file_cmp_block(SOPTS_FILENAME, pw, SOPT_PASSWORD*MAX_SOPTS_SIZE)==0) ? 1 : 0;
 }
 
+/** Load fertigation station configuration from file */
+void OpenSprinkler::fert_station_load() {
+	// Check if file exists, if not, default to 255 (not configured)
+	if(!file_exists(FERT_FILENAME)) {
+		fert_station = 255;  // Default to not configured
+		return;
+	}
+	// File exists, read the value
+	fert_station = file_read_byte(FERT_FILENAME, 0);
+	// Validate: 255 = not configured, 0-254 = valid station ID (but must be < MAX_NUM_STATIONS)
+	// Note: file_read_byte returns 0 if file doesn't exist or is empty, but we already checked file_exists
+	// So if we get here and value is 0, it means station 0 is configured (which is valid)
+	if(fert_station >= MAX_NUM_STATIONS && fert_station != 255) {
+		fert_station = 255;  // safety check: reset to not configured if invalid
+	}
+}
+
+/** Save fertigation station configuration to file */
+void OpenSprinkler::fert_station_save() {
+	file_write_byte(FERT_FILENAME, 0, fert_station);
+}
+
+/** Check if a station is the fertigation station */
+unsigned char OpenSprinkler::is_fert_station(unsigned char sid) {
+	return (fert_station < MAX_NUM_STATIONS && fert_station == sid) ? 1 : 0;
+}
+
 // ==================
 // Schedule Functions
 // ==================
@@ -2306,6 +2335,7 @@ void OpenSprinkler::factory_reset() {
 	}
 
 	attribs_load(); // load and repackage attrib bits (for backward compatibility)
+	fert_station_load(); // load fertigation station configuration
 
 	// 3. write non-volatile controller status
 	nvdata.reboot_cause = REBOOT_CAUSE_RESET;
@@ -2396,6 +2426,7 @@ void OpenSprinkler::options_setup() {
 		#endif
 
 		attribs_load();
+		fert_station_load();
 	}
 
 #if defined(ARDUINO)	// handle AVR buttons

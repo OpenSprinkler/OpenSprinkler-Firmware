@@ -51,6 +51,7 @@ typedef unsigned long ulong;
 /** Data file names */
 #define IOPTS_FILENAME        "iopts.dat"   // integer options data file
 #define SOPTS_FILENAME        "sopts.dat"   // string options data file
+#define FERT_FILENAME         "fert.dat"    // fertigation stations data file
 #define STATIONS_FILENAME     "stns.dat"    // stations data file
 #define NVCON_FILENAME        "nvcon.dat"   // non-volatile controller data file, see OpenSprinkler.h --> struct NVConData
 #define PROG_FILENAME         "prog.dat"    // program data file

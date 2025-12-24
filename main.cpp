@@ -1011,6 +1011,130 @@ void do_loop()
 			// process dynamic events
 			process_dynamic_events(curr_time);
 
+			// ====== Process station-based fertigation ======
+			// Fertigation runs centered in the station duration
+			if(os.fert_station < MAX_NUM_STATIONS) {
+				// Check all stations that are running for fertigation needs
+				for(sid = 0; sid < os.nstations; sid++) {
+					if(os.is_running(sid) && pd.station_qid[sid] < pd.nqueue) {
+						// Find this station in the runtime queue to get program ID and duration
+						q = pd.queue + pd.station_qid[sid];
+						unsigned char prog_id = q->pid;
+						uint16_t station_dur = q->dur;
+						time_os_t station_start = q->st;
+						
+						// Read fertigation settings from program data structure
+						// Note: Scheduled programs use pid+1 in queue (program 0 → queue pid 1)
+						// Manual programs use pid=254 in queue
+						ProgramStruct prog;
+						bool prog_valid = false;
+						
+						if(prog_id > 0 && prog_id <= pd.nprograms && station_dur > 0 && station_start > 0) {
+							// Scheduled program - queue pid is program index + 1
+							// So prog_id 1 = program 0, prog_id 2 = program 1, etc.
+							pd.read(prog_id - 1, &prog);
+							prog_valid = true;
+						} else if(prog_id == 254 && station_dur > 0 && station_start > 0) {
+							// Manual program (pid=254) - find which program has this station configured
+							// Check all programs to find one that matches this station's duration and has fertigation
+							for(unsigned char p = 0; p < pd.nprograms; p++) {
+								pd.read(p, &prog);
+								ulong prog_dur = water_time_resolve(prog.durations[sid]);
+								// Match by duration (allow small difference due to rounding)
+								if(prog.durations[sid] > 0 && 
+								   (prog_dur == station_dur || (prog_dur > 0 && abs((long)prog_dur - (long)station_dur) < 5))) {
+									// Found matching program - check if it has fertigation configured
+									if(prog.fert[sid].enabled) {
+										prog_valid = true;
+										break;
+									}
+								}
+							}
+						}
+						
+						if(prog_valid && station_dur > 0 && station_start > 0) {
+							// Get fertigation configuration
+							if(prog.fert[sid].enabled && prog.fert[sid].value > 0) {
+								// Calculate fertigation duration
+								uint16_t fert_dur = 0;
+								if(prog.fert[sid].mode == 0) {
+									// Time-based mode: value is already in seconds
+									fert_dur = prog.fert[sid].value;
+								} else {
+									// Percentage-based mode: convert percentage to seconds
+									fert_dur = (station_dur * prog.fert[sid].value) / 100;
+								}
+								
+								// Use the single configured fertigation station
+								if(fert_dur > 0 && os.fert_station < MAX_NUM_STATIONS) {
+									// Initialize or update fertigation tracking
+									if(!os.station_fertigation[sid].active || 
+									   os.station_fertigation[sid].fert_start_time != station_start) {
+										// Calculate centered fertigation timing
+										uint16_t delay = (station_dur - fert_dur) / 2;
+										
+										os.station_fertigation[sid].fert_start_time = station_start + delay;
+										if(fert_dur < station_dur) {
+											os.station_fertigation[sid].fert_end_time = station_start + delay + fert_dur;
+										} else {
+											// If fertigation duration >= station duration, run for entire duration
+											os.station_fertigation[sid].fert_end_time = station_start + station_dur;
+										}
+										os.station_fertigation[sid].active = 1;
+									}
+									
+									// Check if we're within the fertigation window
+									if(curr_time >= os.station_fertigation[sid].fert_start_time && 
+									   curr_time < os.station_fertigation[sid].fert_end_time) {
+										// Turn on fertigation station
+										if(!os.is_running(os.fert_station)) {
+											os.set_station_bit(os.fert_station, 1, 1);
+										}
+									} else {
+										// Turn off fertigation station if outside window
+										if(os.is_running(os.fert_station)) {
+											os.set_station_bit(os.fert_station, 0, 1);
+										}
+									}
+								} else {
+									// No fertigation configured or invalid - clear tracking
+									if(os.station_fertigation[sid].active) {
+										os.station_fertigation[sid].active = 0;
+										if(os.is_running(os.fert_station)) {
+											os.set_station_bit(os.fert_station, 0, 1);
+										}
+									}
+								}
+							} else {
+								// No fertigation configured - clear tracking
+								if(os.station_fertigation[sid].active) {
+									os.station_fertigation[sid].active = 0;
+									if(os.is_running(os.fert_station)) {
+										os.set_station_bit(os.fert_station, 0, 1);
+									}
+								}
+							}
+						} else {
+							// Station not in queue or invalid - clear tracking
+							if(os.station_fertigation[sid].active) {
+								os.station_fertigation[sid].active = 0;
+								if(os.is_running(os.fert_station)) {
+									os.set_station_bit(os.fert_station, 0, 1);
+								}
+							}
+						}
+					} else {
+						// Station stopped - clear fertigation tracking
+						if(os.station_fertigation[sid].active) {
+							os.station_fertigation[sid].active = 0;
+							if(os.is_running(os.fert_station)) {
+								os.set_station_bit(os.fert_station, 0, 1);
+							}
+						}
+					}
+				}
+			}
+
 			// activate / deactivate valves
 			os.apply_all_station_bits(overcurrent_monitor);
 
@@ -1348,6 +1472,14 @@ void turn_off_station(unsigned char sid, time_os_t curr_time, unsigned char shif
 	#endif
 
 	os.set_station_bit(sid, 0);
+	
+	// Stop fertigation for this station when it turns off
+	if(os.station_fertigation[sid].active) {
+		os.station_fertigation[sid].active = 0;
+		if(os.fert_station < MAX_NUM_STATIONS && os.is_running(os.fert_station)) {
+			os.set_station_bit(os.fert_station, 0, 1);
+		}
+	}
 
 	// RAH implementation of flow sensor
 	if (flow_gallons > 1) {
