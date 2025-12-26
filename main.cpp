@@ -908,6 +908,9 @@ void do_loop()
 						// skip if the station is a master station (because master cannot be scheduled independently
 						if ((os.status.mas==sid+1) || (os.status.mas2==sid+1))
 							continue;
+						// skip if the station is the fertigation station (fertigation station cannot be scheduled independently)
+						if (os.is_fert_station(sid))
+							continue;
 
 						// if station has non-zero water time and the station is not disabled
 						if (prog.durations[sid] && !(os.attrib_dis[bid]&(1<<s))) {
@@ -976,9 +979,10 @@ void do_loop()
 				for(s=0;s<8;s++) {
 					unsigned char sid = bid*8+s;
 
-					// skip master stations and any station that's not in the queue
+					// skip master stations, fertigation station, and any station that's not in the queue
 					if (os.status.mas == sid+1) continue;
 					if (os.status.mas2== sid+1) continue;
+					if (os.is_fert_station(sid)) continue;
 					if (pd.station_qid[sid]==255) continue;
 
 					q = pd.queue + pd.station_qid[sid];
@@ -1840,6 +1844,9 @@ void manual_start_program(unsigned char pid, unsigned char uwt, unsigned char qo
 		s=sid&0x07;
 		// skip if the station is a master station (because master cannot be scheduled independently
 		if ((os.status.mas==sid+1) || (os.status.mas2==sid+1))
+			continue;
+		// skip if the station is the fertigation station (fertigation station cannot be scheduled independently)
+		if (os.is_fert_station(sid))
 			continue;
 		dur = 60;
 		if(pid==255)  dur=2;
