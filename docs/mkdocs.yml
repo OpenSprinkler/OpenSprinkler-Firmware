@@ -11,6 +11,8 @@ nav:
     - 'User Manual': '2.2.1/221_4_manual.md'
     - 'API Reference': '2.2.1/221_4_api.md'
   - 'Troubleshooting': 'troubleshooting.md'
+  - 'OpenSprinkler Pi':
+    - 'Installing and Updating Firmware': 'OSPi/ospifirmwareinstall.md'
   - 'Archived':
     - 'Previous Manuals and API docs': 'archive.md'
 extra_css:
