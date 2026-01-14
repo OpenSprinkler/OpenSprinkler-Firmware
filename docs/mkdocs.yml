@@ -12,7 +12,9 @@ nav:
     - 'API Reference': '2.2.1/221_4_api.md'
   - 'Troubleshooting': 'troubleshooting.md'
   - 'OpenSprinkler Pi':
-    - 'Installing and Updating Firmware': 'OSPi/ospifirmwareinstall.md'
+    - 'Installing and Updating Firmware': 'OSPi/ospiFirmwareInstall.md'
+  - 'Support Articles':
+    - 'Using Weather Adjustments': 'support/weatherAdjustments.md'
   - 'Archived':
     - 'Previous Manuals and API docs': 'archive.md'
 extra_css:
