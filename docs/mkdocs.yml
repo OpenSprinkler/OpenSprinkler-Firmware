@@ -17,6 +17,7 @@ nav:
     - 'Using Weather Adjustments': 'support/weatherAdjustments.md'
     - 'How to use MQTT': 'support/mqttIntegration.md'
     - 'Setting Up Email Notifications': 'support/emailNotifications.md'
+    - 'Setting Up IFTTT Notifications': 'support/iftttNotifications.md'
   - 'Archived':
     - 'Previous Manuals and API docs': 'archive.md'
 extra_css:
