@@ -24,6 +24,7 @@
 #include "types.h"
 #include "OpenSprinkler.h"
 #include "program.h"
+#include "rooms.h"
 #include "opensprinkler_server.h"
 #include "weather.h"
 #include "mqtt.h"
@@ -1035,8 +1036,10 @@ void server_change_program(OTF_PARAMS_DEF) {
 
 	if (pid==-1) {
 		if(!pd.add(&prog)) handle_return(HTML_DATA_OUTOFBOUND);
+        RoomManager::log_change("Program Added");
 	} else {
 		if(!pd.modify(pid, &prog)) handle_return(HTML_DATA_OUTOFBOUND);
+        RoomManager::log_change("Program Modified");
 	}
 	handle_return(HTML_SUCCESS);
 }
@@ -2168,6 +2171,185 @@ void server_json_debug(OTF_PARAMS_DEF) {
 	handle_return(HTML_OK);
 }
 
+// ================= ROOM MANAGER ENDPOINTS =================
+void server_get_rooms(OTF_PARAMS_DEF) {
+#if defined(USE_OTF)
+    rewind_ether_buffer();
+    print_header(OTF_PARAMS);
+#else
+    print_header();
+#endif
+    RoomManager::to_json(bfill);
+    handle_return(HTML_OK);
+}
+
+void server_set_room(OTF_PARAMS_DEF) {
+#if defined(USE_OTF)
+    if(!process_password(OTF_PARAMS)) return;
+#else
+    char *p = get_buffer;
+#endif
+
+    int id = -1;
+    if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("id"), true)) {
+        id = atoi(tmp_buffer);
+    }
+
+    if (id < 0 || id >= MAX_NUM_ROOMS) handle_return(HTML_DATA_OUTOFBOUND);
+
+    char name[ROOM_NAME_SIZE];
+    int16_t offset = RoomManager::get_offset(id);
+    bool spray = RoomManager::is_spray_mode(id);
+
+    if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("name"), true)) {
+        #if !defined(USE_OTF)
+        urlDecode(tmp_buffer);
+        #endif
+        strncpy(name, tmp_buffer, ROOM_NAME_SIZE);
+    } else {
+        strncpy(name, RoomManager::rooms[id].name, ROOM_NAME_SIZE);
+    }
+
+    if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("off"), true)) {
+        offset = atoi(tmp_buffer);
+    }
+
+    if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("spr"), true)) {
+        spray = atoi(tmp_buffer) > 0;
+    }
+
+    RoomManager::set_room(id, name, offset, spray);
+    handle_return(HTML_SUCCESS);
+}
+
+void server_apply_preset(OTF_PARAMS_DEF) {
+#if defined(USE_OTF)
+    if(!process_password(OTF_PARAMS)) return;
+#else
+    char *p = get_buffer;
+#endif
+
+    int id = -1;
+    if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("id"), true)) {
+        id = atoi(tmp_buffer);
+    }
+
+    if (id < 0 || id >= MAX_NUM_ROOMS) handle_return(HTML_DATA_OUTOFBOUND);
+
+    if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("pname"), true)) {
+        #if !defined(USE_OTF)
+        urlDecode(tmp_buffer);
+        #endif
+        RoomManager::apply_preset(id, tmp_buffer);
+        handle_return(HTML_SUCCESS);
+    }
+
+    handle_return(HTML_DATA_MISSING);
+}
+
+void server_get_room_log(OTF_PARAMS_DEF) {
+#if defined(USE_OTF)
+    if(!process_password(OTF_PARAMS)) return;
+    rewind_ether_buffer();
+    // Plain text response
+    res.writeStatus(200, F("OK"));
+    res.writeHeader(F("Content-Type"), F("text/plain"));
+    res.writeHeader(F("Access-Control-Allow-Origin"), F("*"));
+    res.writeHeader(F("Connection"), F("close"));
+#else
+    print_header(false); // HTML
+#endif
+
+#if defined(ESP8266)
+    File file = LittleFS.open("/change_log.txt", "r");
+    if(file) {
+        while(file.available()) {
+            int n = file.readBytes(ether_buffer, ETHER_BUFFER_SIZE-1);
+            ether_buffer[n] = 0;
+            #if defined(USE_OTF)
+            res.writeBodyChunk((char*)"%s", ether_buffer);
+            #else
+            m_client->write((const uint8_t *)ether_buffer, n);
+            #endif
+        }
+        file.close();
+    }
+#elif defined(ARDUINO)
+    SdFile file;
+    if(file.open("/change_log.txt", O_READ)) {
+         while(file.available()) {
+            int n = file.read(ether_buffer, ETHER_BUFFER_SIZE-1);
+             ether_buffer[n] = 0;
+             m_client->write((const uint8_t *)ether_buffer, n);
+         }
+         file.close();
+    }
+#endif
+    handle_return(HTML_OK);
+}
+
+static const char htmlRooms[] PROGMEM =
+R"html(<!DOCTYPE html>
+<html><head>
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Room Manager</title>
+<style>
+body { font-family: sans-serif; padding: 10px; }
+.room { border: 1px solid #ccc; padding: 10px; margin-bottom: 10px; border-radius: 5px; }
+input { margin: 5px 0; }
+</style>
+<script>
+function api(url, cb) {
+    fetch(url).then(r=>r.json()).then(cb).catch(e=>alert(e));
+}
+function load() {
+    api('/gr', d => {
+        let h = '';
+        d.forEach(r => {
+            h += `<div class="room">
+            <b>${r.name}</b> (ID: ${r.id})<br>
+            Name: <input id="n${r.id}" value="${r.name}"><br>
+            Offset (min): <input type="number" id="o${r.id}" value="${r.offset}"><br>
+            Spray Mode: <input type="checkbox" id="s${r.id}" ${r.spray?'checked':''}><br>
+            <button onclick="save(${r.id})">Save</button>
+            <button onclick="preset(${r.id}, 'Veg Day 1')">Veg D1</button>
+            <button onclick="preset(${r.id}, 'Flower Day 1')">Flw D1</button>
+            </div>`;
+        });
+        document.getElementById('c').innerHTML = h;
+    });
+}
+function save(id) {
+    let n = document.getElementById('n'+id).value;
+    let o = document.getElementById('o'+id).value;
+    let s = document.getElementById('s'+id).checked ? 1 : 0;
+    let pw = prompt("Password?");
+    if(pw) fetch(`/sr?id=${id}&name=${encodeURIComponent(n)}&off=${o}&spr=${s}&pw=${pw}`).then(load);
+}
+function preset(id, p) {
+    let pw = prompt("Password?");
+    if(pw) fetch(`/ar?id=${id}&pname=${encodeURIComponent(p)}&pw=${pw}`).then(alert("Applied"));
+}
+</script>
+</head>
+<body onload="load()">
+<h1>Room Manager</h1>
+<div id="c">Loading...</div>
+<br><a href="/gl?pw=" onclick="this.href+=prompt('Password?')">View Log</a>
+</body></html>)html";
+
+void server_view_rooms(OTF_PARAMS_DEF) {
+    rewind_ether_buffer();
+#if defined(USE_OTF)
+    print_header(OTF_PARAMS, false, strlen_P(htmlRooms));
+    res.writeBodyData((const __FlashStringHelper*)htmlRooms, strlen_P(htmlRooms));
+#else
+    print_header(false);
+    bfill.emit_p(htmlRooms);
+#endif
+    handle_return(HTML_OK);
+}
+
 /*
 // fill ESP8266 flash with some dummy files
 void server_fill_files(OTF_PARAMS_DEF) {
@@ -2222,6 +2404,11 @@ const char _url_keys[] PROGMEM =
 	"ja"
 	"pq"
 	"db"
+    "gr" // get rooms
+    "sr" // set room
+    "ar" // apply preset
+    "gl" // get room log
+    "vr" // view rooms (ui)
 #if defined(ARDUINO)
 	//"ff"
 #endif
@@ -2252,6 +2439,11 @@ URLHandler urls[] = {
 	server_json_all,        // ja
 	server_pause_queue,     // pq
 	server_json_debug,      // db
+    server_get_rooms,
+    server_set_room,
+    server_apply_preset,
+    server_get_room_log,
+    server_view_rooms,
 #if defined(ARDUINO)
 	//server_fill_files,
 #endif

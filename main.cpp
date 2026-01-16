@@ -31,6 +31,7 @@
 #include "mqtt.h"
 #include "main.h"
 #include "notifier.h"
+#include "rooms.h"
 
 #if defined(ARDUINO)
 #include <Arduino.h>
@@ -435,6 +436,7 @@ void do_setup() {
 #endif
 
 	pd.init();           // ProgramData init
+	RoomManager::init(); // RoomManager init
 
 	// set time using RTC if it exists
 	if(RTC.exists())	setTime(RTC.get());
@@ -501,6 +503,7 @@ void do_setup() {
 	os.options_setup();  // Setup options
 
 	pd.init();           // ProgramData init
+	RoomManager::init(); // RoomManager init
 
 	if (os.start_network()) {  // initialize network
 		DEBUG_PRINTLN("network established.");
@@ -872,7 +875,23 @@ void do_loop()
 			for(pid=0; pid<pd.nprograms; pid++) {
 				pd.read(pid, &prog);	// todo future: reduce load time
 				bool will_delete = false;
-				unsigned char runcount = prog.check_match(curr_time, &will_delete);
+
+				time_os_t prog_check_time = curr_time;
+				int8_t room_id = -1;
+				int8_t phase = 0;
+				if (RoomManager::parse_room_tag(prog.name, &room_id, &phase)) {
+					// Apply Offset
+					prog_check_time = (time_os_t)((long)curr_time + (long)RoomManager::get_offset(room_id) * 60);
+
+					// Apply Spray Mode (reduce P2 repeats by 1)
+					if (phase == 2 && RoomManager::is_spray_mode(room_id)) {
+						if (prog.starttime_type == 0 && prog.starttimes[1] > 0) {
+							prog.starttimes[1]--;
+						}
+					}
+				}
+
+				unsigned char runcount = prog.check_match(prog_check_time, &will_delete);
 				if(runcount>0) {
 					// program match found
 					// check and process special program command
