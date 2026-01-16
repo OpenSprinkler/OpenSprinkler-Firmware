@@ -15,6 +15,7 @@ nav:
     - 'Installing and Updating Firmware': 'OSPi/ospiFirmwareInstall.md'
   - 'Support Articles':
     - 'Using Weather Adjustments': 'support/weatherAdjustments.md'
+    - 'How to use MQTT': 'support/mqttIntegration.md'
   - 'Archived':
     - 'Previous Manuals and API docs': 'archive.md'
 extra_css:
