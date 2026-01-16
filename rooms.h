@@ -3,8 +3,7 @@
 
 #include "types.h"
 #include "OpenSprinkler.h"
-
-class BufferFiller; // Forward declaration
+#include "opensprinkler_server.h"
 
 #define MAX_NUM_ROOMS 8
 #define ROOM_NAME_SIZE 24

@@ -201,7 +201,7 @@ void RoomManager::apply_preset(uint8_t room_id, const char* preset_name) {
         // Assuming user will edit.
         for(int i=0; i<MAX_NUM_STATIONS; i++) prog.durations[i] = 0;
 
-        pd.add(&prog);
+        ProgramData::add(&prog);
 
         // P2: Start 10:00, Repeat 4 times, Interval 2 hrs
         create_room_tag(tag, room_id, 2);
@@ -210,7 +210,7 @@ void RoomManager::apply_preset(uint8_t room_id, const char* preset_name) {
         prog.starttimes[0] = 10 * 60;
         prog.starttimes[1] = 3; // Repeat 3 MORE times (total 4)
         prog.starttimes[2] = 120; // 2 hours
-        pd.add(&prog);
+        ProgramData::add(&prog);
 
         log_change("Applied Preset: Veg Day 1");
     }
@@ -222,7 +222,7 @@ void RoomManager::apply_preset(uint8_t room_id, const char* preset_name) {
         prog.starttimes[0] = 8 * 60;
         prog.starttimes[1] = 0;
         prog.starttimes[2] = 0;
-        pd.add(&prog);
+        ProgramData::add(&prog);
 
         // P2: Less frequent
         create_room_tag(tag, room_id, 2);
@@ -231,7 +231,7 @@ void RoomManager::apply_preset(uint8_t room_id, const char* preset_name) {
         prog.starttimes[0] = 12 * 60;
         prog.starttimes[1] = 1; // Repeat 1 MORE time (total 2)
         prog.starttimes[2] = 240; // 4 hours
-        pd.add(&prog);
+        ProgramData::add(&prog);
 
         log_change("Applied Preset: Flower Day 1");
     }
