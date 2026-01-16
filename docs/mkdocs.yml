@@ -18,6 +18,7 @@ nav:
     - 'How to use MQTT': 'support/mqttIntegration.md'
     - 'Setting Up Email Notifications': 'support/emailNotifications.md'
     - 'Setting Up IFTTT Notifications': 'support/iftttNotifications.md'
+    - 'Using Weather Underground (WU)': 'support/weatherUnderground.md'
   - 'Archived':
     - 'Previous Manuals and API docs': 'archive.md'
 extra_css:
