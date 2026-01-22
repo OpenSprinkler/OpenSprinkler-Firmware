@@ -50,10 +50,10 @@ The final step is to choose **which events will trigger IFTTT notifications** an
 * **Weather Update**: Triggered when there is weather update (e.g. a change in water level) or when the external IP address changes.
 * **Controller Reboot**: Triggered when the controller restarts.
 * **Station Finish**: Triggered when a station (zone) completes its run.
-  !!! note
+!!! note
     This may generate a high number of notifications. Only enable it if necessary.
 * **Station Start**: Triggered when a zone begins running.
-  !!! note
+!!! note
     This may generate a high number of notifications. Only enable it if necessary.
 * **Flow Alert**: Triggered when a zone finishes running and the flow rate exceeds the set threshold.
 * **Current Alert**: Triggered when undercurrent or overcurrent faults are detected. (Available from firmware 2.2.1(3))

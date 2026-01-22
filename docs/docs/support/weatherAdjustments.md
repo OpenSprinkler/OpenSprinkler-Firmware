@@ -13,31 +13,31 @@ On the controller's homepage, go to **Edit Options --> Weather and Sensors**, wh
 ### Selecting an Adjustment Method
 
 * **Manual Adjustment (Default)**
-  * Allows manual setting of the watering percentage (0-250%).
-  * Programs with "**Use Weather Adjustment**" enabled will scale watering times based on the set percentage.
-    * Example: If a program schedules 60 minutes for a zone and the watering percentage is set to 50%, the zone will water for 30 minutes.
+    * Allows manual setting of the watering percentage (0-250%).
+    * Programs with "**Use Weather Adjustment**" enabled will scale watering times based on the set percentage.
+        * Example: If a program schedules 60 minutes for a zone and the watering percentage is set to 50%, the zone will water for 30 minutes.
 
 * **Zimmerman**
-  * Automatically adjusts the watering percentage based on **temperature**, **humidity**, and **precipiation**.
-  * When selected, the % Watering input is disabled, as the percentage is calculated dynamically.
-  * It is simple, intuitive, and great for general home irrigation.
-  * Implementation details of the Zimmerman method and its parameters are explained below.
+    * Automatically adjusts the watering percentage based on **temperature**, **humidity**, and **precipiation**.
+    * When selected, the % Watering input is disabled, as the percentage is calculated dynamically.
+    * It is simple, intuitive, and great for general home irrigation.
+    * Implementation details of the Zimmerman method and its parameters are explained below.
 
 * **Auto Rain Delay**
-  * Uses the current precipitation data to automatically set a rain delay.
-  * **Does NOT modify watering percentage**. This will only trigger a rain delay when weather data indicates that it is raining.
+    * Uses the current precipitation data to automatically set a rain delay.
+    * **Does NOT modify watering percentage**. This will only trigger a rain delay when weather data indicates that it is raining.
 
 * **ETo (Evapotranspiration)**
-  * A more **advanced** method based on industry standards.
-  * Utilizes additional weather parameters, such as the **geolocation**, **altitude**, **solar radiation**, and **yearly baseline ETo value** of your location.
-  * **Requirements**:
-    * You must provide a **Baseline ETo** (or click "**Detect Baseline ETo** to auto-detect using your location).
-    * You must set your **Elevation** for accurate calculations.
-  * Implementation details about ETo and its parameters are explained below.
+    * A more **advanced** method based on industry standards.
+    * Utilizes additional weather parameters, such as the **geolocation**, **altitude**, **solar radiation**, and **yearly baseline ETo value** of your location.
+    * **Requirements**:
+        * You must provide a **Baseline ETo** (or click "**Detect Baseline ETo** to auto-detect using your location).
+        * You must set your **Elevation** for accurate calculations.
+        * Implementation details about ETo and its parameters are explained below.
 
 * **Monthly Adjustment**
-  * Similar to Manual mode, but allows setting a **fixed watering percentation per month**.
-  * Useful for **seasonal watering schedules**.
+    * Similar to Manual mode, but allows setting a **fixed watering percentation per month**.
+    * Useful for **seasonal watering schedules**.
 
 ### Using Multi-Day Average Watering Levels
 
@@ -50,7 +50,10 @@ This feature applies **only to interval programs** and will not affect other pro
 Starting with **firmware 2.2.1(3)**, the following weather restrictions can be enabled with any adjustment method:
 
 * **Rain**: Skip watering if the **total forecast rain** exceeds a set amount over a user-defined number of days (e.g. 0.5 inches over the next 3 days). Setting either value to 0 will disable this rule.
-  * **Note**: The forecast capability is limited by your selected weather provider. If the chosen number of days exceeds the amount provided from the weather service, the maximum number of days available will be used. See the table below for the historical capabilities of each provider.
+
+    !!! note
+        The forecast capability is limited by your selected weather provider. If the chosen number of days exceeds the amount provided from the weather service, the maximum number of days available will be used. See the table below for the historical capabilities of each provider.
+
 * **Temperature**: Skip watering if the current temperature falls below a set value (e.g. 50&deg;F or 10&deg;C). A value of -40 (either &deg;F or &deg;C) disables this rule.
 * **California Rule**: Legacy option that prevents watering if rainfall in the past 48 hours exceeds 0.1 inches.
 
@@ -69,6 +72,8 @@ OpenSprinkler's weather service offers multiple weather provider options for fle
 | [Open-Meteo](https://open-meteo.com/) | No | Free and open-source. Historical: 7 days; Forecast: 7 days. |
 | [DWD (Germany Only)](https://brightsky.dev/) | No | Only works for German locations. Historical: 7 days; Forecast: 7 days |
 | [Weather Underground](https://www.wunderground.com/) | Yes | Requires the location to be a PWS station. Historical: 6 days; Forecast: 6 days. |
+
+<br>
 
 **Entering an API Key (if required):**
 
@@ -93,8 +98,8 @@ The Zimmerman method calculates the watering percentage based on **temperature**
 * **Humidity**: 30%
 * **Precipitation**: 0 inches
 
-At these baseline values, the watering percentage remains 100% (i.e. no change to scheduled watering). The adjustment formula is:\
-`Watering Percentage = 100 + (T - 70) * 4 + (30 - H) - 200 * (P - 0)`\
+At these baseline values, the watering percentage remains 100% (i.e. no change to scheduled watering). The adjustment formula is:<br>
+`Watering Percentage = 100 + (T - 70) * 4 + (30 - H) - 200 * (P - 0)`<br>
 Where:
 
 * **T** = Average temperature (&deg;F) from the previous day.
@@ -103,8 +108,8 @@ Where:
 
 **Clamping Rule**: The final watering percentage is always limited between **0% and 200%**
 
-**Example**: Say yesterday's conditions were: T=86&deg;F, H=68%, P=0.12 inches. Using the formula:\
-`100 + (86 - 70) * 4 + (30 - 68) - 200 * (0.12) = 112%`\
+**Example**: Say yesterday's conditions were: T=86&deg;F, H=68%, P=0.12 inches. Using the formula:<br>
+`100 + (86 - 70) * 4 + (30 - 68) - 200 * (0.12) = 112%`<br>
 This means the watering time will be adjusted to **112%** of the original scheduled time.
 
 #### Customizing Baseline Parameters & Weights
@@ -118,8 +123,8 @@ For example, if your weather data consistently over-estimates the humidity, you 
 
 ![Weather Adjustment Options](images/weatherAdjustmentOptions.png)
 
-**The final formula** accounting for both baseline and weight adjustments is:\
-`Watering Percentage = 100 + (T - BT) * 4 * WT + (30 - BH) * WH - 200 * (P - BP) * WP`\
+**The final formula** accounting for both baseline and weight adjustments is:<br>
+`Watering Percentage = 100 + (T - BT) * 4 * WT + (30 - BH) * WH - 200 * (P - BP) * WP`<br>
 Where:
 
 * **BT, BH, BP** = Baseline values for temperature, humidity, and precipitation.
@@ -127,7 +132,7 @@ Where:
 
 ### Evapotranspiration (ETo) Method
 
-Evapotranspiration (ET) measures water loss from soil and plants due to evaporation and transpiration. The ETo adjustment method compares the reference ET index (ETo) and precipitation from the previous day againsst the baseline ETo for your location to calculate the watering percentage. Its formula is:\
+Evapotranspiration (ET) measures water loss from soil and plants due to evaporation and transpiration. The ETo adjustment method compares the reference ET index (ETo) and precipitation from the previous day againsst the baseline ETo for your location to calculate the watering percentage. Its formula is:<br>
 `Watering Percentage = ((Yesterday's ETo - Yesterday's Precip) / Baseline ETo) * 100%`
 
 **Clamping Rule**: The final watering percentage is always limited between **0% and 200%**.

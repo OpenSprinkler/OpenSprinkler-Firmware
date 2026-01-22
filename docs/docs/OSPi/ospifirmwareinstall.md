@@ -15,7 +15,7 @@ This guide assumes you have a working Raspberry Pi setup with either SSH access 
 1. Open an SSH connection to the Raspberry Pi (or connect a keyboard and monitor to the device).
 2. Run the following command:
 
-    ```bash
+    ```
     sudo apt-get install git
     cd ~
     git clone --recurse-submodules https://github.com/OpenSprinkler/OpenSprinkler-Firmware.git
@@ -23,13 +23,13 @@ This guide assumes you have a working Raspberry Pi setup with either SSH access 
 
 3. Change the directory to the firmware folder:
 
-    ```bash
+    ```
     cd OpenSprinkler-Firmware
     ```
 
 4. Build OpenSprinkler:
 
-    ```bash
+    ```
     sudo ./build.sh ospi
     ```
 
@@ -55,20 +55,20 @@ This guide assumes you have a working Raspberry Pi setup with either SSH access 
 1. Open an SSH connection to your Raspberry Pi.
 2. Change directory to your firmware folder. By default it is:
 
-    ```bash
+    ```
     cd /home/pi/OpenSprinkler-Firmware
     ```
 
 3. Update OpenSprinkler firmware source code from github:
 
-    ```bash
+    ```
     git fetch
     git pull --recurse-submodules
     ```
 
 4. Re-build OpenSprinkler:
 
-    ```bash
+    ```
     sudo ./build.sh ospi
     ```
 
@@ -77,13 +77,13 @@ This guide assumes you have a working Raspberry Pi setup with either SSH access 
 
 5. Restart OpenSprinkler:
 
-    ```bash
+    ```
     sudo /etc/init.d/OpenSprinkler.sh restart
     ```
 
     More recent firmware versions have switched to use systemd. If the above command does not work, try the following:
 
-    ```bash
+    ```
     sudo systemctl restart OpenSprinkler.service
     ```
 
@@ -93,7 +93,7 @@ This guide assumes you have a working Raspberry Pi setup with either SSH access 
 
 2. Remove unified firmware from system startup:
 
-    ```bash
+    ```
     sudo /etc/init.d/OpenSprinkler.sh stop
     sudo rm /etc/init.d/OpenSprinkler.sh
     sudo update-rc.d OpenSprinkler.sh remove
@@ -101,14 +101,14 @@ This guide assumes you have a working Raspberry Pi setup with either SSH access 
 
     More recent firmware versions have switched to use systemd. If the above commands do not work, try the following:
 
-    ```bash
+    ```
     sudo systemctl stop OpenSprinkler.service
     sudo rm /etc/systemd/system/OpenSprinkler.service
     ```
 
 3. Remove Dan's Python OSPi program:
 
-    ```bash
+    ```
     sudo /etc/init.d/ospi stop
     sudo rm /etc/init.d/ospi
     sudo update-rc.d ospi remove
@@ -116,7 +116,7 @@ This guide assumes you have a working Raspberry Pi setup with either SSH access 
 
 4. Remove Richard Zimmerman's sprinkler_pi program:
 
-    ```bash
+    ```
     sudo /etc/init.d/sprinklers_pi stop
     sudo rm /etc/init.d/sprinklers_pi
     sudo update-rc.d sprinklers_pi remove

@@ -30,10 +30,9 @@ When using Weather Underground as a data provider, the location **MUST BE** a va
 * On your OpenSprinkler's homepage go to **Edit Options --> Weather and Sensors** and select **Weather Underground** as the Weather Data Provider.
 * Enter the **WU API key** you created. Click the "**Verify**" button to confirm it is correct.
 * **Submit** the changes and go to **Edit Options --> Location**. Nearby PWS stations will appear on the map as **blue dots**.
-  * If they do not show up, try moving the map around until they appear.
+    * If they do not show up, try moving the map around until they appear.
 * Select a blue dot and **Submit** the changes. OpenSprinkler will automatically record the PWS station name.
 
-\
 If the blue dots do not show up, use this work around to set the PWS location name manually:
 
 * Export a copy of your configuration (.json file)
