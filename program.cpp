@@ -224,25 +224,59 @@ int16_t ProgramStruct::starttime_decode(int16_t t) {
 	return t;
 }
 
+/** Get weekday from timestamp. Returns 0=Monday, 6=Sunday. */
+unsigned char ProgramStruct::get_weekday(time_os_t t) {
+#if defined(ARDUINO)
+	unsigned char weekday_t = weekday(t);
+#else
+	time_os_t ct = t;
+	struct tm *ti = gmtime(&ct);
+	unsigned char weekday_t = (ti->tm_wday+1)%7;
+#endif
+	return (weekday_t+5)%7;
+}
+
+/** Calculate days since last scheduled run for MDA purposes.
+ *  Returns -1 if not applicable to this program type.
+ */
+int ProgramStruct::days_since_last(time_os_t t) {
+	switch(type) {
+		case PROGRAM_TYPE_INTERVAL:
+			return days[1];
+
+		case PROGRAM_TYPE_WEEKLY: {
+			unsigned char wd = get_weekday(t);
+			// Walk backwards through bit vector to find previous run day
+			for (unsigned char i = 1; i <= 7; i++) {
+				unsigned char prev_day = (wd - i + 7) % 7;
+				if (days[0] & (1 << prev_day)) {
+					return i;
+				}
+			}
+			return -1;
+		}
+
+		default:
+			return -1;
+	}
+}
+
 /** Check if a given time matches the program's start day */
 unsigned char ProgramStruct::check_day_match(time_os_t t) {
 
-#if defined(ARDUINO)  // get current time from Arduino
-	unsigned char weekday_t = weekday(t);  // weekday ranges from [0,6] within Sunday being 1
+#if defined(ARDUINO)
 	unsigned char day_t = day(t);
 	unsigned char month_t = month(t);
 	unsigned char year_t = year(t);
-#else // get current time from RPI/LINUX
+#else
 	time_os_t ct = t;
 	struct tm *ti = gmtime(&ct);
-	unsigned char weekday_t = (ti->tm_wday+1)%7;  // tm_wday ranges from [0,6] with Sunday being 0
 	unsigned char day_t = ti->tm_mday;
-	unsigned char month_t = ti->tm_mon+1;  // tm_mon ranges from [0,11]
-	unsigned char year_t = ti->tm_year+1900; // tm_year is years since 1900
-#endif // get current time
+	unsigned char month_t = ti->tm_mon+1;
+	unsigned char year_t = ti->tm_year+1900;
+#endif
 
 	int epoch_t = (t / 86400);
-	unsigned char wd = (weekday_t+5)%7;
 	unsigned char dt = day_t;
 
 	if(en_daterange) { // check date range if enabled
@@ -258,11 +292,12 @@ unsigned char ProgramStruct::check_day_match(time_os_t t) {
 
 	// check day match
 	switch(type) {
-		case PROGRAM_TYPE_WEEKLY:
+		case PROGRAM_TYPE_WEEKLY: {
 			// weekday match
+			unsigned char wd = get_weekday(t);
 			if (!(days[0] & (1<<wd)))
 				return 0;
-		break;
+		} break;
 
 		case PROGRAM_TYPE_SINGLERUN:
 			// check match of exact day
