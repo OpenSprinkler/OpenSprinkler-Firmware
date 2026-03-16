@@ -107,6 +107,8 @@ public:
 	unsigned char check_match(time_os_t t, bool *to_delete);
 	void gen_station_runorder(uint16_t runcount, unsigned char *order);
 	int16_t starttime_decode(int16_t t);
+	int days_since_last(time_os_t t);
+	static unsigned char get_weekday(time_os_t t); // returns 0=Monday, 6=Sunday
 
 protected:
 

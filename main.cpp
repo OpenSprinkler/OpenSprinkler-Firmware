@@ -888,13 +888,16 @@ void do_loop()
 						if (wt_restricted > 0) wl = 0; // if watering restriction is active
 						else {
 							wl = os.iopts[IOPT_WATER_PERCENTAGE];
-							// If historical data is enabled and interval program, overwrite watering percentage with historical one.
-							if (mda == 100 && prog.type == PROGRAM_TYPE_INTERVAL && md_N > 0) {
-								// Use interval length unless longer than available data
-								if ((unsigned int)prog.days[1]-1 < md_N){
-									wl = md_scales[prog.days[1]-1];
-								} else {
-									wl = md_scales[md_N-1];
+							// If multi-day averaging is enabled, use historical watering data
+							if (mda == 100 && md_N > 0) {
+								int dsl = prog.days_since_last(curr_time);
+								if (dsl > 0) {
+									unsigned int idx = (unsigned int)(dsl - 1);
+									if (idx < md_N) {
+										wl = md_scales[idx];
+									} else {
+										wl = md_scales[md_N - 1];
+									}
 								}
 							}
 						}
