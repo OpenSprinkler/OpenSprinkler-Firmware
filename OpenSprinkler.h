@@ -278,6 +278,9 @@ public:
 	
 	// fertigation station configuration
 	static unsigned char fert_station;  // station ID designated as fertigation station (255 = not configured)
+	// run-once fertigation: populated by /cr handler, used by scheduler for pid==254 runs
+	static uint16_t runonce_fert[MAX_NUM_STATIONS];
+	static bool has_runonce_fert;
 	
 	// fertigation runtime tracking
 	struct StationFertigation {

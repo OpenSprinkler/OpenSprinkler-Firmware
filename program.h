@@ -99,15 +99,8 @@ public:
 	//   else: standard start time (value between 0 to 1440, by bits 0 to 10)
 	int16_t starttimes[MAX_NUM_STARTTIMES];
 
-	uint16_t durations[MAX_NUM_STATIONS];  // duration / water time of each station
-
-	// fertigation settings per station
-	struct FertigationConfig {
-		unsigned char enabled:1;     // fertigation enabled for this station
-		unsigned char mode:1;        // 0: time-based, 1: percentage-based
-		unsigned char fert_sid:8;    // fertigation station id (0-255, limited by MAX_NUM_STATIONS)
-		uint16_t value;              // duration in seconds (time mode) or percentage (percentage mode)
-	} fert[MAX_NUM_STATIONS];
+	uint16_t durations[MAX_NUM_STATIONS];     // duration / water time of each station
+	uint16_t fert_duration[MAX_NUM_STATIONS]; // fertigation seconds per station (0 = disabled)
 
 	char name[PROGRAM_NAME_SIZE];
 

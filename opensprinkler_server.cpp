@@ -744,28 +744,22 @@ void server_change_runonce(OTF_PARAMS_DEF) {
 	for(int i=0;i<ns;i++) {
 		dur = parse_listdata(&pv);
 		prog.durations[i] = dur > 0 ? dur : 0;
-		// Initialize fertigation settings to disabled
-		prog.fert[i].enabled = 0;
-		prog.fert[i].value = 0;
-		prog.fert[i].mode = 0;
-		prog.fert[i].fert_sid = 255;
+		prog.fert_duration[i] = 0;
 	}
 
 	// Parse fertigation data for run-once if provided (fd0, fd1, fd2, etc.)
+	// Values are in seconds (app must convert % to seconds before sending).
+	// Store in os.runonce_fert[] so the scheduler can read them for pid==254 runs.
+	os.has_runonce_fert = false;
+	memset(os.runonce_fert, 0, sizeof(os.runonce_fert));
 	for(int i=0; i<ns; i++) {
 		char key[8];
 		snprintf(key, sizeof(key), "fd%d", i);
 		if(findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, key, false)) {
 			int fert_value = atoi(tmp_buffer);
-			if(fert_value > 0) {
-				prog.fert[i].enabled = 1;
-				prog.fert[i].value = fert_value;
-				prog.fert[i].mode = 0;  // Default to time-based mode
-				if(os.fert_station < MAX_NUM_STATIONS) {
-					prog.fert[i].fert_sid = os.fert_station;
-				} else {
-					prog.fert[i].fert_sid = 255;  // No fertigation station configured
-				}
+			if(fert_value > 0 && os.fert_station < MAX_NUM_STATIONS) {
+				os.runonce_fert[i] = (uint16_t)fert_value;
+				os.has_runonce_fert = true;
 			}
 		}
 	}
@@ -1050,35 +1044,15 @@ void server_change_program(OTF_PARAMS_DEF) {
 		prog.durations[i] = pre;
 	}
 	pv++; // this should be a ']'
-	// Check if fertigation data follows (new format)
+	// Parse optional fertigation array [fd0, fd1, ...] (seconds; 0 = disabled)
 	if(*pv == '[') {
-		// Parse fertigation data array
 		pv++; // skip '['
 		for (i=0;i<os.nstations;i++) {
-			uint16_t fert_dur = parse_listdata(&pv);
-			if(fert_dur > 0) {
-				prog.fert[i].enabled = 1;
-				prog.fert[i].value = fert_dur;
-				prog.fert[i].mode = 0;  // time-based mode
-				if(os.fert_station < MAX_NUM_STATIONS) {
-					prog.fert[i].fert_sid = os.fert_station;
-				} else {
-					prog.fert[i].fert_sid = 255;
-				}
-			} else {
-				prog.fert[i].enabled = 0;
-				prog.fert[i].value = 0;
-				prog.fert[i].fert_sid = 255;
-			}
+			prog.fert_duration[i] = parse_listdata(&pv);
 		}
 		pv++; // skip ']'
 	} else {
-		// Old format - no fertigation data, clear all fertigation settings
-		for (i=0;i<MAX_NUM_STATIONS;i++) {
-			prog.fert[i].enabled = 0;
-			prog.fert[i].value = 0;
-			prog.fert[i].fert_sid = 255;
-		}
+		memset(prog.fert_duration, 0, sizeof(prog.fert_duration));
 	}
 	pv++; // this should be a ']'
 	// parse program name
@@ -1254,29 +1228,10 @@ void server_json_programs_main(OTF_PARAMS_DEF) {
 			bfill.emit_p(PSTR("$L,"),(uint32_t)prog.durations[i]);
 		}
 		bfill.emit_p(PSTR("$L],["),(uint32_t)prog.durations[i]); // this is the last element
-		// fertigation data - output duration in seconds for each station
-		// Format: [fert_duration_s0, fert_duration_s1, ..., fert_duration_sN]
+		// fertigation durations in seconds per station (0 = disabled)
 		for (i=0; i<os.nstations; i++) {
-			if (prog.fert[i].enabled && prog.fert[i].value > 0) {
-				uint16_t fert_duration = 0;
-				if (prog.fert[i].mode == 0) {
-					// Time-based mode: value is already in seconds
-					fert_duration = prog.fert[i].value;
-				} else {
-					// Percentage-based mode: convert percentage to seconds
-					// Calculate based on station duration
-					if (prog.durations[i] > 0) {
-						ulong station_dur = water_time_resolve(prog.durations[i]);
-						fert_duration = (station_dur * prog.fert[i].value) / 100;
-					}
-				}
-				bfill.emit_p(PSTR("$D"), (int)fert_duration);
-			} else {
-				bfill.emit_p(PSTR("0"));
-			}
-			if(i < os.nstations-1) {
-				bfill.emit_p(PSTR(","));
-			}
+			bfill.emit_p(PSTR("$D"), (int)prog.fert_duration[i]);
+			if(i < os.nstations-1) bfill.emit_p(PSTR(","));
 		}
 		bfill.emit_p(PSTR("],\""));
 		// program name
@@ -1927,78 +1882,6 @@ void server_change_fert_station(OTF_PARAMS_DEF)
 	handle_return(HTML_DATA_OUTOFBOUND);
 }
 
-/** Change program fertigation settings
- * Command: /pf?pw=xxx&pid=X&sid=Y&en=Z&mode=M&value=V
- * pid: program index (0-based)
- * sid: station index (0-based)
- * en: enable fertigation (0 or 1)
- * mode: fertigation mode (0=time-based, 1=percentage-based)
- * value: fertigation duration in seconds (time mode) or percentage (percentage mode)
- */
-void server_change_program_fert(OTF_PARAMS_DEF)
-{
-#if defined(USE_OTF)
-	if(!process_password(OTF_PARAMS)) return;
-#else
-	char* p = get_buffer;
-#endif
-
-	unsigned char pid, sid;
-	ProgramStruct prog;
-
-	// parse program index
-	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("pid"), true)) {
-		handle_return(HTML_DATA_MISSING);
-		return;
-	}
-	pid = atoi(tmp_buffer);
-	if (pid >= pd.nprograms) {
-		handle_return(HTML_DATA_OUTOFBOUND);
-		return;
-	}
-
-	// parse station index
-	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("sid"), true)) {
-		handle_return(HTML_DATA_MISSING);
-		return;
-	}
-	sid = atoi(tmp_buffer);
-	if (sid >= os.nstations) {
-		handle_return(HTML_DATA_OUTOFBOUND);
-		return;
-	}
-
-	// read current program
-	pd.read(pid, &prog);
-
-	// parse enable flag
-	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("en"), true)) {
-		prog.fert[sid].enabled = (tmp_buffer[0]=='0') ? 0 : 1;
-	}
-
-	// parse mode
-	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("mode"), true)) {
-		unsigned char mode = atoi(tmp_buffer);
-		prog.fert[sid].mode = (mode == 1) ? 1 : 0;
-	}
-
-	// parse value
-	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("value"), true)) {
-		uint16_t value = atoi(tmp_buffer);
-		prog.fert[sid].value = value;
-	}
-
-	// Set fertigation station to the configured single fertigation station
-	if(prog.fert[sid].enabled && os.fert_station < MAX_NUM_STATIONS) {
-		prog.fert[sid].fert_sid = os.fert_station;
-	} else {
-		prog.fert[sid].fert_sid = 255;  // not configured
-	}
-
-	// save program
-	pd.modify(pid, &prog);
-	handle_return(HTML_SUCCESS);
-}
 
 /**
  * Test station (previously manual operation)
@@ -2452,7 +2335,6 @@ const char _url_keys[] PROGMEM =
 	"db"
 	"jf"
 	"cf"
-	"pf"
 #if defined(ARDUINO)
 	//"ff"
 #endif
@@ -2483,9 +2365,8 @@ URLHandler urls[] = {
 	server_json_all,        // ja
 	server_pause_queue,     // pq
 	server_json_debug,      // db
-	server_json_fert_station,  // jf
+	server_json_fert_station,   // jf
 	server_change_fert_station, // cf
-	server_change_program_fert, // pf
 #if defined(ARDUINO)
 	//server_fill_files,
 #endif

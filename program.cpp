@@ -113,15 +113,6 @@ void ProgramData::read(unsigned char pid, ProgramStruct *buf) {
 		buf->daterange[1] = 415; // Default: Dec 31
 	}
 	
-	// Validate fertigation fields for backward compatibility
-	// If file was written by old firmware, fert fields will be zero, which is correct default
-	for(unsigned char i = 0; i < MAX_NUM_STATIONS; i++) {
-		// Validate fertigation station ID if enabled
-		if(buf->fert[i].enabled && buf->fert[i].fert_sid >= MAX_NUM_STATIONS) {
-			buf->fert[i].fert_sid = 255;  // Reset invalid fertigation station ID
-			buf->fert[i].enabled = 0;   // Disable if invalid station ID
-		}
-	}
 }
 
 /** Add a program */

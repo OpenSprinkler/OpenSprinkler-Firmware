@@ -73,6 +73,8 @@ unsigned char OpenSprinkler::attrib_grp[MAX_NUM_STATIONS];
 unsigned char OpenSprinkler::masters[NUM_MASTER_ZONES][NUM_MASTER_OPTS];
 time_os_t OpenSprinkler::masters_last_on[NUM_MASTER_ZONES];
 OpenSprinkler::StationFertigation OpenSprinkler::station_fertigation[MAX_NUM_STATIONS];
+uint16_t OpenSprinkler::runonce_fert[MAX_NUM_STATIONS] = {};
+bool OpenSprinkler::has_runonce_fert = false;
 RCSwitch OpenSprinkler::rfswitch;
 
 extern char tmp_buffer[];
