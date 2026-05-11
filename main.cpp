@@ -1775,7 +1775,7 @@ void write_log(unsigned char type, time_os_t curr_time) {
 	if (!os.iopts[IOPT_ENABLE_LOGGING]) return;
 
 	// file name will be logs/xxxxx.tx where xxxxx is the day in epoch time
-	snprintf (tmp_buffer, TMP_BUFFER_SIZE, "%lu", curr_time / 86400);
+	snprintf (tmp_buffer, TMP_BUFFER_SIZE, "%llu", curr_time / 86400);
 	make_logfile_name(tmp_buffer);
 
 	// Step 1: open file if exists, or create new otherwise,
@@ -1876,7 +1876,7 @@ void write_log(unsigned char type, time_os_t curr_time) {
 	}
 	strcat_P(tmp_buffer, PSTR(","));
 	size_t size = strlen(tmp_buffer);
-	snprintf(tmp_buffer + size, TMP_BUFFER_SIZE - size , "%lu", curr_time);
+	snprintf(tmp_buffer + size, TMP_BUFFER_SIZE - size , "%llu", curr_time);
 	if((os.iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_FLOW) && (type==LOGDATA_STATION)) {
 		// RAH implementation of flow sensor
 		strcat_P(tmp_buffer, PSTR(","));
