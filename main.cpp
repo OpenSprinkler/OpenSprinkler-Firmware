@@ -126,13 +126,13 @@ void flow_poll() {
 
 	#if defined(ESP8266)
 	if(os.hw_rev>=2) {
-		pinMode(PIN_SENSOR1, INPUT); // Work-around for PIN_SENSOR1 on OS3.2 and above
-		pinMode(PIN_SENSOR1, INPUT_PULLUP);
+		pinMode(PIN_SENSOR2, INPUT); // Work-around for PIN_SENSOR1 on OS3.2 and above
+		pinMode(PIN_SENSOR2, INPUT_PULLUP);
 	}
 	#endif
 
 
-	unsigned char curr_flow_state = digitalReadExt(PIN_SENSOR1);
+	unsigned char curr_flow_state = digitalReadExt(PIN_SENSOR2);
 	if((!prev_flow_state) || curr_flow_state) { // only record on falling edge
 		prev_flow_state = curr_flow_state;
 		return;
@@ -219,10 +219,14 @@ void ui_state_machine() {
 	if(led_blink_ms) {
 		ulong tm = millis();
 		if(tm - led_toggle_prev > led_blink_ms) { // overflow proof timeout
-			os.toggle_screen_led();
+			//os.toggle_screen_led();
+			os.led_toggle();
 			led_toggle_prev = tm;
 		}
 	}
+	else {
+    	os.led_on();
+  	}
 #endif
 
 	if (!os.button_timeout) {
@@ -231,7 +235,8 @@ void ui_state_machine() {
 	}
 
 	// read button, if something is pressed, wait till release
-	unsigned char button = os.button_read(BUTTON_WAIT_HOLD);
+	//unsigned char button = os.button_read(BUTTON_WAIT_HOLD);
+	unsigned char button;// = os.button_read(BUTTON_WAIT_HOLD);
 
 	if (button & BUTTON_FLAG_DOWN) {  // repond only to button down events
 		os.button_timeout = LCD_BACKLIGHT_TIMEOUT;
@@ -1046,7 +1051,7 @@ void do_loop()
 				pd.clear_pause(); // TODO: what if pause hasn't expired and a new program is scheduled to run?
 
 				// log flow sensor reading if flow sensor is used
-				if(os.iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_FLOW) {
+				if(os.iopts[IOPT_SENSOR2_TYPE]==SENSOR_TYPE_FLOW) {
 					write_log(LOGDATA_FLOWSENSE, curr_time);
 					notif.add(NOTIFY_FLOWSENSOR, (flow_count>os.flowcount_log_start)?(flow_count-os.flowcount_log_start):0);
 				}

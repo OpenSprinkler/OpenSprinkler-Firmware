@@ -91,8 +91,8 @@ extern unsigned char curr_alert_sid;
 	IOEXP* OpenSprinkler::expanders[MAX_NUM_BOARDS/2];
 	IOEXP* OpenSprinkler::mainio; // main controller IO expander object
 	IOEXP* OpenSprinkler::drio; // driver board IO expander object
-	String OpenSprinkler::wifi_ssid="";
-	String OpenSprinkler::wifi_pass="";
+	String OpenSprinkler::wifi_ssid="koko24";
+	String OpenSprinkler::wifi_pass="mikotkdcrv";
 	unsigned char OpenSprinkler::wifi_bssid[6]={0};
 	unsigned char OpenSprinkler::wifi_channel=255;
 	unsigned char OpenSprinkler::wifi_testmode = 0;
@@ -407,9 +407,9 @@ unsigned char OpenSprinkler::iopts[] = {
 	8,
 	0,  // special station auto refresh
 	0,  // notif enable bits
-	0,  // sensor 1 type (see SENSOR_TYPE macro defines)
+	1, //0,  // sensor 1 type (see SENSOR_TYPE macro defines)
 	1,  // sensor 1 option. 0: normally closed; 1: normally open.	default 1.
-	0,  // sensor 2 type
+	2, //0,  // sensor 2 type
 	1,  // sensor 2 option. 0: normally closed; 1: normally open. default 1.
 	0,  // sensor 1 on delay
 	0,  // sensor 1 off delay
@@ -845,6 +845,7 @@ void OpenSprinkler::lcd_start() {
 
 /** Initialize pins, controller variables, LCD */
 void OpenSprinkler::begin() {
+	DEBUG_PRINTLN(F("begin"));
 
 #if defined(ARDUINO)
 	Wire.begin(); // init I2C
@@ -1024,11 +1025,30 @@ pinModeExt(PIN_BUTTON_3, INPUT_PULLUP);
 	// Reset all stations
 	clear_all_station_bits();
 	apply_all_station_bits();
+	DEBUG_PRINTLN(F("bfore defined(ESP8266)"));
 
 #if defined(ESP8266)
 	// OS 3.0 has two independent sensors
-	pinModeExt(PIN_SENSOR1, INPUT_PULLUP);
-	pinModeExt(PIN_SENSOR2, INPUT_PULLUP);
+	//pinModeExt(PIN_SENSOR1, INPUT_PULLUP);
+	//pinModeExt(PIN_SENSOR2, INPUT_PULLUP);
+	DEBUG_PRINTLN(F("pinMode(PIN_RELAY_1, OUTPUT);"));
+	pinMode(PIN_RELAY_1, OUTPUT);
+	pinMode(PIN_RELAY_2, OUTPUT);
+	pinMode(PIN_RELAY_3, OUTPUT);
+	pinMode(PIN_RELAY_4, OUTPUT);
+	pinMode(PIN_RELAY_5, OUTPUT);
+	DEBUG_PRINTLN(F("digitalWrite(PIN_RELAY_1, LOW);"));
+
+	digitalWrite(PIN_RELAY_1, LOW);
+	digitalWrite(PIN_RELAY_2, LOW);
+	digitalWrite(PIN_RELAY_3, LOW);
+	digitalWrite(PIN_RELAY_4, LOW);
+	digitalWrite(PIN_RELAY_5, HIGH); // Turn Off External Relay
+	pinMode(PIN_LED, OUTPUT);
+	  /* todo: handle two sensors */
+  	pinMode(PIN_SENSOR1, INPUT_PULLUP);
+  	pinMode(PIN_SENSOR2, INPUT_PULLUP);
+  	//? attachInterrupt(PIN_SENSOR2, flow_isr, FALLING);
 
 #else
 	// pull shift register OE low to enable output
@@ -1052,7 +1072,8 @@ pinModeExt(PIN_BUTTON_3, INPUT_PULLUP);
 	nvdata.sunset_time = 1080;  // 6:00pm default sunset
 	nvdata.reboot_cause = REBOOT_CAUSE_POWERON;
 
-	nboards = 1;
+	//nboards = 1;
+	nboards = 0;
 	nstations = nboards*8;
 
 	// set rf data pin, unless it is not being used
@@ -1065,7 +1086,8 @@ pinModeExt(PIN_BUTTON_3, INPUT_PULLUP);
 
 	#if defined(ESP8266)  // OS3.0 specific detections
 
-		status.has_curr_sense = 1;  // OS3.0 has current sensing capacility
+		//status.has_curr_sense = 1;  // OS3.0 has current sensing capacility
+		status.has_curr_sense = 0;  // OS3.0 has current sensing capacility
 		// measure baseline current
 		baseline_current = 80;
 
@@ -1162,6 +1184,46 @@ pinModeExt(PIN_BUTTON_3, INPUT_PULLUP);
 #else
 	//DEBUG_PRINTLN(get_runtime_path());
 #endif
+	DEBUG_PRINTLN(F("begin:end"));
+
+
+#if defined(ESP8266)
+	DEBUG_PRINTLN(F("ESP8266"));
+
+#endif
+	// OS 3.0 has two independent sensors
+	//pinModeExt(PIN_SENSOR1, INPUT_PULLUP);
+	//pinModeExt(PIN_SENSOR2, INPUT_PULLUP);
+	DEBUG_PRINTLN(F("pinMode(PIN_RELAY_1, OUTPUT);"));
+	pinMode(PIN_RELAY_1, OUTPUT);
+	pinMode(PIN_RELAY_2, OUTPUT);
+	pinMode(PIN_RELAY_3, OUTPUT);
+	pinMode(PIN_RELAY_4, OUTPUT);
+	pinMode(PIN_RELAY_5, OUTPUT);
+	DEBUG_PRINTLN(F("digitalWrite(PIN_RELAY_1, LOW);"));
+
+	digitalWriteExt(PIN_RELAY_1, LOW);
+		DEBUG_PRINTLN(F("digitalWrite(PIN_RELAY_2, LOW);"));
+
+	digitalWriteExt(PIN_RELAY_2, LOW);
+		DEBUG_PRINTLN(F("digitalWrite(PIN_RELAY_3, LOW);"));
+
+	digitalWriteExt(PIN_RELAY_3, LOW);
+		DEBUG_PRINTLN(F("digitalWrite(PIN_RELAY_4, LOW);"));
+
+	digitalWriteExt(PIN_RELAY_4, LOW);
+		DEBUG_PRINTLN(F("digitalWrite(PIN_RELAY_5, LOW);"));
+
+	digitalWriteExt(PIN_RELAY_5, HIGH); // Turn Off External Relay
+	pinMode(PIN_LED, OUTPUT);
+	  /* todo: handle two sensors */
+  	pinMode(PIN_SENSOR1, INPUT_PULLUP);
+  	pinMode(PIN_SENSOR2, INPUT_PULLUP);
+  	//? attachInterrupt(PIN_SENSOR2, flow_isr, FALLING);
+
+
+
+
 }
 
 #if defined(ESP8266)
@@ -1934,6 +1996,27 @@ unsigned char OpenSprinkler::set_station_bit(unsigned char sid, unsigned char va
 			engage_booster = true; // if bit is changing from 0 to 1, set engage_booster
 			curr_alert_sid = sid+1; // record the zone that's turning on (starting from 1)
 			switch_special_station(sid, 1, dur); // handle special stations
+			switch (sid) {
+				case 0:
+				DEBUG_PRINTLN(F("PIN_RELAY_1 to HIGH"));
+				digitalWrite(PIN_RELAY_1, HIGH);
+								digitalWriteExt(PIN_RELAY_1, HIGH);
+
+				break;
+				case 1:
+				DEBUG_PRINTLN(F("PIN_RELAY_2 to HIGH"));
+				digitalWrite(PIN_RELAY_2, HIGH);
+				break;
+				case 2:
+				digitalWrite(PIN_RELAY_3, HIGH);
+				break;
+				case 3:
+				digitalWrite(PIN_RELAY_4, HIGH);
+				break;
+				case 4:
+				digitalWrite(PIN_RELAY_5, HIGH);
+				break;
+			}
 			return 1;
 		}
 	} else {
@@ -1944,6 +2027,29 @@ unsigned char OpenSprinkler::set_station_bit(unsigned char sid, unsigned char va
 				engage_booster = true;  // if LATCH controller, engage booster when bit changes
 			}
 			switch_special_station(sid, 0); // handle special stations
+			switch (sid) {
+				case 0:
+				DEBUG_PRINTLN(F("PIN_RELAY_1 to LOW"));
+
+				digitalWrite(PIN_RELAY_1, LOW);
+												digitalWriteExt(PIN_RELAY_1, LOW);
+
+				break;
+				case 1:
+								DEBUG_PRINTLN(F("PIN_RELAY_2 to LOW"));
+
+				digitalWrite(PIN_RELAY_2, LOW);
+				break;
+				case 2:
+				digitalWrite(PIN_RELAY_3, LOW);
+				break;
+				case 3:
+				digitalWrite(PIN_RELAY_4, LOW);
+				break;
+				case 4:
+				digitalWrite(PIN_RELAY_5, LOW);
+				break;
+			}
 			return 255;
 		}
 	}
@@ -1976,10 +2082,10 @@ void OpenSprinkler::switch_rfstation(RFStationData *data, bool turnon) {
 
 	if(PIN_RFTX == 255) return; // ignore RF station if RF pin disabled
 
-	rfswitch.enableTransmit(PIN_RFTX);
-	rfswitch.setProtocol(code.protocol);
-	rfswitch.setPulseLength(code.timing);
-	rfswitch.send(turnon ? code.on : code.off, code.bitlength);
+	// rfswitch.enableTransmit(PIN_RFTX);
+	// rfswitch.setProtocol(code.protocol);
+	// rfswitch.setPulseLength(code.timing);
+	// rfswitch.send(turnon ? code.on : code.off, code.bitlength);
 }
 
 /** Switch GPIO station
@@ -2399,7 +2505,7 @@ void OpenSprinkler::options_setup() {
 	}
 
 #if defined(ARDUINO)	// handle AVR buttons
-	unsigned char button = button_read(BUTTON_WAIT_NONE);
+	unsigned char button;// = button_read(BUTTON_WAIT_NONE);
 
 	switch(button & BUTTON_MASK) {
 
@@ -3057,10 +3163,15 @@ unsigned char OpenSprinkler::button_read(unsigned char waitmode)
 
 	if (digitalReadExt(PIN_BUTTON_1) == 0) {
 		curr = button_read_busy(PIN_BUTTON_1, waitmode, BUTTON_1, is_holding);
+		//lcd_print_line_clear_pgm(PSTR("Button_1_Press-egg..."), 0);
+		digitalWrite(PIN_RELAY_4, HIGH);
 	} else if (digitalReadExt(PIN_BUTTON_2) == 0) {
 		curr = button_read_busy(PIN_BUTTON_2, waitmode, BUTTON_2, is_holding);
+		//lcd_print_line_clear_pgm(PSTR("Button_2_Press-egg..."), 0);
 	} else if (digitalReadExt(PIN_BUTTON_3) == 0) {
 		curr = button_read_busy(PIN_BUTTON_3, waitmode, BUTTON_3, is_holding);
+		//lcd_print_line_clear_pgm(PSTR("Button_3_Press-egg..."), 0);
+		digitalWrite(PIN_RELAY_3, HIGH);
 	}
 
 	// set flags in return value
@@ -3276,5 +3387,12 @@ void OpenSprinkler::detect_expanders() {
 			expanders[i] = new IOEXP(address);
 		}
 	}
+}
+void OpenSprinkler::led_toggle() {
+		digitalWrite(PIN_LED,!digitalRead(PIN_LED));
+}
+
+void OpenSprinkler::led_on() {
+		digitalWrite(PIN_LED, 0);
 }
 #endif

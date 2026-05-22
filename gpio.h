@@ -65,6 +65,7 @@ public:
 	}
 
 	void digitalWrite(uint8_t pin, uint8_t v) {
+		Serial.println("gpio:digitalWrite");
 		uint16_t values = i2c_read(NXP_OUTPUT_REG);
 		if(v > 0) values |= (1<<pin);
 		else values &= ~(1 << pin);
