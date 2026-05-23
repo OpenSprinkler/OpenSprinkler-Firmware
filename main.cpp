@@ -235,15 +235,71 @@ void ui_state_machine() {
 	}
 
 	// read button, if something is pressed, wait till release
-	//unsigned char button = os.button_read(BUTTON_WAIT_HOLD);
-	unsigned char button;// = os.button_read(BUTTON_WAIT_HOLD);
+	unsigned char button = BUTTON_NONE; // = os.button_read(BUTTON_WAIT_HOLD);
 
+	#if defined(SONOFF_4CH_PRO_R3)
+	// Sonoff 4CH Pro R3: simple direct GPIO button reading (bypass complex button_read state machine)
+	// Button mapping (each button has its own GPIO, NOT a matrix):
+	//   Physical Button 1: GPIO0 -> Toggle Station 1 (Relay 1)
+	//   Physical Button 2: GPIO9 -> Toggle Station 2 (Relay 2)
+	//   Physical Button 3: GPIO10 -> Toggle Station 3 (Relay 3)
+	//   Physical Button 4: GPIO14 -> Toggle Station 4 (Relay 4)
+	// CRITICAL: start_ether() calls SPI.begin() which reconfigures GPIO14 as SPI CLK.
+	// Reclaim it before reading.
+	pinMode(14, INPUT_PULLUP);
+	static unsigned char last_btn_state = 0;
+	static unsigned long btn_debounce = 0;
+	unsigned char btn_state = 0;
+	if (digitalRead(0) == 0)       btn_state = 1;  // Button 1
+	else if (digitalRead(9) == 0)  btn_state = 2;  // Button 2
+	else if (digitalRead(10) == 0) btn_state = 3;  // Button 3
+	else if (digitalRead(14) == 0) btn_state = 4;  // Button 4
+	unsigned long now = millis();
+	// Only act on a NEW press (transition from 0 to a button) with debounce
+	if (btn_state > 0 && last_btn_state == 0 && (now - btn_debounce) > 200) {
+		btn_debounce = now;
+		last_btn_state = btn_state;
+		unsigned char sid = btn_state - 1;
+		if (os.get_station_bit(sid)) {
+			// Turn OFF: use the same path as web UI
+			unsigned char qid = pd.station_qid[sid];
+			if (qid < pd.nqueue) {
+				pd.queue[qid].deque_time = os.now_tz();
+				turn_off_running_station_immediate(sid, os.now_tz(), 0);
+			} else {
+				os.set_station_bit(sid, 0);
+				os.apply_all_station_bits();
+			}
+		} else {
+			// Turn ON: enqueue + schedule exactly like web UI test button
+			unsigned char sqi = pd.station_qid[sid];
+			if (sqi == 0xFF) { // not already in queue
+				RuntimeQueueStruct *q = pd.enqueue();
+				if (q) {
+					q->st = 0;
+					q->dur = 64800; // 18 hours (max uint16_t timer value)
+					q->sid = sid;
+					q->pid = 254; // manual station
+					schedule_all_stations(os.now_tz(), 0);
+				}
+			}
+			os.set_station_bit(sid, 1, 60);
+			os.apply_all_station_bits();
+		}
+	}
+	// Reset state machine when button is released
+	if (btn_state == 0) {
+		last_btn_state = 0;
+	}
+	return; // Skip LCD-based UI state machine for Sonoff
+	#else
 	if (button & BUTTON_FLAG_DOWN) {  // repond only to button down events
 		os.button_timeout = LCD_BACKLIGHT_TIMEOUT;
 		os.lcd_set_brightness(1);
 	} else {
 		return;
 	}
+	#endif
 
 	switch(ui_state) {
 	case UI_STATE_DEFAULT:
@@ -1185,6 +1241,30 @@ void do_loop()
 			notif.add(NOTIFY_REBOOT);
 		}
 	}
+
+	#if defined(SONOFF_4CH_PRO_R3)
+	// Reclaim GPIO4/GPIO5 from I2C after every loop iteration.
+	// The ESP8266 Wire library uses open-drain signaling: SCL/SDA are left
+	// in INPUT_PULLUP mode after transactions. This provides insufficient
+	// drive current for relay coils on GPIO4/GPIO5, causing them to drop out.
+	// We force them back to OUTPUT on every loop iteration.
+	for(unsigned char sid=0; sid<os.nstations && sid<4; sid++) {
+		unsigned char bid = sid>>3;
+		unsigned char s = sid&0x07;
+		unsigned char mask = (unsigned char)1<<s;
+		unsigned char val = (os.station_bits[bid] & mask) ? 1 : 0;
+		unsigned char pin = 255;
+		switch(sid) {
+			case 0: pin = PIN_RELAY_1; break;
+			case 1: pin = PIN_RELAY_2; break;
+			case 2: pin = PIN_RELAY_3; break;
+			case 3: pin = PIN_RELAY_4; break;
+		}
+		if(pin==255) continue;
+		pinMode(pin, OUTPUT);
+		digitalWrite(pin, val);
+	}
+	#endif
 
 	#if !defined(ARDUINO)
 		delay(1); // For OSPI/LINUX, sleep 1 ms to minimize CPU usage

@@ -619,6 +619,7 @@ typedef bool boolean;
 #define BUTTON_1 0x01
 #define BUTTON_2 0x02
 #define BUTTON_3 0x04
+#define BUTTON_4 0x08
 
 // button status values
 #define BUTTON_NONE 0x00      // no button pressed
