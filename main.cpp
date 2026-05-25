@@ -1775,7 +1775,11 @@ void write_log(unsigned char type, time_os_t curr_time) {
 	if (!os.iopts[IOPT_ENABLE_LOGGING]) return;
 
 	// file name will be logs/xxxxx.tx where xxxxx is the day in epoch time
+#if defined(ARDUINO)
 	snprintf (tmp_buffer, TMP_BUFFER_SIZE, "%lu", curr_time / 86400);
+#else
+	snprintf (tmp_buffer, TMP_BUFFER_SIZE, "%lld", curr_time / 86400);
+#endif
 	make_logfile_name(tmp_buffer);
 
 	// Step 1: open file if exists, or create new otherwise,
