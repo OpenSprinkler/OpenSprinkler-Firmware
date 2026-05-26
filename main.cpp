@@ -1880,7 +1880,11 @@ void write_log(unsigned char type, time_os_t curr_time) {
 	}
 	strcat_P(tmp_buffer, PSTR(","));
 	size_t size = strlen(tmp_buffer);
+#if defined(ARDUINO)
 	snprintf(tmp_buffer + size, TMP_BUFFER_SIZE - size , "%lu", curr_time);
+#else
+	snprintf(tmp_buffer + size, TMP_BUFFER_SIZE - size , "%lld", curr_time);
+#endif
 	if((os.iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_FLOW) && (type==LOGDATA_STATION)) {
 		// RAH implementation of flow sensor
 		strcat_P(tmp_buffer, PSTR(","));
