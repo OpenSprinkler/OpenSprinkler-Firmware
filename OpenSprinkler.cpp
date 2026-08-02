@@ -520,6 +520,7 @@ void OpenSprinkler::reboot_dev(uint8_t cause) {
 
 #include "etherport.h"
 #include <sys/reboot.h>
+#include <errno.h>
 #include <stdlib.h>
 #include <sys/ioctl.h>
 #include <net/if.h>
@@ -596,6 +597,19 @@ void OpenSprinkler::reboot_dev(uint8_t cause) {
 #else
 	sync(); // add sync to prevent file corruption
 	reboot(RB_AUTOBOOT);
+	// reboot() only returns on failure. In a container it always fails: the
+	// default capability set has no CAP_SYS_BOOT and the default seccomp
+	// profile gates the syscall behind it. Falling through used to leave
+	// reboot_timer armed (main.cpp never clears it), so do_loop() called back
+	// in one second later, forever -- an endless nvdata_save() + sync() loop
+	// against the data dir. Exit instead: under a restart policy (systemd
+	// Restart=always, compose restart: unless-stopped) the supervisor brings
+	// the process straight back, which is what "reboot" should mean here.
+	// Unconditional, not DEBUG_PRINTLN: that compiles to {} in release builds,
+	// and this is precisely the case an operator needs to see in the log.
+	fprintf(stderr, "reboot() failed (%s); exiting for the supervisor to restart\n",
+	        strerror(errno));
+	_exit(0);
 #endif
 }
 
