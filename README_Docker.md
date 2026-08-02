@@ -130,7 +130,16 @@ Notes:
 
 ## Publishing (maintainers)
 
-CI pushes to GHCR using the built-in `GITHUB_TOKEN` with no setup.
+CI pushes to GHCR using the built-in `GITHUB_TOKEN` with no setup. Publishing
+runs automatically on every push to `master` and on every published release, and
+can also be triggered on demand:
+
+```sh
+gh workflow run build-ci.yml --ref master
+```
+
+An on-demand run tags exactly as a branch push does (`:master`); it never moves
+`:latest` or writes the `:release` tag.
 
 **One-time step after the first successful publish:** a container package
 created by `GITHUB_TOKEN` is **private** by default, and `packages: write` does

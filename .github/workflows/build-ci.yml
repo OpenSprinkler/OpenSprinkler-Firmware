@@ -150,7 +150,12 @@ jobs:
     name: Release Docker
     runs-on: ubuntu-latest
     needs: [build-pio, build-demo, build-docker]
-    if: ${{ github.event_name == 'push' || github.event_name == 'release' }}
+    # workflow_dispatch is included so a publish can be triggered on demand
+    # (`gh workflow run build-ci.yml --ref master`) without waiting for a push.
+    # It tags exactly as a branch push does: type=ref,event=branch -> :master,
+    # with latest= and the :release tag both off, so an on-demand run can never
+    # move :latest or masquerade as a release.
+    if: ${{ github.event_name == 'push' || github.event_name == 'release' || github.event_name == 'workflow_dispatch' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
