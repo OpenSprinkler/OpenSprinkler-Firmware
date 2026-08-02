@@ -9,6 +9,7 @@ docs/site
 *.o
 OpenSprinkler
 logs
+data
 testmode.h
 
 .codex

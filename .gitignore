@@ -16,3 +16,7 @@ node_modules
 !package.json
 .DS_Store
 testmode.h
+# Bind-mounted data dir used by docker-compose.yaml. The *.dat rule above
+# covers the config files, but not data/logs/ (logs/** is anchored to the repo
+# root, so it does not match a nested logs/).
+data/

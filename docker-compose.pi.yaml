@@ -1,0 +1,51 @@
+# OpenSprinkler - Raspberry Pi hardware overlay (IO ports).
+#
+# Layers real GPIO and I2C access on top of docker-compose.yaml:
+#
+#   docker compose -f docker-compose.yaml -f docker-compose.pi.yaml up -d
+#
+# Prefer uncommenting COMPOSE_FILE in .env over typing those flags. This file
+# and the base file describe the SAME container (same project name, same
+# container_name), so running a bare `docker compose up -d` afterwards changes
+# the config hash and recreates the container with no devices -- silently.
+#
+# Kept separate because `devices:` entries are hard requirements -- naming a
+# device node that does not exist makes `docker compose up` fail. That is what
+# keeps the base file usable on x86-64.
+#
+# This replaces the `--privileged --volume /dev:/dev` invocation that
+# README_Docker.md used to document. The OSPI build opens exactly two device
+# classes, so two mappings are enough:
+#
+#   /dev/gpiochip*  lgpio claims station and sensor pins   (gpio.cpp:195-218)
+#   /dev/i2c-*      zone/sensor expanders, RTC, ADS1115    (i2cd.h:86-99)
+#
+# Nothing else under /dev is touched, and no elevated capability is needed:
+# lgpio is a character-device (ioctl) library, so it does not need /dev/mem or
+# CAP_SYS_RAWIO. Dropping privileged also removes CAP_SYS_BOOT from a process
+# that calls reboot(RB_AUTOBOOT) -- with --pid=host that could restart the Pi.
+#
+# I2C must be enabled on the host first (`dtparam=i2c_arm=on`, or run
+# ./build.sh which does it for you). If it is not, `docker compose up` fails
+# with a missing-device error instead of silently coming up without sensors.
+
+services:
+  opensprinkler:
+    devices:
+      # Raspberry Pi 1-4. On a Pi 5 (bcm2712) the firmware tries gpiochip4
+      # first and only falls back to gpiochip0, so uncomment the Pi 5 line
+      # below -- leaving both active fails on a Pi 4, where gpiochip4 is absent.
+      - "/dev/gpiochip0:/dev/gpiochip0"
+      # - "/dev/gpiochip4:/dev/gpiochip4"   # Raspberry Pi 5 only
+
+      # /dev/i2c-1 on every board the firmware recognises as a Pi.
+      # get_board_type() falls back to /dev/i2c-0 on unrecognised hardware.
+      - "/dev/i2c-1:/dev/i2c-1"
+
+    # Optional: run as your host user so ./data does not fill with root-owned
+    # files. Needs the numeric host GIDs from `getent group gpio i2c` and a
+    # one-time `sudo chown -R 1000:1000 ./data`.
+    # user: "1000:1000"
+    # group_add:
+    #   - "993"   # gpio
+    #   - "994"   # i2c

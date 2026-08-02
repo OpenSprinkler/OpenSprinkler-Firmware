@@ -1,0 +1,86 @@
+# OpenSprinkler - portable base configuration.
+#
+#   docker compose up -d
+#
+# This file alone runs anywhere the image runs (linux/amd64, linux/arm64,
+# linux/arm/v7) and gives you the web UI on http://<host>:8080 with persistent
+# config. It deliberately grants NO hardware access, so it is safe on an x86-64
+# server or a dev laptop where /dev/gpiochip* and /dev/i2c-* do not exist --
+# listing a missing device makes `docker compose up` fail outright.
+#
+# On a Raspberry Pi, add the hardware overlay to drive real zones:
+#
+#   docker compose -f docker-compose.yaml -f docker-compose.pi.yaml up -d
+#
+# IMPORTANT on a Pi: uncomment COMPOSE_FILE in .env instead of typing the two
+# -f flags. Both files describe the same container, so a later bare
+# `docker compose up -d` recreates it WITHOUT device access, and nothing
+# reports the loss -- the UI and healthcheck stay green while no valve opens.
+#
+# First run: create the data directory yourself so it is owned by you rather
+# than by dockerd (the container runs as root, see the ownership note below):
+#
+#   mkdir -p ./data
+
+name: opensprinkler
+
+services:
+  opensprinkler:
+    # Published automatically by .github/workflows/build-ci.yml.
+    # Multi-arch manifest - Docker picks the right architecture for the host.
+    #   :master  - built from every push to master
+    #   :release - most recent published GitHub release
+    #   :latest  - most recent non-prerelease
+    # Mirrored to docker.io/rbhr/opensprinkler once the Docker Hub
+    # credentials are configured; swap the image line to use that instead.
+    image: ghcr.io/rbhr/opensprinkler-firmware:master
+    # build: .        # uncomment to build from this checkout instead of pulling
+                      # (requires `git submodule update --init --recursive` first)
+
+    container_name: opensprinkler
+    restart: unless-stopped
+
+    # host:container. Keep the container side at 8080 unless you also change
+    # the HTTP Port option in the UI -- that value is persisted to
+    # ./data/iopts.dat, and the container becomes unreachable if the two drift
+    # apart. To move it on the host only, use "8081:8080".
+    ports:
+      - "8080:8080"
+
+    # Everything the firmware persists: iopts.dat, sopts.dat, stns.dat,
+    # prog.dat, nvcon.dat, done.dat, sens.dat, senadj.dat, plus a logs/
+    # subdirectory the app creates itself.
+    #
+    # NOTE: the container runs as root, so these files land on the host owned
+    # by root. sopts.dat holds MQTT/SMTP/IFTTT credentials -- consider
+    # `chmod 700 ./data`.
+    volumes:
+      - ./data:/data
+
+    security_opt:
+      - no-new-privileges:true
+
+    # Optional hardening. The firmware needs no Linux capability beyond writing
+    # its data directory, but this is untested against every deployment, so it
+    # is opt-in rather than the default.
+    # cap_drop:
+    #   - ALL
+    # cap_add:
+    #   - DAC_OVERRIDE
+
+    # `curl` is present because the runtime stage inherits it from the base
+    # stage in the Dockerfile. If that base is ever slimmed, drop this block --
+    # Debian's /bin/sh is dash and has no /dev/tcp fallback.
+    # "/" is the right probe: server_home requires no password and returns 200.
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://127.0.0.1:8080/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

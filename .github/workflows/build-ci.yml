@@ -111,7 +111,9 @@ jobs:
             # Essentially just ignore the cache output (PR can't write to registry cache)
             echo "cache-to=type=local,dest=/tmp/discard,ignore-error=true" >> $GITHUB_OUTPUT
           else
-            echo "cache-to=type=registry,mode=max,ref=ghcr.io/${{ steps.lower-owner.outputs.owner }}/opensprinkler-build-cache:ospi" >> $GITHUB_OUTPUT
+            # ignore-error: a cache-export failure must not fail this job, because
+            # release-docker needs: build-docker and would otherwise never publish.
+            echo "cache-to=type=registry,mode=max,ignore-error=true,ref=ghcr.io/${{ steps.lower-owner.outputs.owner }}/opensprinkler-build-cache:ospi" >> $GITHUB_OUTPUT
           fi
 
       - name: Build image
@@ -172,6 +174,42 @@ jobs:
         run: |
           echo "owner=${GITHUB_REPOSITORY_OWNER@L}" >> $GITHUB_OUTPUT
 
+      # Docker Hub is optional. The `secrets` context is NOT available in any
+      # `if:` expression (neither job- nor step-level), so resolve it here --
+      # where secrets ARE legal -- into a plain true/false step output and gate
+      # on that. An unconfigured repo, or a fork that receives no secrets,
+      # degrades to GHCR-only instead of failing the publish.
+      - name: Resolve Docker Hub target
+        id: dockerhub
+        env:
+          DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+          DOCKERHUB_REPOSITORY: ${{ vars.DOCKERHUB_REPOSITORY }}
+        run: |
+          if [[ -n "$DOCKERHUB_USERNAME" && -n "$DOCKERHUB_TOKEN" ]]; then
+            repo="${DOCKERHUB_REPOSITORY:-${DOCKERHUB_USERNAME}/opensprinkler}"
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+            echo "repository=${repo@L}" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Docker Hub::Publishing to docker.io/${repo@L}"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            # Must remain a syntactically valid image reference: "docker.io//x"
+            # can fail metadata-action's parse before enable=false is honoured.
+            echo "repository=placeholder/placeholder" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Docker Hub::vars.DOCKERHUB_USERNAME or secrets.DOCKERHUB_TOKEN not set - publishing to GHCR only"
+          fi
+
+      # Docker Hub login goes first so the `FROM debian:bookworm-slim` pull in
+      # the Dockerfile is authenticated too, moving it off the shared
+      # 100-pulls-per-6h anonymous budget that GitHub's NAT'd runners share.
+      # No `registry:` key -- login-action defaults to docker.io.
+      - name: Login to Docker Hub
+        if: steps.dockerhub.outputs.enabled == 'true'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
         with:
@@ -183,18 +221,23 @@ jobs:
         id: metadata
         uses: docker/metadata-action@v5
         with:
+          # One tag set fans out across both registries. The Docker Hub entry
+          # switches off wholesale when the credentials are absent.
+          #
+          # `latest=auto` is wrong here: type=ref,event=tag does no semver
+          # parsing, so `auto` would move :latest onto a pre-release. Decide it
+          # explicitly instead.
           flavor: |
-            latest=auto
+            latest=${{ github.event_name == 'release' && !github.event.release.prerelease }}
           images: |
             name=ghcr.io/${{ steps.lower-owner.outputs.owner }}/${{ steps.lower-repo.outputs.repository }}
+            name=docker.io/${{ steps.dockerhub.outputs.repository }},enable=${{ steps.dockerhub.outputs.enabled }}
           tags: |
             # Tag with branch name
             type=ref,event=branch
-            # Tag with pr-number
-            type=ref,event=pr
             # Tag with git tag on release
             type=ref,event=tag
-            type=raw,value=release,enable=${{ github.event_name == 'release' }}
+            type=raw,value=release,enable=${{ github.event_name == 'release' && !github.event.release.prerelease }}
 
       - name: Push image
         uses: docker/build-push-action@v6
