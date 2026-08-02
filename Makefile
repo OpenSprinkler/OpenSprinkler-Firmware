@@ -13,7 +13,21 @@ OBJECTS=$(addsuffix .o,$(basename $(SOURCES)))
 .PHONY: all
 all: $(BINARY)
 
-%.o: %.cpp %.c $(HEADERS)
+# Makefile is a prerequisite so that changing CXXFLAGS (or these rules) forces
+# a rebuild. Without it, an object built by an older rule is considered up to
+# date and silently survives -- which is exactly how a pre-existing smtp.o
+# would keep the flagless build described below.
+%.o: %.cpp $(HEADERS) Makefile
+	$(CXX) -c -o "$@" $(CXXFLAGS) "$<"
+
+# smtp.c is the only C source. It must be built with the same flags as the C++
+# sources -- exactly as build.sh does by passing it to g++ on one command line.
+# The previous rule was "%.o: %.cpp %.c", which requires BOTH a .cpp and a
+# same-stem .c to exist; no such pair does, so the rule never matched and
+# smtp.o fell through to make's built-in "cc -c" with no flags at all. That
+# silently dropped -DSMTP_OPENSSL, compiling out every TLS/STARTTLS branch in
+# smtp.c and sending SMTP credentials in cleartext.
+%.o: %.c $(HEADERS) Makefile
 	$(CXX) -c -o "$@" $(CXXFLAGS) "$<"
 
 $(BINARY): $(OBJECTS)
