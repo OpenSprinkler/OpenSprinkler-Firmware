@@ -10,7 +10,7 @@ selects the right architecture for the host.
 
 ```sh
 docker pull ghcr.io/rbhr/opensprinkler-firmware:master     # GitHub Container Registry
-docker pull rbhr/opensprinkler:master                      # Docker Hub (mirror)
+docker pull richardrundle/opensprinkler:master             # Docker Hub (mirror)
 ```
 
 | Tag | Published on |
@@ -153,7 +153,7 @@ exist in **Settings → Secrets and variables → Actions**:
 
 | Kind | Name | Value |
 |---|---|---|
-| Variable | `DOCKERHUB_USERNAME` | your Docker Hub account, e.g. `rbhr` |
+| Variable | `DOCKERHUB_USERNAME` | your Docker Hub account, e.g. `richardrundle` — note this is the Docker Hub login, which need not match the GitHub owner |
 | Secret | `DOCKERHUB_TOKEN` | a Docker Hub **Personal Access Token** (not your password) |
 | Variable *(optional)* | `DOCKERHUB_REPOSITORY` | overrides the default `<username>/opensprinkler` |
 

@@ -31,7 +31,7 @@ services:
     #   :master  - built from every push to master
     #   :release - most recent published GitHub release
     #   :latest  - most recent non-prerelease
-    # Mirrored to docker.io/rbhr/opensprinkler once the Docker Hub
+    # Mirrored to docker.io/richardrundle/opensprinkler once the Docker Hub
     # credentials are configured; swap the image line to use that instead.
     image: ghcr.io/rbhr/opensprinkler-firmware:master
     # build: .        # uncomment to build from this checkout instead of pulling
