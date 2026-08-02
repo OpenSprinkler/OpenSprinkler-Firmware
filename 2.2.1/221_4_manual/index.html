@@ -1,0 +1,1161 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://OpenSprinkler.github.io/OpenSprinkler-Firmware/2.2.1/221_4_manual/" />
+      <link rel="shortcut icon" href="../../img/favicon.ico" />
+    <title>User Manual - OpenSprinkler Documentation</title>
+    <link rel="stylesheet" href="../../css/theme.css" />
+    <link rel="stylesheet" href="../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../../custom.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "User Manual";
+        var mkdocs_page_input_path = "2.2.1/221_4_manual.md";
+        var mkdocs_page_url = "/OpenSprinkler-Firmware/2.2.1/221_4_manual/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../.." class="icon icon-home"> OpenSprinkler Documentation
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../..">Home</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../faq/">FAQ</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../troubleshooting/">Troubleshooting</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../firmware-update/">Firmware Update</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Firmware v2.2.1(5) [NEW]</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../221_5_manual/">User Manual</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../221_5_api/">API Reference</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Firmware v2.2.1(4)</span></p>
+              <ul class="current">
+                  <li class="toctree-l1 current"><a class="reference internal current" href="./">User Manual</a>
+    <ul class="current">
+    <li class="toctree-l2"><a class="reference internal" href="#introduction">Introduction</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#whats-new-in-this-firmware">What's New in this Firmware?</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#hardware-interface">Hardware Interface</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#opensprinkler-v34-new">OpenSprinkler v3.4 (new)</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#opensprinkler-v30-33">OpenSprinkler v3.0-3.3</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#opensprinkler-pi-ospi">OpenSprinkler Pi (OSPi)</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#zone-wiring-diagram">Zone Wiring Diagram</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#installation">Installation</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#step-1-preparation">Step 1: Preparation</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#step-2-wiring-opensprinkler">Step 2: Wiring OpenSprinkler</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#step-3-zone-expanders-optional">Step 3: Zone Expanders (Optional)</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#step-4-setting-up-wifi-ethernet">Step 4: Setting Up WiFi / Ethernet</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#reset-wifi">Reset WiFi</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#reset-device-password">Reset Device Password</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#factory-reset">Factory Reset</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#lcd-display-and-buttons">LCD Display and Buttons</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#web-interface-overview">Web Interface Overview</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#homepage">Homepage</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#sidebar-menu">Sidebar Menu</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#device-status">Device Status</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#station-cards">Station Cards</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#cloud-synced-features">Cloud-Synced Features</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#footer-menu">Footer Menu</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#manually-start-stop-a-zone">Manually Start / Stop a Zone</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#change-rain-delay">Change Rain Delay</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#pause-station-runs">Pause Station Runs</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#stop-all-zones">Stop All Zones</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#edit-options">Edit Options</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#system-settings">System Settings</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#app-settings">App Settings</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#configure-master">Configure Master</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#station-handling">Station Handling</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#weather-adjustment">Weather Adjustment</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#sensor-setup">Sensor Setup</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#integration">Integration</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#lcd-screen">LCD Screen</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#advanced-settings">Advanced Settings</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#reset">Reset</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#run-once-program">Run-Once Program</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#programs">Programs</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#program-data">Program Data</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#program-name-annotations">Program Name Annotations</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#program-preview">Program Preview</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#zones-group-attribute">Zone's Group Attribute</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#logs">Logs</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#firmware-update">Firmware Update</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#links-and-resources">Links and Resources</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#specifications">Specifications</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#advanced-topics">Advanced Topics</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#installing-rf-transmitter">Installing RF Transmitter</a>
+    </li>
+        </ul>
+    </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../221_4_api/">API Reference</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Zone Expander</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../zone-expander/">User Manual</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Sensor Expander [NEW]</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../sensor-expander/">User Manual</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Archived</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../archive/">Previous Manuals and API docs</a>
+                  </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../..">OpenSprinkler Documentation</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
+          <li class="breadcrumb-item">Firmware v2.2.1(4)</li>
+      <li class="breadcrumb-item active">User Manual</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/OpenSprinkler/OpenSprinkler-Firmware/edit/master/docs/2.2.1/221_4_manual.md" class="icon icon-github"> Edit on GitHub</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h2 id="firmware-2214-user-manual-nov-10-2025">Firmware 2.2.1(4) User Manual [Nov 10, 2025]</h2>
+<h3 id="introduction">Introduction</h3>
+<p><strong>OpenSprinkler</strong> is an open-source, web-based sprinkler/irrigation controller designed as a drop-in replacement for conventional sprinkler controllers that lack web connectivity. Its key benefits include an intuitive user interface, remote access, and smart weather-based watering control. It is ideal for homeowners and businesses in applications such as lawn and garden watering, plant irrigation, drip irrigation, hydroponics, etc.</p>
+<p>The OpenSprinkler hardware comes in two flavors:</p>
+<ul>
+<li><strong>OpenSprinkler v3</strong> – Features built-in WiFi, two independent sensor ports, and an optional wired Ethernet module. It is fully assembled and pre-loaded with firmware.</li>
+<li><strong>OpenSprinkler Pi (OSPi)</strong> – Powered by a Raspberry Pi (RPi), requiring some assembly (such as connecting the RPi) and firmware installation.</li>
+</ul>
+<p>Each controller provides 8 zones, with expansion possible via zone expanders (each adding 16 zones): <strong>OpenSprinkler v3</strong> supports up to <strong>72</strong> zones, and <strong>OSPi</strong> supports up to <strong>200</strong> zones.
+<a id="power-models"></a>
+In addition, OpenSprinkler v3 is available in three power models:</p>
+<ul>
+<li><strong>AC-powered</strong> – Comes with an <span class="hl_orange"><strong>Orange</strong></span> terminal block (v3.0-3.3) or <span class="hl_red"><strong>Red</strong></span> power barrel (v3.4). Requires a 24VAC transformer (NOT included by default; available for purchase as an add-on, or use your own 24VAC transformer).</li>
+<li><strong>DC-powered</strong> – Comes with a <strong>Black</strong> power barrel (v3.0-3.3) or <strong>USB-C</strong> connector (v3.4). A compatible power adapter is included for North America. It can operate on 6V–24VDC, including a 12VDC solar panel. Despite DC input power, it is designed to operate 24VAC sprinkler valves, as well as DC non-latching valves.</li>
+<li><strong>LATCH</strong> – Comes with a <strong>Black</strong> power barrel and a 7.5VDC adapter for North America. It's specifically designed for use with <strong>latching solenoid valves only</strong>.</li>
+</ul>
+<hr class="double">
+
+<h3 id="whats-new-in-this-firmware">What's New in this Firmware?</h3>
+<ul>
+<li><strong>Support for DC-powered OpenSprinkler v3.4</strong>, the first OpenSprinkler with USB-C. Supports USB PD (Power Delivery) via CH224 and allows <strong>user-defined PD voltage</strong>.</li>
+<li><strong>Preemptive Running for Manual Actions:</strong> Manual station runs, Run-once programs, and manually started programs now support user-specified queue options:<ul>
+<li><strong>Append</strong>: run after others</li>
+<li><strong>Insert at Front</strong>: run now and pause others</li>
+<li><strong>Replace</strong>: run now and stop others (<strong>default behavior in previous firmwares</strong>).</li>
+</ul>
+</li>
+<li><strong>OSPi GPIO Backend</strong>: Switch from <code>libgpio</code> to <code>lgpio</code>, for simpler API, compatible with <strong>Raspbian Trixie</strong>, and to avoid <code>libgpiod</code> v2 breaking changes.</li>
+<li><strong>Smoother Current Readings:</strong> Added exponential moving average (EMA) filtering for stable current sensing.</li>
+<li><strong>Flexible Weather Script URL:</strong> Support explicit <code>http/https</code> and custom port, making it easy to use custom weather service.</li>
+<li><strong>Optimized Static Pages:</strong> Serve AP homepage and firmware update pages as minified and compressed HTML for faster load times and reduced footprint.</li>
+</ul>
+<hr class="double">
+
+<h3 id="hardware-interface">Hardware Interface</h3>
+<h4 class="hltitle" id="opensprinkler-v34-new">OpenSprinkler v3.4 (new)</h4>
+<p><img alt="OpenSprinkler v3.4 (new enclosure)" src="../images/os34_hardware_interface.jpg" /></p>
+<hr>
+
+<h4 class="hltitle" id="opensprinkler-v30-33">OpenSprinkler v3.0-3.3</h4>
+<p><img alt="OpenSprinkler v3.0-3.3" src="../images/os33_hardware_interface.jpg" /></p>
+<hr>
+
+<h4 class="hltitle" id="opensprinkler-pi-ospi">OpenSprinkler Pi (OSPi)</h4>
+<p><img alt="OpenSprinkler Pi" src="../images/ospi20_hardware_interface.jpg" /></p>
+<hr class="double">
+
+<h3 id="zone-wiring-diagram">Zone Wiring Diagram</h3>
+<p>The diagram below shows how to wire valves on the main controller and expanders.</p>
+<p><strong>Basics</strong></p>
+<ul>
+<li>Each valve solenoid has two wires. Gather one wire from every valve (across the main controller and any expanders) and bundle them into a <strong>COM (common)</strong> wire. Connect this <strong>COM</strong> wire to the controller's <strong>COM</strong> port (do NOT use GND).</li>
+<li>OpenSprinkler has <strong>two COM ports</strong>: they are internally connected, so you may use either one.</li>
+<li>The other wire from each valve goes to its individual zone port (1, 2, 3, ...).</li>
+</ul>
+<p><strong>Polarity</strong></p>
+<ul>
+<li><strong>AC valves</strong> have no polarity — either lead can be COM or zone wire.</li>
+<li><strong>Latching valves</strong> are <strong><em>polarized</em></strong> — connect the <strong>positive</strong> wire (usually <span class="hl_red"><strong>Red</strong></span>) to <span class="hl_red"><strong>COM</strong></span>, and the negative wire (usually <strong>Black</strong>) to a zone port.</li>
+<li>Some DC non-latching valves are polarized too. Again, positive → COM, negative → zone.</li>
+</ul>
+<p><strong>Master Valve / Pump Relay</strong></p>
+<ul>
+<li>If you have a master valve or pump start relay, connect it to any zone port — OpenSprinkler uses software-defined master/pump zones, so you can configure which zones act as master.</li>
+</ul>
+<p><img alt="Zone Wiring" src="../../assets/images/zone_wiring.jpg" /></p>
+<hr class="double">
+
+<h3 id="installation">Installation</h3>
+<div class="admonition warning">
+<p class="admonition-title">AC Power (International Users)</p>
+<p>For <strong>AC-powered</strong> OpenSprinkler, you must use a 24VAC transformer that <strong>matches your country’s mains voltage</strong> standard. An incompatible transformer can damage the controller. If a suitable 24VAC transformer isn't available, consider the <strong>DC-powered</strong> OpenSprinkler instead (6–24VDC input; v3.4 uses USB-C). <strong>Never</strong> connect mains power directly to the controller.</p>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">OpenSprinkler is NOT waterproof</p>
+<p>If installing outdoors, mount it inside a <a href="https://www.amazon.com/Orbit-57095-Weather-Resistant-Outdoor-Mounted-Controller/dp/B000VYGMF2"><strong>weatherproof enclosure</strong></a>.</p>
+</div>
+<div class="admonition info">
+<p class="admonition-title">Video Guides</p>
+<p><strong>Video Guides and Tutorials</strong> are available on the <a href="https://support.opensprinkler.com">OpenSprinkler support site</a>.</p>
+</div>
+<h4 id="step-1-preparation">Step 1: Preparation</h4>
+<p>Carefully label and remove wires from your existing sprinkler controller as you disconnect it. You will typically find:</p>
+<ul>
+<li><strong>Power supply wires</strong> (if you plan to reuse your existing power supply)</li>
+<li>A <strong>COM (common) wire</strong></li>
+<li>One or more <strong>Zone wires</strong></li>
+<li>(Optionally) A <strong>Master Zone / Pump Start Relay</strong> wire</li>
+<li>(Optionally) <strong>Rain / Soil / Flow Sensor</strong> wires</li>
+</ul>
+<hr />
+<h4 id="step-2-wiring-opensprinkler">Step 2: Wiring OpenSprinkler</h4>
+<p>Refer to the <a href="#hardware-interface">Hardware Interface</a> and <a href="#zone-wiring-diagram">Zone Wiring Diagram</a> sections above.</p>
+<p>OpenSprinkler uses <strong>removable terminal blocks</strong> for easy wiring. To detach a block, grab one end firmly, gently wiggle, and pull it out. Insert wires fully, then tighten the screws securely.</p>
+<p><strong>Power:</strong></p>
+<ul>
+<li><strong>OpenSprinkler v3.4 AC:</strong> Plug the 24VAC transformer to the <span class="hl_red"><strong>Red</strong></span> barrel jack.<ul>
+<li>If your transformer has bare wire, use the included screw-terminal-to-plug adapter.</li>
+</ul>
+</li>
+<li><strong>OpenSprinkler v3.0-3.3 AC:</strong> Connect the 24VAC wires to the <span class="hl_orange"><strong>Orange</strong></span> terminal block.<ul>
+<li>AC has no polarity, so the two wires have no distinction.</li>
+</ul>
+</li>
+<li><strong>OpenSprinkler v3.4 DC:</strong> Plug the USB-C cable to the USB-C port (PWR).</li>
+<li><strong>OpenSprinkler v3.0-3.3 DC and Latch:</strong> Insert the DC adapter into the <strong>Black</strong> barrel jack.<ul>
+<li>Note the <strong>COM</strong> terminal is <span class="hl_red"><strong>positive(+)</strong></span>. If your valve wires are polarized, positive goes to COM, and negative goes to a zone. </li>
+</ul>
+</li>
+</ul>
+<p><strong>Sensors:</strong></p>
+<ul>
+<li><strong>Connect sensor signal wires to SN1 + GND</strong> (or <strong>SN2 + GND</strong> if using a second sensor).<ul>
+<li>OpenSprinkler uses <strong>GND</strong> (NOT COM) as the common terminal for sensor inputs. <strong>DO NOT</strong> connect sensor signal wires to <strong>COM</strong>.</li>
+</ul>
+</li>
+<li>On a <strong>AC-powered model</strong>, if a sensor requires 24VAC power (e.g. wireless sensors), you may connect its <strong>power wires</strong> to COM and GND, which supply 24VAC.<ul>
+<li><strong>DC-powered and Latch</strong> models do <strong>NOT</strong> output 24VAC thus cannot power these sensors.</li>
+</ul>
+</li>
+</ul>
+<p>For additional details on specific sensors (rain/soil/flow), refer to <a href="#sensor-setup">Sensor Setup</a>.</p>
+<hr />
+<h4 id="step-3-zone-expanders-optional">Step 3: Zone Expanders (Optional)</h4>
+<div class="admonition warning">
+<p class="admonition-title">Power Off Before Wiring Expanders</p>
+<p>Always <strong>power off the main controller</strong> before connecting, disconnecting, or reconfiguring an expander.</p>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Verify the Correct Port</p>
+<p>Connect the Zone Expander only to the controller port marked <strong>Expander</strong>. Do <strong>NOT</strong> connect it to the port marked <strong>Ether</strong>.</p>
+</div>
+<p>For compatibility, DIP-switch settings, keyed ribbon-cable orientation, daisy chaining, zone mapping, and software configuration, follow the dedicated <a href="../../zone-expander/">Zone Expander User Manual</a>.</p>
+<hr />
+<h4 id="step-4-setting-up-wifi-ethernet">Step 4: Setting Up WiFi / Ethernet</h4>
+<p><strong>WiFi (OpenSprinkler v3 all versions)</strong></p>
+<ol>
+<li>On first boot (or after WiFi reset), OpenSprinkler starts in <strong>AP (Access Point) mode</strong>, broadcasting an SSID like <code>OS_xxxxxx</code> shown on the LCD. Connect your phone/computer to this open SSID.<ul>
+<li><em>On Android</em>: if you see a "WiFi has no Internet" warning, tap Accept to stay connected.</li>
+</ul>
+</li>
+<li>Open a browser and go to <code>192.168.4.1</code> to access the <strong>WiFi Configuration</strong> page. Follow the instructions there. Specifically, select (or manually enter) your home WiFi's SSID and its password (this is your router's WiFi password, NOT OpenSprinkler's password!). The BSSID and Channel fields are filled automatically, but you may leave them empty if preferred.</li>
+<li>Click <strong>Connect</strong>. On successful connection, the controller will reboot into WiFi Station mode.</li>
+<li>Press button <strong>B1</strong> on OpenSprinkler to display the <strong>device IP</strong> assigned by your router. Type in that device IP in a <strong>browser</strong> or the <strong>OpenSprinkler mobile app</strong> to access the web interface.<ul>
+<li><span class="hl">The default device password is <strong>opendoor</strong>. For security, change this immediately after setup.</span></li>
+</ul>
+</li>
+</ol>
+<hr />
+<p><strong>Wired Ethernet (OpenSprinkler v3.2 and later)</strong> </p>
+<ul>
+<li><strong>Power off</strong> the main controller. </li>
+<li><strong>OpenSprinkler v3.4:</strong> Firmly plug the ribbon cable connector into the port on the controller marked <strong>Ether</strong> (it's on the <strong>right</strong> side of the controller).<ul>
+<li>Do <strong>NOT</strong> plug into the port marked <strong>Expander</strong> - that's for zone expander ONLY!
+<img alt="Wired Ether" class="img-shadow" src="../images/os33_wired_ether.png" style="float: right; margin: 5px 5px 5px 5px;" /></li>
+</ul>
+</li>
+</ul>
+<p><span class="vsp2"></span></p>
+<ul>
+<li><strong>OpenSprinkler v3.2-3.3:</strong> Firmly plug the ribbon cable connector into the Ethernet module as shown on the right (keyed; only one way to fit).</li>
+<li>Plug an RJ45 Ethernet cable from your network to the module.</li>
+<li>Power on the controller. It will detect the network and connect automatically.</li>
+</ul>
+<hr />
+<h4 id="reset-wifi">Reset WiFi</h4>
+<ul>
+<li>To re-enter AP mode without erasing other settings:<ul>
+<li>With the controller powered on, press <strong>B3+B2</strong> (first press B3 then while holding B3 quickly press B2, like <code>Ctrl+C</code>), and hold until you see <strong>Reset to AP mode?</strong>.</li>
+<li>Click <strong>B3</strong> to confirm.</li>
+</ul>
+</li>
+<li>You can also reset WiFi from the app/web UI under:<ul>
+<li>From the homepage: <strong>Edit Options → Reset → Reset WiFi</strong>.</li>
+</ul>
+</li>
+<li>If neither of the above works, you need to perform a Factory Reset (see below).</li>
+</ul>
+<hr />
+<h4 id="reset-device-password">Reset Device Password</h4>
+<p>If you forget the device password, you can bypass it using buttons:</p>
+<ol>
+<li>Power off the controller.</li>
+<li>Power it on, and as soon as the OpenSprinkler logo appears, press and hold <strong>B3</strong>. Keep holding until the LCD displays <strong>Setup Options</strong>.</li>
+<li>Click <strong>B3</strong> repeatedly until you see <strong>Ignore Password</strong>. Click <strong>B1</strong> to set it to <strong>Yes</strong>.</li>
+<li>Press and hold <strong>B3</strong> until the controller reboots.</li>
+</ol>
+<p>You can now access the UI without a password. For security, immediately set a new password, and change <strong>Ignore Password</strong> back to <strong>No</strong>.</p>
+<hr />
+<h4 id="factory-reset">Factory Reset</h4>
+<ol>
+<li>Power off the controller.</li>
+<li>Power it on, and as soon as the OpenSprinkler logo appears, press and hold <strong>B1</strong>. Keep holding until the LCD displays <strong>Reset?</strong></li>
+<li>Confirm the answer is <strong>Yes</strong>, then press and hold <strong>B3</strong> until the controller reboots.</li>
+</ol>
+<p>All settings will be cleared and returned to factory defaults.</p>
+<hr class="double">
+
+<h3 id="lcd-display-and-buttons">LCD Display and Buttons</h3>
+<p><img alt="OpenSprinkler LCD Display" class="img-border img-shadow" src="../images/lcd_display.png" /></p>
+<ul>
+<li><strong>Master 1</strong> (if enabled) is shown as the letter <code>M</code>; and <strong>Master 2</strong> as <code>N</code>.</li>
+<li>By default the LCD shows the status of the first 8 zones on the main controller (<code>MC</code>). Each running zone is displayed with a three-letter animation: <code>. o O</code></li>
+<li>Click <strong>B3</strong> to cycle through each group of 8 zones (<code>E1</code>, <code>E2</code>, <code>E3</code>...) on expanders. </li>
+<li>When no zones are running, a <code>(System Idle)</code> message is shown at the top.</li>
+<li>When the controller is in <strong>Remote Extension</strong> mode, a radar icon 📡 is shown.</li>
+<li>When <strong>Pause Queue</strong> or <strong>Rain Delay</strong> is active, a clock icon 🕒 is shown.</li>
+<li>If <strong>Sensor 1</strong> is configured, a letter is shown to indicate its type:<ul>
+<li><code>r</code>: Rain sensor</li>
+<li><code>s</code>: Soil sensor</li>
+<li><code>p</code>: Program switch</li>
+<li><code>f</code>: Flow sensor</li>
+<li>An activated rain sensor is shown as 🌧️, and active soil sensor as 💧.</li>
+</ul>
+</li>
+<li>If <strong>Sensor 2</strong> is configured, its display will follow the same notation as Sensor 1.</li>
+</ul>
+<p><strong>While the controller is running, buttons perform the following functions:</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Button</th>
+<th style="text-align: left;">Function</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Click B1</strong></td>
+<td style="text-align: left;">Display device IP address, port and OTC status</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Click B2</strong></td>
+<td style="text-align: left;">Display device MAC address</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Click B3</strong></td>
+<td style="text-align: left;">Switch between the main controller (<code>MC</code>) and each group of 8 expanded zones<br>(<code>E1</code>, <code>E2</code>, <code>E3</code> ...).</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Hold B1</strong></td>
+<td style="text-align: left;">Stop all zones immediately</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Hold B2</strong></td>
+<td style="text-align: left;">Reboot the controller</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Hold B3</strong></td>
+<td style="text-align: left;">Manually start an existing or test program</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>B1+B2</strong></td>
+<td style="text-align: left;">Hold <strong>B1</strong>, then while holding it press <strong>B2</strong>, like <code>Ctrl+C</code>. Display gateway (router) IP</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>B2+B1</strong></td>
+<td style="text-align: left;">Display external (WAN) IP</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>B2+B3</strong></td>
+<td style="text-align: left;">Display timestamp of the last weather server response</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>B3+B2</strong></td>
+<td style="text-align: left;">For OpenSprinkler v3: reset to AP mode (for WiFi re-config)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>B1+B3</strong></td>
+<td style="text-align: left;"><em>(Internal testing only)</em> Start a quick test program (2s per zone)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>B3+B1</strong></td>
+<td style="text-align: left;">Display last system reboot timestamp and reboot reason</td>
+</tr>
+</tbody>
+</table>
+<p><span class="vsp1"></span></p>
+<p><strong>During booting, <u>while the OpenSprinkler logo is shown</u>, if any button below is pressed:</strong></p>
+<ul>
+<li><strong>B1</strong>: start <strong>Factory Reset</strong>.</li>
+<li><strong>B2</strong>: start <strong>Internal Test Mode</strong>.</li>
+<li><strong>B3</strong>: start <strong>Setup Options</strong>.</li>
+</ul>
+<hr class="double">
+
+<h3 id="web-interface-overview">Web Interface Overview</h3>
+<p>OpenSprinkler’s web interface works on phones, tablets, and computers, enabling you to view status, adjust settings, check logs, and edit programs from any modern <strong>web browser</strong> or via the free <strong>OpenSprinkler mobile app</strong> (search <strong>OpenSprinkler</strong> in your app store). </p>
+<div class="admonition info">
+<p class="admonition-title">Video Guides</p>
+<p><strong>Video Guides and Tutorials</strong> are available on the <a href="https://support.opensprinkler.com">OpenSprinkler support site</a>.</p>
+</div>
+<hr />
+<p><strong>Local Access</strong></p>
+<ul>
+<li>On the controller, press button <strong>B1</strong> to find its <strong>device IP</strong> and <strong>HTTP port</strong>. We denote the IP as <code>os-ip</code> (e.g. <code>192.168.1.122</code>).</li>
+<li>Open a browser and visit <code>http://os-ip</code> (e.g. <code>http://192.168.1.122</code>). If you changed the HTTP port from the default <code>80</code>, include it in the URL (e.g. <code>http://os-ip:8765</code>).</li>
+<li><span class="hl">The default device password is <strong>opendoor</strong></span>. For security, change it upon first use.</li>
+<li>When using the OpenSprinkler mobile app, choose <strong>Manually Add Device</strong>. Enter the device IP.</li>
+<li>Using the IP to access the controller works as long as you are on the same local network.</li>
+</ul>
+<hr />
+<p><strong>Remote Access (via OTC)</strong></p>
+<ul>
+<li>To access the controller remotely, first configure an <a href="#integration"><strong>OpenThings Cloud (OTC) token</strong></a>.</li>
+<li>In the OpenSprinkler mobile app, choose <strong>Manually Add Device</strong> and paste the <strong>OTC token</strong> instead of an IP.</li>
+<li>To access it remotely using a web browser, visit <code>cloud.openthings.io/forward/v1/token</code> where <code>token</code> is the <a href="#integration">OTC token</a>. </li>
+<li>Remote access via OTC does <strong>NOT</strong> need port forwarding on your router.</li>
+</ul>
+<hr class="double">
+
+<h3 id="homepage">Homepage</h3>
+<p><img alt="Homepage Annotations" src="../images/homepage_annotations.jpg" /></p>
+<p>The homepage provides an overview of all zones, current system status, and weather conditions. You’ll see a <strong>weather icon</strong>, the <strong>device time</strong>, <strong>water level</strong>, a <strong>list of zones</strong> showing their current state, and the <strong>device status</strong> at the bottom.</p>
+<ul>
+<li>The bell icon 🔔 (upper right) appears when notifications are available.</li>
+<li>The menu icon ☰ (upper left) opens the sidebar menu.</li>
+</ul>
+<hr />
+<h4 id="sidebar-menu">Sidebar Menu</h4>
+<div class="admonition info">
+<p class="admonition-title">Open the Sidebar</p>
+<p>Open the sidebar menu anytime by <strong>swiping left to right</strong>, or tap the ☰ icon at the top-left corner.</p>
+</div>
+<ul>
+<li><strong>Manage Sites:</strong> Manage multiple controllers (available in the mobile app).</li>
+<li><strong>Export/Import Configuration:</strong> Save or restore all settings and programs. Use this before firmware upgrades or factory resets.</li>
+<li><strong>About:</strong> Shows app version, firmware version, and hardware version.</li>
+<li><strong>Localization:</strong> Change the display language.</li>
+<li><strong>OpenSprinkler.com Login:</strong> (Optional) Log in with your <a href="https://opensprinkler.com">OpenSprinkler.com</a> account credentials to enable <a href="#cloud-synced-features"><strong>cloud-synced features</strong></a> such as station photos, notes, site configurations.</li>
+<li><strong>Disable Operation:</strong> Disable zone operations. Use it when the system will be idle for an extended period.</li>
+<li><strong>Change Password:</strong> Change the device password.</li>
+<li><strong>Reboot OpenSprinkler:</strong> Perform a software reboot.</li>
+<li><strong>System Diagnostics:</strong> View detailed diagnostic data, including timestamp and reason of the last reboot, the last weather call, response code, weather data, and OpenThings Cloud (OTC) connection status.</li>
+</ul>
+<hr />
+<h4 id="device-status">Device Status</h4>
+<p>The footer reports system status, prioritizing the following information in order:</p>
+<ol>
+<li>System enable/disable state</li>
+<li>Currently running stations</li>
+<li>Active Pause Queue / Rain Delay status</li>
+<li>If idle, the Last Run station, or <strong>System Idle</strong> if no such data is available.</li>
+</ol>
+<p>Additional data to display:</p>
+<ul>
+<li>If Flow Sensor is enabled → <strong>Current Flow Rate</strong>.</li>
+<li>If any zones are active → <strong>Total Current Draw</strong> (useful for solenoid diagnosis).</li>
+<li>If <strong>Overcurrent detected</strong> → an <strong>Overcurrent Alert</strong>.</li>
+</ul>
+<hr />
+<h4 id="station-cards">Station Cards</h4>
+<p>Each zone (station) is shown as a card. Tap the gear ⚙️ icon next to a zone name to open its <strong>Attributes</strong> dialog.</p>
+<p><img alt="Station Attributes" class="img-shadow" src="../images/station_attributes_types.jpg" /></p>
+<p><strong>Basic Tab:</strong></p>
+<ul>
+<li><strong>Station Name:</strong> A custom name (up to 32 letters).<br>
+<strong>Annotation:</strong> If a flow sensor is enabled (see <a href="#sensor-setup">Sensor Setup</a>) and the last 5 letters represent a numerical value, a <strong>Flow Alert</strong> notification will trigger when the flow rate exceeds this value after the zone finishes. Example: station name is <strong>Front Yard 1.357</strong>, a flow alert will trigger if the flow rate <code>&gt;1.357</code> after the zone finishes.</li>
+<li><strong>Use Masters:</strong> When enabled, the associated Master zone(s), if defined, will activate whenever this zone runs.</li>
+<li><strong>Ignore Rain/Sensor1/Sensor2:</strong> When enabled, the zone will bypass manual rain delay or sensor(s). Unchecked by default.</li>
+<li><strong>Disable:</strong> Disable and hide this zone. To unhide, use the <a href="#footer-menu">Footer Menu</a>.</li>
+</ul>
+<p><strong>Advanced Tab:</strong></p>
+<ul>
+<li>
+<p><strong>Sequential Group:</strong> Assign the zone to a <strong>Sequential</strong> group (<code>A-D</code>) or the <strong>Parallel</strong> (<code>P</code>) group. The zone's group label appears next to its name on the homepage.</p>
+<ul>
+<li>By default, all zones belong to <strong>group A</strong>.</li>
+<li>Zones in the same sequential group are <strong>automatically serialized</strong> – no two zones run simultaneously.</li>
+<li>Zones in different groups can run simultaneously.</li>
+<li>Parallel (P) zones can run alongside any other zones.</li>
+<li>The sequential group attribute replaces the old per-zone <strong>Sequential</strong> flag, providing more flexible concurrency control.</li>
+</ul>
+</li>
+<li>
+<p><strong>Station Type</strong> (Virtual Zone): Configure special properties so a station can control devices or actions beyond a standard sprinkler valve. These <strong>special/virtual</strong> station types do NOT consume a physical output - you can define them freely up to the controller’s maximum zone count, even without zone expanders.</p>
+<ul>
+<li><span class="hllight"><strong>Standard</strong></span> (default): Regular sprinkler zone.</li>
+<li><span class="hllight"><strong>RF:</strong></span> Controls remote RF (Radio Frequency) power sockets via an external transmitter (requires <a href="https://opensprinkler.com/product/rftoy/">RFtoy</a> for code learning), allowing you to switch powerline devices such as Christmas lights, heaters, pumps.</li>
+<li><span class="hllight"><strong>Remote Station (IP):</strong></span> Triggers a zone on another OpenSprinkler using its <strong>IP, port, and zone index</strong> (both controllers must <strong>share the same device password</strong>).</li>
+<li><span class="hllight"><strong>Remote Station (OTC):</strong></span> Same as above but identifies the remote controller by its <strong>OpenThings Cloud token</strong>, ideal for managing devices across different networks. Again, both controllers must share the same password.</li>
+<li><span class="hllight"><strong>GPIO:</strong></span> Directly toggles an available GPIO pin on the controller (Active High/Low configurable). This type is disabled for controllers that do not have any available GPIO pins.</li>
+<li><span class="hllight"><strong>HTTP:</strong></span> Sends an HTTP GET request upon zone activity. Provide a <code>server</code> (either domain name or IP), <code>port</code>, and the <code>on</code>/<code>off</code> command (excluding the leading slash <code>/</code>). Upon zone activation, it sends <code>server:port/on_command</code>, and upon deactivation <code>server:port/off_command</code>.</li>
+<li><span class="hllight"><strong>HTTPS:</strong></span> Same as HTTP, but using a secure connection.</li>
+</ul>
+</li>
+</ul>
+<hr />
+<h4 id="cloud-synced-features">Cloud-Synced Features</h4>
+<p><img alt="Station Pictures" class="center" src="../images/station_pictures.png" /></p>
+<p>After signing in with your <strong>OpenSprinkler.com</strong> account (via the sidebar menu), additional <strong>cloud-synced</strong> features become available:</p>
+<ul>
+<li><strong>Station Photos &amp; Notes:</strong> Capture and assign custom images and notes to each zone.</li>
+<li><strong>Site Configuration Sync:</strong> Automatically store and restore your device list and settings across devices, making it easy to manage multiple controllers.</li>
+</ul>
+<hr class="double">
+
+<h3 id="footer-menu">Footer Menu</h3>
+<p><img alt="Footer Menu" class="img-shadow" src="../images/footer_menu.png" style="float: right; margin: 8px 0px 8px 16px;" width="200" />
+The Footer Menu is available on all pages from the bottom-right (grid icon #️⃣) providing quick access to common actions:</p>
+<ul>
+<li><strong>Preview Programs</strong> (or keyboard shortcut <code>Alt+V</code>)</li>
+<li><strong>View Logs</strong> (<code>Alt+L</code>)</li>
+<li><strong>Change Rain Delay</strong> (<code>Alt+D</code>)</li>
+<li><strong>Pause Station Runs</strong> (<code>Alt+U</code>)</li>
+<li><strong>Run-Once Program</strong> (<code>Alt+R</code>)</li>
+<li><strong>Edit Programs</strong> (<code>Alt+P</code>)</li>
+<li><strong>Edit Options</strong> (<code>Alt+O</code>)</li>
+<li><strong>Stop All Stations</strong></li>
+<li><strong>Show/Hide Disabled</strong> (available on the homepage):<br>Toggle visibility of zones that have been disabled.</li>
+</ul>
+<p><strong>Tip:</strong> On laptop/desktop computers, you can also open the menu by pressing <code>M</code>.</p>
+<hr />
+<p><img alt="Start Zone" class="img-border img-shadow" src="../images/manually_start_zone.png" style="float: right; margin: 5px 5px 5px 5px;" width="150" /></p>
+<h4 id="manually-start-stop-a-zone">Manually Start / Stop a Zone</h4>
+<p>To <strong>start</strong> a zone manually, click its station card and enter a run time. If another zone in the <strong>same sequential group</strong> is currently running, a <strong>"Run immediately"</strong> checkbox appears to let you choose if you want this zone to run now (and pause other zones in the group), or queue this zone to run after the others finish.</p>
+<p><img alt="Stop Zone" class="img-border img-shadow" src="../images/manually_stop_zone.png" style="float: right; margin: 5px 5px 5px 5px;" width="150" />
+To <strong>stop</strong> a zone that's currently running or queued, click its zone card and confirm.
+If there are other queued zones in the <strong>same sequential group</strong>, a <strong>"Move up remaining stations"</strong> checkbox appears to let you choose if you want all remaining zones in that group to shift up, so the next one starts immediately instead of waiting for its original scheduled time.</p>
+<hr />
+<h4 id="change-rain-delay">Change Rain Delay</h4>
+<p>Use <strong>Change Rain Delay</strong> in the Footer Menu to set a custom rain delay (in hours). Affected zones stop immediately and remain off until the delay expires. To cancel an active rain delay: click the status bar at the footer, or set a rain delay time of <code>0</code>.</p>
+<hr />
+<h4 id="pause-station-runs">Pause Station Runs</h4>
+<p>This feature temporarily halts all active and queued zones:</p>
+<ul>
+<li>Running zones stop immediately and automatically resume when the pause timer reaches 0.</li>
+<li>Start times for queued zones shift accordingly.</li>
+<li>Programs whose start time falls within the pause window are queued and delayed until the pause ends.</li>
+<li>During the pause, the footer shows the <strong>Pause Status</strong>.</li>
+</ul>
+<p>To <strong>modify or cancel</strong> an active pause:</p>
+<ul>
+<li>Click the status bar in the footer, or</li>
+<li>Use Footer Menu → <strong>Change Pause</strong>.</li>
+</ul>
+<hr />
+<h4 id="stop-all-zones">Stop All Zones</h4>
+<p>Immediately terminate all zones and clear the running queue.</p>
+<hr class="double">
+
+<h3 id="edit-options">Edit Options</h3>
+<p>Click Footer Menu → Edit Options (or press <code>Alt+O</code>) to configure settings:</p>
+<h4 id="system-settings">System Settings</h4>
+<ul>
+<li><strong>Location:</strong> Tap <em>Location</em> to open the map and search for your address; or click the pencil icon ✏️ to manually enter the GPS coordinates.<ul>
+<li><strong>PWS location:</strong> When using <strong>WUnderground (WU)</strong> as the weather data provider, you must select a <strong>Personal Weather Station (PWS)</strong> location.<ol>
+<li>First enter and submit a valid <strong>WU API key</strong> in the <a href="#weather-adjustment">Weather and Sensors</a> tab.</li>
+<li>Return to the Location setting - available PWS sites will appear as <strong>blue dots</strong> on the map.</li>
+<li>Click one of the blue dots as your PWS location.</li>
+</ol>
+</li>
+</ul>
+</li>
+<li><strong>Time Zone:</strong> The timezone and DST are detected automatically based on your Location (via weather queries; requires Internet), thus this dropdown list is grayed out by default.<ul>
+<li>To <strong>override manually</strong>, clear the Location field by tapping the cross icon ✖️ next to it – then the timezone dropdown list becomes editable.</li>
+</ul>
+</li>
+<li><strong>Enable Logging:</strong> Stores log data in internal flash memory (enabled by default).</li>
+</ul>
+<hr />
+<h4 id="app-settings">App Settings</h4>
+<p>These settings are stored/cached in the app/UI. They do not affect the controller.</p>
+<ul>
+<li><strong>Use Metric / 24-Hr Time:</strong> Set preferred unit system (imperial or metric) and time format (12-hr or 24-hr). Defaults to automatic detection.</li>
+<li><strong>Orders Stations by Groups / Names:</strong> Customize how zones are sorted on the homepage (instead of solely by zone indices).</li>
+<li><strong>Show Disabled:</strong> Toggle visibility of disabled stations and programs.</li>
+<li><strong>Show Station Number:</strong> Display each zone’s numeric index alongside its name.</li>
+</ul>
+<hr />
+<h4 id="configure-master">Configure Master</h4>
+<p>This firmware supports up to <strong>two independent masters</strong>, each configurable as follows:</p>
+<ul>
+<li><strong>Master Station:</strong> Select a zone to act as a master (pump relay). Any zone can be designated. A master zone activates alongside other zones.</li>
+<li><strong>Master On Adjustment:</strong> Fine-tune the timing of <strong>master activation</strong> (<code>−600</code> to <code>+600</code> seconds, in steps of <code>5</code> seconds). Examples:<ul>
+<li><code>+15</code> → Master turns on <code>15</code> seconds <strong>after</strong> an associated zone starts.</li>
+<li><code>-60</code> → Master turns on <code>60</code> seconds <strong>before</strong> a zone starts.</li>
+</ul>
+</li>
+<li><strong>Master Off Adjustment:</strong> Similar to above but for master <strong>deactivation</strong> timing.</li>
+</ul>
+<hr />
+<h4 id="station-handling">Station Handling</h4>
+<ul>
+<li><strong>Number of Stations:</strong> OpenSprinkler automatically detects the <strong>available zones</strong> (including expanders), but users must manually configure this number - it's allowed to exceed the physical zones to include <strong>Virtual Zones</strong> (see <a href="#station-cards">Station Type</a>). Default: <code>8</code> zones.</li>
+<li><strong>Station Delay:</strong> Time gap between consecutive zones (<code>−600</code> to <code>+600</code> s, in 5-second steps). Default: <code>0</code> (no delay). Examples:<ul>
+<li><code>+60</code> → The next zone starts <code>1</code> minute <strong>after</strong> the previous finishes.</li>
+<li><code>-15</code> → The next zone starts <code>15</code> seconds <strong>before</strong> the previous ends (i.e. the two zones overlap by <code>15</code> seconds). Useful for managing water throttling issues.</li>
+</ul>
+</li>
+</ul>
+<hr />
+<h4 id="weather-adjustment">Weather Adjustment</h4>
+<ul>
+<li><strong>Adjustment Method:</strong> Select a weather-based adjustment method.<ul>
+<li><strong>Manual</strong> (default): set <strong>% Watering</strong> manually.</li>
+<li>Other methods calculate adjustments automatically. Detailed explanations of supported methods are available on <a href="https://openthings.freshdesk.com/support/solutions/articles/5000823370">OpenSprinkler Support</a>.</li>
+</ul>
+</li>
+<li><strong>Adjustment Method Options:</strong> Configure parameters for the selected method.</li>
+<li><strong>Adjust Interval Programs using Multi-Day Average:</strong> This option is available for <strong>Zimmerman or ETo</strong> methods. Enabling it allows <strong>all interval programs</strong> to apply the <strong>average watering level</strong> across the program's interval, rather than just the previous day's. For instance, a program that runs every <code>4</code> days uses the 4-day average. For programs that don't run daily, this provides more accurate adjustments that reflect all weather changes since the last run.<ul>
+<li>Applies only if the <strong>Use Weather</strong> flag is enabled for that program.</li>
+<li>Limited by provider’s historical data (e.g. Apple = <code>10</code> days). If the interval length exceeds the available weather data, the maximum available range is used.</li>
+<li>The array of multi-day averages are shown in <strong>System Diagnostics</strong>.</li>
+</ul>
+</li>
+<li>
+<p><strong>Weather Restrictions:</strong> Available for all adjustment methods (including Manual):</p>
+<ul>
+<li><strong>Rain:</strong> Skip watering if <strong>Total Forecast Rain</strong> &gt; a set amount over a user-defined number of days (e.g. <code>0.5in</code> in the next <code>3</code> days). Setting either value to <code>0</code> disables this rule.<br>The forecast capability is limited by your selected weather provider (Apple = <code>10</code> days). If the number of forecast days exceeds the data, the maximum available range is used.</li>
+<li><strong>Temperature:</strong> Skip watering if <strong>Current Temperature</strong> &lt; a set value (e.g. <code>50°F</code> or <code>10°C</code>). A value of <code>-40</code> (either °F or °C) disables this rule.</li>
+<li><strong>California Rule:</strong> Legacy rule that skips watering if <code>&gt;0.1"</code> rainfall in the past <code>48</code> hours.</li>
+<li><strong>Active weather restrictions</strong> appear both on the homepage and in System Diagnostics.</li>
+</ul>
+</li>
+<li>
+<p><strong>Weather Data Provider:</strong> Choose preferred data provider. Default: <strong>Apple</strong>.</p>
+<ul>
+<li>If the provider requires an API key, a key input box appears.</li>
+<li>Some providers have region limits (e.g. <strong>DWD</strong> = Germany only; <strong>WU</strong> requires PWS location).</li>
+</ul>
+</li>
+<li><strong>% Watering:</strong> Global scaling factor applied to water times. Default: <code>100%</code>.<ul>
+<li>Editable only for <strong>Manual</strong> adjustment method (as others calculate this automatically).</li>
+<li>Example: <code>75%</code> → Multiply all station water times by 0.75.</li>
+<li>Applies only to programs where the <strong>Use Weather</strong> flag is enabled.</li>
+</ul>
+</li>
+</ul>
+<hr />
+<h4 id="sensor-setup">Sensor Setup</h4>
+<p>OpenSprinkler supports <strong>two independent sensors</strong> (<code>SN1</code>, <code>SN2</code>) with configurable types: <strong>Rain</strong>, <strong>Soil</strong> (binary output only), <strong>Program Switch</strong>, and <strong>Flow</strong> (<em>currently only supported on <code>SN1</code></em>).</p>
+<ul>
+<li>
+<p><strong>Connections:</strong></p>
+<ul>
+<li>The sensor's <strong>two signal wires</strong> should be connected to <strong>SN1 + GND</strong> (or <strong>SN2 + GND</strong>).</li>
+<li>Do <strong><u>NOT</u></strong> connect any signal wire to <strong>COM</strong> as it may damage the controller.</li>
+<li><strong>If the sensor needs +5V</strong> power (e.g. certain flow sensors), use <strong>+5V</strong> (VIN) port to supply it.</li>
+<li><strong>If the sensor needs 24VAC</strong> power (e.g. wireless sensors), connect its <strong>power wires</strong> to <strong>COM</strong> and <strong>GND</strong> (AC-powered model only; DC/Latch models can NOT provide 24VAC).</li>
+<li>For OpenSprinkler v3.4: <code>SN3</code>, <code>SN4</code> are reserved for future use and not enabled currently.</li>
+</ul>
+</li>
+<li>
+<p><strong>Rain / Soil Sensor:</strong> Automatically stop zone runs when rain or high soil moisture detected.</p>
+<ul>
+<li>Choose <strong>Normally Open</strong> or <strong>Normally Closed</strong> (most common type).</li>
+<li>Only support sensors that output <strong>binary ON/OFF signals</strong> (dry-contact switches).<ul>
+<li>For <strong>Analog Sensors</strong>, use an <a href="https://opensprinkler.com/product/a2dadapter/"><strong>Analog-to-Digital Adapter</strong></a>, which converts an analog signal to ON/OFF with an adjustable threshold.</li>
+</ul>
+</li>
+<li><strong>Delayed On:</strong> Time sensor must remain active before trigger (prevents false triggers).</li>
+<li><strong>Delayed Off:</strong> Hold time after sensor deactivation (prolongs sensor hold). Examples:<br>
+ 10-minute Delayed On → Sensor regarded as triggered after it's active for 10 minutes.<br>
+ 30-minute Delayed Off → Sensor regarded as deactivated after it's inactive for 30 minutes. </li>
+</ul>
+</li>
+<li><strong>Program Switch:</strong> Use a dry-contact switch / button to start a program.<ul>
+<li><code>SN1</code>: Starts <code>Program 1</code></li>
+<li><code>SN2</code>: Starts <code>Program 2</code></li>
+<li>Activated if the switch / button is pressed for more than 1 second.</li>
+</ul>
+</li>
+<li><strong>Flow Sensor:</strong> Detect flow pulses to measure <strong>real-time flow rate</strong> and <strong>log total flow volume</strong> at the end of each station run and program cycle.<ul>
+<li>Support all <strong>dry-contact, 2-wire</strong> flow sensors (recommended). <img alt="Flow Sensor" class="img-shadow" src="../../assets/images/flow_sensor_example.png" style="float: right; margin: 5px 5px 5px 5px;" width="150" /><ul>
+<li>Connect the two wires to <strong>SN1 + GND</strong>.</li>
+<li>They are essentially reed switches that open and close repeatedly as water flows through the meter. They do not need power and the two wires have no polarity.</li>
+</ul>
+</li>
+<li>Also support <strong>3-wire</strong> flow sensors that work with <strong>+5V</strong>.<ul>
+<li>Wiring: <code>GND</code>(black) to <code>GND</code>, <code>5V</code>(red) to <code>+5V</code> (VIN), Data (yellow) to <code>SN1</code>.</li>
+</ul>
+</li>
+<li><strong>Flow Pulse Rate:</strong> can be found in the flow sensor datasheet.<ul>
+<li>Used to convert flow pulse count to actual water volume.</li>
+<li>Precision is limited to <strong>2 decimal places</strong> (additional decimals discarded).</li>
+<li>If higher precision is needed, scale the rate by a factor of <code>10</code>.</li>
+<li>Recommend keeping <code>L/pulse</code> as the unit (even if the datasheet specifies Gallon/pulse) - the unit is for display only.</li>
+</ul>
+</li>
+<li>Due to software implementation, the flow <strong>click frequency</strong> should <strong>NOT</strong> exceed <code>50Hz</code>, as higher frequencies may lead to inaccuracies.</li>
+</ul>
+</li>
+</ul>
+<hr />
+<h4 id="integration">Integration</h4>
+<ul>
+<li><strong>OTC:</strong> Configure <strong>OpenThings Cloud (OTC)</strong> token for remote access. See <a href="https://openthings.freshdesk.com/support/solutions/articles/5000879535"><strong>OTC Support Article</strong></a>.</li>
+<li><strong>MQTT:</strong> Configure MQTT parameters. See <a href="https://openthings.freshdesk.com/support/solutions/articles/5000859089"><strong>MQTT Support Article</strong></a>.</li>
+<li><strong>Email Notifications:</strong> Configure Email settings. See <a href="https://openthings.freshdesk.com/support/solutions/articles/5000889759"><strong>Email Notifications Support Article</strong></a>.</li>
+<li><strong>IFTTT:</strong> Configure IFTTT Webhooks key. See <a href="https://openthings.freshdesk.com/support/solutions/articles/5000716372"><strong>IFTTT Support Article</strong></a>.</li>
+<li>
+<p><strong>Notification Events:</strong> Select events that trigger MQTT/Email/IFTTT notifications.</p>
+<div class="admonition warning">
+<p class="admonition-title">Avoid Too Many Events</p>
+<p>Enabling too many events or notification methods may cause significant delays, missed responses, or even skipped short water cycles.</p>
+</div>
+</li>
+<li>
+<p><strong>Device Name:</strong> A custom name for this controller, shown on the homepage and included in notifications messages, to help identify the controller.</p>
+</li>
+</ul>
+<hr />
+<h4 id="lcd-screen">LCD Screen</h4>
+<ul>
+<li><strong>Idle Brightness:</strong> Set the LCD brightness when the controller is inactive.<ul>
+<li>Lowering it helps extend the LCD's lifespan.</li>
+<li>Set to <code>0</code> will turn off the LCD completely when inactive.</li>
+<li>Pressing any button reactivates the LCD.</li>
+</ul>
+</li>
+</ul>
+<hr />
+<h4 id="advanced-settings">Advanced Settings</h4>
+<ul>
+<li><strong>HTTP Port:</strong> Change the device's HTTP port. Default: <code>80</code>.</li>
+<li><strong>Undercurrent Threshold:</strong> Triggers Undercurrent notification if a zone’s current draw (<code>mA</code>) falls below this value at the end of its run (e.g., broken wire or faulty solenoid). Default: <code>100 mA</code>.<ul>
+<li>The ideal value is half the typical holding current of your solenoid.</li>
+<li>Set to <code>0</code> to disable this detection.</li>
+</ul>
+</li>
+<li><strong>Overcurrent Limit:</strong> Triggers Overcurrent Alert if the current draw (<code>mA</code>) <strong>at any time</strong> exceeds this value (e.g. due to shorted solenoids, faulty wiring, or too many zones running concurrently).<ul>
+<li>If detected upon starting a zone, <strong>the affected zone shuts off</strong> immediately.</li>
+<li>If detected mid-run (i.e. system overcurrent), <strong>all active zones shut off</strong> immediately.</li>
+<li>The alert appears on LCD, UI/App, and is sent to all enabled notification channels.</li>
+<li>Once tripped, the controller can continue running programs and zones (as long as they don’t trigger overcurrent again), but the alert persists until it's cleared (by clicking the status bar message), or when the controller is rebooted.  </li>
+<li>Set to <code>0</code> to use the system default.</li>
+<li>Set to <code>2550</code> (max) to disable this feature (<span class="hl_red"><strong>NOT recommended</strong></span> as disabling it exposes the controller to potential overcurrent damage).</li>
+<li>To diagnose the cause of overcurrent, perform a <a href="../../troubleshooting/#wiring-and-solenoids"><strong>Solenoid Resistance Test</strong></a>.</li>
+<li>This feature is only available on AC/DC-powered OpenSprinkler v2.3 &amp; v3.x (other controllers like OSPi lack current-sensing capability).</li>
+</ul>
+</li>
+<li><strong>Boost Time (DC/Latch models only):</strong> Voltage-boost duration (<code>0-1000ms</code>). Default: <code>320ms</code>.<ul>
+<li>Increase when using a weak/low-current DC adapter that takes more time to boost voltage.</li>
+</ul>
+</li>
+<li><strong>Target PD Voltage (DC v3.4 only):</strong> Set the desired USB-C PD (Power Delivery) voltage.<ul>
+<li>Set to <code>0</code> to use the system default.</li>
+<li>The <strong>ideal value</strong> is your solenoid's <strong>holding current</strong> multiplied by its <strong>coil resistance</strong> (e.g. <code>0.25 A × 30 Ω = 7.5 V</code>). The <strong>holding current</strong> is listed in the solenoid's datasheet; the <strong>coil resistance</strong> can be measured using a multimeter.</li>
+<li>This option is shown only when the power supply supports PD, PPS, or AVS.</li>
+<li>The <strong>Actual Voltage</strong> (shown beneath the option name) is the closest supported voltage your adapter can provide to match the target value. </li>
+</ul>
+</li>
+<li><strong>Latch On/Off Voltages (Latch model only):</strong> Customize boost voltages for activating and deactivating latching solenoids. Maximum: <code>24V</code>. </li>
+<li><strong>NTP IP Address:</strong> Custom NTP server for time sync. Set to <code>0.0.0.0</code> to use system defaults.</li>
+<li><strong>Ignore Password:</strong> When enabled, accepts any device password (i.e. bypass password).</li>
+<li><strong>Special Station Auto-Refresh:</strong> Periodically resends commands to Virtual Stations (RF/Remote/HTTP) to keep them synchronized with the main controller.</li>
+<li><strong>NTP Sync:</strong> Automatically syncs device time based on your Location.<ul>
+<li>To <strong>manually adjust time</strong>, disable this option, then the Device Time becomes editable. </li>
+</ul>
+</li>
+<li><strong>Use DHCP:</strong> Automatically obtains IP from your router using DHCP.<ul>
+<li><strong>Recommend keeping this option enabled</strong>.</li>
+<li>If <strong>fixed IP assignment</strong> is preferred, use your router’s <strong>DHCP reservation</strong> (IP-to-Mac binding). Disable DHCP only if your router doesn't support DHCP reservation.</li>
+<li>If disabled, you MUST manually enter a <strong>Static IP</strong>, along with <strong>Gateway, Subnet, DNS</strong>. <strong>All must be set correctly</strong> for the controller to function properly.</li>
+</ul>
+</li>
+</ul>
+<hr />
+<h4 id="reset">Reset</h4>
+<ul>
+<li><strong>Clear Log Data:</strong> Erase all stored logs.</li>
+<li><strong>Reset All Options:</strong> Restore all options back to factory defaults.</li>
+<li><strong>Delete All Programs:</strong> Erase all programs.</li>
+<li><strong>Reset Station Attributes:</strong> Restore all station settings to factory defaults.</li>
+<li><strong>Reset Wireless</strong> (v3 only): Reset to WiFi AP mode for re-configuring WiFi.</li>
+</ul>
+<hr class="double">
+
+<p><img alt="Runonce" class="img-border img-shadow" src="../images/runonce_program.png" style="float: right; margin: 5px 5px 5px 5px;" width="250" /></p>
+<h3 id="run-once-program">Run-Once Program</h3>
+<p>Use Footer Menu -&gt; <strong>Run-Once Program</strong> (<code>Alt+R</code>) to manually start a <strong>one-time</strong> program. Here you can load preset run times from an existing program, quickly build a test program, or manually enter the run time for each station.</p>
+<ul>
+<li>All relevant station attributes are applied (e.g. <strong>Use Master</strong>, <strong>Sequential Group</strong>, <strong>Station Delay</strong>, <strong>Master On/Off Adjust</strong>).</li>
+<li>Choose whether to apply the current <strong>% Watering</strong>.</li>
+<li>If you set the program to <strong>Repeat</strong>, the system auto-creates a <a href="#programs"><strong>Single-Run Program</strong></a>.</li>
+<li>If zones are already running, a <strong>Scheduling Option</strong> appears to let you choose how to queue the new program:<ul>
+<li><strong>Append:</strong> Run after existing zones</li>
+<li><strong>Insert to Front:</strong> Run now and <strong>pause</strong> others</li>
+<li><strong>Replace:</strong> Run now and <strong>cancel</strong> others</li>
+</ul>
+</li>
+</ul>
+<p><span class="hllight"><strong>Tip 1 - Start a Program using Controller Buttons</strong></span>
+<br>If you need to grant someone controller access without WiFi, you can start a program on the controller <strong>using its buttons</strong>: Press and hold <strong>B3</strong> until <strong>Run a Program</strong> appears, tap <strong>B3</strong> to navigate through available programs, then press and hold <strong>B3</strong> to start it.</p>
+<p><span class="hllight"><strong>Tip 2 - Create a Manual-Only Program</strong></span>
+<br>You can create a program that won't run on its own but remains available for Run-Once Program and via button activation. To do so: <a href="#programs">Create a new program</a> and set it as <strong>Disabled</strong>.</p>
+<hr class="double">
+
+<h3 id="programs">Programs</h3>
+<p>OpenSprinkler supports up to <strong>40 programs</strong>. Use Footer Menu -&gt; <strong>Edit Programs</strong> (<code>Alt+P</code>) to access the program list. From here you can: <strong>Add</strong>, <strong>Modify</strong>, <strong>Copy</strong>, <strong>Delete</strong>, <strong>Run Manually</strong>, or <strong>Reorder</strong> programs (using the arrow ⬆️ icon).</p>
+<p><img alt="Programs" src="../images/programs.jpg" /></p>
+<h4 id="program-data">Program Data</h4>
+<p>Click <strong>Add</strong> ➕ in the upper-right corner to create a new program. Each program includes:</p>
+<p><span class="hllight"><strong>Basic Settings:</strong></span></p>
+<ul>
+<li><strong>Program Name:</strong> Up to 32 characters. (See <a href="#program-name-annotations">Program Name Annotations</a> for supported suffixes).</li>
+<li><strong>Enabled:</strong> Enable/disable the program.</li>
+<li><strong>Use Weather Adjustment:</strong> Apply weather-based adjustments, including current <strong>% Watering</strong>, <strong>Weather Restrictions</strong>, and <strong>Multi-day Averaging</strong> (for Interval programs only).</li>
+<li><strong>Enable Date Range:</strong> Restrict program operation to a date range. Examples:<ul>
+<li><code>05/15-09/15</code>: May 15 to Sep 15.</li>
+<li><code>11/10-02/20</code>: Nov 10 to Feb 20 (of the following year).</li>
+</ul>
+</li>
+<li><strong>Start Time:</strong> The first start time (e.g. <code>8:15 AM</code>). It also supports using <strong>Sunrise</strong> or <strong>Sunset</strong> times with optional offsets.</li>
+</ul>
+<p><span class="hllight"><strong>Program Type:</strong></span></p>
+<ul>
+<li><strong>Weekly:</strong> Run on selected <strong>weekdays</strong>.</li>
+<li><strong>Interval:</strong> Run <strong>every <code>N</code> days</strong> (<code>1-128</code>).<ul>
+<li><strong>Starting in:</strong> the offset relative to today: <code>0</code> = today, <code>1</code> = tomorrow, up to <code>N-1</code>.</li>
+<li><strong>Multi-day Average</strong> watering level applies to this type.</li>
+</ul>
+</li>
+<li><strong>Single-Run:</strong> A <strong>one-time</strong> program that <strong>auto-deletes</strong> itself after completion.</li>
+<li><strong>Monthly:</strong> Run on a specific day of <strong>each month</strong>: <code>1</code> = 1st day, <code>0</code> = last day.</li>
+<li><strong>Restrictions:</strong><ul>
+<li><strong>Odd-day:</strong> Run only on odd-numbered days (skips the 31st and Feb 29th).</li>
+<li><strong>Even-day:</strong> Run only on even-numbered days.</li>
+</ul>
+</li>
+</ul>
+<p><span class="hllight"><strong>Station Water Times:</strong></span> Set run time per station, from <code>1</code> second to <code>64800</code> seconds (18 hours).<br>Also supports using <strong>sunrise-to-sunset</strong> or <strong>sunset-to-sunrise</strong> duration as the run time.</p>
+<p><span class="hllight"><strong>Additional Start Times:</strong></span> Two options for extra start times / cycles:</p>
+<ul>
+<li><strong>Fixed:</strong> Up to 3 extra cycles at any specified times of the day.</li>
+<li><strong>Repeating:</strong> Repeat at regular intervals (e.g. every 45 minutes for 8 extra cycles).<br>Useful for splitting long watering durations into shorter cycles (<em>cycle and soak</em>).<br>
+Repeating start times may also extend overnight into the next day.</li>
+</ul>
+<hr />
+<h4 id="program-name-annotations">Program Name Annotations</h4>
+<p>Program names can include annotations to customize station run order or trigger special actions.</p>
+<p><span class="hllight"><strong>Station Order Annotation</strong></span> By default a program runs stations in ascending order by index (from lowest to highest). To change this behavior, append the program name with a <code>&gt;</code> followed by one of the following letters. </p>
+<ul>
+<li><code>I</code>: Descending by station index (highest to lowest)</li>
+<li><code>n</code>: Ascending by station name</li>
+<li><code>N</code>: Descending by station name</li>
+<li><code>r</code>: Random order</li>
+<li><code>a</code>: Alternate ascending/descending by index</li>
+<li><code>A</code>: Alternate descending/ascending by index</li>
+<li><code>t</code>: Alternate ascending/descending by name</li>
+<li><code>T</code>: Alternate descending/ascending by name</li>
+</ul>
+<p>Example: A program named <code>Summer Garden &gt;t</code> runs stations by ascending name order the first time, descending the next, and alternates each run thereafter.</p>
+<p>The <a href="#program-preview"><strong>Program Preview</strong></a> reflects all name annotations, allowing easy verification of intended run order. <strong>Manual program runs</strong> also honor these annotations.</p>
+<p><span class="hllight"><strong>Reboot Annotation:</strong></span> Special program names to trigger automatic reboots at regular intervals:</p>
+<ul>
+<li><code>:&gt;reboot</code>: Reboot when the controller becomes idle (no zones running).</li>
+<li><code>:&gt;reboot_now</code> Immediate reboot, regardless of zone activity.</li>
+</ul>
+<p>Both actions are <strong>delayed by one minute</strong> from the scheduled start time to prevent immediate retriggering right after the reboot. At least one zone with a non-zero duration must be included when creating the program, though it will not actually run any zones. Example: a program named <code>:&gt;reboot</code> starting daily at <code>2:00 AM</code> will reboot the controller at that time each day. </p>
+<hr />
+<h4 id="program-preview">Program Preview</h4>
+<p>To verify all programs are set correctly, use Menu -&gt; <strong>Preview Programs</strong> to visualize them.</p>
+<p><img alt="Program Preview" class="center_wider" src="../images/program_preview.jpg" /></p>
+<ul>
+<li><strong>Today’s schedule</strong> is shown by default; use the arrows ⬅️ / ➡️ to browse other days.</li>
+<li><strong>Current time</strong> is shown as a pink vertical line. You can <strong>zoom</strong> or <strong>drag</strong> the plot to view different time windows.</li>
+<li><strong>Colored bars</strong> represent each station's runtime and program name; clicking a bar opens the corresponding program editor.</li>
+</ul>
+<p><strong>Simulation Accuracy:</strong> The preview uses a simulation of the same scheduling algorithm as the controller firmware, fully accounting for settings such as <strong>Master Zones</strong>, <strong>Station Delay</strong>, <strong>Master On/Off Adjustments</strong>, and <strong>Sequential Groups</strong>.</p>
+<p><strong>Weather &amp; Dynamic Events:</strong></p>
+<ul>
+<li><strong>Rain Delay</strong> and <strong>Sensors</strong> are ignored (they rely on real-time conditions).</li>
+<li>Programs set to <strong>Use Weather Adjustment</strong> scale according to the current <strong>% Watering</strong>:<ul>
+<li><strong>Manual:</strong> The same <strong>% Watering</strong> applies to all preview days.</li>
+<li><strong>Zimmerman/ETo:</strong> The current <strong>% Watering</strong> applies only to <strong>today</strong>; all other days assume 100% (they rely on real-time conditions not predictable in advance).</li>
+<li><strong>Weather Restrictions</strong> and <strong>Multi-day Averages</strong> apply only to <strong>today</strong>'s schedule.</li>
+<li>If <strong>% Watering &lt; 20%</strong>, stations with calculated runtime <strong>under 10 seconds</strong> are skipped to avoid very short watering periods (matching firmware behavior).</li>
+</ul>
+</li>
+</ul>
+<hr />
+<h4 id="zones-group-attribute">Zone's Group Attribute</h4>
+<p>OpenSprinkler supports both <strong>Sequential</strong> (one after another) and <strong>Parallel</strong> (concurrent) zone operations, managed by each zone’s <strong>Sequential Group</strong> attribute.</p>
+<ul>
+<li>
+<p>Zones in the <strong>same Sequential Group</strong> run sequentially (one at a time). If a zone is scheduled to start while another zone in the same group is already running, it will be automatically queued. This is the most common method used in most sprinkler controllers, to maintain water pressure by preventing multiple zones from running at the same time.</p>
+</li>
+<li>
+<p>Zones in <strong>different Sequential Groups</strong> can run simultaneously (in parallel).
+Example: If Zones 1–3 are in Group <code>A</code>, and 4–6 in Group <code>B</code>, they can operate in parallel.</p>
+</li>
+<li>
+<p><strong>Parallel Group:</strong> Runs independently of all other zones, useful for lights, pumps, heaters or other non-sprinkler devices (which can run in parallel).</p>
+</li>
+</ul>
+<p><u><strong>NOTE</strong></u>: <strong>Earlier firmwares</strong> used a single <strong>Sequential flag</strong> for all zones, which effectively put all zones in a single sequential group. That flag has been replaced by the multi-group system here, which provides greater flexibility by allowing multiple independent groups.</p>
+<hr class="double">
+
+<h3 id="logs">Logs</h3>
+<p>OpenSprinkler supports logging, which records <strong>Zone Activity</strong>, <strong>Rain Delays</strong>, <strong>Sensor Events</strong>, <strong>Flow Volumes</strong>, and <strong>% Watering Changes</strong> to its internal flash. To view logs:</p>
+<p><img alt="Logs" src="../images/logs.png" /></p>
+<ul>
+<li>Use Footer Menu → <strong>View Logs</strong> (<code>Alt+L</code>) to display a graph of recorded data.</li>
+<li>Use the <strong>Options</strong> tab to select a start and end date (default: last 7 days).
+<br>For large datasets or slow loading, limit the range to a single day.</li>
+<li>Click <strong>Table</strong> at the top to switch to a tabular view.</li>
+</ul>
+<p>For details on the log data format and example scripts to export logs (e.g. as spreadsheets), refer to the <a href="../221_4_api/#18-get-log-data-jl">OpenSprinkler API documentation</a>.</p>
+<hr class="double">
+
+<h3 id="firmware-update">Firmware Update</h3>
+<p>Follow the <a href="../../firmware-update/">firmware update instructions</a>.</p>
+<hr class="double">
+
+<h3 id="links-and-resources">Links and Resources</h3>
+<ul>
+<li><a href="https://opensprinkler.com/">OpenSprinkler Homepage</a></li>
+<li><a href="https://support.opensprinkler.com/">OpenSprinkler Support Site</a></li>
+<li><a href="https://opensprinkler.github.io/OpenSprinkler-Firmware/">OpenSprinkler Documentation</a></li>
+<li><a href="https://github.com/opensprinkler">OpenSprinkler Github</a></li>
+</ul>
+<hr class="double">
+
+<h3 id="specifications">Specifications</h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;"></th>
+<th style="text-align: left;">OpenSprinkler v3</th>
+<th style="text-align: left;">OpenSprinkler Pi (OSPi)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Input Voltage:</strong></td>
+<td style="text-align: left;"><strong>AC</strong> model: 22-28V <strong>AC</strong><br><strong>DC/Latch</strong>: 6V-24V <strong>DC</strong></td>
+<td style="text-align: left;">22-28V <strong>AC</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Power Draw:</strong></td>
+<td style="text-align: left;">0.5-0.9 W</td>
+<td style="text-align: left;">0.5 W + RPi's Power Draw</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Num. of Zones:</strong></td>
+<td style="text-align: left;">Main controller: 8;<br>Expandable to 72</td>
+<td style="text-align: left;">Main controller: 8;<br>Expandable to 200</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Solenoid Driver:</strong></td>
+<td style="text-align: left;"><strong>AC</strong>: 1 A/zone (triac)<br><strong>DC</strong>: 2 A/zone (MOSFET)<br><strong>Latch</strong>: 6A instant/zone</td>
+<td style="text-align: left;">1 A/zone (triac)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Dimensions:</strong></td>
+<td style="text-align: left;"><strong>v3.0-3.3</strong>: 140×56×33 mm<br><strong>v3.4</strong>: 125×79×25 mm</td>
+<td style="text-align: left;">135×105×38 mm</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Weight:</strong></td>
+<td style="text-align: left;">140 g (5 oz)</td>
+<td style="text-align: left;">200 g (7 oz)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Expander:</strong></td>
+<td style="text-align: left;">130×75×25 mm / 100 g (4 oz)</td>
+<td style="text-align: left;">130×75×25 mm / 100 g (4 oz)</td>
+</tr>
+</tbody>
+</table>
+<hr class="double">
+
+<h3 id="advanced-topics">Advanced Topics</h3>
+<h4 id="installing-rf-transmitter">Installing RF Transmitter</h4>
+<p>OpenSprinkler supports standard 434 MHz and 315 MHz <strong>RF (Radio Frequency) transmitters</strong>, allowing it to control remote power sockets for switched powerline devices such as lights, heaters, fans, and pumps. To use RF stations:</p>
+<ul>
+<li>Use an <a href="https://opensprinkler.com/product/rftoy/"><strong>RFToy</strong></a> to capture and decode the signals from your remote power sockets.</li>
+<li>Each RF code is a hexadecimal string: either 25-digit (e.g. <code>H00003C0300003C3301490118</code>) or 16-digit (e.g. <code>51001A0100BA00AA</code>), that encodes the on/off commands and timing data.</li>
+<li>The RFToy kit includes both 433 MHz and 315 MHz transmitter/receiver pairs — select the one that matches your remote sockets. For best range, solder a <code>17 cm</code> wire antenna to the <code>ANT</code> pin on the transmitter (straight or coiled).</li>
+</ul>
+<p><strong>Connecting the RF Transmitter:</strong></p>
+<ul>
+<li><strong>OpenSprinkler v3 / OSPi v2:</strong> Have a built-in <strong>3-pin RF header</strong>. Plug the RF transmitter directly into this header, with <strong>component side up</strong> (see <a href="#hardware-interface">Hardware Interface Diagram</a>).
+<img alt="RF Transmitter" class="img-border img-shadow" src="../images/rf_transmitter.png" style="float: right; margin: 5px 5px 5px 5px;" width="180" /></li>
+<li><strong>OSPi v1:</strong> No dedicated shrouded header, but <code>DATA/VIN/GND</code> pads are available on the PCB for soldering the transmitter to these pins.</li>
+</ul>
+<p>For detailed setup steps and examples, see the <a href="https://opensprinkler.com/opensprinkler-firmware-2-1-1-new-feature-control-remote-power-sockets/">RF Station blog post</a>.</p>
+<p><br></p>
+<hr class="double">
+              
+            </div>
+          </div><footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
+        <a href="../221_5_api/" class="btn btn-neutral float-left" title="API Reference"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+        <a href="../221_4_api/" class="btn btn-neutral float-right" title="API Reference">Next <span class="icon icon-circle-arrow-right"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/OpenSprinkler/OpenSprinkler-Firmware" class="fa fa-github" style="color: #fcfcfc"> GitHub</a>
+        </span>
+    
+    
+      <span><a href="../221_5_api/" style="color: #fcfcfc">&laquo; Previous</a></span>
+    
+    
+      <span><a href="../221_4_api/" style="color: #fcfcfc">Next &raquo;</a></span>
+    
+  </span>
+</div>
+    <script src="../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../..";</script>
+    <script src="../../js/theme_extra.js"></script>
+    <script src="../../js/theme.js"></script>
+      <script src="../../js/nav_badges.js"></script>
+      <script src="../../search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

@@ -1,0 +1,1624 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://OpenSprinkler.github.io/OpenSprinkler-Firmware/2.2.1/221_4_api/" />
+      <link rel="shortcut icon" href="../../img/favicon.ico" />
+    <title>API Reference - OpenSprinkler Documentation</title>
+    <link rel="stylesheet" href="../../css/theme.css" />
+    <link rel="stylesheet" href="../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../../custom.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "API Reference";
+        var mkdocs_page_input_path = "2.2.1/221_4_api.md";
+        var mkdocs_page_url = "/OpenSprinkler-Firmware/2.2.1/221_4_api/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../.." class="icon icon-home"> OpenSprinkler Documentation
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../..">Home</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../faq/">FAQ</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../troubleshooting/">Troubleshooting</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../firmware-update/">Firmware Update</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Firmware v2.2.1(5) [NEW]</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../221_5_manual/">User Manual</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../221_5_api/">API Reference</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Firmware v2.2.1(4)</span></p>
+              <ul class="current">
+                  <li class="toctree-l1"><a class="reference internal" href="../221_4_manual/">User Manual</a>
+                  </li>
+                  <li class="toctree-l1 current"><a class="reference internal current" href="./">API Reference</a>
+    <ul class="current">
+    <li class="toctree-l2"><a class="reference internal" href="#0-overview">0. Overview</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#1-major-changes">1. Major Changes</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#2-get-controller-variables-jc">2. Get Controller Variables /jc</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#3-change-controller-variables-cv">3. Change Controller Variables /cv</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#4-get-options-jo">4. Get Options /jo</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#5-change-options-co">5. Change Options /co</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#6-set-device-password-sp">6. Set Device Password /sp</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#7-get-station-names-and-attributes-jn">7. Get Station Names and Attributes /jn</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#8-get-special-station-data-je">8. Get Special Station Data /je</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#9-change-station-names-and-attributes-cs">9. Change Station Names and Attributes /cs</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#10-get-station-status-js">10. Get Station Status /js</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#11-manual-station-run-cm">11. Manual Station Run /cm</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#12-manually-start-a-program-mp">12. Manually Start a Program /mp</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#13-get-program-data-jp">13. Get Program Data /jp</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#14-change-program-data-cp">14. Change Program Data /cp</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#15-delete-programs-dp">15. Delete Program(s) /dp</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#16-move-up-re-order-a-program-up">16. Move Up (Re-order) a Program /up</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#17-run-once-program-cr">17. Run-Once Program /cr</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#18-get-log-data-jl">18. Get Log Data /jl</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#19-delete-log-data-dl">19. Delete Log Data /dl</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#20-change-script-url-cu">20. Change Script URL /cu</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#21-get-all-ja">21. Get All /ja</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#22-pause-queue-pq">22. Pause Queue /pq</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#23-debug-print-db">23. Debug Print /db</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#24-list-of-reboot-causes">24. List of Reboot Causes</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#25-list-of-weather-error-codes">25. List of Weather Error Codes</a>
+    </li>
+    </ul>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Zone Expander</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../zone-expander/">User Manual</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Sensor Expander [NEW]</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../sensor-expander/">User Manual</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Archived</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../archive/">Previous Manuals and API docs</a>
+                  </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../..">OpenSprinkler Documentation</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
+          <li class="breadcrumb-item">Firmware v2.2.1(4)</li>
+      <li class="breadcrumb-item active">API Reference</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/OpenSprinkler/OpenSprinkler-Firmware/edit/master/docs/2.2.1/221_4_api.md" class="icon icon-github"> Edit on GitHub</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h2 id="firmware-2214-api-reference-nov-1-2025">Firmware 2.2.1(4) API Reference [Nov 1, 2025]</h2>
+<h3 id="0-overview">0. Overview</h3>
+<ul>
+<li><strong>Authentication</strong> (<code>pw</code>): All API calls require the device password via the <code>pw</code> parameter. The value must be provided as a lowercase MD5 hash. The OpenSprinkler app and web interfaces handle this hashing automatically. If you are making direct API calls, you must hash your plaintext password before sending the request. You can use any standard <a href="https://www.md5hashgenerator.com/">MD5 generation tool</a> for this.</li>
+<li><strong>Device IP</strong>: Throughout this document, <code>os-ip</code> denotes the controller's IP address or hostname.</li>
+<li><strong>Command Parameters</strong>: Parameters can be sent in any order. You do NOT need to include every parameter in a request - any omitted parameter will retain its current value on the device.</li>
+<li><strong>Return values</strong> are all formatted in JSON, for example: <code>{"fwv":221}</code>, <code>{"result":1}</code>. Below is the list of error codes:</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Code</th>
+<th style="text-align: left;">Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>1</code></td>
+<td style="text-align: left;">Success</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>2</code></td>
+<td style="text-align: left;">Unauthorized (missing device password or device password is incorrect)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>3</code></td>
+<td style="text-align: left;">Mismatch (new password and confirmation password do not match)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>16</code></td>
+<td style="text-align: left;">Data Missing (missing required parameters)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>17</code></td>
+<td style="text-align: left;">Out of Range (value exceeds the acceptable range)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>18</code></td>
+<td style="text-align: left;">Data Format Error (provided data does not match required format)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>19</code></td>
+<td style="text-align: left;">RF code Error (RF code does not match required format)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>32</code></td>
+<td style="text-align: left;">Page Not Found (page not found or requested file missing)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>48</code></td>
+<td style="text-align: left;">Not Permitted (e.g. cannot operate on the requested station)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>64</code></td>
+<td style="text-align: left;">Upload failed (e.g. OTA firmware update failed)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="1-major-changes">1. Major Changes</h3>
+<ul>
+<li><strong>Support for DC-Powered OpenSprinkler v3.4</strong>: Includes two new variables related to <strong>USB-PD (Power Delivery)</strong>:<ul>
+<li><code>tpdv</code> (Target PD Voltage), in <a href="#4-get-options-jo">controller options</a> (<code>/jo</code>), sets the target PD voltage.</li>
+<li><code>apdv</code> (Actual PD Voltage), in <a href="#2-get-controller-variables-jc">controller variables</a> (<code>/jc</code>), reports the active PD voltage.</li>
+</ul>
+</li>
+<li><strong>Queuing Option for Manual Runs</strong>: Manual actions can now choose whether new zones run immediately or later. Applied to <a href="#11-manual-station-run-cm"><strong>Manual Station Run</strong></a>, <a href="#17-run-once-program-cr"><strong>Run-Once</strong></a>, and <a href="#12-manually-start-a-program-mp"><strong>Manual Program Start</strong></a>.<ul>
+<li>A new parameter <code>qo</code> is added for these commands, allowing a choice between appending zones to the queue, inserting them at the front, or replacing the existing queue.</li>
+</ul>
+</li>
+</ul>
+<p>In the following, <span class="hl">new changes since the last firmware are highlighted in green like here.</span></p>
+<hr />
+<h3 id="2-get-controller-variables-jc">2. Get Controller Variables <code>/jc</code></h3>
+<p><strong>Usage</strong>: <code>http://os-ip/jc?<strong>pw</strong>=xxx</code></p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Variable</th>
+<th style="text-align: left;">Explanation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>devt</code></td>
+<td style="text-align: left;">Device time in Unix epoch seconds (local time, adjusted to the device’s time zone).</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>nbrd</code></td>
+<td style="text-align: left;">Number of 8-station groups/boards, including the main controller.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>en</code></td>
+<td style="text-align: left;">Operation enable bit (<code>1</code>: enabled; <code>0</code>: disabled).</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>sn1</code></td>
+<td style="text-align: left;">Sensor 1 status (<code>1</code>: active; <code>0</code>: inactive).</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>sn2</code></td>
+<td style="text-align: left;">Sensor 2 status (OS v3.x and OSPi only).</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>rd</code></td>
+<td style="text-align: left;">Rain delay flag (<code>1</code>: manual rain delay active; <code>0</code>: not active).</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>rdst</code></td>
+<td style="text-align: left;">Rain delay stop time (epoch seconds); <code>0</code>: rain delay is not in effect.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>sunrise</code></td>
+<td style="text-align: left;">Today’s sunrise time, number of minutes since midnight.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>sunset</code></td>
+<td style="text-align: left;">Today’s sunset time, number of minutes since midnight.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>eip</code></td>
+<td style="text-align: left;">External IPv4, as a 32-bit integer: <code>(ip[3]&lt;&lt;24)+(ip[2]&lt;&lt;16)+(ip[1]&lt;&lt;8)+ip[0]</code>.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>lwc</code></td>
+<td style="text-align: left;">Timestamp (epoch seconds) of the last weather <strong>request</strong>.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>lswc</code></td>
+<td style="text-align: left;">Timestamp (epoch seconds) of the last weather <strong>response</strong>. <code>0</code> means no successful response yet.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>lupt</code></td>
+<td style="text-align: left;">Last device reboot time (epoch seconds).</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>lrbtc</code></td>
+<td style="text-align: left;">Cause code for the last reboot (see <a href="#24-list-of-reboot-causes">List of Reboot Causes</a>).</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>lrun</code></td>
+<td style="text-align: left;">Last run record: <code>[station_index, program_index, duration, end_time_epoch]</code>.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>RSSI</code></td>
+<td style="text-align: left;">Wi-Fi signal strength (<code>dBm</code>, OS 3.x only).</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>mac</code></td>
+<td style="text-align: left;">Hardware MAC address.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>loc</code></td>
+<td style="text-align: left;">GPS coordinates of the device location.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>jsp</code></td>
+<td style="text-align: left;">JavaScript URL. Default: <code>https://ui.opensprinkler.com/js</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>wsp</code></td>
+<td style="text-align: left;">Weather script URL. Default: <code>weather.opensprinkler.com</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>wto</code></td>
+<td style="text-align: left;">Weather adjustment options (fields depend on the selected adjustment method).</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>wtdata</code></td>
+<td style="text-align: left;">Raw data relayed from the weather server; used to compute watering percentage.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>wterr</code></td>
+<td style="text-align: left;">Error code from the last weather server response (see <a href="#25-list-of-weather-error-codes">List of Weather Error Codes</a>).</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>ifkey</code></td>
+<td style="text-align: left;">IFTTT Webhooks key (enables IFTTT notifications).</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>mqtt</code></td>
+<td style="text-align: left;">MQTT configuration parameters.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>curr</code></td>
+<td style="text-align: left;">Total current draw across all zones (<code>mA</code>). Available only on controllers with current sensing capability.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>sbits</code></td>
+<td style="text-align: left;">Station status bits. An array where each byte is an LSB bitfield for an 8-station group. Example: <code>2</code> (<code>0b00000010</code>) → <code>2nd</code> station is open; <code>192</code> (<code>0b11000000</code>) → <code>7th</code> and <code>8th</code> stations are open.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>ps</code></td>
+<td style="text-align: left;">Program status per station: each element represents a station consisting of four numbers <code>[pid, rem, start, gid]</code> where <code>pid</code>: program index (<code>0</code>: not running), <code>rem</code>: remaining seconds, <code>start</code>: start time, <code>gid</code>: sequential group ID. If a station’s <code>sbit=0</code> but <code>pid!=0</code>, it’s queued (waiting but not running yet).</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>flwrt</code></td>
+<td style="text-align: left;">Flow count window (seconds). This value is firmware-dependent and is <u><strong>NOT</strong></u> the flow sampling rate. Instead <code>flcrt/flwrt</code> gives the flow rate (clicks per second).</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>flcrt</code></td>
+<td style="text-align: left;">Flow count (windowed): number of flow-sensor clicks during the last <code>flwrt</code> secs.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>flcto</code></td>
+<td style="text-align: left;"><span class="hl">Flow count (total): cumulative flow-sensor clicks since power-on (reset on reboot).</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>pq</code></td>
+<td style="text-align: left;">Pause state (<code>0</code>: inactive; <code>1</code>: active).</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>pt</code></td>
+<td style="text-align: left;">Countdown timer for an active pause (seconds).</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>nq</code></td>
+<td style="text-align: left;">Number of elements in the program queue (zones running or waiting).</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>otc</code></td>
+<td style="text-align: left;">OpenThings Cloud (OTC) configuration parameters.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>otcs</code></td>
+<td style="text-align: left;">OTC connection status (<code>0</code>: not enabled; <code>1</code>: connecting; <code>2</code>: disconnected; <code>3</code>: connected).</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>dname</code></td>
+<td style="text-align: left;">Device name (included in notification messages to identify the controller).</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>gpio</code></td>
+<td style="text-align: left;">Array of spare/free GPIO pins (usable for GPIO stations).</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>email</code></td>
+<td style="text-align: left;">Email notification settings.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>ocs</code></td>
+<td style="text-align: left;">Overcurrent status. <code>0</code>: none; <code>255</code>: system-wide overcurrent; other: index of the station that triggered overcurrent (station index starts from <code>1</code>).</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>wtrestr</code></td>
+<td style="text-align: left;">Weather restriction status (<code>0</code>: inactive; <code>1</code>: active).</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>wls</code></td>
+<td style="text-align: left;">Array of current multi-day average watering levels. Length depends on provider (e.g., Apple up to 10 days; others may support fewer).</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>apdv</code></td>
+<td style="text-align: left;"><span class="hl">Active/Actual USB-PD voltage (V); read-only, for DC-powered OS v3.4.</span></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="3-change-controller-variables-cv">3. Change Controller Variables <code>/cv</code></h3>
+<p><strong>Usage</strong>: <code>http://os-ip/cv?<strong>pw</strong>=xxx&amp;<strong>rsn</strong>=x&amp;<strong>rrsn</strong>=x&amp;<strong>rbt</strong>=x&amp;<strong>en</strong>=x&amp;<strong>rd</strong>=x&amp;<strong>re</strong>=x&amp;<strong>update</strong>=x&amp;<strong>ap</strong>=x&amp;<strong>rocs</strong>=x</code></p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Parameter</th>
+<th style="text-align: left;">Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>rsn</code></td>
+<td style="text-align: left;">Reset all stations (both running and queued). <code>1</code> triggers the reset; <code>0</code>: no effect.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>rrsn</code></td>
+<td style="text-align: left;">Reset all <strong>running</strong> stations (but not queued ones). <code>1</code> triggers the reset.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>rbt</code></td>
+<td style="text-align: left;">Reboot the controller. <code>1</code> triggers the reboot.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>en</code></td>
+<td style="text-align: left;">Enable/disable operation. <code>1</code>: enable; <code>0</code>: disable.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>rd</code></td>
+<td style="text-align: left;">Set rain delay (hours). Range: <code>0–32767</code>. <code>0</code> clears any active rain delay.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>re</code></td>
+<td style="text-align: left;">Set the controller in remote extension mode. <code>1</code>: enable; <code>0</code>: disable.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>ap</code></td>
+<td style="text-align: left;">Reset to AP mode for Wi-Fi reconfiguration without erasing settings/programs. Effective on OS 3.x only.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>update</code></td>
+<td style="text-align: left;">Trigger firmware update (OSPi/Linux only).</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>rocs</code></td>
+<td style="text-align: left;">Clear overcurrent status (ocs). <code>1</code>: clears.</td>
+</tr>
+</tbody>
+</table>
+<p><br><strong>Examples:</strong></p>
+<ul>
+<li><code>http://os-ip/cv?pw=xxx&amp;rbt=1</code>: reboot controller</li>
+<li><code>http://os-ip/cv?pw=xxx&amp;en=0</code>: disable operation</li>
+<li><code>http://os-ip/cv?pw=xxx&amp;rd=24</code>: set a 24-hour rain delay</li>
+</ul>
+<hr />
+<h3 id="4-get-options-jo">4. Get Options <code>/jo</code></h3>
+<p><strong>Usage</strong>: <code>http://os-ip/jo?<strong>pw</strong>=xxx</code></p>
+<p><u>Note</u>: options marked <strong>RO</strong> are read-only and not modifiable via the <code>/co</code> command</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Variable</th>
+<th style="text-align: left;">Explanation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>fwv</code></td>
+<td style="text-align: left;">Firmware version (e.g., <code>221</code> → v2.2.1). <strong>RO</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>fwm</code></td>
+<td style="text-align: left;">Firmware minor revision number. <strong>RO</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>tz</code></td>
+<td style="text-align: left;">Time zone (<code>offset_hours*4+48</code>). Examples: <code>GMT+0</code>→<code>48</code>; <code>GMT−4</code>→<code>32</code>; <code>GMT+9:30</code>→<code>86</code>. The value must be between <code>0–108</code>.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>dhcp</code></td>
+<td style="text-align: left;">Use DHCP (<code>1</code>: yes, <code>0</code>: no).</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>ip{1,2,3,4}</code></td>
+<td style="text-align: left;">Static IP (ignored if <code>dhcp=1</code>).</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>gw{1,2,3,4}</code></td>
+<td style="text-align: left;">Gateway (router) IP (ignored if <code>dhcp=1</code>).</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>dns{1,2,3,4}</code></td>
+<td style="text-align: left;">DNS server IP (ignored if <code>dhcp=1</code>).</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>subn{1,2,3,4}</code></td>
+<td style="text-align: left;">Subnet mask (ignored if <code>dhcp=1</code>).</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>ntp</code></td>
+<td style="text-align: left;">Use NTP sync (<code>1</code>: yes, <code>0</code>: no).</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>ntp{1,2,3,4}</code></td>
+<td style="text-align: left;">Custom NTP server IP (ignored if <code>ntp=0</code>).</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>hp{0,1}</code></td>
+<td style="text-align: left;">The lower and upper bytes of HTTP port: <code>http_port=(hp1&lt;&lt;8)+hp0</code>.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>hwv</code></td>
+<td style="text-align: left;">Hardware version. <strong>RO</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>hwt</code></td>
+<td style="text-align: left;">Hardware type (<code>0xAC</code>: AC-powered; <code>0xDC</code>: DC-powered; <code>0x1A</code>: Latch). <strong>RO</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>ext</code></td>
+<td style="text-align: left;">Number of 8-station expansion boards (excluding main controller).</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>sdt</code></td>
+<td style="text-align: left;">Station delay time (seconds). Range <code>[-600, 600]</code> (i.e. <code>[-10, 10]</code> minutes), in increments / step of <code>5</code> seconds.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>mas</code>/<code>mas2</code></td>
+<td style="text-align: left;">Master station 1 and 2 indices (<code>0</code>: none).</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>mton</code>/<code>mton2</code></td>
+<td style="text-align: left;">Master 1 and 2 ON Adjusted time (seconds). Range <code>[-600, 600]</code>, step <code>5</code>.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>mtof</code>/<code>mtof2</code></td>
+<td style="text-align: left;">Master 1 and 2 OFF Adjusted time (seconds). Range <code>[-600, 600]</code>, step <code>5</code>.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>sn1t</code></td>
+<td style="text-align: left;">Sensor 1 type. <code>0</code>: none, <code>1</code>: rain, <code>2</code>: flow, <code>3</code>: soil, <code>240</code>: program switch.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>sn1o</code></td>
+<td style="text-align: left;">Sensor 1 option. <code>0</code>: normally closed, <code>1</code>: normally open (default).</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>sn1on</code>/<code>sn1of</code></td>
+<td style="text-align: left;">Sensor 1 delayed-on / delayed-off (minutes).</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>sn2t</code>/<code>sn2o</code></td>
+<td style="text-align: left;">Sensor 2 type / option (same semantics as Sensor 1).</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>sn2on</code>/<code>sn2of</code></td>
+<td style="text-align: left;">Sensor 2 delayed-on / delayed-off (minutes).</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>wl</code></td>
+<td style="text-align: left;">Water level (% watering). Range <code>0–250</code>.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>den</code></td>
+<td style="text-align: left;">Operation enable bit. To change, you must use the <code>/cv</code> command.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>ipas</code></td>
+<td style="text-align: left;">Ignore password. <code>1</code>: ignore; <code>0</code>: do not ignore.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>devid</code></td>
+<td style="text-align: left;">Device ID.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>con</code>/<code>lit</code>/<code>dim</code></td>
+<td style="text-align: left;">LCD contrast/backlight/dimming values.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>bst</code></td>
+<td style="text-align: left;">Boost time (milliseconds) for DC-powered &amp; Latch controllers. Range <code>0–1000</code>, step size <code>4</code>.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>uwt</code></td>
+<td style="text-align: left;">Weather adjustment method. <code>0</code>: Manual; <code>1</code>: Zimmerman; <code>2</code>: Auto Rain Delay; <code>3</code>: ETo; <code>4</code>: Monthly. <u>NOTE</u>: Previously <code>uwt.bit[7]</code> flagged California water restriction; that bit is no longer used: instead, water restriction is indicated in the <code>wto</code> (weather options) variable.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>lg</code></td>
+<td style="text-align: left;">Enable logging (<code>1</code>: on, <code>0</code>: off).</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>fpr{0,1}</code></td>
+<td style="text-align: left;">Flow pulse rate (scaled by <code>100</code>), calculated as <code>((fpr1&lt;&lt;8)+fpr0)/100.0</code>.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>re</code></td>
+<td style="text-align: left;">Remote extension mode. To change, you must use the <code>/cv</code> command.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>dexp</code>/<code>mexp</code></td>
+<td style="text-align: left;">Detected / maximum zone expanders (<code>-1</code>: cannot auto-detect). <strong>RO</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>sar</code></td>
+<td style="text-align: left;">Special-station auto-refresh. When <code>1</code>, special (e.g. RF, HTTP) stations will automatically refresh to ensure in sync with the master controller.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>fwire</code></td>
+<td style="text-align: left;">Force wired connection (OS 3.x only). <code>1</code>: stay wired; <code>0</code>: allow Wi-Fi.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>ife</code></td>
+<td style="text-align: left;">Notification event enable bits. A bit field:<br>• <code>b0</code>: Program scheduled<br>• <code>b1</code>: Sensor1 update<br>• <code>b2</code>: Flow sensor status update<br>• <code>b3</code>: Weather update (e.g. water level change, eip change)<br>• <code>b4</code>: Reboot<br>• <code>b5</code>: Station finish<br>• <code>b6</code>: Sensor2 update<br>• <code>b7</code>: Rain delay update<br></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>ife2</code></td>
+<td style="text-align: left;">Extended notification bits:<br>• <code>b0</code>: Station start<br>• <code>b1</code>: Flow alert<br>• <code>b2</code>: Current alert.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>imin</code></td>
+<td style="text-align: left;">Undercurrent threshold in mA (<code>/10</code>). Example: <code>imin=10</code>→100 mA.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>imax</code></td>
+<td style="text-align: left;">Overcurrent threshold in mA (<code>/10</code>). <code>0</code>: system default; <code>255</code>: disabled. Example: <code>imax=120</code>→1200 mA.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>tpdv</code></td>
+<td style="text-align: left;"><span class="hl">Target USB-PD voltage (in decivolts) for DC-powered OS v3.4+.</span> Example: <code>tpdv=78</code>→7.8 V</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="5-change-options-co">5. Change Options <code>/co</code></h3>
+<p><strong>Usage</strong>: <code>http://os-ip/co?<strong>pw</strong>=xxx&amp;<strong>[opn]</strong>=[opv]&amp;<strong>loc</strong>=x&amp;<strong>wto</strong>=x&amp;<strong>ifkey</strong>=x&amp;<strong>ttt</strong>=x<br>&amp;<strong>otc</strong>=x&amp;<strong>dname</strong>=x&amp;<strong>mqtt</strong>=x&amp;<strong>email</strong>=x</code></p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Parameter</th>
+<th style="text-align: left;">Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>[opn]</code></td>
+<td style="text-align: left;">Option name to modify (see the <a href="#4-get-options-jo">options list</a> above). <strong>RO</strong> fields cannot be changed. You can include multiple option changes in one call (e.g., <code>&amp;tz=32&amp;dhcp=1</code>).</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>[opv]</code></td>
+<td style="text-align: left;">New value to be assigned to <code>[opn]</code>.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>loc</code></td>
+<td style="text-align: left;">Location string (URL-encoded). Accepts <code>"city,state"</code>, ZIP code, or <code>"lat,lon"</code>. When you use the UI/app to set the location, it always converts it to GPS.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>wto</code></td>
+<td style="text-align: left;">Weather options as URL-encoded JSON <strong>without</strong> the outer <code>{}</code>. Fields depend on the selected method (e.g., Zimmerman has six parameters for the weights and baselines of temp <code>t</code>, humidity <code>h</code>, and rain <code>r</code>.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>ifkey</code></td>
+<td style="text-align: left;">IFTTT Webhooks key.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>ttt</code></td>
+<td style="text-align: left;">Set device time manually (epoch seconds). Ignored if <code>ntp=1</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>otc</code></td>
+<td style="text-align: left;">OpenThings Cloud (OTC) configuration as JSON <strong>without</strong> the outer <code>{}</code>. Example: <code>otc="en":1,"token":"token","server":"ws.cloud.openthings.io","port":80</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>mqtt</code></td>
+<td style="text-align: left;">MQTT configuration as JSON <strong>without</strong> the outer <code>{}</code>. Example: <code>mqtt="en":1,"host":"x","port":1883,"pubt":"opensprinkler","subt":""</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>email</code></td>
+<td style="text-align: left;">Email configuration as JSON <strong>without</strong> the outer <code>{}</code>. Example: <code>email="en":1,"host":"x","port":465,"user":"a@b.io","pass":"","recipient":""</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>dname</code></td>
+<td style="text-align: left;">Device name.</td>
+</tr>
+</tbody>
+</table>
+<p><br><strong>Examples:</strong></p>
+<ul>
+<li><code>os-ip/co?pw=xxx&amp;loc=42.01,-75.22</code>: change location to GPS coord <code>42.01,-75.22</code></li>
+<li><code>os-ip/co?pw=xxx&amp;hp0=144&amp;hp1=31</code>: change HTTP port to <code>8080</code> (<code>31*256+144=8080</code>)</li>
+<li><code>os-ip/co?pw=xxx&amp;sdt=30</code>: set station delay time to <code>30</code> seconds</li>
+<li><code>os-ip/co?pw=xxx&amp;sn1t=1&amp;sn1o=1</code>: configure sensor1 to rain sensor, normally-open type</li>
+</ul>
+<hr />
+<h3 id="6-set-device-password-sp">6. Set Device Password <code>/sp</code></h3>
+<p><strong>Usage</strong>: <code>http://os-ip/sp?<strong>pw</strong>=xxx&amp;<strong>npw</strong>=xxx&amp;<strong>cpw</strong>=xxx</code></p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Parameter</th>
+<th style="text-align: left;">Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>npw</code></td>
+<td style="text-align: left;">New password (MD5 hash)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>cpw</code></td>
+<td style="text-align: left;">Confirmation (MD5 hash)</td>
+</tr>
+</tbody>
+</table>
+<p><br><strong>Examples:</strong></p>
+<ul>
+<li><code>os-ip/sp?pw=xxx&amp;npw=e0ff85143dfa717536cbb668cc8f8e8b&amp;cpw=e0ff85143dfa717536cbb668cc8f8e8b</code>: change password to the MD5 hash of the plaintext password <code>sprinkler</code>.</li>
+<li>If either <code>npw</code> or <code>cpw</code> is omitted, <code>Data Missing</code> error is returned. If <code>npw</code> and <code>cpw</code> do not match, a <code>Mismatch</code> error is returned. Refer to the <a href="#0-overview">list of error code</a>.</li>
+</ul>
+<hr />
+<h3 id="7-get-station-names-and-attributes-jn">7. Get Station Names and Attributes <code>/jn</code></h3>
+<p><strong>Usage</strong>: <code>http://os-ip/jn?<strong>pw</strong>=xxx</code></p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Variable</th>
+<th style="text-align: left;">Explanation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>snames</code></td>
+<td style="text-align: left;">Array of station names (length equals number of zones).</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>maxlen</code></td>
+<td style="text-align: left;">Maximum characters allowed per station name.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>stn_grp</code></td>
+<td style="text-align: left;">Each zone's sequential group ID. Value below <code>255</code>: a sequential group; <code>255</code>: parallel group.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>masop</code></td>
+<td style="text-align: left;">Master1 operation bitfields, stored as an array, where each byte (LSB) represents a 8-zone group. For <code>24</code> zones, the array has <code>3</code> bytes: first byte → zones <code>1-8</code>; second byte → zones <code>9-16</code>; third byte → <code>17-24</code>. Each byte indicates which zones in that group activate the master zone: For example, <code>254</code> (<code>0b11111110</code>) means all zones except the first zone activate master1.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>masop2</code></td>
+<td style="text-align: left;">Master2 operation bitfields. Same layout as <code>masop</code>.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>ignore_rain</code></td>
+<td style="text-align: left;">Ignore Rain Delay bitfields.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>ignore_sn1</code></td>
+<td style="text-align: left;">Ignore Sensor1 bitfields.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>ignore_sn2</code></td>
+<td style="text-align: left;">Ignore Sensor2 bitfields.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>stn_dis</code></td>
+<td style="text-align: left;">Zone Disable bitfields.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>stn_spe</code></td>
+<td style="text-align: left;">Special Station flag bitfields.</td>
+</tr>
+</tbody>
+</table>
+<p><br><strong>Example:</strong>
+<code>{"masop":[255],"masop2":[0],"ignore_rain":[0],"ignore_sn1":[0],"ignore_sn2":[0],"stn_dis":[0],"stn_spe":[0],"stn_grp":[0,0,0,1,0,0,0,0],"snames":["S01","S02","S03","S04","S05","S06","S07","S08"],"maxlen":32}</code></p>
+<hr />
+<h3 id="8-get-special-station-data-je">8. Get Special Station Data <code>/je</code></h3>
+<p><strong>Usage</strong>: <code>http://os-ip/je?<strong>pw</strong>=xxx</code></p>
+<p><u><strong>Response Format</strong></u>: <code>{"0":{"st":xxx, "sd":"xxx"}, "1":{"st":xxx, "sd":"xxx"}, ...}</code><br>
+Only stations with <code>stn_spe bit=1</code> appear.</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Key</th>
+<th style="text-align: left;">Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>station_id</code></td>
+<td style="text-align: left;">Station index in string form (e.g., <code>"0"</code>, <code>"1"</code>).</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>st</code></td>
+<td style="text-align: left;">Special-station type code (see table below).</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>sd</code></td>
+<td style="text-align: left;">Type-specific data payload associated with <code>st</code>.</td>
+</tr>
+</tbody>
+</table>
+<p><br>
+<strong>Station Types</strong>:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;"><code>st</code></th>
+<th style="text-align: left;">Type</th>
+<th style="text-align: left;">Format of <code>sd</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>0</code></td>
+<td style="text-align: left;">Standard</td>
+<td style="text-align: left;">Should not appear here, as only special stations are listed.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>1</code></td>
+<td style="text-align: left;">RF (Radio Frequency)</td>
+<td style="text-align: left;">Either legacy 16-byte RF hex code (protocol 1, 24 bits), or the new 25-byte code (prefixed with <code>H</code>, supporting all protocols and bit lengths).</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>2</code></td>
+<td style="text-align: left;">Remote (IP)</td>
+<td style="text-align: left;">14-byte hex code: 8 bytes for IP; 4 for port; 2 for station index.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>3</code></td>
+<td style="text-align: left;">GPIO</td>
+<td style="text-align: left;">3 bytes. First 2 bytes: GPIO index; third byte: active state (<code>1</code> or <code>0</code>).</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>4</code></td>
+<td style="text-align: left;">HTTP</td>
+<td style="text-align: left;">Comma-separated string (up to 240 bytes) formatted as: <code>server,port,on_cmd,off_cmd</code>. Assume <code>server</code> is HTTP.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>5</code></td>
+<td style="text-align: left;">HTTPS</td>
+<td style="text-align: left;">Same format as <code>st=4</code>. Assume <code>server</code> is HTTPS.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>6</code></td>
+<td style="text-align: left;">Remote (OTC)</td>
+<td style="text-align: left;">35-byte hex code. First 32 bytes: OTC token, then <code>'\0'</code>, then 2 bytes for station index.</td>
+</tr>
+</tbody>
+</table>
+<p><br><strong>Example:</strong>
+<code>{"0":{"st":2,"sd":"c0a80093005002"},"1":{"st":1,"sd":"05331305333C0021"},<br>"2":{"st":4,"sd":"demo.opensprinkler.com,80,on/?z=1,off"}}</code></p>
+<hr />
+<h3 id="9-change-station-names-and-attributes-cs">9. Change Station Names and Attributes <code>/cs</code></h3>
+<p><strong>Usage</strong>: <code>http://os-ip/cs?<strong>pw</strong>=xxx&amp;<strong>s?</strong>=x&amp;<strong>m?</strong>=x&amp;<strong>i?</strong>=x&amp;<strong>j?</strong>=x&amp;<strong>k?</strong>=x&amp;<strong>n?</strong>=x&amp;<strong>d?</strong>=x&amp;<strong>p?</strong>=x&amp;<strong>g?</strong>=x&amp;<strong>sid</strong>=xx&amp;<strong>st</strong>=xx&amp;<strong>sd</strong>=xx
+</code></p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Parameter</th>
+<th style="text-align: left;">Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>s?</code></td>
+<td style="text-align: left;">Station name: <code>?</code> is the <strong>station index</strong> starting at 0. Example: <code>s2=Front%20Lawn</code> sets the <strong>third</strong> station to <code>Front Lawn</code>. Max length is <code>maxlen</code> from <code>/jn</code>.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>m?</code></td>
+<td style="text-align: left;">Master1 operation bitfields: <code>?</code> is the <strong><u>board</u> index</strong> starting at 0. <code>m0</code>: zones <code>1-8</code> (main controller); <code>m1</code>: zones <code>9-16</code> and so on. Example: <code>m0=255</code> sets all zones on the main controller to activate Master1; <code>m1=4</code> sets the 3rd station on the first expander to activate Master1. Refer to the <code>masop</code> variable in <a href="#7-get-station-names-and-attributes-jn">Station Attributes</a>.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>n?</code></td>
+<td style="text-align: left;">Master2 operation bitfields. Same format as <code>m?</code>.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>i?</code></td>
+<td style="text-align: left;"><code>ignore_rain</code> bitfields.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>j?</code></td>
+<td style="text-align: left;"><code>ignore_sn1</code> bitfields.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>k?</code></td>
+<td style="text-align: left;"><code>ignore_sn2</code> bitfields.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>d?</code></td>
+<td style="text-align: left;"><code>stn_dis</code> (station disable) bitfields.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>p?</code></td>
+<td style="text-align: left;"><code>stn_spe</code> (station special) bitfields.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>g?</code></td>
+<td style="text-align: left;">Station's sequential group ID (<u>not</u> a bitfield). <code>?</code>: station index.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>sid</code></td>
+<td style="text-align: left;">Special-station target index (station id).</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>st</code></td>
+<td style="text-align: left;">Special-station type (see <code>/je</code>).</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>sd</code></td>
+<td style="text-align: left;">Special-station data payload (see <code>/je</code>). URL-encoded.</td>
+</tr>
+</tbody>
+</table>
+<p><br><strong>Note</strong>:</p>
+<ul>
+<li>Multiple assignments can be combined in one call; omitted fields are unchanged.</li>
+<li>To make a station "special", set the corresponding <code>p?</code> bit and provide <code>sid/st/sd</code>.</li>
+</ul>
+<p><strong>Examples:</strong></p>
+<ul>
+<li><code>os-ip/cs?pw=xxx&amp;s0=Front%20Lawn&amp;s1=Back%20Lawn</code>: set the first two stations' names</li>
+<li><code>os-ip/cs?pw=xxx&amp;m0=127&amp;s7=Garage</code>: set station 8's name and master operation bits for board <code>m0</code> (<code>127</code>=all but station 8 activate Master1).</li>
+<li><code>os-ip/cs?pw=xxx&amp;sid=2&amp;st=1&amp;sd=00553300553c001c</code>: set special station data for station 3</li>
+<li><code>os-ip/cs?pw=xxx&amp;g4=1</code>: assign group id <code>1</code> to station 5.</li>
+</ul>
+<hr />
+<h3 id="10-get-station-status-js">10. Get Station Status <code>/js</code></h3>
+<p><strong>Usage</strong>: <code>http://os-ip/js?<strong>pw</strong>=xxx</code></p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Variable</th>
+<th style="text-align: left;">Explanation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>sn</code></td>
+<td style="text-align: left;">Array of <code>1</code>/<code>0</code> indicating each station's On/Off status.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>nstations</code></td>
+<td style="text-align: left;">Total number of stations.</td>
+</tr>
+</tbody>
+</table>
+<p><br><strong>Example:</strong> <code>{"sn":[1,1,0,0,0,0,0,0],"nstations":8}</code>
+<br>Stations 1 and 2 (at indices <code>0</code> and <code>1</code> in the array) are currently open</p>
+<hr />
+<h3 id="11-manual-station-run-cm">11. Manual Station Run <code>/cm</code></h3>
+<p><strong><span class="hl">Usage</span></strong>: <code>http://os-ip/cm?<strong>pw</strong>=xxx&amp;<strong>sid</strong>=xx&amp;<strong>en</strong>=x&amp;<strong>t</strong>=xxx&amp;<strong>ssta</strong>=x&amp;<strong>qo</strong>=x</code></p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Parameter</th>
+<th style="text-align: left;">Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>sid</code></td>
+<td style="text-align: left;">Station index (starting at <code>0</code>).</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>en</code></td>
+<td style="text-align: left;">Enable (<code>1</code>: open, <code>0</code>: close).</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>t</code></td>
+<td style="text-align: left;">Time in seconds (max: <code>64800</code> i.e. 18 hours). <strong>Required when opening a zone.</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>qo</code></td>
+<td style="text-align: left;"><span class="hl">Queuing option (applies when opening a zone)</span>. <code>0</code>: append after other zones (default); <code>1</code>: insert ahead of other zones.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>ssta</code></td>
+<td style="text-align: left;">Shift remaining stations in the <strong>same sequential</strong> group when <strong>closing</strong> a zone (<code>en=0</code>). <code>0</code>: don’t shift; <code>1</code>: shift. Ignored when opening a zone.</td>
+</tr>
+</tbody>
+</table>
+<p><br><strong>Note:</strong></p>
+<ul>
+<li>Opening a master station by itself is not allowed (error), as it cannot be operated independently. To run a master alone, you can make use of a dummy zone (i.e. a zone not physically connected) and open that zone, which in turn opens the associated master(s).</li>
+<li>Opening a station that is already running or already queued returns an error.</li>
+<li>Manually started stations are assigned a program ID of <code>99</code>.</li>
+</ul>
+<p><strong>Examples:</strong></p>
+<ul>
+<li><code>os-ip/cm?pw=xxx&amp;sid=0&amp;en=1&amp;t=360</code>: open station 1 for 6 minutes, append to the queue.</li>
+<li><code>os-ip/cm?pw=xxx&amp;sid=3&amp;en=1&amp;t=300&amp;qo=1</code>: open station 4 for 5 minutes, insert ahead of other zones.</li>
+<li><code>os-ip/cm?pw=xxx&amp;sid=3&amp;en=0</code>: close station 4. Remaining stations in the same sequential group retain their original assigned start times.</li>
+<li><code>os-ip/cm?pw=xxx&amp;sid=3&amp;en=0&amp;ssta=1</code>: close station 4 and shift remaining stations in the same sequential group, so the next station starts immediately. </li>
+</ul>
+<hr />
+<h3 id="12-manually-start-a-program-mp">12. Manually Start a Program <code>/mp</code></h3>
+<p><strong><span class="hl">Usage</span></strong>: <code>http://os-ip/mp?<strong>pw</strong>=xxx&amp;<strong>pid</strong>=xx&amp;<strong>uwt</strong>=x&amp;<strong>qo</strong>=x</code></p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Parameter</th>
+<th style="text-align: left;">Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>pid</code></td>
+<td style="text-align: left;">Program index (starting from <code>0</code>).</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>uwt</code></td>
+<td style="text-align: left;">Use weather (<code>1</code>: apply current watering level; <code>0</code>: run at 100%).</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>qo</code></td>
+<td style="text-align: left;"><span class="hl">Queuing option.</span> <code>0</code>: append the new program to the end of the queue; <code>1</code>: insert at front (preemptive); <code>2</code>: <strong>replace</strong>, i.e. reset all zones, clear queue, then start the new program. If <code>qo</code> is omitted, the default behavior is <code>2</code> (backward compatible).</td>
+</tr>
+</tbody>
+</table>
+<p><br><strong>Note:</strong> Program <strong>name annotations</strong> are honored when starting a program manually. If <code>pid</code> is out of bound, an error is returned.</p>
+<p><strong>Examples:</strong></p>
+<ul>
+<li><code>os-ip/mp?pw=xxx&amp;pid=0&amp;uwt=0</code>: reset all zones, then start program 1 at 100% watering level. As <code>qo</code> is omitted, this behavior is backward compatible with previous firmwares.</li>
+<li><code>os-ip/mp?pw=xxx&amp;pid=1&amp;uwt=1&amp;qo=0</code>: <span class="hl">append program 2 at the end of the queue, using the current watering level.</span></li>
+<li><code>os-ip/mp?pw=xxx&amp;pid=1&amp;uwt=1&amp;qo=1</code>: <span class="hl">insert program 2 at the front of the queue.</span></li>
+<li><code>os-ip/mp?pw=xxx&amp;pid=1&amp;uwt=1&amp;qo=2</code>: <span class="hl">reset all zones, then start program 2 using the current watering level.</span></li>
+</ul>
+<hr />
+<h3 id="13-get-program-data-jp">13. Get Program Data <code>/jp</code></h3>
+<p><strong>Usage</strong>: <code>http://os-ip/jp?<strong>pw</strong>=xxx</code></p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Variable</th>
+<th style="text-align: left;">Explanation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>nprogs</code></td>
+<td style="text-align: left;">Number of programs.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>nboards</code></td>
+<td style="text-align: left;">Number of 8-zone groups (includes the main controller).</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>mnp</code></td>
+<td style="text-align: left;">Max number of programs allowed (<code>40</code> for this firmware).</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>mnst</code></td>
+<td style="text-align: left;">Max number of fixed start times per program (<code>4</code> in this firmware).</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>pnsize</code></td>
+<td style="text-align: left;">Max characters allowed for a program name (<code>32</code> in this firmware).</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>pd</code></td>
+<td style="text-align: left;">Array of <strong>Program Entries</strong>; each follows the structure below.</td>
+</tr>
+</tbody>
+</table>
+<p><br><strong>Program Entry Structure:</strong><br>
+<code>[flag, days0, days1, [start0, start1, start2, start3], [dur0, dur1,...], name, [endr, from, to]]</code></p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Field</th>
+<th style="text-align: left;">Explanation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>flag</code></td>
+<td style="text-align: left;">Bitfield of program flags (see <code>flag</code> table below).</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>days0</code>,<code>days1</code></td>
+<td style="text-align: left;">Start-day data (see <strong>Start-day types</strong> below).</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>start0..start3</code></td>
+<td style="text-align: left;">Start-time data (see <strong>Start-time encoding</strong> below).</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>dur*</code></td>
+<td style="text-align: left;">Per-station durations in seconds (max: <code>64800</code>). The length must equal station count. Support two special values: <code>65534</code> → sunrise-to-sunset duration; <code>65535</code>→ sunset-to-sunrise duration.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>name</code></td>
+<td style="text-align: left;">Program name (≤<code>pnsize</code> characters).</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>[endr,from,to]</code></td>
+<td style="text-align: left;">Date-range tuple (see <strong>Date-range tuple</strong> below).</td>
+</tr>
+</tbody>
+</table>
+<p><br><strong><code>flag</code> <u>bitfield</u></strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">bit(s)</th>
+<th style="text-align: left;">Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>0</code></td>
+<td style="text-align: left;">Program enable flag (<code>en</code>). <code>1</code>: enabled; <code>0</code>:disabled.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>1</code></td>
+<td style="text-align: left;">Use weather flag (<code>uwt</code>). <code>1</code>: yes; <code>0</code>: no.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>2–3</code></td>
+<td style="text-align: left;">Odd/Even restriction. <code>0</code>: none; <code>1</code>: odd-day; <code>2</code>: even-day; <code>3</code>: undefined.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>4–5</code></td>
+<td style="text-align: left;">Start-day type. <code>0</code>: weekly; <code>1</code>: single-run; <code>2</code>: monthly; <code>3</code>: interval-day.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>6</code></td>
+<td style="text-align: left;">Start-time type. <code>0</code>: repeating type; <code>1</code>: fixed times.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>7</code></td>
+<td style="text-align: left;">Date-range enable. <code>0</code>: off; <code>1</code>: on.</td>
+</tr>
+</tbody>
+</table>
+<p><br><strong><u>Start-day Types</u></strong>. Depending on <code>flag.bits[4-5]</code>:</p>
+<ul>
+<li><code>0</code> → <strong>Weekly</strong>: <code>days0.bits[0-6]</code> store the binary selections (LSB) from Monday to Sunday. <code>days1</code> is unused. Example: <code>days0=127 (0b1111111)</code> runs daily; <code>days0=21 (0b0010101)</code> runs Mon/Wed/Fri. </li>
+<li><code>1</code> → <strong>Single-run</strong>: <code>days0</code> and <code>days1</code> together form a 16-bit unsigned integer encoding the day (<code>epoch_seconds / 86400</code>).</li>
+<li><code>2</code> → <strong>Monthly</strong>: <code>days0</code> stores the day of the month (<code>1-31</code>). Use <code>0</code> for the last day of a month.</li>
+<li><code>3</code> → <strong>Interval-day</strong>: <code>days1</code> is the interval day (every <code>N</code> days); <code>days0</code> is the remainder ("starting in" offset). Example: <code>days1=3, days0=0</code> means every <code>3</code> days starting today.</li>
+</ul>
+<p><br><strong><u>Start-time Encoding</u></strong>. Depending on <code>flag.bit[6]</code>:</p>
+<ul>
+<li><code>1</code> → <strong>Fixed start-time</strong>: each of <code>start0, 1, 2, 3</code> is a 16-bit integer representing an independent start time. For each:<ul>
+<li>If <code>bit[15]=1</code> (negative value), this start time is disabled.</li>
+<li>If <code>bits[13-14]</code> are both <code>0</code>, this is a standard time (<code>0-1439</code>) representing the minute count from <code>00:00 AM</code> to <code>11:59 PM</code>.</li>
+<li>If <code>bit[13]=1</code>, this is a <strong>sunset-based</strong> time; if <code>bit[14]=1</code>, this is a <strong>sunrise-based</strong> time. In either case, the remaining bits define a <strong>signed offset</strong> from the sunset / sunrise time, with <code>bit[12]</code> being the sign (<code>1</code>=negative), and <code>bits[0-10]</code> (i.e. <code>start_time &amp; 0x7FF</code>) the absolute value of offset in minutes.</li>
+</ul>
+</li>
+<li><code>0</code> → <strong>Repeating start-times</strong>: <code>start0</code> stores the first start-time (same encoding as above); <code>start1</code> is the repeat count; <code>start2</code> the interval (every <code>N</code>) minutes; <code>start3</code> unused. Example: <code>[480,5,120,0]</code> → start at <code>8:00 AM</code>, repeat every <code>2</code> hours for <code>5</code> times.</li>
+</ul>
+<p><br><strong><u>Date-range tuple</u></strong>: <code>[endr,from,to]</code></p>
+<ul>
+<li><code>endr</code>: Date-range enable. Must equal <code>flag.bit[7]</code>.</li>
+<li><code>from, to</code>: Start and end dates, encoded as <code>(month&lt;&lt;5)+day</code>. Example: <code>Feb 3</code> is encoded as <code>(2&lt;&lt;5)+3=67</code>. Defaults: <code>from=33 (Jan 1)</code>, <code>to=415 (Dec 31)</code>.</li>
+<li><code>from</code> and <code>to</code> are both inclusive. If <code>from=to</code>, it defines a range of one day. If <code>from&gt;to</code>, the range wraps into the next year.</li>
+</ul>
+<p><br><strong>Example:</strong> <code>{"nprogs":3, "nboards":1, "mnp":40, "mnst":4, "pnsize":32, "pd":[[3,127,0,[480,2,240,0],[0,2700,0,2700,0,0,0,0],"Summer",[0,33,415]], [2,9,0,[120,0,300,0],[0,3720,0,0,0,0,0,0],"Fall Prog",[0,33,415]],[195,16,0,[1150,-1,-1,-1],[0,0,0,0,0,0,64800,0],"Pipe",[1,67,415]]]}</code></p>
+<hr />
+<h3 id="14-change-program-data-cp">14. Change Program Data <code>/cp</code></h3>
+<p><strong>Usage</strong>: <code>http://os-ip/cp?<strong>pw</strong>=xxx&amp;<strong>pid</strong>=xx&amp;<strong>en</strong>=x&amp;<strong>uwt</strong>=x&amp;<strong>name</strong>=xxx&amp;<strong>v</strong>=[flag,days0,days1,[start0,start1,start2,start3],[dur0,dur1,dur2…]]&amp;<strong>from</strong>=xxx&amp;<strong>to</strong>=xxx</code></p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Parameter</th>
+<th style="text-align: left;">Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>pid</code></td>
+<td style="text-align: left;">Program index, in the range <code>[-1, N-1]</code>. If <code>pid=-1</code>: add a new program; otherwise, modify an existing program.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>en</code></td>
+<td style="text-align: left;">Directly set the program's enable bit (<code>flag.bit0</code>). <strong>If present, all other parameters are ignored!</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>uwt</code></td>
+<td style="text-align: left;">Directly set the <code>uwt</code> bit (<code>flag.bit1</code>). <strong>If present, all other params are ignored!</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>name</code></td>
+<td style="text-align: left;">Program name (URL-encoded, without quotes).</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>v</code></td>
+<td style="text-align: left;">Program body (see <a href="#13-get-program-data-jp"><code>/jp</code> endpoint</a>), <strong>excluding</strong> <code>name/from/to</code>.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>from</code>/<code>to</code></td>
+<td style="text-align: left;">Date-range parameters <code>(month&lt;&lt;5)+day</code> (see <a href="#13-get-program-data-jp"><code>/jp</code> endpoint</a>).</td>
+</tr>
+</tbody>
+</table>
+<p><br><strong>Examples:</strong></p>
+<ul>
+<li><code>os-ip/cp?pw=xxx&amp;pid=0&amp;en=0</code>: disable program 1.</li>
+<li><code>os-ip/cp?pw=xxx&amp;pid=1&amp;uwt=1</code>: enable "use weather" on program 2.</li>
+<li><code>os-ip/cp?pw=xxx&amp;pid=-1&amp;v=[3,127,0,[480,2,240,0],[1800,1200,0,0,0,0,0,0]]&amp;name=Summer%20Prog</code>: add a new program, enabled, use weather adjustment, no date range,  no restriction, weekday schedule that runs on every day, repeating start time type, start at <code>8:00 AM</code>, repeat every <code>4</code> hours for <code>2</code> times, and the watering times are: station 1 – <code>30</code> minute; station 2 – <code>20</code> minutes, program name is "Summer Prog".</li>
+<li><code>os-ip/cp?pw=xxx&amp;pid=-1&amp;v=[131,127,0,[480,2,240,0],[1800,1200,0,0,0,0,0,0]]&amp;name=Winter%20Program&amp;from=353&amp;to=67</code>: add a new program, enabled, using date range from <code>Nov 1</code> to <code>Feb 3</code>, named "Winter Program", the other parameters are the same as the "Summer Prog" above</li>
+</ul>
+<hr />
+<h3 id="15-delete-programs-dp">15. Delete Program(s) <code>/dp</code></h3>
+<p><strong>Usage</strong>: <code>http://os-ip/dp?<strong>pw</strong>=xxx&amp;<strong>pid</strong>=x</code></p>
+<p><code>pid</code>: Program index in <code>[0, N-1]</code>. <code>pid=-1</code> deletes ALL existing programs.</p>
+<p><strong>Examples:</strong></p>
+<ul>
+<li><code>os-ip/dp?pw=xxx&amp;pid=1</code>: delete program 2.</li>
+<li><code>os-ip/dp?pw=xxx&amp;pid=-1</code>: delete all programs.</li>
+</ul>
+<hr />
+<h3 id="16-move-up-re-order-a-program-up">16. Move Up (Re-order) a Program <code>/up</code></h3>
+<p><strong>Usage</strong>: <code>http://os-ip/up?<strong>pw</strong>=xxx&amp;<strong>pid</strong>=x</code></p>
+<p><code>pid</code>: Program index in <code>[1, N-1]</code>. <code>pid=0</code> has no effect.</p>
+<p><strong>Examples:</strong></p>
+<ul>
+<li><code>os-ip/up?pw=xxx&amp;pid=2</code>: move program 3 up, before program 2.</li>
+<li><code>os-ip/up?pw=xxx&amp;pid=0</code>: no effect as the program 1 cannot be moved up.</li>
+</ul>
+<hr />
+<h3 id="17-run-once-program-cr">17. Run-Once Program <code>/cr</code></h3>
+<p><strong><span class="hl">Usage</span></strong>: <code>http://os-ip/cr?<strong>pw</strong>=xxx&amp;<strong>t</strong>=[x,x,...,x]&amp;<strong>cnt</strong>=xxx&amp;<strong>int</strong>=xxx&amp;<strong>uwt</strong>=xxx&amp;<strong>anno</strong>=xxx&amp;<strong>qo</strong>=x</code></p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Parameter</th>
+<th style="text-align: left;">Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>t</code></td>
+<td style="text-align: left;">Array of per-station <strong>duration</strong> (in seconds). A value of <code>0</code> means that station does not run. Stations launched via this command are assigned program ID <code>254</code>.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>cnt</code></td>
+<td style="text-align: left;">Repeat count. <code>0</code>: run once (no repeats).</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>int</code></td>
+<td style="text-align: left;">Repeat interval (in minutes). Must be <code>&gt;0</code> <strong>if and only if</strong> <code>cnt&gt;0</code>.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>uwt</code></td>
+<td style="text-align: left;">Use weather. <code>1</code>: apply current watering level to durations; <code>0</code>: no.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>anno</code></td>
+<td style="text-align: left;">Program name annotation, in the form of <code>&gt;X</code> where <code>X</code> is an annotation letter. See OpenSprinkler User Manual.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>qo</code></td>
+<td style="text-align: left;"><span class="hl">Queuing option</span> (same as <code>/mp</code>). <code>0</code>: append to end; <code>1</code>: insert at front; <code>2</code>: <strong>replace</strong> (reset all zones, clear queue, then start). Default is <code>2</code> if <code>qo</code> is omitted.</td>
+</tr>
+</tbody>
+</table>
+<p><br><strong>NOTE:</strong> If the program is set to repeat (<code>cnt&gt;0</code> and <code>int&gt;0</code>), the firmware auto-creates a <strong>single-run</strong> program named "Run-once with repeat" (plus <code>anno</code>). This is necessary to support repeats.</p>
+<p><strong>Examples:</strong></p>
+<ul>
+<li><code>os-ip/cr?pw=xxx&amp;t=[60,0,60,0,60,0,60,0]</code>: reset all zones, then start a run-once program that turns on stations 1, 3, 5,7 for <code>1</code> minute each. As <code>qo</code> is omitted, this behavior is compatible with previous firmwares. </li>
+<li><code>os-ip/cr?pw=xxx&amp;t=[60,0,60,0,60,0,60,0]&amp;uwt=1&amp;qo=0</code>: append the run-once program at the end of the queue, using the current watering level.</li>
+<li><code>os-ip/cr?pw=xxx&amp;t=[60,0,60,0,60,0,60,0]&amp;uwt=0&amp;qo=1</code>: insert the run-once program at the front of the queue, using 100% watering level.</li>
+<li><code>os-ip/cr?pw=xxx&amp;t=[60,0,60,0,60,0,60,0]&amp;cnt=3&amp;int=15&amp;anno=&gt;N</code>: similar to the first example above, but also set it to repeat every <code>15</code> minutes for <code>3</code> times. This auto-creates a single-run program, appending the annotation <code>&gt;N</code> to the program name (<code>&gt;N</code> tells the program to run zones in reverse order of zone names).</li>
+</ul>
+<hr />
+<h3 id="18-get-log-data-jl">18. Get Log Data <code>/jl</code></h3>
+<p><strong>Usage</strong>:<br>
+<code>http://os-ip/jl?<strong>pw</strong>=xxx&amp;<strong>start</strong>=xxx&amp;<strong>end</strong>=xxx&amp;<strong>type</strong>=x</code>
+<br><code>http://os-ip/jl?<strong>pw</strong>=xxx&amp;<strong>hist</strong>=n&amp;<strong>type</strong>=x</code></p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Parameter</th>
+<th style="text-align: left;">Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>start</code></td>
+<td style="text-align: left;">Start time (epoch seconds), inclusive.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>end</code></td>
+<td style="text-align: left;">End time (epoch seconds), inclusive. Max span: <code>365</code> days.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>hist</code></td>
+<td style="text-align: left;">History window in days back from today. <code>0</code>: today only; <code>1</code>:today+yesterday; and so on. Max span: <code>365</code> days.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>type</code></td>
+<td style="text-align: left;">Filter special events (indicated by <code>pid=0</code>). Choices: <code>s1</code>,<code>s2</code>,<code>rd</code>,<code>fl</code>,<code>wl</code></td>
+</tr>
+</tbody>
+</table>
+<p><br><strong>Log Record Format</strong></p>
+<ul>
+<li><code>[pid,sid,dur,end]</code>: standard run</li>
+<li><code>[pid,sid,dur,end,flow]</code>: with flow sensor enabled (5th element)</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Field</th>
+<th style="text-align: left;">Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>pid</code></td>
+<td style="text-align: left;">Program index (<strong>1-based</strong>); special events use <code>pid=0</code>.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>sid</code></td>
+<td style="text-align: left;">Station index (<strong>0-based</strong>); or a <strong>special event code</strong> (string) when <code>pid=0</code>.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>dur</code></td>
+<td style="text-align: left;">Duration in seconds.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>end</code></td>
+<td style="text-align: left;">End time (epoch seconds).</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>flow</code></td>
+<td style="text-align: left;">Optional flow metric for the run (present only if flow sensor is enabled).</td>
+</tr>
+</tbody>
+</table>
+<p><br><strong>Special Event Code</strong>
+<br>A log record is a special event if its <code>pid=0</code>, in which case <code>sid</code> is a string code:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;"><code>sid</code></th>
+<th style="text-align: left;">Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>s1</code></td>
+<td style="text-align: left;">Sensor1 event</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>s2</code></td>
+<td style="text-align: left;">Sensor2 event</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>rd</code></td>
+<td style="text-align: left;">Rain delay event</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>fl</code></td>
+<td style="text-align: left;">Flow reading</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>wl</code></td>
+<td style="text-align: left;">Watering level log</td>
+</tr>
+</tbody>
+</table>
+<p><br><strong>Example Request:</strong> <code>http://os-ip/jl?pw=pw_md5&amp;start=1413567367&amp;end=1413657367</code>
+<br><strong>Response:</strong> <code>[[3,17,616,1413511817], [0,"rd",86400,1413511845], [254,1,5,1413512107], [1,3,2700,1413552661], [5,3,1200,1413559201]]</code></p>
+<hr />
+<h3 id="19-delete-log-data-dl">19. Delete Log Data <code>/dl</code></h3>
+<p><strong>Usage</strong>: <code>http://os-ip/dl?<strong>pw</strong>=xxx&amp;<strong>day</strong>=n</code></p>
+<p><code>day</code>: Day index calculated as <code>floor(epoch_seconds/86400)</code>. Use <code>day=all</code> to delete <strong>all</strong> logs.</p>
+<p><strong>Examples:</strong></p>
+<ul>
+<li><code>os-ip/dl?pw=xxx&amp;day=16361</code>: delete the log file for day <code>Oct 18, 2014</code>.</li>
+<li><code>os-ip/dl?pw=xxx&amp;day=all</code>: delete all log files. </li>
+</ul>
+<hr />
+<h3 id="20-change-script-url-cu">20. Change Script URL <code>/cu</code></h3>
+<p><strong>Usage</strong>: <code>http://os-ip/cu?<strong>pw</strong>=xxx&amp;<strong>jsp</strong>=xxx&amp;<strong>wsp</strong>=xxx</code></p>
+<ul>
+<li><code>jsp</code>: UI/Javascript path (URL encoded)</li>
+<li><code>wsp</code>: Weather script path (URL encoded)</li>
+</ul>
+<p><strong>Example:</strong></p>
+<ul>
+<li><code>os-ip/cu?pw=xxx&amp;jsp=https%3A%2F%2Fui.opensprinkler.com%2Fjs</code>: set UI script path to <code>https://ui.opensprinkler.com/js</code>.</li>
+</ul>
+<hr />
+<h3 id="21-get-all-ja">21. Get All <code>/ja</code></h3>
+<p><strong>Usage</strong>: <code>http://os-ip/ja?<strong>pw</strong>=xxx</code>
+<br>Returns a single JSON combining the return values of <code>/jc</code>, <code>/jo</code>, <code>/jn</code>, <code>/js</code>, <code>/jp</code>.</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Variable</th>
+<th style="text-align: left;">Source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>settings</code></td>
+<td style="text-align: left;"><code>/jc</code> (controller variables)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>options</code></td>
+<td style="text-align: left;"><code>/jo</code> (options)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>stations</code></td>
+<td style="text-align: left;"><code>/jn</code> (station names &amp; attributes)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>status</code></td>
+<td style="text-align: left;"><code>/js</code> (station status)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>programs</code></td>
+<td style="text-align: left;"><code>/jp</code> (program data)</td>
+</tr>
+</tbody>
+</table>
+<p><br><strong>Example Return:</strong> <code>{"settings":{...},"options":{...},"stations":{...},"status":{...},"programs":{...}}</code></p>
+<hr />
+<h3 id="22-pause-queue-pq">22. Pause Queue <code>/pq</code></h3>
+<p><strong>Usage</strong>: <code>http://os-ip/pq?<strong>pw</strong>=xxx&amp;<strong>dur</strong>=x&amp;<strong>repl</strong>=x</code></p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Parameter</th>
+<th style="text-align: left;">Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>dur</code></td>
+<td style="text-align: left;">Toggle-style pause. If no pause is active and <code>dur&gt;0</code>, start a pause of <code>dur</code> seconds. If a pause is active, cancels the pause (resume stations) regardless of <code>dur</code> value.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>repl</code></td>
+<td style="text-align: left;">Replace/set pause. Sets the pause to <code>repl</code> seconds (starts new or updates existing). <code>repl=0</code> cancels any active pause. If both <code>repl</code> and <code>dur</code> are present, <code>repl</code> takes precedence.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Examples:</strong></p>
+<ul>
+<li><code>os-ip/pq?pw=xxx&amp;dur=600</code>: start a 10-minute pause if none active; otherwise cancel pause. </li>
+<li><code>os-ip/pq?pw=xxx&amp;repl=250</code>: start a 250-second pause if none active; otherwise replace it.</li>
+</ul>
+<hr />
+<h3 id="23-debug-print-db">23. Debug Print <code>/db</code></h3>
+<p><strong>Usage</strong>: <code>http://os-ip/db</code>
+<br>Returns diagnostics information (e.g. firmware build date, time, available heap/RAM). Authentication (the <code>pw</code> parameter) not required.</p>
+<hr />
+<h3 id="24-list-of-reboot-causes">24. List of Reboot Causes</h3>
+<p>Interpretation of the <code>lrbtc</code> variable in <code>/jc</code> result.
+<br>Source: <a href="https://github.com/OpenSprinkler/OpenSprinkler-Firmware/blob/master/defines.h#L105">https://github.com/OpenSprinkler/OpenSprinkler-Firmware/blob/master/defines.h</a></p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Code</th>
+<th style="text-align: left;">Cause</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">0</td>
+<td style="text-align: left;">None/unknown</td>
+</tr>
+<tr>
+<td style="text-align: left;">1</td>
+<td style="text-align: left;">Factory reset</td>
+</tr>
+<tr>
+<td style="text-align: left;">2</td>
+<td style="text-align: left;">Button triggered</td>
+</tr>
+<tr>
+<td style="text-align: left;">3</td>
+<td style="text-align: left;">Reset to AP mode</td>
+</tr>
+<tr>
+<td style="text-align: left;">4</td>
+<td style="text-align: left;">API/timer triggered</td>
+</tr>
+<tr>
+<td style="text-align: left;">5</td>
+<td style="text-align: left;">API triggered reboot</td>
+</tr>
+<tr>
+<td style="text-align: left;">6</td>
+<td style="text-align: left;">Switched from AP to client mode</td>
+</tr>
+<tr>
+<td style="text-align: left;">7</td>
+<td style="text-align: left;">Firmware update</td>
+</tr>
+<tr>
+<td style="text-align: left;">8</td>
+<td style="text-align: left;">Weather call failed &gt;24h</td>
+</tr>
+<tr>
+<td style="text-align: left;">9</td>
+<td style="text-align: left;">Network failed too many times</td>
+</tr>
+<tr>
+<td style="text-align: left;">10</td>
+<td style="text-align: left;">NTP sync reboot</td>
+</tr>
+<tr>
+<td style="text-align: left;">99</td>
+<td style="text-align: left;">Power-on</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="25-list-of-weather-error-codes">25. List of Weather Error Codes</h3>
+<p>Interpretation of the <code>wterr</code> variable in <code>/jc</code> result.</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Code</th>
+<th style="text-align: left;">Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">0</td>
+<td style="text-align: left;">Success</td>
+</tr>
+<tr>
+<td style="text-align: left;">-1</td>
+<td style="text-align: left;">Request not received</td>
+</tr>
+<tr>
+<td style="text-align: left;">-2</td>
+<td style="text-align: left;">Cannot connect to weather server</td>
+</tr>
+<tr>
+<td style="text-align: left;">-3</td>
+<td style="text-align: left;">Request timed out</td>
+</tr>
+<tr>
+<td style="text-align: left;">-4</td>
+<td style="text-align: left;">Received empty response</td>
+</tr>
+</tbody>
+</table>
+<p><br><strong>Positive codes</strong> are application errors from the weather service. Refer to <a href="https://github.com/OpenSprinkler/OpenSprinkler-Weather/blob/master/src/errors.ts">https://github.com/OpenSprinkler/OpenSprinkler-Weather/blob/master/src/errors.ts</a></p>
+<hr />
+              
+            </div>
+          </div><footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
+        <a href="../221_4_manual/" class="btn btn-neutral float-left" title="User Manual"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+        <a href="../../zone-expander/" class="btn btn-neutral float-right" title="User Manual">Next <span class="icon icon-circle-arrow-right"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/OpenSprinkler/OpenSprinkler-Firmware" class="fa fa-github" style="color: #fcfcfc"> GitHub</a>
+        </span>
+    
+    
+      <span><a href="../221_4_manual/" style="color: #fcfcfc">&laquo; Previous</a></span>
+    
+    
+      <span><a href="../../zone-expander/" style="color: #fcfcfc">Next &raquo;</a></span>
+    
+  </span>
+</div>
+    <script src="../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../..";</script>
+    <script src="../../js/theme_extra.js"></script>
+    <script src="../../js/theme.js"></script>
+      <script src="../../js/nav_badges.js"></script>
+      <script src="../../search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

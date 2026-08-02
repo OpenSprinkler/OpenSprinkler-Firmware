@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://OpenSprinkler.github.io/OpenSprinkler-Firmware/zone-expander/" />
+      <link rel="shortcut icon" href="../img/favicon.ico" />
+    <title>User Manual - OpenSprinkler Documentation</title>
+    <link rel="stylesheet" href="../css/theme.css" />
+    <link rel="stylesheet" href="../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../custom.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "User Manual";
+        var mkdocs_page_input_path = "zone-expander.md";
+        var mkdocs_page_url = "/OpenSprinkler-Firmware/zone-expander/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href=".." class="icon icon-home"> OpenSprinkler Documentation
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="..">Home</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../faq/">FAQ</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../troubleshooting/">Troubleshooting</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../firmware-update/">Firmware Update</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Firmware v2.2.1(5) [NEW]</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../2.2.1/221_5_manual/">User Manual</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../2.2.1/221_5_api/">API Reference</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Firmware v2.2.1(4)</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../2.2.1/221_4_manual/">User Manual</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../2.2.1/221_4_api/">API Reference</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Zone Expander</span></p>
+              <ul class="current">
+                  <li class="toctree-l1 current"><a class="reference internal current" href="./">User Manual</a>
+    <ul class="current">
+    <li class="toctree-l2"><a class="reference internal" href="#introduction">Introduction</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#hardware-wiring">Hardware &amp; Wiring</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#1-insert-expander-cable">1. Insert Expander Cable</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#2-expander-zone-wiring">2. Expander Zone Wiring</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#3-set-the-expander-index">3. Set the Expander Index</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#software-configuration">Software Configuration</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#specifications">Specifications</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#troubleshooting">Troubleshooting</a>
+    </li>
+    </ul>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Sensor Expander [NEW]</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../sensor-expander/">User Manual</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Archived</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../archive/">Previous Manuals and API docs</a>
+                  </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="..">OpenSprinkler Documentation</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href=".." class="icon icon-home" aria-label="Docs"></a></li>
+          <li class="breadcrumb-item">Zone Expander</li>
+      <li class="breadcrumb-item active">User Manual</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/OpenSprinkler/OpenSprinkler-Firmware/edit/master/docs/zone-expander.md" class="icon icon-github"> Edit on GitHub</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="zone-expander-user-manual">Zone Expander User Manual</h1>
+<h2 id="introduction">Introduction</h2>
+<p><img alt="OpenSprinkler Zone Expander v3" class="center" src="../assets/images/osexp_v3.jpg" /></p>
+<p>A <strong>Zone Expander</strong> adds 16 physical zones to an OpenSprinkler controller. The main controller provides the first 8 zones, and each expander adds another 16. OpenSprinkler v3 supports up to four expanders, for a total of <strong>72 zones</strong>. OSPi supports up to <strong>200 zones</strong>.</p>
+<ul>
+<li>
+<p><strong>OpenSprinkler v3 AC/DC:</strong></p>
+<ul>
+<li>Compatible with <strong>Zone Expander v3</strong>.</li>
+<li>Expander cable is a ribbon cable with a <strong>2×5</strong> connector on each end.</li>
+<li><strong>Power model</strong>: an AC-powered OpenSprinkler v3 requires an AC Expander v3, while a DC-powered v3 requires a DC Expander v3.</li>
+</ul>
+</li>
+<li>
+<p><strong>OpenSprinkler v2.3 AC and OSPi (AC only):</strong></p>
+<ul>
+<li>Compatible with <strong>AC Zone Expander v2.1</strong></li>
+<li>Expander cable has a <strong>2×4</strong> connector on each end.</li>
+</ul>
+</li>
+</ul>
+<hr />
+<h2 id="hardware-wiring">Hardware &amp; Wiring</h2>
+<div class="admonition warning">
+<p class="admonition-title">Power Off Before Making Changes</p>
+<p>Always <strong>power off the main controller</strong> before making expander changes (connecting, disconnecting, re-wiring). Never plug in/out a ribbon cable or change DIP switch while the main controller is alive.</p>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Use the Correct Expander Port</p>
+<p>On <strong>OpenSprinkler v3</strong>, use the port on the left marked <strong>Expander</strong>. Do NOT use the port on the right marked <strong>Ether</strong>; that port is only for the wired Ethernet module.</p>
+</div>
+<h3 class="zone-step-heading" id="1-insert-expander-cable">1. Insert Expander Cable</h3>
+<ul>
+<li>With the main controller powered off, plug one end of the ribbon cable into the main controller's <strong>Expander</strong> port. On OpenSprinkler v3, this is the port on the left. The connector is keyed and has a raised <strong>bump</strong>, which must align with the <strong>notch</strong> in the receptacle. When correctly oriented as shown below, the red stripe on the ribbon cable is always on the right side of the receptacle. If the connector does not seat easily, stop and check its orientation; never force it.</li>
+</ul>
+<p><img alt="Keyed ribbon cable connector" class="center_wider img-border" src="../assets/images/ribbon_connector_keyed.jpg" /></p>
+<ul>
+<li>
+<p>Plug the other end of the cable into the expander. Again, the connector is keyed, and its bump must match the notch at the top of the receptacle.</p>
+<ul>
+<li><strong>Expander v3:</strong> The 2×5 ports on both sides of the expander are equivalent. Pick one, and use the other to link additional expanders.</li>
+<li><strong>Expander v2.1:</strong> Connect the cable to the expander's <strong>IN</strong> port on the left. Daisy-chain additional expanders by following the <strong>OUT → IN</strong> links.</li>
+</ul>
+</li>
+</ul>
+<hr />
+<h3 class="zone-step-heading" id="2-expander-zone-wiring">2. Expander Zone Wiring</h3>
+<ul>
+<li>Connect each valve's zone wire to its numbered terminal on the expander.</li>
+<li>Join the other wire from every valve to the main controller's <strong>COM</strong> wire. Note that the expander has no common of its own — all zones share the main controller's COM.</li>
+</ul>
+<p><img alt="Zone wiring" src="../assets/images/zone_wiring.jpg" /></p>
+<hr />
+<h3 class="zone-step-heading" id="3-set-the-expander-index">3. Set the Expander Index</h3>
+<p><img alt="DIP Switch" class="img-border" src="../assets/images/dip_switch.png" style="float: right; margin: 5px 5px 5px 5px;" /></p>
+<ul>
+<li>For <strong>OpenSprinkler v3</strong>: each expander must have a unique index (<code>1</code>-<code>4</code>) set by the two DIP switches on its back (see picture on the right). Before making changes to the DIP switches, always power off the main controller.</li>
+<li>For <strong>OpenSprinkler v2.3 and OSPi</strong>: there is no DIP switch - the expander index is implied by the order they are daisy-chained.</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Expander</th>
+<th style="text-align: left;">DIP switch positions</th>
+<th style="text-align: left;">Index</th>
+<th style="text-align: left;">Zones</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>1st</code></td>
+<td style="text-align: left;"><code>Down, Down</code></td>
+<td style="text-align: left;"><code>1</code></td>
+<td style="text-align: left;"><code>9–24</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>2nd</code></td>
+<td style="text-align: left;"><code>Up, Down</code></td>
+<td style="text-align: left;"><code>2</code></td>
+<td style="text-align: left;"><code>25–40</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>3rd</code></td>
+<td style="text-align: left;"><code>Down, Up</code></td>
+<td style="text-align: left;"><code>3</code></td>
+<td style="text-align: left;"><code>41–56</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>4th</code></td>
+<td style="text-align: left;"><code>Up, Up</code></td>
+<td style="text-align: left;"><code>4</code></td>
+<td style="text-align: left;"><code>57–72</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="software-configuration">Software Configuration</h2>
+<p>After completing the expander wiring:</p>
+<ol>
+<li>Power on the controller.</li>
+<li>In the OpenSprinkler mobile app or web UI, go to <strong>Edit Options → Station Handling</strong>.</li>
+<li>Under <strong>Number of Stations</strong>, it shows the <strong>number of available zones</strong>, including those on detected expanders.</li>
+<li>Select the total number of zones you want to enable.</li>
+</ol>
+<p><strong>NOTE</strong>:</p>
+<ul>
+<li>While OpenSprinkler v3 can detect expanders, it does not automatically enable them. You must manually set the number of zones to enable.</li>
+<li>If the available zone count is incorrect, power off the controller, verify that every expander has a unique DIP-switch index and that all ribbon cables are connected correctly.</li>
+<li>You may enable more zones than physically available, to use them as Virtual Zones, such as Remote, HTTP(s), RF, GPIO.</li>
+</ul>
+<hr />
+<h2 id="specifications">Specifications</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;"></th>
+<th style="text-align: left;">Zone Expander</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Num. of Zones:</strong></td>
+<td style="text-align: left;">16</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Solenoid Driver:</strong></td>
+<td style="text-align: left;"><strong>AC:</strong> 1 A/zone (triac)<br><strong>DC:</strong> 2 A/zone (MOSFET)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Dimensions:</strong></td>
+<td style="text-align: left;">130 × 75 × 25 mm<br>(5.1 × 3.0 × 1.0 in)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Weight:</strong></td>
+<td style="text-align: left;">100 g (4 oz)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="troubleshooting">Troubleshooting</h2>
+<p>For expander detection, power, wiring, and zone-output problems, see <a href="../troubleshooting/#power-and-expander">Power and Expander Troubleshooting</a>.</p>
+<hr />
+              
+            </div>
+          </div><footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
+        <a href="../2.2.1/221_4_api/" class="btn btn-neutral float-left" title="API Reference"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+        <a href="../sensor-expander/" class="btn btn-neutral float-right" title="User Manual">Next <span class="icon icon-circle-arrow-right"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/OpenSprinkler/OpenSprinkler-Firmware" class="fa fa-github" style="color: #fcfcfc"> GitHub</a>
+        </span>
+    
+    
+      <span><a href="../2.2.1/221_4_api/" style="color: #fcfcfc">&laquo; Previous</a></span>
+    
+    
+      <span><a href="../sensor-expander/" style="color: #fcfcfc">Next &raquo;</a></span>
+    
+  </span>
+</div>
+    <script src="../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "..";</script>
+    <script src="../js/theme_extra.js"></script>
+    <script src="../js/theme.js"></script>
+      <script src="../js/nav_badges.js"></script>
+      <script src="../search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

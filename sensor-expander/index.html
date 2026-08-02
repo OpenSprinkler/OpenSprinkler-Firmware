@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://OpenSprinkler.github.io/OpenSprinkler-Firmware/sensor-expander/" />
+      <link rel="shortcut icon" href="../img/favicon.ico" />
+    <title>User Manual - OpenSprinkler Documentation</title>
+    <link rel="stylesheet" href="../css/theme.css" />
+    <link rel="stylesheet" href="../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../custom.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "User Manual";
+        var mkdocs_page_input_path = "sensor-expander.md";
+        var mkdocs_page_url = "/OpenSprinkler-Firmware/sensor-expander/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href=".." class="icon icon-home"> OpenSprinkler Documentation
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="..">Home</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../faq/">FAQ</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../troubleshooting/">Troubleshooting</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../firmware-update/">Firmware Update</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Firmware v2.2.1(5) [NEW]</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../2.2.1/221_5_manual/">User Manual</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../2.2.1/221_5_api/">API Reference</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Firmware v2.2.1(4)</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../2.2.1/221_4_manual/">User Manual</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../2.2.1/221_4_api/">API Reference</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Zone Expander</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../zone-expander/">User Manual</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Sensor Expander [NEW]</span></p>
+              <ul class="current">
+                  <li class="toctree-l1 current"><a class="reference internal current" href="./">User Manual</a>
+    <ul class="current">
+    <li class="toctree-l2"><a class="reference internal" href="#introduction">Introduction</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#hardware-wiring">Hardware &amp; Wiring</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#1-insert-expander-cable">1. Insert Expander Cable</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#2-wiring-an-analog-sensor">2. Wiring an Analog Sensor</a>
+        <ul>
+    <li class="toctree-l4"><a class="reference internal" href="#important-notes-supply-and-signal-voltage-limits">⚠️ Important Notes: Supply and Signal Voltage Limits</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#3-detection-and-troubleshooting">3. Detection and Troubleshooting</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#edit-sensors-sensor-logs">Edit Sensors &amp; Sensor Logs</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#add-or-edit-a-sensor">Add or Edit a Sensor</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#configure-an-ads1115-sensor">Configure an ADS1115 Sensor</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#configure-other-sensor-types">Configure Other Sensor Types</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#display-sensor-readings">Display Sensor Readings</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#viewdownloaddelete-sensor-logs">View/Download/Delete Sensor Logs</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#sensor-adjustments">Sensor Adjustments</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#configure-a-sensor-adjustment">Configure a Sensor Adjustment</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#combined-adjustment">Combined Adjustment</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#specifications">Specifications</a>
+    </li>
+    </ul>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Archived</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../archive/">Previous Manuals and API docs</a>
+                  </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="..">OpenSprinkler Documentation</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href=".." class="icon icon-home" aria-label="Docs"></a></li>
+          <li class="breadcrumb-item">Sensor Expander [NEW]</li>
+      <li class="breadcrumb-item active">User Manual</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/OpenSprinkler/OpenSprinkler-Firmware/edit/master/docs/sensor-expander.md" class="icon icon-github"> Edit on GitHub</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="sensor-expander-user-manual">Sensor Expander User Manual</h1>
+<h2 id="introduction">Introduction</h2>
+<p><img alt="OpenSprinkler Sensor Expander" src="../assets/images/senexp.jpeg" /></p>
+<p>The <strong>Sensor Expander</strong> provides 16 channels of analog sensor inputs to OpenSprinkler. It allows OpenSprinkler to interface with a wide variety of external sensors, such as temperature, soil moisture, light, pressure, and water-level sensors. The firmware can read, display, and log their values, and use them to adjust watering times automatically based on real-world conditions. Examples include: reducing watering when soil moisture is high, adjusting for temperature, accounting for ambient light levels, or stopping irrigation when a water tank runs low.</p>
+<div class="admonition note">
+<p class="admonition-title">Compatibility</p>
+<ul>
+<li>The Sensor Expander requires an <strong>OpenSprinkler v3</strong> (v3.0-3.4) main controller, running <strong>Firmware 2.2.1(5)</strong> or newer. The App/UI version must be <strong>2.4.96</strong> or newer.</li>
+<li>Each main controller only supports <strong>one Sensor Expander</strong>.</li>
+<li>The Sensor Expander may be used together with <strong>Zone Expanders</strong> (up to four).</li>
+</ul>
+</div>
+<p>The Sensor Expander is <strong>NOT</strong> compatible with OpenSprinkler v2.3 or OpenSprinkler Pi (OSPi). However, <strong>recent versions of OSPi</strong> (v1.5 and v2.0) feature two on-board ADS1115 chips, providing 8 channels of analog inputs out of the box when updated to firmware 2.2.1(5).</p>
+<p><strong>Sensor Terminology</strong>:</p>
+<ul>
+<li><strong>Built-in Sensors</strong> refer to sensor ports on the main controller, identified by <code>SN1</code>–<code>SN4</code> where available. They support <strong>digital</strong> sensors such as rain, flow, and program switch.</li>
+<li><strong>Expanded Sensors</strong> are managed through <strong>Edit Sensors</strong>. They include <strong>analog</strong> sensors connected to the Sensor Expander and <strong>virtual</strong> sensors such as Aggregate and System Internal sensors. Expanded Sensors can be used for program adjustment.</li>
+</ul>
+<hr class="double">
+
+<h2 id="hardware-wiring">Hardware &amp; Wiring</h2>
+<div class="admonition warning">
+<p class="admonition-title">Power Off Before Making Changes</p>
+<p>Always <strong>power off the main controller</strong> before making expander changes (connecting, disconnecting, re-wiring). Never plug in/out a ribbon cable, or install/remove sensors while the main controller is alive.</p>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Use the Correct Expander Port</p>
+<p>On <strong>OpenSprinkler v3</strong>, use the port on the left marked <strong>Expander</strong>. Do NOT use the port on the right marked <strong>Ether</strong>; that port is only for the wired Ethernet module.</p>
+</div>
+<h3 id="1-insert-expander-cable">1. Insert Expander Cable</h3>
+<ul>
+<li>With the main controller powered off, plug one end of the ribbon cable into the main controller's <strong>Expander</strong> port. On OpenSprinkler v3, this is the port on the left. The connector is keyed and has a raised <strong>bump</strong>, which must align with the <strong>notch</strong> in the receptacle. When correctly oriented as shown below, the red stripe on the ribbon cable is always on the right side of the receptacle. If the connector does not seat easily, stop and check its orientation; never force it.</li>
+</ul>
+<p><img alt="Keyed ribbon cable connector" class="center_wider img-border" src="../assets/images/ribbon_connector_keyed.jpg" /></p>
+<ul>
+<li>Plug the other end of the cable into the Sensor Expander. Again, the connector is keyed, and its bump must match the notch at the top of the receptacle. The two 2×5 ports on the Sensor Expander are equivalent. Use either one, and use the other to connect Zone Expanders, if present.</li>
+</ul>
+<hr />
+<h3 id="2-wiring-an-analog-sensor">2. Wiring an Analog Sensor</h3>
+<p>Most analog sensors provide the following three connections. Check the sensor's datasheet to verify its wire colors and voltage requirements.</p>
+<ul>
+<li><strong>Power</strong>: Connect to the Sensor Expander's <code>3.3V</code> or <code>5V</code> pin, according to the sensor's supply-voltage requirement.</li>
+<li><strong>Ground</strong>: Connect to the Sensor Expander's <code>GND</code> pin.</li>
+<li><strong>Signal</strong>: Connect the sensor's output to one of the 16 inputs, labeled <code>A1</code>–<code>16</code>.</li>
+</ul>
+<h4 class="notes-title" id="important-notes-supply-and-signal-voltage-limits">⚠️ Important Notes: Supply and Signal Voltage Limits</h4>
+<ul>
+<li>The expander provides dual voltages: <code>3.3V</code> and <code>5V</code>. The <code>5V</code> rail is denoted <code>VDD</code> below.</li>
+<li>Due to legacy design, on an <strong>AC-powered OpenSprinkler v3</strong>, the expander's <code>5V</code> (<code>VDD</code>) pin supplies only <code>4.3V</code> (one diode drop below <code>5V</code>). You should normally use this pin if <code>4.3V</code> is sufficient to power your sensor. If your sensor requires a true <code>5V</code> supply, you may use the main controller's <code>+5V</code> pin. However, the expander's <code>VDD</code> remains at a lower voltage, so your sensor's output must <strong>never exceed <code>VDD + 0.3V</code></strong> to avoid any potential damage. For example, with <code>VDD = 4.3V</code>, your sensor's output must remain below <code>4.6V</code>, regardless of its supply voltage. Exceeding this limit risks damaging the expander's ADC chips.</li>
+<li>These limits are compatible with many common irrigation sensors. For example, SMT50, VH400, and THERM200 all accept a supply voltage of <code>4.3V</code> and produce an output between <code>0–3V</code>. They can therefore operate from the expander's VDD while remaining well below the ADC input limit.</li>
+<li>Before connecting a sensor, carefully check its datasheet for both its required supply voltage and its maximum output voltage, to make sure they are within limits.</li>
+</ul>
+<p>(<em>The expander's <code>1WD</code> pins are reserved for 1-wire devices and are not enabled in this firmware.</em>)</p>
+<hr />
+<h3 id="3-detection-and-troubleshooting">3. Detection and Troubleshooting</h3>
+<p>After wiring is complete, power on the controller and open <strong>Edit Sensors</strong>. When adding an ADS1115 sensor (the default sensor type), the interface shows a warning if the required analog hardware is not detected. If detection fails:</p>
+<ol>
+<li>Power off the controller.</li>
+<li>Check the ribbon-cable orientation and seating.</li>
+<li>Check all connections in the expansion chain.</li>
+<li>Power on the controller and check again.</li>
+</ol>
+<p>For additional diagnostic guidance, see <a href="../troubleshooting/">Troubleshooting</a>.</p>
+<hr class="double">
+
+<h2 id="edit-sensors-sensor-logs">Edit Sensors &amp; Sensor Logs</h2>
+<p>The instructions below describe <strong>Firmware 2.2.1(5)</strong> and <strong>App/UI 2.4.96</strong>. The firmware supplies sensor metadata to the UI, so later releases may display additional types, fields, or units.</p>
+<h3 id="add-or-edit-a-sensor">Add or Edit a Sensor</h3>
+<p><img alt="Add and configure an Expanded Sensor" src="../assets/images/senexp_addsensor.jpg" /></p>
+<p>Open <strong>Edit Sensors</strong>, then add a new sensor or modify an existing sensor. Every sensor has the following common settings:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Setting</th>
+<th style="text-align: left;">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>Name</code></td>
+<td style="text-align: left;">User-defined sensor name (up to 32 characters).</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>Enabled</code></td>
+<td style="text-align: left;">Sensor enable flag.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>Logging</code></td>
+<td style="text-align: left;">Enable logging of this sensor.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>Show on Home</code></td>
+<td style="text-align: left;">Display the latest reading on the homepage.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>Type</code></td>
+<td style="text-align: left;">ADS1115, Aggregate, System Internal, or Onboard Digital.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>Interval</code></td>
+<td style="text-align: left;">Time between sensor readings and logging, in minutes. See note below.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>Unit</code></td>
+<td style="text-align: left;">Physical unit for this sensor.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>Min/Max</code></td>
+<td style="text-align: left;">Output limits. Values outside this range are clamped<br>and marked in the sensor status.</td>
+</tr>
+</tbody>
+</table>
+<p><br>Each new sensor is assigned a <strong>stable ID</strong> (<code>uuid</code>). Unlike a positional index, a <code>uuid</code> does not change when sensors are deleted, modified, or reordered, so logs, program adjustments, and Aggregate Sensors can continue to identify the sensor by its <code>uuid</code>.</p>
+<div class="admonition note">
+<p class="admonition-title">Choosing an Interval</p>
+<p><code>Interval</code> controls how often the sensor is read and logged (if enabled). A shorter value leads to more frequent logging, which can slow down log retrieval and chart display, and reduce the relative log capacity for other sensors. Most irrigation-related measurements change slowly, so we recommend an <code>Interval</code> of <code>15</code> minutes or longer. Use a smaller value only if your application truly needs it.</p>
+</div>
+<hr />
+<h3 id="configure-an-ads1115-sensor">Configure an ADS1115 Sensor</h3>
+<p>To configure an ADS1115 sensor: first type in the <code>Pin</code> number (<code>1</code>–<code>16</code>) to which the sensor is wired, then choose a <code>Subtype</code>:</p>
+<ul>
+<li><strong>Linear</strong>: Converts raw ADC voltage linearly by <code>value = scale × voltage + offset</code>. The <code>scale</code> is applied first, followed by the <code>offset</code>.</li>
+<li><strong>Baked-in Types</strong>: Pre-configured for known sensors (SMT50, SMT100, VH400, THERM200, AquaPlumb). The firmware internally applies the formula obtained from these sensors' datasheets to convert raw ADC voltage to sensor readings. Users can additionally apply post-conversion <code>scale</code> and <code>offset</code> to calibrate the readings.</li>
+<li><strong>Piecewise Linear</strong>: The most flexible type, supporting non-linear mapping of voltage by 2-8 sample points, each a <code>(voltage, value)</code> pair. Values between points are interpolated.</li>
+</ul>
+<p>The Sensor Expander is only detected during controller startup. If the expander is not plugged in, or plugged in after the controller is powered on, a warning <em><code>The required hardware for this type was not detected</code></em> will be shown in the UI.</p>
+<hr />
+<h3 id="configure-other-sensor-types">Configure Other Sensor Types</h3>
+<p>The Edit Sensor interface also allows non-ADS1115 sensors, including:</p>
+<ul>
+<li><strong>Aggregate:</strong> Combines up to eight <strong>child</strong> sensors and aggregates their data using operations like <code>Min</code>, <code>Max</code>, <code>Average</code>, <code>Sum</code>, <code>Median</code>, or <code>Range</code>. Each child may have its own <code>scale</code> and <code>offset</code>. This is useful, for example, when you need to average or denoise readings from multiple soil moisture sensors. Aggregate sensors can themselves be children of other aggregate sensors, allowing flexible hierarchies.</li>
+<li><strong>System Internal:</strong> Monitor metrics like available Heap size and Flash size. Combined with logging, this lets you track the microcontroller’s resource usage over time.</li>
+<li><strong>Onboard Digital:</strong> Allows you to programmatically link the controller’s built-in digital sensors (e.g., rain, soil) to the Expanded Sensor interface. Normally, built-in sensors affect watering on a per-zone basis (via each zone’s <strong>Ignore Sensor</strong> flag). By routing them through the Expanded Sensor interface, you can use them in program-level adjustments.</li>
+</ul>
+<p>(<em>The </em><em>Weather Sensor</em><em> type is currently disabled in firmware 2.2.1(5).</em>)</p>
+<hr />
+<h3 id="display-sensor-readings">Display Sensor Readings</h3>
+<p><img alt="Sensor Show on Homepage" class="center img-border" src="../assets/images/senexp_showonhome.jpg" /></p>
+<p>A sensor's most recent reading is displayed on the homepage if its <code>Show on Home</code> flag is set. Below is a list of <strong>Sensor Value Indicators</strong>:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Indicator</th>
+<th style="text-align: left;">Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><span style="color:#27AE60"><strong>Green value</strong></span></td>
+<td style="text-align: left;">The displayed value is valid and current.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><span style="color:#E67E22"><strong>Orange with ⚠</strong></span></td>
+<td style="text-align: left;">The most recent read failed because of a hardware or communication<br>error, or the value is stale because its update window passed without<br>a successful reading.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><span style="color:#5D99C3"><strong>Blue with ⊤</strong></span></td>
+<td style="text-align: left;">The value exceeded <code>max</code> and was clamped.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><span style="color:#5D99C3"><strong>Blue with ⊥</strong></span></td>
+<td style="text-align: left;">The value fell below <code>min</code> and was clamped.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Gray —</strong></td>
+<td style="text-align: left;">No valid reading yet, such as before the first successful reading.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="viewdownloaddelete-sensor-logs">View/Download/Delete Sensor Logs</h3>
+<p><img alt="Sensor Logs" class="center_wider" src="../assets/images/senexp_log.jpg" /></p>
+<p>The <strong>Sensor Logs</strong> page displays retained sensor readings. Here you can:</p>
+<ul>
+<li><strong>View</strong> sensor readings over a selected period (<code>3H</code>, <code>1D</code>, <code>1W</code>, <code>All</code>).</li>
+<li>Drag-select a region to <strong>zoom in</strong>, or pinch to zoom on a mobile device, then <strong>Reset Zoom</strong>.</li>
+<li><strong>Download</strong> an individual sensor's data as a <code>.csv</code> spreadsheet.</li>
+<li><strong>Download All</strong> sensor logs.</li>
+<li><strong>Delete All</strong> logs, or delete an individual sensor's records.</li>
+<li>A <strong>Show Inactive</strong> checkbox lets you view logs from previously deleted sensors.</li>
+</ul>
+<hr class="double">
+
+<h2 id="sensor-adjustments">Sensor Adjustments</h2>
+<p>The <strong>Edit Programs</strong> page now includes a new <strong>Use Sensor Adjustment</strong> section. It lets you define how the program's station run times should be scaled based on the value of a selected sensor. For example, reducing watering when soil moisture is high, increasing it when temperature is warm, or stopping watering at a defined sensor value. You can use any sensor as input, including an Aggregate Sensor that combines readings from multiple sources.</p>
+<p><img alt="Sensor Adjustments" class="img-border" src="../assets/images/senexp_senadj.jpg" /></p>
+<h3 id="configure-a-sensor-adjustment">Configure a Sensor Adjustment</h3>
+<p>Go to <strong>Edit Programs</strong>, add a new program or select an existing program, then enable <strong>Use Sensor Adjustment</strong>. Select a sensor from the dropdown list, then define a custom <strong>Adjustment Curve</strong> by providing up to eight sample points, each a <code>{sensor_value, watering %}</code> pair. Values between points are linearly interpolated, and values outside the range use the nearest endpoint factor. Duplicate values are allowed and define a step. The curve is visualized in real time as you add or modify sample points. When available, the current sensor value is shown as a green dotted line for reference. </p>
+<p>If the selected sensor is disabled or deleted, or its reading is unavailable, failed, or stale, the sensor adjustment factor defaults to <code>100%</code>.</p>
+<hr />
+<h3 id="combined-adjustment">Combined Adjustment</h3>
+<p><strong>Sensor Adjustment</strong> and <strong>Weather Adjustment</strong> can work alongside each other. The program’s final water time is multiplied by both the sensor-based and the weather-based "watering %" values. When both are enabled for a program:</p>
+<pre><code class="language-text">total_adjustment_factor = weather adjustment × sensor adjustment
+</code></pre>
+<p>The <strong>Program Preview</strong> feature calculates the total adjustment when displaying the resulting water time of each station in a program. For example:</p>
+<pre><code class="language-text">Weather adjustment: 80%
+Sensor adjustment:  150%
+Total adjustment:   80% × 150% = 120%
+</code></pre>
+<p>A station with a programmed duration of <code>30</code> minutes would therefore run for<br><code>30 × 120% = 36</code> minutes.</p>
+<hr class="double">
+
+<h2 id="specifications">Specifications</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;"></th>
+<th style="text-align: left;">Sensor Expander</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Num. of ADC Channels:</strong></td>
+<td style="text-align: left;">16</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Dimensions:</strong></td>
+<td style="text-align: left;">63.5 × 63.5 × 25.4 mm<br>(2.5 × 2.5 × 1.0 in)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Weight:</strong></td>
+<td style="text-align: left;">113 g (4 oz)</td>
+</tr>
+</tbody>
+</table>
+<hr class="double">
+              
+            </div>
+          </div><footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
+        <a href="../zone-expander/" class="btn btn-neutral float-left" title="User Manual"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+        <a href="../archive/" class="btn btn-neutral float-right" title="Previous Manuals and API docs">Next <span class="icon icon-circle-arrow-right"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/OpenSprinkler/OpenSprinkler-Firmware" class="fa fa-github" style="color: #fcfcfc"> GitHub</a>
+        </span>
+    
+    
+      <span><a href="../zone-expander/" style="color: #fcfcfc">&laquo; Previous</a></span>
+    
+    
+      <span><a href="../archive/" style="color: #fcfcfc">Next &raquo;</a></span>
+    
+  </span>
+</div>
+    <script src="../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "..";</script>
+    <script src="../js/theme_extra.js"></script>
+    <script src="../js/theme.js"></script>
+      <script src="../js/nav_badges.js"></script>
+      <script src="../search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>
