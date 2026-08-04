@@ -6,8 +6,8 @@ LD=$(CXX)
 LIBS=pthread mosquitto ssl crypto i2c lgpio
 LDFLAGS=$(addprefix -l,$(LIBS))
 BINARY=OpenSprinkler
-SOURCES=main.cpp OpenSprinkler.cpp notifier.cpp program.cpp opensprinkler_server.cpp utils.cpp weather.cpp gpio.cpp mqtt.cpp smtp.c RCSwitch.cpp i2cd.cpp ads1115.cpp $(wildcard sensors/*.cpp) $(wildcard external/TinyWebsockets/tiny_websockets_lib/src/*.cpp) $(wildcard external/OpenThings-Framework-Firmware-Library/*.cpp)
-HEADERS=$(wildcard *.h) $(wildcard *.hpp) $(wildcard sensors/*.h)
+SOURCES=main.cpp OpenSprinkler.cpp notifier.cpp program.cpp opensprinkler_server.cpp utils.cpp weather.cpp gpio.cpp mqtt.cpp smtp.c RCSwitch.cpp i2cd.cpp ads1115.cpp $(wildcard boards/*.cpp) $(wildcard sensors/*.cpp) $(wildcard external/TinyWebsockets/tiny_websockets_lib/src/*.cpp) $(wildcard external/OpenThings-Framework-Firmware-Library/*.cpp)
+HEADERS=$(wildcard *.h) $(wildcard *.hpp) $(wildcard boards/*.h) $(wildcard sensors/*.h)
 OBJECTS=$(addsuffix .o,$(basename $(SOURCES)))
 
 .PHONY: all
@@ -30,7 +30,13 @@ container:
 TEST_HTTP_PORT?=18080
 
 .PHONY: test-api
-test-api:
+test-api: test-board-profiles
 	$(MAKE) clean
 	$(MAKE) VERSION=DEMO EXTRA_CXXFLAGS="-DHTTP_PORT=$(TEST_HTTP_PORT)"
 	python3 tests/api_contract.py --port $(TEST_HTTP_PORT)
+
+.PHONY: test-board-profiles
+test-board-profiles:
+	@set -e; output=$$(mktemp); trap 'rm -f "$$output"' EXIT; \
+		$(CXX) -std=gnu++14 -I. tests/board_profile_test.cpp boards/board_profile.cpp -o "$$output"; \
+		"$$output"

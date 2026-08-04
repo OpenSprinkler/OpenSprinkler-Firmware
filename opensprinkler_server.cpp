@@ -386,10 +386,10 @@ void server_json_stations_main(OTF_PARAMS_DEF) {
 	server_json_board_attrib(PSTR("masop3"), os.attrib_mas3);
 	server_json_board_attrib(PSTR("masop4"), os.attrib_mas4);
 	server_json_board_attrib(PSTR("ignore_rain"), os.attrib_igrd);
-	// Per-sensor "ignore" board mask. SN3/SN4 only emitted on OS 3.4+.
+	// Per-sensor "ignore" board mask. SN3/SN4 are emitted when present.
 	server_json_board_attrib(PSTR("ignore_sn1"), os.attrib_igs[0]);
 	server_json_board_attrib(PSTR("ignore_sn2"), os.attrib_igs[1]);
-	if (os.hw_rev >= 4) {
+	if (sensor_available(2)) {
 		server_json_board_attrib(PSTR("ignore_sn3"), os.attrib_igs[2]);
 		server_json_board_attrib(PSTR("ignore_sn4"), os.attrib_igs[3]);
 	}
@@ -512,7 +512,7 @@ void server_change_stations(OTF_PARAMS_DEF) {
 	server_change_board_attrib(FKV_SOURCE, 'i', os.attrib_igrd); // ignore rain delay
 	server_change_board_attrib(FKV_SOURCE, 'j', os.attrib_igs[0]); // ignore sensor1
 	server_change_board_attrib(FKV_SOURCE, 'k', os.attrib_igs[1]); // ignore sensor2
-	if (os.hw_rev >= 4) {
+	if (sensor_available(2)) {
 		server_change_board_attrib(FKV_SOURCE, 'o', os.attrib_igs[2]); // ignore sensor3
 		server_change_board_attrib(FKV_SOURCE, 'r', os.attrib_igs[3]); // ignore sensor4
 	}
@@ -1004,7 +1004,7 @@ void server_json_options_main() {
 		}
 
 		if ((oid>=IOPT_SENSOR3_TYPE && oid<=IOPT_SENSOR4_OFF_DELAY)) {
-			if (os.hw_rev < 4) continue; // SN3/SN4 only on OS 3.4+
+			if (!sensor_available(2)) continue;
 		}
 		#else
 		if (oid==IOPT_BOOST_TIME || oid==IOPT_I_MIN_THRESHOLD || oid==IOPT_I_MAX_LIMIT || oid==IOPT_LATCH_ON_VOLTAGE || oid==IOPT_LATCH_OFF_VOLTAGE || oid==IOPT_TARGET_PD_VOLTAGE) continue;
@@ -1174,12 +1174,12 @@ void server_json_controller_main(OTF_PARAMS_DEF) {
 							pd.nqueue,
 							os.status.overcurrent_sid);
 
-	// SN3/SN4 only present on OS 3.4+ hardware. UI uses key-presence to
+	// SN3/SN4 are only emitted when present. UI uses key-presence to
 	// decide whether to render the corresponding controls.
-		if (os.hw_rev >= 4) {
-			bfill.emit_p(PSTR("\"sn3\":$D,\"sn4\":$D,"),
-								 os.sn_sensors[2].active,
-								 os.sn_sensors[3].active);
+	if (sensor_available(2)) {
+		bfill.emit_p(PSTR("\"sn3\":$D,\"sn4\":$D,"),
+			os.sn_sensors[2].active,
+			os.sn_sensors[3].active);
 	}
 
 #if defined(ESP8266)

@@ -354,18 +354,37 @@ enum {
 #undef OS_HW_VERSION
 
 /** Hardware defines */
+#include "boards/board_profile.h"
+
+// Compatibility names for callers while pin access migrates to board profiles.
+#define PIN_BUTTON_1    (osboard::active().pins.buttons[0])
+#define PIN_BUTTON_2    (osboard::active().pins.buttons[1])
+#define PIN_BUTTON_3    (osboard::active().pins.buttons[2])
+#define PIN_SENSOR1     (osboard::active().pins.sensors[0])
+#define PIN_SENSOR2     (osboard::active().pins.sensors[1])
+#define PIN_SENSOR3     (osboard::active().pins.sensors[2])
+#define PIN_SENSOR4     (osboard::active().pins.sensors[3])
+#define PIN_RFRX        (osboard::active().pins.rf_rx)
+#define PIN_RFTX        (osboard::active().pins.rf_tx)
+#define PIN_BOOST       (osboard::active().pins.boost)
+#define PIN_BOOST_EN    (osboard::active().pins.boost_enable)
+#define PIN_LATCH_COM   (osboard::active().pins.latch_common)
+#define PIN_LATCH_COMA  (osboard::active().pins.latch_common_anode)
+#define PIN_LATCH_COMK  (osboard::active().pins.latch_common_cathode)
+#define PIN_IOEXP_INT   (osboard::active().pins.io_expander_interrupt)
+
 #if defined(ESP8266) // for ESP8266
 
 	#define OS_HW_VERSION    (OS_HW_VERSION_BASE+30)
-	#define IOEXP_PIN        0x80 // base for pins on main IO expander
-	#define MAIN_I2CADDR     0x20 // main IO expander I2C address
-	#define ACDR_I2CADDR     0x21 // ac driver I2C address
-	#define DCDR_I2CADDR     0x22 // dc driver I2C address
-	#define LADR_I2CADDR     0x23 // latch driver I2C address
-	#define EXP_I2CADDR_BASE 0x24 // base of expander I2C address
-	#define LCD_I2CADDR      0x3C // 128x64 OLED display I2C address
-	#define EEPROM_I2CADDR   0x50 // 24C02 EEPROM I2C address
-	#define CH224_I2CADDR    0x22 // CH224A/Q I2C address
+	#define IOEXP_PIN        osboard::IO_EXPANDER_PIN_BASE
+	#define MAIN_I2CADDR     osboard::MAIN_IO_EXPANDER_ADDRESS
+	#define ACDR_I2CADDR     osboard::AC_DRIVER_ADDRESS
+	#define DCDR_I2CADDR     osboard::DC_DRIVER_ADDRESS
+	#define LADR_I2CADDR     osboard::LATCH_DRIVER_ADDRESS
+	#define EXP_I2CADDR_BASE osboard::EXPANDER_ADDRESS_BASE
+	#define LCD_I2CADDR      osboard::LCD_ADDRESS
+	#define EEPROM_I2CADDR   osboard::EEPROM_ADDRESS
+	#define CH224_I2CADDR    osboard::CH224_ADDRESS
 
 	#define PIN_CURR_SENSE    A0    // current sensing pin
 	#define PIN_LATCH_VOLT_SENSE A0 // latch voltage sensing pin
@@ -373,98 +392,19 @@ enum {
 	#define ETHER_BUFFER_SIZE   2048
 	#define ETHER_BUFFER_ALLOC_SIZE   ETHER_BUFFER_SIZE
 
-	#define PIN_ETHER_CS       16 // Ethernet CS (chip select pin) is 16 on OS 3.2 and above
-	#define ETHER_SPI_CLOCK    10000000L // SPI clock for Ethernet (e.g. 10MHz)
-
-	/* To accommodate different OS30 versions, we use software defines pins */
-	extern unsigned char PIN_BUTTON_1;
-	extern unsigned char PIN_BUTTON_2;
-	extern unsigned char PIN_BUTTON_3;
-	extern unsigned char PIN_RFRX;
-	extern unsigned char PIN_RFTX;
-	extern unsigned char PIN_BOOST;
-	extern unsigned char PIN_BOOST_EN;
-	extern unsigned char PIN_LATCH_COM;
-	extern unsigned char PIN_LATCH_COMA;
-	extern unsigned char PIN_LATCH_COMK;
-	extern unsigned char PIN_SENSOR1;
-	extern unsigned char PIN_SENSOR2;
-	extern unsigned char PIN_SENSOR3;
-	extern unsigned char PIN_SENSOR4;
-	extern unsigned char PIN_IOEXP_INT;
-
-	/* Original OS30 pin defines */
-	//#define V0_MAIN_INPUTMASK 0b00001010 // main input pin mask
-	// pins on main PCF8574 IO expander have pin numbers IOEXP_PIN+i
-	#define V0_PIN_BUTTON_1      IOEXP_PIN+1 // button 1
-	#define V0_PIN_BUTTON_2      0           // button 2
-	#define V0_PIN_BUTTON_3      IOEXP_PIN+3 // button 3
-	#define V0_PIN_RFRX          14
-	#define V0_PIN_PWR_RX        IOEXP_PIN+0
-	#define V0_PIN_RFTX          16
-	#define V0_PIN_PWR_TX        IOEXP_PIN+2
-	#define V0_PIN_BOOST         IOEXP_PIN+6
-	#define V0_PIN_BOOST_EN      IOEXP_PIN+7
-	#define V0_PIN_SENSOR1       12 // sensor 1
-	#define V0_PIN_SENSOR2       13 // sensor 2
-
-	/* OS31 pin defines */
-	// pins on PCA9555A IO expander have pin numbers IOEXP_PIN+i
-	#define V1_IO_CONFIG         0x1F00 // config bits
-	#define V1_IO_OUTPUT         0x1F00 // output bits
-	#define V1_PIN_BUTTON_1      IOEXP_PIN+10 // button 1
-	#define V1_PIN_BUTTON_2      IOEXP_PIN+11 // button 2
-	#define V1_PIN_BUTTON_3      IOEXP_PIN+12 // button 3
-	#define V1_PIN_RFRX          14
-	#define V1_PIN_RFTX          16
-	#define V1_PIN_IOEXP_INT     12
-	#define V1_PIN_BOOST         IOEXP_PIN+13
-	#define V1_PIN_BOOST_EN      IOEXP_PIN+14
-	#define V1_PIN_LATCH_COM     IOEXP_PIN+15
-	#define V1_PIN_SENSOR1       IOEXP_PIN+8 // sensor 1
-	#define V1_PIN_SENSOR2       IOEXP_PIN+9 // sensor 2
-
-	/* OS32 pin defines */
-	// pins on PCA9555A IO expander have pin numbers IOEXP_PIN+i
-	#define V2_IO_CONFIG         0x1000 // config bits
-	#define V2_IO_OUTPUT         0x1E00 // output bits
-	#define V2_PIN_BUTTON_1      2 // button 1
-	#define V2_PIN_BUTTON_2      0 // button 2
-	#define V2_PIN_BUTTON_3      IOEXP_PIN+12 // button 3
-	#define V2_PIN_RFTX          15
-	#define V2_PIN_BOOST         IOEXP_PIN+13
-	#define V2_PIN_BOOST_EN      IOEXP_PIN+14
-	#define V2_PIN_LATCH_COMA    IOEXP_PIN+8  // latch COM+ (anode)
-	#define V2_PIN_SRLAT         IOEXP_PIN+9  // shift register latch
-	#define V2_PIN_SRCLK         IOEXP_PIN+10 // shift register clock
-	#define V2_PIN_SRDAT         IOEXP_PIN+11 // shift register data
-	#define V2_PIN_LATCH_COMK    IOEXP_PIN+15 // latch COM- (cathode)
-	#define V2_PIN_SENSOR1       3  // sensor 1
-	#define V2_PIN_SENSOR2       10 // sensor 2
-	#define V2_PIN_SENSOR3       IOEXP_PIN+10 // sensor 3 (OS 3.4 only — IO expander pin)
-	#define V2_PIN_SENSOR4       IOEXP_PIN+11 // sensor 4 (OS 3.4 only — IO expander pin)
-	#define V2_PIN_BOOST_SEL     IOEXP_PIN+8
+	#define PIN_ETHER_CS       osboard::ETHERNET_CS_PIN
+	#define ETHER_SPI_CLOCK    osboard::ETHERNET_SPI_CLOCK_HZ
 
 	#define USE_DISPLAY
 
 #elif defined(OSPI) // for OSPi
 
 	#define OS_HW_VERSION    OSPI_HW_VERSION_BASE
-	#define PIN_SR_LATCH      22    // shift register latch pin
-	#define PIN_SR_DATA       27    // shift register data pin
-	#define PIN_SR_DATA_ALT   21    // shift register data pin (alternative, for RPi 1 rev. 1 boards)
-	#define PIN_SR_CLOCK       4    // shift register clock pin
-	#define PIN_SR_OE         17    // shift register output enable pin
-	#define PIN_SENSOR1       14
-	#define PIN_SENSOR2       23
-	// SN3/SN4 don't exist on OSPi hardware; sentinel values are referenced by
-	// sensor_pin() but never reached at runtime (sensor_available() returns false).
-	#define PIN_SENSOR3       255
-	#define PIN_SENSOR4       255
-	#define PIN_RFTX          15    // RF transmitter pin
-	#define PIN_BUTTON_1      24    // button 1
-	#define PIN_BUTTON_2      18    // button 2
-	#define PIN_BUTTON_3      10    // button 3
+	#define PIN_SR_LATCH      osboard::OSPI_SHIFT_LATCH_PIN
+	#define PIN_SR_DATA       osboard::OSPI_SHIFT_DATA_PIN
+	#define PIN_SR_DATA_ALT   osboard::OSPI_SHIFT_DATA_ALT_PIN
+	#define PIN_SR_CLOCK      osboard::OSPI_SHIFT_CLOCK_PIN
+	#define PIN_SR_OE         osboard::OSPI_SHIFT_OUTPUT_ENABLE_PIN
 
 	#define PIN_FREE_LIST       {5,6,7,8,9,11,12,13,16,19,20,21,23,25,26}  // free GPIO pins
 	#define ETHER_BUFFER_SIZE   8192
@@ -486,11 +426,6 @@ enum {
 	#define PIN_SR_DATA     0
 	#define PIN_SR_CLOCK    0
 	#define PIN_SR_OE       0
-	#define PIN_SENSOR1     0
-	#define PIN_SENSOR2     0
-	#define PIN_SENSOR3     0
-	#define PIN_SENSOR4     0
-	#define PIN_RFTX        0
 	#define PIN_FREE_LIST  {}
 	#define ETHER_BUFFER_SIZE   8192  // HTTP client send/receive (weather, notifier, remote station)
 	#define ETHER_BUFFER_ALLOC_SIZE   ETHER_BUFFER_SIZE

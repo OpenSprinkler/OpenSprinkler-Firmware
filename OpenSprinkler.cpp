@@ -66,24 +66,11 @@ const uint8_t sensor_log_codes[NUM_SENSORS] = {
 };
 
 unsigned char sensor_pin(uint8_t i) {
-	switch (i) {
-		case 0: return PIN_SENSOR1;
-		case 1: return PIN_SENSOR2;
-	#if defined(ESP8266)
-		case 2: return PIN_SENSOR3;
-		case 3: return PIN_SENSOR4;
-	#endif
-	}
-	return 255;
+	return i < NUM_SENSORS ? osboard::active().pins.sensors[i] : osboard::UNUSED_PIN;
 }
 
 bool sensor_available(uint8_t i) {
-	if (i < 2) return true;
-#if defined(ESP8266)
-	return OpenSprinkler::hw_rev >= 4;
-#else
-	return false;
-#endif
+	return i < osboard::active().sensor_count;
 }
 
 int8_t sensor_index_from_log_code(uint8_t type) {
@@ -393,7 +380,7 @@ unsigned char OpenSprinkler::start_network() {
 }
 
 unsigned char OpenSprinkler::start_ether() {
-	if(hw_rev<2) return 0;  // ethernet capability is only available when hw_rev>=2
+	if(!osboard::has(osboard::CAP_ETHERNET)) return 0;
 	eth.isW5500 = (hw_rev==2)?false:true; // os 3.2 uses enc28j60 and 3.3 uses w5500
 
 	SPI.begin();
@@ -625,19 +612,11 @@ void OpenSprinkler::begin() {
 	hw_rev = 0;
 
 #if defined(ESP8266)
+	osboard::select(osboard::PROFILE_UNKNOWN);
 	Wire.begin(); // init I2C
 	/* detect hardware revision type */
 	if(detect_i2c(MAIN_I2CADDR)) {	// check if main PCF8574 exists
-		/* assign revision 0 pins */
-		PIN_BUTTON_1 = V0_PIN_BUTTON_1;
-		PIN_BUTTON_2 = V0_PIN_BUTTON_2;
-		PIN_BUTTON_3 = V0_PIN_BUTTON_3;
-		PIN_RFRX = V0_PIN_RFRX;
-		PIN_RFTX = V0_PIN_RFTX;
-		PIN_BOOST = V0_PIN_BOOST;
-		PIN_BOOST_EN = V0_PIN_BOOST_EN;
-		PIN_SENSOR1 = V0_PIN_SENSOR1;
-		PIN_SENSOR2 = V0_PIN_SENSOR2;
+		osboard::select(osboard::PROFILE_OS_30);
 
 		/* check hardware type */
 		if(detect_i2c(ACDR_I2CADDR)) {
@@ -657,8 +636,8 @@ void OpenSprinkler::begin() {
 		mainio = new PCF8574(MAIN_I2CADDR);
 		mainio->i2c_write(0, 0x0F); // set lower four bits of main PCF8574 (8-ch) to high
 
-		digitalWriteExt(V0_PIN_PWR_TX, 1); // turn on TX power
-		digitalWriteExt(V0_PIN_PWR_RX, 1); // turn on RX power
+		digitalWriteExt(osboard::OS30_POWER_TX_PIN, 1); // turn on TX power
+		digitalWriteExt(osboard::OS30_POWER_RX_PIN, 1); // turn on RX power
 		pinModeExt(PIN_BUTTON_2, INPUT_PULLUP);
 		digitalWriteExt(PIN_BOOST, LOW);
 		digitalWriteExt(PIN_BOOST_EN, LOW);
@@ -670,6 +649,7 @@ void OpenSprinkler::begin() {
 		if(digitalRead(16)==LOW) {
 			// revision 1
 			hw_rev = 1;
+			osboard::select(osboard::PROFILE_OS_31);
 			if(detect_i2c(ACDR_I2CADDR)) {
 				hw_type = HW_TYPE_AC;
 				drio = new PCA9555(ACDR_I2CADDR);
@@ -685,20 +665,8 @@ void OpenSprinkler::begin() {
 			}
 			mainio = drio;
 
-			mainio->i2c_write(NXP_CONFIG_REG, V1_IO_CONFIG);
-			mainio->i2c_write(NXP_OUTPUT_REG, V1_IO_OUTPUT);
-
-			PIN_BUTTON_1 = V1_PIN_BUTTON_1;
-			PIN_BUTTON_2 = V1_PIN_BUTTON_2;
-			PIN_BUTTON_3 = V1_PIN_BUTTON_3;
-			PIN_RFRX = V1_PIN_RFRX;
-			PIN_RFTX = V1_PIN_RFTX;
-			PIN_IOEXP_INT = V1_PIN_IOEXP_INT;
-			PIN_BOOST = V1_PIN_BOOST;
-			PIN_BOOST_EN = V1_PIN_BOOST_EN;
-			PIN_LATCH_COM = V1_PIN_LATCH_COM;
-			PIN_SENSOR1 = V1_PIN_SENSOR1;
-			PIN_SENSOR2 = V1_PIN_SENSOR2;
+			mainio->i2c_write(NXP_CONFIG_REG, osboard::OS31_IO_CONFIG);
+			mainio->i2c_write(NXP_OUTPUT_REG, osboard::OS31_IO_OUTPUT);
 		} else { // revision 2 and above
 			// conditions for revision 4:
 			// * has I2C EEPROM @ 0x52? --> OS 3.4 AC (skipping 0x51 due to conflict with PCF8563)
@@ -708,6 +676,7 @@ void OpenSprinkler::begin() {
 			bool has_ch224_1 = detect_i2c(CH224_I2CADDR+1);
 			if(has_eeprom_2 || (has_ch224_0 && has_ch224_1)) {
 				hw_rev = 4;
+				osboard::select(osboard::PROFILE_OS_34);
 				drio = new PCA9555(ACDR_I2CADDR); // all OS 3.4 models have IOEXP at 0x21 due to address conflicts with CH224
 				mainio = drio;
 				if(has_ch224_0 && has_ch224_1) {
@@ -722,6 +691,7 @@ void OpenSprinkler::begin() {
 				} else {
 					hw_rev = 2;
 				}
+				osboard::select(osboard::PROFILE_OS_32_33);
 				if(detect_i2c(ACDR_I2CADDR)) {
 					hw_type = HW_TYPE_AC;
 					drio = new PCA9555(ACDR_I2CADDR);
@@ -738,25 +708,8 @@ void OpenSprinkler::begin() {
 			}
 			mainio = drio;
 
-			mainio->i2c_write(NXP_CONFIG_REG, V2_IO_CONFIG);
-			mainio->i2c_write(NXP_OUTPUT_REG, V2_IO_OUTPUT);
-
-			PIN_BUTTON_1 = V2_PIN_BUTTON_1;
-			PIN_BUTTON_2 = V2_PIN_BUTTON_2;
-			PIN_BUTTON_3 = V2_PIN_BUTTON_3;
-			PIN_RFTX = V2_PIN_RFTX;
-			PIN_BOOST = V2_PIN_BOOST;
-			PIN_BOOST_EN = V2_PIN_BOOST_EN;
-			PIN_LATCH_COMK = V2_PIN_LATCH_COMK; // os3.2latch uses H-bridge separate cathode and anode design
-			PIN_LATCH_COMA = V2_PIN_LATCH_COMA;
-			PIN_SENSOR1 = V2_PIN_SENSOR1;
-			PIN_SENSOR2 = V2_PIN_SENSOR2;
-			if(hw_rev == 4) {
-				// SN3/SN4 are wired to IO expander pins on OS 3.4 only.
-				// Earlier rev2/rev3 boards leave PIN_SENSOR3/4 at the default 255 sentinel.
-				PIN_SENSOR3 = V2_PIN_SENSOR3;
-				PIN_SENSOR4 = V2_PIN_SENSOR4;
-			}
+			mainio->i2c_write(NXP_CONFIG_REG, osboard::OS32_IO_CONFIG);
+			mainio->i2c_write(NXP_OUTPUT_REG, osboard::OS32_IO_OUTPUT);
 		}
 	}
 
@@ -957,7 +910,8 @@ void OpenSprinkler::latch_disable_alloutputs_v2() {
 	// latch v2 has a pca9555 the lowest 8 bits of which control all h-bridge anode pins
 	drio->i2c_write(NXP_OUTPUT_REG, drio->i2c_read(NXP_OUTPUT_REG) & 0xFF00);
 	// latch v2 has a 74hc595 which controls all h-bridge cathode pins
-	drio->shift_out(V2_PIN_SRLAT, V2_PIN_SRCLK, V2_PIN_SRDAT, 0x00);
+	drio->shift_out(osboard::OS32_SHIFT_LATCH_PIN, osboard::OS32_SHIFT_CLOCK_PIN,
+		osboard::OS32_SHIFT_DATA_PIN, 0x00);
 
 	// todo: handle latch expander
 }
@@ -996,7 +950,8 @@ void OpenSprinkler::latch_setzoneoutput_v2(unsigned char sid, unsigned char A, u
 		else reg &= (~(1<<sid));
 		drio->i2c_write(NXP_OUTPUT_REG, reg);
 
-		drio->shift_out(V2_PIN_SRLAT, V2_PIN_SRCLK, V2_PIN_SRDAT, K ? (1<<sid) : 0);
+		drio->shift_out(osboard::OS32_SHIFT_LATCH_PIN, osboard::OS32_SHIFT_CLOCK_PIN,
+			osboard::OS32_SHIFT_DATA_PIN, K ? (1<<sid) : 0);
 
 	} else { // on expander
 		// todo: handle latch expander
@@ -1651,7 +1606,7 @@ void OpenSprinkler::switch_rfstation(RFStationData *data, bool turnon) {
 	RFStationCode code;
 	if(!parse_rfstation_code(data, &code)) return; // return if the timing parameter is 0
 
-	if(PIN_RFTX == 255) return; // ignore RF station if RF pin disabled
+	if(PIN_RFTX == osboard::UNUSED_PIN) return; // ignore RF station if RF pin disabled
 
 	rfswitch.enableTransmit(PIN_RFTX);
 	rfswitch.setProtocol(code.protocol);
