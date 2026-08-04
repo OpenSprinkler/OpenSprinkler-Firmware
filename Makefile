@@ -1,7 +1,7 @@
 CXX=g++
 # -std=gnu++17
 VERSION?=OSPI
-CXXFLAGS=-std=gnu++14 -D$(VERSION) -DSMTP_OPENSSL -Wall -include string.h -include cstdint -Iexternal/TinyWebsockets/tiny_websockets_lib/include -Iexternal/OpenThings-Framework-Firmware-Library/
+CXXFLAGS=-std=gnu++14 -D$(VERSION) -DSMTP_OPENSSL -Wall -include string.h -include cstdint -Iexternal/TinyWebsockets/tiny_websockets_lib/include -Iexternal/OpenThings-Framework-Firmware-Library/ $(EXTRA_CXXFLAGS)
 LD=$(CXX)
 LIBS=pthread mosquitto ssl crypto i2c lgpio
 LDFLAGS=$(addprefix -l,$(LIBS))
@@ -26,3 +26,11 @@ clean:
 .PHONY: container
 container:
 	docker build .
+
+TEST_HTTP_PORT?=18080
+
+.PHONY: test-api
+test-api:
+	$(MAKE) clean
+	$(MAKE) VERSION=DEMO EXTRA_CXXFLAGS="-DHTTP_PORT=$(TEST_HTTP_PORT)"
+	python3 tests/api_contract.py --port $(TEST_HTTP_PORT)
