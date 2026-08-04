@@ -30,7 +30,7 @@ container:
 TEST_HTTP_PORT?=18080
 
 .PHONY: test-api
-test-api: test-board-profiles
+test-api: test-board-profiles test-hardware-detection
 	$(MAKE) clean
 	$(MAKE) VERSION=DEMO EXTRA_CXXFLAGS="-DHTTP_PORT=$(TEST_HTTP_PORT)"
 	python3 tests/api_contract.py --port $(TEST_HTTP_PORT)
@@ -39,4 +39,10 @@ test-api: test-board-profiles
 test-board-profiles:
 	@set -e; output=$$(mktemp); trap 'rm -f "$$output"' EXIT; \
 		$(CXX) -std=gnu++14 -I. tests/board_profile_test.cpp boards/board_profile.cpp -o "$$output"; \
+		"$$output"
+
+.PHONY: test-hardware-detection
+test-hardware-detection:
+	@set -e; output=$$(mktemp); trap 'rm -f "$$output"' EXIT; \
+		$(CXX) -std=gnu++14 -I. tests/hardware_detection_test.cpp boards/hardware_detection.cpp -o "$$output"; \
 		"$$output"

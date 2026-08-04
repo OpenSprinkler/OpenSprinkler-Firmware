@@ -57,6 +57,7 @@ constexpr uint8_t EXPANDER_ADDRESS_BASE = 0x24;
 constexpr uint8_t LCD_ADDRESS = 0x3C;
 constexpr uint8_t EEPROM_ADDRESS = 0x50;
 constexpr uint8_t CH224_ADDRESS = 0x22;
+constexpr uint8_t REVISION1_DETECT_PIN = 16;
 constexpr uint8_t ETHERNET_CS_PIN = 16;
 constexpr uint32_t ETHERNET_SPI_CLOCK_HZ = 10000000UL;
 

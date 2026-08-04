@@ -24,6 +24,7 @@
 #include "OpenSprinkler.h"
 #include "opensprinkler_server.h"
 #include "gpio.h"
+#include "boards/hardware_detection.h"
 #ifdef __has_include
 	#if __has_include("testmode.h")
 		#include "testmode.h"
@@ -606,6 +607,17 @@ void OpenSprinkler::lcd_start() {
 
 //extern void flow_isr();
 
+#if defined(ESP8266)
+static bool probe_i2c_address(uint8_t address) {
+	return detect_i2c(address);
+}
+
+static bool probe_revision1_strap() {
+	pinMode(osboard::REVISION1_DETECT_PIN, INPUT);
+	return digitalRead(osboard::REVISION1_DETECT_PIN) == LOW;
+}
+#endif
+
 /** Initialize pins, controller variables, LCD */
 void OpenSprinkler::begin() {
 	hw_type = HW_TYPE_UNKNOWN;
@@ -614,25 +626,19 @@ void OpenSprinkler::begin() {
 #if defined(ESP8266)
 	osboard::select(osboard::PROFILE_UNKNOWN);
 	Wire.begin(); // init I2C
-	/* detect hardware revision type */
-	if(detect_i2c(MAIN_I2CADDR)) {	// check if main PCF8574 exists
-		osboard::select(osboard::PROFILE_OS_30);
+	const osboard::HardwareDetection hardware =
+		osboard::detect_hardware(probe_i2c_address, probe_revision1_strap);
+	hw_rev = hardware.revision;
+	hw_type = hardware.power_type;
+	osboard::select(hardware.profile);
 
-		/* check hardware type */
-		if(detect_i2c(ACDR_I2CADDR)) {
-			hw_type = HW_TYPE_AC;
-			drio = new PCF8574(ACDR_I2CADDR);
-		} else if(detect_i2c(DCDR_I2CADDR)) {
-			hw_type = HW_TYPE_DC;
-			drio = new PCF8574(DCDR_I2CADDR);
-		} else if(detect_i2c(LADR_I2CADDR)) {
-			hw_type = HW_TYPE_LATCH;
-			drio = new PCF8574(LADR_I2CADDR);
-		} else {
-			hw_type = HW_TYPE_UNKNOWN;
-			drio = new PCF8574(ACDR_I2CADDR);
-		}
+	if (hardware.driver_kind == osboard::DRIVER_PCF8574) {
+		drio = new PCF8574(hardware.driver_address);
+	} else {
+		drio = new PCA9555(hardware.driver_address);
+	}
 
+	if (hardware.separate_main_io) {
 		mainio = new PCF8574(MAIN_I2CADDR);
 		mainio->i2c_write(0, 0x0F); // set lower four bits of main PCF8574 (8-ch) to high
 
@@ -642,72 +648,13 @@ void OpenSprinkler::begin() {
 		digitalWriteExt(PIN_BOOST, LOW);
 		digitalWriteExt(PIN_BOOST_EN, LOW);
 		digitalWriteExt(PIN_LATCH_COM, LOW);
-
 	} else {
-
-		pinMode(16, INPUT);
-		if(digitalRead(16)==LOW) {
-			// revision 1
-			hw_rev = 1;
-			osboard::select(osboard::PROFILE_OS_31);
-			if(detect_i2c(ACDR_I2CADDR)) {
-				hw_type = HW_TYPE_AC;
-				drio = new PCA9555(ACDR_I2CADDR);
-			} else if(detect_i2c(DCDR_I2CADDR)) {
-				hw_type = HW_TYPE_DC;
-				drio = new PCA9555(DCDR_I2CADDR);
-			} else if(detect_i2c(LADR_I2CADDR)) {
-				hw_type = HW_TYPE_LATCH;
-				drio = new PCA9555(LADR_I2CADDR);
-			} else {
-				hw_type = HW_TYPE_UNKNOWN;
-				drio = new PCA9555(ACDR_I2CADDR);
-			}
-			mainio = drio;
-
+		mainio = drio;
+		if (hardware.initialize_usb_pd) usbpd.begin();
+		if (hardware.profile == osboard::PROFILE_OS_31) {
 			mainio->i2c_write(NXP_CONFIG_REG, osboard::OS31_IO_CONFIG);
 			mainio->i2c_write(NXP_OUTPUT_REG, osboard::OS31_IO_OUTPUT);
-		} else { // revision 2 and above
-			// conditions for revision 4:
-			// * has I2C EEPROM @ 0x52? --> OS 3.4 AC (skipping 0x51 due to conflict with PCF8563)
-			// * has CH224A/Q @ both 0x22, 0x23? --> OS 3.4 DC
-			bool has_eeprom_2 = detect_i2c(EEPROM_I2CADDR+2);
-			bool has_ch224_0 = detect_i2c(CH224_I2CADDR);
-			bool has_ch224_1 = detect_i2c(CH224_I2CADDR+1);
-			if(has_eeprom_2 || (has_ch224_0 && has_ch224_1)) {
-				hw_rev = 4;
-				osboard::select(osboard::PROFILE_OS_34);
-				drio = new PCA9555(ACDR_I2CADDR); // all OS 3.4 models have IOEXP at 0x21 due to address conflicts with CH224
-				mainio = drio;
-				if(has_ch224_0 && has_ch224_1) {
-					hw_type = HW_TYPE_DC;
-					usbpd.begin();
-				} else {
-					hw_type = HW_TYPE_AC;
-				}
-			} else {
-				if(detect_i2c(EEPROM_I2CADDR)) { // revision 3 has an I2C EEPROM at this address
-					hw_rev = 3;
-				} else {
-					hw_rev = 2;
-				}
-				osboard::select(osboard::PROFILE_OS_32_33);
-				if(detect_i2c(ACDR_I2CADDR)) {
-					hw_type = HW_TYPE_AC;
-					drio = new PCA9555(ACDR_I2CADDR);
-				} else if(detect_i2c(DCDR_I2CADDR)) {
-					hw_type = HW_TYPE_DC;
-					drio = new PCA9555(DCDR_I2CADDR);
-				} else if(detect_i2c(LADR_I2CADDR)) {
-					hw_type = HW_TYPE_LATCH;
-					drio = new PCA9555(LADR_I2CADDR);
-				} else {
-					hw_type = HW_TYPE_UNKNOWN;
-					drio = new PCA9555(ACDR_I2CADDR);
-				}
-			}
-			mainio = drio;
-
+		} else {
 			mainio->i2c_write(NXP_CONFIG_REG, osboard::OS32_IO_CONFIG);
 			mainio->i2c_write(NXP_OUTPUT_REG, osboard::OS32_IO_OUTPUT);
 		}
