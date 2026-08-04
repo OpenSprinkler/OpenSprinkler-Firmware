@@ -440,7 +440,7 @@ void do_setup() {
 void initialize_otf();
 
 void do_setup() {
-	initialiseEpoch();   // initialize time reference for millis() and micros()
+	initialiseEpoch();   // initialize the Linux microsecond clock reference
 	os.begin();          // OpenSprinkler init
 	os.options_setup();  // Setup options
 

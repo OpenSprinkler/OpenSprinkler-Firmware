@@ -30,11 +30,11 @@
 #else // headers for RPI/LINUX
 	#include <stdio.h>
 	#include <limits.h>
-	#include <sys/time.h>
 	#include <arpa/inet.h>
 	#include <sys/socket.h>
 	#include <ifaddrs.h>
 	#include <net/route.h>
+	#include "platform/clock.h"
 #endif
 #include "defines.h"
 
@@ -115,12 +115,6 @@ void str2mac(const char *_str, unsigned char mac[]);
 	const char* get_data_dir();
 	void set_data_dir(const char *new_data_dir);
 	char* get_filename_fullpath(const char *filename);
-	void delay(uint32_t ms);
-	void delayMicroseconds(uint32_t us);
-	void delayMicrosecondsHard(uint32_t us);
-	uint32_t millis();   // defined in external/OpenThings-Framework-Firmware-Library/Websocket.cpp
-	uint32_t micros();
-	void initialiseEpoch();
 	#if defined(OSPI)
 	unsigned int detect_rpi_rev();
 	char* get_runtime_path();
