@@ -1,7 +1,7 @@
 /*
   RCSwitch - Arduino libary for remote control outlet switches
   Copyright (c) 2011 Suat Özgür.  All right reserved.
-  
+
   Contributors:
   - Andre Koehler / info(at)tomate-online(dot)de
   - Gordeev Andrey Vladimirovich / gordeev(at)openpyro(dot)com
@@ -13,8 +13,8 @@
   - Robert ter Vehn / <first name>.<last name>(at)gmail(dot)com
   - Johann Richard / <first name>.<last name>(at)gmail(dot)com
   - Vlad Gheorghe / <first name>.<last name>(at)gmail(dot)com https://github.com/vgheo
-  - Matias Cuenca-Acuna 
-  
+  - Matias Cuenca-Acuna
+
   Project home: https://github.com/sui77/rc-switch/
 
   This library is free software; you can redistribute it and/or
@@ -32,17 +32,17 @@
   Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
-#if defined(ESP8266)
+#if defined(ARDUINO)
 #include<Arduino.h>
 #endif
 
-#include "gpio.h"
-#include "utils.h"
-#include "RCSwitch.h"
+#include "../gpio.h"
+#include "../utils.h"
+#include "rf_switch.h"
 
 /* Format for protocol definitions:
  * {pulselength, Sync bit, "0" bit, "1" bit, invertedSignal}
- * 
+ *
  * pulselength: pulse length in microseconds, e.g. 350
  * Sync bit: {1, 31} means 1 high pulse and 31 low pulses
  *     (perceived as a 31*pulselength long pulse, total length of sync bit is
@@ -172,8 +172,8 @@ void RCSwitch::send(uint32_t code, uint16_t length) {
 void RCSwitch::transmit(HighLow pulses) {
   uint8_t firstLogicLevel = (this->protocol.invertedSignal) ? LOW : HIGH;
   uint8_t secondLogicLevel = (this->protocol.invertedSignal) ? HIGH : LOW;
- 
-  uint32_t timeout = micros() + this->protocol.pulseLength * pulses.high; 
+
+  uint32_t timeout = micros() + this->protocol.pulseLength * pulses.high;
   digitalWrite(this->nTransmitterPin, firstLogicLevel);
   while(micros() < timeout) {
     delayMicroseconds(5);

@@ -29,7 +29,7 @@
 #include "gpio.h"
 #include "images.h"
 #include "mqtt.h"
-#include "RCSwitch.h"
+#include "drivers/rf_switch.h"
 #include <cmath>
 #include <new>
 
@@ -37,8 +37,7 @@
 	#include <Arduino.h>
 	#include <Wire.h>
 	#include <SPI.h>
-	#include <RCSwitch.h>
-	#include "I2CRTC.h"
+	#include "drivers/i2c_rtc.h"
 
 	#include <FS.h>
 	#include <LittleFS.h>
@@ -49,7 +48,7 @@
 	#include <Ticker.h>
 	#include "espconnect.h"
 	#include "EMailSender.h"
-	#include "ch224.h"
+	#include "drivers/ch224.h"
 
 #else // headers for RPI/LINUX
 	#include <time.h>
@@ -64,7 +63,7 @@
 #endif // end of headers
 
 #if defined(USE_DISPLAY)
-	#include "SSD1306Display.h"
+	#include "drivers/ssd1306_display.h"
 #endif
 
 #include "sensors/sensor.h"
@@ -72,7 +71,7 @@
 #include "sensors/weather_sensor.h"
 #include "sensors/system_internal_sensor.h"
 #include "sensors/onboard_digital_sensor.h"
-#include "ads1115.h"
+#include "drivers/ads1115.h"
 #include "sensors/ads1115_sensor.h"
 
 #if defined(ESP8266)

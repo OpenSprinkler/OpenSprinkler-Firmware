@@ -1,36 +1,3 @@
-/*
- * I2CRTC.h - library for common I2C RTCs
- * This library is intended to be uses with Arduino Time.h library functions
- */
-
-
 #pragma once
 
-#define DS1307_ADDR  0x68
-#define MCP7940_ADDR 0x6F
-#define PCF8563_ADDR 0x51
-
-#include "types.h"
-#include "TimeLib.h"
-
-// library interface description
-class I2CRTC
-{
-	// user-accessible "public" interface
-	public:
-	I2CRTC();
-	static time_os_t get();
-	static void set(time_os_t t);
-	static void read(tmElements_t &tm);
-	static void write(tmElements_t &tm);
-	static bool detect();
-	static bool exists();
-	
-	private:
-	static uint8_t dec2bcd(uint8_t num);
-	static uint8_t bcd2dec(uint8_t num);
-	static uint8_t addr;
-};
-
-extern I2CRTC RTC;
-
+#include "drivers/i2c_rtc.h"

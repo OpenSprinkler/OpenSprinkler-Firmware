@@ -1,4 +1,4 @@
-#if defined(ESP8266)
+#if defined(ARDUINO)
 
 #include "ch224.h"
 #include <Arduino.h> // For delay()

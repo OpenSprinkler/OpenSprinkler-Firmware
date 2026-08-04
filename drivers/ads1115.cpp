@@ -1,9 +1,9 @@
 #include "ads1115.h"
-#include "utils.h"   // millis() on Linux/DEMO
+#include "../utils.h"   // millis() on Linux/DEMO
 
 #include <cmath>
 
-#if defined(ESP8266)
+#if defined(ARDUINO)
 ADS1115::ADS1115(uint8_t address, TwoWire& wire) : _address(address), _wire(&wire) {}
 ADS1115::ADS1115(uint8_t address) : ADS1115(address, Wire) {}
 
@@ -83,7 +83,7 @@ int16_t ADS1115::get_pin_value(uint8_t pin) {
 			return -1;
 		}
 
-#if defined(ESP8266)
+#if defined(ARDUINO)
 		yield();
 #else
 		delay(1);
