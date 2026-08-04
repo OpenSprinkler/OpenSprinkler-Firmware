@@ -28,6 +28,8 @@
 #include "Arduino.h"
 #include "drivers/io_expander.h"
 
+// The caller owns the expander and must keep it alive after registration.
+void gpio_set_main_expander(IOEXP* expander);
 void pinModeExt(unsigned char pin, unsigned char mode);
 void digitalWriteExt(unsigned char pin, unsigned char value);
 unsigned char digitalReadExt(unsigned char pin);

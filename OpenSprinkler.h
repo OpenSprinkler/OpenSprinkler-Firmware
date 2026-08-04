@@ -487,7 +487,7 @@ public:
 	static void lcd_print_pgm(PGM_P str); // ESP8266 does not allow PGM_P followed by PROGMEM
 	static void lcd_print_line_clear_pgm(PGM_P str, unsigned char line);
 
-	static IOEXP *mainio, *drio;
+	static IOEXP *drio;
 	static IOEXP *expanders[];
 	static CH224 usbpd;
 	static uint8_t actual_pd_voltage;

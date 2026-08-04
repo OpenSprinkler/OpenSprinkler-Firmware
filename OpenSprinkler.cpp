@@ -131,7 +131,6 @@ bool OpenSprinkler::has_ads1115() {
 	unsigned char OpenSprinkler::state = OS_STATE_INITIAL;
 	unsigned char OpenSprinkler::prev_station_bits[MAX_NUM_BOARDS];
 	IOEXP* OpenSprinkler::expanders[MAX_NUM_BOARDS/2];
-	IOEXP* OpenSprinkler::mainio; // main controller IO expander object
 	IOEXP* OpenSprinkler::drio; // driver board IO expander object
 	String OpenSprinkler::wifi_ssid="";
 	String OpenSprinkler::wifi_pass="";
@@ -639,8 +638,9 @@ void OpenSprinkler::begin() {
 	}
 
 	if (hardware.separate_main_io) {
-		mainio = new PCF8574(MAIN_I2CADDR);
-		mainio->i2c_write(0, 0x0F); // set lower four bits of main PCF8574 (8-ch) to high
+		IOEXP* main_expander = new PCF8574(MAIN_I2CADDR);
+		gpio_set_main_expander(main_expander);
+		main_expander->i2c_write(0, 0x0F); // set lower four bits of main PCF8574 (8-ch) to high
 
 		digitalWriteExt(osboard::OS30_POWER_TX_PIN, 1); // turn on TX power
 		digitalWriteExt(osboard::OS30_POWER_RX_PIN, 1); // turn on RX power
@@ -649,14 +649,14 @@ void OpenSprinkler::begin() {
 		digitalWriteExt(PIN_BOOST_EN, LOW);
 		digitalWriteExt(PIN_LATCH_COM, LOW);
 	} else {
-		mainio = drio;
+		gpio_set_main_expander(drio);
 		if (hardware.initialize_usb_pd) usbpd.begin();
 		if (hardware.profile == osboard::PROFILE_OS_31) {
-			mainio->i2c_write(NXP_CONFIG_REG, osboard::OS31_IO_CONFIG);
-			mainio->i2c_write(NXP_OUTPUT_REG, osboard::OS31_IO_OUTPUT);
+			drio->i2c_write(NXP_CONFIG_REG, osboard::OS31_IO_CONFIG);
+			drio->i2c_write(NXP_OUTPUT_REG, osboard::OS31_IO_OUTPUT);
 		} else {
-			mainio->i2c_write(NXP_CONFIG_REG, osboard::OS32_IO_CONFIG);
-			mainio->i2c_write(NXP_OUTPUT_REG, osboard::OS32_IO_OUTPUT);
+			drio->i2c_write(NXP_CONFIG_REG, osboard::OS32_IO_CONFIG);
+			drio->i2c_write(NXP_OUTPUT_REG, osboard::OS32_IO_OUTPUT);
 		}
 	}
 
