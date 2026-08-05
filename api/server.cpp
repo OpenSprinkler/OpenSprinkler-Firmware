@@ -21,16 +21,16 @@
  * <http://www.gnu.org/licenses/>.
  */
 
-#include "opensprinkler_server.h"
-#include "types.h"
-#include "OpenSprinkler.h"
-#include "program.h"
-#include "bfiller.h"
-#include "weather.h"
-#include "mqtt.h"
-#include "main.h"
-#include "api/handlers.h"
-#include "api/routes.h"
+#include "../opensprinkler_server.h"
+#include "../types.h"
+#include "../OpenSprinkler.h"
+#include "../program.h"
+#include "../bfiller.h"
+#include "../weather.h"
+#include "../mqtt.h"
+#include "../main.h"
+#include "handlers.h"
+#include "routes.h"
 
 // External variables defined in main ion file
 extern OTF::OpenThingsFramework *otf;
@@ -42,7 +42,7 @@ extern OTF::OpenThingsFramework *otf;
 #if defined(ESP8266)
 	#include <FS.h>
 	#include <LittleFS.h>
-	#include "espconnect.h"
+	#include "../espconnect.h"
 	extern ESP8266WebServer *update_server;
 	extern ENC28J60lwIP enc28j60;
 	extern Wiznet5500lwIP w5500;
