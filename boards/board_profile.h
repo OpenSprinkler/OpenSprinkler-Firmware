@@ -82,6 +82,7 @@ constexpr uint8_t OS40_HARDWARE_VERSION = 40;
 constexpr uint16_t OS40_IO_CONFIG = 0xFF00;
 constexpr uint16_t OS40_IO_OUTPUT = 0x0000;
 constexpr uint8_t OS40_CURRENT_SENSE_PIN = 0;
+constexpr uint8_t OS40_EXTERNAL_FLASH_CS_PIN = 8;
 constexpr uint8_t OS40_ETHERNET_IRQ_PIN = 10;
 constexpr uint8_t OS40_ETHERNET_RESET_PIN = 11;
 constexpr uint8_t OS40_ETHERNET_CS_PIN = 18;

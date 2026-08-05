@@ -722,6 +722,9 @@ void OpenSprinkler::begin() {
 
 #elif defined(ESP32)
 	osboard::select(osboard::PROFILE_OS_40);
+	// Keep the shared SPI bus idle until external flash support is initialized.
+	pinMode(PIN_FLASH_CS, OUTPUT);
+	digitalWrite(PIN_FLASH_CS, HIGH);
 	Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL);
 	const osboard::HardwareDetection hardware =
 		osboard::detect_os4_hardware(probe_i2c_address);

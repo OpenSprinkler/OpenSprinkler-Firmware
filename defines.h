@@ -430,6 +430,7 @@ enum {
 	#define CH224_I2CADDR    osboard::CH224_ADDRESS
 
 	#define PIN_CURR_SENSE   osboard::OS40_CURRENT_SENSE_PIN
+	#define PIN_FLASH_CS     osboard::OS40_EXTERNAL_FLASH_CS_PIN
 	#define PIN_ETHER_IRQ    osboard::OS40_ETHERNET_IRQ_PIN
 	#define PIN_ETHER_RESET  osboard::OS40_ETHERNET_RESET_PIN
 	#define PIN_ETHER_CS     osboard::OS40_ETHERNET_CS_PIN

@@ -55,6 +55,7 @@ int main() {
 	assert(active().pins.boost_enable == IO_EXPANDER_PIN_BASE + 14);
 	assert(has(CAP_ETHERNET));
 	assert(OS40_CURRENT_SENSE_PIN == 0);
+	assert(OS40_EXTERNAL_FLASH_CS_PIN == 8);
 	assert(OS40_ETHERNET_CS_PIN == 18);
 	assert(OS40_I2C_CLOCK_PIN == 22);
 	assert(OS40_I2C_DATA_PIN == 23);
