@@ -10,7 +10,6 @@ build-1284/*
 !build.sh
 !startOpenSprinkler.sh
 !updater.sh
-!tools/claude-review.sh
 *.bak
 node_modules
 *.json
@@ -18,3 +17,4 @@ node_modules
 !package-lock.json
 .DS_Store
 testmode.h
+.agents/review.md
