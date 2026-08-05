@@ -43,8 +43,6 @@ unsigned char wt_restricted = 0;
 
 extern const char *user_agent_string;
 
-unsigned char findKeyVal (const char *str,char *strbuf, uint16_t maxlen,const char *key,bool key_in_pgm=false,uint8_t *keyfound=NULL);
-
 unsigned char parseMdScalesArray (const char* input);
 
 // The weather function calls getweather.py on remote server to retrieve weather data

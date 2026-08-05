@@ -57,35 +57,6 @@ extern OpenSprinkler os;
 extern ProgramData pd;
 extern uint32_t flow_count;
 
-static OTF::Response *current_res = nullptr;
-BufferFiller bfill;
-
-static void bfill_flush(const char *buf, size_t len) {
-	if (current_res && len > 0)
-		current_res->writeBodyData(buf, len);
-}
-
-void begin_response(OTF::Response &res) {
-	current_res = &res;
-	bfill = BufferFiller(ether_buffer, ETHER_BUFFER_SIZE);
-	bfill.set_flush(bfill_flush);
-}
-
-// Define return error code
-#define HTML_OK               0x00
-#define HTML_SUCCESS          0x01
-#define HTML_UNAUTHORIZED     0x02
-#define HTML_MISMATCH         0x03
-#define HTML_DATA_MISSING     0x10
-#define HTML_DATA_OUTOFBOUND  0x11
-#define HTML_DATA_FORMATERROR 0x12
-#define HTML_RFCODE_ERROR     0x13
-#define HTML_PAGE_NOT_FOUND   0x20
-#define HTML_NOT_PERMITTED    0x30
-#define HTML_UPLOAD_FAILED    0x40
-#define HTML_INTERNAL_ERROR   0x50
-#define HTML_REDIRECT_HOME    0xFF
-
 static const char htmlMobileHeader[] PROGMEM =
 	"<meta name=\"viewport\" content=\"width=device-width,initial-scale=1.0,minimum-scale=1.0,user-scalable=no\">"
 ;
@@ -93,111 +64,6 @@ static const char htmlMobileHeader[] PROGMEM =
 static const char htmlReturnHome[] PROGMEM =
 	"<script>window.location=\"/\";</script>\n"
 ;
-
-unsigned char findKeyVal (const OTF::Request &req,char *strbuf, uint16_t maxlen,const char *key,bool key_in_pgm=false,uint8_t *keyfound=NULL) {
-#if defined(ESP8266)
-	char* result = key_in_pgm ? req.getQueryParameter((const __FlashStringHelper *)key) : req.getQueryParameter(key);
-#else
-	char* result = req.getQueryParameter(key);
-#endif
-	if(result!=NULL) {
-		strncpy(strbuf, result, maxlen);
-		strbuf[maxlen-1]=0;
-		if(keyfound) *keyfound=1;
-		return strlen(strbuf);
-	} else {
-		if(keyfound) *keyfound=0;
-	}
-	return 0;
-}
-
-unsigned char findKeyVal (const char *str,char *strbuf, uint16_t maxlen,const char *key,bool key_in_pgm=false,uint8_t *keyfound=NULL) {
-	uint8_t found=0;
-	uint16_t i=0;
-	const char *kp;
-	if(str==NULL||strbuf==NULL||key==NULL) {return 0;}
-	kp=key;
-	if (key_in_pgm) {
-		// key is in program memory space
-		while(*str &&  *str!=' ' && *str!='\n' && found==0){
-			if (*str == pgm_read_byte(kp)){
-				kp++;
-				if (pgm_read_byte(kp) == '\0'){
-					str++;
-					kp=key;
-					if (*str == '='){
-						found=1;
-					}
-				}
-			} else {
-				kp=key;
-			}
-			str++;
-		}
-	}	else {
-		while(*str &&  *str!=' ' && *str!='\n' && found==0){
-			if (*str == *kp){
-				kp++;
-				if (*kp == '\0'){
-					str++;
-					kp=key;
-					if (*str == '='){
-						found=1;
-					}
-				}
-			} else {
-				kp=key;
-			}
-			str++;
-		}
-	}
-	if (found==1){
-		// copy the value to a buffer and terminate it with '\0'
-		while(*str &&  *str!=' ' && *str!='\n' && *str!='&' && i<maxlen-1){
-			*strbuf=*str;
-			i++;
-			str++;
-			strbuf++;
-		}
-		if (!(*str) || *str == ' ' || *str == '\n' || *str == '&') {
-			*strbuf = '\0';
-		} else {
-			found = 0;	// Ignore partial values i.e. value length is larger than maxlen
-			i = 0;
-		}
-	}
-	// return the length of the value
-	if (keyfound) *keyfound = found;
-	return(i);
-}
-
-
-enum ContentType { CT_JSON, CT_HTML, CT_CSV, CT_BINARY };
-
-void print_header(OTF_PARAMS_DEF, ContentType ct=CT_JSON, int len=0) {
-	res.writeStatus(200, F("OK"));
-	switch (ct) {
-		case CT_JSON:   res.writeHeader(F("Content-Type"), F("application/json")); break;
-		case CT_HTML:   res.writeHeader(F("Content-Type"), F("text/html")); break;
-		case CT_CSV:    res.writeHeader(F("Content-Type"), F("text/csv")); break;
-		case CT_BINARY: res.writeHeader(F("Content-Type"), F("application/octet-stream")); break;
-	}
-	if(len>0)
-		res.writeHeader(F("Content-Length"), len);
-	res.writeHeader(F("Access-Control-Allow-Origin"), F("*"));
-	res.writeHeader(F("Cache-Control"), F("max-age=0, no-cache, no-store, must-revalidate"));
-	res.writeHeader(F("Connection"), F("close"));
-}
-
-void print_header_compressed_html(OTF_PARAMS_DEF, int len) {
-	res.writeStatus(200, F("OK"));
-	res.writeHeader(F("Content-Type"), F("text/html; charset=utf-8"));
-	res.writeHeader(F("Access-Control-Allow-Origin"), F("*")); // from esp8266 2.4 this has to be sent explicitly
-	res.writeHeader(F("Content-Length"), len);
-	res.writeHeader(F("Vary"), F("Accept-Encoding"));
-	res.writeHeader(F("Content-Encoding"), F("gzip"));
-	res.writeHeader(F("Connection"), F("close"));
-}
 
 #if !defined(ESP8266)
 string two_digits(uint8_t x) {
@@ -211,22 +77,6 @@ String two_digits(uint8_t x) {
 
 String toHMS(uint32_t t) {
 	return two_digits(t/3600)+":"+two_digits((t/60)%60)+":"+two_digits(t%60);
-}
-
-void otf_send_result(OTF_PARAMS_DEF, unsigned char code, const char *item = NULL) {
-	String json = F("{\"result\":");
-#if defined(ESP8266)
-	json += code;
-#else
-	json += std::to_string(code);
-#endif
-	if (!item) item = "";
-	json += F(",\"item\":\"");
-	json += item;
-	json += F("\"");
-	json += F("}");
-	print_header(OTF_PARAMS, CT_JSON, json.length());
-	res.writeBodyChunk((char *)"%s",json.c_str());
 }
 
 #if defined(ESP8266)
@@ -326,34 +176,6 @@ void on_ap_try_connect(OTF_PARAMS_DEF) {
 }
 #endif
 
-
-/** Check and verify password */
-boolean check_password(char *p) {
-	return true;
-}
-boolean process_password(OTF_PARAMS_DEF, boolean fwv_on_fail=false) {
-#if defined(DEMO)
-	return true;
-#endif
-	if (os.iopts[IOPT_IGNORE_PASSWORD])  return true;
-
-	/*if(req.isCloudRequest()){ // password is not required if this is coming from cloud connection
-		return true;
-	}*/
-	const char *pw = req.getQueryParameter("pw");
-	if(pw != NULL && os.password_verify(pw)) return true;
-
-	/* if fwv_on_fail is true, output fwv if password check has failed */
-	if(fwv_on_fail) {
-		print_header(OTF_PARAMS);
-		begin_response(res);
-		iopt_get_json_name(IOPT_FW_VERSION, tmp_buffer);
-		bfill.emit_p(PSTR("{\"$S\":$D}"), tmp_buffer, os.iopts[0]);
-	} else {
-		otf_send_result(OTF_PARAMS, HTML_UNAUTHORIZED);
-	}
-	return false;
-}
 
 void server_json_board_attrib(const char* name, unsigned char *attrib)
 {

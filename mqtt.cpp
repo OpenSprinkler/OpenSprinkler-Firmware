@@ -97,8 +97,6 @@ bool OSMqtt::_done_subscribed = false;		//Flag indicating if command topic has b
 //******************************** HELPER FUNCTIONS ********************************// 
 
 extern uint16_t parse_listdata(char **p);
-extern unsigned char findKeyVal (const char *str,char *strbuf, uint16_t maxlen,const char *key,bool key_in_pgm=false,uint8_t *keyfound=NULL);
-
 //****************************** COMMAND ACTIONS ******************************//
 
 //ensure command incudes correct password
