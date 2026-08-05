@@ -17,7 +17,7 @@
  * along with this program.  If not, see
  * <http://www.gnu.org/licenses/>.
  */
-#if defined(ESP8266)
+#if defined(ARDUINO)
 
 #include "espconnect.h"
 
@@ -51,24 +51,39 @@ String scan_network() {
 
 void start_network_ap(const char *ssid, const char *pass) {
 	if(!ssid) return;
+	WiFi.mode(WIFI_AP_STA); // start in AP_STA mode
+	#if defined(ESP32)
+	WiFi.disconnect(false, false);
+	WiFi.setSleep(false);
+	#else
+	WiFi.disconnect();	// disconnect from router
+	#endif
 	if(pass) WiFi.softAP(ssid, pass);
 	else WiFi.softAP(ssid);
-	WiFi.mode(WIFI_AP_STA); // start in AP_STA mode
-	WiFi.disconnect();	// disconnect from router
 }
 
 void start_network_sta_with_ap(const char *ssid, const char *pass, int32_t channel, const unsigned char *bssid) {
 	if(!ssid || !pass) return;
 	if(WiFi.getMode()!=WIFI_AP_STA) WiFi.mode(WIFI_AP_STA);
+	#if defined(ESP32)
+	WiFi.setSleep(false);
+	WiFi.setAutoReconnect(true);
+	#endif
 	WiFi.begin(ssid, pass, channel, bssid);
 }
 
 void start_network_sta(const char *ssid, const char *pass, int32_t channel, const unsigned char *bssid) {
 	if(!ssid || !pass) return;
+	#if defined(ESP32)
+	WiFi.disconnect(false, false);
+	delay(100);
+	#endif
 	if(WiFi.getMode()!=WIFI_STA) WiFi.mode(WIFI_STA);
-	WiFi.begin(ssid, pass, channel, bssid);
 	WiFi.setSleep(false); // work-around for ARP issue: disable sleep mode
+	#if defined(ESP8266)
 	WiFi.setOutputPower(20.5);
+	#endif
 	WiFi.setAutoReconnect(true); // enable auto reconnect
+	WiFi.begin(ssid, pass, channel, bssid);
 }
 #endif

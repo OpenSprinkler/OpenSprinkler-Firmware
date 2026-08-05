@@ -23,7 +23,7 @@
 
  #pragma once
 
-#if defined(ESP8266)
+#if defined(ARDUINO)
 	#include <Arduino.h>
 #else // headers for RPI/LINUX
 	#include <stdio.h>
@@ -56,14 +56,14 @@ void strReplace(char *, char c, char r);
 bool isLastDayofMonth(unsigned char month, unsigned char day);
 bool isValidDate(uint16_t date);
 bool isLeapYear(uint16_t year);	// whether a 4 digit year is a leap year
-#if defined(ESP8266)
+	#if defined(ARDUINO)
 unsigned char hex2dec(const char *hex);
 bool isHex(char c);
 bool isValidMAC(const char *_mac);
 void str2mac(const char *_str, unsigned char mac[]);
 #endif
 
-#if defined(ESP8266)
+#if defined(ARDUINO)
 
 #else // Arduino compatible functions for RPI/LINUX
 	#if defined(OSPI)

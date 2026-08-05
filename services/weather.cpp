@@ -256,7 +256,7 @@ void parse_wto(char* wto) {
 void apply_monthly_adjustment(time_os_t curr_time) {
 	// ====== Check monthly water percentage ======
 	if(os.iopts[IOPT_USE_WEATHER]==WEATHER_METHOD_MONTHLY) {
-#if defined(ESP8266)
+	#if defined(ARDUINO)
 		unsigned char m = month(curr_time)-1;
 #else
 		time_t _ct = curr_time;

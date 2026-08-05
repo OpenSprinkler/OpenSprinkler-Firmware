@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-#if defined(ESP8266)
+#if defined(ARDUINO)
 #include <FS.h>
 #include <LittleFS.h>
 using os_file_type = File;
@@ -46,7 +46,7 @@ unsigned char file_read_byte(const char* filename, uint32_t position);
 void file_write_byte(const char* filename, uint32_t position, unsigned char value);
 unsigned char file_cmp_block(const char* filename, const char* value, uint32_t position);
 
-#if !defined(ESP8266)
+#if !defined(ARDUINO)
 const char* get_data_dir();
 void set_data_dir(const char* data_directory);
 char* get_filename_fullpath(const char* filename);

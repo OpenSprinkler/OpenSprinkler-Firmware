@@ -25,6 +25,9 @@
 #include "../core/program.h"
 #include "../ArduinoJson.hpp"
 #include "../api/server.h"
+#if defined(ESP32)
+#include "EMailSender.h"
+#endif
 
 uint8_t NotifQueue::nqueue = 0;
 uint8_t NotifQueue::head = 0;
@@ -258,7 +261,7 @@ static void format_notification(uint16_t type, uint32_t lval, float fval,
 			// Body: "at YYYY-MM-DD hh:mm:ss, Station [...] ran for X. FLOW ALERT! ..."
 			strcat_P(bufs.body, PSTR("at "));
 			time_os_t curr_time = os.now_tz();
-			#if defined(ESP8266)
+				#if defined(ARDUINO)
 				tmElements_t tm;
 				breakTime(curr_time, tm);
 				snprintf_P(bufs.body + strlen(bufs.body), bufs.body_cap - strlen(bufs.body),
@@ -403,7 +406,7 @@ static void format_notification(uint16_t type, uint32_t lval, float fval,
 
 			strcat_P(bufs.body, PSTR("at "));
 			time_os_t curr_time = os.now_tz();
-			#if defined(ESP8266)
+				#if defined(ARDUINO)
 				tmElements_t tm;
 				breakTime(curr_time, tm);
 				snprintf_P(bufs.body + strlen(bufs.body), bufs.body_cap - strlen(bufs.body),
@@ -468,12 +471,18 @@ static void format_notification(uint16_t type, uint32_t lval, float fval,
 			strncpy_P(bufs.topic, PSTR("system"), bufs.topic_cap - 1);
 			snprintf_P(bufs.payload, bufs.payload_cap,
 			           PSTR("{\"state\":\"started\",\"cause\":%d}"), (int)os.last_reboot_cause);
-			#if defined(ESP8266)
+				#if defined(ESP8266)
 				snprintf_P(bufs.body + strlen(bufs.body), bufs.body_cap - strlen(bufs.body),
 				           PSTR("rebooted. Cause: %d. Device IP: "), os.last_reboot_cause);
 				IPAddress _ip = useEth ? eth.localIP() : WiFi.localIP();
 				unsigned char ip[4] = {_ip[0], _ip[1], _ip[2], _ip[3]};
-				ip2string(bufs.body, bufs.body_cap, ip);
+					ip2string(bufs.body, bufs.body_cap, ip);
+				#elif defined(ESP32)
+					snprintf_P(bufs.body + strlen(bufs.body), bufs.body_cap - strlen(bufs.body),
+					           PSTR("rebooted. Cause: %d. Device IP: "), os.last_reboot_cause);
+					IPAddress _ip = useEth ? ETH.localIP() : WiFi.localIP();
+					unsigned char ip[4] = {_ip[0], _ip[1], _ip[2], _ip[3]};
+					ip2string(bufs.body, bufs.body_cap, ip);
 			#else
 				strcat_P(bufs.body, PSTR("controller process restarted."));
 			#endif
@@ -488,7 +497,7 @@ static void format_notification(uint16_t type, uint32_t lval, float fval,
 static void send_email(const EmailConfig &cfg, const char *subject, const char *body) {
 	if (!cfg.host || !cfg.user || !cfg.pass || !cfg.recipient) return;
 
-#if defined(ESP8266)
+	#if defined(ARDUINO)
 	EMailSender::EMailMessage msg;
 	msg.subject = subject;
 	msg.message = body;
@@ -500,7 +509,7 @@ static void send_email(const EmailConfig &cfg, const char *subject, const char *
 		emailSend.setUseAuth(false);
 	}
 	(void)emailSend.send(cfg.recipient, msg);
-#else
+	#else
 	enum smtp_connection_security security_flag;
 	if (cfg.port == 25) {
 		security_flag = SMTP_SECURITY_NONE;

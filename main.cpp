@@ -42,6 +42,13 @@
 	lwipEth eth;
 	bool useEth = false; // tracks whether we are using WiFi or wired Ether connection
 	uint32_t getNtpTime();
+#elif defined(ESP32)
+	#include <Arduino.h>
+	#include <WebServer.h>
+	WebServer *update_server = NULL;
+	DNSServer *dns = NULL;
+	bool useEth = false;
+	uint32_t getNtpTime();
 #else // header and defs for RPI/Linux
 	#include <dirent.h>
 	#include <unistd.h>
@@ -50,7 +57,7 @@
 
 OTF::OpenThingsFramework *otf = NULL;
 
-#if defined(ESP8266)
+#if defined(ARDUINO)
 static uint16_t led_blink_ms = LED_FAST_BLINK;
 #else
 static uint16_t led_blink_ms = 0;
@@ -241,6 +248,9 @@ void ui_state_machine() {
 					#if defined(ESP8266)
 						if (useEth) { os.lcd.print(eth.gatewayIP()); }
 						else { os.lcd.print(WiFi.gatewayIP()); }
+					#elif defined(ESP32)
+						if (useEth) { os.lcd.print(ETH.gatewayIP()); }
+						else { os.lcd.print(WiFi.gatewayIP()); }
 					#else
 						route_t route = get_route();
 						char str[INET_ADDRSTRLEN];
@@ -263,6 +273,9 @@ void ui_state_machine() {
 				os.lcd.setCursor(0, 0);
 				#if defined(ESP8266)
 					if (useEth) { os.lcd.print(eth.localIP()); }
+					else { os.lcd.print(WiFi.localIP()); }
+				#elif defined(ESP32)
+					if (useEth) { os.lcd.print(ETH.localIP()); }
 					else { os.lcd.print(WiFi.localIP()); }
 				#else
 					route_t route = get_route();
@@ -333,7 +346,7 @@ void ui_state_machine() {
 					os.lcd.print(os.last_reboot_cause);
 					ui_state = UI_STATE_DISP_IP;
 				} else if(digitalReadExt(PIN_BUTTON_2)==0) {  // if B2 is pressed while holding B3, reset to AP and reboot
-					#if defined(ESP8266)
+					#if defined(ARDUINO)
 					if(!ui_confirm(PSTR("Reset to AP?"))) {ui_state = UI_STATE_DEFAULT; break;}
 					os.reset_to_ap();
 					#endif
@@ -383,7 +396,7 @@ void ui_state_machine() {
 // ======================
 // Setup Function
 // ======================
-#if defined(ESP8266)
+#if defined(ARDUINO)
 void do_setup() {
 	/* Clear WDT reset flag. */
 	WiFi.persistent(false);
@@ -394,7 +407,7 @@ void do_setup() {
 
 	os.begin();          // OpenSprinkler init
 	os.options_setup();  // Setup options
-#if defined(ESP8266)
+#if defined(ARDUINO)
 	os.setup_pd_voltage();
 #endif
 
@@ -475,16 +488,24 @@ void check_weather();
 static bool process_special_program_command(const char*, uint32_t curr_time);
 static void perform_ntp_sync();
 
-#if defined(ESP8266)
+#if defined(ARDUINO)
 void start_server_ap();
 void start_server_client();
+#if defined(ESP8266)
 static Ticker reboot_ticker;
+#else
+static uint32_t reboot_deadline = 0;
+#endif
 
 void reboot_in(uint32_t ms) {
 	if(os.state != OS_STATE_WAIT_REBOOT) {
 		os.state = OS_STATE_WAIT_REBOOT;
 		DEBUG_PRINTLN(F("Prepare to restart..."));
+		#if defined(ESP8266)
 		reboot_ticker.once_ms(ms, ESP.restart);
+		#else
+		reboot_deadline = millis() + ms;
+		#endif
 	}
 }
 #else
@@ -493,7 +514,7 @@ void handle_web_request(char *p);
 
 uint32_t currpoll_timeout = 0;
 void overcurrent_monitor() {
-#if defined(ESP8266)
+#if defined(ARDUINO)
 	// If a zone is turning on, do immediate overcurrent monitoring here for ~50ms
 	if (curr_alert_sid) {
 		int16_t imax = os.get_imax();
@@ -542,7 +563,7 @@ void do_loop()
 		}
 	}
 
-#if defined(ESP8266)
+	#if defined(ARDUINO)
 	{
 		uint32_t tn = millis();
 		if((int32_t)(tn-currpoll_timeout) > 0) { // overflow proof timeout
@@ -573,7 +594,7 @@ void do_loop()
 	time_os_t curr_time = os.now_tz();
 
 	// ====== Process Ethernet packets ======
-#if defined(ESP8266)	// Process Ethernet packets for Arduino
+	#if defined(ARDUINO)	// Process Ethernet packets for Arduino
 	static uint32_t connecting_timeout;
 	switch(os.state) {
 	case OS_STATE_INITIAL:
@@ -585,7 +606,7 @@ void do_loop()
 			start_server_client();
 			os.state = OS_STATE_CONNECTED;
 			connecting_timeout = 0;
-		} else if(os.get_wifi_mode()==WIFI_MODE_AP) {
+		} else if(os.get_wifi_mode()==OS_WIFI_MODE_AP) {
 			start_server_ap();
 			dns->setErrorReplyCode(DNSReplyCode::NoError);
 			dns->start(53, "*", WiFi.softAPIP());
@@ -593,12 +614,18 @@ void do_loop()
 			connecting_timeout = 0;
 		} else {
 			led_blink_ms = LED_SLOW_BLINK;
+			#if defined(ESP32)
+			if(WiFi.getMode()!=WIFI_STA) WiFi.mode(WIFI_STA);
+			os.config_ip();
+			#endif
 			if(os.sopt_load(SOPT_STA_BSSID_CHL).length()>0 && os.wifi_channel<255) {
 				start_network_sta(os.wifi_ssid.c_str(), os.wifi_pass.c_str(), (int32_t)os.wifi_channel, os.wifi_bssid);
 			}
 			else
 				start_network_sta(os.wifi_ssid.c_str(), os.wifi_pass.c_str());
+			#if defined(ESP8266)
 			os.config_ip();
+			#endif
 			os.state = OS_STATE_CONNECTING;
 			connecting_timeout = millis() + 120000L;
 			os.lcd.setCursor(0, -1);
@@ -610,12 +637,18 @@ void do_loop()
 
 	case OS_STATE_TRY_CONNECT:
 		led_blink_ms = LED_SLOW_BLINK;
+		#if defined(ESP32)
+		if(WiFi.getMode()!=WIFI_AP_STA) WiFi.mode(WIFI_AP_STA);
+		os.config_ip();
+		#endif
 		if(os.sopt_load(SOPT_STA_BSSID_CHL).length()>0 && os.wifi_channel<255) {
 			start_network_sta_with_ap(os.wifi_ssid.c_str(), os.wifi_pass.c_str(), (int32_t)os.wifi_channel, os.wifi_bssid);
 		}
 		else
 			start_network_sta_with_ap(os.wifi_ssid.c_str(), os.wifi_pass.c_str());
+		#if defined(ESP8266)
 		os.config_ip();
+		#endif
 		os.state = OS_STATE_CONNECTED;
 		break;
 
@@ -631,7 +664,11 @@ void do_loop()
 		} else {
 			if((int32_t)((uint32_t)millis()-connecting_timeout)>0) {
 				os.state = OS_STATE_INITIAL;
+				#if defined(ESP32)
+				WiFi.disconnect(false, false);
+				#else
 				WiFi.disconnect(true);
+				#endif
 				DEBUG_PRINTLN(F("timeout"));
 			}
 		}
@@ -641,15 +678,18 @@ void do_loop()
 		if(dns) dns->processNextRequest();
 		if(otf) otf->loop();
 		if(update_server) update_server->handleClient();
+		#if defined(ESP32)
+		if(reboot_deadline && (int32_t)((uint32_t)millis() - reboot_deadline) >= 0) ESP.restart();
+		#endif
 		break;
 
 	case OS_STATE_CONNECTED:
-		if(os.get_wifi_mode() == WIFI_MODE_AP) {
+		if(os.get_wifi_mode() == OS_WIFI_MODE_AP) {
 			dns->processNextRequest();
 			update_server->handleClient();
 			otf->loop();
 			connecting_timeout = 0;
-			if(os.get_wifi_mode()==WIFI_MODE_STA) {
+			if(os.get_wifi_mode()==OS_WIFI_MODE_STA) {
 				// already in STA mode, waiting to reboot
 				break;
 			}
@@ -664,7 +704,15 @@ void do_loop()
 				otf->loop(os.network_connected());
 				connecting_timeout = 0;
 			} else {
-				// WiFi disconnected, ESP8266 will handle re-connect
+				#if defined(ESP32)
+				static uint32_t reconnect_at = 0;
+				if ((int32_t)((uint32_t)millis() - reconnect_at) >= 0) {
+					reconnect_at = millis() + 30000UL;
+					os.state = OS_STATE_INITIAL;
+				}
+				#else
+				// ESP8266 handles reconnection internally.
+				#endif
 			}
 		}
 		break;
@@ -1078,7 +1126,7 @@ void do_loop()
 		}
 	}
 
-	#if !defined(ESP8266)
+		#if !defined(ARDUINO)
 		delay(1); // For OSPI/LINUX, sleep 1 ms to minimize CPU usage
 	#endif
 }
@@ -1148,7 +1196,7 @@ static void check_network() {
 
 /** Perform NTP sync */
 static void perform_ntp_sync() {
-#if defined(ESP8266)
+	#if defined(ARDUINO)
 	// do not perform ntp if this option is disabled, or if a program is currently running
 	if (!os.iopts[IOPT_USE_NTP] || os.status.program_busy) return;
 	// do not perform ntp if network is not connected
@@ -1180,7 +1228,7 @@ static void perform_ntp_sync() {
 #endif
 }
 
-#if !defined(ESP8266) // main function for RPI/LINUX
+	#if !defined(ARDUINO) // main function for RPI/LINUX
 int main(int argc, char *argv[]) {
 	// Disable buffering to work with systemctl journal
 	setvbuf(stdout, NULL, _IOLBF, 0);

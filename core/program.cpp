@@ -241,7 +241,7 @@ int16_t ProgramStruct::starttime_decode(int16_t t) {
 /** Check if a given time matches the program's start day */
 unsigned char ProgramStruct::check_day_match(time_os_t t) {
 
-#if defined(ESP8266)  // get current time from Arduino
+	#if defined(ARDUINO)  // get current time from Arduino
 	unsigned char weekday_t = weekday(t);  // weekday ranges from [0,6] within Sunday being 1
 	unsigned char day_t = day(t);
 	unsigned char month_t = month(t);

@@ -43,7 +43,7 @@ bool parse_program_duration(const char *value, uint32_t *duration) {
 	return true;
 }
 
-#if !defined(ESP8266) // RPI/LINUX
+#if !defined(ARDUINO) // RPI/LINUX
 
 #include <stdio.h>
 #include <sys/stat.h>
@@ -350,7 +350,7 @@ bool isLeapYear(uint16_t y){ // Accepts 4 digit year and returns if leap year
 	return (y%400==0) || ((y%4==0) && (y%100!=0));
 }
 
-#if defined(ESP8266)
+#if defined(ARDUINO)
 unsigned char hex2dec(const char *hex) {
 	return strtol(hex, NULL, 16);
 }

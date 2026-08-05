@@ -2,7 +2,7 @@
 
 #include "../defines.h"
 
-#if defined(ESP8266)
+#if defined(ARDUINO)
 
 #include <FS.h>
 #include <LittleFS.h>
@@ -63,7 +63,7 @@ char* get_filename_fullpath(const char* filename) {
 #endif
 
 void remove_file(const char* filename) {
-#if defined(ESP8266)
+	#if defined(ARDUINO)
 	if (!LittleFS.exists(filename)) return;
 	LittleFS.remove(filename);
 #else
@@ -72,7 +72,9 @@ void remove_file(const char* filename) {
 }
 
 void ensure_log_dir() {
-#if !defined(ESP8266)
+	#if defined(ESP32)
+	if (!LittleFS.exists(LOG_DIR)) LittleFS.mkdir(LOG_DIR);
+	#elif !defined(ARDUINO)
 	const char* directory = get_filename_fullpath(LOG_DIR);
 	struct stat status;
 	if (stat(directory, &status) != 0) {
@@ -85,7 +87,7 @@ void ensure_log_dir() {
 }
 
 bool file_exists(const char* filename) {
-#if defined(ESP8266)
+	#if defined(ARDUINO)
 	return LittleFS.exists(filename);
 #else
 	FILE* file = fopen(get_filename_fullpath(filename), "rb");
@@ -96,7 +98,7 @@ bool file_exists(const char* filename) {
 }
 
 os_file_type file_open(const char* filename, FileOpenMode mode) {
-#if defined(ESP8266)
+	#if defined(ARDUINO)
 	switch (mode) {
 	default:
 	case FileOpenMode::Read:
@@ -143,7 +145,7 @@ os_file_type file_open(const char* filename, FileOpenMode mode) {
 }
 
 void file_close(os_file_type file) {
-#if defined(ESP8266)
+	#if defined(ARDUINO)
 	file.close();
 #else
 	fclose(file);
@@ -151,7 +153,7 @@ void file_close(os_file_type file) {
 }
 
 bool file_seek(os_file_type file, uint32_t position, FileSeekMode mode) {
-#if defined(ESP8266)
+	#if defined(ARDUINO)
 	switch (mode) {
 	case FileSeekMode::Set:
 		return file.seek(position, fs::SeekMode::SeekSet);
@@ -178,7 +180,7 @@ bool file_seek(os_file_type file, uint32_t position) {
 }
 
 int file_read(os_file_type file, void* target, uint32_t length) {
-#if defined(ESP8266)
+	#if defined(ARDUINO)
 	return file.read((uint8_t*)target, length);
 #else
 	return fread(target, 1, length, file);
@@ -186,7 +188,7 @@ int file_read(os_file_type file, void* target, uint32_t length) {
 }
 
 int file_write(os_file_type file, const void* source, uint32_t length) {
-#if defined(ESP8266)
+	#if defined(ARDUINO)
 	return file.write((const uint8_t*)source, length);
 #else
 	return fwrite(source, 1, length, file);
@@ -194,7 +196,7 @@ int file_write(os_file_type file, const void* source, uint32_t length) {
 }
 
 uint32_t file_size(os_file_type file) {
-#if defined(ESP8266)
+#if defined(ARDUINO)
 	return file.size();
 #else
 	long current = ftell(file);

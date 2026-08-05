@@ -126,7 +126,7 @@ void turn_off_station(unsigned char sid, time_os_t curr_time, unsigned char shif
 		if (!station_bit) return;
 	}
 
-	#if defined(ESP8266)
+	#if defined(ARDUINO)
 	int16_t current = (int16_t)os.read_current(true);
 	int16_t imin = os.get_imin();
 	if((current < imin) && (os.hw_type==HW_TYPE_AC || os.hw_type==HW_TYPE_DC)) {

@@ -61,4 +61,19 @@ HardwareDetection detect_hardware(I2cProbe probe_i2c, Revision1Probe probe_revis
 	return result;
 }
 
+HardwareDetection detect_os4_hardware(I2cProbe probe_i2c) {
+	const bool has_ch224_primary = probe_i2c(CH224_ADDRESS);
+	const bool has_ch224_secondary = probe_i2c(CH224_ADDRESS + 1);
+	const bool is_dc = has_ch224_primary && has_ch224_secondary;
+	return {
+		0,
+		is_dc ? POWER_DC : POWER_AC,
+		PROFILE_OS_40,
+		DRIVER_PCA9555,
+		MAIN_IO_EXPANDER_ADDRESS,
+		false,
+		is_dc,
+	};
+}
+
 } // namespace osboard

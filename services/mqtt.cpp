@@ -21,9 +21,13 @@
  * <http://www.gnu.org/licenses/>.
  */
 
-#if defined(ESP8266)
+#if defined(ARDUINO)
 	#include <Arduino.h>
+	#if defined(ESP8266)
 	#include <ESP8266WiFi.h>
+	#else
+	#include <WiFi.h>
+	#endif
 	#define MQTT_SOCKET_TIMEOUT 5
 	#include <PubSubClient.h>
 
@@ -49,7 +53,7 @@
 // Debug routines to help identify any blocking of the event loop for an extended period
 
 #if defined(ENABLE_DEBUG)
-	#if defined(ESP8266)
+	#if defined(ARDUINO)
 		#include "../TimeLib.h"
 		#define DEBUG_TIMESTAMP(msg, ...) {time_os_t t = os.now_tz(); Serial.printf("%02d-%02d-%02d %02d:%02d:%02d - ", year(t), month(t), day(t), hour(t), minute(t), second(t));}
 	#else
@@ -118,7 +122,7 @@ boolean checkPassword(char* pw) {
 //handles /cv command
 void changeValues(char *message){
 	DEBUG_LOGF("Changing Values\r\n");
-	#if defined(ESP8266)
+	#if defined(ARDUINO)
 		extern uint32_t reboot_timer;
 	#endif
 
@@ -129,7 +133,7 @@ void changeValues(char *message){
 
 	if(findKeyVal(message, tmp_buffer, TMP_BUFFER_SIZE, PSTR("rbt"), true)){
 		DEBUG_LOGF("Rebooting\r\n");
-		#if defined(ESP8266)
+		#if defined(ARDUINO)
 			os.status.safe_reboot = 0;
 			reboot_timer = os.now_tz() + 1;
 		#else
@@ -317,7 +321,7 @@ void OSMqtt::init(void) {
 	DEBUG_LOGF("MQTT Init\r\n");
 
 	uint8_t mac[6] = {0};
-	#if defined(ESP8266)
+	#if defined(ARDUINO)
 	os.load_hardware_mac(mac, useEth);
 	#else
 	os.load_hardware_mac(mac, true);
@@ -474,7 +478,7 @@ void OSMqtt::loop(void) {
 }
 
 /**************************** ESP8266 ********************************************/
-#if defined(ESP8266)
+#if defined(ARDUINO)
 WiFiClient wifiClient;
 
 int OSMqtt::_init(void) {
@@ -488,7 +492,7 @@ int OSMqtt::_init(void) {
 		mqtt_client = 0;
 	}
 
-	#if defined(ESP8266)
+	#if defined(ARDUINO)
 		client = &wifiClient;
 	#else
 		client = &ethClient;

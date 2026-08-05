@@ -3,7 +3,7 @@
 #include "../OpenSprinkler.h"
 #include "../core/program.h"
 
-#if defined(ESP8266)
+#if defined(ARDUINO)
 	#include <FS.h>
 	#include <LittleFS.h>
 #else
@@ -19,7 +19,7 @@ extern ProgramData pd;
 extern uint32_t flow_count;
 extern float flow_last_gpm;
 
-#if defined(ESP8266)
+#if defined(ARDUINO)
 static uint32_t get_sprinkler_log_size();
 static bool delete_log_oldest();
 #endif
@@ -49,7 +49,7 @@ void write_log(unsigned char type, time_os_t curr_time) {
 	snprintf(tmp_buffer, TMP_BUFFER_SIZE, "%" PRIu32, (uint32_t)curr_time / 86400);
 	make_logfile_name(tmp_buffer);
 
-	#if defined(ESP8266)
+	#if defined(ARDUINO)
 	File file = LittleFS.open(tmp_buffer, "r+");
 	if(!file) {
 		uint32_t limit = (uint32_t)LOG_SPRINKLER_MAX_KB * 1024;
@@ -124,7 +124,7 @@ void write_log(unsigned char type, time_os_t curr_time) {
 	snprintf(tmp_buffer + size, TMP_BUFFER_SIZE - size, "%" PRIu32, (uint32_t)curr_time);
 	if((os.iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_FLOW) && (type==LOGDATA_STATION)) {
 		strcat_P(tmp_buffer, PSTR(","));
-		#if defined(ESP8266)
+		#if defined(ARDUINO)
 		dtostrf(flow_last_gpm,5,2,tmp_buffer+strlen(tmp_buffer));
 		#else
 		snprintf(tmp_buffer+strlen(tmp_buffer), TMP_BUFFER_SIZE, "%5.2f", flow_last_gpm);
@@ -132,7 +132,7 @@ void write_log(unsigned char type, time_os_t curr_time) {
 	}
 	strcat_P(tmp_buffer, PSTR("]\r\n"));
 
-	#if defined(ESP8266)
+	#if defined(ARDUINO)
 	file.write((const uint8_t*)tmp_buffer, strlen(tmp_buffer));
 	file.close();
 	#else
@@ -141,17 +141,29 @@ void write_log(unsigned char type, time_os_t curr_time) {
 	#endif
 }
 
-#if defined(ESP8266)
+#if defined(ARDUINO)
 static uint32_t get_sprinkler_log_size() {
+	#if defined(ESP8266)
 	Dir dir = LittleFS.openDir(LOG_DIR);
 	uint32_t total = 0;
 	while (dir.next()) {
 		if (dir.fileName().endsWith(".txt")) total += dir.fileSize();
 	}
 	return total;
+	#else
+	File dir = LittleFS.open(LOG_DIR);
+	uint32_t total = 0;
+	if (!dir || !dir.isDirectory()) return 0;
+	for (File file = dir.openNextFile(); file; file = dir.openNextFile()) {
+		if (String(file.name()).endsWith(".txt")) total += file.size();
+		file.close();
+	}
+	return total;
+	#endif
 }
 
 static bool delete_log_oldest() {
+	#if defined(ESP8266)
 	Dir dir = LittleFS.openDir(LOG_DIR);
 	uint32_t oldest_day = UINT32_MAX;
 	String oldest_fn;
@@ -170,6 +182,25 @@ static bool delete_log_oldest() {
 		return true;
 	}
 	return false;
+	#else
+	File dir = LittleFS.open(LOG_DIR);
+	if (!dir || !dir.isDirectory()) return false;
+	uint32_t oldest_day = UINT32_MAX;
+	String oldest_fn;
+	for (File file = dir.openNextFile(); file; file = dir.openNextFile()) {
+		String name = file.name();
+		file.close();
+		if (!name.endsWith(".txt")) continue;
+		const char* basename = strrchr(name.c_str(), '/');
+		uint32_t day = (uint32_t)atol(basename ? basename + 1 : name.c_str());
+		if (day < oldest_day) {
+			oldest_day = day;
+			oldest_fn = name;
+		}
+	}
+	if (oldest_fn.length() == 0) return false;
+	return LittleFS.remove(oldest_fn);
+	#endif
 }
 #endif
 
@@ -185,6 +216,19 @@ void delete_log(char *name) {
 		make_logfile_name(name);
 		if(!LittleFS.exists(tmp_buffer)) return;
 		LittleFS.remove(tmp_buffer);
+	}
+	#elif defined(ESP32)
+	if (strncmp(name, "all", 3) == 0) {
+		File dir = LittleFS.open(LOG_DIR);
+		if (!dir || !dir.isDirectory()) return;
+		for (File file = dir.openNextFile(); file; file = dir.openNextFile()) {
+			String filename = file.name();
+			file.close();
+			if (filename.endsWith(".txt")) LittleFS.remove(filename);
+		}
+	} else {
+		make_logfile_name(name);
+		if (LittleFS.exists(tmp_buffer)) LittleFS.remove(tmp_buffer);
 	}
 	#else
 	if (strncmp(name, "all", 3) == 0) {

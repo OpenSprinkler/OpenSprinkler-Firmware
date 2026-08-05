@@ -13,7 +13,7 @@ namespace {
 const char* route_uris[] PROGMEM = {
 	"cv", "jc", "dp", "cp", "cr", "mp", "up", "jp", "jpa", "co", "jo", "sp",
 	"js", "cm", "cs", "jn", "je", "jl", "dl", "su", "cu", "ja", "pq", "db",
-#if defined(ESP8266)
+#if defined(ARDUINO)
 	"lf",
 #if defined(ENABLE_DEBUG)
 	"df",
@@ -47,7 +47,7 @@ ApiHandler route_handlers[] = {
 	server_json_all,
 	server_pause_queue,
 	server_json_debug,
-#if defined(ESP8266)
+#if defined(ARDUINO)
 	server_list_files,
 #if defined(ENABLE_DEBUG)
 	server_delete_file,
@@ -69,7 +69,7 @@ static_assert(sizeof(route_uris) / sizeof(route_uris[0]) ==
 void register_api_routes(OTF::OpenThingsFramework& framework) {
 	char uri[10] = {'/', 0};
 	for (size_t index = 0; index < sizeof(route_handlers) / sizeof(route_handlers[0]); index++) {
-#if defined(ESP8266)
+#if defined(ARDUINO)
 		strncpy_P(uri + 1, route_uris[index], sizeof(uri) - 1);
 #else
 		strncpy(uri + 1, route_uris[index], sizeof(uri) - 1);

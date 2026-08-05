@@ -5,7 +5,7 @@
 
 #include <limits>
 
-#if !defined(ESP8266)
+#if !defined(ARDUINO)
 	#include <stdarg.h>
 	#include <unistd.h>
 #endif

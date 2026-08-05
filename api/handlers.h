@@ -27,7 +27,7 @@ void server_change_scripturl(const OTF::Request&, OTF::Response&);
 void server_json_all(const OTF::Request&, OTF::Response&);
 void server_pause_queue(const OTF::Request&, OTF::Response&);
 void server_json_debug(const OTF::Request&, OTF::Response&);
-#if defined(ESP8266)
+#if defined(ARDUINO)
 void server_list_files(const OTF::Request&, OTF::Response&);
 #if defined(ENABLE_DEBUG)
 void server_delete_file(const OTF::Request&, OTF::Response&);

@@ -28,7 +28,7 @@ void begin_response(OTF::Response& response) {
 
 unsigned char findKeyVal(const OTF::Request& request, char* buffer, uint16_t max_length,
 	const char* key, bool key_in_program_memory, uint8_t* key_found) {
-#if defined(ESP8266)
+#if defined(ARDUINO)
 	char* result = key_in_program_memory
 		? request.getQueryParameter((const __FlashStringHelper*)key)
 		: request.getQueryParameter(key);
@@ -136,7 +136,7 @@ void print_header_compressed_html(const OTF::Request&, OTF::Response& response,
 void otf_send_result(const OTF::Request& request, OTF::Response& response,
 	unsigned char code, const char* item) {
 	String json = F("{\"result\":");
-#if defined(ESP8266)
+#if defined(ARDUINO)
 	json += code;
 #else
 	json += std::to_string(code);

@@ -40,14 +40,20 @@ extern OTF::OpenThingsFramework *otf;
 #define FKV_SOURCE req
 #define handle_return(x) {if(x!=HTML_OK) otf_send_result(req,res,x); return;}
 
-#if defined(ESP8266)
+#if defined(ARDUINO)
 	#include <FS.h>
 	#include <LittleFS.h>
 	#include "../services/espconnect.h"
+	#if defined(ESP8266)
 	extern ESP8266WebServer *update_server;
 	extern ENC28J60lwIP enc28j60;
 	extern Wiznet5500lwIP w5500;
 	extern lwipEth eth;
+	#elif defined(ESP32)
+	#include <WebServer.h>
+	#include <Update.h>
+	extern WebServer *update_server;
+	#endif
 #else
 	#include <stdarg.h>
 	#include <stdlib.h>
@@ -68,7 +74,7 @@ static const char htmlReturnHome[] PROGMEM =
 	"<script>window.location=\"/\";</script>\n"
 ;
 
-#if !defined(ESP8266)
+#if !defined(ARDUINO)
 string two_digits(uint8_t x) {
 	return std::to_string(x);
 }
@@ -82,7 +88,7 @@ String toHMS(uint32_t t) {
 	return two_digits(t/3600)+":"+two_digits((t/60)%60)+":"+two_digits(t%60);
 }
 
-#if defined(ESP8266)
+#if defined(ARDUINO)
 void update_server_send_result(unsigned char code, const char* item = NULL) {
 	String json = F("{\"result\":");
 	json += code;
@@ -112,20 +118,20 @@ String get_ap_ssid() {
 static String scanned_ssids;
 
 void on_ap_home(OTF_PARAMS_DEF) {
-	if(os.get_wifi_mode()!=WIFI_MODE_AP) return;
+	if(os.get_wifi_mode()!=OS_WIFI_MODE_AP) return;
 	print_header_compressed_html(OTF_PARAMS, ap_home_html_gz_len);
 	//res.writeBodyChunk((char *) "%s", ap_home_html_gz);
 	res.writeBodyData((const __FlashStringHelper*)ap_home_html_gz, ap_home_html_gz_len);
 }
 
 void on_ap_scan(OTF_PARAMS_DEF) {
-	if(os.get_wifi_mode()!=WIFI_MODE_AP) return;
+	if(os.get_wifi_mode()!=OS_WIFI_MODE_AP) return;
 	print_header(OTF_PARAMS, CT_JSON, scanned_ssids.length());
 	res.writeBodyChunk((char *)"%s",scanned_ssids.c_str());
 }
 
 void on_ap_change_config(OTF_PARAMS_DEF) {
-	if(os.get_wifi_mode()!=WIFI_MODE_AP) return;
+	if(os.get_wifi_mode()!=OS_WIFI_MODE_AP) return;
 	char *ssid = req.getQueryParameter("ssid");
 	if(ssid!=NULL&&strlen(ssid)!=0) {
 		os.wifi_ssid = ssid;
@@ -163,7 +169,7 @@ void on_ap_change_config(OTF_PARAMS_DEF) {
 void reboot_in(uint32_t ms);
 
 void on_ap_try_connect(OTF_PARAMS_DEF) {
-	if(os.get_wifi_mode()!=WIFI_MODE_AP) return;
+	if(os.get_wifi_mode()!=OS_WIFI_MODE_AP) return;
 	String json = "{";
 	json += F("\"ip\":");
 	json += (WiFi.status() == WL_CONNECTED) ? (uint32_t)WiFi.localIP() : 0;
@@ -171,7 +177,7 @@ void on_ap_try_connect(OTF_PARAMS_DEF) {
 	print_header(OTF_PARAMS, CT_JSON, json.length());
 	res.writeBodyChunk((char *)"%s",json.c_str());
 	if(WiFi.status() == WL_CONNECTED && WiFi.localIP()) {
-		os.iopts[IOPT_WIFI_MODE] = WIFI_MODE_STA;
+		os.iopts[IOPT_WIFI_MODE] = OS_WIFI_MODE_STA;
 		os.iopts_save();
 		DEBUG_PRINTLN(F("IP received by client, restart."));
 		reboot_in(1000);
@@ -574,7 +580,7 @@ void server_json_options_main() {
 	unsigned char oid;
 	bool emitted = false;
 	for(oid=0;oid<NUM_IOPTS;oid++) {
-		#if !defined(ESP8266) // do not send the following parameters for non-Arduino platforms
+		#if !defined(ARDUINO) // do not send the following parameters for non-Arduino platforms
 		if (oid==IOPT_USE_NTP			|| oid==IOPT_USE_DHCP		 ||
 				(oid>=IOPT_STATIC_IP1	&& oid<=IOPT_STATIC_IP4) ||
 				(oid>=IOPT_GATEWAY_IP1 && oid<=IOPT_GATEWAY_IP4) ||
@@ -593,7 +599,7 @@ void server_json_options_main() {
 			v=water_time_decode_signed(v);
 		}
 
-		#if defined(ESP8266)
+		#if defined(ARDUINO)
 		if (oid==IOPT_BOOST_TIME) {
 			if (os.hw_type==HW_TYPE_AC || os.hw_type==HW_TYPE_UNKNOWN) continue;
 			else v<<=2;
@@ -609,7 +615,7 @@ void server_json_options_main() {
 		}
 
 		if (oid==IOPT_TARGET_PD_VOLTAGE) {
-			if (!(os.hw_rev==4 && os.hw_type==HW_TYPE_DC)) continue;
+			if (!HAS_TARGET_PD_VOLTAGE(os.hw_rev, os.hw_type)) continue;
 		}
 
 		if ((oid>=IOPT_SENSOR3_TYPE && oid<=IOPT_SENSOR4_OFF_DELAY)) {
@@ -621,7 +627,7 @@ void server_json_options_main() {
 		if (oid>=IOPT_SENSOR3_TYPE && oid<=IOPT_SENSOR4_OFF_DELAY) continue;
 		#endif
 
-		#if defined(ESP8266)
+		#if defined(ARDUINO)
 		if (oid==IOPT_HW_VERSION) {
 			v+=os.hw_rev;	// for OS3.x, add hardware revision number
 		}
@@ -791,7 +797,7 @@ void server_json_controller_main(OTF_PARAMS_DEF) {
 			os.sn_sensors[3].active);
 	}
 
-#if defined(ESP8266)
+#if defined(ARDUINO)
 	bfill.emit_p(PSTR("\"RSSI\":$D,"), (int16_t)WiFi.RSSI());
 	bfill.emit_p(PSTR("\"apdv\":$D,"), os.actual_pd_voltage);
 #endif
@@ -799,7 +805,7 @@ void server_json_controller_main(OTF_PARAMS_DEF) {
 	bfill.emit_p(PSTR("\"otc\":{$O},\"otcs\":$D,"), SOPT_OTC_OPTS, otf->getCloudStatus());
 
 	unsigned char mac[6] = {0};
-#if defined(ESP8266)
+#if defined(ARDUINO)
 	os.load_hardware_mac(mac, useEth);
 #else
 	os.load_hardware_mac(mac, true);
@@ -830,7 +836,7 @@ void server_json_controller_main(OTF_PARAMS_DEF) {
 		bfill.emit_p((idx == md_N-1) ? PSTR("],") : PSTR(","));
 	}
 
-#if defined(ESP8266)
+#if defined(ARDUINO)
 	uint16_t current = os.read_current(true);
 	if((!os.status.program_busy) && (current<os.baseline_current)) current=0;
 	bfill.emit_p(PSTR("\"curr\":$D,"), current);
@@ -912,7 +918,7 @@ void server_home(OTF_PARAMS_DEF)
  * rd:	rain delay hours (0 turns off rain delay)
  * re:	remote extension mode
  * rocs: reset overcurrent status (0 or 1)
- * ap:	reset to ap (ESP8266 only)
+ * ap:	reset to AP mode (Arduino targets only)
  * update: launch update script (for OSPi/Linux only)
  */
 void server_change_values(OTF_PARAMS_DEF)
@@ -931,7 +937,7 @@ void server_change_values(OTF_PARAMS_DEF)
 		os.status.overcurrent_sid = 0; // clear overcurrent status
 	}
 
-	#if !defined(ESP8266)
+	#if !defined(ARDUINO)
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("update"), true) && atoi(tmp_buffer) > 0) {
 		os.update_dev();
 	}
@@ -968,7 +974,7 @@ void server_change_values(OTF_PARAMS_DEF)
 		}
 	}
 
-	#if defined(ESP8266)
+	#if defined(ARDUINO)
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("ap"), true)) {
 		os.reset_to_ap();
 	}
@@ -1034,7 +1040,9 @@ void server_change_options(OTF_PARAMS_DEF)
 	bool time_change = false;
 	bool weather_change = false;
 	bool sensor_change = false;
+	#if defined(ARDUINO)
 	bool tpdv_change = false;
+	#endif
 
 	// !!! p and bfill share the same buffer, so don't write
 	// to bfill before you are done analyzing the buffer !!!
@@ -1084,7 +1092,9 @@ void server_change_options(OTF_PARAMS_DEF)
 			}
 			if ((oid>=IOPT_SENSOR1_TYPE && oid<=IOPT_SENSOR2_OFF_DELAY) ||
 			    (oid>=IOPT_SENSOR3_TYPE && oid<=IOPT_SENSOR4_OFF_DELAY)) sensor_change = true;
+			#if defined(ARDUINO)
 			if (oid==IOPT_TARGET_PD_VOLTAGE) tpdv_change = true;
+			#endif
 		}
 	}
 
@@ -1145,13 +1155,13 @@ void server_change_options(OTF_PARAMS_DEF)
 
 	// if not using NTP and manually setting time
 	if (!os.iopts[IOPT_USE_NTP] && findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("ttt"), true)) {
-#if defined(ESP8266)
+#if defined(ARDUINO)
 		uint32_t t;
 		t = strtoul(tmp_buffer, NULL, 0);
 #endif
 		// before chaging time, reset all stations to avoid messing up with timing
 		reset_all_stations_immediate();
-#if defined(ESP8266)
+#if defined(ARDUINO)
 		setTime(t);
 		RTC.set(t);
 #endif
@@ -1161,7 +1171,7 @@ void server_change_options(OTF_PARAMS_DEF)
 	os.iopts_save();
 	os.populate_master();
 
-#if defined(ESP8266)
+#if defined(ARDUINO)
 	if (tpdv_change) {
 		os.setup_pd_voltage();
 	}
@@ -1326,7 +1336,7 @@ void server_change_manual(OTF_PARAMS_DEF) {
 }
 
 
-#if defined(ESP8266)
+#if defined(ARDUINO)
 int file_fgets(File file, char* buf, int maxsize) {
 	int index=0;
 	while(index<maxsize) {
@@ -1397,7 +1407,7 @@ void server_json_log(OTF_PARAMS_DEF) {
 		snprintf(tmp_buffer, TMP_BUFFER_ALLOC_SIZE , "%d", i);
 		make_logfile_name(tmp_buffer);
 
-#if defined(ESP8266)
+	#if defined(ARDUINO)
 		File file = LittleFS.open(tmp_buffer, "r");
 		if(!file) continue;
 #else // prepare to open log file for Linux
@@ -1406,7 +1416,7 @@ void server_json_log(OTF_PARAMS_DEF) {
 #endif // prepare to open log file
 		int result;
 		while(true) {
-		#if defined(ESP8266)
+		#if defined(ARDUINO)
 			// do not use file.read_byte or read_byteUntil because it's very slow
 			result = file_fgets(file, tmp_buffer, TMP_BUFFER_SIZE);
 			if (result <= 0) {
@@ -2491,7 +2501,7 @@ void server_delete_sensor_log(OTF_PARAMS_DEF) {
 
 			file_record_idx += batch_records;
 			flat_idx += batch_records;
-			#if defined(ESP8266)
+			#if defined(ARDUINO)
 				yield();
 			#endif
 		}
@@ -2643,9 +2653,9 @@ void server_json_all(OTF_PARAMS_DEF) {
 	handle_return(HTML_OK);
 }
 
-#if defined(ESP8266)
+#if defined(ARDUINO)
 
-#else
+#elif !defined(ARDUINO)
 #include <sys/sysinfo.h>
 static uint32_t freeHeap() {
 	//return sysconf(_SC_AVPHYS_PAGES) * sysconf(_SC_PAGESIZE);
@@ -2663,7 +2673,7 @@ void server_json_debug(OTF_PARAMS_DEF) {
 	print_header(OTF_PARAMS);
 
 	bfill.emit_p(PSTR("{\"date\":\"$S\",\"time\":\"$S\",\"heap\":$L"), __DATE__, __TIME__,
-#if defined(ESP8266)
+	#if defined(ESP8266)
 	ESP.getFreeHeap());
 	bfill.emit_p(PSTR(",\"maxblock\":$L,\"frag\":$D"),
 		(uint32_t)ESP.getMaxFreeBlockSize(),
@@ -2693,7 +2703,19 @@ void server_json_debug(OTF_PARAMS_DEF) {
 		DEBUG_PRINTLN(dir.fileSize());
 	}
 */
-#else
+	#elif defined(ESP32)
+	ESP.getFreeHeap());
+	bfill.emit_p(PSTR(",\"maxblock\":$L"), (uint32_t)ESP.getMaxAllocHeap());
+	bfill.emit_p(PSTR(",\"flash\":$L,\"used\":$L,\"devip\":\"$S\","),
+		(uint32_t)LittleFS.totalBytes(), (uint32_t)LittleFS.usedBytes(),
+		(useEth ? ETH.localIP() : WiFi.localIP()).toString().c_str());
+	if (useEth) {
+		bfill.emit_p(PSTR("\"isW5500\":1,\"spi_clock\":$L}"), (uint32_t)ETHER_SPI_CLOCK);
+	} else {
+		bfill.emit_p(PSTR("\"rssi\":$D,\"bssid\":\"$S\",\"bssidchl\":\"$O\"}"),
+			WiFi.RSSI(), WiFi.BSSIDstr().c_str(), SOPT_STA_BSSID_CHL);
+	}
+	#else
 	(uint32_t)freeHeap());
 	bfill.emit_p(PSTR("}"));
 #endif
@@ -2707,7 +2729,7 @@ void server_json_debug(OTF_PARAMS_DEF) {
  * pw:   password
  * Returns a JSON array of [filename, size]
  */
-#if defined(ESP8266)
+	#if defined(ESP8266)
 void server_list_files(OTF_PARAMS_DEF) {
 	if(!process_password(OTF_PARAMS)) return;
 	begin_response(res);
@@ -2735,7 +2757,35 @@ void server_list_files(OTF_PARAMS_DEF) {
 	bfill.emit_p(PSTR("]}"));
 	handle_return(HTML_OK);
 }
-#endif
+	#elif defined(ESP32)
+static void emit_file_directory(BufferFiller& output, const char* path,
+	const char* prefix, bool& first) {
+	File directory = LittleFS.open(path);
+	if (!directory || !directory.isDirectory()) return;
+	for (File file = directory.openNextFile(); file; file = directory.openNextFile()) {
+		String name = file.name();
+		if (name.indexOf('.') >= 0) {
+			if (!first) output.emit_p(PSTR(","));
+			output.emit_p(PSTR("[\"$S$S\",$L]"), prefix, name.c_str(),
+				(uint32_t)file.size());
+			first = false;
+		}
+		file.close();
+	}
+}
+
+void server_list_files(OTF_PARAMS_DEF) {
+	if(!process_password(OTF_PARAMS)) return;
+	begin_response(res);
+	print_header(OTF_PARAMS);
+	bfill.emit_p(PSTR("{\"files\":["));
+	bool first = true;
+	emit_file_directory(bfill, "/", "/", first);
+	emit_file_directory(bfill, LOG_DIR, LOG_DIR, first);
+	bfill.emit_p(PSTR("]}"));
+	handle_return(HTML_OK);
+}
+	#endif
 
 /**
  * Delete a file
@@ -2744,7 +2794,7 @@ void server_list_files(OTF_PARAMS_DEF) {
  * pw:   password
  * fn:   filename to delete
  */
-#if defined(ESP8266) && defined(ENABLE_DEBUG)
+#if defined(ARDUINO) && defined(ENABLE_DEBUG)
 void server_delete_file(OTF_PARAMS_DEF) {
 	if(!process_password(OTF_PARAMS)) return;
 
@@ -2779,7 +2829,7 @@ void server_fill_files(OTF_PARAMS_DEF) {
 */
 
 // handle Ethernet request
-#if defined(ESP8266)
+#if defined(ARDUINO)
 void on_firmware_update(OTF_PARAMS_DEF) {
 	if(req.isCloudRequest()) otf_send_result(OTF_PARAMS, HTML_NOT_PERMITTED, "fw update");
 	print_header_compressed_html(OTF_PARAMS, update_html_gz_len);
@@ -2817,7 +2867,7 @@ void on_update_options() {
 void on_firmware_upload() {
 	HTTPUpload& upload = update_server->upload();
 	if(upload.status == UPLOAD_FILE_START){
-		if(os.iopts[IOPT_WIFI_MODE]==WIFI_MODE_STA) {
+		if(os.iopts[IOPT_WIFI_MODE]==OS_WIFI_MODE_STA) {
 			// TODO: stopping these can cause problems if the update fails and the user abandons the task
 			//WiFiUDP::stopAll();
 			//mqtt_client->disconnect();
@@ -2892,7 +2942,7 @@ void start_server_ap() {
 
 #endif
 
-#if !defined(ESP8266)
+#if !defined(ARDUINO)
 void initialize_otf() {
 	if(!otf) return;
 	static bool callback_initialized = false;
@@ -2907,7 +2957,7 @@ void initialize_otf() {
 }
 #endif
 
-#if defined(ESP8266)
+#if defined(ARDUINO)
 #define NTP_NTRIES 10
 /** NTP sync request */
 // due to lwip not supporting UDP, we have to use configTime and time() functions

@@ -46,6 +46,19 @@ int main() {
 		IO_EXPANDER_PIN_BASE + 10, IO_EXPANDER_PIN_BASE + 11);
 	assert(has(CAP_ETHERNET));
 
+	check_sensor_pins(PROFILE_OS_40, 4, 1, 2, 3, 6);
+	assert(active().pins.buttons[0] == IO_EXPANDER_PIN_BASE + 8);
+	assert(active().pins.buttons[1] == 9);
+	assert(active().pins.buttons[2] == IO_EXPANDER_PIN_BASE + 9);
+	assert(active().pins.rf_tx == 7);
+	assert(active().pins.boost == IO_EXPANDER_PIN_BASE + 13);
+	assert(active().pins.boost_enable == IO_EXPANDER_PIN_BASE + 14);
+	assert(has(CAP_ETHERNET));
+	assert(OS40_CURRENT_SENSE_PIN == 0);
+	assert(OS40_ETHERNET_CS_PIN == 18);
+	assert(OS40_I2C_CLOCK_PIN == 22);
+	assert(OS40_I2C_DATA_PIN == 23);
+
 	check_sensor_pins(PROFILE_OSPI_BOARD, 2, 14, 23, UNUSED_PIN, UNUSED_PIN);
 	assert(active().pins.buttons[0] == 24);
 	assert(active().pins.rf_tx == 15);

@@ -107,5 +107,22 @@ int main() {
 	assert(result.initialize_usb_pd);
 	assert(probe_count == 4);
 
+	reset_probes();
+	result = detect_os4_hardware(probe_i2c);
+	check_driver(result, 0, POWER_AC, PROFILE_OS_40, DRIVER_PCA9555,
+		MAIN_IO_EXPANDER_ADDRESS);
+	assert(!result.separate_main_io);
+	assert(!result.initialize_usb_pd);
+	assert(probe_count == 2);
+
+	reset_probes();
+	present[CH224_ADDRESS] = true;
+	present[CH224_ADDRESS + 1] = true;
+	result = detect_os4_hardware(probe_i2c);
+	check_driver(result, 0, POWER_DC, PROFILE_OS_40, DRIVER_PCA9555,
+		MAIN_IO_EXPANDER_ADDRESS);
+	assert(result.initialize_usb_pd);
+	assert(probe_count == 2);
+
 	return 0;
 }

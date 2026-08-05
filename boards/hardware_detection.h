@@ -32,5 +32,6 @@ using I2cProbe = bool (*)(uint8_t address);
 using Revision1Probe = bool (*)();
 
 HardwareDetection detect_hardware(I2cProbe probe_i2c, Revision1Probe probe_revision1);
+HardwareDetection detect_os4_hardware(I2cProbe probe_i2c);
 
 } // namespace osboard

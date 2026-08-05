@@ -2,7 +2,7 @@
 
 #include "utils.h"
 
-#if defined(ESP8266)
+#if defined(ARDUINO)
 #include <Arduino.h>
 #else
 #include <stdio.h>

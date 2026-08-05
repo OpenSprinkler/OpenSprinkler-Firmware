@@ -12,6 +12,7 @@ enum ProfileId : uint8_t {
 	PROFILE_OS_31,
 	PROFILE_OS_32_33,
 	PROFILE_OS_34,
+	PROFILE_OS_40,
 	PROFILE_OSPI_BOARD,
 	PROFILE_DEMO_BOARD,
 };
@@ -57,6 +58,7 @@ constexpr uint8_t EXPANDER_ADDRESS_BASE = 0x24;
 constexpr uint8_t LCD_ADDRESS = 0x3C;
 constexpr uint8_t EEPROM_ADDRESS = 0x50;
 constexpr uint8_t CH224_ADDRESS = 0x22;
+constexpr uint8_t RTC_ADDRESS = 0x51;
 constexpr uint8_t REVISION1_DETECT_PIN = 16;
 constexpr uint8_t ETHERNET_CS_PIN = 16;
 constexpr uint32_t ETHERNET_SPI_CLOCK_HZ = 10000000UL;
@@ -73,6 +75,21 @@ constexpr uint8_t OS32_SHIFT_LATCH_PIN = IO_EXPANDER_PIN_BASE + 9;
 constexpr uint8_t OS32_SHIFT_CLOCK_PIN = IO_EXPANDER_PIN_BASE + 10;
 constexpr uint8_t OS32_SHIFT_DATA_PIN = IO_EXPANDER_PIN_BASE + 11;
 constexpr uint8_t OS32_BOOST_SELECT_PIN = IO_EXPANDER_PIN_BASE + 8;
+
+// OpenSprinkler v4.0 (ESP32-C6). AC and DC use the same PCA9555 address;
+// CH224 detection selects the power type at runtime.
+constexpr uint8_t OS40_HARDWARE_VERSION = 40;
+constexpr uint16_t OS40_IO_CONFIG = 0xFF00;
+constexpr uint16_t OS40_IO_OUTPUT = 0x0000;
+constexpr uint8_t OS40_CURRENT_SENSE_PIN = 0;
+constexpr uint8_t OS40_ETHERNET_IRQ_PIN = 10;
+constexpr uint8_t OS40_ETHERNET_RESET_PIN = 11;
+constexpr uint8_t OS40_ETHERNET_CS_PIN = 18;
+constexpr uint8_t OS40_SPI_MOSI_PIN = 19;
+constexpr uint8_t OS40_SPI_MISO_PIN = 20;
+constexpr uint8_t OS40_SPI_CLOCK_PIN = 21;
+constexpr uint8_t OS40_I2C_CLOCK_PIN = 22;
+constexpr uint8_t OS40_I2C_DATA_PIN = 23;
 
 constexpr uint8_t OSPI_SHIFT_LATCH_PIN = 22;
 constexpr uint8_t OSPI_SHIFT_DATA_PIN = 27;

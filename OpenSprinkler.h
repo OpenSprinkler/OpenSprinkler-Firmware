@@ -33,7 +33,7 @@
 #include <cmath>
 #include <new>
 
-#if defined(ESP8266) // headers for Arduino
+#if defined(ARDUINO)
 	#include <Arduino.h>
 	#include <Wire.h>
 	#include <SPI.h>
@@ -41,14 +41,20 @@
 
 	#include <FS.h>
 	#include <LittleFS.h>
-	#include <ENC28J60lwIP.h>
-	#include <W5500lwIP.h>
 	#include <OpenThingsFramework.h>
 	#include <DNSServer.h>
-	#include <Ticker.h>
 	#include "services/espconnect.h"
-	#include "services/EMailSender.h"
 	#include "drivers/ch224.h"
+	#if defined(ESP8266)
+		#include <ESP8266WebServer.h>
+		#include <ENC28J60lwIP.h>
+		#include <W5500lwIP.h>
+		#include <Ticker.h>
+		#include "services/EMailSender.h"
+	#elif defined(ESP32)
+		#include <WiFi.h>
+		#include <ETH.h>
+	#endif
 
 #else // headers for RPI/LINUX
 	#include <time.h>
@@ -109,6 +115,10 @@
 		}
 	};
 	extern lwipEth eth;
+	extern bool useEth;
+#elif defined(ESP32)
+	class WebServer;
+	extern WebServer *update_server;
 	extern bool useEth;
 #else
 	// OSPI/Linux specific
@@ -482,7 +492,7 @@ public:
 	static void ui_set_options(int oid);		// ui for setting options (oid-> starting option index)
 #endif
 
-#if defined(ESP8266) // LCD functions for Arduino
+#if defined(ARDUINO) // LCD functions for Arduino
 	static void lcd_print_pgm(PGM_P str); // ESP8266 does not allow PGM_P followed by PROGMEM
 	static void lcd_print_line_clear_pgm(PGM_P str, unsigned char line);
 
@@ -492,7 +502,7 @@ public:
 	static uint8_t actual_pd_voltage;
 
 	static void detect_expanders();
-	static unsigned char get_wifi_mode() { if (useEth) return WIFI_MODE_STA; else return wifi_testmode ? WIFI_MODE_STA : iopts[IOPT_WIFI_MODE];}
+	static unsigned char get_wifi_mode() { if (useEth) return OS_WIFI_MODE_STA; else return wifi_testmode ? OS_WIFI_MODE_STA : iopts[IOPT_WIFI_MODE];}
 	static unsigned char wifi_testmode;
 	static String wifi_ssid, wifi_pass;
 	static unsigned char wifi_bssid[6], wifi_channel;

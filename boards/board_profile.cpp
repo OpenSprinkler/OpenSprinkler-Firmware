@@ -55,6 +55,15 @@ const BoardProfile OS34_PROFILE OSBOARD_PROGMEM = {
 	CAP_ETHERNET,
 };
 
+const BoardProfile OS40_PROFILE OSBOARD_PROGMEM = {
+	{{IO_EXPANDER_PIN_BASE + 8, 9, IO_EXPANDER_PIN_BASE + 9},
+	 {1, 2, 3, 6},
+	 UNUSED_PIN, 7, IO_EXPANDER_PIN_BASE + 13, IO_EXPANDER_PIN_BASE + 14,
+	 UNUSED_PIN, UNUSED_PIN, UNUSED_PIN, UNUSED_PIN},
+	4,
+	CAP_ETHERNET,
+};
+
 const BoardProfile OSPI_PROFILE OSBOARD_PROGMEM = {
 	{{24, 18, 10},
 	 {14, 23, UNUSED_PIN, UNUSED_PIN},
@@ -104,6 +113,9 @@ void select(ProfileId id) {
 		break;
 	case PROFILE_OS_34:
 		profile = &OS34_PROFILE;
+		break;
+	case PROFILE_OS_40:
+		profile = &OS40_PROFILE;
 		break;
 	case PROFILE_OSPI_BOARD:
 		profile = &OSPI_PROFILE;
