@@ -23,7 +23,7 @@
 
 #include <limits.h>
 #include "program.h"
-#include "main.h"
+#include "../main.h"
 
 #if !defined(SECS_PER_DAY)
 #define SECS_PER_MIN  (60UL)
