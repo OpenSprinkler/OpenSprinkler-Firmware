@@ -35,7 +35,7 @@ Embedded paths should continue to favor static storage, explicit ownership, and 
 - `storage/` owns cross-platform file access and sprinkler-log persistence.
 - `sensors/` remains the expanded-sensor domain.
 
-Root forwarding headers preserve existing include paths while callers migrate. `main.cpp` remains the platform entrypoint and polling orchestrator. `OpenSprinkler` remains the compatibility state facade; splitting that state requires a separate behavioral redesign and is not part of this file migration.
+Internal includes now reference their owning subdirectory directly; the temporary root forwarding headers have been removed. New includes should use repository-root-relative paths. `main.cpp` remains the platform entrypoint and polling orchestrator. `OpenSprinkler` remains the compatibility state facade; splitting that state requires a separate behavioral redesign and is not part of this file migration.
 
 ## Completed Migration
 
@@ -50,4 +50,4 @@ Root forwarding headers preserve existing include paths while callers migrate. `
 
 Future changes can split the remaining controller state, options, and station storage from `OpenSprinkler` behind explicit interfaces. That work should be driven by ESP32 requirements and accompanied by focused state-transition and persistence tests; it should not be mixed into mechanical file moves.
 
-Use temporary compatibility wrappers when needed, then remove them once all callers use the new boundary. Avoid broad renames or unrelated cleanup in migration commits.
+Avoid reintroducing compatibility wrappers, broad renames, or unrelated cleanup in future migration commits.

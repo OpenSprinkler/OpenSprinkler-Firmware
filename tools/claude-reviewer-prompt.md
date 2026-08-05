@@ -26,8 +26,8 @@ You are a skeptical second engineer reviewing another AI's plan or diff for the
   The mobile app and web UI depend on these exactly.
 - **ESP8266 RAM limits still apply** (~80 KB) — watch for stack/heap growth, large
   buffers, and dynamic `new`/`delete` in hot paths.
-- **Platform differences** belong behind the existing guards/wrappers
-  (`#if defined(ESP8266)` / `OSPI`/`DEMO`, or `hal/`-style abstractions), not scattered.
+- **Platform differences** belong behind the existing guards or the `platform/`,
+  `drivers/`, and `boards/` boundaries, not scattered through domain code.
 - Do **not** hand-edit generated artifacts (`htmls.h`); regenerate from `html/`.
 - Treat `external/`, `.pio/`, `node_modules/`, `.dat` files, and `logs/` as
   dependency/runtime state.
