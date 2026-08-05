@@ -4,6 +4,7 @@
 #include "../OpenSprinkler.h"
 #include "../notifier.h"
 #include "../sensors/sensor.h"
+#include "../storage/logging.h"
 #include "../weather.h"
 
 extern OpenSprinkler os;
@@ -15,8 +16,6 @@ extern uint32_t flow_stop;
 extern uint32_t flow_gallons;
 extern uint32_t flow_count;
 extern float flow_last_gpm;
-
-void write_log(unsigned char type, time_os_t curr_time);
 
 namespace {
 

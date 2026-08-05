@@ -27,7 +27,4 @@
 #pragma once
 
 #include "core/scheduler.h"
-
-void delete_log(char *name);
-void write_log(unsigned char type, time_os_t curr_time);
-void make_logfile_name(char *name);
+#include "storage/logging.h"
