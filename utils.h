@@ -25,8 +25,6 @@
 
 #if defined(ESP8266)
 	#include <Arduino.h>
-	#include <FS.h>
-	#include <LittleFS.h>
 #else // headers for RPI/LINUX
 	#include <stdio.h>
 	#include <limits.h>
@@ -37,51 +35,7 @@
 	#include "platform/clock.h"
 #endif
 #include "defines.h"
-
-
-#if defined(ESP8266)
-typedef File os_file_type;
-#else
-typedef FILE* os_file_type;
-#endif
-
-enum class FileOpenMode {
-	Read,
-	ReadWrite,
-	WriteTruncate,
-	ReadWriteTruncate,
-	Append,
-	ReadAppend,
-};
-
-enum class FileSeekMode {
-	Set,
-	Current,
-	End
-};
-
-
-// File reading/writing functions
-//remove unused functions: void write_to_file(const char *fname, const char *data, uint32_t size, uint32_t pos=0, bool trunc=true);
-//remove unused functions: void read_from_file(const char *fname, char *data, uint32_t maxsize=TMP_BUFFER_SIZE, int pos=0);
-void remove_file(const char *fname);
-bool file_exists(const char *fname);
-void ensure_log_dir();
-
-os_file_type file_open(const char *fn, FileOpenMode mode);
-void file_close(os_file_type f);
-bool file_seek(os_file_type f, uint32_t position, FileSeekMode mode);
-bool file_seek(os_file_type f, uint32_t position);
-int file_read(os_file_type f, void *target, uint32_t len);
-int file_write(os_file_type f, const void *source, uint32_t len);
-uint32_t file_size(os_file_type f);
-
-void file_read_block (const char *fname, void *dst, uint32_t pos, uint32_t len);
-void file_write_block(const char *fname, const void *src, uint32_t pos, uint32_t len);
-void file_copy_block (const char *fname, uint32_t from, uint32_t to, uint32_t len, void *tmp=0);
-unsigned char file_read_byte (const char *fname, uint32_t pos);
-void file_write_byte(const char *fname, uint32_t pos, unsigned char v);
-unsigned char file_cmp_block(const char *fname, const char *buf, uint32_t pos);
+#include "storage/files.h"
 
 // misc. string and time converstion functions
 void strncpy_P0(char* dest, const char* src, int n);
@@ -112,12 +66,8 @@ void str2mac(const char *_str, unsigned char mac[]);
 #if defined(ESP8266)
 
 #else // Arduino compatible functions for RPI/LINUX
-	const char* get_data_dir();
-	void set_data_dir(const char *new_data_dir);
-	char* get_filename_fullpath(const char *filename);
 	#if defined(OSPI)
 	unsigned int detect_rpi_rev();
-	char* get_runtime_path();
 
 	struct route_t {
 		char iface[16];
