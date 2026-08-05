@@ -196,7 +196,6 @@ uint16_t parse_listdata(char **p) {
 	return (uint16_t)atol(tmp_buffer);
 }
 
-void manual_start_program(unsigned char, unsigned char, unsigned char, unsigned char usa=0);
 /** Manual start program
  * Command: /mp?pw=xxx&pid=xx&uwt=x&qo=x
  *
