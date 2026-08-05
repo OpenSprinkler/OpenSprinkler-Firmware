@@ -37,19 +37,19 @@
 	struct mosquitto *mqtt_client = NULL;
 #endif
 
-#include "OpenSprinkler.h"
-#include "opensprinkler_server.h"
-#include "main.h"
-#include "program.h"
-#include "types.h"
+#include "../OpenSprinkler.h"
+#include "../opensprinkler_server.h"
+#include "../main.h"
+#include "../program.h"
+#include "../types.h"
 #include "mqtt.h"
-#include "ArduinoJson.hpp"
+#include "../ArduinoJson.hpp"
 
 // Debug routines to help identify any blocking of the event loop for an extended period
 
 #if defined(ENABLE_DEBUG)
 	#if defined(ESP8266)
-		#include "TimeLib.h"
+		#include "../TimeLib.h"
 		#define DEBUG_TIMESTAMP(msg, ...) {time_os_t t = os.now_tz(); Serial.printf("%02d-%02d-%02d %02d:%02d:%02d - ", year(t), month(t), day(t), hour(t), minute(t), second(t));}
 	#else
 		#include <sys/time.h>

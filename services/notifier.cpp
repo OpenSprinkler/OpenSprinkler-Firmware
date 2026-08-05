@@ -22,9 +22,9 @@
  */
 
 #include "notifier.h"
-#include "program.h"
-#include "ArduinoJson.hpp"
-#include "opensprinkler_server.h"
+#include "../program.h"
+#include "../ArduinoJson.hpp"
+#include "../opensprinkler_server.h"
 
 uint8_t NotifQueue::nqueue = 0;
 uint8_t NotifQueue::head = 0;

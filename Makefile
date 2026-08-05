@@ -9,8 +9,9 @@ LIBS+=i2c lgpio
 endif
 LDFLAGS=$(addprefix -l,$(LIBS))
 BINARY=OpenSprinkler
-SOURCES=main.cpp OpenSprinkler.cpp notifier.cpp program.cpp utils.cpp weather.cpp mqtt.cpp smtp.c $(wildcard api/*.cpp) $(wildcard boards/*.cpp) $(wildcard drivers/*.cpp) $(wildcard platform/*.cpp) $(wildcard sensors/*.cpp) $(wildcard storage/*.cpp) $(wildcard external/TinyWebsockets/tiny_websockets_lib/src/*.cpp) $(wildcard external/OpenThings-Framework-Firmware-Library/*.cpp)
-HEADERS=$(wildcard *.h) $(wildcard *.hpp) $(wildcard api/*.h) $(wildcard boards/*.h) $(wildcard drivers/*.h) $(wildcard platform/*.h) $(wildcard sensors/*.h) $(wildcard storage/*.h)
+SERVICE_SOURCES=$(filter-out services/EMailSender.cpp services/espconnect.cpp,$(wildcard services/*.cpp)) $(wildcard services/*.c)
+SOURCES=main.cpp OpenSprinkler.cpp program.cpp utils.cpp $(wildcard api/*.cpp) $(wildcard boards/*.cpp) $(wildcard drivers/*.cpp) $(wildcard platform/*.cpp) $(wildcard sensors/*.cpp) $(SERVICE_SOURCES) $(wildcard storage/*.cpp) $(wildcard external/TinyWebsockets/tiny_websockets_lib/src/*.cpp) $(wildcard external/OpenThings-Framework-Firmware-Library/*.cpp)
+HEADERS=$(wildcard *.h) $(wildcard *.hpp) $(wildcard api/*.h) $(wildcard boards/*.h) $(wildcard drivers/*.h) $(wildcard platform/*.h) $(wildcard sensors/*.h) $(wildcard services/*.h) $(wildcard storage/*.h)
 OBJECTS=$(addsuffix .o,$(basename $(SOURCES)))
 
 .PHONY: all
@@ -24,7 +25,7 @@ $(BINARY): $(OBJECTS)
 
 .PHONY: clean
 clean:
-	rm -f $(OBJECTS) gpio.o i2cd.o RCSwitch.o ads1115.o $(BINARY)
+	rm -f $(OBJECTS) gpio.o i2cd.o RCSwitch.o ads1115.o notifier.o weather.o mqtt.o smtp.o EMailSender.o espconnect.o $(BINARY)
 
 .PHONY: container
 container:
