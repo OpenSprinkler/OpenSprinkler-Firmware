@@ -55,4 +55,3 @@ private:
 	static char* get_pub_topic() { return _pub_topic; }
 	static char* get_sub_topic() { return _sub_topic; }
 };
-
