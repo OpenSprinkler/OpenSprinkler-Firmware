@@ -25,12 +25,13 @@
 
 #include "types.h"
 #include "OpenSprinkler.h"
-#include "program.h"
-#include "weather.h"
-#include "opensprinkler_server.h"
-#include "mqtt.h"
-#include "main.h"
-#include "notifier.h"
+#include "core/program.h"
+#include "services/weather.h"
+#include "api/server.h"
+#include "services/mqtt.h"
+#include "core/scheduler.h"
+#include "storage/logging.h"
+#include "services/notifier.h"
 
 #if defined(ESP8266)
 	#include <Arduino.h>

@@ -26,9 +26,9 @@
 #include "types.h"
 #include "defines.h"
 #include "utils.h"
-#include "gpio.h"
+#include "platform/gpio.h"
 #include "images.h"
-#include "mqtt.h"
+#include "services/mqtt.h"
 #include "drivers/rf_switch.h"
 #include <cmath>
 #include <new>
@@ -46,8 +46,8 @@
 	#include <OpenThingsFramework.h>
 	#include <DNSServer.h>
 	#include <Ticker.h>
-	#include "espconnect.h"
-	#include "EMailSender.h"
+	#include "services/espconnect.h"
+	#include "services/EMailSender.h"
 	#include "drivers/ch224.h"
 
 #else // headers for RPI/LINUX
@@ -59,7 +59,7 @@
 	#include "OpenThingsFramework.h"
 	#include "etherport.h"
 	#include "rpitime.h"
-	#include "smtp.h"
+	#include "services/smtp.h"
 #endif // end of headers
 
 #if defined(USE_DISPLAY)

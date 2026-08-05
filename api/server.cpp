@@ -24,11 +24,12 @@
 #include "server.h"
 #include "../types.h"
 #include "../OpenSprinkler.h"
-#include "../program.h"
+#include "../core/program.h"
 #include "../bfiller.h"
-#include "../weather.h"
-#include "../mqtt.h"
-#include "../main.h"
+#include "../services/weather.h"
+#include "../services/mqtt.h"
+#include "../core/scheduler.h"
+#include "../storage/logging.h"
 #include "handlers.h"
 #include "routes.h"
 
@@ -42,7 +43,7 @@ extern OTF::OpenThingsFramework *otf;
 #if defined(ESP8266)
 	#include <FS.h>
 	#include <LittleFS.h>
-	#include "../espconnect.h"
+	#include "../services/espconnect.h"
 	extern ESP8266WebServer *update_server;
 	extern ENC28J60lwIP enc28j60;
 	extern Wiznet5500lwIP w5500;

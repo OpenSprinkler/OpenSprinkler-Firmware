@@ -2,10 +2,10 @@
 
 #include "program.h"
 #include "../OpenSprinkler.h"
-#include "../notifier.h"
+#include "../services/notifier.h"
 #include "../sensors/sensor.h"
 #include "../storage/logging.h"
-#include "../weather.h"
+#include "../services/weather.h"
 
 extern OpenSprinkler os;
 extern ProgramData pd;

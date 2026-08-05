@@ -23,7 +23,8 @@
 
 #include <limits.h>
 #include "program.h"
-#include "../main.h"
+#include "../core/scheduler.h"
+#include "../storage/logging.h"
 
 #if !defined(SECS_PER_DAY)
 #define SECS_PER_MIN  (60UL)

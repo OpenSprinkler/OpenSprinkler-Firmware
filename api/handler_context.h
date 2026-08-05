@@ -2,8 +2,9 @@
 
 #include "http.h"
 #include "../OpenSprinkler.h"
-#include "../main.h"
-#include "../program.h"
+#include "../core/scheduler.h"
+#include "../storage/logging.h"
+#include "../core/program.h"
 
 extern OTF::OpenThingsFramework* otf;
 extern char tmp_buffer[];

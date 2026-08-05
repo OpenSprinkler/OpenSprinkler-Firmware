@@ -95,7 +95,7 @@ private:
 
 #include <cstdio>
 
-#include "../i2cd.h"
+#include "../platform/i2c.h"
 
 #include "../font.h"
 #include "../images.h"

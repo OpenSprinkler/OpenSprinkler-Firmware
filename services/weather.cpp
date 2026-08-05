@@ -24,9 +24,10 @@
 #include <stdlib.h>
 #include "../OpenSprinkler.h"
 #include "../utils.h"
-#include "../opensprinkler_server.h"
+#include "../api/server.h"
 #include "weather.h"
-#include "../main.h"
+#include "../core/scheduler.h"
+#include "../storage/logging.h"
 #include "../types.h"
 #include "../ArduinoJson.hpp"
 

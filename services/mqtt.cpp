@@ -38,9 +38,10 @@
 #endif
 
 #include "../OpenSprinkler.h"
-#include "../opensprinkler_server.h"
-#include "../main.h"
-#include "../program.h"
+#include "../api/server.h"
+#include "../core/scheduler.h"
+#include "../storage/logging.h"
+#include "../core/program.h"
 #include "../types.h"
 #include "mqtt.h"
 #include "../ArduinoJson.hpp"

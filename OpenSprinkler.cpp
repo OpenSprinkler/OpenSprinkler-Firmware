@@ -22,15 +22,15 @@
  */
 
 #include "OpenSprinkler.h"
-#include "opensprinkler_server.h"
-#include "gpio.h"
+#include "api/server.h"
+#include "platform/gpio.h"
 #include "boards/hardware_detection.h"
 #ifdef __has_include
 	#if __has_include("testmode.h")
 		#include "testmode.h"
 	#endif
 #endif
-#include "program.h"
+#include "core/program.h"
 #include "ArduinoJson.hpp"
 
 /** Declare static data members */
@@ -511,7 +511,7 @@ void OpenSprinkler::reboot_dev(uint8_t cause) {
 #include <sys/ioctl.h>
 #include <net/if.h>
 #include "utils.h"
-#include "opensprinkler_server.h"
+#include "api/server.h"
 
 /** Initialize network with the given mac address and http port */
 unsigned char OpenSprinkler::start_network() {

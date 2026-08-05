@@ -18,7 +18,7 @@
 #include <Arduino.h>
 #include <Wire.h>
 #elif defined(OSPI)
-#include "../i2cd.h"
+#include "../platform/i2c.h"
 #endif
 
 class ADS1115 {

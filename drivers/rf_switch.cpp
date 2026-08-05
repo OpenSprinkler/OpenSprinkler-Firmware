@@ -36,7 +36,7 @@
 #include<Arduino.h>
 #endif
 
-#include "../gpio.h"
+#include "../platform/gpio.h"
 #include "../utils.h"
 #include "rf_switch.h"
 

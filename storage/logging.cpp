@@ -1,7 +1,7 @@
 #include "logging.h"
 
 #include "../OpenSprinkler.h"
-#include "../program.h"
+#include "../core/program.h"
 
 #if defined(ESP8266)
 	#include <FS.h>
