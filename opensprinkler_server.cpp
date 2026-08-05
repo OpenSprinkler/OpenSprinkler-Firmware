@@ -29,6 +29,8 @@
 #include "weather.h"
 #include "mqtt.h"
 #include "main.h"
+#include "api/handlers.h"
+#include "api/routes.h"
 
 // External variables defined in main ion file
 extern OTF::OpenThingsFramework *otf;
@@ -176,221 +178,6 @@ void on_ap_try_connect(OTF_PARAMS_DEF) {
 }
 #endif
 
-
-void server_json_board_attrib(const char* name, unsigned char *attrib)
-{
-	bfill.emit_p(PSTR("\"$F\":["), name);
-	for(unsigned char i=0;i<os.nboards;i++) {
-		bfill.emit_p(PSTR("$D"), attrib[i]);
-		if(i!=os.nboards-1)
-			bfill.emit_p(PSTR(","));
-	}
-	bfill.emit_p(PSTR("],"));
-}
-
-void server_json_stations_attrib(const char* name, unsigned char *attrib)
-{
-	bfill.emit_p(PSTR("\"$F\":["), name);
-	for(unsigned char bid=0;bid<os.nboards;bid++) {
-		for (unsigned char s = 0; s < 8; s++) {
-			bfill.emit_p(PSTR("$D"), attrib[bid * 8 + s]);
-			if(bid != os.nboards-1 || s < 7) {
-				bfill.emit_p(PSTR(","));
-			}
-		}
-	}
-	bfill.emit_p(PSTR("],"));
-}
-
-void server_json_stations_main(OTF_PARAMS_DEF) {
-	server_json_board_attrib(PSTR("masop"), os.attrib_mas);
-	server_json_board_attrib(PSTR("masop2"), os.attrib_mas2);
-	server_json_board_attrib(PSTR("masop3"), os.attrib_mas3);
-	server_json_board_attrib(PSTR("masop4"), os.attrib_mas4);
-	server_json_board_attrib(PSTR("ignore_rain"), os.attrib_igrd);
-	// Per-sensor "ignore" board mask. SN3/SN4 are emitted when present.
-	server_json_board_attrib(PSTR("ignore_sn1"), os.attrib_igs[0]);
-	server_json_board_attrib(PSTR("ignore_sn2"), os.attrib_igs[1]);
-	if (sensor_available(2)) {
-		server_json_board_attrib(PSTR("ignore_sn3"), os.attrib_igs[2]);
-		server_json_board_attrib(PSTR("ignore_sn4"), os.attrib_igs[3]);
-	}
-	server_json_board_attrib(PSTR("stn_dis"), os.attrib_dis);
-	server_json_board_attrib(PSTR("stn_spe"), os.attrib_spe);
-	server_json_stations_attrib(PSTR("stn_grp"), os.attrib_grp);
-
-	bfill.emit_p(PSTR("\"snames\":["));
-	unsigned char sid;
-	for(sid=0;sid<os.nstations;sid++) {
-		os.get_station_name(sid, tmp_buffer);
-		bfill.emit_p(PSTR("\"$S\""), tmp_buffer);
-		if(sid!=os.nstations-1)
-			bfill.emit_p(PSTR(","));
-	}
-	bfill.emit_p(PSTR("],\"maxlen\":$D}"), STATION_NAME_SIZE);
-}
-
-/** Output stations data */
-void server_json_stations(OTF_PARAMS_DEF) {
-	if(!process_password(OTF_PARAMS)) return;
-	begin_response(res);
-	print_header(OTF_PARAMS);
-
-	bfill.emit_p(PSTR("{"));
-	server_json_stations_main(OTF_PARAMS);
-	handle_return(HTML_OK);
-}
-
-/** Output station special attribute */
-void server_json_station_special(OTF_PARAMS_DEF) {
-	if(!process_password(OTF_PARAMS)) return;
-	begin_response(res);
-	print_header(OTF_PARAMS);
-
-	unsigned char sid;
-	unsigned char comma=0;
-	StationData *data = (StationData*)tmp_buffer;
-
-	bfill.emit_p(PSTR("{"));
-	for(sid=0;sid<os.nstations;sid++) {
-		unsigned char bid=sid>>3,s=sid&0x07;
-		if(os.attrib_spe[bid]&(1<<s)) { // check if this is a special station
-			os.get_station_data(sid, data);
-			if (comma) bfill.emit_p(PSTR(","));
-			else {comma=1;}
-			bfill.emit_p(PSTR("\"$D\":{\"st\":$D,\"sd\":\"$S\"}"), sid, data->type, data->sped);
-		}
-	}
-	bfill.emit_p(PSTR("}"));
-	handle_return(HTML_OK);
-}
-
-void server_change_board_attrib(const OTF::Request &req, char header, unsigned char *attrib) {
-	char tbuf2[6] = {0};
-	unsigned char bid;
-	tbuf2[0]=header;
-	for(bid=0;bid<os.nboards;bid++) {
-		snprintf(tbuf2+1, 4, "%d", bid);
-		if(findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, tbuf2)) {
-			attrib[bid] = atoi(tmp_buffer);
-		}
-	}
-}
-
-bool server_change_station_groups(const OTF::Request &req) {
-	char tbuf2[6] = {0};
-	unsigned char bid, s, sid;
-	tbuf2[0]='g';
-	for(bid=0;bid<os.nboards;bid++) {
-		for(s=0;s<8;s++) {
-			sid=bid*8+s;
-			snprintf(tbuf2+1, 4, "%d", sid);
-			if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, tbuf2)) {
-				char *end = NULL;
-				long gid = strtol(tmp_buffer, &end, 10);
-				if (!tmp_buffer[0] || *end || !((gid >= 0 && gid < NUM_SEQ_GROUPS) || gid == PARALLEL_GROUP_ID)) {
-					return false;
-				}
-				os.attrib_grp[sid] = (unsigned char)gid;
-			}
-		}
-	}
-	return true;
-}
-
-/**Change Station Name and Attributes
- * Command: /cs?pw=xxx&s?=x&m?=x&i?=x&n?=x&d?=x
- *
- * pw: password
- * s?: station name (? is station index, starting from 0)
- * m?: master1 operation bit field (? is board index, starting from 0)
- * i?: ignore rain bit field
- * j?: ignore sensor1 bit field
- * k?: ignore sensor2 bit field
- * o?: ignore sensor3 bit field
- * r?: ignore sensor4 bit field
- * n?: master2 operation bit field
- * u?: master3 operation bit field
- * v?: master4 operation bit field
- * d?: disable sation bit field
- * p?: station special flag bit field
- * g?: sequential group id
- */
-void server_change_stations(OTF_PARAMS_DEF) {
-	if(!process_password(OTF_PARAMS)) return;
-
-	unsigned char sid;
-	char tbuf2[5] = {'s', 0, 0, 0, 0};
-	// process station names
-	for(sid=0;sid<os.nstations;sid++) {
-		snprintf(tbuf2+1, 4, "%d", sid);
-		if(findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, tbuf2)) {
-			strReplaceQuoteBackslash(tmp_buffer);
-			os.set_station_name(sid, tmp_buffer);
-		}
-	}
-
-	server_change_board_attrib(FKV_SOURCE, 'm', os.attrib_mas); // master1
-	server_change_board_attrib(FKV_SOURCE, 'i', os.attrib_igrd); // ignore rain delay
-	server_change_board_attrib(FKV_SOURCE, 'j', os.attrib_igs[0]); // ignore sensor1
-	server_change_board_attrib(FKV_SOURCE, 'k', os.attrib_igs[1]); // ignore sensor2
-	if (sensor_available(2)) {
-		server_change_board_attrib(FKV_SOURCE, 'o', os.attrib_igs[2]); // ignore sensor3
-		server_change_board_attrib(FKV_SOURCE, 'r', os.attrib_igs[3]); // ignore sensor4
-	}
-	server_change_board_attrib(FKV_SOURCE, 'n', os.attrib_mas2); // master2
-	server_change_board_attrib(FKV_SOURCE, 'u', os.attrib_mas3); // master3
-	server_change_board_attrib(FKV_SOURCE, 'v', os.attrib_mas4); // master4
-	server_change_board_attrib(FKV_SOURCE, 'd', os.attrib_dis); // disable
-	if (!server_change_station_groups(FKV_SOURCE)) handle_return(HTML_DATA_OUTOFBOUND);
-	/* handle special data */
-	if(findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("sid"), true)) {
-		char *end = NULL;
-		long sid_value = strtol(tmp_buffer, &end, 10);
-		if (!tmp_buffer[0] || *end || sid_value < 0 || sid_value >= os.nstations) {
-			handle_return(HTML_DATA_OUTOFBOUND);
-		}
-		sid = (unsigned char)sid_value;
-		if(findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("st"), true) &&
-			 findKeyVal(FKV_SOURCE, tmp_buffer+1, TMP_BUFFER_SIZE-1, PSTR("sd"), true)) {
-
-			tmp_buffer[0]-='0';
-			tmp_buffer[STATION_SPECIAL_DATA_SIZE] = 0;
-
-			if(tmp_buffer[0] == STN_TYPE_GPIO) {
-				// check that pin does not clash with OSPi pins
-				unsigned char gpio = (tmp_buffer[1] - '0') * 10 + tmp_buffer[2] - '0';
-				unsigned char activeState = tmp_buffer[3] - '0';
-
-				unsigned char gpioList[] = PIN_FREE_LIST;
-				bool found = false;
-				for (unsigned char i = 0; i < sizeof(gpioList) && found == false; i++) {
-					if (gpioList[i] == gpio) found = true;
-				}
-				if (!found || activeState > 1) {
-					handle_return(HTML_DATA_OUTOFBOUND);
-				}
-			} else if ((tmp_buffer[0] == STN_TYPE_HTTP) || (tmp_buffer[0] == STN_TYPE_HTTPS) || (tmp_buffer[0] == STN_TYPE_REMOTE_OTC)) {
-				if (strlen(tmp_buffer+1) > sizeof(HTTPStationData)) {
-					handle_return(HTML_DATA_OUTOFBOUND);
-				}
-			}
-			// write spe data
-			file_write_block(STATIONS_FILENAME, tmp_buffer,
-				(uint32_t)sid*sizeof(StationData)+offsetof(StationData,type), STATION_SPECIAL_DATA_SIZE+1);
-
-		} else {
-
-			handle_return(HTML_DATA_MISSING);
-
-		}
-	}
-	// handle special attribute after parameters have been processed
-	server_change_board_attrib(FKV_SOURCE, 'p', os.attrib_spe);
-
-	os.attribs_save();
-	handle_return(HTML_SUCCESS);
-}
 
 /** Parse one number from a comma separate list */
 uint16_t parse_listdata(char **p) {
@@ -2991,92 +2778,6 @@ void server_fill_files(OTF_PARAMS_DEF) {
 }
 */
 
-typedef void (*URLHandler)(OTF_PARAMS_DEF);
-
-/* Server function urls
- * The order must exactly match the order of the
- * handler functions below
- */
-
-const char *uris[] PROGMEM = {
-	"cv",
-	"jc",
-	"dp",
-	"cp",
-	"cr",
-	"mp",
-	"up",
-	"jp",
-	"jpa",
-	"co",
-	"jo",
-	"sp",
-	"js",
-	"cm",
-	"cs",
-	"jn",
-	"je",
-	"jl",
-	"dl",
-	"su",
-	"cu",
-	"ja",
-	"pq",
-	"db",
-#if defined(ESP8266)
-	"lf",
-#if defined(ENABLE_DEBUG)
-	"df",
-#endif
-#endif
-	"jsn",
-	"csn",
-	"dsn",
-	"jsl",
-	"dsl",
-	"jsd",
-};
-
-// Server function handlers
-URLHandler urls[] = {
-	server_change_values,   // cv
-	server_json_controller, // jc
-	server_delete_program,  // dp
-	server_change_program,  // cp
-	server_change_runonce,  // cr
-	server_manual_program,  // mp
-	server_moveup_program,  // up
-	server_json_programs,   // jp
-	server_json_program_adj,// jpa
-	server_change_options,  // co
-	server_json_options,    // jo
-	server_change_password, // sp
-	server_json_status,     // js
-	server_change_manual,   // cm
-	server_change_stations, // cs
-	server_json_stations,   // jn
-	server_json_station_special,// je
-	server_json_log,        // jl
-	server_delete_log,      // dl
-	server_view_scripturl,  // su
-	server_change_scripturl,// cu
-	server_json_all,        // ja
-	server_pause_queue,     // pq
-	server_json_debug,      // db
-#if defined(ESP8266)
-	server_list_files,      // lf
-#if defined(ENABLE_DEBUG)
-	server_delete_file,     // df
-#endif
-#endif
-	server_json_sensors,      // jsn
-	server_change_sensor,     // csn
-	server_delete_sensor,     // dsn
-	server_json_sensor_log,   // jsl
-	server_delete_sensor_log, // dsl
-	server_json_sensor_desc,     // jsd
-};
-
 // handle Ethernet request
 #if defined(ESP8266)
 void on_firmware_update(OTF_PARAMS_DEF) {
@@ -3157,15 +2858,7 @@ void start_server_client() {
 		update_server->on("/update", HTTP_POST, on_firmware_upload_fin, on_firmware_upload);
 		update_server->on("/update", HTTP_OPTIONS, on_update_options);
 
-		char uri_buf[10] = {0};
-		uri_buf[0] = '/';
-
-		// set up all other handlers
-		for(unsigned char i=0;i<sizeof(urls)/sizeof(URLHandler);i++) {
-			strncpy_P(uri_buf+1, uris[i], 9);
-			uri_buf[9] = 0;
-			otf->on(uri_buf, urls[i]);
-		}
+		register_api_routes(*otf);
 		callback_initialized = true;
 	}
 	update_server->begin();
@@ -3188,15 +2881,7 @@ void start_server_ap() {
 	otf->onMissingPage(on_ap_home);
 	update_server->begin();
 
-	char uri_buf[10] = {0};
-	uri_buf[0] = '/';
-
-	// set up all other handlers
-	for(unsigned char i=0;i<sizeof(urls)/sizeof(URLHandler);i++) {
-		strncpy(uri_buf+1, uris[i], 9);
-		uri_buf[9] = 0;
-		otf->on(uri_buf, urls[i]);
-	}
+	register_api_routes(*otf);
 
 	os.lcd.setCursor(0, -1);
 	os.lcd.print(F("OSAP:"));
@@ -3216,15 +2901,7 @@ void initialize_otf() {
 		otf->on("/", server_home);  // handle home page
 		otf->on("/index.html", server_home);
 
-		char uri_buf[10] = {0};
-		uri_buf[0] = '/';
-
-		// set up all other handlers
-		for(unsigned char i=0;i<sizeof(urls)/sizeof(URLHandler);i++) {
-			strncpy(uri_buf+1, uris[i], 9);
-			uri_buf[9] = 0;
-			otf->on(uri_buf, urls[i]);
-		}
+		register_api_routes(*otf);
 		callback_initialized = true;
 	}
 }
