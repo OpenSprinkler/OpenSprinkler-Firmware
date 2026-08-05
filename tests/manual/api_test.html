@@ -1,0 +1,741 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OpenSprinkler API Test</title>
+<style>
+:root { color-scheme: light dark; font-family: system-ui, sans-serif; }
+body { margin: 0; background: #f3f5f7; color: #18212a; }
+main { max-width: 1050px; margin: 0 auto; padding: 24px; }
+h1 { margin: 0 0 18px; font-size: 1.55rem; }
+.settings { display: grid; grid-template-columns: 2fr 110px 1.5fr 110px; gap: 12px; align-items: end; }
+label { display: grid; gap: 5px; font-size: .82rem; font-weight: 650; }
+input, button { box-sizing: border-box; min-height: 38px; border: 1px solid #aab3bb; border-radius: 5px; font: inherit; }
+input { width: 100%; padding: 7px 9px; background: #fff; color: #18212a; }
+.hash-option { display: flex; align-items: center; gap: 7px; margin: 10px 0 18px; font-size: .82rem; }
+.hash-option input { width: auto; min-height: auto; }
+.toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+button { padding: 7px 13px; background: #fff; color: #18212a; cursor: pointer; }
+button.primary { color: #fff; background: #1769aa; border-color: #1769aa; }
+button.danger { color: #fff; background: #a63737; border-color: #a63737; }
+button:disabled { cursor: default; opacity: .5; }
+.summary { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; min-height: 28px; margin-bottom: 10px; }
+.summary strong { font-size: .9rem; }
+progress { width: min(360px, 100%); height: 12px; }
+.notice { margin: 0 0 14px; color: #5e6973; font-size: .85rem; }
+.table-wrap { overflow-x: auto; border: 1px solid #c6cdd3; background: #fff; }
+table { width: 100%; border-collapse: collapse; font-size: .86rem; }
+th, td { padding: 8px 10px; border-bottom: 1px solid #dce1e5; text-align: left; vertical-align: top; }
+th { background: #e9edf0; white-space: nowrap; }
+td:nth-child(1) { width: 36px; text-align: right; color: #68727b; }
+td:nth-child(3), td:nth-child(4) { white-space: nowrap; }
+.pass { color: #16713d; font-weight: 700; }
+.fail { color: #a22222; font-weight: 700; }
+.skip { color: #796315; font-weight: 700; }
+.running { color: #1769aa; font-weight: 700; }
+details { max-width: 620px; }
+summary { cursor: pointer; }
+code { word-break: break-all; }
+@media (max-width: 720px) { .settings { grid-template-columns: 1fr 100px; } main { padding: 14px; } }
+@media (prefers-color-scheme: dark) {
+  body { background: #171a1d; color: #e8ecef; }
+  input, button, .table-wrap { background: #22272b; color: #e8ecef; border-color: #58616a; }
+  th { background: #2c3237; } th, td { border-color: #41484e; }
+  .notice { color: #adb6bd; }
+}
+</style>
+</head>
+<body>
+<main>
+  <h1>OpenSprinkler API Compatibility Test</h1>
+  <section class="settings" aria-label="Controller connection">
+    <label>Host, URL, or OTC token
+      <input id="target" value="localhost" autocomplete="off" spellcheck="false">
+    </label>
+    <label id="port-label">Port
+      <input id="port" type="number" min="1" max="65535" value="80">
+    </label>
+    <label>Password
+      <input id="password" type="password" value="opendoor">
+    </label>
+    <label>Timeout (ms)
+      <input id="timeout" type="number" min="1000" max="120000" value="8000">
+    </label>
+  </section>
+  <label class="hash-option"><input id="password-is-hash" type="checkbox"> Password is already an MD5 hash</label>
+
+  <div class="toolbar">
+    <button class="primary" data-suite="readonly">Read-only</button>
+    <button class="danger" data-suite="state">Controller actions</button>
+    <button class="danger" data-suite="sensors">Expanded Sensors</button>
+    <button class="danger" data-suite="limit">72-zone limit</button>
+    <button data-suite="validation">Validation</button>
+    <button id="stop" disabled>Stop</button>
+    <button id="clear">Clear</button>
+  </div>
+  <p class="notice">Controller actions can operate zones and associated masters. Expanded Sensor tests create one temporary sensor. The 72-zone suite temporarily changes expansion count and station names. State-changing suites attempt cleanup even after a failure.</p>
+
+  <div class="summary">
+    <strong id="summary">Ready</strong>
+    <progress id="progress" value="0" max="1"></progress>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>#</th><th>Test</th><th>Status</th><th>Time</th><th>Details</th></tr></thead>
+      <tbody id="results"></tbody>
+    </table>
+  </div>
+</main>
+
+<script>
+"use strict";
+
+const $ = (id) => document.getElementById(id);
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+let running = false;
+let stopRequested = false;
+let activeController = null;
+
+function assert(condition, message) {
+  if (!condition) throw new Error(message);
+}
+
+function md5(input) {
+  const bytes = new TextEncoder().encode(input);
+  const bitLength = bytes.length * 8;
+  const paddedLength = (((bytes.length + 8) >>> 6) + 1) * 64;
+  const data = new Uint8Array(paddedLength);
+  data.set(bytes);
+  data[bytes.length] = 0x80;
+  const view = new DataView(data.buffer);
+  view.setUint32(paddedLength - 8, bitLength >>> 0, true);
+  view.setUint32(paddedLength - 4, Math.floor(bitLength / 0x100000000), true);
+  const shifts = [7,12,17,22, 5,9,14,20, 4,11,16,23, 6,10,15,21];
+  const constants = Array.from({length: 64}, (_, i) => Math.floor(Math.abs(Math.sin(i + 1)) * 0x100000000) >>> 0);
+  const rotate = (x, n) => ((x << n) | (x >>> (32 - n))) >>> 0;
+  let a0 = 0x67452301, b0 = 0xefcdab89, c0 = 0x98badcfe, d0 = 0x10325476;
+  for (let offset = 0; offset < data.length; offset += 64) {
+    let a = a0, b = b0, c = c0, d = d0;
+    for (let i = 0; i < 64; i++) {
+      let f, g;
+      if (i < 16) { f = (b & c) | (~b & d); g = i; }
+      else if (i < 32) { f = (d & b) | (~d & c); g = (5 * i + 1) & 15; }
+      else if (i < 48) { f = b ^ c ^ d; g = (3 * i + 5) & 15; }
+      else { f = c ^ (b | ~d); g = (7 * i) & 15; }
+      const word = view.getUint32(offset + g * 4, true);
+      const next = (b + rotate((a + f + constants[i] + word) >>> 0, shifts[(i >>> 4) * 4 + (i & 3)])) >>> 0;
+      a = d; d = c; c = b; b = next;
+    }
+    a0 = (a0 + a) >>> 0; b0 = (b0 + b) >>> 0; c0 = (c0 + c) >>> 0; d0 = (d0 + d) >>> 0;
+  }
+  return [a0,b0,c0,d0].map((n) => Array.from({length: 4}, (_, i) => ((n >>> (i * 8)) & 255).toString(16).padStart(2, "0")).join("")).join("");
+}
+
+function passwordHash() {
+  const value = $("password").value;
+  if ($("password-is-hash").checked) {
+    assert(/^[0-9a-f]{32}$/i.test(value), "The supplied password hash is not 32 hexadecimal characters");
+    return value.toLowerCase();
+  }
+  return md5(value);
+}
+
+function baseUrl() {
+  const raw = $("target").value.trim().replace(/\/+$/, "");
+  assert(raw, "Host or OTC token is required");
+  if (/^OT[0-9A-Za-z]{30}$/.test(raw)) return `https://cloud.openthings.io/forward/v1/${raw}/`;
+  if (/^https?:\/\//i.test(raw)) return `${raw}/`;
+  const hasPort = /:\d+$/.test(raw);
+  return `http://${raw}${hasPort ? "" : `:${$("port").value}`}/`;
+}
+
+function redact(url) {
+  return url.replace(/([?&]pw=)[^&]*/i, "$1<redacted>");
+}
+
+async function request(endpoint, params = {}, options = {}) {
+  const url = new URL(endpoint.replace(/^\//, ""), baseUrl());
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== null) url.searchParams.set(key, String(value));
+  }
+  if (options.auth !== false) url.searchParams.set("pw", options.passwordHash || passwordHash());
+  const timeout = options.timeout || Number($("timeout").value) || 8000;
+  activeController = new AbortController();
+  const timer = setTimeout(() => activeController.abort(new Error(`Timed out after ${timeout} ms`)), timeout);
+  try {
+    const response = await fetch(url, {cache: "no-store", signal: activeController.signal});
+    const text = await response.text();
+    let data = null;
+    try { data = JSON.parse(text); } catch (_) {}
+    if (!response.ok) throw new Error(`HTTP ${response.status}: ${text.slice(0, 160)}`);
+    if (options.json !== false && data === null) throw new Error(`Invalid JSON: ${text.slice(0, 160)}`);
+    return {response, data, text, url: redact(url.href)};
+  } finally {
+    clearTimeout(timer);
+    activeController = null;
+  }
+}
+
+async function success(endpoint, params = {}, options = {}) {
+  const result = await request(endpoint, params, options);
+  assert(result.data && result.data.result === 1, `${endpoint} returned ${result.text}`);
+  return result;
+}
+
+async function poll(description, check, timeout = 5000, interval = 150) {
+  const deadline = Date.now() + timeout;
+  let lastError;
+  while (Date.now() < deadline) {
+    if (stopRequested) throw new Error("Stopped");
+    try {
+      const value = await check();
+      if (value) return value;
+    } catch (error) { lastError = error; }
+    await sleep(interval);
+  }
+  throw new Error(`${description} did not settle${lastError ? `: ${lastError.message}` : ""}`);
+}
+
+function endpointTest(name, endpoint, validate, params = {}, options = {}) {
+  return {name, async run(ctx) {
+    const result = await request(endpoint, typeof params === "function" ? params(ctx) : params, options);
+    return validate(result.data, result, ctx) || result.url;
+  }};
+}
+
+async function writeStationNames(names) {
+  for (let start = 0; start < names.length; start += 8) {
+    const params = {};
+    for (let sid = start; sid < Math.min(start + 8, names.length); sid++) params[`s${sid}`] = names[sid];
+    await success("cs", params);
+  }
+}
+
+const suites = {
+  readonly: {
+    title: "Read-only",
+    tests: [
+      endpointTest("Controller variables /jc", "jc", (d, _, c) => {
+        assert(Number.isInteger(d.en) && Array.isArray(d.ps), "Missing controller state"); c.controller = d;
+      }),
+      endpointTest("Options /jo", "jo", (d, _, c) => {
+        for (const key of ["fwv","fwm","hwv","mas3","mas4"]) assert(key in d, `Missing ${key}`);
+        if (d.hwv === 34) {
+          for (const key of ["sn3t","sn3o","sn4t","sn4o"]) assert(key in d, `Missing ${key}`);
+          for (const key of ["sn3","sn4"]) assert(key in c.controller, `Missing ${key}`);
+        }
+        c.options = d;
+      }),
+      endpointTest("Station names and attributes /jn", "jn", (d, _, c) => {
+        assert(Array.isArray(d.snames) && Array.isArray(d.masop3) && Array.isArray(d.masop4), "Missing station or extended-master data");
+        if (c.options && c.options.hwv === 34) assert(Array.isArray(d.ignore_sn3) && Array.isArray(d.ignore_sn4), "Missing SN3/SN4 attributes");
+        c.stations = d;
+      }),
+      endpointTest("Special stations /je", "je", (d) => assert(d && typeof d === "object" && !Array.isArray(d), "Expected an object")),
+      endpointTest("Station status /js", "js", (d) => assert(Array.isArray(d.sn) && d.sn.length === d.nstations, "Station count mismatch")),
+      endpointTest("Programs /jp", "jp", (d, _, c) => {
+        assert(Array.isArray(d.pd) && d.pd.length === d.nprogs, "Program count mismatch"); c.programs = d;
+      }),
+      endpointTest("Program adjustments /jpa", "jpa", (d, _, c) => {
+        assert(Array.isArray(d.jpa) && d.maxrt === 604800, "Invalid adjustment payload");
+        if (c.programs) assert(d.jpa.length === c.programs.nprogs, "Adjustment/program count mismatch");
+        d.jpa.forEach((x) => assert(Math.abs(x.ta - x.wa * x.sa) < 0.001, "ta does not equal wa * sa"));
+      }),
+      endpointTest("Expanded Sensors /jsn", "jsn", (d, _, c) => {
+        assert(Array.isArray(d.sn) && d.count === d.sn.length, "Sensor count mismatch");
+        const ids = d.sn.map((x) => x.uuid); assert(ids.every((x) => x > 0) && new Set(ids).size === ids.length, "Invalid or duplicate UUID"); c.sensors = d;
+      }),
+      endpointTest("Expanded Sensor metadata /jsd", "jsd", (d) => {
+        for (const key of ["sensors","units","enums","as","flags"]) assert(key in d, `Missing ${key}`);
+        assert(d.enums.AggregateAction[2] === "Average", "Aggregate default enum changed");
+        assert(d.flags.length >= 3, "Expected Enabled, Logging, and Show on Home flags");
+      }, {}, {timeout: 15000}),
+      endpointTest("Sensor log window page /jsl", "jsl", (d, r) => {
+        if (d && d.result === 80) return {skip: "Sensor log has not been initialized"};
+        assert(Array.isArray(d), "Expected sensor log array");
+        for (const key of ["X-OS-Next-Cursor","X-OS-Total-Slots","X-OS-Window-Start","X-OS-Window-End","X-OS-Page-Done"])
+          assert(r.response.headers.get(key) !== null, `Missing ${key}`);
+      }, () => ({page: 1, cursor: 0, count: 10, after: Math.floor(Date.now() / 1000) - 86400, fmt: "json"})),
+      endpointTest("Seven-day sprinkler logs /jl", "jl", (d) => assert(Array.isArray(d), "Expected sprinkler log array"), {hist: 7}),
+      endpointTest("Combined data /ja", "ja", (d) => {
+        for (const key of ["settings","options","stations","status","programs","sensors"]) assert(key in d, `Missing ${key}`);
+      }),
+      {name: "Filesystem listing /lf (ESP8266)", async run(ctx) {
+        if (!ctx.options || ctx.options.hwv < 30 || ctx.options.hwv >= 40) return {skip: "Not an OpenSprinkler v3 target"};
+        const r = await request("lf"); assert(Array.isArray(r.data.files), "Missing files array"); return r.url;
+      }},
+      {name: "Diagnostics /db", async run() {
+        const r = await request("db", {}, {auth: false, json: false}); assert(r.text.length > 20, "Empty diagnostics response"); return r.url;
+      }}
+    ]
+  },
+
+  state: {
+    title: "Controller actions",
+    confirm: "This suite changes controller settings and briefly operates station 1 and any associated master. Continue?",
+    async cleanup(ctx) {
+      if (ctx.passwordChanged && ctx.temporaryPasswordHash && ctx.originalPasswordHash) {
+        try { await success("co", {ipas: 0}, {auth: false}); } catch (_) {}
+        try {
+          await success("sp", {npw: ctx.originalPasswordHash, cpw: ctx.originalPasswordHash}, {passwordHash: ctx.temporaryPasswordHash});
+          ctx.passwordChanged = false;
+        } catch (_) {}
+      }
+    },
+    tests: [
+      {name: "Capture controller state", async run(ctx) {
+        ctx.controller = (await request("jc")).data; ctx.options = (await request("jo")).data; ctx.stations = (await request("jn")).data; ctx.programs = (await request("jp")).data;
+        return `enabled=${ctx.controller.en}, stations=${ctx.stations.snames.length}, programs=${ctx.programs.nprogs}`;
+      }},
+      {name: "Toggle and restore operation enable", async run(ctx) {
+        const original = ctx.controller.en; const changed = original ? 0 : 1;
+        try {
+          await success("cv", {en: changed});
+          await poll("operation enable", async () => (await request("jc")).data.en === changed);
+        } finally {
+          await success("cv", {en: original});
+          await poll("operation enable restore", async () => (await request("jc")).data.en === original);
+        }
+        return `${original} -> ${changed} -> ${original}`;
+      }},
+      {name: "Start and stop rain delay /cv", async run(ctx) {
+        const original = (await request("jc")).data;
+        if (original.rd) return {skip: "Rain delay is already active"};
+        try {
+          await success("cv", {rd: 123});
+          await poll("rain delay start", async () => {
+            const d = (await request("jc")).data; return d.rd === 1 && d.rdst > d.devt;
+          });
+          await success("cv", {rd: 0});
+          await poll("rain delay stop", async () => {
+            const d = (await request("jc")).data; return d.rd === 0 && d.rdst === 0;
+          });
+        } finally {
+          const d = (await request("jc")).data;
+          if (d.rd) await success("cv", {rd: 0});
+        }
+        return "Observed active then inactive";
+      }},
+      {name: "Toggle and restore remote extension mode /cv", async run(ctx) {
+        const original = ctx.options.re;
+        const changed = original ? 0 : 1;
+        try {
+          await success("cv", {re: changed});
+          await poll("remote extension mode", async () => (await request("jo")).data.re === changed);
+        } finally {
+          await success("cv", {re: original});
+          await poll("remote extension restore", async () => (await request("jo")).data.re === original);
+        }
+        return `${original} -> ${changed} -> ${original}`;
+      }},
+      {name: "Change and restore watering level /co", async run(ctx) {
+        const original = ctx.options.wl;
+        const changed = original > 0 ? original - 1 : 1;
+        try {
+          await success("co", {wl: changed});
+          await poll("watering level", async () => (await request("jo")).data.wl === changed);
+        } finally {
+          await success("co", {wl: original});
+          await poll("watering level restore", async () => (await request("jo")).data.wl === original);
+        }
+        return `${original} -> ${changed} -> ${original}`;
+      }},
+      {name: "Special-character device name /co", async run(ctx) {
+        const original = ctx.controller.dname;
+        const changed = "T~`!@#$^&*";
+        try {
+          await success("co", {dname: changed});
+          await poll("device name", async () => (await request("jc")).data.dname === changed);
+        } finally {
+          await success("co", {dname: original});
+          await poll("device name restore", async () => (await request("jc")).data.dname === original);
+        }
+        return "Encoded, stored, and restored";
+      }},
+      {name: "Expansion count 0/3 and restore /co", async run(ctx) {
+        const status = (await request("js")).data;
+        if (status.sn.some(Boolean)) return {skip: "A station is currently running"};
+        const original = ctx.options.ext;
+        try {
+          await success("co", {ext: 3});
+          await poll("32-station expansion", async () => (await request("js")).data.nstations === 32);
+          await success("co", {ext: 0});
+          await poll("8-station base", async () => (await request("js")).data.nstations === 8);
+        } finally {
+          await success("co", {ext: original});
+          await poll("expansion restore", async () => (await request("jo")).data.ext === original);
+        }
+        return `${original} -> 3 -> 0 -> ${original}`;
+      }},
+      {name: "Password rotation and ignore-password /sp", async run(ctx) {
+        if (ctx.options.hwv === 255) return {skip: "Demo builds intentionally do not change passwords"};
+        if (ctx.options.ipas) return {skip: "Ignore-password was already enabled"};
+        const originalHash = passwordHash();
+        const temporaryHash = md5(`OS API test ${Date.now()}`);
+        ctx.originalPasswordHash = originalHash;
+        ctx.temporaryPasswordHash = temporaryHash;
+        let passwordChanged = false;
+        let ignoreEnabled = false;
+        try {
+          const mismatch = await request("sp", {npw: temporaryHash, cpw: originalHash});
+          assert(mismatch.data.result === 3, "Mismatched password confirmation was accepted");
+          await success("sp", {npw: temporaryHash, cpw: temporaryHash});
+          passwordChanged = true;
+          ctx.passwordChanged = true;
+          const rejected = await request("jp", {}, {passwordHash: originalHash});
+          assert(rejected.data.result === 2, "Old password was not rejected");
+          const accepted = await request("jp", {}, {passwordHash: temporaryHash});
+          assert(Number.isInteger(accepted.data.nprogs), "Temporary password was rejected");
+          await success("co", {ipas: 1}, {passwordHash: temporaryHash});
+          ignoreEnabled = true;
+          const unauthenticated = await request("jp", {}, {auth: false});
+          assert(Number.isInteger(unauthenticated.data.nprogs), "Ignore-password did not permit access");
+          await success("co", {ipas: 0}, {passwordHash: temporaryHash});
+          ignoreEnabled = false;
+        } finally {
+          if (ignoreEnabled) {
+            try { await success("co", {ipas: 0}, {auth: false}); } catch (_) {}
+          }
+          if (passwordChanged) {
+            await success("sp", {npw: originalHash, cpw: originalHash}, {passwordHash: temporaryHash});
+            ctx.passwordChanged = false;
+          }
+        }
+        const restored = await request("jp", {}, {passwordHash: originalHash});
+        assert(Number.isInteger(restored.data.nprogs), "Original password was not restored");
+        return "Mismatch, rotation, bypass, and restoration verified";
+      }},
+      {name: "Master 3/4 and SN3/4 attributes", async run(ctx) {
+        const s = ctx.stations; const params = {u0: s.masop3[0] ^ 1, v0: s.masop4[0] ^ 2};
+        const restore = {u0: s.masop3[0], v0: s.masop4[0]};
+        if (Array.isArray(s.ignore_sn3)) { params.o0 = s.ignore_sn3[0] ^ 4; restore.o0 = s.ignore_sn3[0]; }
+        if (Array.isArray(s.ignore_sn4)) { params.r0 = s.ignore_sn4[0] ^ 8; restore.r0 = s.ignore_sn4[0]; }
+        try {
+          await success("cs", params);
+          const changed = (await request("jn")).data;
+          assert(changed.masop3[0] === params.u0 && changed.masop4[0] === params.v0, "Master attributes did not change");
+          if (params.o0 !== undefined) assert(changed.ignore_sn3[0] === params.o0, "SN3 attribute did not change");
+          if (params.r0 !== undefined) assert(changed.ignore_sn4[0] === params.r0, "SN4 attribute did not change");
+        } finally { await success("cs", restore); }
+        return "Changed and restored first 8-zone group";
+      }},
+      {name: "Station name and parallel group /cs", async run(ctx) {
+        if (ctx.stations.snames.length < 5) return {skip: "Fewer than five stations"};
+        const original = {s0: ctx.stations.snames[0], g4: ctx.stations.stn_grp[4]};
+        try {
+          await success("cs", {s0: "Front Lawn", g4: 255});
+          const changed = await poll("station attributes", async () => {
+            const d = (await request("jn")).data;
+            return d.snames[0] === "Front Lawn" && d.stn_grp[4] === 255 ? d : null;
+          });
+          assert(changed.snames.length === ctx.stations.snames.length, "Station count changed unexpectedly");
+        } finally {
+          await success("cs", original);
+          await poll("station attribute restore", async () => {
+            const d = (await request("jn")).data;
+            return d.snames[0] === original.s0 && d.stn_grp[4] === original.g4;
+          });
+        }
+        return "Name/group changed and restored";
+      }},
+      {name: "Run-once parallel/sequential scheduling /cr", async run(ctx) {
+        const stationData = (await request("jn")).data;
+        const status = (await request("js")).data;
+        if (status.nstations < 5) return {skip: "Fewer than five stations"};
+        if (status.sn.some(Boolean)) return {skip: "A station is currently running"};
+        const selected = [0,1,3,4];
+        const firstBoardFlag = (values, sid) => Array.isArray(values) && (values[0] & (1 << sid)) !== 0;
+        const masters = [ctx.options.mas, ctx.options.mas2, ctx.options.mas3, ctx.options.mas4];
+        if (selected.some((sid) => masters.includes(sid + 1) || firstBoardFlag(stationData.stn_dis, sid) || firstBoardFlag(stationData.stn_spe, sid)))
+          return {skip: "One of stations 1, 2, 4, or 5 is disabled, special, or a master"};
+        const restoreGroups = {};
+        const testGroups = {};
+        for (const sid of selected) { restoreGroups[`g${sid}`] = stationData.stn_grp[sid]; testGroups[`g${sid}`] = sid === 4 ? 255 : 0; }
+        const durations = Array(status.nstations).fill(0);
+        for (const sid of selected) durations[sid] = 5;
+        try {
+          await success("cs", testGroups);
+          await success("cr", {t: JSON.stringify(durations)});
+          await poll("run-once scheduling", async () => {
+            const d = (await request("js")).data;
+            return d.sn[0] === 1 && d.sn[1] === 0 && d.sn[4] === 1;
+          }, 5000);
+        } finally {
+          await success("cv", {rsn: 1});
+          await poll("run-once reset", async () => !(await request("js")).data.sn.some(Boolean), 5000);
+          await success("cs", restoreGroups);
+        }
+        return "Sequential station queued while parallel stations ran";
+      }},
+      {name: "Run station 1 for two seconds", async run(ctx) {
+        const firstBitSet = (values) => Array.isArray(values) && (values[0] & 1) !== 0;
+        const masterStations = [ctx.options.mas, ctx.options.mas2, ctx.options.mas3, ctx.options.mas4];
+        if (masterStations.includes(1)) return {skip: "Station 1 is configured as a master"};
+        if (firstBitSet(ctx.stations.stn_dis)) return {skip: "Station 1 is disabled"};
+        if (firstBitSet(ctx.stations.stn_spe)) return {skip: "Station 1 is a special station"};
+        const originalEnable = ctx.controller.en;
+        try {
+          if (!originalEnable) await success("cv", {en: 1});
+          await success("cm", {sid: 0, en: 1, t: 2, qo: 2});
+          await poll("station start", async () => (await request("js")).data.sn[0] === 1, 3000);
+          await poll("station stop", async () => (await request("js")).data.sn[0] === 0, 7000);
+        } finally {
+          await success("cv", {rsn: 1});
+          if (!originalEnable) await success("cv", {en: 0});
+        }
+        return "Observed ON then OFF";
+      }},
+      {name: "Temporary program CRUD, /mp, and /jpa", async run(ctx) {
+        const status = (await request("js")).data;
+        const name = `API Test ${Date.now().toString().slice(-8)}`;
+        const durations = Array(status.nstations).fill(0); durations[0] = 5;
+        const body = JSON.stringify([1,127,0,[480,0,0,0],durations]);
+        let pid = null;
+        let started = false;
+        try {
+          await success("cp", {pid: -1, v: body, name, snadj: "0,0"});
+          const programs = (await request("jp")).data;
+          pid = programs.pd.findIndex((p) => p[5] === name);
+          assert(pid >= 0, "Temporary program was not returned by /jp");
+          const adj = (await request("jpa")).data;
+          assert(adj.jpa.length === programs.nprogs, "/jpa did not include the temporary program");
+          const firstBitSet = (values) => Array.isArray(values) && (values[0] & 1) !== 0;
+          const masters = [ctx.options.mas, ctx.options.mas2, ctx.options.mas3, ctx.options.mas4];
+          if (!masters.includes(1) && !firstBitSet(ctx.stations.stn_dis) && !firstBitSet(ctx.stations.stn_spe)) {
+            await success("mp", {pid});
+            started = true;
+            await poll("manual program start", async () => (await request("jc")).data.ps[0][0] === 254, 5000);
+          }
+        } finally {
+          if (started) await success("cv", {rsn: 1});
+          if (pid !== null && pid >= 0) await success("dp", {pid});
+        }
+        return started ? "Created, started through /mp, reset, and deleted" : "Created, verified, and deleted; /mp skipped for station configuration";
+      }},
+      {name: "Delete-all programs /dp?pid=-1 on empty setup", async run(ctx) {
+        if (ctx.programs.nprogs !== 0) return {skip: "Controller already has programs; refusing to delete them"};
+        const status = (await request("js")).data;
+        const durations = Array(status.nstations).fill(0);
+        const body = JSON.stringify([1,127,0,[480,0,0,0],durations]);
+        let created = false;
+        try {
+          await success("cp", {pid: -1, v: body, name: "API Delete All 1", snadj: "0,0"});
+          await success("cp", {pid: -1, v: body, name: "API Delete All 2", snadj: "0,0"});
+          created = true;
+          assert((await request("jp")).data.nprogs === 2, "Temporary programs were not created");
+          await success("dp", {pid: -1});
+          created = false;
+          assert((await request("jp")).data.nprogs === 0, "Delete-all left programs behind");
+        } finally {
+          if (created) await success("dp", {pid: -1});
+        }
+        return "Created two programs and deleted all";
+      }}
+    ]
+  },
+
+  sensors: {
+    title: "Expanded Sensors",
+    confirm: "This suite creates, modifies, and deletes a temporary Aggregate Sensor. Continue?",
+    async cleanup(ctx) {
+      if (ctx.sensorUuid) {
+        try { await success("dsn", {uuid: ctx.sensorUuid}); } catch (_) {}
+        ctx.sensorUuid = null;
+      }
+    },
+    tests: [
+      endpointTest("Sensor metadata /jsd", "jsd", (d) => assert(d.sensors.length >= 4 && d.flags.length >= 3, "Incomplete metadata")),
+      {name: "Capture Expanded Sensor list /jsn", async run(ctx) {
+        const d = (await request("jsn")).data; assert(d.count === d.sn.length, "Sensor count mismatch"); ctx.sensorCount = d.count; return `${d.count} existing sensors`;
+      }},
+      {name: "Create temporary Aggregate /csn", async run(ctx) {
+        ctx.sensorName = `API Aggregate ${Date.now().toString().slice(-6)}`;
+        await success("csn", {uuid: -1, type: 0, name: ctx.sensorName, action: 2, unit: 4, min: 0, max: 100, interval: 15, flag: 1});
+        const found = await poll("sensor creation", async () => {
+          const d = (await request("jsn")).data; return d.sn.find((x) => x.name === ctx.sensorName);
+        });
+        ctx.sensorUuid = found.uuid; assert(ctx.sensorUuid > 0, "No UUID assigned"); return `uuid=${ctx.sensorUuid}`;
+      }},
+      {name: "Modify temporary Aggregate /csn", async run(ctx) {
+        if (!ctx.sensorUuid) return {skip: "Creation failed"};
+        await success("csn", {uuid: ctx.sensorUuid, type: 0, name: ctx.sensorName, action: 3, interval: 2, min: -10, max: 110, flag: 5});
+        const found = await poll("sensor modification", async () => {
+          const d = (await request("jsn")).data; return d.sn.find((x) => x.uuid === ctx.sensorUuid && x.interval === 2 && x.flag === 5 && x.extra.action === 3);
+        });
+        assert(found.min === -10 && found.max === 110, "Min/max were not preserved"); return "action=Sum, interval=2, flag=5";
+      }},
+      {name: "Filtered paginated sensor log /jsl", async run(ctx) {
+        if (!ctx.sensorUuid) return {skip: "Creation failed"};
+        const r = await request("jsl", {uuid: ctx.sensorUuid, page: 1, cursor: 0, count: 16, fmt: "json"}, {timeout: 15000});
+        if (r.data && r.data.result === 80) return {skip: "Sensor log has not been initialized"};
+        assert(Array.isArray(r.data), "Expected log array"); assert(r.response.headers.get("X-OS-Next-Cursor") !== null, "Missing pagination headers"); return `${r.data.length} matching records`;
+      }},
+      {name: "Paginated sensor-log deletion /dsl", async run(ctx) {
+        if (!ctx.sensorUuid) return {skip: "Creation failed"};
+        const r = await request("dsl", {uuid: ctx.sensorUuid, page: 1, cursor: 0, count: 16});
+        if (r.data && r.data.result === 80) return {skip: "Sensor log has not been initialized"};
+        assert(r.data.result === 1 && Number.isInteger(r.data.next) && Number.isInteger(r.data.total) && Number.isInteger(r.data.deleted) && [0,1].includes(r.data.done), "Invalid deletion progress");
+        return `next=${r.data.next}, total=${r.data.total}, deleted=${r.data.deleted}`;
+      }},
+      {name: "Delete temporary sensor /dsn", async run(ctx) {
+        if (!ctx.sensorUuid) return {skip: "Creation failed"};
+        const uuid = ctx.sensorUuid; await success("dsn", {uuid}); ctx.sensorUuid = null;
+        await poll("sensor deletion", async () => !(await request("jsn")).data.sn.some((x) => x.uuid === uuid));
+        return `deleted uuid=${uuid}`;
+      }},
+      {name: "Verify sensor count restored /jsn", async run(ctx) {
+        const d = (await request("jsn")).data; assert(d.count === ctx.sensorCount, `Expected ${ctx.sensorCount}, got ${d.count}`); return `${d.count} sensors`;
+      }}
+    ]
+  },
+
+  limit: {
+    title: "72-zone limit",
+    confirm: "This test temporarily configures 72 stations and replaces every station name with a 32-character test value. Original names and expansion count will be restored. Run only when no zones are active. Continue?",
+    async cleanup(ctx) {
+      if (ctx.limitNames) {
+        try {
+          await success("co", {ext: 8});
+          await writeStationNames(ctx.limitNames);
+        } catch (_) {}
+      }
+      if (ctx.originalExt !== undefined) {
+        try { await success("co", {ext: ctx.originalExt}); } catch (_) {}
+      }
+    },
+    tests: [
+      {name: "Capture names and configure 72 stations", async run(ctx) {
+        const status = (await request("js")).data;
+        if (status.sn.some(Boolean)) { ctx.limitSkip = "A station is currently running"; return {skip: ctx.limitSkip}; }
+        ctx.originalExt = (await request("jo")).data.ext;
+        await success("co", {ext: 8});
+        await poll("72-station expansion", async () => (await request("js")).data.nstations === 72);
+        const d = (await request("jn")).data;
+        assert(d.snames.length === 72, `Expected 72 names, got ${d.snames.length}`);
+        ctx.limitNames = d.snames.slice();
+        return `Captured 72 names; original ext=${ctx.originalExt}`;
+      }},
+      {name: "Write 72 maximum-length station names /cs", async run(ctx) {
+        if (ctx.limitSkip) return {skip: ctx.limitSkip};
+        assert(ctx.limitNames, "Name snapshot is unavailable");
+        const testNames = Array.from({length: 72}, (_, sid) => md5(String(sid)));
+        await writeStationNames(testNames);
+        ctx.limitWritten = true;
+        return "Nine sequential batches of eight names";
+      }},
+      {name: "Verify all maximum-length names /jn", async run(ctx) {
+        if (ctx.limitSkip) return {skip: ctx.limitSkip};
+        assert(ctx.limitWritten, "Test names were not written");
+        const d = (await request("jn")).data;
+        for (let sid = 0; sid < 72; sid++) assert(d.snames[sid] === md5(String(sid)), `Station ${sid + 1} name mismatch`);
+        return "All 72 names preserved exactly";
+      }},
+      {name: "Restore names and expansion count", async run(ctx) {
+        if (ctx.limitSkip) return {skip: ctx.limitSkip};
+        assert(ctx.limitNames, "Name snapshot is unavailable");
+        await writeStationNames(ctx.limitNames);
+        await success("co", {ext: ctx.originalExt});
+        await poll("expansion count restore", async () => (await request("jo")).data.ext === ctx.originalExt);
+        ctx.limitNames = null;
+        ctx.originalExt = undefined;
+        return "Original configuration restored";
+      }}
+    ]
+  },
+
+  validation: {
+    title: "Validation",
+    tests: [
+      {name: "Reject incorrect password", async run() {
+        const r = await request("jc", {}, {passwordHash: "00000000000000000000000000000000"}); assert(r.data.result === 2, `Expected result 2, got ${r.text}`); return "result=2";
+      }},
+      {name: "Reject station index at station count", async run() {
+        const d = (await request("js")).data; const r = await request("cm", {sid: d.nstations, en: 1, t: 1}); assert(r.data.result === 17, `Expected result 17, got ${r.text}`); return "result=17";
+      }},
+      {name: "Reject sequential group 4", async run() {
+        const r = await request("cs", {g0: 4}); assert(r.data.result === 17, `Expected result 17, got ${r.text}`); return "result=17";
+      }},
+      {name: "Reject zero sensor interval", async run() {
+        const r = await request("csn", {uuid: -1, type: 0, interval: 0}); assert(r.data.result === 17, `Expected result 17, got ${r.text}`); return "result=17";
+      }},
+      {name: "Reject invalid sensor type", async run() {
+        const r = await request("csn", {uuid: -1, type: 255}); assert(r.data.result === 17, `Expected result 17, got ${r.text}`); return "result=17";
+      }},
+      {name: "Reject zero sensor-log page count", async run() {
+        const r = await request("jsl", {page: 1, count: 0});
+        if (r.data.result === 80) return {skip: "Sensor log has not been initialized"};
+        assert(r.data.result === 17, `Expected result 17, got ${r.text}`); return "result=17";
+      }},
+      {name: "Reject paginated delete-all", async run() {
+        const r = await request("dsl", {uuid: -1, page: 1}); assert(r.data.result === 18, `Expected result 18, got ${r.text}`); return "result=18";
+      }},
+      {name: "Reject out-of-range program index", async run() {
+        const r = await request("cp", {pid: 255, en: 0}); assert(r.data.result === 17, `Expected result 17, got ${r.text}`); return "result=17";
+      }},
+      {name: "Reject missing delete-program index", async run() {
+        const r = await request("dp"); assert(r.data.result === 16, `Expected result 16, got ${r.text}`); return "result=16";
+      }}
+    ]
+  }
+};
+
+function addRow(index, test) {
+  const row = document.createElement("tr");
+  row.innerHTML = `<td>${index + 1}</td><td></td><td class="running">running</td><td></td><td></td>`;
+  row.children[1].textContent = test.name;
+  $("results").append(row);
+  return row;
+}
+
+function setDetails(cell, value) {
+  if (!value) return;
+  const details = document.createElement("details");
+  const summary = document.createElement("summary"); summary.textContent = "show";
+  const code = document.createElement("code"); code.textContent = String(value);
+  details.append(summary, code); cell.replaceChildren(details);
+}
+
+async function runSuite(key) {
+  if (running) return;
+  const suite = suites[key];
+  if (suite.confirm && !confirm(suite.confirm)) return;
+  running = true; stopRequested = false; activeController = null;
+  document.querySelectorAll("button[data-suite]").forEach((b) => b.disabled = true);
+  $("stop").disabled = false; $("results").replaceChildren();
+  $("progress").max = suite.tests.length; $("progress").value = 0;
+  const ctx = {}; let passed = 0, failed = 0, skipped = 0;
+  try {
+    for (let i = 0; i < suite.tests.length; i++) {
+      if (stopRequested) break;
+      const test = suite.tests[i]; const row = addRow(i, test); const started = performance.now();
+      try {
+        const detail = await test.run(ctx);
+        if (detail && detail.skip) { row.children[2].className = "skip"; row.children[2].textContent = "skip"; setDetails(row.children[4], detail.skip); skipped++; }
+        else { row.children[2].className = "pass"; row.children[2].textContent = "pass"; setDetails(row.children[4], detail); passed++; }
+      } catch (error) {
+        row.children[2].className = "fail"; row.children[2].textContent = "fail"; setDetails(row.children[4], error.stack || error.message); failed++;
+      }
+      row.children[3].textContent = `${Math.round(performance.now() - started)} ms`;
+      $("progress").value = i + 1;
+      $("summary").textContent = `${suite.title}: ${passed} passed, ${failed} failed, ${skipped} skipped`;
+    }
+  } finally {
+    if (suite.cleanup) await suite.cleanup(ctx);
+    running = false; activeController = null;
+    document.querySelectorAll("button[data-suite]").forEach((b) => b.disabled = false);
+    $("stop").disabled = true;
+    if (stopRequested) $("summary").textContent += " (stopped)";
+  }
+}
+
+document.querySelectorAll("button[data-suite]").forEach((button) => button.addEventListener("click", () => runSuite(button.dataset.suite)));
+$("stop").addEventListener("click", () => { stopRequested = true; if (activeController) activeController.abort(); });
+$("clear").addEventListener("click", () => { if (!running) { $("results").replaceChildren(); $("summary").textContent = "Ready"; $("progress").value = 0; } });
+$("target").addEventListener("input", () => {
+  const target = $("target").value.trim();
+  $("port-label").style.visibility = (/^https?:\/\//i.test(target) || /^OT[0-9A-Za-z]{30}$/.test(target)) ? "hidden" : "visible";
+});
+</script>
+</body>
+</html>
