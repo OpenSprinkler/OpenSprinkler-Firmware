@@ -23,11 +23,4 @@
 
 #pragma once
 
-#include "types.h"
-#include <limits>
-#include "api/http.h"
-
-#if !defined(ESP8266)
-#include <stdarg.h>
-#include <unistd.h>
-#endif
+#include "api/server.h"

@@ -21,7 +21,7 @@
  * <http://www.gnu.org/licenses/>.
  */
 
-#include "../opensprinkler_server.h"
+#include "server.h"
 #include "../types.h"
 #include "../OpenSprinkler.h"
 #include "../program.h"

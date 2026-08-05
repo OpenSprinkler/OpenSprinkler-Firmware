@@ -1,8 +1,8 @@
 /* OpenSprinkler Unified Firmware
  * Copyright (C) 2015 by Ray Wang (ray@opensprinkler.com)
  *
- * Header file containing declarations of functions defined in main.cpp,
- * but called by other translation units.
+ * Compatibility header for runtime scheduler and logging functions that
+ * historically lived in main.cpp.
  *
  * Feb 2015 @ OpenSprinkler.com
  *

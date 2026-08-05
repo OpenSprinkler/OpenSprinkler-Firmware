@@ -24,13 +24,30 @@ Directories should normally contain files directly; deeper nesting is reserved f
 
 Embedded paths should continue to favor static storage, explicit ownership, and bounded buffers. New abstractions must not introduce routine heap allocation on ESP8266.
 
-## Migration Order
+## Current Boundaries
 
-1. Establish Demo API contract checks and keep all current platform builds green.
-2. Centralize board capabilities and pin assignments.
-3. Extract platform and hardware access behind narrow interfaces.
-4. Split API handlers by domain without changing routes or JSON.
-5. Move scheduling, station, program, and option logic out of the `OpenSprinkler` object.
-6. Isolate persistence and add explicit migration tests before changing any data format.
+- `boards/` owns immutable board profiles and hardware detection.
+- `platform/` owns Linux/Arduino GPIO, Linux I2C, and Linux clock adapters.
+- `drivers/` owns ADC, RTC, I/O expander, RF, display, and USB-PD hardware access.
+- `core/` owns program data and runtime scheduling policy.
+- `api/` owns HTTP parsing, route registration, server implementation, and domain handlers.
+- `services/` owns MQTT, weather, notifications, email, and network provisioning integrations.
+- `storage/` owns cross-platform file access and sprinkler-log persistence.
+- `sensors/` remains the expanded-sensor domain.
+
+Root forwarding headers preserve existing include paths while callers migrate. `main.cpp` remains the platform entrypoint and polling orchestrator. `OpenSprinkler` remains the compatibility state facade; splitting that state requires a separate behavioral redesign and is not part of this file migration.
+
+## Completed Migration
+
+1. Established Demo API contract checks and board, hardware-detection, and storage tests.
+2. Centralized board capabilities, pin assignments, and hardware detection.
+3. Extracted platform adapters and reusable hardware drivers.
+4. Centralized HTTP infrastructure and route registration, and established domain handler boundaries.
+5. Moved program data and runtime scheduling out of the root entrypoint.
+6. Isolated file access and sprinkler logging without changing persistent formats.
+
+## Follow-up Work
+
+Future changes can split the remaining controller state, options, and station storage from `OpenSprinkler` behind explicit interfaces. That work should be driven by ESP32 requirements and accompanied by focused state-transition and persistence tests; it should not be mixed into mechanical file moves.
 
 Use temporary compatibility wrappers when needed, then remove them once all callers use the new boundary. Avoid broad renames or unrelated cleanup in migration commits.
