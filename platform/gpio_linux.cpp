@@ -2,7 +2,7 @@
 
 #if defined(OSPI)
 
-#include "../utils.h"
+#include "util/utils.h"
 
 #include <lgpio.h>
 #include <stdio.h>

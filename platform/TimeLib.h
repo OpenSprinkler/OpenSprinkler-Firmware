@@ -136,4 +136,3 @@ time_os_t makeTime(tmElements_t &tm);	// convert time elements into time_os_t
 } // extern "C++"
 #endif // __cplusplus
 #endif /* _Time_h */
-

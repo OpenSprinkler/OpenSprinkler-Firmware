@@ -27,7 +27,7 @@
 #include <WiFiUdp.h>
 #include "time.h"
 #include "../defines.h"
-#include "../htmls.h"
+#include "html/htmls.h"
 
 String scan_network();
 void start_network_ap(const char *ssid, const char *pass);

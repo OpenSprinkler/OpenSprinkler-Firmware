@@ -25,9 +25,9 @@
 
 #include "types.h"
 #include "defines.h"
-#include "utils.h"
+#include "util/utils.h"
 #include "platform/gpio.h"
-#include "images.h"
+#include "drivers/images.h"
 #include "services/mqtt.h"
 #include "drivers/rf_switch.h"
 #include <cmath>
@@ -64,7 +64,7 @@
 	#include <sys/stat.h>
 	#include "OpenThingsFramework.h"
 	#include "etherport.h"
-	#include "rpitime.h"
+	#include "platform/clock.h"
 	#include "services/smtp.h"
 #endif // end of headers
 

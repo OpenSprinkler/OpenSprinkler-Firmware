@@ -4,8 +4,8 @@
 
 #include <SSD1306.h>
 
-#include "../font.h"
-#include "../images.h"
+#include "font.h"
+#include "images.h"
 
 #define LCD_STD 0 // Standard LCD
 #define LCD_I2C 1
@@ -97,8 +97,8 @@ private:
 
 #include "../platform/i2c.h"
 
-#include "../font.h"
-#include "../images.h"
+#include "font.h"
+#include "images.h"
 #include <fcntl.h>
 #include <stdlib.h>
 #include <unistd.h>

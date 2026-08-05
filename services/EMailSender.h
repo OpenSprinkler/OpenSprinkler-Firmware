@@ -35,7 +35,7 @@
 #ifndef EMailSender_h
 #define EMailSender_h
 
-#include "../EMailSenderKey.h"
+#include "EMailSenderKey.h"
 
 #if ARDUINO >= 100
 #include "Arduino.h"

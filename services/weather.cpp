@@ -23,13 +23,13 @@
 
 #include <stdlib.h>
 #include "../OpenSprinkler.h"
-#include "../utils.h"
+#include "util/utils.h"
 #include "../api/server.h"
 #include "weather.h"
 #include "../core/scheduler.h"
 #include "../storage/logging.h"
 #include "../types.h"
-#include "../ArduinoJson.hpp"
+#include "external/ArduinoJson.hpp"
 
 extern OpenSprinkler os; // OpenSprinkler object
 extern char tmp_buffer[];

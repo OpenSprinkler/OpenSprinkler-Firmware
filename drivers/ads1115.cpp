@@ -1,5 +1,5 @@
 #include "ads1115.h"
-#include "../utils.h"   // millis() on Linux/DEMO
+#include "util/utils.h"   // millis() on Linux/DEMO
 
 #include <cmath>
 

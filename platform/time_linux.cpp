@@ -9,6 +9,13 @@ namespace {
 
 uint64_t epoch_microseconds = 0;
 
+tm utc_components(time_os_t timestamp) {
+	time_t value = timestamp;
+	tm result = {};
+	gmtime_r(&value, &result);
+	return result;
+}
+
 } // namespace
 
 void delay(uint32_t milliseconds) {
@@ -55,6 +62,26 @@ uint32_t micros() {
 	gettimeofday(&tv, nullptr);
 	uint64_t now = (uint64_t)tv.tv_sec * 1000000 + (uint64_t)tv.tv_usec;
 	return (uint32_t)(now - epoch_microseconds);
+}
+
+int hour(time_os_t timestamp) {
+	return utc_components(timestamp).tm_hour;
+}
+
+int minute(time_os_t timestamp) {
+	return utc_components(timestamp).tm_min;
+}
+
+int second(time_os_t timestamp) {
+	return utc_components(timestamp).tm_sec;
+}
+
+int day(time_os_t timestamp) {
+	return utc_components(timestamp).tm_mday;
+}
+
+int month(time_os_t timestamp) {
+	return utc_components(timestamp).tm_mon + 1;
 }
 
 #endif

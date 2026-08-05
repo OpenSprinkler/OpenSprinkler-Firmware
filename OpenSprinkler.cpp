@@ -31,7 +31,7 @@
 	#endif
 #endif
 #include "core/program.h"
-#include "ArduinoJson.hpp"
+#include "external/ArduinoJson.hpp"
 
 #if defined(ESP32)
 #include <WebServer.h>
@@ -563,7 +563,7 @@ void OpenSprinkler::reboot_dev(uint8_t cause) {
 #include <stdlib.h>
 #include <sys/ioctl.h>
 #include <net/if.h>
-#include "utils.h"
+#include "util/utils.h"
 #include "api/server.h"
 
 /** Initialize network with the given mac address and http port */
@@ -3015,7 +3015,7 @@ void OpenSprinkler::lcd_set_brightness(unsigned char value) {
 }
 
 #if defined(USE_DISPLAY)
-#include "images.h"
+#include "drivers/images.h"
 void OpenSprinkler::flash_screen() {
 	lcd.drawXbm(0, 0, OpenSprinkler_Logo_width, OpenSprinkler_Logo_height,
 		(const unsigned char*)OpenSprinkler_Logo_image);

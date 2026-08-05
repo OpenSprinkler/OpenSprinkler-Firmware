@@ -23,7 +23,7 @@
 
 #include "notifier.h"
 #include "../core/program.h"
-#include "../ArduinoJson.hpp"
+#include "external/ArduinoJson.hpp"
 #include "../api/server.h"
 #if defined(ESP32)
 #include "EMailSender.h"

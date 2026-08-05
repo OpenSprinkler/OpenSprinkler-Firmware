@@ -11,7 +11,7 @@
 #define PCF8563_ADDR 0x51
 
 #include "../types.h"
-#include "../TimeLib.h"
+#include "platform/TimeLib.h"
 
 // library interface description
 class I2CRTC

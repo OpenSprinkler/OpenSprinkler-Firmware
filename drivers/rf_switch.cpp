@@ -37,7 +37,7 @@
 #endif
 
 #include "../platform/gpio.h"
-#include "../utils.h"
+#include "util/utils.h"
 #include "rf_switch.h"
 
 /* Format for protocol definitions:

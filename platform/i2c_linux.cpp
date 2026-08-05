@@ -2,7 +2,7 @@
 
 #if defined(OSPI)
 
-#include "../utils.h"
+#include "util/utils.h"
 
 #include <fcntl.h>
 #include <sys/ioctl.h>

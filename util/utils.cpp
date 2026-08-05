@@ -21,7 +21,7 @@
  * <http://www.gnu.org/licenses/>
  */
 
-#include "utils.h"
+#include "util/utils.h"
 #include "types.h"
 #include "OpenSprinkler.h"
 #include <math.h>

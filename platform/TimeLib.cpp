@@ -27,6 +27,8 @@
 	1.4  5	Sep 2014 - compatibility with Arduino 1.5.7
 */
 
+#if defined(ARDUINO)
+
 #if ARDUINO >= 100
 #include <Arduino.h>
 #else
@@ -320,3 +322,5 @@ void setSyncInterval(time_os_t interval){ // set the number of seconds between r
 	syncInterval = (uint32_t)interval;
 	nextSyncTime = sysTime + syncInterval;
 }
+
+#endif // ARDUINO
