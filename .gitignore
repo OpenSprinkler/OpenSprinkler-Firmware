@@ -15,5 +15,6 @@ build-1284/*
 node_modules
 *.json
 !package.json
+!package-lock.json
 .DS_Store
 testmode.h
