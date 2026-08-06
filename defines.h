@@ -211,6 +211,7 @@ enum {
 #define DEFAULT_OTC_PORT_DEV       80
 #define DEFAULT_OTC_SERVER_APP    "cloud.openthings.io"
 #define DEFAULT_OTC_PORT_APP       443
+#define FIRMWARE_UPDATE_PORT       8080
 #define DEFAULT_OTC_TOKEN_LENGTH   32
 #define DEFAULT_DEVICE_NAME       "My OpenSprinkler"
 #define DEFAULT_EMPTY_STRING      ""

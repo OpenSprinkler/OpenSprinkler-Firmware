@@ -388,10 +388,14 @@ unsigned char OpenSprinkler::start_network() {
 	extern DNSServer *dns;
 	if(get_wifi_mode() == OS_WIFI_MODE_AP) dns = new DNSServer();
 	if(update_server) { delete update_server; update_server = NULL; }
+	if (httpport == FIRMWARE_UPDATE_PORT) {
+		DEBUG_PRINTLN(F("Firmware update server disabled: HTTP port 8080 is reserved"));
+		return 1;
+	}
 		#if defined(ESP8266)
-		update_server = new ESP8266WebServer(8080);
+		update_server = new ESP8266WebServer(FIRMWARE_UPDATE_PORT);
 		#else
-		update_server = new WebServer(8080);
+		update_server = new WebServer(FIRMWARE_UPDATE_PORT);
 	#endif
 	DEBUG_PRINT(F("Started update server"));
 	return 1;

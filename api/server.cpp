@@ -1042,6 +1042,9 @@ void server_change_options(OTF_PARAMS_DEF)
 	bool sensor_change = false;
 	#if defined(ARDUINO)
 	bool tpdv_change = false;
+	bool httpport_requested = false;
+	const uint8_t previous_httpport_0 = os.iopts[IOPT_HTTPPORT_0];
+	const uint8_t previous_httpport_1 = os.iopts[IOPT_HTTPPORT_1];
 	#endif
 
 	// !!! p and bfill share the same buffer, so don't write
@@ -1065,6 +1068,9 @@ void server_change_options(OTF_PARAMS_DEF)
 		char tbuf2[6];
 		iopt_get_json_name(oid, tbuf2);
 		if(findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, tbuf2)) {
+			#if defined(ARDUINO)
+			if (oid == IOPT_HTTPPORT_0 || oid == IOPT_HTTPPORT_1) httpport_requested = true;
+			#endif
 			int32_t v = atol(tmp_buffer);
 			if (flags & IOPT_FLAG_SIGNED_TIME) {
 				v=water_time_encode_signed(v);
@@ -1097,6 +1103,16 @@ void server_change_options(OTF_PARAMS_DEF)
 			#endif
 		}
 	}
+	#if defined(ARDUINO)
+	if (httpport_requested) {
+		uint16_t httpport = (uint16_t)(os.iopts[IOPT_HTTPPORT_1] << 8) | os.iopts[IOPT_HTTPPORT_0];
+		if (httpport == FIRMWARE_UPDATE_PORT) {
+			os.iopts[IOPT_HTTPPORT_0] = previous_httpport_0;
+			os.iopts[IOPT_HTTPPORT_1] = previous_httpport_1;
+			err = 1;
+		}
+	}
+	#endif
 
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("loc"), true)) {
 		strReplaceQuoteBackslash(tmp_buffer);
@@ -2831,7 +2847,15 @@ void server_fill_files(OTF_PARAMS_DEF) {
 // handle Ethernet request
 #if defined(ARDUINO)
 void on_firmware_update(OTF_PARAMS_DEF) {
-	if(req.isCloudRequest()) otf_send_result(OTF_PARAMS, HTML_NOT_PERMITTED, "fw update");
+	if(req.isCloudRequest()) {
+		otf_send_result(OTF_PARAMS, HTML_NOT_PERMITTED, "fw update");
+		return;
+	}
+	if (!update_server) {
+		otf_send_result(OTF_PARAMS, HTML_NOT_PERMITTED,
+			"HTTP port 8080 is reserved for firmware update");
+		return;
+	}
 	print_header_compressed_html(OTF_PARAMS, update_html_gz_len);
 	//res.writeBodyChunk((char *) "%s", ap_update_html);
 	res.writeBodyData((const __FlashStringHelper*)update_html_gz, update_html_gz_len);
@@ -2905,13 +2929,15 @@ void start_server_client() {
 		otf->on("/", server_home);  // handle home page
 		otf->on("/index.html", server_home);
 		otf->on("/update", on_firmware_update, OTF::HTTP_GET); // handle firmware update
-		update_server->on("/update", HTTP_POST, on_firmware_upload_fin, on_firmware_upload);
-		update_server->on("/update", HTTP_OPTIONS, on_update_options);
+		if (update_server) {
+			update_server->on("/update", HTTP_POST, on_firmware_upload_fin, on_firmware_upload);
+			update_server->on("/update", HTTP_OPTIONS, on_update_options);
+		}
 
 		register_api_routes(*otf);
 		callback_initialized = true;
 	}
-	update_server->begin();
+	if (update_server) update_server->begin();
 }
 
 void start_server_ap() {
@@ -2926,10 +2952,12 @@ void start_server_ap() {
 	otf->on("/ccap", on_ap_change_config);
 	otf->on("/jtap", on_ap_try_connect);
 	otf->on("/update", on_firmware_update, OTF::HTTP_GET);
-	update_server->on("/update", HTTP_POST, on_firmware_upload_fin, on_firmware_upload);
-	update_server->on("/update", HTTP_OPTIONS, on_update_options);
+	if (update_server) {
+		update_server->on("/update", HTTP_POST, on_firmware_upload_fin, on_firmware_upload);
+		update_server->on("/update", HTTP_OPTIONS, on_update_options);
+	}
 	otf->onMissingPage(on_ap_home);
-	update_server->begin();
+	if (update_server) update_server->begin();
 
 	register_api_routes(*otf);
 
