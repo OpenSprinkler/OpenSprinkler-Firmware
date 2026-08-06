@@ -37,12 +37,17 @@ td:nth-child(3), td:nth-child(4) { white-space: nowrap; }
 details { max-width: 620px; }
 summary { cursor: pointer; }
 code { word-break: break-all; }
+dialog { max-width: 560px; padding: 20px; border: 1px solid #aab3bb; border-radius: 6px; background: #fff; color: #18212a; }
+dialog::backdrop { background: rgb(0 0 0 / 45%); }
+dialog p { margin: 0 0 18px; line-height: 1.45; }
+.dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin: 0; }
 @media (max-width: 720px) { .settings { grid-template-columns: 1fr 100px; } main { padding: 14px; } }
 @media (prefers-color-scheme: dark) {
   body { background: #171a1d; color: #e8ecef; }
   input, button, .table-wrap { background: #22272b; color: #e8ecef; border-color: #58616a; }
   th { background: #2c3237; } th, td { border-color: #41484e; }
   .notice { color: #adb6bd; }
+  dialog { background: #22272b; color: #e8ecef; border-color: #58616a; }
 }
 </style>
 </head>
@@ -86,6 +91,14 @@ code { word-break: break-all; }
       <tbody id="results"></tbody>
     </table>
   </div>
+
+  <dialog id="confirm-dialog">
+    <p id="confirm-message"></p>
+    <form method="dialog" class="dialog-actions">
+      <button value="cancel">Cancel</button>
+      <button class="danger" value="confirm">Run tests</button>
+    </form>
+  </dialog>
 </main>
 
 <script>
@@ -696,10 +709,21 @@ function setDetails(cell, value) {
   details.append(summary, code); cell.replaceChildren(details);
 }
 
+function confirmAction(message) {
+  const dialog = $("confirm-dialog");
+  if (typeof dialog.showModal !== "function") return Promise.resolve(window.confirm(message));
+  $("confirm-message").textContent = message;
+  dialog.returnValue = "cancel";
+  return new Promise((resolve) => {
+    dialog.addEventListener("close", () => resolve(dialog.returnValue === "confirm"), {once: true});
+    dialog.showModal();
+  });
+}
+
 async function runSuite(key) {
   if (running) return;
   const suite = suites[key];
-  if (suite.confirm && !confirm(suite.confirm)) return;
+  if (suite.confirm && !await confirmAction(suite.confirm)) return;
   running = true; stopRequested = false; activeController = null;
   document.querySelectorAll("button[data-suite]").forEach((b) => b.disabled = true);
   $("stop").disabled = false; $("results").replaceChildren();
