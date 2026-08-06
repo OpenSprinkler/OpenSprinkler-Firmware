@@ -1,3 +1,5 @@
+#if defined(ARDUINO)
+
 #include "OpenSprinkler.h"
 
 void do_setup();
@@ -10,3 +12,5 @@ void setup() {
 void loop() {
   do_loop();
 }
+
+#endif
