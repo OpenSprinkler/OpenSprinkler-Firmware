@@ -32,6 +32,7 @@
 #include "core/scheduler.h"
 #include "storage/logging.h"
 #include "services/notifier.h"
+#include "services/firmware_update.h"
 
 #if defined(ESP8266)
 	#include <Arduino.h>
@@ -686,7 +687,7 @@ void do_loop()
 	case OS_STATE_CONNECTED:
 		if(os.get_wifi_mode() == OS_WIFI_MODE_AP) {
 			dns->processNextRequest();
-			update_server->handleClient();
+			if(update_server) update_server->handleClient();
 			otf->loop();
 			connecting_timeout = 0;
 			if(os.get_wifi_mode()==OS_WIFI_MODE_STA) {
@@ -700,7 +701,7 @@ void do_loop()
 			}
 		} else {
 			if(useEth || WiFi.status() == WL_CONNECTED) {
-				update_server->handleClient();
+				if(update_server) update_server->handleClient();
 				otf->loop(os.network_connected());
 				connecting_timeout = 0;
 			} else {
@@ -718,7 +719,9 @@ void do_loop()
 		break;
 	}
 
-	ui_state_machine();
+	firmware_update.loop();
+	if (!firmware_update.busy() && firmware_update.phase() != FirmwareUpdatePhase::Success)
+		ui_state_machine();
 
 #else // Process Ethernet packets for RPI/LINUX
 	if(otf) otf->loop();

@@ -42,13 +42,21 @@
         .form-group {
             margin-bottom: 18px;
         }
+		section {
+			border-top: 1px solid var(--border);
+			padding-top: 20px;
+			margin-top: 20px;
+		}
+		section:first-of-type { border-top: 0; margin-top: 0; padding-top: 0; }
+		h2 { font-size: 20px; margin: 0 0 14px; }
         label {
             display: block;
             font-weight: 600;
             margin-bottom: 6px;
         }
         input[type="password"],
-        input[type="file"] {
+		input[type="file"],
+		select {
             width: 100%;
             padding: 10px;
             font-size: 16px;
@@ -79,6 +87,15 @@
             border-radius: 5px;
             cursor: pointer;
         }
+		button.secondary {
+			color: var(--accent);
+			background: transparent;
+			border: 1px solid var(--accent);
+			margin-top: 8px;
+		}
+		button:disabled { opacity: .55; cursor: default; }
+		progress { width: 100%; height: 12px; }
+		.help { color: var(--muted); font-size: 14px; margin-top: 5px; }
         #msg {
             text-align: left;
             font-weight: 600;
@@ -100,23 +117,37 @@
 
 <main>
     <h1>OpenSprinkler Firmware Update</h1>
-    <form method='POST' action='/update' id='fm' enctype='multipart/form-data'>
-        <div class="form-group">
-            <label for="file">Firmware File (.bin)</label>
-            <input type='file' name='file' accept='.bin' id='file'>
-        </div>
-        <div class="form-group">
-            <label for="pw">Device Password</label>
-            <input type='password' name='pw' id='pw'>
-        </div>
+	<div class="form-group">
+		<label for="pw">Device Password</label>
+		<input type='password' id='pw' autocomplete="current-password">
+	</div>
 
-        <div class="warning-box">
-            <b>IMPORTANT:</b> Firmware updates across major revisions (e.g., from 2.2.1 to 2.2.2) will trigger a factory reset. Please save a copy of your current configurations before proceeding.
-        </div>
+	<div class="warning-box">
+		<b>IMPORTANT:</b> Firmware updates across major revisions (e.g., from 2.2.1 to 2.2.2) will trigger a factory reset. Save a copy of your current configurations before proceeding.
+	</div>
 
-        <p id='msg'></p>
-        <button type='button' id='btn_submit'>Upload Firmware</button>
-    </form>
+	<section id="online_section">
+		<h2>Online Update</h2>
+		<div class="form-group">
+			<label for="release">Firmware Version</label>
+			<select id="release" disabled><option>Checking for releases...</option></select>
+			<p class="help" id="release_details"></p>
+		</div>
+		<button type="button" id="btn_install" disabled>Install Selected Version</button>
+		<button type="button" class="secondary" id="btn_refresh">Check Again</button>
+	</section>
+
+	<section>
+		<h2>Manual Update</h2>
+		<div class="form-group">
+			<label for="file" id="file_label">Firmware File</label>
+			<input type='file' name='file' id='file'>
+		</div>
+		<button type='button' id='btn_submit'>Upload Firmware File</button>
+	</section>
+
+	<p id='msg' aria-live="polite"></p>
+	<progress id="progress" value="0" max="100" hidden></progress>
 </main>
 
 <script>
@@ -309,66 +340,270 @@
 
     // --- Main page logic ---
     function id(s) { return document.getElementById(s); }
-    function show_msg(s, c) {
-        const msgEl = id('msg');
-        msgEl.innerHTML = `<font color=${c}>${s}</font>`;
+    const apiBase = '//' + window.location.hostname + ':8080/update';
+    let deviceInfo = null;
+    let catalogBytes = null;
+    let catalogSignature = '';
+    let releases = [];
+
+    function show_msg(text, color) {
+        const message = id('msg');
+        message.textContent = text;
+        message.style.color = color || 'inherit';
     }
 
-    id('btn_submit').addEventListener('click', function(e){
-        e.preventDefault();
+    function set_busy(busy) {
+        id('btn_install').disabled = busy || !releases.length;
+        id('btn_refresh').disabled = busy;
+        id('btn_submit').disabled = busy;
+		id('release').disabled = busy || !releases.length;
+    }
+
+		function wait(milliseconds) {
+			return new Promise(function(resolve) { setTimeout(resolve, milliseconds); });
+		}
+
+		async function fetch_with_timeout(url, options, timeout) {
+			const controller = new AbortController();
+			const timer = setTimeout(function() { controller.abort(); }, timeout || 15000);
+			try {
+				return await fetch(url, Object.assign({}, options || {}, {signal: controller.signal}));
+			} catch (error) {
+				if (error.name === 'AbortError') throw new Error('The request timed out.');
+				throw error;
+			} finally {
+				clearTimeout(timer);
+			}
+		}
+
+		async function fetch_with_retry(url, options) {
+			let failure;
+			for (let attempt = 1; attempt <= 3; attempt++) {
+				try {
+					const response = await fetch_with_timeout(url, options, 20000);
+				if (response.ok || response.status < 500) return response;
+				failure = new Error('Server returned HTTP ' + response.status + '.');
+			} catch (error) {
+				failure = error;
+			}
+			if (attempt < 3) await wait(attempt * 500);
+		}
+		throw failure;
+	}
+
+    async function request_token() {
+		const password = id('pw').value;
+		if (!password && !confirm('You did not input a device password. Continue?')) throw new Error('Cancelled');
+		const body = new URLSearchParams({pw: password ? md5(password) : ''});
+		const response = await fetch_with_timeout(apiBase + '/auth', {method: 'POST', body});
+        const data = await response.json();
+        if (data.result !== 1 || !data.token) throw new Error('Authentication failed. Check the device password.');
+        return data.token;
+    }
+
+    async function load_releases() {
+        set_busy(true);
+        show_msg('Checking for firmware releases...', 'gray');
+        try {
+			const infoResponse = await fetch_with_timeout(apiBase + '/info', {cache: 'no-store'});
+            if (!infoResponse.ok) throw new Error('The controller did not return update information.');
+            deviceInfo = await infoResponse.json();
+            id('file').accept = deviceInfo.extension || '';
+            id('file_label').textContent = 'Firmware File (' + (deviceInfo.extension || 'device firmware') + ')';
+            const select = id('release');
+            select.textContent = '';
+            releases = [];
+            if (!deviceInfo.configured) {
+                select.add(new Option('Online updates are not configured', ''));
+                select.disabled = true;
+                show_msg('Manual firmware upload is available below.', 'gray');
+                return;
+            }
+
+            const base = deviceInfo.base_url.replace(/\/$/, '');
+            const responses = await Promise.all([
+                fetch_with_retry(base + '/v1/manifest.json', {cache: 'no-store'}),
+                fetch_with_retry(base + '/v1/manifest.sig', {cache: 'no-store'})
+            ]);
+            if (!responses[0].ok || !responses[1].ok) throw new Error('The release catalog is unavailable.');
+            catalogBytes = new Uint8Array(await responses[0].arrayBuffer());
+            catalogSignature = (await responses[1].text()).trim();
+            const catalog = JSON.parse(new TextDecoder().decode(catalogBytes));
+            if (catalog.schema !== 1 || !Array.isArray(catalog.releases) || !catalogSignature)
+                throw new Error('The release catalog format is invalid.');
+
+            catalog.releases.forEach(function(release) {
+                const artifact = release.targets && release.targets[deviceInfo.target];
+				if (!artifact || typeof artifact.file !== 'string' ||
+					!artifact.file.startsWith('/v1/releases/') || !artifact.size) return;
+                releases.push(Object.assign({}, release, {
+                    label: release_label(release),
+                    artifact: artifact,
+                    url: new URL(artifact.file, base).href
+                }));
+            });
+            releases.slice(0, 3).forEach(function(release, index) {
+                select.add(new Option((index === 0 ? 'Latest: ' : '') + release.label, release.id));
+            });
+            releases = releases.slice(0, 3);
+            select.disabled = !releases.length;
+            update_release_details();
+            show_msg(releases.length ? 'Firmware releases are available.' : 'No compatible releases found.', releases.length ? 'green' : 'red');
+        } catch (error) {
+            releases = [];
+            show_msg('Unable to check for updates: ' + error.message, 'red');
+        } finally {
+            set_busy(false);
+        }
+    }
+
+    function selected_release() {
+        return releases.find(function(release) { return release.id === id('release').value; });
+    }
+
+    function release_label(release) {
+        const version = String(release.version);
+        return /^\d{3}$/.test(version) ? version.split('').join('.') + '(' + release.build + ')' : release.id;
+    }
+
+    function update_release_details() {
+        const release = selected_release();
+        id('release_details').textContent = release ? Math.ceil(release.artifact.size / 1024) + ' KB' : '';
+    }
+
+    function download_firmware(release, attempt) {
+		attempt = attempt || 1;
+        return new Promise(function(resolve, reject) {
+            const xhr = new XMLHttpRequest();
+			function retry(error) {
+				if (attempt >= 3) return reject(error);
+				show_msg('Firmware download failed; retrying (' + attempt + '/3)...', 'gray');
+				setTimeout(function() {
+					download_firmware(release, attempt + 1).then(resolve, reject);
+				}, attempt * 500);
+			}
+            xhr.open('GET', release.url, true);
+            xhr.responseType = 'blob';
+			xhr.timeout = 60000;
+            xhr.onprogress = function(event) {
+                if (!event.lengthComputable) return;
+                const pct = Math.round(event.loaded * 100 / event.total);
+                id('progress').hidden = false;
+                id('progress').value = pct;
+                show_msg('Downloading firmware (' + pct + '%)...', 'gray');
+            };
+            xhr.onload = function() {
+				if (xhr.status >= 500) return retry(new Error('Firmware download failed.'));
+				if (xhr.status !== 200) return reject(new Error('Firmware download failed.'));
+                if (!xhr.response || xhr.response.size !== release.artifact.size)
+                    return reject(new Error('Downloaded firmware size does not match the catalog.'));
+                resolve(xhr.response);
+            };
+			xhr.onerror = function() { retry(new Error('A network error occurred during firmware download.')); };
+			xhr.ontimeout = function() { retry(new Error('Firmware download timed out.')); };
+            xhr.send();
+        });
+    }
+
+    async function prepare_update(release, allowDowngrade, token) {
+        const query = new URLSearchParams({
+            token: token,
+            id: release.id,
+            sig: catalogSignature,
+            allow_downgrade: allowDowngrade ? '1' : '0'
+        });
+		const response = await fetch_with_timeout(apiBase + '/prepare?' + query, {
+			method: 'POST',
+			headers: {'Content-Type': 'application/octet-stream'},
+			body: catalogBytes
+		}, 20000);
+        const result = await response.json();
+        if (result.result !== 1 || !result.upload_token)
+            throw new Error(result.item || 'The controller rejected the signed release catalog.');
+        return result.upload_token;
+    }
+
+    function upload_firmware(file, filename, token, verified) {
+        return new Promise(function(resolve, reject) {
+            const data = new FormData();
+            data.append('file', file, filename);
+            const xhr = new XMLHttpRequest();
+            const endpoint = verified ? '/upload' : '';
+            xhr.open('POST', apiBase + endpoint + '?token=' + encodeURIComponent(token), true);
+            xhr.timeout = 300000;
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState !== 4) return;
+                if (xhr.status !== 200) return reject(new Error('Could not connect to the update server.'));
+                try {
+                    const result = JSON.parse(xhr.responseText);
+                    if (result.result !== 1) return reject(new Error(result.item || 'Firmware upload failed.'));
+                    resolve();
+                } catch (error) { reject(new Error('The device returned an invalid response.')); }
+            };
+            xhr.upload.onprogress = function(event) {
+                if (!event.lengthComputable) return;
+                const pct = Math.round(event.loaded * 100 / event.total);
+                id('progress').hidden = false;
+                id('progress').value = pct;
+                show_msg('Uploading firmware (' + pct + '%)...', 'gray');
+            };
+            xhr.onerror = function() { reject(new Error('A network error occurred during upload.')); };
+            xhr.ontimeout = function() { reject(new Error('Firmware upload timed out.')); };
+            xhr.send(data);
+        });
+    }
+
+    id('release').addEventListener('change', update_release_details);
+    id('btn_refresh').addEventListener('click', load_releases);
+    id('btn_install').addEventListener('click', async function() {
+        const release = selected_release();
+        if (!release) return;
+        const newer = release.version > deviceInfo.current_version ||
+            (release.version === deviceInfo.current_version && release.build > deviceInfo.current_build);
+        let allowDowngrade = false;
+        if (!newer) {
+            allowDowngrade = confirm('This version is not newer than the installed firmware. Install it anyway?');
+            if (!allowDowngrade) return;
+        } else if (!confirm('Install firmware ' + release.label + ' and reboot the controller?')) return;
+        set_busy(true);
+        try {
+            const firmware = await download_firmware(release);
+            const token = await request_token();
+            const uploadToken = await prepare_update(release, allowDowngrade, token);
+            const filename = release.artifact.file.split('/').pop();
+            await upload_firmware(firmware, filename, uploadToken, true);
+            show_msg('Update successful. The controller is rebooting.', 'green');
+            id('pw').value = '';
+        } catch (error) {
+            if (error.message !== 'Cancelled') show_msg(error.message, 'red');
+        } finally {
+            set_busy(false);
+        }
+    });
+
+    id('btn_submit').addEventListener('click', async function() {
         const files = id('file').files;
-        if (files.length === 0) {
+        if (!files.length) {
             show_msg('Please select a firmware file.', 'red');
             return;
         }
-
-        let password = id('pw').value;
-        if (password === '') {
-            if (!confirm('You did not input a device password. Are you sure you want to continue?')) return;
+        set_busy(true);
+        try {
+            const token = await request_token();
+            const file = files[0];
+            const expected = deviceInfo && deviceInfo.extension;
+            if (expected && !file.name.endsWith(expected)) throw new Error('Select a ' + expected + ' firmware file for this controller.');
+            await upload_firmware(file, file.name, token, false);
+            show_msg('Update successful. The controller is rebooting.', 'green');
+            id('pw').value = '';
+        } catch (error) {
+            if (error.message !== 'Cancelled') show_msg(error.message, 'red');
+        } finally {
+            set_busy(false);
         }
-
-        show_msg('Uploading... Please wait.', 'gray');
-
-        const fd = new FormData();
-        const file = files[0];
-        fd.append('file', file, file.name);
-        // Hash the password if it's not empty, otherwise send empty string
-        fd.append('pw', password ? md5(password) : '');
-
-        const xhr = new XMLHttpRequest();
-        xhr.onreadystatechange = function() {
-            if (xhr.readyState === 4 && xhr.status === 200) {
-                try {
-                    const jd = JSON.parse(xhr.responseText);
-                    if (jd.result === 1) {
-                        show_msg('Update successful! The device is rebooting. You may close this page.', 'green');
-                        id('pw').value = ''; // Clear password on success
-                    } else if (jd.result === 2) {
-                        show_msg('Authentication failed. Check device password and try again.', 'red');
-                    } else {
-                        show_msg('Update failed. An unknown error occurred.', 'red');
-                    }
-                } catch (e) {
-                    show_msg('Update failed. Received an invalid response from the device.', 'red');
-                }
-            } else if (xhr.readyState === 4) {
-                show_msg('Upload failed. Could not connect to the update server.', 'red');
-            }
-        };
-        xhr.upload.onprogress = function (evt) {
-            if (evt.lengthComputable) {
-                const pct = Math.max(5, Math.min(100, Math.round((evt.loaded / evt.total) * 100)));
-                show_msg('Uploading... (' + pct + '%) Please wait.', 'gray');
-            }
-        };
-
-        const uploadUrl = '//' + window.location.hostname + ':8080/update';
-        xhr.open('POST', uploadUrl, true);
-        xhr.timeout = 300000; // 5 minutes timeout
-        xhr.ontimeout = function(){ show_msg('Upload timed out. Please check the device connection and try again.', 'red'); };
-        xhr.onerror   = function(){ show_msg('A network error occurred during the upload.', 'red'); };
-        xhr.send(fd);
     });
+
+    load_releases();
 </script>
 
 </body>

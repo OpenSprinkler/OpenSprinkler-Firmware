@@ -28,6 +28,7 @@
 #include "../bfiller.h"
 #include "../services/weather.h"
 #include "../services/mqtt.h"
+#include "../services/firmware_update.h"
 #include "../core/scheduler.h"
 #include "../storage/logging.h"
 #include "handlers.h"
@@ -2861,23 +2862,122 @@ void on_firmware_update(OTF_PARAMS_DEF) {
 	res.writeBodyData((const __FlashStringHelper*)update_html_gz, update_html_gz_len);
 }
 
-void on_firmware_upload_fin() {
-	if (os.iopts[IOPT_IGNORE_PASSWORD]) {
-		// don't check password
-	} else if(!(update_server->hasArg("pw") && os.password_verify(update_server->arg("pw").c_str()))) {
+static bool firmware_upload_authorized = false;
+static bool firmware_upload_failed = false;
+
+void on_update_page() {
+	update_server->sendHeader("Content-Encoding", "gzip");
+	update_server->sendHeader("Cache-Control", "no-store");
+	update_server->send_P(200, PSTR("text/html"),
+		reinterpret_cast<PGM_P>(update_html_gz), update_html_gz_len);
+}
+
+void on_update_auth() {
+	String password = update_server->arg("pw");
+	char token[17];
+	if (!firmware_update.issue_token(password.c_str(), token)) {
 		update_server_send_result(HTML_UNAUTHORIZED);
-		Update.end(false);
 		return;
 	}
-	// finish update and check error
-	if(!Update.end(true) || Update.hasError()) {
-		update_server_send_result(HTML_UPLOAD_FAILED);
-		//handle_return(HTML_UPLOAD_FAILED);
-	}
+	String json = F("{\"result\":1,\"token\":\"");
+	json += token;
+	json += F("\",\"expires_in\":300}");
+	update_server->sendHeader("Access-Control-Allow-Origin", "*");
+	update_server->sendHeader("Cache-Control", "no-store");
+	update_server->send(200, "application/json", json);
+}
 
+void on_update_info() {
+	String json = F("{\"configured\":");
+	json += firmware_update.configured() ? F("true") : F("false");
+	json += F(",\"target\":\"");
+	json += firmware_update.target();
+	json += F("\",\"extension\":\"");
+	json += firmware_update.file_extension();
+	json += F("\",\"current_version\":");
+	json += OS_FW_VERSION;
+	json += F(",\"current_build\":");
+	json += OS_FW_MINOR;
+	json += F(",\"base_url\":\"");
+	json += firmware_update.base_url();
+	json += F("\"}");
+	update_server->sendHeader("Access-Control-Allow-Origin", "*");
+	update_server->sendHeader("Cache-Control", "no-store");
+	update_server->send(200, "application/json", json);
+}
+
+void on_update_prepare() {
+	if (firmware_update.busy()) {
+		update_server_send_result(HTML_NOT_PERMITTED, "update busy");
+		return;
+	}
+	if (!firmware_update.consume_token(update_server->arg("token").c_str())) {
+		update_server_send_result(HTML_UNAUTHORIZED);
+		return;
+	}
+	String release_id = update_server->arg("id");
+	String signature = update_server->arg("sig");
+	String manifest = update_server->arg("plain");
+	bool allow_downgrade = update_server->arg("allow_downgrade") == "1";
+	if (!release_id.length() || !signature.length() || !manifest.length()) {
+		update_server_send_result(HTML_DATA_MISSING, "catalog");
+		return;
+	}
+	char upload_token[17];
+	if (!firmware_update.prepare_verified(reinterpret_cast<const uint8_t *>(manifest.c_str()),
+		manifest.length(), signature.c_str(), release_id.c_str(), allow_downgrade, upload_token)) {
+		update_server_send_result(HTML_UPLOAD_FAILED, firmware_update.message());
+		return;
+	}
+	String json = F("{\"result\":1,\"upload_token\":\"");
+	json += upload_token;
+	json += F("\",\"expires_in\":300}");
+	update_server->sendHeader("Access-Control-Allow-Origin", "*");
+	update_server->sendHeader("Cache-Control", "no-store");
+	update_server->send(200, "application/json", json);
+}
+
+void on_update_status() {
+	String json = F("{\"phase\":\"");
+	json += firmware_update.phase_name();
+	json += F("\",\"progress\":");
+	json += firmware_update.percent();
+	json += F(",\"done\":");
+	json += firmware_update.bytes_done();
+	json += F(",\"total\":");
+	json += firmware_update.bytes_total();
+	json += F(",\"message\":\"");
+	json += firmware_update.message();
+	json += F("\"}");
+	update_server->sendHeader("Access-Control-Allow-Origin", "*");
+	update_server->sendHeader("Cache-Control", "no-store");
+	update_server->send(200, "application/json", json);
+}
+
+static void finish_firmware_upload(bool verified) {
+	if (!firmware_upload_authorized) {
+		firmware_upload_failed = false;
+		update_server_send_result(HTML_UNAUTHORIZED);
+		return;
+	}
+	firmware_upload_authorized = false;
+	bool finished = !firmware_upload_failed &&
+		(verified ? firmware_update.finish_verified() : firmware_update.finish_manual());
+	if (!finished) {
+		firmware_upload_failed = false;
+		update_server_send_result(HTML_UPLOAD_FAILED, firmware_update.message());
+		return;
+	}
+	firmware_upload_failed = false;
 	update_server_send_result(HTML_SUCCESS);
-	delay(1000); // so the UI has time to receive the success code
-	os.reboot_dev(REBOOT_CAUSE_FWUPDATE);
+}
+
+void on_firmware_upload_fin() {
+	finish_firmware_upload(false);
+}
+
+void on_verified_upload_fin() {
+	finish_firmware_upload(true);
 }
 
 void on_update_options() {
@@ -2888,37 +2988,60 @@ void on_update_options() {
 	update_server->send(200, "text/plain", "");
 }
 
-void on_firmware_upload() {
+static void receive_firmware_upload(bool verified) {
 	HTTPUpload& upload = update_server->upload();
 	if(upload.status == UPLOAD_FILE_START){
-		if(os.iopts[IOPT_WIFI_MODE]==OS_WIFI_MODE_STA) {
-			// TODO: stopping these can cause problems if the update fails and the user abandons the task
-			//WiFiUDP::stopAll();
-			//mqtt_client->disconnect();
+		if (verified) {
+			firmware_upload_authorized = firmware_update.begin_verified(upload.filename.c_str(),
+				update_server->arg("token").c_str());
+		} else {
+			firmware_upload_authorized = firmware_update.consume_token(update_server->arg("token").c_str()) &&
+				firmware_update.begin_manual(upload.filename.c_str());
 		}
+		firmware_upload_failed = !firmware_upload_authorized;
 		DEBUG_PRINT(F("upload: "));
 		DEBUG_PRINTLN(upload.filename);
-		uint32_t maxSketchSpace = (ESP.getFreeSketchSpace()-0x1000)&0xFFFFF000;
-		if(!Update.begin(maxSketchSpace)) {
-			DEBUG_PRINT(F("begin failed "));
-			DEBUG_PRINTLN(maxSketchSpace);
-		}
-
 	} else if(upload.status == UPLOAD_FILE_WRITE) {
-		DEBUG_PRINT(".");
-		if(Update.write(upload.buf, upload.currentSize) != upload.currentSize) {
-			DEBUG_PRINTLN(F("size mismatch"));
+		if (!firmware_upload_failed) {
+			bool written = verified ? firmware_update.write_verified(upload.buf, upload.currentSize) :
+				firmware_update.write_manual(upload.buf, upload.currentSize);
+			if (!written) firmware_upload_failed = true;
 		}
-
 	} else if(upload.status == UPLOAD_FILE_END) {
-
 		DEBUG_PRINTLN(F("completed"));
-
 	} else if(upload.status == UPLOAD_FILE_ABORTED){
-		Update.end();
+		if (firmware_upload_authorized) firmware_update.abort_upload();
+		firmware_upload_failed = true;
 		DEBUG_PRINTLN(F("aborted"));
 	}
 	delay(0);
+}
+
+void on_firmware_upload() {
+	receive_firmware_upload(false);
+}
+
+void on_verified_upload() {
+	receive_firmware_upload(true);
+}
+
+static void register_update_routes() {
+	static decltype(update_server) registered_server = nullptr;
+	if (registered_server == update_server) return;
+	registered_server = update_server;
+	update_server->on("/update", HTTP_GET, on_update_page);
+	update_server->on("/update", HTTP_POST, on_firmware_upload_fin, on_firmware_upload);
+	update_server->on("/update", HTTP_OPTIONS, on_update_options);
+	update_server->on("/update/auth", HTTP_POST, on_update_auth);
+	update_server->on("/update/auth", HTTP_OPTIONS, on_update_options);
+	update_server->on("/update/info", HTTP_GET, on_update_info);
+	update_server->on("/update/info", HTTP_OPTIONS, on_update_options);
+	update_server->on("/update/prepare", HTTP_POST, on_update_prepare);
+	update_server->on("/update/prepare", HTTP_OPTIONS, on_update_options);
+	update_server->on("/update/upload", HTTP_POST, on_verified_upload_fin, on_verified_upload);
+	update_server->on("/update/upload", HTTP_OPTIONS, on_update_options);
+	update_server->on("/update/status", HTTP_GET, on_update_status);
+	update_server->on("/update/status", HTTP_OPTIONS, on_update_options);
 }
 
 void start_server_client() {
@@ -2929,15 +3052,13 @@ void start_server_client() {
 		otf->on("/", server_home);  // handle home page
 		otf->on("/index.html", server_home);
 		otf->on("/update", on_firmware_update, OTF::HTTP_GET); // handle firmware update
-		if (update_server) {
-			update_server->on("/update", HTTP_POST, on_firmware_upload_fin, on_firmware_upload);
-			update_server->on("/update", HTTP_OPTIONS, on_update_options);
-		}
-
 		register_api_routes(*otf);
 		callback_initialized = true;
 	}
-	if (update_server) update_server->begin();
+	if (update_server) {
+		register_update_routes();
+		update_server->begin();
+	}
 }
 
 void start_server_ap() {
@@ -2952,10 +3073,7 @@ void start_server_ap() {
 	otf->on("/ccap", on_ap_change_config);
 	otf->on("/jtap", on_ap_try_connect);
 	otf->on("/update", on_firmware_update, OTF::HTTP_GET);
-	if (update_server) {
-		update_server->on("/update", HTTP_POST, on_firmware_upload_fin, on_firmware_upload);
-		update_server->on("/update", HTTP_OPTIONS, on_update_options);
-	}
+	if (update_server) register_update_routes();
 	otf->onMissingPage(on_ap_home);
 	if (update_server) update_server->begin();
 

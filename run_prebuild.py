@@ -1,6 +1,7 @@
 # Run node compress_htmls.mjs as a prebuild step
 import subprocess
 import os
+import shutil
 
 # Import the PlatformIO environment
 Import("env")
@@ -44,3 +45,16 @@ except subprocess.CalledProcessError as e:
 except Exception as e:
     print(f"An unexpected error occurred: {e}")
     env.Exit(1)
+
+
+def create_esp32_release_artifact(source, target, env):
+    source_path = env.subst("$BUILD_DIR/${PROGNAME}.bin")
+    release_path = env.subst("$BUILD_DIR/${PROGNAME}.bin32")
+    shutil.copy2(source_path, release_path)
+    print(f"Created ESP32-C6 release artifact: {release_path}")
+
+
+# PlatformIO expects firmware.bin for its upload pipeline. Keep that internal
+# artifact and also emit the architecture-specific file used for releases.
+if env.get("PIOENV") == "os4_esp32c6":
+    env.AddPostAction("$BUILD_DIR/${PROGNAME}.bin", create_esp32_release_artifact)
