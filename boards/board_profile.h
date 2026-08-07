@@ -61,7 +61,7 @@ constexpr uint8_t CH224_ADDRESS = 0x22;
 constexpr uint8_t RTC_ADDRESS = 0x51;
 constexpr uint8_t REVISION1_DETECT_PIN = 16;
 constexpr uint8_t ETHERNET_CS_PIN = 16;
-constexpr uint32_t ETHERNET_SPI_CLOCK_HZ = 10000000UL;
+constexpr uint32_t ETHERNET_SPI_CLOCK_HZ = 20000000UL;
 
 constexpr uint8_t OS30_POWER_RX_PIN = IO_EXPANDER_PIN_BASE + 0;
 constexpr uint8_t OS30_POWER_TX_PIN = IO_EXPANDER_PIN_BASE + 2;
