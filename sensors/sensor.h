@@ -97,7 +97,8 @@ enum class SensorType : uint8_t {
 	X(Volume,      "Volume")      \
 	X(Salinity,    "Salinity")    \
 	X(Angle,       "Angle")       \
-	X(Precipitation, "Precipitation")
+	X(Precipitation, "Precipitation") \
+	X(SolarRadiation, "Solar Radiation")
 
 // X(id, display_name, short_symbol, group_id)
 #define SENSOR_UNIT_LIST(X) \
@@ -153,7 +154,10 @@ enum class SensorType : uint8_t {
 	X(Radian,            "Radian",             "rad",   Angle)       \
 	X(MillimetersPerHour, "Millimeters Per Hour", "mm/h", Precipitation) \
 	X(InchesPerHour,     "Inches Per Hour",    "in/h",  Precipitation) \
-	X(Kilobyte,          "Kilobyte",           "KB",    None)
+	X(Kilobyte,          "Kilobyte",           "KB",    None)        \
+	X(MillimetersPerDay, "Millimeters Per Day", "mm/day", Precipitation) \
+	X(InchesPerDay,      "Inches Per Day",      "in/day", Precipitation) \
+	X(KilowattHoursPerSquareMeterPerDay, "Kilowatt Hours Per Square Meter Per Day", "kWh/m2/day", SolarRadiation)
 
 enum class SensorUnitGroup : uint8_t {
 #define X(id, name) id,
@@ -234,9 +238,30 @@ enum class AggregateAction : uint8_t {
 
 typedef Sensor* (*SensorGetter)(uint8_t);
 
+// X(id, display_name)
+#define WEATHER_ACTION_LIST(X) \
+	X(CurrentTemperature,       "Current Temperature")       \
+	X(CurrentHumidity,          "Current Humidity")          \
+	X(CurrentWindSpeed,         "Current Wind Speed")        \
+	X(CurrentRaining,           "Currently Raining")         \
+	X(ForecastLowTemperature,   "Today's Low Temperature")   \
+	X(ForecastHighTemperature,  "Today's High Temperature")  \
+	X(ForecastPrecipitation,    "Today's Precipitation")      \
+	X(HistoricalTemperature,    "Previous Day Temperature")  \
+	X(HistoricalHumidity,       "Previous Day Humidity")     \
+	X(HistoricalPrecipitation,  "Previous Day Precipitation") \
+	X(HistoricalWindSpeed,      "Previous Day Wind Speed")   \
+	X(HistoricalSolarRadiation, "Previous Day Solar Radiation") \
+	X(HistoricalETo,            "Previous Day ETo")
+
 enum class WeatherAction : uint8_t {
+#define X(id, name) id,
+	WEATHER_ACTION_LIST(X)
+#undef X
 	MAX_VALUE,
 };
+static_assert(static_cast<uint8_t>(WeatherAction::MAX_VALUE) <= 16,
+	"weather sensor valid mask must be widened");
 
 typedef float (*WeatherGetter)(WeatherAction);
 
@@ -291,8 +316,8 @@ float sensor_piecewise_interp(float x, const sensor_adjustment_point_t *points, 
 
 // Convert a value between units within the same SensorUnitGroup.
 // Returns the value unchanged if from == to or the units are in different groups.
-// v1 supports the Temperature group (Celsius / Fahrenheit / Kelvin); other
-// groups are added on demand.
+// Supported conversions include Temperature, Length, Velocity, and
+// Precipitation rate groups.
 float convert_unit(float value, SensorUnit from, SensorUnit to);
 
 const char *enum_string(SensorUnitGroup group);

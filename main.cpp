@@ -1171,6 +1171,7 @@ void check_weather() {
 	if (os.status.program_busy) return;
 
 	if (!os.network_connected()) return;
+	CheckWeatherSensors();
 
 	time_os_t ntz = os.now_tz();
 	if (os.checkwt_success_lasttime && (ntz > os.checkwt_success_lasttime + CHECK_WEATHER_SUCCESS_TIMEOUT)) {

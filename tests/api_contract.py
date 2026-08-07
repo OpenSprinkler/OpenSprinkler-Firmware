@@ -144,7 +144,7 @@ def check_sensors(data):
 def check_sensor_definitions(data):
     require_keys("/jsd", data, ["sensors", "units", "enums", "as", "flags"])
     assert all(isinstance(item, list) and len(item) == 4 for item in data["units"])
-    assert len(data["units"]) >= 53
+    assert len(data["units"]) >= 56
     require_keys(
         "/jsd.enums",
         data["enums"],
@@ -160,6 +160,9 @@ def check_sensor_definitions(data):
         "Onboard Digital",
     }
     assert expected_names <= sensor_names
+    weather = next(item for item in data["sensors"] if item.get("n") == "Weather Sensor")
+    assert not weather.get("dis")
+    assert len(data["enums"]["WeatherAction"]) == 13
     assert {item.get("a") for item in data["as"]} == {
         "name", "interval", "unit", "min", "max", "type"
     }

@@ -31,6 +31,7 @@
 	#endif
 #endif
 #include "core/program.h"
+#include "services/weather.h"
 #include "external/ArduinoJson.hpp"
 
 #if defined(ESP32)
@@ -2478,7 +2479,7 @@ void OpenSprinkler::poll_sensors() {
 }
 
 float OpenSprinkler::get_sensor_weather_data(WeatherAction action) {
-	return NAN; // TODO make function for WeatherSensor
+	return weather_sensor_get_value(action);
 }
 
 /** LCD and button functions */

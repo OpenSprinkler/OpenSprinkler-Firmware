@@ -22,3 +22,7 @@ class WeatherSensor : public Sensor {
 
 	WeatherGetter weather_getter;
 };
+
+SensorUnit weather_action_native_unit(WeatherAction action);
+bool weather_action_unit_is_valid(WeatherAction action, SensorUnit unit);
+void weather_action_defaults(WeatherAction action, uint32_t *interval, float *min, float *max, SensorUnit *unit);

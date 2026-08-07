@@ -23,6 +23,11 @@
 
 #pragma once
 
+#include <stdint.h>
+#include "types.h"
+
+enum class WeatherAction : uint8_t;
+
 #define WEATHER_UPDATE_SUNRISE  0x01
 #define WEATHER_UPDATE_SUNSET   0x02
 #define WEATHER_UPDATE_EIP      0x04
@@ -32,7 +37,23 @@
 
 #define MAX_N_MD_SCALES 14 // maximum number of days that can be stored in md_scales array
 
+#define WEATHER_SENSOR_REFRESH_MS  (21600UL * 1000UL)
+#define WEATHER_SENSOR_RETRY_MS    (15UL * 60UL * 1000UL)
+#define WEATHER_SENSOR_STALE_MS    (12UL * 60UL * 60UL * 1000UL)
+
+enum WeatherSensorGroup : uint8_t {
+	WEATHER_SENSOR_GROUP_CURRENT = 1 << 0,
+	WEATHER_SENSOR_GROUP_FORECAST = 1 << 1,
+	WEATHER_SENSOR_GROUP_HISTORICAL = 1 << 2,
+};
+
 void GetWeather();
+void CheckWeatherSensors();
+float weather_sensor_get_value(WeatherAction action);
+void weather_sensor_reset_cache();
+void weather_sensor_schedule_refresh();
+bool weather_sensor_parse_response(const char *json, uint8_t requested_groups,
+	uint16_t requested_actions = 0);
 
 extern char wt_rawData[];
 extern int wt_errCode;

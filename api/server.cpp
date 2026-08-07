@@ -1205,6 +1205,7 @@ void server_change_options(OTF_PARAMS_DEF)
 		wt_rawData[0] = 0;
 		wt_errCode = HTTP_RQT_NOT_RECEIVED;
 		os.checkwt_lasttime = 0;  // force weather update
+		weather_sensor_reset_cache();
 	}
 
 	if(sensor_change) {
@@ -1627,6 +1628,10 @@ void server_change_sensor(OTF_PARAMS_DEF) {
 	uint32_t interval = SENSOR_DEFAULT_INTERVAL;
 	SensorUnit unit = SENSOR_DEFAULT_UNIT;
 	uint8_t flag = SENSOR_DEFAULT_FLAG;
+	bool min_set = false;
+	bool max_set = false;
+	bool interval_set = false;
+	bool unit_set = false;
 
 	char name[SENSOR_NAME_LEN];
 	strncpy(name, SENSOR_DEFAULT_NAME, SENSOR_NAME_LEN);
@@ -1653,16 +1658,19 @@ void server_change_sensor(OTF_PARAMS_DEF) {
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("min"), true)) {
 		min=strtod(tmp_buffer, &end);
 		if (*end != '\0') handle_return(HTML_DATA_FORMATERROR);
-}
+		min_set = true;
+	}
 
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("max"), true)) {
 		max=strtod(tmp_buffer, &end);
 		if (*end != '\0') handle_return(HTML_DATA_FORMATERROR);
+		max_set = true;
 	}
 
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("interval"), true)) {
 		interval=strtoul(tmp_buffer, &end, 10);
 		if (*end != '\0') handle_return(HTML_DATA_FORMATERROR);
+		interval_set = true;
 	}
 
 	if (interval < 1) handle_return(HTML_DATA_OUTOFBOUND);
@@ -1672,6 +1680,7 @@ void server_change_sensor(OTF_PARAMS_DEF) {
 		if (*end != '\0') handle_return(HTML_DATA_FORMATERROR);
 		if (unit_raw >= (uint32_t)SensorUnit::MAX_VALUE) handle_return(HTML_DATA_OUTOFBOUND);
 		unit = static_cast<SensorUnit>(unit_raw);
+		unit_set = true;
 	}
 
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("flag"), true)) {
@@ -1834,7 +1843,7 @@ void server_change_sensor(OTF_PARAMS_DEF) {
 			break;
 		}
 		case SensorType::Weather: {
-			WeatherAction action = WeatherAction::MAX_VALUE;
+			WeatherAction action = WeatherAction::CurrentTemperature;
 
 			if (sensor_type == original_sensor_type) {
 				if ((sensor = Sensor::get(sid))) {
@@ -1849,6 +1858,18 @@ void server_change_sensor(OTF_PARAMS_DEF) {
 				if (action_raw >= (uint32_t)WeatherAction::MAX_VALUE) handle_return(HTML_DATA_OUTOFBOUND);
 				action = static_cast<WeatherAction>(action_raw);
 			}
+
+			if (original_sensor_type != SensorType::Weather) {
+				uint32_t default_interval;
+				float default_min, default_max;
+				SensorUnit default_unit;
+				weather_action_defaults(action, &default_interval, &default_min, &default_max, &default_unit);
+				if (!interval_set) interval = default_interval;
+				if (!min_set) min = default_min;
+				if (!max_set) max = default_max;
+				if (!unit_set) unit = default_unit;
+			}
+			if (!weather_action_unit_is_valid(action, unit)) handle_return(HTML_DATA_OUTOFBOUND);
 
 			result_sensor = new WeatherSensor(interval, min, max, (const char*)&name, unit, flag, os.get_sensor_weather_data, action);
 
@@ -1939,6 +1960,7 @@ void server_change_sensor(OTF_PARAMS_DEF) {
 	}
 
 	delete result_sensor;
+	weather_sensor_schedule_refresh();
 
 	handle_return(HTML_SUCCESS);
 }
@@ -1993,6 +2015,7 @@ void server_delete_sensor(OTF_PARAMS_DEF) {
 	} else {
 		if (!Sensor::del((uint8_t)idx)) handle_return(HTML_INTERNAL_ERROR);
 	}
+	weather_sensor_schedule_refresh();
 
 	handle_return(HTML_SUCCESS);
 }
@@ -2578,11 +2601,7 @@ void server_json_sensor_description_main(OTF_PARAMS_DEF) {
 				ADS1115Sensor::emit_description_json(&bfill);
 				break;
 			case SensorType::Weather:
-				// Disabled this release — server-side weather-data path
-				// needs design work before usable end-to-end. Existing
-				// WeatherSensor records continue to deserialize and run;
-				// new creation is blocked via the "dis" flag.
-				bfill.emit_p(PSTR("{\"n\":\"Weather Sensor\",\"dis\":1}"));
+				WeatherSensor::emit_description_json(&bfill);
 				break;
 			case SensorType::SystemInternal:
 				SystemInternalSensor::emit_description_json(&bfill);

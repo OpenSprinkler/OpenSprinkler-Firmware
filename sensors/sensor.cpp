@@ -26,7 +26,10 @@ const char *enum_string(AggregateAction action) {
 
 const char *enum_string(WeatherAction action) {
 	switch (action) {
-		case WeatherAction::MAX_VALUE: return nullptr;
+	#define X(id, name) case WeatherAction::id: return PSTR(name);
+	WEATHER_ACTION_LIST(X)
+	#undef X
+	case WeatherAction::MAX_VALUE: return nullptr;
 	}
 	return nullptr;
 }
@@ -167,7 +170,61 @@ float convert_unit(float value, SensorUnit from, SensorUnit to) {
 			default:                     return value;
 		}
 	}
-	// Other groups (Pressure, Length, Volume, ...) added when their sensors land.
+	if (g == SensorUnitGroup::Length) {
+		float meters;
+		switch (from) {
+			case SensorUnit::Millimeter: meters = value / 1000.0f; break;
+			case SensorUnit::Centimeter: meters = value / 100.0f; break;
+			case SensorUnit::Meter:      meters = value; break;
+			case SensorUnit::Kilometer:  meters = value * 1000.0f; break;
+			case SensorUnit::Inch:       meters = value * 0.0254f; break;
+			case SensorUnit::Foot:       meters = value * 0.3048f; break;
+			case SensorUnit::Mile:       meters = value * 1609.344f; break;
+			default: return value;
+		}
+		switch (to) {
+			case SensorUnit::Millimeter: return meters * 1000.0f;
+			case SensorUnit::Centimeter: return meters * 100.0f;
+			case SensorUnit::Meter:      return meters;
+			case SensorUnit::Kilometer:  return meters / 1000.0f;
+			case SensorUnit::Inch:       return meters / 0.0254f;
+			case SensorUnit::Foot:       return meters / 0.3048f;
+			case SensorUnit::Mile:       return meters / 1609.344f;
+			default: return value;
+		}
+	}
+	if (g == SensorUnitGroup::Velocity) {
+		float meters_per_second;
+		switch (from) {
+			case SensorUnit::MetersPerSecond:   meters_per_second = value; break;
+			case SensorUnit::KilometersPerHour: meters_per_second = value / 3.6f; break;
+			case SensorUnit::MilesPerHour:      meters_per_second = value * 0.44704f; break;
+			default: return value;
+		}
+		switch (to) {
+			case SensorUnit::MetersPerSecond:   return meters_per_second;
+			case SensorUnit::KilometersPerHour: return meters_per_second * 3.6f;
+			case SensorUnit::MilesPerHour:      return meters_per_second / 0.44704f;
+			default: return value;
+		}
+	}
+	if (g == SensorUnitGroup::Precipitation) {
+		float millimeters_per_hour;
+		switch (from) {
+			case SensorUnit::MillimetersPerHour: millimeters_per_hour = value; break;
+			case SensorUnit::InchesPerHour:      millimeters_per_hour = value * 25.4f; break;
+			case SensorUnit::MillimetersPerDay:  millimeters_per_hour = value / 24.0f; break;
+			case SensorUnit::InchesPerDay:       millimeters_per_hour = value * 25.4f / 24.0f; break;
+			default: return value;
+		}
+		switch (to) {
+			case SensorUnit::MillimetersPerHour: return millimeters_per_hour;
+			case SensorUnit::InchesPerHour:      return millimeters_per_hour / 25.4f;
+			case SensorUnit::MillimetersPerDay:  return millimeters_per_hour * 24.0f;
+			case SensorUnit::InchesPerDay:       return millimeters_per_hour * 24.0f / 25.4f;
+			default: return value;
+		}
+	}
 	return value;
 }
 
