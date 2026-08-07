@@ -64,6 +64,14 @@ static uint16_t led_blink_ms = LED_FAST_BLINK;
 static uint16_t led_blink_ms = 0;
 #endif
 
+static inline bool firmware_update_display_active() {
+#if defined(ARDUINO)
+	return firmware_update.display_active();
+#else
+	return false;
+#endif
+}
+
 #define STRINGIFY(x) #x
 #define TOSTRING(x) STRINGIFY(x)
 
@@ -720,7 +728,7 @@ void do_loop()
 	}
 
 	firmware_update.loop();
-	if (!firmware_update.display_active())
+	if (!firmware_update_display_active())
 		ui_state_machine();
 
 #else // Process Ethernet packets for RPI/LINUX
@@ -753,7 +761,7 @@ void do_loop()
 		if (os.button_timeout) os.button_timeout--;
 
 #if defined(USE_DISPLAY)
-		if (!ui_state && !firmware_update.display_active())
+		if (!ui_state && !firmware_update_display_active())
 			os.lcd_print_time(curr_time);  // print time
 #endif
 
@@ -1071,7 +1079,7 @@ void do_loop()
 
 #if defined(USE_DISPLAY)
 		// process LCD display
-		if (!ui_state && !firmware_update.display_active()) {
+		if (!ui_state && !firmware_update_display_active()) {
 			os.lcd_print_screen(ui_anim_chars[(uint32_t)curr_time%3]);
 		}
 #endif
