@@ -2864,27 +2864,14 @@ void on_firmware_update(OTF_PARAMS_DEF) {
 
 static bool firmware_upload_authorized = false;
 static bool firmware_upload_failed = false;
+static bool firmware_upload_auth_failed = false;
+static bool firmware_upload_legacy = false;
 
 void on_update_page() {
 	update_server->sendHeader("Content-Encoding", "gzip");
 	update_server->sendHeader("Cache-Control", "no-store");
 	update_server->send_P(200, PSTR("text/html"),
 		reinterpret_cast<PGM_P>(update_html_gz), update_html_gz_len);
-}
-
-void on_update_auth() {
-	String password = update_server->arg("pw");
-	char token[17];
-	if (!firmware_update.issue_token(password.c_str(), token)) {
-		update_server_send_result(HTML_UNAUTHORIZED);
-		return;
-	}
-	String json = F("{\"result\":1,\"token\":\"");
-	json += token;
-	json += F("\",\"expires_in\":300}");
-	update_server->sendHeader("Access-Control-Allow-Origin", "*");
-	update_server->sendHeader("Cache-Control", "no-store");
-	update_server->send(200, "application/json", json);
 }
 
 void on_update_info() {
@@ -2913,7 +2900,7 @@ void on_update_prepare() {
 		update_server_send_result(HTML_NOT_PERMITTED, "update busy");
 		return;
 	}
-	if (!firmware_update.consume_token(update_server->arg("token").c_str())) {
+	if (!firmware_update.authenticate(update_server->arg("pw").c_str())) {
 		update_server_send_result(HTML_UNAUTHORIZED);
 		return;
 	}
@@ -2957,9 +2944,23 @@ void on_update_status() {
 }
 
 static void finish_firmware_upload(bool verified) {
-	if (!firmware_upload_authorized) {
+	if (!verified && firmware_upload_legacy &&
+		!firmware_update.authenticate(update_server->arg("pw").c_str())) {
+		if (firmware_upload_authorized) firmware_update.abort_upload();
+		firmware_upload_authorized = false;
 		firmware_upload_failed = false;
+		firmware_upload_auth_failed = false;
+		firmware_upload_legacy = false;
 		update_server_send_result(HTML_UNAUTHORIZED);
+		return;
+	}
+	if (!firmware_upload_authorized) {
+		bool unauthorized = firmware_upload_auth_failed;
+		firmware_upload_failed = false;
+		firmware_upload_auth_failed = false;
+		firmware_upload_legacy = false;
+		update_server_send_result(unauthorized ? HTML_UNAUTHORIZED : HTML_UPLOAD_FAILED,
+			unauthorized ? nullptr : firmware_update.message());
 		return;
 	}
 	firmware_upload_authorized = false;
@@ -2967,10 +2968,14 @@ static void finish_firmware_upload(bool verified) {
 		(verified ? firmware_update.finish_verified() : firmware_update.finish_manual());
 	if (!finished) {
 		firmware_upload_failed = false;
+		firmware_upload_auth_failed = false;
+		firmware_upload_legacy = false;
 		update_server_send_result(HTML_UPLOAD_FAILED, firmware_update.message());
 		return;
 	}
 	firmware_upload_failed = false;
+	firmware_upload_auth_failed = false;
+	firmware_upload_legacy = false;
 	update_server_send_result(HTML_SUCCESS);
 }
 
@@ -2993,20 +2998,38 @@ void on_update_options() {
 static void receive_firmware_upload(bool verified) {
 	HTTPUpload& upload = update_server->upload();
 	if(upload.status == UPLOAD_FILE_START){
+		firmware_upload_authorized = false;
+		firmware_upload_failed = false;
+		firmware_upload_auth_failed = false;
+		firmware_upload_legacy = false;
 		if (verified) {
 			firmware_upload_authorized = firmware_update.begin_verified(upload.filename.c_str(),
 				update_server->arg("token").c_str());
+			firmware_upload_auth_failed = !firmware_upload_authorized;
 		} else {
-			uint32_t upload_size = (uint32_t)update_server->arg("size").toInt();
-			firmware_upload_authorized = firmware_update.consume_token(update_server->arg("token").c_str()) &&
-				firmware_update.begin_manual(upload.filename.c_str(), upload_size,
-					update_server->arg("sha256").c_str());
+			bool modern = update_server->hasArg("size") || update_server->hasArg("sha256");
+			if (modern) {
+				if (!firmware_update.authenticate(update_server->arg("pw").c_str())) {
+					firmware_upload_auth_failed = true;
+				} else {
+					uint32_t upload_size = (uint32_t)update_server->arg("size").toInt();
+					firmware_upload_authorized = firmware_update.begin_manual(
+						upload.filename.c_str(), upload_size,
+						update_server->arg("sha256").c_str());
+				}
+			} else {
+				// Legacy pages send the file before the multipart password field, so
+				// authentication must be deferred until the upload-finished callback.
+				firmware_upload_legacy = true;
+				firmware_upload_authorized =
+					firmware_update.begin_legacy_manual(upload.filename.c_str());
+			}
 		}
-		firmware_upload_failed = !firmware_upload_authorized;
+		firmware_upload_failed = !firmware_upload_authorized && !firmware_upload_auth_failed;
 		DEBUG_PRINT(F("upload: "));
 		DEBUG_PRINTLN(upload.filename);
 	} else if(upload.status == UPLOAD_FILE_WRITE) {
-		if (!firmware_upload_failed) {
+		if (firmware_upload_authorized && !firmware_upload_failed) {
 			bool written = verified ? firmware_update.write_verified(upload.buf, upload.currentSize) :
 				firmware_update.write_manual(upload.buf, upload.currentSize);
 			if (!written) firmware_upload_failed = true;
@@ -3036,8 +3059,6 @@ static void register_update_routes() {
 	update_server->on("/update", HTTP_GET, on_update_page);
 	update_server->on("/update", HTTP_POST, on_firmware_upload_fin, on_firmware_upload);
 	update_server->on("/update", HTTP_OPTIONS, on_update_options);
-	update_server->on("/update/auth", HTTP_POST, on_update_auth);
-	update_server->on("/update/auth", HTTP_OPTIONS, on_update_options);
 	update_server->on("/update/info", HTTP_GET, on_update_info);
 	update_server->on("/update/info", HTTP_OPTIONS, on_update_options);
 	update_server->on("/update/prepare", HTTP_POST, on_update_prepare);

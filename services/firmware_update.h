@@ -21,8 +21,7 @@ public:
 	const char *file_extension() const;
 	const char *base_url() const;
 
-	bool issue_token(const char *password, char token_out[17]);
-	bool consume_token(const char *token);
+	bool authenticate(const char *password) const;
 
 	bool prepare_verified(const uint8_t *descriptor, size_t descriptor_length,
 		const char *signature_hex, const char *release_id, bool allow_downgrade,
@@ -32,6 +31,7 @@ public:
 	bool finish_verified();
 
 	bool begin_manual(const char *filename, uint32_t size, const char *sha256_hex);
+	bool begin_legacy_manual(const char *filename);
 	bool write_manual(const uint8_t *data, size_t length);
 	bool finish_manual();
 	void abort_upload();
@@ -49,7 +49,8 @@ public:
 private:
 	bool begin_image(const uint8_t header[16], uint32_t size);
 	bool valid_image_header(const uint8_t header[16]) const;
-	bool begin_upload(const char *filename, bool verified, uint32_t size = 0);
+	bool begin_upload(const char *filename, bool verified, uint32_t size = 0,
+		bool legacy_manual = false);
 	bool write_upload(const uint8_t *data, size_t length, bool verified);
 	bool finish_upload(bool verified);
 	void fail(const char *message);
@@ -59,9 +60,7 @@ private:
 
 	FirmwareUpdatePhase _phase = FirmwareUpdatePhase::Idle;
 	char _message[96] = "Ready";
-	char _token[17] = {};
 	char _upload_token[17] = {};
-	uint32_t _token_expires = 0;
 	uint32_t _upload_token_expires = 0;
 	uint32_t _bytes_done = 0;
 	uint32_t _bytes_total = 0;
@@ -75,6 +74,7 @@ private:
 	bool _tail_pending = false;
 	bool _update_started = false;
 	bool _manual = false;
+	bool _legacy_manual = false;
 };
 
 extern FirmwareUpdateService firmware_update;

@@ -175,20 +175,9 @@ void FirmwareUpdateService::make_token(char token_out[17]) {
 	snprintf(token_out, 17, "%08lx%08lx", (unsigned long)a, (unsigned long)b);
 }
 
-bool FirmwareUpdateService::issue_token(const char *password, char token_out[17]) {
-	if (!os.iopts[IOPT_IGNORE_PASSWORD] && (!password || !os.password_verify(password))) return false;
-	make_token(_token);
-	strcpy(token_out, _token);
-	_token_expires = millis() + FIRMWARE_UPDATE_TOKEN_TTL;
-	return true;
-}
-
-bool FirmwareUpdateService::consume_token(const char *token) {
-	bool valid = token && _token[0] && strcmp(token, _token) == 0 &&
-		(int32_t)((uint32_t)millis() - _token_expires) < 0;
-	_token[0] = 0;
-	_token_expires = 0;
-	return valid;
+bool FirmwareUpdateService::authenticate(const char *password) const {
+	return os.iopts[IOPT_IGNORE_PASSWORD] ||
+		(password && os.password_verify(password));
 }
 
 bool FirmwareUpdateService::prepare_verified(const uint8_t *descriptor, size_t descriptor_length,
@@ -290,7 +279,8 @@ bool FirmwareUpdateService::begin_image(const uint8_t header[16], uint32_t size)
 	return true;
 }
 
-bool FirmwareUpdateService::begin_upload(const char *filename, bool verified, uint32_t size) {
+bool FirmwareUpdateService::begin_upload(const char *filename, bool verified, uint32_t size,
+	bool legacy_manual) {
 	const char *dot = filename ? strrchr(filename, '.') : nullptr;
 	if (!dot || strcmp(dot, file_extension()) != 0) {
 		fail("Firmware filename has the wrong extension");
@@ -301,6 +291,7 @@ bool FirmwareUpdateService::begin_upload(const char *filename, bool verified, ui
 	_tail_pending = false;
 	_update_started = false;
 	_manual = !verified;
+	_legacy_manual = legacy_manual;
 	_reboot_at = 0;
 	_display_until = 0;
 	if (!verified) _bytes_total = size;
@@ -332,6 +323,12 @@ bool FirmwareUpdateService::begin_manual(const char *filename, uint32_t size, co
 		return false;
 	}
 	return begin_upload(filename, false, size);
+}
+
+bool FirmwareUpdateService::begin_legacy_manual(const char *filename) {
+	if (busy()) return false;
+	reset_transfer();
+	return begin_upload(filename, false, 0, true);
 }
 
 bool FirmwareUpdateService::write_upload(const uint8_t *data, size_t length, bool verified) {
@@ -368,7 +365,15 @@ bool FirmwareUpdateService::write_upload(const uint8_t *data, size_t length, boo
 	}
 
 	size_t write_length = length - offset;
-	if (_bytes_done + length == _bytes_total && write_length) {
+	if (_legacy_manual && write_length) {
+		if (_tail_pending && Update.write(&_tail_byte, 1) != 1) {
+			fail("Unable to write firmware upload");
+			return false;
+		}
+		_tail_byte = data[offset + write_length - 1];
+		_tail_pending = true;
+		write_length--;
+	} else if (_bytes_done + length == _bytes_total && write_length) {
 		_tail_byte = data[offset + write_length - 1];
 		_tail_pending = true;
 		write_length--;
@@ -399,23 +404,26 @@ bool FirmwareUpdateService::finish_upload(bool verified) {
 	_phase = FirmwareUpdatePhase::Verifying;
 	strcpy(_message, verified ? "Verifying firmware" : "Finalizing firmware upload");
 	update_display();
-	if (_bytes_done != _bytes_total || !_tail_pending) {
+	if ((!_legacy_manual && _bytes_done != _bytes_total) || !_tail_pending ||
+		(_legacy_manual && _bytes_done < 1024)) {
 		fail(verified ? "Firmware upload size does not match signed release" :
 			"Firmware upload size does not match declared size");
 		return false;
 	}
 	uint8_t actual_sha256[32];
 	sha256_finish(actual_sha256);
-	if (memcmp(actual_sha256, _expected_sha256, sizeof(actual_sha256)) != 0) {
+	if (!_legacy_manual &&
+		memcmp(actual_sha256, _expected_sha256, sizeof(actual_sha256)) != 0) {
 		fail("Firmware checksum verification failed");
 		return false;
 	}
-	if (Update.write(&_tail_byte, 1) != 1 || !Update.end(false) || Update.hasError()) {
+	if (Update.write(&_tail_byte, 1) != 1 || !Update.end(_legacy_manual) || Update.hasError()) {
 		fail("Firmware installation failed");
 		return false;
 	}
 	_update_started = false;
 	_manual = false;
+	_legacy_manual = false;
 	_phase = FirmwareUpdatePhase::Success;
 	strcpy(_message, "Update complete; rebooting");
 	_reboot_at = millis() + 1500UL;
@@ -438,10 +446,6 @@ void FirmwareUpdateService::abort_upload() {
 
 void FirmwareUpdateService::loop() {
 	uint32_t now = millis();
-	if (_token[0] && (int32_t)(now - _token_expires) >= 0) {
-		_token[0] = 0;
-		_token_expires = 0;
-	}
 	if (_phase == FirmwareUpdatePhase::Prepared && _upload_token[0] &&
 		(int32_t)(now - _upload_token_expires) >= 0) {
 		fail("Prepared firmware upload expired");
@@ -460,6 +464,7 @@ void FirmwareUpdateService::reset_transfer() {
 	_tail_pending = false;
 	_update_started = false;
 	_manual = false;
+	_legacy_manual = false;
 	_reboot_at = 0;
 	_display_until = 0;
 }
@@ -477,6 +482,7 @@ void FirmwareUpdateService::fail(const char *message) {
 	}
 	_update_started = false;
 	_manual = false;
+	_legacy_manual = false;
 	_phase = FirmwareUpdatePhase::Error;
 	strncpy(_message, message, sizeof(_message) - 1);
 	_message[sizeof(_message) - 1] = 0;

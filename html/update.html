@@ -493,14 +493,10 @@
 		throw failure;
 	}
 
-    async function request_token() {
+    function password_hash() {
 		const password = id('pw').value;
 		if (!password && !confirm('You did not input a device password. Continue?')) throw new Error('Cancelled');
-		const body = new URLSearchParams({pw: password ? md5(password) : ''});
-		const response = await fetch_with_timeout(apiBase + '/auth', {method: 'POST', body});
-        const data = await response.json();
-        if (data.result !== 1 || !data.token) throw new Error('Authentication failed. Check the device password.');
-        return data.token;
+		return password ? md5(password) : '';
     }
 
     async function load_releases() {
@@ -694,9 +690,9 @@
         });
     }
 
-    async function prepare_update(release, allowDowngrade, token) {
+    async function prepare_update(release, allowDowngrade, password) {
 		const query = new URLSearchParams({
-			token: token,
+			pw: password,
 			id: release.id,
 			sig: release.descriptorSignature,
 			allow_downgrade: allowDowngrade ? '1' : '0'
@@ -707,19 +703,24 @@
 			body: release.descriptorBytes
 		}, 20000);
         const result = await response.json();
+		if (result.result === 2)
+			throw new Error('Authentication failed. Check the device password.');
         if (result.result !== 1 || !result.upload_token)
 			throw new Error(result.item || 'The controller rejected the signed release.');
         return result.upload_token;
     }
 
-	function upload_firmware(file, filename, token, verified, sha256) {
+	function upload_firmware(file, filename, credential, verified, sha256) {
         return new Promise(function(resolve, reject) {
             const data = new FormData();
             data.append('file', file, filename);
             const xhr = new XMLHttpRequest();
             const endpoint = verified ? '/upload' : '';
-			const query = new URLSearchParams({token: token});
-			if (!verified) {
+			const query = new URLSearchParams();
+			if (verified) {
+				query.set('token', credential);
+			} else {
+				query.set('pw', credential);
 				query.set('size', file.size);
 				query.set('sha256', sha256);
 			}
@@ -730,6 +731,8 @@
                 if (xhr.status !== 200) return reject(new Error('Could not connect to the update server.'));
                 try {
                     const result = JSON.parse(xhr.responseText);
+					if (result.result === 2)
+						return reject(new Error('Authentication failed. Check the device password.'));
                     if (result.result !== 1) return reject(new Error(result.item || 'Firmware upload failed.'));
                     resolve();
                 } catch (error) { reject(new Error('The device returned an invalid response.')); }
@@ -776,8 +779,8 @@
         set_busy(true);
         try {
             const firmware = await download_firmware(release);
-            const token = await request_token();
-            const uploadToken = await prepare_update(release, allowDowngrade, token);
+			const password = password_hash();
+			const uploadToken = await prepare_update(release, allowDowngrade, password);
             const filename = release.artifact.file.split('/').pop();
             await upload_firmware(firmware, filename, uploadToken, true);
             show_msg('Update successful. The controller is rebooting.', 'green');
@@ -802,8 +805,8 @@
 			if (expected && !file.name.endsWith(expected)) throw new Error('Select a ' + expected + ' firmware file for this controller.');
 			show_msg('Calculating firmware checksum...', 'gray');
 			const sha256 = await sha256_file(file);
-			const token = await request_token();
-			await upload_firmware(file, file.name, token, false, sha256);
+			const password = password_hash();
+			await upload_firmware(file, file.name, password, false, sha256);
             show_msg('Update successful. The controller is rebooting.', 'green');
             id('pw').value = '';
 			clear_firmware_file();
