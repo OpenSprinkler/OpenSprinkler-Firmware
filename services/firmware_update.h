@@ -31,7 +31,7 @@ public:
 	bool write_verified(const uint8_t *data, size_t length);
 	bool finish_verified();
 
-	bool begin_manual(const char *filename);
+	bool begin_manual(const char *filename, uint32_t size, const char *sha256_hex);
 	bool write_manual(const uint8_t *data, size_t length);
 	bool finish_manual();
 	void abort_upload();
@@ -44,11 +44,12 @@ public:
 	uint32_t bytes_total() const { return _bytes_total; }
 	uint8_t percent() const;
 	bool busy() const;
+	bool display_active() const;
 
 private:
 	bool begin_image(const uint8_t header[16], uint32_t size);
 	bool valid_image_header(const uint8_t header[16]) const;
-	bool begin_upload(const char *filename, bool verified);
+	bool begin_upload(const char *filename, bool verified, uint32_t size = 0);
 	bool write_upload(const uint8_t *data, size_t length, bool verified);
 	bool finish_upload(bool verified);
 	void fail(const char *message);
@@ -66,6 +67,7 @@ private:
 	uint32_t _bytes_total = 0;
 	uint32_t _last_progress = 0;
 	uint32_t _reboot_at = 0;
+	uint32_t _display_until = 0;
 	uint8_t _expected_sha256[32] = {};
 	uint8_t _image_header[16] = {};
 	uint8_t _image_header_len = 0;

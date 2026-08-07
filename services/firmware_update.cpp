@@ -9,6 +9,7 @@
 
 #if defined(ESP8266)
 	#include <Updater.h>
+	#include <StackThunk.h>
 	#include <bearssl/bearssl.h>
 #else
 	#include <Update.h>
@@ -24,6 +25,7 @@
 
 #define FIRMWARE_UPDATE_CATALOG_LIMIT 1900
 #define FIRMWARE_UPDATE_TOKEN_TTL 300000UL
+#define FIRMWARE_UPDATE_DISPLAY_HOLD 5000UL
 
 extern OpenSprinkler os;
 
@@ -78,12 +80,26 @@ static void sha256_buffer(const uint8_t *data, size_t length, uint8_t digest[32]
 	sha256_finish(digest);
 }
 
-static bool verify_catalog_signature(const uint8_t digest[32], const uint8_t *signature, size_t length) {
 #if defined(ESP8266)
+extern "C" uint32_t firmware_update_verify_signature(const uint8_t *digest,
+	const uint8_t *signature, size_t length) {
 	br_ec_public_key key = {BR_EC_secp256r1,
 		const_cast<unsigned char *>(FW_UPDATE_PUBLIC_KEY), sizeof(FW_UPDATE_PUBLIC_KEY)};
 	br_ecdsa_vrfy verify = br_ecdsa_vrfy_asn1_get_default();
 	return verify && verify(br_ec_get_default(), digest, 32, &key, signature, length) == 1;
+}
+
+make_stack_thunk(firmware_update_verify_signature);
+extern "C" uint32_t thunk_firmware_update_verify_signature(const uint8_t *digest,
+	const uint8_t *signature, size_t length);
+#endif
+
+static bool verify_catalog_signature(const uint8_t digest[32], const uint8_t *signature, size_t length) {
+#if defined(ESP8266)
+	stack_thunk_add_ref();
+	bool valid = thunk_firmware_update_verify_signature(digest, signature, length) == 1;
+	stack_thunk_del_ref();
+	return valid;
 #else
 	mbedtls_ecdsa_context key;
 	mbedtls_ecdsa_init(&key);
@@ -280,6 +296,7 @@ bool FirmwareUpdateService::prepare_verified(const uint8_t *manifest, size_t man
 	_upload_token_expires = millis() + FIRMWARE_UPDATE_TOKEN_TTL;
 	_phase = FirmwareUpdatePhase::Prepared;
 	strcpy(_message, "Ready to receive verified firmware");
+	_display_until = millis() + FIRMWARE_UPDATE_DISPLAY_HOLD;
 	update_display();
 	return true;
 }
@@ -310,7 +327,7 @@ bool FirmwareUpdateService::begin_image(const uint8_t header[16], uint32_t size)
 	return true;
 }
 
-bool FirmwareUpdateService::begin_upload(const char *filename, bool verified) {
+bool FirmwareUpdateService::begin_upload(const char *filename, bool verified, uint32_t size) {
 	const char *dot = filename ? strrchr(filename, '.') : nullptr;
 	if (!dot || strcmp(dot, file_extension()) != 0) {
 		fail("Firmware filename has the wrong extension");
@@ -322,8 +339,9 @@ bool FirmwareUpdateService::begin_upload(const char *filename, bool verified) {
 	_update_started = false;
 	_manual = !verified;
 	_reboot_at = 0;
-	if (verified) sha256_begin();
-	else _bytes_total = 0;
+	_display_until = 0;
+	if (!verified) _bytes_total = size;
+	sha256_begin();
 	_phase = FirmwareUpdatePhase::Uploading;
 	strcpy(_message, verified ? "Uploading verified firmware" : "Receiving firmware upload");
 	update_display();
@@ -343,19 +361,23 @@ bool FirmwareUpdateService::begin_verified(const char *filename, const char *upl
 	return begin_upload(filename, true);
 }
 
-bool FirmwareUpdateService::begin_manual(const char *filename) {
+bool FirmwareUpdateService::begin_manual(const char *filename, uint32_t size, const char *sha256_hex) {
 	if (busy()) return false;
 	reset_transfer();
-	return begin_upload(filename, false);
+	if (!size || !parse_sha256(sha256_hex, _expected_sha256)) {
+		fail("Firmware upload size or checksum is invalid");
+		return false;
+	}
+	return begin_upload(filename, false, size);
 }
 
 bool FirmwareUpdateService::write_upload(const uint8_t *data, size_t length, bool verified) {
 	if (_phase != FirmwareUpdatePhase::Uploading || _manual == verified || !data || !length) return false;
-	if (verified && (_bytes_done > _bytes_total || length > _bytes_total - _bytes_done)) {
-		fail("Firmware upload exceeds signed size");
+	if (_bytes_total && (_bytes_done > _bytes_total || length > _bytes_total - _bytes_done)) {
+		fail(verified ? "Firmware upload exceeds signed size" : "Firmware upload exceeds declared size");
 		return false;
 	}
-	if (verified) sha256_add(data, length);
+	sha256_add(data, length);
 
 	size_t offset = 0;
 	if (_image_header_len < sizeof(_image_header)) {
@@ -366,7 +388,7 @@ bool FirmwareUpdateService::write_upload(const uint8_t *data, size_t length, boo
 		offset += copied;
 		if (_image_header_len == sizeof(_image_header)) {
 			uint32_t update_size = _bytes_total;
-			if (!verified) {
+			if (!update_size) {
 				uint32_t free_space = ESP.getFreeSketchSpace();
 				if (free_space <= 0x1000UL) {
 					fail("Not enough OTA space for this firmware");
@@ -383,7 +405,7 @@ bool FirmwareUpdateService::write_upload(const uint8_t *data, size_t length, boo
 	}
 
 	size_t write_length = length - offset;
-	if (verified && _bytes_done + length == _bytes_total && write_length) {
+	if (_bytes_done + length == _bytes_total && write_length) {
 		_tail_byte = data[offset + write_length - 1];
 		_tail_pending = true;
 		write_length--;
@@ -414,23 +436,19 @@ bool FirmwareUpdateService::finish_upload(bool verified) {
 	_phase = FirmwareUpdatePhase::Verifying;
 	strcpy(_message, verified ? "Verifying firmware" : "Finalizing firmware upload");
 	update_display();
-	if (verified) {
-		if (_bytes_done != _bytes_total || !_tail_pending) {
-			fail("Firmware upload size does not match catalog");
-			return false;
-		}
-		uint8_t actual_sha256[32];
-		sha256_finish(actual_sha256);
-		if (memcmp(actual_sha256, _expected_sha256, sizeof(actual_sha256)) != 0) {
-			fail("Firmware checksum verification failed");
-			return false;
-		}
-		if (Update.write(&_tail_byte, 1) != 1 || !Update.end(false) || Update.hasError()) {
-			fail("Firmware installation failed");
-			return false;
-		}
-	} else if (!Update.end(true) || Update.hasError()) {
-		fail("Firmware upload failed validation");
+	if (_bytes_done != _bytes_total || !_tail_pending) {
+		fail(verified ? "Firmware upload size does not match catalog" :
+			"Firmware upload size does not match declared size");
+		return false;
+	}
+	uint8_t actual_sha256[32];
+	sha256_finish(actual_sha256);
+	if (memcmp(actual_sha256, _expected_sha256, sizeof(actual_sha256)) != 0) {
+		fail("Firmware checksum verification failed");
+		return false;
+	}
+	if (Update.write(&_tail_byte, 1) != 1 || !Update.end(false) || Update.hasError()) {
+		fail("Firmware installation failed");
 		return false;
 	}
 	_update_started = false;
@@ -463,11 +481,7 @@ void FirmwareUpdateService::loop() {
 	}
 	if (_phase == FirmwareUpdatePhase::Prepared && _upload_token[0] &&
 		(int32_t)(now - _upload_token_expires) >= 0) {
-		_upload_token[0] = 0;
-		_upload_token_expires = 0;
-		_phase = FirmwareUpdatePhase::Error;
-		strcpy(_message, "Prepared firmware upload expired");
-		update_display();
+		fail("Prepared firmware upload expired");
 	}
 	if (_phase == FirmwareUpdatePhase::Success && _reboot_at &&
 		(int32_t)(now - _reboot_at) >= 0) os.reboot_dev(REBOOT_CAUSE_FWUPDATE);
@@ -484,6 +498,7 @@ void FirmwareUpdateService::reset_transfer() {
 	_update_started = false;
 	_manual = false;
 	_reboot_at = 0;
+	_display_until = 0;
 }
 
 void FirmwareUpdateService::fail(const char *message) {
@@ -502,6 +517,7 @@ void FirmwareUpdateService::fail(const char *message) {
 	_phase = FirmwareUpdatePhase::Error;
 	strncpy(_message, message, sizeof(_message) - 1);
 	_message[sizeof(_message) - 1] = 0;
+	_display_until = millis() + FIRMWARE_UPDATE_DISPLAY_HOLD;
 	update_display();
 }
 
@@ -526,6 +542,12 @@ bool FirmwareUpdateService::busy() const {
 	return _phase == FirmwareUpdatePhase::Uploading || _phase == FirmwareUpdatePhase::Verifying;
 }
 
+bool FirmwareUpdateService::display_active() const {
+	if (_phase == FirmwareUpdatePhase::Uploading || _phase == FirmwareUpdatePhase::Verifying ||
+		_phase == FirmwareUpdatePhase::Success) return true;
+	return _display_until && (int32_t)((uint32_t)millis() - _display_until) < 0;
+}
+
 void FirmwareUpdateService::update_display() {
 #if defined(USE_DISPLAY)
 	static uint32_t last_update = 0;
@@ -542,7 +564,7 @@ void FirmwareUpdateService::update_display() {
 	case FirmwareUpdatePhase::Error: display_message = "Update failed"; break;
 	default: break;
 	}
-	os.lcd_print_update(display_message, percent());
+	os.lcd_print_update(display_message, _bytes_total ? percent() : -1);
 #endif
 }
 

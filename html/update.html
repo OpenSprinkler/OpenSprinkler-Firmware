@@ -4,146 +4,109 @@
     <title>OpenSprinkler Firmware Update</title>
     <meta name='viewport' content='width=device-width, initial-scale=1'>
     <style>
-        :root{
-          --bg:#f6f7fb; --fg:#0f172a; --muted:#586380;
-          --card:#fff; --border:#e2e8f0;
-          --accent:#2563eb;
-          --warning-bg: #fffbe6; --warning-fg: #8b5d0b; --warning-border: #fde68a;
-        }
-        @media (prefers-color-scheme: dark){
-          :root{
-            --bg:#0b1220; --fg:#e6eaff; --muted:#a3acc7;
-            --card:#0f172a; --border:#1e293b;
-            --accent:#60a5fa;
-            --warning-bg: #2e240b; --warning-fg: #fde047; --warning-border: #713f12;
-          }
-        }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: var(--bg);
-            margin: 0;
-            padding: 20px;
-            color: var(--fg);
-        }
-        main {
-            max-width: 600px;
-            margin: 0 auto;
-            background-color: var(--card);
-            padding: 25px 30px;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-        }
-        h1 {
-            text-align: center;
-            color: var(--fg);
-            margin-top: 0;
-            margin-bottom: 25px;
-        }
-        .form-group {
-            margin-bottom: 18px;
-        }
-		section {
-			border-top: 1px solid var(--border);
-			padding-top: 20px;
-			margin-top: 20px;
-		}
-		section:first-of-type { border-top: 0; margin-top: 0; padding-top: 0; }
-		h2 { font-size: 20px; margin: 0 0 14px; }
-        label {
-            display: block;
-            font-weight: 600;
-            margin-bottom: 6px;
-        }
-        input[type="password"],
-		input[type="file"],
-		select {
-            width: 100%;
-            padding: 10px;
-            font-size: 16px;
-            border: 1px solid var(--border);
-            border-radius: 5px;
-            box-sizing: border-box;
-            background-color: transparent;
-            color: inherit;
-        }
-        input[type="file"]::file-selector-button {
-            font-weight: 600;
-            color: var(--accent);
-            background-color: transparent;
-            border: 1px solid var(--accent);
-            border-radius: 5px;
-            padding: 8px 12px;
-            cursor: pointer;
-            margin-right: 10px;
-        }
-        button {
-            width: 100%;
-            padding: 12px;
-            font-size: 16px;
-            font-weight: 600;
-            color: #fff;
-            background-color: var(--accent);
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-        }
-		button.secondary {
-			color: var(--accent);
-			background: transparent;
-			border: 1px solid var(--accent);
-			margin-top: 8px;
-		}
-		button:disabled { opacity: .55; cursor: default; }
-		progress { width: 100%; height: 12px; }
-		.help { color: var(--muted); font-size: 14px; margin-top: 5px; }
-        #msg {
-            text-align: left;
-            font-weight: 600;
-            margin: 20px 0;
-            min-height: 20px;
-        }
-        .warning-box {
-            background-color: var(--warning-bg);
-            color: var(--warning-fg);
-            border: 1px solid var(--warning-border);
-            padding: 15px;
-            margin-bottom: 20px;
-            border-radius: 5px;
-            font-size: 16px;
-        }
+    :root{
+      --bg:#f4f5f7; --fg:#111827; --muted:#6b7280;
+      --card:#ffffff; --border:#e5e7eb; --input-border:#d1d5db;
+      --accent:#2563eb; --accent-hover:#1d4ed8; --accent-fg:#ffffff;
+      --head-bg:#f7f7f7; --head-fg:#262626;
+      --focus:rgba(37,99,235,.22);
+      --imp-bg:#fff7ed; --imp-fg:#7c2d12; --imp-accent:#ea580c;
+    }
+    @media (prefers-color-scheme: dark){
+      :root{
+        --bg:#0b1220; --fg:#e6eaf2; --muted:#9aa4b8;
+        --card:#111a2e; --border:#2a3344; --input-border:#3a4658;
+        --accent:#3b82f6; --accent-hover:#60a5fa; --accent-fg:#ffffff;
+        --head-bg:#1b2130; --head-fg:#cbd5e1;
+        --focus:rgba(59,130,246,.30);
+        --imp-bg:#3a2412; --imp-fg:#fed7aa; --imp-accent:#fb923c;
+      }
+    }
+    *{ box-sizing:border-box; }
+    body{
+      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+      background:var(--bg); color:var(--fg); margin:0; padding:24px 16px; line-height:1.45;
+    }
+    main{ max-width:560px; margin:0 auto; }
+    h1{ text-align:center; font-size:22px; margin:0 0 22px; }
+    .important{
+      background:var(--imp-bg); color:var(--imp-fg);
+      border-left:4px solid var(--imp-accent); border-radius:6px;
+      padding:12px 16px; margin-bottom:22px; font-size:15px;
+    }
+    .important b{ color:var(--imp-accent); letter-spacing:.3px; }
+    section{
+      margin-bottom:16px; background:var(--card);
+      border:1px solid var(--border); border-radius:8px; overflow:hidden;
+    }
+    section[hidden]{ display:none; }
+    section > h2{
+      margin:0; padding:10px 16px;
+      background:var(--head-bg); color:var(--head-fg); border-bottom:1px solid var(--border);
+      font-size:13px; font-weight:700; letter-spacing:.5px; text-transform:uppercase;
+    }
+    .body{ padding:16px; }
+    .field{ margin-bottom:14px; }
+    .field:last-of-type{ margin-bottom:0; }
+    label{ display:block; font-weight:600; font-size:13px; color:var(--muted); margin-bottom:6px; }
+    input[type="password"],input[type="file"],select{
+      width:100%; padding:10px 12px; font-size:16px; color:inherit;
+      background:transparent; border:1px solid var(--input-border); border-radius:6px;
+    }
+    input:focus,select:focus{ border-color:var(--accent); box-shadow:0 0 0 3px var(--focus); outline:none; }
+    input[type="file"]::file-selector-button{
+      font-weight:600; color:var(--accent); background:transparent;
+      border:1px solid var(--accent); border-radius:6px; padding:8px 12px; margin-right:10px; cursor:pointer;
+    }
+    button{
+      width:100%; padding:12px; font-size:16px; font-weight:600;
+      color:var(--accent-fg); background:var(--accent); border:none; border-radius:6px; cursor:pointer;
+    }
+    button:hover:not(:disabled){ background:var(--accent-hover); }
+    button.secondary{ color:var(--accent); background:transparent; border:1px solid var(--accent); }
+    button.secondary:hover:not(:disabled){ background:var(--focus); }
+    button + button{ margin-top:8px; }
+    button:disabled{ opacity:.5; cursor:default; }
+    .help{ color:var(--muted); font-size:13px; margin-top:6px; }
+    #msg{ text-align:center; font-weight:600; margin:18px 0; min-height:20px; }
+    progress{ width:100%; height:12px; }
     </style>
 </head>
 <body>
 
 <main>
     <h1>OpenSprinkler Firmware Update</h1>
-	<div class="form-group">
-		<label for="pw">Device Password</label>
-		<input type='password' id='pw' autocomplete="current-password">
-	</div>
 
-	<div class="warning-box">
-		<b>IMPORTANT:</b> Firmware updates across major revisions (e.g., from 2.2.1 to 2.2.2) will trigger a factory reset. Save a copy of your current configurations before proceeding.
-	</div>
+	<div class="important"><b>IMPORTANT:</b> Please back up your configuration before proceeding. In the OpenSprinkler App/UI, select <b>Export Configurations</b> from the side menu.</div>
 
-	<section id="online_section">
-		<h2>Online Update</h2>
-		<div class="form-group">
-			<label for="release">Firmware Version</label>
-			<select id="release" disabled><option>Checking for releases...</option></select>
-			<p class="help" id="release_details"></p>
+	<section>
+		<h2>Device Password</h2>
+		<div class="body">
+			<input type="password" id="pw" autocomplete="current-password" aria-label="Device password">
 		</div>
-		<button type="button" id="btn_install" disabled>Install Selected Version</button>
-		<button type="button" class="secondary" id="btn_refresh">Check Again</button>
+	</section>
+
+	<section id="online_section" hidden>
+		<h2>One-Click Firmware Update</h2>
+		<div class="body">
+			<div class="field">
+				<select id="release" aria-label="Firmware version" disabled><option>Checking for releases...</option></select>
+				<p class="help" id="release_details"></p>
+			</div>
+			<button type="button" class="secondary" id="btn_refresh">Obtain Firmware List</button>
+			<button type="button" id="btn_install" disabled>Install Selected Version</button>
+		</div>
 	</section>
 
 	<section>
-		<h2>Manual Update</h2>
-		<div class="form-group">
-			<label for="file" id="file_label">Firmware File</label>
-			<input type='file' name='file' id='file'>
+		<h2>Manual Firmware Upload</h2>
+		<div class="body">
+			<div class="field">
+				<label for="file" id="file_label">Firmware File</label>
+				<input type="file" name="file" id="file">
+			</div>
+			<button type="button" id="btn_submit">Upload Selected Firmware</button>
 		</div>
-		<button type='button' id='btn_submit'>Upload Firmware File</button>
 	</section>
 
 	<p id='msg' aria-live="polite"></p>
@@ -337,6 +300,85 @@
         return temp.toLowerCase();
     }
 
+	function sha256_bytes(bytes) {
+		const constants = [
+			0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,
+			0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,
+			0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,
+			0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,
+			0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,
+			0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,
+			0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,
+			0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2
+		];
+		const state = new Uint32Array([
+			0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,
+			0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19
+		]);
+		const words = new Uint32Array(64);
+		const total = Math.ceil((bytes.length + 9) / 64) * 64;
+		const bitHigh = Math.floor(bytes.length / 0x20000000);
+		const bitLow = (bytes.length << 3) >>> 0;
+		function byte_at(position) {
+			if (position < bytes.length) return bytes[position];
+			if (position === bytes.length) return 0x80;
+			if (position >= total - 8) {
+				const offset = position - (total - 8);
+				const value = offset < 4 ? bitHigh : bitLow;
+				return (value >>> ((3 - (offset & 3)) * 8)) & 0xff;
+			}
+			return 0;
+		}
+		function rotate_right(value, bits) {
+			return (value >>> bits) | (value << (32 - bits));
+		}
+		for (let block = 0; block < total; block += 64) {
+			for (let i = 0; i < 16; i++) {
+				const position = block + i * 4;
+				words[i] = ((byte_at(position) << 24) | (byte_at(position + 1) << 16) |
+					(byte_at(position + 2) << 8) | byte_at(position + 3)) >>> 0;
+			}
+			for (let i = 16; i < 64; i++) {
+				const s0 = rotate_right(words[i - 15], 7) ^ rotate_right(words[i - 15], 18) ^
+					(words[i - 15] >>> 3);
+				const s1 = rotate_right(words[i - 2], 17) ^ rotate_right(words[i - 2], 19) ^
+					(words[i - 2] >>> 10);
+				words[i] = (words[i - 16] + s0 + words[i - 7] + s1) >>> 0;
+			}
+			let a=state[0],b=state[1],c=state[2],d=state[3];
+			let e=state[4],f=state[5],g=state[6],h=state[7];
+			for (let i = 0; i < 64; i++) {
+				const sum1 = rotate_right(e, 6) ^ rotate_right(e, 11) ^ rotate_right(e, 25);
+				const choice = (e & f) ^ (~e & g);
+				const temp1 = (h + sum1 + choice + constants[i] + words[i]) >>> 0;
+				const sum0 = rotate_right(a, 2) ^ rotate_right(a, 13) ^ rotate_right(a, 22);
+				const majority = (a & b) ^ (a & c) ^ (b & c);
+				const temp2 = (sum0 + majority) >>> 0;
+				h=g; g=f; f=e; e=(d+temp1)>>>0; d=c; c=b; b=a; a=(temp1+temp2)>>>0;
+			}
+			state[0]=(state[0]+a)>>>0; state[1]=(state[1]+b)>>>0;
+			state[2]=(state[2]+c)>>>0; state[3]=(state[3]+d)>>>0;
+			state[4]=(state[4]+e)>>>0; state[5]=(state[5]+f)>>>0;
+			state[6]=(state[6]+g)>>>0; state[7]=(state[7]+h)>>>0;
+		}
+		return Array.from(state, function(value) {
+			return value.toString(16).padStart(8, '0');
+		}).join('');
+	}
+
+	async function sha256_file(file) {
+		const bytes = new Uint8Array(await file.arrayBuffer());
+		if (window.crypto && window.crypto.subtle) {
+			try {
+				const digest = await window.crypto.subtle.digest('SHA-256', bytes);
+				return Array.from(new Uint8Array(digest), function(value) {
+					return value.toString(16).padStart(2, '0');
+				}).join('');
+			} catch (error) {}
+		}
+		return sha256_bytes(bytes);
+	}
+
 
     // --- Main page logic ---
     function id(s) { return document.getElementById(s); }
@@ -403,13 +445,20 @@
 
     async function load_releases() {
         set_busy(true);
-        show_msg('Checking for firmware releases...', 'gray');
+        show_msg('Loading update information...', 'gray');
         try {
 			const infoResponse = await fetch_with_timeout(apiBase + '/info', {cache: 'no-store'});
             if (!infoResponse.ok) throw new Error('The controller did not return update information.');
             deviceInfo = await infoResponse.json();
             id('file').accept = deviceInfo.extension || '';
             id('file_label').textContent = 'Firmware File (' + (deviceInfo.extension || 'device firmware') + ')';
+			id('online_section').hidden = !!deviceInfo.ap_mode;
+			if (deviceInfo.ap_mode) {
+				releases = [];
+				show_msg('', 'inherit');
+				return;
+			}
+			show_msg('Checking for firmware releases...', 'gray');
             const select = id('release');
             select.textContent = '';
             releases = [];
@@ -523,13 +572,18 @@
         return result.upload_token;
     }
 
-    function upload_firmware(file, filename, token, verified) {
+	function upload_firmware(file, filename, token, verified, sha256) {
         return new Promise(function(resolve, reject) {
             const data = new FormData();
             data.append('file', file, filename);
             const xhr = new XMLHttpRequest();
             const endpoint = verified ? '/upload' : '';
-            xhr.open('POST', apiBase + endpoint + '?token=' + encodeURIComponent(token), true);
+			const query = new URLSearchParams({token: token});
+			if (!verified) {
+				query.set('size', file.size);
+				query.set('sha256', sha256);
+			}
+			xhr.open('POST', apiBase + endpoint + '?' + query.toString(), true);
             xhr.timeout = 300000;
             xhr.onreadystatechange = function() {
                 if (xhr.readyState !== 4) return;
@@ -589,11 +643,13 @@
         }
         set_busy(true);
         try {
-            const token = await request_token();
-            const file = files[0];
-            const expected = deviceInfo && deviceInfo.extension;
-            if (expected && !file.name.endsWith(expected)) throw new Error('Select a ' + expected + ' firmware file for this controller.');
-            await upload_firmware(file, file.name, token, false);
+			const file = files[0];
+			const expected = deviceInfo && deviceInfo.extension;
+			if (expected && !file.name.endsWith(expected)) throw new Error('Select a ' + expected + ' firmware file for this controller.');
+			show_msg('Calculating firmware checksum...', 'gray');
+			const sha256 = await sha256_file(file);
+			const token = await request_token();
+			await upload_firmware(file, file.name, token, false, sha256);
             show_msg('Update successful. The controller is rebooting.', 'green');
             id('pw').value = '';
         } catch (error) {

@@ -2898,6 +2898,8 @@ void on_update_info() {
 	json += OS_FW_VERSION;
 	json += F(",\"current_build\":");
 	json += OS_FW_MINOR;
+	json += F(",\"ap_mode\":");
+	json += os.get_wifi_mode() == OS_WIFI_MODE_AP ? F("true") : F("false");
 	json += F(",\"base_url\":\"");
 	json += firmware_update.base_url();
 	json += F("\"}");
@@ -2995,8 +2997,10 @@ static void receive_firmware_upload(bool verified) {
 			firmware_upload_authorized = firmware_update.begin_verified(upload.filename.c_str(),
 				update_server->arg("token").c_str());
 		} else {
+			uint32_t upload_size = (uint32_t)update_server->arg("size").toInt();
 			firmware_upload_authorized = firmware_update.consume_token(update_server->arg("token").c_str()) &&
-				firmware_update.begin_manual(upload.filename.c_str());
+				firmware_update.begin_manual(upload.filename.c_str(), upload_size,
+					update_server->arg("sha256").c_str());
 		}
 		firmware_upload_failed = !firmware_upload_authorized;
 		DEBUG_PRINT(F("upload: "));

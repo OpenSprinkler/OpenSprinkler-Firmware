@@ -459,7 +459,7 @@ public:
 	static void lcd_print_time(time_os_t t);  // print current time
 	static void lcd_print_ip(const unsigned char *ip, unsigned char endian);  // print ip
 	static void lcd_print_mac(const unsigned char *mac);  // print mac
-	static void lcd_print_update(const char *message, uint8_t percent); // print firmware update progress
+	static void lcd_print_update(const char *message, int16_t percent); // percent < 0 means indeterminate
 	static void lcd_print_screen(char c);  // print station bits of the board selected by display_board
 	static void lcd_print_version(unsigned char v);  // print version number
 	static void lcd_set_brightness(unsigned char value=1);

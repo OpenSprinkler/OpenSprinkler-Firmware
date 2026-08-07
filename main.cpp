@@ -720,7 +720,7 @@ void do_loop()
 	}
 
 	firmware_update.loop();
-	if (!firmware_update.busy() && firmware_update.phase() != FirmwareUpdatePhase::Success)
+	if (!firmware_update.display_active())
 		ui_state_machine();
 
 #else // Process Ethernet packets for RPI/LINUX
@@ -753,7 +753,7 @@ void do_loop()
 		if (os.button_timeout) os.button_timeout--;
 
 #if defined(USE_DISPLAY)
-		if (!ui_state)
+		if (!ui_state && !firmware_update.display_active())
 			os.lcd_print_time(curr_time);  // print time
 #endif
 
@@ -1071,7 +1071,9 @@ void do_loop()
 
 #if defined(USE_DISPLAY)
 		// process LCD display
-		if (!ui_state) { os.lcd_print_screen(ui_anim_chars[(uint32_t)curr_time%3]); }
+		if (!ui_state && !firmware_update.display_active()) {
+			os.lcd_print_screen(ui_anim_chars[(uint32_t)curr_time%3]);
+		}
 #endif
 
 		// handle reboot request

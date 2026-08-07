@@ -2621,25 +2621,26 @@ void OpenSprinkler::lcd_print_mac(const unsigned char *mac) {
 	lcd.setAutoDisplay(true);
 }
 
-void OpenSprinkler::lcd_print_update(const char *message, uint8_t percent) {
+void OpenSprinkler::lcd_print_update(const char *message, int16_t percent) {
 	lcd.setAutoDisplay(false);
 	lcd.clear();
 
 #if defined(ARDUINO)
-	if (percent > 100) percent = 100;
 	lcd.setColor(WHITE);
 	lcd.setTextAlignment(TEXT_ALIGN_CENTER);
-	lcd.setFont(ArialMT_Plain_10);
-	lcd.drawString(64, 0, F("Firmware Update"));
-	lcd.drawProgressBar(8, 18, 112, 12, percent);
-
-	char value[6];
-	snprintf(value, sizeof(value), "%u%%", percent);
-	lcd.setFont(ArialMT_Plain_16);
-	lcd.drawString(64, 32, value);
-	if (message && message[0]) {
-		lcd.setFont(ArialMT_Plain_10);
-		lcd.drawString(64, 53, message);
+	lcd.setFont(Monospaced_plain_13);
+	lcd.drawString(64, 8, F("Firmware Update"));
+	if (percent >= 0) {
+		if (percent > 100) percent = 100;
+		lcd.drawProgressBar(14, 29, 100, 6, (uint8_t)percent);
+		char status[28];
+		if (message && strlen(message) <= 10)
+			snprintf(status, sizeof(status), "%s %d%%", message, percent);
+		else
+			snprintf(status, sizeof(status), "%s", message ? message : "");
+		lcd.drawString(64, 40, status);
+	} else if (message && message[0]) {
+		lcd.drawString(64, 38, message);
 	}
 	lcd.display();
 
@@ -2651,10 +2652,12 @@ void OpenSprinkler::lcd_print_update(const char *message, uint8_t percent) {
 	lcd_print_pgm(PSTR("Firmware Update"));
 	lcd.setCursor(0, 1);
 	for (uint8_t i = 0; message && message[i] && i < 21; i++) lcd.print(message[i]);
-	lcd.setCursor(0, 2);
-	lcd_print_pgm(PSTR("Progress: "));
-	lcd.print(percent);
-	lcd.print('%');
+	if (percent >= 0) {
+		lcd.setCursor(0, 2);
+		lcd_print_pgm(PSTR("Progress: "));
+		lcd.print(percent > 100 ? 100 : percent);
+		lcd.print('%');
+	}
 	lcd.display();
 #endif
 	lcd.setAutoDisplay(true);
