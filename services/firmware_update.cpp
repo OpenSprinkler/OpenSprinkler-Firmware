@@ -23,7 +23,7 @@
 	#define FIRMWARE_UPDATE_BASE_URL "https://firmware.opensprinkler.com"
 #endif
 
-#define FIRMWARE_UPDATE_CATALOG_LIMIT 1900
+#define FIRMWARE_UPDATE_DESCRIPTOR_LIMIT 1024
 #define FIRMWARE_UPDATE_TOKEN_TTL 300000UL
 #define FIRMWARE_UPDATE_DISPLAY_HOLD 5000UL
 
@@ -94,7 +94,7 @@ extern "C" uint32_t thunk_firmware_update_verify_signature(const uint8_t *digest
 	const uint8_t *signature, size_t length);
 #endif
 
-static bool verify_catalog_signature(const uint8_t digest[32], const uint8_t *signature, size_t length) {
+static bool verify_release_signature(const uint8_t digest[32], const uint8_t *signature, size_t length) {
 #if defined(ESP8266)
 	stack_thunk_add_ref();
 	bool valid = thunk_firmware_update_verify_signature(digest, signature, length) == 1;
@@ -138,26 +138,6 @@ static bool parse_sha256(const char *input, uint8_t output[32]) {
 	if (!input || strlen(input) != 64) return false;
 	size_t length = 0;
 	return hex_to_bytes(input, output, 32, length) && length == 32;
-}
-
-static uint32_t read_catalog_sequence() {
-	uint32_t sequence = 0;
-	File file = LittleFS.open("/fwseq.dat", "r");
-	if (file) {
-		if (file.read(reinterpret_cast<uint8_t *>(&sequence), sizeof(sequence)) !=
-			(int)sizeof(sequence)) sequence = 0;
-		file.close();
-	}
-	return sequence;
-}
-
-static bool write_catalog_sequence(uint32_t sequence) {
-	File file = LittleFS.open("/fwseq.dat", "w");
-	if (!file) return false;
-	bool written = file.write(reinterpret_cast<const uint8_t *>(&sequence), sizeof(sequence)) ==
-		sizeof(sequence);
-	file.close();
-	return written;
 }
 
 bool FirmwareUpdateService::configured() const {
@@ -211,7 +191,7 @@ bool FirmwareUpdateService::consume_token(const char *token) {
 	return valid;
 }
 
-bool FirmwareUpdateService::prepare_verified(const uint8_t *manifest, size_t manifest_length,
+bool FirmwareUpdateService::prepare_verified(const uint8_t *descriptor, size_t descriptor_length,
 	const char *signature_hex, const char *release_id, bool allow_downgrade,
 	char upload_token_out[17]) {
 	if (busy()) return false;
@@ -220,57 +200,44 @@ bool FirmwareUpdateService::prepare_verified(const uint8_t *manifest, size_t man
 		fail("Online updates are not configured");
 		return false;
 	}
-	if (!manifest || !manifest_length || manifest_length > FIRMWARE_UPDATE_CATALOG_LIMIT ||
+	if (!descriptor || !descriptor_length || descriptor_length > FIRMWARE_UPDATE_DESCRIPTOR_LIMIT ||
 		!release_id || !release_id[0]) {
-		fail("Release catalog request is invalid");
+		fail("Signed release request is invalid");
 		return false;
 	}
 
 	uint8_t signature[72];
 	size_t signature_length = 0;
 	uint8_t digest[32];
-	sha256_buffer(manifest, manifest_length, digest);
+	sha256_buffer(descriptor, descriptor_length, digest);
 	if (!hex_to_bytes(signature_hex, signature, sizeof(signature), signature_length) ||
-		signature_length < 64 || !verify_catalog_signature(digest, signature, signature_length)) {
-		fail("Release catalog signature is invalid");
+		signature_length < 64 || !verify_release_signature(digest, signature, signature_length)) {
+		fail("Release signature is invalid");
 		return false;
 	}
 
 	ArduinoJson::JsonDocument doc;
-	ArduinoJson::DeserializationError error = ArduinoJson::deserializeJson(doc, manifest, manifest_length);
+	ArduinoJson::DeserializationError error =
+		ArduinoJson::deserializeJson(doc, descriptor, descriptor_length);
 	if (error || doc["schema"].as<uint8_t>() != 1) {
-		fail("Release catalog format is invalid");
+		fail("Release descriptor format is invalid");
 		return false;
 	}
-	uint32_t sequence = doc["sequence"] | 0;
-	uint32_t stored_sequence = read_catalog_sequence();
-	if (!sequence || sequence < stored_sequence) {
-		fail("Release catalog is older than the last verified catalog");
-		return false;
-	}
-
-	ArduinoJson::JsonObject selected;
-	for (ArduinoJson::JsonObject item : doc["releases"].as<ArduinoJson::JsonArray>()) {
-		const char *id = item["id"];
-		if (id && strcmp(id, release_id) == 0) {
-			selected = item;
-			break;
-		}
-	}
-	if (selected.isNull()) {
-		fail("Requested firmware release was not found");
+	const char *descriptor_id = doc["id"];
+	if (!descriptor_id || strcmp(descriptor_id, release_id) != 0) {
+		fail("Signed release does not match the requested release");
 		return false;
 	}
 
-	uint32_t version = selected["version"] | 0;
-	uint16_t build = selected["build"] | 0;
+	uint32_t version = doc["version"] | 0;
+	uint16_t build = doc["build"] | 0;
 	bool newer = version > OS_FW_VERSION || (version == OS_FW_VERSION && build > OS_FW_MINOR);
 	if (!version || (!newer && !allow_downgrade)) {
 		fail("Selected firmware is not newer than this build");
 		return false;
 	}
 
-	ArduinoJson::JsonObject artifact = selected["targets"][target()].as<ArduinoJson::JsonObject>();
+	ArduinoJson::JsonObject artifact = doc["targets"][target()].as<ArduinoJson::JsonObject>();
 	const char *path = artifact["file"];
 	size_t path_length = path ? strlen(path) : 0;
 	size_t extension_length = strlen(file_extension());
@@ -281,11 +248,7 @@ bool FirmwareUpdateService::prepare_verified(const uint8_t *manifest, size_t man
 		strcmp(path + path_length - extension_length, file_extension()) != 0 ||
 		!parse_sha256(artifact["sha256"], _expected_sha256) || size < 1024 ||
 		size > ESP.getFreeSketchSpace() || (min_flash && ESP.getFlashChipSize() < min_flash)) {
-		fail("Release catalog contains an incompatible entry");
-		return false;
-	}
-	if (sequence > stored_sequence && !write_catalog_sequence(sequence)) {
-		fail("Unable to save release catalog sequence");
+		fail("Signed release contains an incompatible entry");
 		return false;
 	}
 
@@ -437,7 +400,7 @@ bool FirmwareUpdateService::finish_upload(bool verified) {
 	strcpy(_message, verified ? "Verifying firmware" : "Finalizing firmware upload");
 	update_display();
 	if (_bytes_done != _bytes_total || !_tail_pending) {
-		fail(verified ? "Firmware upload size does not match catalog" :
+		fail(verified ? "Firmware upload size does not match signed release" :
 			"Firmware upload size does not match declared size");
 		return false;
 	}
@@ -560,11 +523,13 @@ void FirmwareUpdateService::update_display() {
 	case FirmwareUpdatePhase::Prepared: display_message = "Ready"; break;
 	case FirmwareUpdatePhase::Uploading: display_message = "Uploading"; break;
 	case FirmwareUpdatePhase::Verifying: display_message = "Verifying"; break;
-	case FirmwareUpdatePhase::Success: display_message = "Rebooting"; break;
+	case FirmwareUpdatePhase::Success: display_message = "Rebooting ...."; break;
 	case FirmwareUpdatePhase::Error: display_message = "Update failed"; break;
 	default: break;
 	}
-	os.lcd_print_update(display_message, _bytes_total ? percent() : -1);
+	int16_t display_percent = _bytes_total ?
+		(_phase == FirmwareUpdatePhase::Success ? 100 : percent()) : -1;
+	os.lcd_print_update(display_message, display_percent);
 #endif
 }
 

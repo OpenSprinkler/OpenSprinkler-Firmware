@@ -34,7 +34,7 @@ container:
 TEST_HTTP_PORT?=18080
 
 .PHONY: test-api
-test-api: test-board-profiles test-hardware-detection test-storage-files
+test-api: test-board-profiles test-hardware-detection test-storage-files test-firmware-release
 	$(MAKE) clean
 	$(MAKE) VERSION=DEMO EXTRA_CXXFLAGS="-DHTTP_PORT=$(TEST_HTTP_PORT)"
 	python3 tests/api_contract.py --port $(TEST_HTTP_PORT)
@@ -56,3 +56,7 @@ test-storage-files:
 	@set -e; output=$$(mktemp); data=$$(mktemp -d); trap 'rm -f "$$output"; rm -rf "$$data"' EXIT; \
 		$(CXX) -std=gnu++14 -DDEMO -I. tests/storage_files_test.cpp storage/files.cpp -o "$$output"; \
 		"$$output" "$$data"
+
+.PHONY: test-firmware-release
+test-firmware-release:
+	python3 -B -m unittest tests/test_firmware_release.py

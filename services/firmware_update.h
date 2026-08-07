@@ -24,7 +24,7 @@ public:
 	bool issue_token(const char *password, char token_out[17]);
 	bool consume_token(const char *token);
 
-	bool prepare_verified(const uint8_t *manifest, size_t manifest_length,
+	bool prepare_verified(const uint8_t *descriptor, size_t descriptor_length,
 		const char *signature_hex, const char *release_id, bool allow_downgrade,
 		char upload_token_out[17]);
 	bool begin_verified(const char *filename, const char *upload_token);

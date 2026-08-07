@@ -552,7 +552,9 @@ bool OpenSprinkler::network_connected(void) {
 
 /** Reboot controller */
 void OpenSprinkler::reboot_dev(uint8_t cause) {
-	lcd_print_line_clear_pgm(PSTR("Rebooting..."), 0);
+	// FirmwareUpdateService already owns and clears its reboot screen.
+	if (cause != REBOOT_CAUSE_FWUPDATE)
+		lcd_print_line_clear_pgm(PSTR("Rebooting..."), 0);
 	if(cause) {
 		nvdata.reboot_cause = cause;
 		nvdata_save();
@@ -3063,6 +3065,10 @@ void OpenSprinkler::lcd_set_brightness(unsigned char value) {
 #if defined(USE_DISPLAY)
 #include "drivers/images.h"
 void OpenSprinkler::flash_screen() {
+	// Compose the complete splash off-screen so an OTA reboot cannot expose the
+	// previous progress framebuffer or partially drawn splash content.
+	lcd.setAutoDisplay(false);
+	lcd.clear();
 	lcd.drawXbm(0, 0, OpenSprinkler_Logo_width, OpenSprinkler_Logo_height,
 		(const unsigned char*)OpenSprinkler_Logo_image);
 
@@ -3103,6 +3109,7 @@ void OpenSprinkler::flash_screen() {
 	#endif
 
 	lcd.display();
+	lcd.setAutoDisplay(true);
 	delay(2000);
 	lcd.clear();
 	lcd.display();

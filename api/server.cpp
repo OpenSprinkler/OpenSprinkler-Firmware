@@ -2919,15 +2919,15 @@ void on_update_prepare() {
 	}
 	String release_id = update_server->arg("id");
 	String signature = update_server->arg("sig");
-	String manifest = update_server->arg("plain");
+	String descriptor = update_server->arg("plain");
 	bool allow_downgrade = update_server->arg("allow_downgrade") == "1";
-	if (!release_id.length() || !signature.length() || !manifest.length()) {
-		update_server_send_result(HTML_DATA_MISSING, "catalog");
+	if (!release_id.length() || !signature.length() || !descriptor.length()) {
+		update_server_send_result(HTML_DATA_MISSING, "signed release");
 		return;
 	}
 	char upload_token[17];
-	if (!firmware_update.prepare_verified(reinterpret_cast<const uint8_t *>(manifest.c_str()),
-		manifest.length(), signature.c_str(), release_id.c_str(), allow_downgrade, upload_token)) {
+	if (!firmware_update.prepare_verified(reinterpret_cast<const uint8_t *>(descriptor.c_str()),
+		descriptor.length(), signature.c_str(), release_id.c_str(), allow_downgrade, upload_token)) {
 		update_server_send_result(HTML_UPLOAD_FAILED, firmware_update.message());
 		return;
 	}

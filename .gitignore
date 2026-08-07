@@ -12,6 +12,8 @@ build-1284/*
 !updater.sh
 *.bak
 node_modules
+__pycache__/
+*.pyc
 *.json
 !package.json
 !package-lock.json

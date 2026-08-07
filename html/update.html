@@ -54,21 +54,50 @@
       background:transparent; border:1px solid var(--input-border); border-radius:6px;
     }
     input:focus,select:focus{ border-color:var(--accent); box-shadow:0 0 0 3px var(--focus); outline:none; }
+	.release-row{ display:grid; grid-template-columns:minmax(0,1fr) 44px; gap:8px; }
+	.icon-button{
+	  width:44px; height:44px; padding:0; display:flex; align-items:center; justify-content:center;
+	  font-size:25px; line-height:1;
+	}
     input[type="file"]::file-selector-button{
       font-weight:600; color:var(--accent); background:transparent;
       border:1px solid var(--accent); border-radius:6px; padding:8px 12px; margin-right:10px; cursor:pointer;
     }
-    button{
+    button,.button-link{
       width:100%; padding:12px; font-size:16px; font-weight:600;
       color:var(--accent-fg); background:var(--accent); border:none; border-radius:6px; cursor:pointer;
     }
-    button:hover:not(:disabled){ background:var(--accent-hover); }
-    button.secondary{ color:var(--accent); background:transparent; border:1px solid var(--accent); }
-    button.secondary:hover:not(:disabled){ background:var(--focus); }
-    button + button{ margin-top:8px; }
+    .button-link{ display:block; text-align:center; text-decoration:none; }
+    button:hover:not(:disabled),.button-link:hover{ background:var(--accent-hover); }
+    button.secondary,.button-link.secondary{ color:var(--accent); background:transparent; border:1px solid var(--accent); }
+    button.secondary:hover:not(:disabled),.button-link.secondary:hover{ background:var(--focus); }
+    button + button,button + .button-link,.button-link + button{ margin-top:8px; }
     button:disabled{ opacity:.5; cursor:default; }
     .help{ color:var(--muted); font-size:13px; margin-top:6px; }
-    #msg{ text-align:center; font-weight:600; margin:18px 0; min-height:20px; }
+    .modal{
+      position:fixed; inset:0; z-index:10; display:flex; align-items:center; justify-content:center;
+      padding:20px; background:rgba(0,0,0,.55);
+    }
+    .modal[hidden]{ display:none; }
+    .modal-panel{
+      width:min(680px,100%); max-height:85vh; display:flex; flex-direction:column;
+      background:var(--card); border:1px solid var(--border); border-radius:8px; overflow:hidden;
+    }
+    .modal-header{
+      display:flex; align-items:center; gap:12px; padding:12px 16px;
+      background:var(--head-bg); border-bottom:1px solid var(--border);
+    }
+    .modal-header h2{ flex:1; margin:0; font-size:17px; }
+    .modal-close{ width:auto; padding:5px 9px; color:var(--fg); background:transparent; font-size:20px; }
+    .modal-close:hover:not(:disabled){ background:var(--focus); }
+    .release-notes{ margin:0; padding:18px; overflow:auto; white-space:pre-wrap; font:14px/1.5 inherit; }
+    .modal-footer{ padding:12px 16px; border-top:1px solid var(--border); }
+    .status-panel{
+      position:sticky; top:8px; z-index:5; padding:12px 16px; margin-bottom:16px;
+      background:var(--card); border:1px solid var(--border); border-radius:8px;
+    }
+    .status-panel[hidden]{ display:none; }
+    #msg{ text-align:center; font-weight:600; margin:0 0 8px; }
     progress{ width:100%; height:12px; }
     </style>
 </head>
@@ -86,14 +115,22 @@
 		</div>
 	</section>
 
+	<div class="status-panel" id="status_panel" aria-live="polite" hidden>
+		<p id="msg"></p>
+		<progress id="progress" value="0" max="100" hidden></progress>
+	</div>
+
 	<section id="online_section" hidden>
 		<h2>One-Click Firmware Update</h2>
 		<div class="body">
 			<div class="field">
-				<select id="release" aria-label="Firmware version" disabled><option>Checking for releases...</option></select>
+				<div class="release-row">
+					<select id="release" aria-label="Firmware version" disabled><option>Checking for releases...</option></select>
+					<button type="button" class="secondary icon-button" id="btn_refresh" aria-label="Refresh firmware list" title="Refresh firmware list">&#8635;</button>
+				</div>
 				<p class="help" id="release_details"></p>
 			</div>
-			<button type="button" class="secondary" id="btn_refresh">Obtain Firmware List</button>
+			<button type="button" class="secondary" id="btn_notes" disabled>View Release Notes</button>
 			<button type="button" id="btn_install" disabled>Install Selected Version</button>
 		</div>
 	</section>
@@ -103,15 +140,26 @@
 		<div class="body">
 			<div class="field">
 				<label for="file" id="file_label">Firmware File</label>
-				<input type="file" name="file" id="file">
+				<input type="file" name="file" id="file" autocomplete="off">
 			</div>
 			<button type="button" id="btn_submit">Upload Selected Firmware</button>
 		</div>
 	</section>
 
-	<p id='msg' aria-live="polite"></p>
-	<progress id="progress" value="0" max="100" hidden></progress>
 </main>
+
+<div class="modal" id="notes_modal" role="dialog" aria-modal="true" aria-labelledby="notes_title" hidden>
+	<div class="modal-panel">
+		<div class="modal-header">
+			<h2 id="notes_title">Release Notes</h2>
+			<button type="button" class="modal-close" id="btn_notes_close" aria-label="Close">&times;</button>
+		</div>
+		<pre class="release-notes" id="notes_body">Loading...</pre>
+		<div class="modal-footer">
+			<a class="button-link secondary" id="notes_github" href="https://github.com/OpenSprinkler/OpenSprinkler-Firmware/releases" target="_blank" rel="noopener">Open on GitHub</a>
+		</div>
+	</div>
+</div>
 
 <script>
     /**
@@ -384,19 +432,31 @@
     function id(s) { return document.getElementById(s); }
     const apiBase = '//' + window.location.hostname + ':8080/update';
     let deviceInfo = null;
-    let catalogBytes = null;
-    let catalogSignature = '';
+    let firmwareBase = '';
     let releases = [];
+
+	function clear_firmware_file() {
+		id('file').value = '';
+	}
+
+	window.addEventListener('pageshow', clear_firmware_file);
+	clear_firmware_file();
 
     function show_msg(text, color) {
         const message = id('msg');
         message.textContent = text;
         message.style.color = color || 'inherit';
+		id('status_panel').hidden = !text && id('progress').hidden;
     }
 
     function set_busy(busy) {
+		if (busy) {
+			id('progress').hidden = true;
+			id('progress').value = 0;
+		}
         id('btn_install').disabled = busy || !releases.length;
         id('btn_refresh').disabled = busy;
+		id('btn_notes').disabled = busy || !releases.length;
         id('btn_submit').disabled = busy;
 		id('release').disabled = busy || !releases.length;
     }
@@ -469,33 +529,27 @@
                 return;
             }
 
-            const base = deviceInfo.base_url.replace(/\/$/, '');
-            const responses = await Promise.all([
-                fetch_with_retry(base + '/v1/manifest.json', {cache: 'no-store'}),
-                fetch_with_retry(base + '/v1/manifest.sig', {cache: 'no-store'})
-            ]);
-            if (!responses[0].ok || !responses[1].ok) throw new Error('The release catalog is unavailable.');
-            catalogBytes = new Uint8Array(await responses[0].arrayBuffer());
-            catalogSignature = (await responses[1].text()).trim();
-            const catalog = JSON.parse(new TextDecoder().decode(catalogBytes));
-            if (catalog.schema !== 1 || !Array.isArray(catalog.releases) || !catalogSignature)
-                throw new Error('The release catalog format is invalid.');
+			firmwareBase = deviceInfo.base_url.replace(/\/$/, '');
+			const response = await fetch_with_retry(
+				firmwareBase + '/v1/manifest.json', {cache: 'no-store'});
+			if (!response.ok) throw new Error('The release catalog is unavailable.');
+			const catalog = await response.json();
+			if (catalog.schema !== 2 || !Array.isArray(catalog.releases))
+				throw new Error('The release catalog format is invalid.');
 
-            catalog.releases.forEach(function(release) {
-                const artifact = release.targets && release.targets[deviceInfo.target];
-				if (!artifact || typeof artifact.file !== 'string' ||
-					!artifact.file.startsWith('/v1/releases/') || !artifact.size) return;
-                releases.push(Object.assign({}, release, {
-                    label: release_label(release),
-                    artifact: artifact,
-                    url: new URL(artifact.file, base).href
-                }));
-            });
-            releases.slice(0, 3).forEach(function(release, index) {
-                select.add(new Option((index === 0 ? 'Latest: ' : '') + release.label, release.id));
-            });
-            releases = releases.slice(0, 3);
-            select.disabled = !releases.length;
+			catalog.releases.forEach(function(release) {
+				if (!release || typeof release.id !== 'string' ||
+					!Array.isArray(release.targets) || !release.targets.includes(deviceInfo.target) ||
+					typeof release.descriptor !== 'string' ||
+					typeof release.signature !== 'string' ||
+					!release.descriptor.startsWith('/v1/releases/') ||
+					!release.signature.startsWith('/v1/releases/')) return;
+				releases.push(Object.assign({}, release, {label: release_label(release)}));
+			});
+			releases.forEach(function(release, index) {
+				select.add(new Option((index === 0 ? 'Latest: ' : '') + release.label, release.id));
+			});
+			select.disabled = !releases.length;
             update_release_details();
             show_msg(releases.length ? 'Firmware releases are available.' : 'No compatible releases found.', releases.length ? 'green' : 'red');
         } catch (error) {
@@ -515,10 +569,96 @@
         return /^\d{3}$/.test(version) ? version.split('').join('.') + '(' + release.build + ')' : release.id;
     }
 
-    function update_release_details() {
-        const release = selected_release();
-        id('release_details').textContent = release ? Math.ceil(release.artifact.size / 1024) + ' KB' : '';
-    }
+	function close_release_notes() {
+		id('notes_modal').hidden = true;
+		document.body.style.overflow = '';
+	}
+
+	async function open_release_notes() {
+		const release = selected_release();
+		if (!release) return;
+		const modal = id('notes_modal');
+		const notes = id('notes_body');
+		const github = id('notes_github');
+		modal.hidden = false;
+		document.body.style.overflow = 'hidden';
+		id('notes_title').textContent = 'Release Notes';
+		notes.textContent = 'Loading...';
+		github.href = 'https://github.com/OpenSprinkler/OpenSprinkler-Firmware/releases';
+		id('btn_notes_close').focus();
+		try {
+			await load_release_descriptor(release);
+			const tag = String(release.version) + '(' + release.build + ')';
+			const response = await fetch_with_timeout(
+				'https://api.github.com/repos/OpenSprinkler/OpenSprinkler-Firmware/releases/tags/' +
+				encodeURIComponent(tag),
+				{cache: 'no-store', headers: {'Accept': 'application/vnd.github+json'}}, 20000);
+			id('notes_title').textContent = 'Release Notes - ' + release.label;
+			if (response.status === 404) {
+				notes.textContent = 'Release notes for ' + release.label + ' have not been published yet.';
+				return;
+			}
+			if (!response.ok) throw new Error('GitHub returned HTTP ' + response.status + '.');
+			const data = await response.json();
+			id('notes_title').textContent = 'Release Notes - ' + (data.name || tag);
+			notes.textContent = data.body || 'No release notes were provided for this version.';
+			if (typeof data.html_url === 'string' &&
+				data.html_url.startsWith('https://github.com/OpenSprinkler/OpenSprinkler-Firmware/releases/'))
+				github.href = data.html_url;
+		} catch (error) {
+			notes.textContent = 'Unable to load release notes: ' + error.message;
+		}
+	}
+
+	async function load_release_descriptor(release) {
+		if (release.descriptorPromise) return release.descriptorPromise;
+		release.descriptorPromise = (async function() {
+			const responses = await Promise.all([
+				fetch_with_retry(new URL(release.descriptor, firmwareBase).href, {cache: 'no-store'}),
+				fetch_with_retry(new URL(release.signature, firmwareBase).href, {cache: 'no-store'})
+			]);
+			if (!responses[0].ok || !responses[1].ok)
+				throw new Error('The signed release information is unavailable.');
+			const descriptorBytes = new Uint8Array(await responses[0].arrayBuffer());
+			const signature = (await responses[1].text()).trim();
+			const descriptor = JSON.parse(new TextDecoder().decode(descriptorBytes));
+			const artifact = descriptor.targets && descriptor.targets[deviceInfo.target];
+			if (descriptor.schema !== 1 || descriptor.id !== release.id || !signature ||
+				!artifact || typeof artifact.file !== 'string' ||
+				!artifact.file.startsWith('/v1/releases/') || !artifact.size ||
+				typeof artifact.sha256 !== 'string')
+				throw new Error('The signed release information is invalid.');
+			release.version = descriptor.version;
+			release.build = descriptor.build;
+			release.label = release_label(descriptor);
+			release.artifact = artifact;
+			release.url = new URL(artifact.file, firmwareBase).href;
+			release.descriptorBytes = descriptorBytes;
+			release.descriptorSignature = signature;
+			Array.from(id('release').options).forEach(function(option, index) {
+				if (option.value === release.id)
+					option.textContent = (index === 0 ? 'Latest: ' : '') + release.label;
+			});
+			return release;
+		})();
+		return release.descriptorPromise;
+	}
+
+	async function update_release_details() {
+		const release = selected_release();
+		if (!release) {
+			id('release_details').textContent = '';
+			return;
+		}
+		id('release_details').textContent = 'Loading...';
+		try {
+			await load_release_descriptor(release);
+			if (selected_release() === release)
+				id('release_details').textContent = Math.ceil(release.artifact.size / 1024) + ' KB';
+		} catch (error) {
+			if (selected_release() === release) id('release_details').textContent = 'Unavailable';
+		}
+	}
 
     function download_firmware(release, attempt) {
 		attempt = attempt || 1;
@@ -555,20 +695,20 @@
     }
 
     async function prepare_update(release, allowDowngrade, token) {
-        const query = new URLSearchParams({
-            token: token,
-            id: release.id,
-            sig: catalogSignature,
-            allow_downgrade: allowDowngrade ? '1' : '0'
-        });
+		const query = new URLSearchParams({
+			token: token,
+			id: release.id,
+			sig: release.descriptorSignature,
+			allow_downgrade: allowDowngrade ? '1' : '0'
+		});
 		const response = await fetch_with_timeout(apiBase + '/prepare?' + query, {
 			method: 'POST',
 			headers: {'Content-Type': 'application/octet-stream'},
-			body: catalogBytes
+			body: release.descriptorBytes
 		}, 20000);
         const result = await response.json();
         if (result.result !== 1 || !result.upload_token)
-            throw new Error(result.item || 'The controller rejected the signed release catalog.');
+			throw new Error(result.item || 'The controller rejected the signed release.');
         return result.upload_token;
     }
 
@@ -609,10 +749,24 @@
 
     id('release').addEventListener('change', update_release_details);
     id('btn_refresh').addEventListener('click', load_releases);
-    id('btn_install').addEventListener('click', async function() {
-        const release = selected_release();
-        if (!release) return;
-        const newer = release.version > deviceInfo.current_version ||
+	id('btn_notes').addEventListener('click', open_release_notes);
+	id('btn_notes_close').addEventListener('click', close_release_notes);
+	id('notes_modal').addEventListener('click', function(event) {
+		if (event.target === id('notes_modal')) close_release_notes();
+	});
+	document.addEventListener('keydown', function(event) {
+		if (event.key === 'Escape' && !id('notes_modal').hidden) close_release_notes();
+	});
+	id('btn_install').addEventListener('click', async function() {
+		const release = selected_release();
+		if (!release) return;
+		try {
+			await load_release_descriptor(release);
+		} catch (error) {
+			show_msg(error.message, 'red');
+			return;
+		}
+		const newer = release.version > deviceInfo.current_version ||
             (release.version === deviceInfo.current_version && release.build > deviceInfo.current_build);
         let allowDowngrade = false;
         if (!newer) {
@@ -652,6 +806,7 @@
 			await upload_firmware(file, file.name, token, false, sha256);
             show_msg('Update successful. The controller is rebooting.', 'green');
             id('pw').value = '';
+			clear_firmware_file();
         } catch (error) {
             if (error.message !== 'Cancelled') show_msg(error.message, 'red');
         } finally {

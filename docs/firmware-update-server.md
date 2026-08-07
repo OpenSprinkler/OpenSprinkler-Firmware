@@ -1,11 +1,11 @@
 # Firmware Update Server
 
 OpenSprinkler's standalone update page retrieves release files through the user's browser. The
-browser downloads the signed catalog and selected firmware from
-`https://firmware.opensprinkler.com`, then uploads the unchanged bytes to the controller. The
-controller verifies the catalog signature, hardware target, image header, file size, and SHA-256
-digest before finalizing the update. The controller never makes an Internet connection, so this
-works within the ESP8266 RAM limit without weakening update authentication.
+browser downloads the release index, the selected release's signed descriptor, and its firmware
+from `https://firmware.opensprinkler.com`, then uploads the signed descriptor and firmware to the
+controller. The controller verifies the release signature, hardware target, image header, file
+size, and SHA-256 digest before finalizing the update. The unrestricted index never enters the
+controller's RAM, and the controller never makes an Internet connection.
 
 ## Initial Setup
 
@@ -42,9 +42,9 @@ Example Apache configuration:
         Header always set Access-Control-Allow-Methods "GET, HEAD, OPTIONS"
     </Directory>
 
-    <FilesMatch "^manifest\.(json|sig)$">
+    <Files "manifest.json">
         Header always set Cache-Control "no-store, no-cache, must-revalidate"
-    </FilesMatch>
+    </Files>
 
     <Location /v1/releases/>
         Header always set Cache-Control "public, max-age=31536000, immutable"
@@ -76,19 +76,20 @@ python3 tools/firmware_release.py prepare \
   --private-key ~/secure/opensprinkler-firmware-p256.pem \
   --output-dir ~/firmware-publish/v1 \
   --esp8266 .pio/build/os3x_esp8266/firmware.bin \
-  --esp32c6 .pio/build/os4_esp32c6/firmware.bin \
-  --version 221 --build 6 --sequence 1
+  --esp32c6 .pio/build/os4_esp32c6/firmware.bin32 \
+  --version 221 --build 6
 ```
 
-The tool gives ESP8266 files a `.bin` extension and ESP32-C6 files a `.bin32` extension, calculates SHA-256, keeps at most three catalog releases, and signs the exact catalog bytes. The catalog contains only the fields required to identify, validate, and install each release; the update page derives its display label from the numeric version and build. Increase `--sequence` for every publication; controllers persist the highest verified sequence and reject replayed older catalogs. Publish immutable artifacts first and the catalog last:
-
-The generated catalog is limited to 1900 bytes, matching the verifier limit on ESP8266 and
-ESP32-C6. Do not raise the release-tool limit without changing and testing the firmware limit.
+The tool gives ESP8266 files a `.bin` extension and ESP32-C6 files a `.bin32` extension and
+calculates SHA-256 for each binary. Every release directory contains `release.json` and
+`release.sig`; the descriptor is limited to 1024 bytes and is the only release metadata verified
+by the controller. The top-level `manifest.json` is an unrestricted browser index and may list the
+complete release history. Publish immutable release directories first and the browser index last:
 
 ```bash
 rsync -av --ignore-existing ~/firmware-publish/v1/releases/ \
   server:/var/firmware.opensprinkler.com/v1/releases/
-rsync -av ~/firmware-publish/v1/manifest.json ~/firmware-publish/v1/manifest.sig \
+rsync -av ~/firmware-publish/v1/manifest.json \
   server:/var/firmware.opensprinkler.com/v1/
 ```
 
@@ -96,7 +97,8 @@ Verify the public result before announcing a release:
 
 ```bash
 curl -f https://firmware.opensprinkler.com/v1/manifest.json
-curl -f https://firmware.opensprinkler.com/v1/manifest.sig
+curl -f https://firmware.opensprinkler.com/v1/releases/2.2.1-6/release.json
+curl -f https://firmware.opensprinkler.com/v1/releases/2.2.1-6/release.sig
 curl -I https://firmware.opensprinkler.com/v1/releases/2.2.1-6/opensprinkler-2.2.1-6-esp8266.bin
 ```
 
