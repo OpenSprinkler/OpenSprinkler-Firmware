@@ -1189,7 +1189,7 @@ void OpenSprinkler::detect_binarysensor_status(time_os_t curr_time) {
 	for (uint8_t i = 0; i < NUM_SENSORS; i++) {
 		if (!sensor_available(i)) continue;
 		uint8_t type = iopts[sensor_iopt_keys[i].type];
-		if (type != SENSOR_TYPE_RAIN && type != SENSOR_TYPE_SOIL) continue;
+		if (type != SENSOR_TYPE_RAIN && type != SENSOR_TYPE_SOIL && type != SENSOR_TYPE_PRESSURE) continue;
 
 		// SN1/SN2 GPIO pins need INPUT_PULLUP on OS 3.2+. SN3/SN4 are on
 		// the I/O expander where pinMode() is a no-op anyway, so the call
@@ -2629,6 +2629,9 @@ void OpenSprinkler::lcd_print_screen(char c) {
 				break;
 			case SENSOR_TYPE_SOIL:
 				lcd.write(sn_sensors[i].active?ICON_SOIL:(sn_sensors[i].raw?'S':'s'));
+				break;
+			case SENSOR_TYPE_PRESSURE:
+				lcd.write(sn_sensors[i].active?'B':(sn_sensors[i].raw?'B':'b'));
 				break;
 			case SENSOR_TYPE_FLOW:
 				lcd.write(flowcount_rt>0?'F':'f');

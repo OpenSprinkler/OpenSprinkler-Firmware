@@ -23,7 +23,7 @@ In addition, OpenSprinkler v3 is available in three power models:
 
 * **Expanded Sensor Support & Sensor Expander:** A new framework for Expanded Sensors, including analog sensors connected through the **Sensor Expander** and virtual sensors such as Aggregate and System Internal, with per-sensor logging. Expanded Sensor readings can automatically scale program watering through configurable adjustment curves. Refer to the dedicated [Sensor Expander](../sensor-expander.md) documentation.
 * **Sensor Terminology**: we distinguish between the following two categories of sensors:
-    * **Built-in Sensors** refer to sensor ports on the main controller, identified by `SN1`–`SN4` where available. They support digital sensors such as rain, flow, and program switch.
+    * **Built-in Sensors** refer to sensor ports on the main controller, identified by `SN1`–`SN4` where available. They support digital sensors such as rain, flow, pressure, and program switch.
     * **Expanded Sensors** are configurable sensors managed through **Edit Sensors**. They include analog as well as virtual sensors managed through the Expanded Sensor interface, and they can be used for program adjustment.
 * **Extended Master Support:** This firmware supports up to **four master stations**, with independent on/off adjustments and per-zone selection of which masters apply.
 * **Additional Built-in Sensor Ports (SN3/SN4):** This firmware enables two additional built-in sensor ports on OpenSprinkler v3.4, for a total of four: `SN1`–`SN4`.
@@ -224,6 +224,7 @@ All settings will be cleared and returned to factory defaults.
     * `s`: Soil sensor
     * `p`: Program switch
     * `f`: Flow sensor (SN1 only)
+    * `b`: Pressure sensor
     * An activated rain sensor is shown as 🌧️, and active soil sensor as 💧.
 
 **While the controller is running, buttons perform the following functions:**
@@ -517,7 +518,7 @@ This firmware supports up to **four independent masters**, each configurable as 
 !!! note "Built-in vs. Expanded Sensors"
     This section covers the controller's **built-in** sensor ports. For **analog sensors** connected via the **Sensor Expander** (such as temperature, soil moisture, light, etc.) and sensor-based program adjustment, see the dedicated [**Sensor Expander User Manual**](../sensor-expander.md).
 
-All supported controllers provide two independent built-in sensor ports (`SN1/SN2`). OpenSprinkler v3.4 provides two additional ports (`SN3/SN4`). Each port can be configured as **Rain**, **Soil** (binary output only), or **Program Switch**; and **Flow** is supported only on `SN1`.
+All supported controllers provide two independent built-in sensor ports (`SN1/SN2`). OpenSprinkler v3.4 provides two additional ports (`SN3/SN4`). Each port can be configured as **Rain**, **Soil**, **Pressure** (binary output only), or **Program Switch**; and **Flow** is supported only on `SN1`.
 
 * **Connections:**
     * Connect the sensor's **two signal wires** to **GND** and an available sensor port of your choice (**SN1**–**SN4**).
@@ -525,7 +526,7 @@ All supported controllers provide two independent built-in sensor ports (`SN1/SN
     * **If a sensor needs +5V** (e.g. certain flow sensors), use **+5V** (VIN) port to supply it.
     * **If a sensor needs 24VAC** power (e.g. wireless sensors), connect its **power wires** to **COM** and **GND** (AC-powered model only; DC/Latch models cannot provide 24VAC).
 
-* **Rain / Soil Sensors:** Automatically stop zone runs when rain or high soil moisture is detected.
+* **Rain / Soil / Pressure Sensors:** Automatically stop zone runs when rain, high soil moisture, or abnormal pressure is detected.
     * Choose **Normally Open** or **Normally Closed**; Normally Closed is the most common type.
     * Supports only sensors that output **binary ON/OFF signals** (dry-contact switches).
         * For **Analog Sensors**, use an [**Analog-to-Digital Adapter**](https://opensprinkler.com/product/a2dadapter/), which converts an analog signal to ON/OFF with an adjustable threshold.

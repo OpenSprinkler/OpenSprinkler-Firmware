@@ -217,6 +217,7 @@ All settings will be cleared and returned to factory defaults.
     * `s`: Soil sensor
     * `p`: Program switch
     * `f`: Flow sensor
+    * `b`: Pressure sensor
     * An activated rain sensor is shown as 🌧️, and active soil sensor as 💧.
 * If **Sensor 2** is configured, its display will follow the same notation as Sensor 1.
 
@@ -500,7 +501,7 @@ This firmware supports up to **two independent masters**, each configurable as f
 
 #### Sensor Setup
 
-OpenSprinkler supports **two independent sensors** (`SN1`, `SN2`) with configurable types: **Rain**, **Soil** (binary output only), **Program Switch**, and **Flow** (*currently only supported on `SN1`*).
+OpenSprinkler supports **two independent sensors** (`SN1`, `SN2`) with configurable types: **Rain**, **Soil**, **Pressure** (binary output only), **Program Switch**, and **Flow** (*currently only supported on `SN1`*).
 
 * **Connections:**
     * The sensor's **two signal wires** should be connected to **SN1 + GND** (or **SN2 + GND**).
@@ -509,7 +510,7 @@ OpenSprinkler supports **two independent sensors** (`SN1`, `SN2`) with configura
     * **If the sensor needs 24VAC** power (e.g. wireless sensors), connect its **power wires** to **COM** and **GND** (AC-powered model only; DC/Latch models can NOT provide 24VAC).
     * For OpenSprinkler v3.4: `SN3`, `SN4` are reserved for future use and not enabled currently.
 
-* **Rain / Soil Sensor:** Automatically stop zone runs when rain or high soil moisture detected.
+* **Rain / Soil / Pressure Sensor:** Automatically stop zone runs when rain, high soil moisture, or abnormal pressure detected.
     * Choose **Normally Open** or **Normally Closed** (most common type).
     * Only support sensors that output **binary ON/OFF signals** (dry-contact switches).
         * For **Analog Sensors**, use an [**Analog-to-Digital Adapter**](https://opensprinkler.com/product/a2dadapter/), which converts an analog signal to ON/OFF with an adjustable threshold.

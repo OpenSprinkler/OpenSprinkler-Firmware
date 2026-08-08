@@ -745,12 +745,14 @@ void do_loop()
 		for (uint8_t i = 0; i < NUM_SENSORS; i++) {
 			if (!sensor_available(i)) continue;
 			if (os.sn_sensors[i].prev_active == os.sn_sensors[i].active) continue;
+			uint16_t notif_bit = (os.iopts[sensor_iopt_keys[i].type] == SENSOR_TYPE_PRESSURE)
+			                     ? NOTIFY_PRESSURE : sensor_notif_bits[i];
 			if (os.sn_sensors[i].active) {
 				os.sn_sensors[i].active_lasttime = curr_time;
-				notif.add(sensor_notif_bits[i], sensor_log_codes[i], 1);
+				notif.add(notif_bit, sensor_log_codes[i], 1);
 			} else {
 				write_log(sensor_log_codes[i], curr_time);
-				notif.add(sensor_notif_bits[i], sensor_log_codes[i], 0);
+				notif.add(notif_bit, sensor_log_codes[i], 0);
 			}
 			os.sn_sensors[i].prev_active = os.sn_sensors[i].active;
 		}
@@ -1304,7 +1306,7 @@ void process_dynamic_events(time_os_t curr_time) {
 	bool sn[NUM_SENSORS];
 	for (uint8_t i = 0; i < NUM_SENSORS; i++) {
 		uint8_t type = os.iopts[sensor_iopt_keys[i].type];
-		sn[i] = sensor_available(i) && (type == SENSOR_TYPE_RAIN || type == SENSOR_TYPE_SOIL) && os.sn_sensors[i].active;
+		sn[i] = sensor_available(i) && (type == SENSOR_TYPE_RAIN || type == SENSOR_TYPE_SOIL || type == SENSOR_TYPE_PRESSURE) && os.sn_sensors[i].active;
 	}
 
 	unsigned char sid, s, bid, qid, igrd;
