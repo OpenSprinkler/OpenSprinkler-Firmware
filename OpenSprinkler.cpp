@@ -36,6 +36,7 @@
 
 #if defined(ESP32)
 #include <WebServer.h>
+#include <esp_mac.h>
 #endif
 
 /** Declare static data members */
@@ -73,6 +74,28 @@ const uint8_t sensor_log_codes[NUM_SENSORS] = {
 
 unsigned char sensor_pin(uint8_t i) {
 	return i < NUM_SENSORS ? osboard::active().pins.sensors[i] : osboard::UNUSED_PIN;
+}
+
+unsigned char sensor_pullup_pin(uint8_t i) {
+	return i < NUM_SENSORS ? osboard::active().pins.sensor_pullups[i] : osboard::UNUSED_PIN;
+}
+
+static void configure_sensor_digital_input(uint8_t i) {
+	const uint8_t input_pin = sensor_pin(i);
+	const uint8_t pullup_pin = sensor_pullup_pin(i);
+#if defined(ARDUINO)
+	if (pullup_pin != osboard::UNUSED_PIN) {
+		// Preload HIGH before enabling the output to avoid a brief low pulse.
+		pinModeExt(input_pin, INPUT);
+		digitalWriteExt(pullup_pin, HIGH);
+		pinModeExt(pullup_pin, OUTPUT);
+	} else {
+		pinModeExt(input_pin, INPUT_PULLUP);
+	}
+#else
+	(void)pullup_pin;
+	pinMode(input_pin, INPUT_PULLUP);
+#endif
 }
 
 bool sensor_available(uint8_t i) {
@@ -355,10 +378,20 @@ bool detect_i2c(int addr) {
 
 /** read hardware MAC into tmp_buffer */
 bool OpenSprinkler::load_hardware_mac(unsigned char* buffer, bool wired) {
+	#if defined(ESP32)
+	if (wired) {
+		// Report the address assigned to the active Ethernet interface.
+		if (ETH.macAddress(buffer)) return true;
+		return esp_read_mac(buffer, ESP_MAC_ETH) == ESP_OK;
+	}
+	// Reading the eFuse-derived STA address does not require WiFi to be enabled.
+	return esp_read_mac(buffer, ESP_MAC_WIFI_STA) == ESP_OK;
+	#else
 	WiFi.macAddress((unsigned char*)buffer);
 	// if requesting wired Ethernet MAC, flip the last byte to create a modified MAC
 	if(wired) buffer[5] = ~buffer[5];
 	return true;
+	#endif
 }
 
 /** Initialize network with the given mac address and http port */
@@ -419,8 +452,18 @@ unsigned char OpenSprinkler::start_ether() {
 	lcd_print_line_clear_pgm(PSTR("Start wired link"), 1);
 	lcd_print_line_clear_pgm(PSTR("  [w5500]    "), 2);
 	uint32_t timeout = millis() + 10000UL;
+	uint32_t next_count = millis();
+	uint8_t timecount = 1;
 	while ((!ETH.linkUp() || (uint32_t)ETH.localIP() == 0) &&
-		(int32_t)((uint32_t)millis() - timeout) < 0) delay(200);
+		(int32_t)((uint32_t)millis() - timeout) < 0) {
+		if ((int32_t)((uint32_t)millis() - next_count) >= 0) {
+			lcd.setCursor(13, 2);
+			lcd.print(timecount++);
+			next_count += 1000UL;
+		}
+		delay(200);
+	}
+	lcd_print_line_clear_pgm(PSTR(""), 2);
 	if (ETH.linkUp() && (uint32_t)ETH.localIP() != 0) {
 		ETH.setDefault();
 		if (iopts[IOPT_USE_DHCP]) {
@@ -795,11 +838,9 @@ void OpenSprinkler::begin() {
 	apply_all_station_bits();
 
 #if defined(ARDUINO)
-	// Unavailable sensor pins remain 255, which pinModeExt safely ignores.
-	pinModeExt(PIN_SENSOR1, INPUT_PULLUP);
-	pinModeExt(PIN_SENSOR2, INPUT_PULLUP);
-	pinModeExt(PIN_SENSOR3, INPUT_PULLUP);
-	pinModeExt(PIN_SENSOR4, INPUT_PULLUP);
+	for (uint8_t i = 0; i < osboard::active().sensor_count; i++) {
+		configure_sensor_digital_input(i);
+	}
 
 #else
 	// pull shift register OE low to enable output
@@ -852,8 +893,13 @@ void OpenSprinkler::begin() {
 	lcd.setCursor(0,0);
 	lcd.print(F("Init file system"));
 	lcd.setCursor(0,1);
-	if(!LittleFS.begin()) {
-		// !!! flash init failed, stall as we cannot proceed
+	#if defined(ESP32)
+	const bool filesystem_ready = LittleFS.begin(true);
+	#else
+	const bool filesystem_ready = LittleFS.begin();
+	#endif
+	if(!filesystem_ready) {
+		// Mounting failed even after the platform's filesystem recovery attempt.
 		lcd.setCursor(0, 0);
 		lcd_print_pgm(PSTR("Error Code: 0x2D"));
 		delay(5000);
@@ -1217,10 +1263,11 @@ void OpenSprinkler::detect_binarysensor_status(time_os_t curr_time) {
 		uint8_t type = iopts[sensor_iopt_keys[i].type];
 		if (type != SENSOR_TYPE_RAIN && type != SENSOR_TYPE_SOIL) continue;
 
-		// SN1/SN2 GPIO pins need INPUT_PULLUP on OS 3.2+. SN3/SN4 are on
-		// the I/O expander where pinMode() is a no-op anyway, so the call
-		// is safe regardless.
-		if (i < 2 && hw_rev >= 2) pinMode(sensor_pin(i), INPUT_PULLUP);
+		// Reassert direct-GPIO pull-ups. OS4 uses its dedicated external
+		// 10K pull-up control; earlier direct inputs use the internal pull-up.
+		if (sensor_pullup_pin(i) != osboard::UNUSED_PIN || (i < 2 && hw_rev >= 2)) {
+			configure_sensor_digital_input(i);
+		}
 
 		unsigned char val = digitalReadExt(sensor_pin(i));
 		sn_sensors[i].raw = (val == iopts[sensor_iopt_keys[i].option]) ? 0 : 1;
@@ -1257,7 +1304,9 @@ unsigned char OpenSprinkler::detect_programswitch_status(time_os_t curr_time) {
 		if (!sensor_available(i)) continue;
 		if (iopts[sensor_iopt_keys[i].type] != SENSOR_TYPE_PSWITCH) continue;
 
-		if (i < 2 && hw_rev >= 2) pinMode(sensor_pin(i), INPUT_PULLUP);
+		if (sensor_pullup_pin(i) != osboard::UNUSED_PIN || (i < 2 && hw_rev >= 2)) {
+			configure_sensor_digital_input(i);
+		}
 
 		sn_sensors[i].raw = (digitalReadExt(sensor_pin(i)) != iopts[sensor_iopt_keys[i].option]);
 		sensor_hist[i] = (sensor_hist[i] << 1) | sn_sensors[i].raw;

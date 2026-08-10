@@ -47,6 +47,10 @@ int main() {
 	assert(has(CAP_ETHERNET));
 
 	check_sensor_pins(PROFILE_OS_40, 4, 1, 2, 3, 6);
+	assert(active().pins.sensor_pullups[0] == 4);
+	assert(active().pins.sensor_pullups[1] == 16);
+	assert(active().pins.sensor_pullups[2] == 17);
+	assert(active().pins.sensor_pullups[3] == 5);
 	assert(active().pins.buttons[0] == IO_EXPANDER_PIN_BASE + 8);
 	assert(active().pins.buttons[1] == 9);
 	assert(active().pins.buttons[2] == IO_EXPANDER_PIN_BASE + 9);
@@ -61,6 +65,7 @@ int main() {
 	assert(OS40_I2C_DATA_PIN == 23);
 
 	check_sensor_pins(PROFILE_OSPI_BOARD, 2, 14, 23, UNUSED_PIN, UNUSED_PIN);
+	assert(active().pins.sensor_pullups[0] == UNUSED_PIN);
 	assert(active().pins.buttons[0] == 24);
 	assert(active().pins.rf_tx == 15);
 	assert(OSPI_SHIFT_LATCH_PIN == 22);

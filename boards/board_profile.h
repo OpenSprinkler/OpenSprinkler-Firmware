@@ -25,6 +25,7 @@ enum Capability : uint8_t {
 struct BoardPins {
 	uint8_t buttons[3];
 	uint8_t sensors[4];
+	uint8_t sensor_pullups[4]; // GPIO driving the external pull-up, or UNUSED_PIN
 	uint8_t rf_rx;
 	uint8_t rf_tx;
 	uint8_t boost;
@@ -41,8 +42,8 @@ struct BoardProfile {
 	uint8_t capabilities;
 };
 
-static_assert(sizeof(BoardPins) == 15, "BoardPins must remain compact");
-static_assert(sizeof(BoardProfile) == 17, "BoardProfile must remain compact");
+static_assert(sizeof(BoardPins) == 19, "BoardPins must remain compact");
+static_assert(sizeof(BoardProfile) == 21, "BoardProfile must remain compact");
 
 const BoardProfile& active();
 void select(ProfileId id);

@@ -500,8 +500,8 @@ enum {
 
 #else
 
-	#if defined(ARDUINO)
-	// work-around for PIN_SENSOR1 on OS3.2 and above
+	#if defined(ESP8266)
+	// Work around the ESP8266 serial RX conflict with PIN_SENSOR1 on OS3.2+.
 	#define DEBUG_BEGIN(x)   {Serial.begin(115200); Serial.end();}
 	#else
 	#define DEBUG_BEGIN(x)   {}

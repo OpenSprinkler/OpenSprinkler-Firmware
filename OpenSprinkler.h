@@ -239,6 +239,7 @@ extern const uint8_t  sensor_log_codes[NUM_SENSORS];    // LOGDATA_SENSOR1..4 co
 // Helper accessors for sensor metadata. These index iopts[] which is RAM, so
 // they're plain inline reads (no pgm_read_byte needed for the iopts side).
 unsigned char sensor_pin(uint8_t i);  // implemented in OpenSprinkler.cpp
+unsigned char sensor_pullup_pin(uint8_t i);
 bool sensor_available(uint8_t i);     // true if the physical SN input exists
 int8_t sensor_index_from_log_code(uint8_t type);
 
