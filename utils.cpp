@@ -524,6 +524,17 @@ ulong water_time_resolve(uint16_t v) {
 	}
 }
 
+// Scale a resolved duration using 32-bit arithmetic, then enforce the
+// 16-bit effective-runtime limit used by this firmware generation.
+uint16_t water_time_scale(uint32_t duration, uint8_t watering_percentage) {
+	if (!duration || !watering_percentage) return 0;
+	if (duration > MAX_RUNTIME_DURATION * 100UL / watering_percentage) {
+		return (uint16_t)MAX_RUNTIME_DURATION;
+	}
+	uint32_t scaled = duration * (uint32_t)watering_percentage / 100UL;
+	return (uint16_t)scaled;
+}
+
 // encode a 16-bit signed water time (-600 to 600)
 // to unsigned byte (0 to 240)
 unsigned char water_time_encode_signed(int16_t i) {

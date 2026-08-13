@@ -184,11 +184,12 @@ void manualRun(char *message){
 	unsigned long curr_time = os.now_tz();
 	if(en){
 		if(findKeyVal(message, tmp_buffer, TMP_BUFFER_SIZE, PSTR("t"), true)){
-			timer = (uint16_t)atol(tmp_buffer);
-			if(timer==0 || timer>64800){
+			uint32_t requested_timer = strtoul(tmp_buffer, NULL, 10);
+			if(requested_timer==0 || requested_timer>MAX_PROGRAMMED_DURATION){
 				DEBUG_LOGF("Time out of bounds.\r\n");
 				return;
 			}
+			timer = (uint16_t)requested_timer;
 			if((os.status.mas==sid+1) || (os.status.mas2==sid+1)){
 				DEBUG_LOGF("Cannot independently schedule master.\r\n");
 				return;
@@ -295,7 +296,7 @@ void runOnceProgram(char *message){
 	}
 
 	for(sid = 0; sid < os.nstations; sid++){
-		dur = parse_listdata(&pv)*wl/100;
+		dur = water_time_scale(water_time_resolve(parse_listdata(&pv)), wl);
 		bid = sid >> 3;
 		s = sid&0x07;
 
@@ -303,7 +304,7 @@ void runOnceProgram(char *message){
 			RuntimeQueueStruct *q = pd.enqueue();
 			if(q){
 				q->st = 0;
-				q->dur = water_time_resolve(dur);
+				q->dur = dur;
 				q->pid = 254;
 				q->sid = sid;
 				match_found = true;

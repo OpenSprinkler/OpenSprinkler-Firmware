@@ -823,16 +823,16 @@ void server_change_runonce(OTF_PARAMS_DEF) {
 
 	for(unsigned char oi=0;oi<ns;oi++) {
 		sid=order[oi];
-		dur=prog.durations[sid]*wl/100;
+		uint16_t effective_dur = water_time_scale(water_time_resolve(prog.durations[sid]), wl);
 		bid=sid>>3;
 		s=sid&0x07;
 		// if non-zero duration is given
 		// and if the station has not been disabled
-		if (dur>0 && !(os.attrib_dis[bid]&(1<<s))) {
+		if (effective_dur>0 && !(os.attrib_dis[bid]&(1<<s))) {
 			RuntimeQueueStruct *q = pd.enqueue();
 			if (q) {
 				q->st = 0;
-				q->dur = water_time_resolve(dur);
+				q->dur = effective_dur;
 				q->pid = 254;
 				q->sid = sid;
 				match_found = true;
@@ -1813,10 +1813,11 @@ void server_change_manual(OTF_PARAMS_DEF) {
 	unsigned long curr_time = os.now_tz();
 	if (en) { // if turning on a station, must provide timer
 		if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("t"), true)) {
-			timer=(uint16_t)atol(tmp_buffer);
-			if (timer==0 || timer>64800) {
+			uint32_t requested_timer = strtoul(tmp_buffer, NULL, 10);
+			if (requested_timer==0 || requested_timer>MAX_PROGRAMMED_DURATION) {
 				handle_return(HTML_DATA_OUTOFBOUND);
 			}
+			timer=(uint16_t)requested_timer;
 
 			unsigned char qo = 0;
 			if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("qo"), true)) {

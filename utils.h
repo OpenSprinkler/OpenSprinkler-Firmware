@@ -53,6 +53,7 @@ unsigned char file_cmp_block(const char *fname, const char *buf, ulong pos);
 // misc. string and time converstion functions
 void strncpy_P0(char* dest, const char* src, int n);
 ulong water_time_resolve(uint16_t v);
+uint16_t water_time_scale(uint32_t duration, uint8_t watering_percentage);
 unsigned char water_time_encode_signed(int16_t i);
 int16_t water_time_decode_signed(unsigned char i);
 void urlDecode(char *);

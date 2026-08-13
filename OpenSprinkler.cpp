@@ -2166,7 +2166,7 @@ void OpenSprinkler::switch_remotestation(RemoteIPStationData *data, bool turnon,
 		if(dur>0) {
 			timer = dur;
 		} else {
-			timer = iopts[IOPT_SPE_AUTO_REFRESH]?4*MAX_NUM_STATIONS:64800;
+			timer = iopts[IOPT_SPE_AUTO_REFRESH]?4*MAX_NUM_STATIONS:MAX_PROGRAMMED_DURATION;
 		}
 	}
 	bf.emit_p(PSTR("GET /cm?pw=$O&sid=$D&en=$D&t=$D"),
@@ -2205,7 +2205,7 @@ void OpenSprinkler::switch_remotestation(RemoteOTCStationData *data, bool turnon
 		if(dur>0) {
 			timer = dur;
 		} else {
-			timer = iopts[IOPT_SPE_AUTO_REFRESH]?4*MAX_NUM_STATIONS:64800;
+			timer = iopts[IOPT_SPE_AUTO_REFRESH]?4*MAX_NUM_STATIONS:MAX_PROGRAMMED_DURATION;
 		}
 	}
 	bf.emit_p(PSTR("GET /forward/v1/$S/cm?pw=$O&sid=$D&en=$D&t=$D"),
