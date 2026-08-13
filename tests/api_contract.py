@@ -84,6 +84,28 @@ class DemoServer:
         with urllib.request.urlopen(url, timeout=3) as response:
             return json.load(response)
 
+    def raw_http(self, headers, body_parts=(), shutdown_write=False):
+        with socket.create_connection(("127.0.0.1", self.port), timeout=3) as sock:
+            sock.settimeout(4)
+            sock.sendall(headers)
+            for delay, part in body_parts:
+                if delay:
+                    time.sleep(delay)
+                sock.sendall(part)
+            if shutdown_write:
+                sock.shutdown(socket.SHUT_WR)
+
+            response = bytearray()
+            while True:
+                try:
+                    chunk = sock.recv(4096)
+                except ConnectionResetError:
+                    break
+                if not chunk:
+                    break
+                response.extend(chunk)
+            return bytes(response)
+
 
 def check_options(data):
     require_keys(
@@ -187,6 +209,38 @@ def check_combined(data):
     assert len(data["status"]["sn"]) == data["status"]["nstations"]
 
 
+def check_request_bodies(server):
+    path = f"/jo?pw={PASSWORD_HASH}"
+
+    def request(content_length):
+        return (
+            f"POST {path} HTTP/1.1\r\n"
+            f"Host: 127.0.0.1\r\n"
+            f"Content-Length: {content_length}\r\n"
+            f"Connection: close\r\n\r\n"
+        ).encode()
+
+    fragmented = server.raw_http(
+        request("6"),
+        [(0, b"abc"), (0.05, b"def")],
+    )
+    assert fragmented.startswith(b"HTTP/1.1 200"), fragmented[:80]
+
+    malformed = server.raw_http(request("12x"))
+    assert malformed.startswith(b"HTTP/1.1 400"), malformed[:80]
+
+    oversized = server.raw_http(request("8193"), shutdown_write=True)
+    assert oversized.startswith(b"HTTP/1.1 413"), oversized[:80]
+
+    truncated = server.raw_http(
+        request("6"),
+        [(0, b"abc")],
+        shutdown_write=True,
+    )
+    assert truncated.startswith(b"HTTP/1.1 408"), truncated[:80]
+    print("PASS HTTP request body handling")
+
+
 def run_contract(server):
     checks = [
         ("jo", check_options),
@@ -201,6 +255,7 @@ def run_contract(server):
     for endpoint, check in checks:
         check(server.get_json(endpoint))
         print(f"PASS /{endpoint}")
+    check_request_bodies(server)
 
 
 def main():
