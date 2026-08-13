@@ -2565,7 +2565,10 @@ void bfill_enum_values(const char *name) {
 
 	bool needs_comma = false;
 
-	bfill.emit_p(PSTR("\"$S\":["), name);
+	// $F: name and the enum strings below come from PSTR() helpers, i.e. they
+	// live in flash. $S copies via memcpy(), which byte-reads the source and
+	// faults (Exception 3) on ESP8266 flash addresses.
+	bfill.emit_p(PSTR("\"$F\":["), name);
 
 	for (size_t i = 0; i < static_cast<size_t>(T::MAX_VALUE); ++i) {
 		if (needs_comma) {
@@ -2575,7 +2578,7 @@ void bfill_enum_values(const char *name) {
 
 		const char* str = enum_string(static_cast<T>(i));
 		if (str) {
-			bfill.emit_p(PSTR("\"$S\""), str);
+			bfill.emit_p(PSTR("\"$F\""), str);
 			needs_comma = true;
 		}
 	}
@@ -2619,7 +2622,7 @@ void server_json_sensor_description_main(OTF_PARAMS_DEF) {
 	for (uint8_t i = 0; i < static_cast<uint8_t>(SensorUnit::MAX_VALUE); i++) {
 		if (i) bfill.emit_p(PSTR(","));
 		SensorUnit unit = static_cast<SensorUnit>(i);
-		bfill.emit_p(PSTR("[$D,\"$S\",\"$S\",$D]"),
+		bfill.emit_p(PSTR("[$D,\"$F\",\"$F\",$D]"),
 			i, get_sensor_unit_name(unit), get_sensor_unit_short(unit),
 			static_cast<uint8_t>(get_sensor_unit_group(unit)));
 	}
