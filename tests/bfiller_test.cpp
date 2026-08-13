@@ -56,5 +56,13 @@ int main() {
 	streaming.emit_p(PSTR("start:$S:end"), value.c_str());
 	assert(!streaming.overflowed());
 	assert(streamed == "start:" + value + ":end");
+
+	streamed.clear();
+	BufferFiller flash_streaming(stream_buffer, sizeof(stream_buffer));
+	flash_streaming.set_flush(capture);
+	flash_streaming.emit_p(PSTR("start:$F:end"),
+		PSTR("flash string longer than the streaming buffer"));
+	assert(!flash_streaming.overflowed());
+	assert(streamed == "start:flash string longer than the streaming buffer:end");
 	return 0;
 }

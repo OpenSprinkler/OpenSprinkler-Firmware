@@ -4,6 +4,9 @@
 
 #if defined(ARDUINO)
 #include <Arduino.h>
+#if defined(ESP8266)
+#include <mmu_iram.h>
+#endif
 #else
 #include <stdio.h>
 #include <string.h>
@@ -51,8 +54,25 @@ class BufferFiller {
 		return true;
 	}
 
+	bool append_progmem(PGM_P s) {
+		if (!s || overflow) return fail();
+		char byte;
+		while ((byte = pgm_read_byte(s++)) != 0) {
+			if (!append_char(byte)) return false;
+		}
+		return true;
+	}
+
 	bool append_string(const char *s) {
 		if (!s || overflow) return fail();
+		#if defined(ESP8266)
+		// Defensively handle a flash-backed value passed through $S. Callers
+		// should still use $F for PSTR/PROGMEM values.
+		if (mmu_is_icache(s)) {
+			DEBUG_PRINTLN(F("bfill: $S given a PROGMEM pointer; use $F"));
+			return append_progmem(s);
+		}
+		#endif
 		size_t slen = strlen(s);
 		if (flush_fn && position() + slen >= len) {
 			mid_flush();
@@ -123,14 +143,9 @@ public:
 				append_char(dec2hexchar(value & 0x0F));
 				break;
 			}
-			case 'F': {
-				PGM_P value = va_arg(ap, PGM_P);
-				char byte;
-				while ((byte = pgm_read_byte(value++)) != 0) {
-					if (!append_char(byte)) break;
-				}
+			case 'F':
+				append_progmem(va_arg(ap, PGM_P));
 				break;
-			}
 			case 'O': {
 				uint16_t oid = va_arg(ap, int);
 				if (flush_fn && position() + MAX_SOPTS_SIZE >= len) mid_flush();
