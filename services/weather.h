@@ -23,6 +23,7 @@
 
 #pragma once
 
+#include <stddef.h>
 #include <stdint.h>
 #include "types.h"
 
@@ -47,13 +48,27 @@ enum WeatherSensorGroup : uint8_t {
 	WEATHER_SENSOR_GROUP_HISTORICAL = 1 << 2,
 };
 
+typedef void (*weather_option_loader_t)(uint8_t oid, char *buffer, uint16_t maxlen);
+
+struct WeatherHttpTarget {
+	char *host;
+	uint16_t port;
+	bool use_ssl;
+};
+
 void GetWeather();
 void CheckWeatherSensors();
+void MaintainWeatherSensors();
 float weather_sensor_get_value(WeatherAction action);
 void weather_sensor_reset_cache();
 void weather_sensor_schedule_refresh();
 bool weather_sensor_parse_response(const char *json, uint8_t requested_groups,
 	uint16_t requested_actions = 0);
+uint8_t weather_sensor_expire_groups();
+bool weather_build_http_request(char *output, size_t output_size,
+	char *scratch, size_t scratch_size, const char *endpoint,
+	const char *extra_query, const char *user_agent,
+	weather_option_loader_t option_loader, WeatherHttpTarget *target);
 
 extern char wt_rawData[];
 extern int wt_errCode;

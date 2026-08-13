@@ -47,6 +47,7 @@ static uint16_t weather_sensor_valid = 0;
 static uint16_t weather_sensor_requested_actions = 0;
 static uint8_t weather_sensor_requested_groups = 0;
 static uint8_t weather_sensor_received_groups = 0;
+static uint8_t weather_sensor_stale_groups = 0;
 static uint32_t weather_sensor_group_updated[3] = {};
 static uint32_t weather_sensor_next_request = 0;
 
@@ -72,6 +73,116 @@ static uint16_t weather_group_action_mask(uint8_t group) {
 		if (weather_action_group(static_cast<WeatherAction>(i)) == group) mask |= 1U << i;
 	}
 	return mask;
+}
+
+class WeatherRequestWriter {
+public:
+	WeatherRequestWriter(char *buffer, size_t capacity) :
+		buffer(buffer), capacity(capacity), used(0), good(buffer && capacity) {
+		if (good) buffer[0] = 0;
+	}
+
+	bool append(const char *text) {
+		if (!text) return fail();
+		while (*text) {
+			if (!append_char(*text++)) return false;
+		}
+		return true;
+	}
+
+	bool append_url_encoded(const char *text) {
+		if (!text) return fail();
+		static const char hex[] = "0123456789ABCDEF";
+		while (*text) {
+			uint8_t c = static_cast<uint8_t>(*text++);
+			if (c == ' ' || c == '"' || c == '\'' || c == '<' || c == '>' || c > 127) {
+				if (!append_char('%') || !append_char(hex[(c >> 4) & 0x0F]) ||
+					!append_char(hex[c & 0x0F])) return false;
+			} else if (!append_char(static_cast<char>(c))) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	bool ok() const { return good; }
+
+private:
+	bool append_char(char c) {
+		if (!good || used + 1 >= capacity) return fail();
+		buffer[used++] = c;
+		buffer[used] = 0;
+		return true;
+	}
+
+	bool fail() {
+		good = false;
+		if (buffer && capacity) buffer[capacity - 1] = 0;
+		return false;
+	}
+
+	char *buffer;
+	size_t capacity;
+	size_t used;
+	bool good;
+};
+
+static void load_weather_option(uint8_t oid, char *buffer, uint16_t maxlen) {
+	os.sopt_load(oid, buffer, maxlen);
+}
+
+bool weather_build_http_request(char *output, size_t output_size,
+	char *scratch, size_t scratch_size, const char *endpoint,
+	const char *extra_query, const char *user_agent,
+	weather_option_loader_t option_loader, WeatherHttpTarget *target) {
+	if (!output || !scratch || scratch_size < 2 || !endpoint || !extra_query ||
+		!user_agent || !option_loader || !target) return false;
+
+	WeatherRequestWriter writer(output, output_size);
+	writer.append("GET /");
+	writer.append(endpoint);
+	writer.append("?loc=");
+
+	uint16_t option_capacity = static_cast<uint16_t>(scratch_size - 1);
+	if (option_capacity > MAX_SOPTS_SIZE) option_capacity = MAX_SOPTS_SIZE;
+	option_loader(SOPT_LOCATION, scratch, option_capacity);
+	scratch[option_capacity] = 0;
+	writer.append_url_encoded(scratch);
+
+	writer.append("&wto=");
+	option_loader(SOPT_WEATHER_OPTS, scratch, option_capacity);
+	scratch[option_capacity] = 0;
+	writer.append_url_encoded(scratch);
+	writer.append(extra_query);
+
+	option_loader(SOPT_WEATHERURL, scratch, option_capacity);
+	scratch[option_capacity] = 0;
+	target->host = scratch;
+	target->use_ssl = true;
+	target->port = 443;
+	if (strncmp_P(scratch, PSTR("http://"), 7) == 0) {
+		target->host = scratch + 7;
+		target->use_ssl = false;
+		target->port = 80;
+	} else if (strncmp_P(scratch, PSTR("https://"), 8) == 0) {
+		target->host = scratch + 8;
+	}
+
+	char *colon = strchr(target->host, ':');
+	if (colon) {
+		*colon = 0;
+		long parsed_port = strtol(colon + 1, nullptr, 10);
+		if (parsed_port < 1 || parsed_port > 65535) return false;
+		target->port = static_cast<uint16_t>(parsed_port);
+	}
+	if (!target->host[0]) return false;
+
+	writer.append(" HTTP/1.0\r\nHOST: ");
+	writer.append(target->host);
+	writer.append("\r\nUser-Agent: ");
+	writer.append(user_agent);
+	writer.append("\r\nConnection: close\r\n\r\n");
+	return writer.ok();
 }
 
 static void weather_sensor_store(ArduinoJson::JsonObject group, const char *key, WeatherAction action) {
@@ -109,6 +220,7 @@ static bool weather_sensor_parse_group(ArduinoJson::JsonDocument &doc, const cha
 			break;
 	}
 	weather_sensor_group_updated[weather_group_index(group)] = millis();
+	weather_sensor_stale_groups &= ~group;
 	weather_sensor_received_groups |= group;
 	return true;
 }
@@ -139,6 +251,41 @@ bool weather_sensor_parse_response(const char *buffer, uint8_t requested_groups,
 	return groups_complete && actions_complete;
 }
 
+uint8_t weather_sensor_expire_groups() {
+	uint8_t newly_stale = 0;
+	const uint8_t groups[] = {
+		WEATHER_SENSOR_GROUP_CURRENT,
+		WEATHER_SENSOR_GROUP_FORECAST,
+		WEATHER_SENSOR_GROUP_HISTORICAL,
+	};
+	uint32_t now_ms = millis();
+	for (uint8_t i = 0; i < sizeof(groups); i++) {
+		uint8_t group = groups[i];
+		uint32_t updated = weather_sensor_group_updated[i];
+		if (updated && (uint32_t)(now_ms - updated) > WEATHER_SENSOR_STALE_MS &&
+			!(weather_sensor_stale_groups & group)) {
+			weather_sensor_stale_groups |= group;
+			newly_stale |= group;
+		}
+	}
+	return newly_stale;
+}
+
+void MaintainWeatherSensors() {
+	uint8_t newly_stale = weather_sensor_expire_groups();
+	if (!newly_stale) return;
+
+	for (uint8_t i = 0; i < os.nsensors; i++) {
+		if (!(os.sensors[i].flag & (1 << SENSOR_FLAG_ENABLE))) continue;
+		Sensor *sensor = Sensor::get(i);
+		if (!sensor || sensor->get_sensor_type() != SensorType::Weather) continue;
+		WeatherAction action = static_cast<WeatherSensor *>(sensor)->action;
+		if (action >= WeatherAction::MAX_VALUE || !(weather_action_group(action) & newly_stale)) continue;
+		os.sensors[i].status =
+			(os.sensors[i].status & SENSOR_STATUS_VALID) | SENSOR_STATUS_STALE;
+	}
+}
+
 static void weather_sensor_callback(char *buffer) {
 	peel_http_header(buffer);
 	weather_sensor_parse_response(buffer, weather_sensor_requested_groups,
@@ -157,11 +304,21 @@ static uint8_t find_weather_sensor_groups() {
 		groups |= weather_action_group(action);
 		weather_sensor_requested_actions |=
 			static_cast<uint16_t>(1U << static_cast<uint8_t>(action));
-		// Make a newly configured sensor, or one whose shared data became stale,
-		// retry on the next one-second poll after this service request.
-		if (isnan(weather_sensor_get_value(action))) os.sensors[i].next_update = 0;
 	}
 	return groups;
+}
+
+static void schedule_weather_sensor_poll(uint8_t groups) {
+	if (!groups) return;
+	for (uint8_t i = 0; i < os.nsensors; i++) {
+		if (!(os.sensors[i].flag & (1 << SENSOR_FLAG_ENABLE))) continue;
+		Sensor *sensor = Sensor::get(i);
+		if (!sensor || sensor->get_sensor_type() != SensorType::Weather) continue;
+		WeatherAction action = static_cast<WeatherSensor *>(sensor)->action;
+		if (action < WeatherAction::MAX_VALUE && (weather_action_group(action) & groups)) {
+			os.sensors[i].next_update = 0;
+		}
+	}
 }
 
 void weather_sensor_reset_cache() {
@@ -169,6 +326,7 @@ void weather_sensor_reset_cache() {
 	weather_sensor_requested_actions = 0;
 	weather_sensor_requested_groups = 0;
 	weather_sensor_received_groups = 0;
+	weather_sensor_stale_groups = 0;
 	weather_sensor_next_request = 0;
 	memset(weather_sensor_group_updated, 0, sizeof(weather_sensor_group_updated));
 }
@@ -204,38 +362,23 @@ void CheckWeatherSensors() {
 	if (weather_sensor_requested_groups & WEATHER_SENSOR_GROUP_HISTORICAL) scope[scope_len++] = 'h';
 	scope[scope_len] = 0;
 
-	// urlEncode() can expand each input byte to three bytes. Reserve enough
-	// capacity for that worst case plus the HTTP headers appended below.
-	BufferFiller bf = BufferFiller(ether_buffer, (ETHER_BUFFER_SIZE - 256) / 3);
-	bf.emit_p(PSTR("GET /weatherSensorData?loc=$O&wto=$O&scope=$S"),
-		SOPT_LOCATION, SOPT_WEATHER_OPTS, scope);
-	urlEncode(ether_buffer);
-
-	char *host = tmp_buffer;
-	os.sopt_load(SOPT_WEATHERURL, host);
-	char *host_start = host;
-	bool use_ssl = true;
-	uint16_t port = 443;
-	if (strncmp_P(host, PSTR("http://"), 7) == 0) {
-		use_ssl = false;
-		port = 80;
-		host_start = host + 7;
-	} else if (strncmp_P(host, PSTR("https://"), 8) == 0) {
-		host_start = host + 8;
+	char extra_query[12];
+	snprintf(extra_query, sizeof(extra_query), "&scope=%s", scope);
+	WeatherHttpTarget target;
+	if (!weather_build_http_request(ether_buffer, ETHER_BUFFER_SIZE,
+		tmp_buffer, TMP_BUFFER_ALLOC_SIZE, "weatherSensorData", extra_query,
+		user_agent_string, load_weather_option, &target)) {
+		DEBUG_PRINTLN(F("weather sensor: request too large or invalid"));
+		weather_sensor_next_request = millis() + WEATHER_SENSOR_RETRY_MS;
+		return;
 	}
-	char *colon = strchr(host_start, ':');
-	if (colon) {
-		*colon = 0;
-		port = static_cast<uint16_t>(atoi(colon + 1));
-	}
-
-	size_t used = strlen(ether_buffer);
-	snprintf(ether_buffer + used, ETHER_BUFFER_SIZE - used,
-		" HTTP/1.0\r\nHOST: %s\r\nUser-Agent: %s\r\nConnection: close\r\n\r\n",
-		host_start, user_agent_string);
 
 	weather_sensor_received_groups = 0;
-	int ret = os.send_http_request(host_start, port, ether_buffer, weather_sensor_callback, use_ssl);
+	int ret = os.send_http_request(target.host, target.port, ether_buffer,
+		weather_sensor_callback, target.use_ssl);
+	// A successful group refresh should be visible on the next sensor poll,
+	// even when that sensor normally uses a long interval.
+	schedule_weather_sensor_poll(weather_sensor_received_groups);
 	bool complete = ret == HTTP_RQT_SUCCESS &&
 		(weather_sensor_received_groups & weather_sensor_requested_groups) == weather_sensor_requested_groups &&
 		(weather_sensor_valid & weather_sensor_requested_actions) == weather_sensor_requested_actions;
@@ -354,63 +497,25 @@ static void getweather_callback_with_peel_header(char* buffer) {
 
 void GetWeather() {
 	if(!os.network_connected()) return;
-	// use temp buffer to construct get command
-	BufferFiller bf = BufferFiller(tmp_buffer, TMP_BUFFER_ALLOC_SIZE);
 	int method = os.iopts[IOPT_USE_WEATHER];
 	// use manual adjustment call for monthly adjustment -- a bit ugly, but does not involve weather server changes
 	if(method==WEATHER_METHOD_MONTHLY) method=WEATHER_METHOD_MANUAL;
-	bf.emit_p(PSTR("$D?loc=$O&wto=$O&fwv=$D"),
-								method,
-								SOPT_LOCATION,
-								SOPT_WEATHER_OPTS,
-								(int)os.iopts[IOPT_FW_VERSION]);
-
-
-	urlEncode(tmp_buffer);
-
-	strcpy(ether_buffer, "GET /");
-	strcat(ether_buffer, tmp_buffer);
-	// because we are using tmp_buffer both for encoding the string
-	// and for loading weather url, we will load weather url AFTER
-	// the encoded string has been copied into ether_buffer
-
-	// load weather url to tmp_buffer
-	char *host = tmp_buffer;
-	os.sopt_load(SOPT_WEATHERURL, host);
-
-	// Parse protocol and extract host/port
-	char *host_start = host;
-
-	bool use_ssl = true;  // default to https
-	int port = 443;       // default to https port
-
-	// Check for http:// or https://
-	if (strncmp_P(host, PSTR("http://"), 7) == 0) {
-		use_ssl = false;
-		port = 80;
-		host_start = host + 7;
-	} else if (strncmp_P(host, PSTR("https://"), 8) == 0) {
-		use_ssl = true;
-		port = 443;
-		host_start = host + 8;
-	}
-
-	// Check for explicit port number
-	char *colon = strchr(host_start, ':');
-	if (colon) {
-		*colon = '\0';  // null-terminate hostname
-		port = atoi(colon + 1);
-	}
-
-	strcat(ether_buffer, " HTTP/1.0\r\nHOST: ");
-	strcat(ether_buffer, host_start);
-	strcat(ether_buffer, "\r\nUser-Agent: ");
-	strcat(ether_buffer, user_agent_string);
-	strcat(ether_buffer, "\r\n\r\n");
-
 	wt_errCode = HTTP_RQT_NOT_RECEIVED;
+	char endpoint[4];
+	snprintf(endpoint, sizeof(endpoint), "%d", method);
+	char extra_query[16];
+	snprintf(extra_query, sizeof(extra_query), "&fwv=%d", (int)os.iopts[IOPT_FW_VERSION]);
+	WeatherHttpTarget target;
+	if (!weather_build_http_request(ether_buffer, ETHER_BUFFER_SIZE,
+		tmp_buffer, TMP_BUFFER_ALLOC_SIZE, endpoint, extra_query,
+		user_agent_string, load_weather_option, &target)) {
+		DEBUG_PRINTLN(F("weather: request too large or invalid"));
+		wt_errCode = HTTP_RQT_CONNECT_ERR;
+		return;
+	}
 	DEBUG_PRINT(ether_buffer);
-	int ret = os.send_http_request(host_start, port, ether_buffer, getweather_callback_with_peel_header, use_ssl);
+	int ret = os.send_http_request(target.host, target.port, ether_buffer,
+		getweather_callback_with_peel_header, target.use_ssl);
 	if(ret!=HTTP_RQT_SUCCESS) {
 		if(wt_errCode < 0) wt_errCode = ret;
 		// if wt_errCode > 0, the call is successful but weather script may return error

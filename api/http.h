@@ -30,9 +30,9 @@ extern BufferFiller bfill;
 
 void begin_response(OTF::Response& response);
 
-unsigned char findKeyVal(const OTF::Request& request, char* buffer, uint16_t max_length,
+uint16_t findKeyVal(const OTF::Request& request, char* buffer, uint16_t max_length,
 	const char* key, bool key_in_program_memory = false, uint8_t* key_found = nullptr);
-unsigned char findKeyVal(const char* source, char* buffer, uint16_t max_length,
+uint16_t findKeyVal(const char* source, char* buffer, uint16_t max_length,
 	const char* key, bool key_in_program_memory = false, uint8_t* key_found = nullptr);
 
 void print_header(const OTF::Request& request, OTF::Response& response,

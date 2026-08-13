@@ -26,7 +26,7 @@ void begin_response(OTF::Response& response) {
 	bfill.set_flush(bfill_flush);
 }
 
-unsigned char findKeyVal(const OTF::Request& request, char* buffer, uint16_t max_length,
+uint16_t findKeyVal(const OTF::Request& request, char* buffer, uint16_t max_length,
 	const char* key, bool key_in_program_memory, uint8_t* key_found) {
 #if defined(ARDUINO)
 	char* result = key_in_program_memory
@@ -45,7 +45,7 @@ unsigned char findKeyVal(const OTF::Request& request, char* buffer, uint16_t max
 	return 0;
 }
 
-unsigned char findKeyVal(const char* source, char* buffer, uint16_t max_length,
+uint16_t findKeyVal(const char* source, char* buffer, uint16_t max_length,
 	const char* key, bool key_in_program_memory, uint8_t* key_found) {
 	uint8_t found = 0;
 	uint16_t length = 0;

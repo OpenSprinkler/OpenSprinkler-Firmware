@@ -34,7 +34,7 @@ container:
 TEST_HTTP_PORT?=18080
 
 .PHONY: test-api
-test-api: test-board-profiles test-hardware-detection test-storage-files test-firmware-release test-sensor-units test-weather-sensor-cache
+test-api: test-board-profiles test-hardware-detection test-storage-files test-firmware-release test-buffer-filler test-string-buffer test-sensor-units test-weather-sensor-cache
 	$(MAKE) clean
 	$(MAKE) VERSION=DEMO EXTRA_CXXFLAGS="-DHTTP_PORT=$(TEST_HTTP_PORT)"
 	python3 tests/api_contract.py --port $(TEST_HTTP_PORT)
@@ -69,6 +69,23 @@ test-sensor-units:
 			-Iexternal/OpenThings-Framework-Firmware-Library \
 			-ffunction-sections -fdata-sections \
 			tests/sensor_unit_test.cpp sensors/sensor.cpp sensors/weather_sensor.cpp \
+			-Wl,--gc-sections -o "$$output"; \
+		"$$output"
+
+.PHONY: test-buffer-filler
+test-buffer-filler:
+	@set -e; output=$$(mktemp); trap 'rm -f "$$output"' EXIT; \
+		$(CXX) -std=gnu++14 -DDEMO -I. tests/bfiller_test.cpp -o "$$output"; \
+		"$$output"
+
+.PHONY: test-string-buffer
+test-string-buffer:
+	@set -e; output=$$(mktemp); trap 'rm -f "$$output"' EXIT; \
+		$(CXX) -std=gnu++14 -DDEMO -I. \
+			-Iexternal/TinyWebsockets/tiny_websockets_lib/include \
+			-Iexternal/OpenThings-Framework-Firmware-Library \
+			-ffunction-sections -fdata-sections \
+			tests/string_buffer_test.cpp util/utils.cpp api/http.cpp \
 			-Wl,--gc-sections -o "$$output"; \
 		"$$output"
 

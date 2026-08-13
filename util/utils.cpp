@@ -173,9 +173,8 @@ BoardType get_board_type() {
 
 
 // copy n-character string from program memory with ending 0
-void strncpy_P0(char* dest, const char* src, int n) {
-	unsigned char i;
-	for(i=0;i<n;i++) {
+void strncpy_P0(char* dest, const char* src, size_t n) {
+	for (size_t i = 0; i < n; i++) {
 		*dest=pgm_read_byte(src++);
 		dest++;
 	}
@@ -315,8 +314,9 @@ void peel_http_header(char* buffer) { // remove the HTTP header
 }
 
 void strReplace(char *str, char c, char r) {
-	for(unsigned char i=0;i<strlen(str);i++) {
-		if(str[i]==c) str[i]=r;
+	if (!str) return;
+	for (; *str; str++) {
+		if (*str == c) *str = r;
 	}
 }
 

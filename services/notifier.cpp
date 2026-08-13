@@ -142,6 +142,10 @@ static void send_ifttt(const char *body) {
 	          SOPT_IFTTT_KEY, DEFAULT_IFTTT_URL, user_agent_string,
 	          (int)(strlen(body) + 13),         // +13 for {"value1":""}
 	          body);
+	if (bf.overflowed()) {
+		DEBUG_PRINTLN(F("IFTTT request too large"));
+		return;
+	}
 
 	os.send_http_request(DEFAULT_IFTTT_URL, 80, ether_buffer, default_http_callback);
 }

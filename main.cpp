@@ -1164,6 +1164,9 @@ static bool process_special_program_command(const char* pname, uint32_t curr_tim
 
 /** Make weather query */
 void check_weather() {
+	// Cache expiration is local state maintenance and must not depend on the
+	// network or on whether a program is currently running.
+	MaintainWeatherSensors();
 	// do not check weather if
 	// - network check has failed, or
 	// - the controller is in remote extension mode

@@ -23,6 +23,8 @@
 
  #pragma once
 
+#include <stddef.h>
+
 #if defined(ARDUINO)
 	#include <Arduino.h>
 #else // headers for RPI/LINUX
@@ -38,7 +40,7 @@
 #include "storage/files.h"
 
 // misc. string and time converstion functions
-void strncpy_P0(char* dest, const char* src, int n);
+void strncpy_P0(char* dest, const char* src, size_t n);
 uint32_t water_time_resolve(uint16_t v);
 uint32_t water_time_scale(uint32_t duration, uint8_t weather_percent, float sensor_factor);
 bool parse_program_duration(const char *value, uint32_t *duration);

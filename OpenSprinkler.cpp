@@ -1945,6 +1945,10 @@ void OpenSprinkler::switch_remotestation(RemoteIPStationData *data, bool turnon,
 						ip[0],ip[1],ip[2],ip[3]);
 
 	bf.emit_p(PSTR("User-Agent: $S\r\n\r\n"), user_agent_string);
+	if (bf.overflowed()) {
+		DEBUG_PRINTLN(F("remote IP request too large"));
+		return;
+	}
 
 	char server[20];
 	snprintf(server, 20, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
@@ -1984,6 +1988,10 @@ void OpenSprinkler::switch_remotestation(RemoteOTCStationData *data, bool turnon
 	bf.emit_p(PSTR(" HTTP/1.0\r\nHOST: $S\r\nConnection:close\r\n"), DEFAULT_OTC_SERVER_APP);
 
 	bf.emit_p(PSTR("User-Agent: $S\r\n\r\n"), user_agent_string);
+	if (bf.overflowed()) {
+		DEBUG_PRINTLN(F("remote OTC request too large"));
+		return;
+	}
 
 	send_http_request(DEFAULT_OTC_SERVER_APP, DEFAULT_OTC_PORT_APP, p, default_http_callback, true);
 }
@@ -2010,6 +2018,10 @@ void OpenSprinkler::switch_httpstation(HTTPStationData *data, bool turnon, bool 
 
 	bf.emit_p(PSTR("GET /$S HTTP/1.0\r\nHOST: $S\r\n"), cmd, server);
 	bf.emit_p(PSTR("User-Agent: $S\r\n\r\n"), user_agent_string);
+	if (bf.overflowed()) {
+		DEBUG_PRINTLN(F("HTTP station request too large"));
+		return;
+	}
 
 	send_http_request(server, atoi(port), p, default_http_callback, usessl);
 }
@@ -2511,8 +2523,10 @@ void OpenSprinkler::poll_sensors() {
 		float new_value = sensor->get_new_value(&new_status);
 
 		if (new_status & SENSOR_STATUS_ERROR) {
-			// Hardware fault — preserve last good value but flag error; clear stale
-			mem.status = (mem.status & SENSOR_STATUS_VALID) | SENSOR_STATUS_ERROR;
+			// Preserve the last good value and any established stale condition.
+			// A later successful read clears both ERROR and STALE.
+			mem.status = (mem.status & (SENSOR_STATUS_VALID | SENSOR_STATUS_STALE)) |
+				SENSOR_STATUS_ERROR;
 		} else {
 			mem.value = new_value;
 			mem.status = new_status; // VALID + CLAMPED_* as appropriate; clears ERROR/STALE
