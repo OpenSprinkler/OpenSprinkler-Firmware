@@ -461,6 +461,22 @@ unsigned char OpenSprinkler::start_ether() {
 	}
 
 	load_hardware_mac((uint8_t*)tmp_buffer, true);
+
+	/* Bring up the chip on its own first and wait for the link there. eth.begin()
+	 * registers the netif with lwIP, starts its DHCP client and installs the
+	 * packet polling callback, and none of that can be taken back: LwipIntfDev
+	 * has no end(). Committing to it before we know a cable is attached is what
+	 * used to leave a second, invisible interface running after a fallback. */
+	if(!eth.rawBegin((uint8_t*)tmp_buffer)) return 0;
+	lcd_print_line_clear_pgm(PSTR("Wait for link"), 1);
+	uint32_t linkout = millis()+ETHER_LINK_TIMEOUT;
+	while(!eth.rawLinked() && (int32_t)((uint32_t)millis()-linkout)<0) { delay(250); }
+	if(!eth.rawLinked() && !iopts[IOPT_FORCE_WIRED]) {
+		// no cable and the user has not asked us to insist: leave lwIP untouched
+		DEBUG_PRINTLN(F("no wired link, falling back to WiFi"));
+		return 0;
+	}
+
 	if (iopts[IOPT_USE_DHCP]==0) { // config static IP before calling eth.begin
 		IPAddress staticip(iopts+IOPT_STATIC_IP1);
 		IPAddress gateway(iopts+IOPT_GATEWAY_IP1);
