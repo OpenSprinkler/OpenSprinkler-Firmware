@@ -108,9 +108,22 @@
 		inline wl_status_t status() {
 			return (isW5500)?w5500.status():enc28j60.status();
 		}
+		// Bring up the controller chip only, without registering anything with
+		// lwIP. LwipIntfDev inherits publicly from the driver, so the raw begin()
+		// is reachable and can be called before we commit to the interface.
+		inline boolean rawBegin(const uint8_t *macAddress) {
+			return (isW5500)?w5500.Wiznet5500::begin(macAddress):enc28j60.ENC28J60::begin(macAddress);
+		}
+		// Link state straight from the chip, usable once rawBegin() has run
+		inline bool rawLinked() {
+			return (isW5500)?w5500.Wiznet5500::isLinked():enc28j60.ENC28J60::isLinked();
+		}
 	};
 	extern lwipEth eth;
 	extern bool useEth;
+	// eth.begin() succeeded, so the netif stays registered even if the controller
+	// later falls back to WiFi. LwipIntfDev has no way to undo it.
+	extern bool eth_started;
 #else
 	// OSPI/Linux specific
 #endif

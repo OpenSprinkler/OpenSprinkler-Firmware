@@ -461,6 +461,22 @@ unsigned char OpenSprinkler::start_ether() {
 	}
 
 	load_hardware_mac((uint8_t*)tmp_buffer, true);
+
+	/* Bring up the chip on its own first and wait for the link there. eth.begin()
+	 * registers the netif with lwIP, starts its DHCP client and installs the
+	 * packet polling callback, and none of that can be taken back: LwipIntfDev
+	 * has no end(). Committing to it before we know a cable is attached is what
+	 * used to leave a second, invisible interface running after a fallback. */
+	if(!eth.rawBegin((uint8_t*)tmp_buffer)) return 0;
+	lcd_print_line_clear_pgm(PSTR("Wait for link"), 1);
+	uint32_t linkout = millis()+ETHER_LINK_TIMEOUT;
+	while(!eth.rawLinked() && (int32_t)((uint32_t)millis()-linkout)<0) { delay(250); }
+	if(!eth.rawLinked() && !iopts[IOPT_FORCE_WIRED]) {
+		// no cable and the user has not asked us to insist: leave lwIP untouched
+		DEBUG_PRINTLN(F("no wired link, falling back to WiFi"));
+		return 0;
+	}
+
 	if (iopts[IOPT_USE_DHCP]==0) { // config static IP before calling eth.begin
 		IPAddress staticip(iopts+IOPT_STATIC_IP1);
 		IPAddress gateway(iopts+IOPT_GATEWAY_IP1);
@@ -470,6 +486,7 @@ unsigned char OpenSprinkler::start_ether() {
 	}
 	eth.setDefault();
 	if(!eth.begin((uint8_t*)tmp_buffer))	return 0;
+	eth_started = true;
 	lcd_print_line_clear_pgm(PSTR("Start wired link"), 1);
 	lcd_print_line_clear_pgm(eth.isW5500 ? PSTR("  [w5500]    ") : PSTR(" [enc28j60]  "), 2);
 
@@ -493,9 +510,14 @@ unsigned char OpenSprinkler::start_ether() {
 			iopts_save();
 		}
 		return 1;
+	} else if (iopts[IOPT_FORCE_WIRED]) {
+		return 1;
 	} else {
-		// if wired connection has failed at this point, return depending on whether the user wants to force wired
-		return (iopts[IOPT_FORCE_WIRED] ? 1 : 0);
+		// falling back to WiFi, but the wired interface stays up and keeps its
+		// DHCP client running: it may still pick up an address later and answer
+		// on it, without the controller knowing about it
+		DEBUG_PRINTLN(F("wired link failed, falling back to WiFi with the netif still up"));
+		return 0;
 	}
 }
 
@@ -3068,14 +3090,21 @@ void OpenSprinkler::config_ip() {
 }
 
 void OpenSprinkler::save_wifi_ip() {
-	// todo: handle wired ethernet
-	if(iopts[IOPT_USE_DHCP] && WiFi.status() == WL_CONNECTED) {
+	if(!iopts[IOPT_USE_DHCP]) return;
+	if(useEth) {
+		if(!eth.connected()) return;
+		memcpy(iopts+IOPT_STATIC_IP1, &(eth.localIP()[0]), 4);
+		memcpy(iopts+IOPT_GATEWAY_IP1, &(eth.gatewayIP()[0]),4);
+		memcpy(iopts+IOPT_DNS_IP1, &(eth.dnsIP()[0]), 4);
+		memcpy(iopts+IOPT_SUBNET_MASK1, &(eth.subnetMask()[0]), 4);
+	} else {
+		if(WiFi.status() != WL_CONNECTED) return;
 		memcpy(iopts+IOPT_STATIC_IP1, &(WiFi.localIP()[0]), 4);
 		memcpy(iopts+IOPT_GATEWAY_IP1, &(WiFi.gatewayIP()[0]),4);
 		memcpy(iopts+IOPT_DNS_IP1, &(WiFi.dnsIP()[0]), 4);
 		memcpy(iopts+IOPT_SUBNET_MASK1, &(WiFi.subnetMask()[0]), 4);
-		iopts_save();
 	}
+	iopts_save();
 }
 
 void OpenSprinkler::detect_expanders() {

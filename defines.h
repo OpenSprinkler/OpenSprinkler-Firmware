@@ -375,6 +375,7 @@ enum {
 
 	#define PIN_ETHER_CS       16 // Ethernet CS (chip select pin) is 16 on OS 3.2 and above
 	#define ETHER_SPI_CLOCK    10000000L // SPI clock for Ethernet (e.g. 10MHz)
+	#define ETHER_LINK_TIMEOUT 8000L // how long to wait for the wired link before giving up (in ms)
 
 	/* To accommodate different OS30 versions, we use software defines pins */
 	extern unsigned char PIN_BUTTON_1;

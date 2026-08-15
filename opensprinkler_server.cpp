@@ -1183,7 +1183,8 @@ void server_json_controller_main(OTF_PARAMS_DEF) {
 	}
 
 #if defined(ESP8266)
-	bfill.emit_p(PSTR("\"RSSI\":$D,"), (int16_t)WiFi.RSSI());
+	// RSSI is meaningless on a wired connection, where the radio is off
+	if(!useEth) bfill.emit_p(PSTR("\"RSSI\":$D,"), (int16_t)WiFi.RSSI());
 	bfill.emit_p(PSTR("\"apdv\":$D,"), os.actual_pd_voltage);
 #endif
 
@@ -3064,6 +3065,10 @@ void server_json_debug(OTF_PARAMS_DEF) {
 	bfill.emit_p(PSTR(",\"flash\":$D,\"used\":$D,\"devip\":\"$S\","), fs_info.totalBytes, fs_info.usedBytes, (useEth?eth.localIP():WiFi.localIP()).toString().c_str());
 	if(useEth) {
 		bfill.emit_p(PSTR("\"isW5500\":$D,\"spi_clock\":$L,\"arp_size\":$D}"), eth.isW5500, ETHER_SPI_CLOCK, ARP_TABLE_SIZE);
+	} else if(eth_started) {
+		// on WiFi, but the wired netif is still registered and may hold its own address
+		bfill.emit_p(PSTR("\"ethip\":\"$S\",\"rssi\":$D,\"bssid\":\"$S\",\"bssidchl\":\"$O\"}"),
+		eth.localIP().toString().c_str(), WiFi.RSSI(), WiFi.BSSIDstr().c_str(), SOPT_STA_BSSID_CHL);
 	} else {
 		bfill.emit_p(PSTR("\"rssi\":$D,\"bssid\":\"$S\",\"bssidchl\":\"$O\"}"),
 		WiFi.RSSI(), WiFi.BSSIDstr().c_str(), SOPT_STA_BSSID_CHL);
