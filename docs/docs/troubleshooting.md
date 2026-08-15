@@ -239,7 +239,7 @@ If your controller can't connect or stay connected via wired Ethernet, try these
 2. **Disable PoE** (Power-over-Ethernet) on that port: OpenSprinkler’s wired module is **not PoE-compatible**. PoE-enabled port can cause it to malfunction.
 3. **DHCP Setting:** Leave the controller on DHCP, and set a **DHCP reservation** (IP-to-Mac) on your router to assign it a fixed IP. If you must use Static IP, verify **Gateway IP, DNS, Subnet Mask** are all correct and compatible with your router settings.
 4. **Use a dedicated router:** If your wired network is very busy, the most effective solution is to place OpenSprinkler on a dedicated router to isolate it from heavy traffic. 
-5. **Set an auto-reboot program:** If the controller connects initially but doesn't stay connected, a work-around is to set an auto-reboot program (daily or any regular interval of your choice). See [Program Name Annotation](manual.md#program-name-annotations) in the user manual.
+5. **Set an auto-reboot program:** If the controller connects initially but doesn't stay connected, a work-around is to set an auto-reboot program (daily or any regular interval of your choice). See [Program Name Annotation](manual.md#program-name-annotations) in the user manual. On firmware versions that include the wired connection watchdog this is usually unnecessary: the controller checks the connection about every 10 minutes and reboots itself if it stays unreachable, waiting until no program is running.
 
 **<u>For OSPi</u>:** Networking is managed by RPi. Ensure RPi has adequate power (OSPi supplies up to 500 mA. RPi 3/4/5 may need extra power via USB, otherwise network may be unstable).
 

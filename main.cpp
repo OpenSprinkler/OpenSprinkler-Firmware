@@ -34,6 +34,7 @@
 
 #if defined(ESP8266)
 	#include <Arduino.h>
+	#include <lwip/etharp.h>
 	ESP8266WebServer *update_server = NULL;
 	DNSServer *dns = NULL;
 	ENC28J60lwIP enc28j60(PIN_ETHER_CS); // ENC28J60 lwip for wired Ether
@@ -70,6 +71,10 @@ void manual_start_program(unsigned char, unsigned char, unsigned char, unsigned 
 #define CHECK_WEATHER_SUCCESS_TIMEOUT 86400L // Weather check success interval (in seconds)
 #define LCD_BACKLIGHT_TIMEOUT     15    // LCD backlight timeout (in seconds))
 #define PING_TIMEOUT              200   // Ping test timeout (in ms)
+#define ARP_PROBE_WAIT            2     // how long to wait for the gateway's ARP reply (in seconds)
+#define NETWORK_FAILS_MAX         6     // clamp for network_fails (it is a 3-bit field)
+#define NETWORK_FAILS_REBOOT      3     // consecutive failed checks before rebooting
+#define REBOOT_NETWORK_FAIL_DELAY 5     // grace period before a network reboot (in seconds)
 #define UI_STATE_MACHINE_INTERVAL 50    // how often does ui_state_machine run (in ms)
 #define CLIENT_READ_TIMEOUT       5     // client read timeout (in seconds)
 #define DHCP_CHECKLEASE_INTERVAL  3600L // DHCP check lease interval (in seconds)
@@ -1881,14 +1886,105 @@ void delete_log(char *name) {
 #endif
 }
 
+#if defined(ESP8266)
+/** Record the outcome of a network check, and reboot if the connection stays down */
+static void network_check_result(bool ok) {
+	/* Whether an outage may still trigger a reboot. Initialized on first use,
+	 * which is safely after os.begin() has restored last_reboot_cause: if the
+	 * previous boot already ended in a network reboot and the connection has not
+	 * worked since, rebooting again will not fix it either - the cable is simply
+	 * unplugged - so the controller stops trying. */
+	static bool reboot_armed = (os.last_reboot_cause != REBOOT_CAUSE_NETWORK_FAIL);
+
+	if (ok) {
+		reboot_armed = true;
+		if (os.status.network_fails == 0) return;
+		DEBUG_PRINTLN(F("network check recovered"));
+		os.status.network_fails = 0;
+		// call off a reboot that was scheduled for an outage the controller has
+		// since recovered from. Only our own reboot is cancelled here.
+		if (os.status.safe_reboot && os.nvdata.reboot_cause == REBOOT_CAUSE_NETWORK_FAIL) {
+			os.status.safe_reboot = 0;
+			reboot_timer = 0;
+		}
+		return;
+	}
+
+	if (os.status.network_fails < NETWORK_FAILS_MAX) os.status.network_fails++;
+	DEBUG_PRINT(F("network check failed: "));
+	DEBUG_PRINTLN(os.status.network_fails);
+
+	if (os.status.network_fails < NETWORK_FAILS_REBOOT) return;
+	if (!reboot_armed || os.status.safe_reboot) return;
+
+	/* A wedged Ethernet controller cannot be brought back in place: LwipIntfDev
+	 * has no counterpart to begin(), which registers the netif and installs the
+	 * packet polling callback, so calling it a second time would corrupt the
+	 * interface list. Rebooting is the only way back, and it is deferred until
+	 * no program is running (see the safe_reboot handling in do_loop). */
+	DEBUG_PRINTLN(F("network down, scheduling reboot"));
+	reboot_armed = false;
+	os.nvdata.reboot_cause = REBOOT_CAUSE_NETWORK_FAIL;
+	os.status.safe_reboot = 1;
+	reboot_timer = os.now_tz() + REBOOT_NETWORK_FAIL_DELAY;
+}
+#endif
+
 /** Perform network check
- * This function pings the router
- * to check if it's still online.
- * If not, it re-initializes Ethernet controller.
+ * On a wired connection, this verifies the link and address, then asks the
+ * router for its MAC address to confirm that packets still arrive.
+ * If the connection stays down, the controller reboots once it is idle.
  */
 static void check_network() {
-	// TODO:
-	// nothing to do for other platforms
+#if defined(ESP8266)
+	/* Only the wired connection is watched here. In WiFi mode the ESP8266 SDK
+	 * reconnects on its own, which the connection handling in do_loop relies on,
+	 * so this watchdog stays out of the way there. */
+	if (!useEth) return;
+
+	// seconds left before an outstanding probe is collected, 0 if none is in
+	// flight. do_loop calls this function once per second, which is also the
+	// cadence req_network is raised at.
+	static unsigned char probe_wait = 0;
+
+	if (os.status.req_network) {
+		os.status.req_network = 0;
+
+		/* Stage 1: link state and IP address. This catches an unplugged cable
+		 * and an expired DHCP lease, but not a stalled receive path, which
+		 * leaves both of them looking healthy. */
+		if (!eth.connected()) {
+			network_check_result(false);
+			return;
+		}
+
+		/* Stage 2: ask the gateway to identify itself. Its answer has to travel
+		 * through exactly the receive path that stage 1 cannot vouch for. With
+		 * no gateway configured there is nothing to ask, so stage 1 stands on
+		 * its own. */
+		netif *nif = eth.getNetIf();
+		const ip4_addr_t *gw = netif_ip4_gw(nif);
+		if (ip4_addr_isany(gw)) {
+			network_check_result(true);
+			return;
+		}
+		etharp_request(nif, gw);
+		probe_wait = ARP_PROBE_WAIT;
+		return;
+	}
+
+	/* Collect the probe once the reply has had time to arrive. The gateway's ARP
+	 * entry doubles as the liveness signal: only a received reply refreshes it,
+	 * and lwIP drops it after ARP_MAXAGE. */
+	if (probe_wait && --probe_wait == 0) {
+		netif *nif = eth.getNetIf();
+		eth_addr *mac = NULL;
+		const ip4_addr_t *ip = NULL;
+		network_check_result(etharp_find_addr(nif, netif_ip4_gw(nif), &mac, &ip) >= 0);
+	}
+#else
+	// nothing to do for other platforms: the OS manages the network
+#endif
 }
 
 /** Perform NTP sync */
