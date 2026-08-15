@@ -3063,7 +3063,10 @@ void server_json_debug(OTF_PARAMS_DEF) {
 	LittleFS.info(fs_info);
 	bfill.emit_p(PSTR(",\"flash\":$D,\"used\":$D,\"devip\":\"$S\","), fs_info.totalBytes, fs_info.usedBytes, (useEth?eth.localIP():WiFi.localIP()).toString().c_str());
 	if(useEth) {
-		bfill.emit_p(PSTR("\"isW5500\":$D,\"spi_clock\":$L,\"arp_size\":$D}"), eth.isW5500, ETHER_SPI_CLOCK, ARP_TABLE_SIZE);
+		extern unsigned char network_check_fails;
+		extern bool network_reboot_pending;
+		bfill.emit_p(PSTR("\"isW5500\":$D,\"spi_clock\":$L,\"arp_size\":$D,\"ethlink\":$D,\"netfails\":$D,\"netreboot\":$D}"),
+		eth.isW5500, ETHER_SPI_CLOCK, ARP_TABLE_SIZE, eth.connected()?1:0, network_check_fails, network_reboot_pending?1:0);
 	} else {
 		bfill.emit_p(PSTR("\"rssi\":$D,\"bssid\":\"$S\",\"bssidchl\":\"$O\"}"),
 		WiFi.RSSI(), WiFi.BSSIDstr().c_str(), SOPT_STA_BSSID_CHL);

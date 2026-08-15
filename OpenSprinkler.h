@@ -108,6 +108,12 @@
 		inline wl_status_t status() {
 			return (isW5500)?w5500.status():enc28j60.status();
 		}
+		// the lwIP interface behind the active controller. LwipIntfDev hands it
+		// out as const, but etharp_request() takes a mutable netif, so the cast
+		// is kept here rather than at every call site.
+		inline netif* getNetIf() {
+			return (netif*)((isW5500)?w5500.getNetIf():enc28j60.getNetIf());
+		}
 	};
 	extern lwipEth eth;
 	extern bool useEth;
