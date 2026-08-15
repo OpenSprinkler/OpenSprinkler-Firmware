@@ -1889,19 +1889,11 @@ void delete_log(char *name) {
 #if defined(ESP8266)
 /** Record the outcome of a network check, and reboot if the connection stays down */
 static void network_check_result(bool ok) {
-	/* Whether an outage may still trigger a reboot. Initialized on first use,
-	 * which is safely after os.options_setup() has restored last_reboot_cause:
-	 * if the previous boot already ended in a network reboot and the connection
-	 * has not worked since, rebooting again will not fix it either - the cable is
-	 * simply unplugged - so the controller stops trying. */
+	// if the last boot already ended in a network reboot and nothing has worked
+	// since, another one will not help either. set after options_setup has run
 	static bool reboot_armed = (os.last_reboot_cause != REBOOT_CAUSE_NETWORK_FAIL);
-	// consecutive failures seen by this watchdog. Kept separate from
-	// status.network_fails so that a single lost probe does not immediately stop
-	// MQTT and the weather query, both of which bail out on that flag.
-	static unsigned char fails = 0;
-	// set while a reboot scheduled *here* is pending, so the cancel path below
-	// never calls off a reboot that something else requested
-	static bool reboot_pending = false;
+	static unsigned char fails = 0;  // kept apart from status.network_fails
+	static bool reboot_pending = false;  // set while our own reboot is armed
 	static uint8_t saved_reboot_cause = REBOOT_CAUSE_NONE;
 
 	if (ok) {
@@ -1910,9 +1902,7 @@ static void network_check_result(bool ok) {
 		DEBUG_PRINTLN(F("network check recovered"));
 		fails = 0;
 		os.status.network_fails = 0;
-		// call off a reboot that we scheduled for an outage the controller has
-		// since recovered from, and undo the reboot cause we staged for it
-		if (reboot_pending) {
+		if (reboot_pending) {  // call off the reboot we scheduled
 			reboot_pending = false;
 			os.nvdata.reboot_cause = saved_reboot_cause;
 			os.status.safe_reboot = 0;
@@ -1924,21 +1914,15 @@ static void network_check_result(bool ok) {
 	if (fails < NETWORK_FAILS_MAX) fails++;
 	DEBUG_PRINT(F("network check failed: "));
 	DEBUG_PRINTLN(fails);
-	// only report the connection as down once it has failed twice in a row, so a
-	// single dropped ARP reply does not pause MQTT and the weather query
+	// report down only from the second failure on: mqtt and check_weather stop on this
 	if (fails > 1) os.status.network_fails = fails;
 
 	if (fails < NETWORK_FAILS_REBOOT) return;
 	if (!reboot_armed) return;
-	// leave any other pending reboot alone - taking over safe_reboot here would
-	// downgrade an unconditional reboot request to an idle-only one
-	if (os.status.safe_reboot || reboot_timer) return;
+	if (os.status.safe_reboot || reboot_timer) return;  // leave another reboot alone
 
-	/* A wedged Ethernet controller cannot be brought back in place: LwipIntfDev
-	 * has no counterpart to begin(), which registers the netif and installs the
-	 * packet polling callback, so calling it a second time would corrupt the
-	 * interface list. Rebooting is the only way back, and it is deferred until
-	 * no program is running (see the safe_reboot handling in do_loop). */
+	// LwipIntfDev has no counterpart to begin(), so the interface cannot be
+	// re-initialized in place; rebooting is the only way back
 	DEBUG_PRINTLN(F("network down, scheduling reboot"));
 	reboot_armed = false;
 	reboot_pending = true;
@@ -1956,50 +1940,34 @@ static void network_check_result(bool ok) {
  */
 static void check_network() {
 #if defined(ESP8266)
-	/* Only the wired connection is watched here. In WiFi mode the ESP8266 SDK
-	 * reconnects on its own, which the connection handling in do_loop relies on,
-	 * so this watchdog stays out of the way there. */
-	if (!useEth) return;
+	if (!useEth) return;  // in WiFi mode the SDK handles re-connect itself
 
-	// seconds left before an outstanding probe is collected, 0 if none is in
-	// flight. do_loop calls this function once per second, which is also the
-	// cadence req_network is raised at.
-	static unsigned char probe_wait = 0;
+	static unsigned char probe_wait = 0;  // seconds left before collecting the probe
 
 	if (os.status.req_network) {
 		os.status.req_network = 0;
 
-		/* Stage 1: link state and IP address. This catches an unplugged cable
-		 * and an expired DHCP lease, but not a stalled receive path, which
-		 * leaves both of them looking healthy. */
+		// link and address. a stalled receive path leaves both looking healthy
 		if (!eth.connected()) {
 			network_check_result(false);
 			return;
 		}
 
-		/* Stage 2: ask the gateway to identify itself. Its answer has to travel
-		 * through exactly the receive path that stage 1 cannot vouch for. With
-		 * no gateway configured there is nothing to ask, so stage 1 stands on
-		 * its own. */
 		netif *nif = eth.getNetIf();
 		const ip4_addr_t *gw = netif_ip4_gw(nif);
-		if (ip4_addr_isany(gw)) {
+		if (ip4_addr_isany(gw)) {  // nothing to ask, stage 1 stands on its own
 			network_check_result(true);
 			return;
 		}
-		/* Drop what we know about the gateway first. lwIP keeps a resolved entry
-		 * for ARP_MAXAGE (300s) regardless of whether anything still arrives, so
-		 * without this the lookup below would be answered from the cache and the
-		 * probe would prove nothing. */
+		// drop the cached entry first: lwIP keeps a resolved one for ARP_MAXAGE
+		// whether or not anything still arrives, and would answer from cache
 		etharp_cleanup_netif(nif);
 		etharp_request(nif, gw);
 		probe_wait = ARP_PROBE_WAIT;
 		return;
 	}
 
-	/* Collect the probe once the reply has had time to arrive. Since the table
-	 * was cleared just before the request went out, an entry can only be there
-	 * if a reply came back in through the receive path. */
+	// an entry can only be here if a reply came back in through the receive path
 	if (probe_wait && --probe_wait == 0) {
 		netif *nif = eth.getNetIf();
 		eth_addr *mac = NULL;
