@@ -111,6 +111,9 @@
 	};
 	extern lwipEth eth;
 	extern bool useEth;
+	// eth.begin() succeeded, so the netif stays registered even when the
+	// controller falls back to WiFi. LwipIntfDev has no way to undo it.
+	extern bool eth_started;
 #else
 	// OSPI/Linux specific
 #endif

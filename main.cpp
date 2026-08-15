@@ -40,6 +40,7 @@
 	Wiznet5500lwIP w5500(PIN_ETHER_CS); // W5500 lwip for wired Ether
 	lwipEth eth;
 	bool useEth = false; // tracks whether we are using WiFi or wired Ether connection
+	bool eth_started = false;
 	uint32_t getNtpTime();
 #else // header and defs for RPI/Linux
 	#include <dirent.h>
