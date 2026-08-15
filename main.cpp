@@ -1887,14 +1887,18 @@ void delete_log(char *name) {
 }
 
 #if defined(ESP8266)
+// watchdog state, reported by /db so its behaviour can be observed from outside
+unsigned char network_check_fails = 0;
+bool network_reboot_pending = false;
+
 /** Record the outcome of a network check, and reboot if the connection stays down */
 static void network_check_result(bool ok) {
 	// if the last boot already ended in a network reboot and nothing has worked
 	// since, another one will not help either. set after options_setup has run
 	static bool reboot_armed = (os.last_reboot_cause != REBOOT_CAUSE_NETWORK_FAIL);
-	static unsigned char fails = 0;  // kept apart from status.network_fails
-	static bool reboot_pending = false;  // set while our own reboot is armed
 	static uint8_t saved_reboot_cause = REBOOT_CAUSE_NONE;
+	unsigned char &fails = network_check_fails;  // kept apart from status.network_fails
+	bool &reboot_pending = network_reboot_pending;
 
 	if (ok) {
 		reboot_armed = true;
