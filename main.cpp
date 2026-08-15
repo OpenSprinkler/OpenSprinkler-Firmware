@@ -1890,32 +1890,49 @@ void delete_log(char *name) {
 /** Record the outcome of a network check, and reboot if the connection stays down */
 static void network_check_result(bool ok) {
 	/* Whether an outage may still trigger a reboot. Initialized on first use,
-	 * which is safely after os.begin() has restored last_reboot_cause: if the
-	 * previous boot already ended in a network reboot and the connection has not
-	 * worked since, rebooting again will not fix it either - the cable is simply
-	 * unplugged - so the controller stops trying. */
+	 * which is safely after os.options_setup() has restored last_reboot_cause:
+	 * if the previous boot already ended in a network reboot and the connection
+	 * has not worked since, rebooting again will not fix it either - the cable is
+	 * simply unplugged - so the controller stops trying. */
 	static bool reboot_armed = (os.last_reboot_cause != REBOOT_CAUSE_NETWORK_FAIL);
+	// consecutive failures seen by this watchdog. Kept separate from
+	// status.network_fails so that a single lost probe does not immediately stop
+	// MQTT and the weather query, both of which bail out on that flag.
+	static unsigned char fails = 0;
+	// set while a reboot scheduled *here* is pending, so the cancel path below
+	// never calls off a reboot that something else requested
+	static bool reboot_pending = false;
+	static uint8_t saved_reboot_cause = REBOOT_CAUSE_NONE;
 
 	if (ok) {
 		reboot_armed = true;
-		if (os.status.network_fails == 0) return;
+		if (fails == 0) return;
 		DEBUG_PRINTLN(F("network check recovered"));
+		fails = 0;
 		os.status.network_fails = 0;
-		// call off a reboot that was scheduled for an outage the controller has
-		// since recovered from. Only our own reboot is cancelled here.
-		if (os.status.safe_reboot && os.nvdata.reboot_cause == REBOOT_CAUSE_NETWORK_FAIL) {
+		// call off a reboot that we scheduled for an outage the controller has
+		// since recovered from, and undo the reboot cause we staged for it
+		if (reboot_pending) {
+			reboot_pending = false;
+			os.nvdata.reboot_cause = saved_reboot_cause;
 			os.status.safe_reboot = 0;
 			reboot_timer = 0;
 		}
 		return;
 	}
 
-	if (os.status.network_fails < NETWORK_FAILS_MAX) os.status.network_fails++;
+	if (fails < NETWORK_FAILS_MAX) fails++;
 	DEBUG_PRINT(F("network check failed: "));
-	DEBUG_PRINTLN(os.status.network_fails);
+	DEBUG_PRINTLN(fails);
+	// only report the connection as down once it has failed twice in a row, so a
+	// single dropped ARP reply does not pause MQTT and the weather query
+	if (fails > 1) os.status.network_fails = fails;
 
-	if (os.status.network_fails < NETWORK_FAILS_REBOOT) return;
-	if (!reboot_armed || os.status.safe_reboot) return;
+	if (fails < NETWORK_FAILS_REBOOT) return;
+	if (!reboot_armed) return;
+	// leave any other pending reboot alone - taking over safe_reboot here would
+	// downgrade an unconditional reboot request to an idle-only one
+	if (os.status.safe_reboot || reboot_timer) return;
 
 	/* A wedged Ethernet controller cannot be brought back in place: LwipIntfDev
 	 * has no counterpart to begin(), which registers the netif and installs the
@@ -1924,6 +1941,8 @@ static void network_check_result(bool ok) {
 	 * no program is running (see the safe_reboot handling in do_loop). */
 	DEBUG_PRINTLN(F("network down, scheduling reboot"));
 	reboot_armed = false;
+	reboot_pending = true;
+	saved_reboot_cause = os.nvdata.reboot_cause;
 	os.nvdata.reboot_cause = REBOOT_CAUSE_NETWORK_FAIL;
 	os.status.safe_reboot = 1;
 	reboot_timer = os.now_tz() + REBOOT_NETWORK_FAIL_DELAY;
@@ -1968,14 +1987,19 @@ static void check_network() {
 			network_check_result(true);
 			return;
 		}
+		/* Drop what we know about the gateway first. lwIP keeps a resolved entry
+		 * for ARP_MAXAGE (300s) regardless of whether anything still arrives, so
+		 * without this the lookup below would be answered from the cache and the
+		 * probe would prove nothing. */
+		etharp_cleanup_netif(nif);
 		etharp_request(nif, gw);
 		probe_wait = ARP_PROBE_WAIT;
 		return;
 	}
 
-	/* Collect the probe once the reply has had time to arrive. The gateway's ARP
-	 * entry doubles as the liveness signal: only a received reply refreshes it,
-	 * and lwIP drops it after ARP_MAXAGE. */
+	/* Collect the probe once the reply has had time to arrive. Since the table
+	 * was cleared just before the request went out, an entry can only be there
+	 * if a reply came back in through the receive path. */
 	if (probe_wait && --probe_wait == 0) {
 		netif *nif = eth.getNetIf();
 		eth_addr *mac = NULL;
