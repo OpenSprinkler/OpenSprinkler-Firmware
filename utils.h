@@ -93,6 +93,7 @@ int16_t water_time_decode_signed(unsigned char i);
 void urlDecode(char *);
 void urlEncode(char *);
 void strReplaceQuoteBackslash(char *);
+void strStripOuterBraces(char *);
 void peel_http_header(char*);
 void strReplace(char *, char c, char r);
 
