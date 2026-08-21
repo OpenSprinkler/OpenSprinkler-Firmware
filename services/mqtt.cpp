@@ -42,10 +42,7 @@
 #endif
 
 #include "../OpenSprinkler.h"
-#include "../api/server.h"
-#include "../core/scheduler.h"
-#include "../storage/logging.h"
-#include "../core/program.h"
+#include "api/commands.h"
 #include "../types.h"
 #include "mqtt.h"
 #include "external/ArduinoJson.hpp"
@@ -70,7 +67,6 @@
 #endif
 
 extern OpenSprinkler os;
-extern ProgramData pd;
 extern char tmp_buffer[];
 
 #define OS_MQTT_KEEPALIVE      60
@@ -99,219 +95,33 @@ char OSMqtt::_pub_topic[MQTT_MAX_TOPIC_LEN + 1] = {0}; // topic for publishing d
 char OSMqtt::_sub_topic[MQTT_MAX_TOPIC_LEN + 1] = {0}; // topic for subscribing
 bool OSMqtt::_done_subscribed = false;		//Flag indicating if command topic has been subscribed to
 
-//******************************** HELPER FUNCTIONS ********************************// 
+// MQTT callbacks run synchronously from os.mqtt.loop() on the main thread, after
+// OTF has finished handling any local request. Shared scratch buffers are not in
+// concurrent use while command execution runs.
+uint8_t dispatch_mqtt_command(const uint8_t* payload, size_t length) {
+	if (!payload || length < 2 || memchr(payload, 0, length)) return HTML_DATA_FORMATERROR;
 
-extern uint16_t parse_listdata(char **p);
-//****************************** COMMAND ACTIONS ******************************//
-
-//ensure command incudes correct password
-boolean checkPassword(char* pw) {
-	if (os.iopts[IOPT_IGNORE_PASSWORD])  return true;
-
-	if(findKeyVal(pw, tmp_buffer, TMP_BUFFER_SIZE, PSTR("pw"), true)){
-		if (os.password_verify(tmp_buffer)) return true;
-	}else{
-		DEBUG_LOGF("Device password not found.\r\n");
-		return false;
-	}
-
-	DEBUG_LOGF("Device password verification Failed.\r\n");
-	return false;
-}
-
-//handles /cv command
-void changeValues(char *message){
-	DEBUG_LOGF("Changing Values\r\n");
-	#if defined(ARDUINO)
-		extern uint32_t reboot_timer;
-	#endif
-
-	if(findKeyVal(message, tmp_buffer, TMP_BUFFER_SIZE, PSTR("rsn"), true)){
-		DEBUG_LOGF("Resetting all stations\r\n");
-		reset_all_stations();
-	}
-
-	if(findKeyVal(message, tmp_buffer, TMP_BUFFER_SIZE, PSTR("rbt"), true)){
-		DEBUG_LOGF("Rebooting\r\n");
-		#if defined(ARDUINO)
-			os.status.safe_reboot = 0;
-			reboot_timer = os.now_tz() + 1;
-		#else
-			os.reboot_dev(REBOOT_CAUSE_WEB);
-		#endif
-	}
-
-	if(findKeyVal(message, tmp_buffer, TMP_BUFFER_SIZE, PSTR("en"), true)){
-		if (tmp_buffer[0]=='1' && !os.status.enabled) os.enable();
-		else if (tmp_buffer[0]=='0' && os.status.enabled) os.disable();
-	}
-
-	if(findKeyVal(message, tmp_buffer, TMP_BUFFER_SIZE, PSTR("rd"), true)){
-		int rd = atoi(tmp_buffer);
-		if(rd>0){
-			os.nvdata.rd_stop_time = os.now_tz() + (uint32_t) rd * 3600;
-			os.raindelay_start();
-		}else if (rd==0){
-			os.raindelay_stop();
+	// Parse only the query portion. This preserves legacy payloads without a
+	// '?' because their first parameter begins immediately after the command.
+	ParamSource params(payload + 2, length - 2);
+	if (!os.iopts[IOPT_IGNORE_PASSWORD]) {
+		if (!params.get(tmp_buffer, TMP_BUFFER_SIZE, PSTR("pw"), true) ||
+			!os.password_verify(tmp_buffer)) {
+			return HTML_UNAUTHORIZED;
 		}
 	}
-}
 
-//handles /cm command
-void manualRun(char *message){
-	int sid = -1;
-	if(findKeyVal(message, tmp_buffer, TMP_BUFFER_SIZE, PSTR("sid"), true)){
-		sid = atoi(tmp_buffer);
-		if(sid < 0 || sid >= os.nstations){
-			DEBUG_LOGF("Invalid station ID.\r\n");
-			return;
-		}
-	}else{
-		DEBUG_LOGF("No station ID found.\r\n");
-		return;
+	uint8_t result = HTML_PAGE_NOT_FOUND;
+	if (payload[0] == 'c') {
+		if (payload[1] == 'v') result = execute_change_values(params, CV_ACTIONS_MQTT);
+		else if (payload[1] == 'm') result = execute_manual_station(params);
+		else if (payload[1] == 'r') result = execute_runonce(params);
+	} else if (payload[0] == 'm' && payload[1] == 'p') {
+		result = execute_manual_program(params);
 	}
 
-	unsigned char en = 0;
-	if(findKeyVal(message, tmp_buffer, TMP_BUFFER_SIZE, PSTR("en"), true)){
-		en = atoi(tmp_buffer);
-	}else{
-		DEBUG_LOGF("No enable bit found.\r\n");
-		return;
-	}
-
-	uint32_t timer = 0;
-	uint32_t curr_time = os.now_tz();
-	if(en){
-		if(findKeyVal(message, tmp_buffer, TMP_BUFFER_SIZE, PSTR("t"), true)){
-			if(!parse_program_duration(tmp_buffer, &timer)){
-				DEBUG_LOGF("Time out of bounds.\r\n");
-				return;
-			}
-			if(os.is_master_station(sid)){
-				DEBUG_LOGF("Cannot independently schedule master.\r\n");
-				return;
-			}
-			RuntimeQueueStruct *q = NULL;
-			unsigned char sqi = pd.station_qid[sid];
-			//check if station has schedule
-			if(sqi!=0xFF){
-				q = pd.queue+sqi;
-			}else{
-				q = pd.enqueue();
-			}
-			
-			if(q){
-				q->st = 0;
-				q->dur = timer;
-				q->sid = sid;
-				q->pid = MANUAL_PID;
-				schedule_all_stations(curr_time);
-			}else{
-				DEBUG_LOGF("Queue is full.\r\n");
-				return;
-			}
-		}else{
-			DEBUG_LOGF("No time value found.\r\n")
-			return;
-		}
-	}else{
-		unsigned char ssta = 0;
-		if(findKeyVal(message, tmp_buffer, TMP_BUFFER_SIZE, PSTR("ssta"), true)){
-			ssta = atoi(tmp_buffer);
-		}
-		RuntimeQueueStruct *q = pd.queue + pd.station_qid[sid];
-		q->deque_time = curr_time;
-		turn_off_station(sid, curr_time, ssta);
-	}
-	return;
-}
-
-//handles /mp command
-void programStart(char *message){
-	if(!findKeyVal(message, tmp_buffer, TMP_BUFFER_SIZE, PSTR("pid"), true)){
-		DEBUG_LOGF("Program ID missing.\r\n")
-		return;
-	}
-	int pid = atoi(tmp_buffer);
-	if(pid < 0 || pid >= pd.nprograms){
-		DEBUG_LOGF("Program ID out of bounds.\r\n");
-		return;
-	}
-
-	unsigned char uwt = 0;
-	if(findKeyVal(message, tmp_buffer, TMP_BUFFER_SIZE, PSTR("uwt"), true)){
-		if(tmp_buffer[0]=='1') uwt = 1;
-	}
-
-	unsigned char qo = QUEUE_OPTION_REPLACE;
-	if (findKeyVal(message, tmp_buffer, TMP_BUFFER_SIZE, PSTR("qo"), true)) {
-		qo=(unsigned char)atoi(tmp_buffer);
-	}
-
-	if (qo == QUEUE_OPTION_REPLACE) {
-		// reset all stations and clear queue
-		reset_all_stations_immediate();
-	}
-
-	manual_start_program(pid+1, uwt, qo);
-
-	return;
-}
-
-//handles /cr command
-void runOnceProgram(char *message){
-	char *pv;
-	bool found = false;
-	for(pv = message; (*pv) != 0 && pv<message+100; pv++){
-		if(strncmp(pv, "t=[", 3)==0){
-			found = true;
-			break;
-		}
-	}
-	if(!found){
-		DEBUG_LOGF("No program definition found.\r\n");
-		return;
-	}
-	pv+=3;
-
-	unsigned char sid, bid, s;
-	uint32_t dur;
-	boolean match_found = false;
-	unsigned char wl = 100;
-	if(findKeyVal(message,tmp_buffer,TMP_BUFFER_SIZE,PSTR("uwt"),true)){
-		if(tmp_buffer[0]=='1') wl = os.iopts[IOPT_WATER_PERCENTAGE];
-	}
-
-	unsigned char qo = QUEUE_OPTION_REPLACE;
-	if (findKeyVal(message, tmp_buffer, TMP_BUFFER_SIZE, PSTR("qo"), true)) {
-		qo=(unsigned char)atoi(tmp_buffer);
-	}
-	if (qo == QUEUE_OPTION_REPLACE) {
-		// reset all stations and clear queue
-		reset_all_stations_immediate();
-	}
-
-	for(sid = 0; sid < os.nstations; sid++){
-		dur = water_time_scale(water_time_resolve(parse_listdata(&pv)), wl, 1.f);
-		bid = sid >> 3;
-		s = sid&0x07;
-
-		if(dur > 0 && !(os.attrib_dis[bid]&(1<<s))){
-			RuntimeQueueStruct *q = pd.enqueue();
-			if(q){
-				q->st = 0;
-				q->dur = dur;
-				q->pid = RUNONCE_PID;
-				q->sid = sid;
-				match_found = true;
-			}
-		}
-	}
-	if(match_found){
-		schedule_all_stations(os.now_tz(), qo);
-		return;
-	}
-	return;
+	if (result != HTML_SUCCESS) DEBUG_LOGF("MQTT command failed: %u\r\n", result);
+	return result;
 }
 
 //****************************** MQTT FUNCTIONS ******************************//
@@ -433,8 +243,7 @@ void OSMqtt::subscribe(void){
 		return;
 	}
 	DEBUG_LOGF("MQTT Subscribe: %s\r\n", _sub_topic);
-	_done_subscribed = true;
-	_subscribe();
+	_done_subscribed = (_subscribe() == MQTT_SUCCESS);
 }
 
 // Regularly call the loop function to ensure "keep alive" messages are sent to the broker and to reconnect if needed.
@@ -557,26 +366,8 @@ int OSMqtt::_publish(const char *topic, const char *payload) {
 
 void subscribe_callback(char *topic, unsigned char *payload, unsigned int length) {
 	DEBUG_LOGF("Subscribe Callback\r\n");
-	payload[length] = 0; // properly end the message
-	char* message = (char*)payload;
-	if(!checkPassword(message)){
-		return;
-	}
-
-	if(message[0]=='c'){
-		if(message[1]=='v'){
-			changeValues(message);
-		}else if(message[1]=='m'){
-			manualRun(message);
-		}else if(message[1]=='r'){
-			runOnceProgram(message);
-		}
-	}else if(message[0]=='m' && message[1]=='p'){
-		programStart(message);
-	}else{
-		DEBUG_LOGF("Unsupported mqtt subscribe request\r\n");
-		return;
-	}
+	(void)topic;
+	dispatch_mqtt_command(payload, length);
 }
 
 int OSMqtt::_subscribe(void){
@@ -617,7 +408,7 @@ static bool _connected = false;
 static void _mqtt_connection_cb(struct mosquitto *mqtt_client, void *obj, int reason) {
 	DEBUG_LOGF("MQTT Connnection Callback: %s (%d)\r\n", mosquitto_strerror(reason), reason);
 
-	::_connected = true;
+	::_connected = (reason == 0);
 	
 	String avail_topic(OSMqtt::get_pub_topic());
 	avail_topic += "/";
@@ -660,17 +451,23 @@ int OSMqtt::_init(void) {
 	mosquitto_connect_callback_set(mqtt_client, _mqtt_connection_cb);
 	mosquitto_disconnect_callback_set(mqtt_client, _mqtt_disconnection_cb);
 	mosquitto_log_callback_set(mqtt_client, _mqtt_log_cb);
-	String avail_topic(_id);
-	avail_topic += "/";
-	avail_topic += MQTT_AVAILABILITY_TOPIC;
-	DEBUG_LOGF("%s\n", avail_topic.c_str());
-	mosquitto_will_set(mqtt_client, avail_topic.c_str(), strlen(MQTT_OFFLINE_PAYLOAD), MQTT_OFFLINE_PAYLOAD, 0, true);
 
 	return MQTT_SUCCESS;
 }
 
 int OSMqtt::_connect(void) {
 	int rc;
+	::_connected = false;
+	String avail_topic(_pub_topic);
+	avail_topic += "/";
+	avail_topic += MQTT_AVAILABILITY_TOPIC;
+	mosquitto_will_clear(mqtt_client);
+	rc = mosquitto_will_set(mqtt_client, avail_topic.c_str(), strlen(MQTT_OFFLINE_PAYLOAD),
+		MQTT_OFFLINE_PAYLOAD, 0, true);
+	if (rc != MOSQ_ERR_SUCCESS) {
+		DEBUG_LOGF("MQTT Will: Failed (%s)\r\n", mosquitto_strerror(rc));
+		return MQTT_ERROR;
+	}
 	if (_username[0]) {
 		rc = mosquitto_username_pw_set(mqtt_client, _username, _password);
 		if (rc != MOSQ_ERR_SUCCESS) {
@@ -712,27 +509,10 @@ int OSMqtt::_publish(const char *topic, const char *payload) {
 
 void subscribe_callback(struct mosquitto *mosq, void *obj, const struct mosquitto_message *message){
 	DEBUG_LOGF("Callback\r\n");
-	char *topic = message->topic;
-	char *msg = (char*)(message->payload);
-
-	if(!checkPassword(msg)){
-		return;
-	}
-
-	if(msg[0]=='c'){
-		if(msg[1]=='v'){
-			changeValues(msg);
-		}else if(msg[1]=='m'){
-			manualRun(msg);
-		}else if(msg[1]=='r'){
-			runOnceProgram(msg);
-		}
-	}else if(msg[0]=='m' && msg[1]=='p'){
-		programStart(msg);
-	}else{
-		DEBUG_LOGF("Invalid request\r\n");
-		return;
-	}
+	(void)mosq;
+	(void)obj;
+	if (!message) return;
+	dispatch_mqtt_command(static_cast<const uint8_t*>(message->payload), message->payloadlen);
 }
 
 int OSMqtt::_subscribe(void) {

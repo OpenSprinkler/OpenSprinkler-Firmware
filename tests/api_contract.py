@@ -78,8 +78,11 @@ class DemoServer:
         if self.temp_dir:
             self.temp_dir.cleanup()
 
-    def get_json(self, endpoint):
-        query = urllib.parse.urlencode({"pw": PASSWORD_HASH})
+    def get_json(self, endpoint, params=None):
+        query_params = {"pw": PASSWORD_HASH}
+        if params:
+            query_params.update(params)
+        query = urllib.parse.urlencode(query_params)
         url = f"http://127.0.0.1:{self.port}/{endpoint}?{query}"
         with urllib.request.urlopen(url, timeout=3) as response:
             return json.load(response)
@@ -241,6 +244,43 @@ def check_request_bodies(server):
     print("PASS HTTP request body handling")
 
 
+def check_control_commands(server):
+    result = server.get_json("cm", {"sid": 0, "en": 1, "t": 64800, "qo": 0})
+    assert result["result"] == 1, result
+    status = server.get_json("jc")
+    assert status["ps"][0][0] == 99, status["ps"][0]
+
+    result = server.get_json("cv", {"rsn": 0, "rbt": 0})
+    assert result["result"] == 1, result
+    status = server.get_json("jc")
+    assert status["ps"][0][0] == 99, status["ps"][0]
+
+    result = server.get_json("cm", {"sid": 0, "en": 1, "t": 30})
+    assert result["result"] == 0x30, result
+    status = server.get_json("jc")
+    assert status["ps"][0][0] == 99, status["ps"][0]
+
+    result = server.get_json("cv", {"rsn": 1})
+    assert result["result"] == 1, result
+    result = server.get_json("cm", {"sid": 0, "en": 0})
+    assert result["result"] == 0x11, result
+
+    result = server.get_json("cv", {"rd": -1})
+    assert result["result"] == 0x11, result
+
+    program_count = server.get_json("jp")["nprogs"]
+    # Extra entries from a previously larger station setup remain compatible.
+    result = server.get_json("cr", {"t": "[64800,0,0,0,0,0,0,0,999]", "cnt": 0})
+    assert result["result"] == 1, result
+    assert server.get_json("jp")["nprogs"] == program_count
+    result = server.get_json("cv", {"rsn": 1})
+    assert result["result"] == 1, result
+
+    result = server.get_json("cr", {"t": "[60,0"})
+    assert result["result"] == 0x12, result
+    print("PASS shared control command behavior")
+
+
 def run_contract(server):
     checks = [
         ("jo", check_options),
@@ -256,6 +296,7 @@ def run_contract(server):
         check(server.get_json(endpoint))
         print(f"PASS /{endpoint}")
     check_request_bodies(server)
+    check_control_commands(server)
 
 
 def main():

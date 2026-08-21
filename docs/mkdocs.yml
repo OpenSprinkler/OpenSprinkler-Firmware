@@ -9,7 +9,10 @@ nav:
   - 'FAQ':  'faq.md'
   - 'Troubleshooting': 'troubleshooting.md'
   - 'Firmware Update': 'firmware-update.md'
-  - 'Firmware v2.2.1(5) [NEW]':
+  - 'Firmware v2.2.1(6) [DEV]':
+    - 'User Manual': '2.2.1/221_6_manual.md'
+    - 'API Reference': '2.2.1/221_6_api.md'
+  - 'Firmware v2.2.1(5)':
     - 'User Manual': '2.2.1/221_5_manual.md'
     - 'API Reference': '2.2.1/221_5_api.md'
   - 'Firmware v2.2.1(4)':

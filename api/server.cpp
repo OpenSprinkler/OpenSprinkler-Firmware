@@ -33,6 +33,7 @@
 #include "../storage/logging.h"
 #include "handlers.h"
 #include "routes.h"
+#include "api/commands.h"
 
 // External variables defined in main ion file
 extern OTF::OpenThingsFramework *otf;
@@ -214,37 +215,7 @@ uint16_t parse_listdata(char **p) {
  */
 void server_manual_program(OTF_PARAMS_DEF) {
 	if(!process_password(OTF_PARAMS)) return;
-
-	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("pid"), true))
-		handle_return(HTML_DATA_MISSING);
-
-	int pid=atoi(tmp_buffer);
-	if (pid < 0 || pid >= pd.nprograms) {
-		handle_return(HTML_DATA_OUTOFBOUND);
-	}
-
-	unsigned char uwt = 0;
-	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("uwt"), true)) {
-		if(tmp_buffer[0]=='1') uwt = 1;
-	}
-
-	unsigned char usa = 0;
-	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("usa"), true)) {
-		if(tmp_buffer[0]=='1') usa = 1;
-	}
-
-	unsigned char qo = QUEUE_OPTION_REPLACE;
-	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("qo"), true)) {
-		qo=(unsigned char)atoi(tmp_buffer);
-	}
-	if (qo == QUEUE_OPTION_REPLACE) {
-		// reset all stations and clear queue
-		reset_all_stations_immediate();
-	}
-
-	manual_start_program(pid+1, uwt, qo, usa);
-
-	handle_return(HTML_SUCCESS);
+	handle_return(execute_manual_program(ParamSource(req)));
 }
 
 /**
@@ -260,117 +231,7 @@ void server_manual_program(OTF_PARAMS_DEF) {
  */
 void server_change_runonce(OTF_PARAMS_DEF) {
 	if(!process_password(OTF_PARAMS)) return;
-	if(!findKeyVal(FKV_SOURCE,tmp_buffer,TMP_BUFFER_SIZE, "t", false)) handle_return(HTML_DATA_MISSING);
-	char *pv = tmp_buffer+1;
-
-	ProgramStruct prog, annoprog;
-	unsigned char ns = os.nstations;
-
-	uint16_t dur;
-	for(int i=0;i<ns;i++) {
-		dur = parse_listdata(&pv);
-		prog.durations[i] = dur > 0 ? dur : 0;
-	}
-
-	unsigned char order[ns];
-	annoprog.name[0] = 0;
-	// check if anno parameter is provided
-	if(findKeyVal(FKV_SOURCE,tmp_buffer,PROGRAM_NAME_SIZE-1,PSTR("anno"),true)){
-		tmp_buffer[PROGRAM_NAME_SIZE-1] = 0; // make sure it ends properly
-		strcpy(annoprog.name, tmp_buffer);
-	}
-	annoprog.gen_station_runorder(1, order);
-
-	//check if repeat count is defined and create program to perform the repetitions
-	if(findKeyVal(FKV_SOURCE,tmp_buffer,TMP_BUFFER_SIZE,PSTR("cnt"),true)){
-		prog.starttimes[1] = (uint16_t)atol(tmp_buffer) - 1;
-		if(prog.starttimes[1] >= 0){
-			if(findKeyVal(FKV_SOURCE,tmp_buffer,TMP_BUFFER_SIZE,PSTR("int"),true)){
-				prog.starttimes[2] = (uint16_t)atol(tmp_buffer);
-			}else{
-				handle_return(HTML_DATA_MISSING);
-			}
-			//check for positive interval length
-			if(prog.starttimes[2] < 1){
-				handle_return(HTML_DATA_OUTOFBOUND);
-			}
-			uint32_t curr_time = os.now_tz();
-
-			curr_time = (curr_time / 60) + prog.starttimes[2] + 1; //time in minutes for one interval past current time
-			uint16_t epoch_t = curr_time / 1440;
-
-			//if repeat count and interval are defined --> complete program
-			prog.enabled = 1;
-			prog.use_weather = 0;
-			if(findKeyVal(FKV_SOURCE,tmp_buffer,TMP_BUFFER_SIZE,PSTR("uwt"),true)){
-				if((uint16_t)atol(tmp_buffer)){
-					prog.use_weather = 1;
-				}
-			}
-			prog.oddeven = 0;
-			prog.type = 1;
-			prog.starttime_type = 0;
-			prog.en_daterange = 0;
-			prog.days[0] = (epoch_t >> 8) & 0b11111111; //one interval past current day in epoch time
-			prog.days[1] = epoch_t & 0b11111111; //one interval past current day in epoch time
-			prog.starttimes[0] = curr_time % 1440; //one interval past current time
-			strcpy_P(prog.name, PSTR(RUNONCE_REPEAT_PREFIX));
-			strncat(prog.name, annoprog.name, PROGRAM_NAME_SIZE-strlen(prog.name)-1);
-			prog.name[PROGRAM_NAME_SIZE-1]=0;
-
-			//if no more repeats, remove interval to flag for deletion
-			if(prog.starttimes[1] == 0){
-				prog.starttimes[2] = 0;
-			}
-
-			if(!pd.add(&prog)){
-				handle_return(HTML_DATA_OUTOFBOUND);
-			}
-		}
-	}
-
-	//No repeat count defined or first repeat --> use old API
-	unsigned char sid, bid, s;
-	boolean match_found = false;
-
-	unsigned char wl = 100;
-	if(findKeyVal(FKV_SOURCE,tmp_buffer,TMP_BUFFER_SIZE,PSTR("uwt"),true)){
-		if(tmp_buffer[0]=='1') wl = os.iopts[IOPT_WATER_PERCENTAGE];
-	}
-
-	unsigned char qo = QUEUE_OPTION_REPLACE;
-	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("qo"), true)) {
-		qo=(unsigned char)atoi(tmp_buffer);
-	}
-	if (qo == QUEUE_OPTION_REPLACE) {
-		// reset all stations and clear queue
-		reset_all_stations_immediate();
-	}
-
-	for(unsigned char oi=0;oi<ns;oi++) {
-		sid=order[oi];
-		uint32_t effective_dur = water_time_scale(water_time_resolve(prog.durations[sid]), wl, 1.f);
-		bid=sid>>3;
-		s=sid&0x07;
-		// if non-zero duration is given
-		// and if the station has not been disabled
-		if (effective_dur>0 && !(os.attrib_dis[bid]&(1<<s))) {
-			RuntimeQueueStruct *q = pd.enqueue();
-			if (q) {
-				q->st = 0;
-				q->dur = effective_dur;
-				q->pid = RUNONCE_PID;
-				q->sid = sid;
-				match_found = true;
-			}
-		}
-	}
-	if(match_found) {
-		schedule_all_stations(os.now_tz(), qo);
-		handle_return(HTML_SUCCESS);
-	}
-
-	handle_return(HTML_DATA_MISSING);
+	handle_return(execute_runonce(ParamSource(req)));
 }
 
 
@@ -924,63 +785,8 @@ void server_home(OTF_PARAMS_DEF)
  */
 void server_change_values(OTF_PARAMS_DEF)
 {
-	extern uint32_t reboot_timer;
 	if(!process_password(OTF_PARAMS)) return;
-	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("rsn"), true) && atoi(tmp_buffer) > 0) {
-		reset_all_stations();
-	}
-
-	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("rrsn"), true) && atoi(tmp_buffer) > 0) {
-		reset_all_stations(true);
-	}
-
-	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("rocs"), true) && atoi(tmp_buffer) > 0) {
-		os.status.overcurrent_sid = 0; // clear overcurrent status
-	}
-
-	#if !defined(ARDUINO)
-	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("update"), true) && atoi(tmp_buffer) > 0) {
-		os.update_dev();
-	}
-#endif
-
-	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("rbt"), true) && atoi(tmp_buffer) > 0) {
-		os.status.safe_reboot = 0;
-		reboot_timer = os.now_tz() + 1;
-		handle_return(HTML_SUCCESS);
-	}
-
-	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("en"), true)) {
-		if (tmp_buffer[0]=='1' && !os.status.enabled)  os.enable();
-		else if (tmp_buffer[0]=='0' &&	os.status.enabled)	os.disable();
-	}
-
-	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("rd"), true)) {
-		int rd = atoi(tmp_buffer);
-		if (rd>0) {
-			os.nvdata.rd_stop_time = os.now_tz() + (uint32_t) rd * 3600;
-			os.raindelay_start();
-		} else if (rd==0){
-			os.raindelay_stop();
-		} else	handle_return(HTML_DATA_OUTOFBOUND);
-	}
-
-	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("re"), true)) {
-		if (tmp_buffer[0]=='1' && !os.iopts[IOPT_REMOTE_EXT_MODE]) {
-			os.iopts[IOPT_REMOTE_EXT_MODE] = 1;
-			os.iopts_save();
-		} else if(tmp_buffer[0]=='0' && os.iopts[IOPT_REMOTE_EXT_MODE]) {
-			os.iopts[IOPT_REMOTE_EXT_MODE] = 0;
-			os.iopts_save();
-		}
-	}
-
-	#if defined(ARDUINO)
-	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("ap"), true)) {
-		os.reset_to_ap();
-	}
-	#endif
-	handle_return(HTML_SUCCESS);
+	handle_return(execute_change_values(ParamSource(req), CV_ACTIONS_HTTP));
 }
 
 // remove spaces from a string
@@ -1280,77 +1086,7 @@ void server_json_status(OTF_PARAMS_DEF)
  */
 void server_change_manual(OTF_PARAMS_DEF) {
 	if(!process_password(OTF_PARAMS)) return;
-
-	int sid=-1;
-	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("sid"), true)) {
-		sid=atoi(tmp_buffer);
-		if (sid<0 || sid>=os.nstations) handle_return(HTML_DATA_OUTOFBOUND);
-	} else {
-		handle_return(HTML_DATA_MISSING);
-	}
-
-	unsigned char en=0;
-	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("en"), true)) {
-		en=atoi(tmp_buffer);
-	} else {
-		handle_return(HTML_DATA_MISSING);
-	}
-
-	uint32_t timer=0;
-	uint32_t curr_time = os.now_tz();
-	if (en) { // if turning on a station, must provide timer
-		if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("t"), true)) {
-			if (!parse_program_duration(tmp_buffer, &timer)) {
-				handle_return(HTML_DATA_OUTOFBOUND);
-			}
-
-			unsigned char qo = 0;
-			if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("qo"), true)) {
-				qo=(unsigned char)atoi(tmp_buffer);
-			}
-			// schedule manual station
-			// skip if the station is a master station
-			// (because master cannot be scheduled independently)
-			if (os.is_master_station(sid))
-				handle_return(HTML_NOT_PERMITTED);
-
-			RuntimeQueueStruct *q = NULL;
-			unsigned char sqi = pd.station_qid[sid];
-			// check if the station already has a schedule
-			if (sqi!=0xFF) { // if so, do nothing
-
-			} else {  // otherwise create a new queue element
-				q = pd.enqueue();
-			}
-			// if the queue is not full (and the station doesn't already have a schedule
-			if (q) {
-				q->st = 0;
-				q->dur = timer;
-				q->sid = sid;
-				q->pid = MANUAL_PID;  // testing stations are assigned the manual program index
-				schedule_all_stations(curr_time, qo);
-			} else {
-				handle_return(HTML_NOT_PERMITTED);
-			}
-		} else {
-			handle_return(HTML_DATA_MISSING);
-		}
-	} else {	// turn off station
-		unsigned char ssta = 0;
-		if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("ssta"), true)) {
-			ssta = atoi(tmp_buffer);
-		}
-		// mark station for removal
-		if(pd.station_qid[sid]==255) {
-			// return error message if turning off a zone that's not currently in the queue
-			handle_return(HTML_DATA_OUTOFBOUND);
-		} else {
-			RuntimeQueueStruct *q = pd.queue + pd.station_qid[sid];
-			q->deque_time = curr_time;
-			turn_off_station(sid, curr_time, ssta);
-		}
-	}
-	handle_return(HTML_SUCCESS);
+	handle_return(execute_manual_station(ParamSource(req)));
 }
 
 

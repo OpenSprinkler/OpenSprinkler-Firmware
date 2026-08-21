@@ -23,6 +23,11 @@
 
 #pragma once
 
+#include <cstddef>
+#include <cstdint>
+
+uint8_t dispatch_mqtt_command(const uint8_t* payload, size_t length);
+
 class OSMqtt {
 private:
 	static char _id[];

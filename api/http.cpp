@@ -28,6 +28,10 @@ void begin_response(OTF::Response& response) {
 
 uint16_t findKeyVal(const OTF::Request& request, char* buffer, uint16_t max_length,
 	const char* key, bool key_in_program_memory, uint8_t* key_found) {
+	if (!buffer || !key || max_length == 0) {
+		if (key_found) *key_found = 0;
+		return 0;
+	}
 #if defined(ARDUINO)
 	char* result = key_in_program_memory
 		? request.getQueryParameter((const __FlashStringHelper*)key)
@@ -47,56 +51,60 @@ uint16_t findKeyVal(const OTF::Request& request, char* buffer, uint16_t max_leng
 
 uint16_t findKeyVal(const char* source, char* buffer, uint16_t max_length,
 	const char* key, bool key_in_program_memory, uint8_t* key_found) {
-	uint8_t found = 0;
-	uint16_t length = 0;
-	if (!source || !buffer || !key) return 0;
+	if (!source) {
+		if (key_found) *key_found = 0;
+		return 0;
+	}
+	return findKeyVal(source, strlen(source), buffer, max_length, key,
+		key_in_program_memory, key_found);
+}
 
-	const char* key_position = key;
-	if (key_in_program_memory) {
-		while (*source && *source != ' ' && *source != '\n' && !found) {
-			if (*source == pgm_read_byte(key_position)) {
-				key_position++;
-				if (pgm_read_byte(key_position) == '\0') {
-					source++;
-					key_position = key;
-					if (*source == '=') found = 1;
-				}
-			} else {
-				key_position = key;
-			}
-			source++;
+uint16_t findKeyVal(const char* source, size_t source_length, char* buffer, uint16_t max_length,
+	const char* key, bool key_in_program_memory, uint8_t* key_found) {
+	if (key_found) *key_found = 0;
+	if (!source || !buffer || !key || max_length == 0) return 0;
+	buffer[0] = 0;
+
+	auto key_byte = [key, key_in_program_memory](size_t index) -> char {
+		return key_in_program_memory ? pgm_read_byte(key + index) : key[index];
+	};
+
+	size_t value_position = source_length;
+	for (size_t position = 0; position < source_length; position++) {
+		char source_byte = source[position];
+		if (!source_byte || source_byte == ' ' || source_byte == '\n') break;
+		bool parameter_start = position == 0 || source[position - 1] == '&' ||
+			(position == 1 && source[0] == '?');
+		if (!parameter_start) continue;
+
+		size_t key_index = 0;
+		while (position + key_index < source_length) {
+			char expected = key_byte(key_index);
+			if (!expected || source[position + key_index] != expected) break;
+			key_index++;
 		}
-	} else {
-		while (*source && *source != ' ' && *source != '\n' && !found) {
-			if (*source == *key_position) {
-				key_position++;
-				if (*key_position == '\0') {
-					source++;
-					key_position = key;
-					if (*source == '=') found = 1;
-				}
-			} else {
-				key_position = key;
-			}
-			source++;
+		if (key_byte(key_index) == 0 && position + key_index < source_length &&
+			source[position + key_index] == '=') {
+			value_position = position + key_index + 1;
+			break;
 		}
 	}
 
-	if (found) {
-		while (*source && *source != ' ' && *source != '\n' && *source != '&' &&
-			length < max_length - 1) {
-			*buffer++ = *source++;
-			length++;
-		}
-		if (!*source || *source == ' ' || *source == '\n' || *source == '&') {
-			*buffer = '\0';
-		} else {
-			found = 0;
-			length = 0;
-		}
+	if (value_position == source_length) return 0;
+
+	size_t value_end = value_position;
+	while (value_end < source_length) {
+		char source_byte = source[value_end];
+		if (!source_byte || source_byte == ' ' || source_byte == '\n' || source_byte == '&') break;
+		value_end++;
 	}
-	if (key_found) *key_found = found;
-	return length;
+
+	size_t value_length = value_end - value_position;
+	if (value_length >= max_length) return 0;
+	if (value_length > 0) memcpy(buffer, source + value_position, value_length);
+	buffer[value_length] = 0;
+	if (key_found) *key_found = 1;
+	return static_cast<uint16_t>(value_length);
 }
 
 void print_header(const OTF::Request&, OTF::Response& response,
