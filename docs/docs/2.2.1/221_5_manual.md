@@ -267,7 +267,7 @@ OpenSprinkler’s web interface works on phones, tablets, and computers, enablin
 **Local Access**
 
 * On the controller, press button **B1** to find its **device IP** and **HTTP port**. We denote the IP as `os-ip` (e.g. `192.168.1.122`).
-* Open a browser and visit `http://os-ip`. The default HTTP port is `80` on **OpenSprinkler v3** (e.g. `http://192.168.1.122`), and `8080` on **OSPi** (e.g. `http://192.168.1.122:8080`). If you changed the HTTP port (e.g. `8765`), include it in the URL (e.g. `http://os-ip:8765`).
+* Open a browser and visit `http://os-ip`. The default HTTP port is `80` on **OpenSprinkler v3** (e.g. `http://192.168.1.122`), and `88` on **OSPi** (e.g. `http://192.168.1.122:88`). If you changed the HTTP port (e.g. `8765`), include it in the URL (e.g. `http://os-ip:8765`). OSPi installs created before firmware 2.2.1(6) default to `8080` and keep that port across upgrades — the new default only applies to a fresh install or after a factory reset.
 * <span class="hl">The default device password is **opendoor**</span>. For security, change it upon first use.
 * When using the OpenSprinkler mobile app, choose **Manually Add a Device**. Type in a custom name, and enter the device IP and password.
 * Using the IP to access the controller works as long as you are on the same local network.
@@ -580,8 +580,9 @@ All supported controllers provide two independent built-in sensor ports (`SN1/SN
 
 ### Advanced Settings
 
-* **HTTP Port:** Change the device's HTTP port. Changing the port requires a restart. Default: `80` on OpenSprinkler v3 and `8080` on OSPi.
+* **HTTP Port:** Change the device's HTTP port. Changing the port requires a restart. Default: `80` on OpenSprinkler v3 and `88` on OSPi (`8080` on OSPi installs predating firmware 2.2.1(6); upgrading does not move an existing port).
     * On OpenSprinkler v3, do **NOT** use `8080` as it's reserved for OTA firmware update.
+    * If you run OSPi in Docker, the port the firmware listens on must match the container side of the `ports:` mapping in `docker-compose.yaml`, or the container will be unreachable.
 * **Undercurrent Threshold:** Triggers Undercurrent notification if a zone’s current draw (`mA`) falls below this threshold at the end of its run (e.g. due to broken wire or faulty solenoid). Default: `100 mA`.
     * The ideal value is half the typical holding current of your solenoid.
     * Set to `0` to disable this detection.

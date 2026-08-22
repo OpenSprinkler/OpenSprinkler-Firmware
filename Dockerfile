@@ -50,8 +50,8 @@ WORKDIR /OpenSprinkler
 #-- Logs and config information go into the volume on /data
 VOLUME /data
 
-#-- OpenSprinkler interface is available on 8080
-EXPOSE 8080
+#-- OpenSprinkler interface is available on 88 (the OSPi default HTTP port)
+EXPOSE 88
 
 #-- By default, start OS using /data for saving data/NVM/log files
 CMD [ "/OpenSprinkler/OpenSprinkler", "-d", "/data" ]

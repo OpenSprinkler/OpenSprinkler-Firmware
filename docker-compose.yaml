@@ -40,12 +40,16 @@ services:
     container_name: opensprinkler
     restart: unless-stopped
 
-    # host:container. Keep the container side at 8080 unless you also change
-    # the HTTP Port option in the UI -- that value is persisted to
-    # ./data/iopts.dat, and the container becomes unreachable if the two drift
-    # apart. To move it on the host only, use "8081:8080".
+    # host:container. Keep the container side at 88 -- the OSPi default HTTP
+    # port -- unless you also change the HTTP Port option in the UI. That value
+    # is persisted to ./data/iopts.dat and wins over anything set here, so the
+    # container becomes unreachable if the two drift apart. To move it on the
+    # host only, change the left-hand side, e.g. "8081:88".
+    #
+    # Carrying over a ./data from firmware 2.2.1(5) or earlier? Those installs
+    # default to 8080 and keep it, so use "88:8080" or change the port in the UI.
     ports:
-      - "8080:8080"
+      - "88:88"
 
     # Everything the firmware persists: iopts.dat, sopts.dat, stns.dat,
     # prog.dat, nvcon.dat, done.dat, sens.dat, senadj.dat, plus a logs/
@@ -73,7 +77,7 @@ services:
     # Debian's /bin/sh is dash and has no /dev/tcp fallback.
     # "/" is the right probe: server_home requires no password and returns 200.
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://127.0.0.1:8080/"]
+      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://127.0.0.1:88/"]
       interval: 30s
       timeout: 5s
       retries: 3

@@ -160,13 +160,17 @@ bool OpenSprinkler::has_ads1115() {
 
 OTCConfig OpenSprinkler::otc;
 
-// HTTP port defaults differ by platform.
+// HTTP port defaults differ by platform. v3 stays on 80; 8080 is reserved
+// there for OTA firmware upload. OSPi/DEMO default to 88 -- low enough to be
+// unobtrusive in a URL, and both the systemd unit and the container run as
+// root, so binding a privileged port is not a problem. Existing installs are
+// unaffected: defaults are only consulted when iopts.dat is absent or reset.
 #if defined(ESP8266)
 #define DEFAULT_HTTPPORT_0 80
 #define DEFAULT_HTTPPORT_1 0
 #else
-#define DEFAULT_HTTPPORT_0 144
-#define DEFAULT_HTTPPORT_1 31
+#define DEFAULT_HTTPPORT_0 88
+#define DEFAULT_HTTPPORT_1 0
 #endif
 
 /** Per-option metadata: JSON name, max value, factory default, flags, LCD prompt.
