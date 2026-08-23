@@ -27,7 +27,8 @@ mkdir -p ./data          # create it yourself so it is not owned by dockerd
 docker compose up -d
 ```
 
-The web UI is then on <http://localhost:8080>.
+The web UI is then on <http://localhost:88> (the OSPi default HTTP port; installs
+carrying over a `./data` from firmware 2.2.1(5) or earlier stay on `8080`).
 
 `docker-compose.yaml` on its own grants **no** hardware access, so it runs
 anywhere — an x86-64 box, a laptop, a Pi. On a Raspberry Pi driving real zones,
@@ -101,7 +102,7 @@ to run as your own uid instead.
 mkdir -p ~/opensprinkler
 docker run -d \
   --name opensprinkler \
-  --publish 8080:8080 \
+  --publish 88:88 \
   --restart unless-stopped \
   --volume ~/opensprinkler:/data \
   --device /dev/gpiochip0 \
