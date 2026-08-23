@@ -54,7 +54,8 @@ Gotchas:
   so `make clean` between `VERSION=` changes.
 
 Running the Linux build: `./OpenSprinkler -d <datadir>` — all `.dat` files, `logs/`, and NVM
-live there; web UI on port 8080. `-d` defaults to the current directory, which is why
+live there; web UI on port 88 on OSPi/DEMO (v3 stays on 80); existing installs keep
+whatever `iopts.dat` already holds. `-d` defaults to the current directory, which is why
 `startOpenSprinkler.sh` (used by `OpenSprinkler.service`) passes nothing and runs from the
 checkout. That is load-bearing: `OpenSprinkler::update_dev()` implements in-app firmware
 update by shelling out to `cd $(get_data_dir()) && ./updater.sh`, so on OSPi **the data dir
