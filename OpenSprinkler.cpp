@@ -85,10 +85,9 @@ static void configure_sensor_digital_input(uint8_t i) {
 	const uint8_t pullup_pin = sensor_pullup_pin(i);
 #if defined(ARDUINO)
 	if (pullup_pin != osboard::UNUSED_PIN) {
-		// Preload HIGH before enabling the output to avoid a brief low pulse.
 		pinModeExt(input_pin, INPUT);
-		digitalWriteExt(pullup_pin, HIGH);
 		pinModeExt(pullup_pin, OUTPUT);
+		digitalWriteExt(pullup_pin, HIGH);
 	} else {
 		pinModeExt(input_pin, INPUT_PULLUP);
 	}
