@@ -26,7 +26,7 @@ enum class FileSeekMode {
 	End,
 };
 
-void remove_file(const char* filename);
+bool remove_file(const char* filename);
 bool file_exists(const char* filename);
 void ensure_log_dir();
 
@@ -38,12 +38,12 @@ int file_read(os_file_type file, void* target, uint32_t length);
 int file_write(os_file_type file, const void* source, uint32_t length);
 uint32_t file_size(os_file_type file);
 
-void file_read_block(const char* filename, void* destination, uint32_t position, uint32_t length);
-void file_write_block(const char* filename, const void* source, uint32_t position, uint32_t length);
-void file_copy_block(const char* filename, uint32_t from, uint32_t to, uint32_t length,
+bool file_read_block(const char* filename, void* destination, uint32_t position, uint32_t length);
+bool file_write_block(const char* filename, const void* source, uint32_t position, uint32_t length);
+bool file_copy_block(const char* filename, uint32_t from, uint32_t to, uint32_t length,
 	void* temporary_buffer = nullptr);
 unsigned char file_read_byte(const char* filename, uint32_t position);
-void file_write_byte(const char* filename, uint32_t position, unsigned char value);
+bool file_write_byte(const char* filename, uint32_t position, unsigned char value);
 unsigned char file_cmp_block(const char* filename, const char* value, uint32_t position);
 
 #if !defined(ARDUINO)

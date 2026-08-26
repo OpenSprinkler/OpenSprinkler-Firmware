@@ -88,14 +88,15 @@ void ProgramData::load_count() {
 }
 
 /** Save program count to program file */
-void ProgramData::save_count() {
-	file_write_byte(PROG_FILENAME, 0, nprograms);
+bool ProgramData::save_count() {
+	return file_write_byte(PROG_FILENAME, 0, nprograms);
 }
 
 /** Erase all program data */
-void ProgramData::eraseall() {
+bool ProgramData::eraseall() {
+	if (!file_write_byte(PROG_FILENAME, 0, 0)) return false;
 	nprograms = 0;
-	save_count();
+	return true;
 }
 
 /** Read a program from program file*/
@@ -108,30 +109,34 @@ void ProgramData::read(unsigned char pid, ProgramStruct *buf) {
 /** Add a program */
 unsigned char ProgramData::add(ProgramStruct *buf, SensorAdjustment *adj) {
 	if (nprograms >= MAX_NUM_PROGRAMS)	return 0;
-	file_write_block(PROG_FILENAME, buf, 1+(uint32_t)nprograms*PROGRAMSTRUCT_SIZE, PROGRAMSTRUCT_SIZE);
-	if (adj) SensorAdjustment::write(adj, nprograms);
+	if (!file_write_block(PROG_FILENAME, buf, 1+(uint32_t)nprograms*PROGRAMSTRUCT_SIZE, PROGRAMSTRUCT_SIZE)) return 0;
+	if (!SensorAdjustment::write(adj, nprograms)) return 0;
+	if (!file_write_byte(PROG_FILENAME, 0, nprograms + 1)) return 0;
 	nprograms++;
-	save_count();
 	return 1;
 }
 
 /** Move a program up (i.e. swap a program with the one above it) */
-void ProgramData::moveup(unsigned char pid) {
-	if(pid >= nprograms || pid == 0) return;
+bool ProgramData::moveup(unsigned char pid) {
+	if(pid >= nprograms || pid == 0) return false;
 	// swap program pid-1 and pid
 	uint32_t pos = 1+(uint32_t)(pid-1)*PROGRAMSTRUCT_SIZE;
 	uint32_t next = pos+PROGRAMSTRUCT_SIZE;
 	char buf2[PROGRAMSTRUCT_SIZE];
-	file_read_block(PROG_FILENAME, tmp_buffer, pos, PROGRAMSTRUCT_SIZE);
-	file_read_block(PROG_FILENAME, buf2, next, PROGRAMSTRUCT_SIZE);
-	file_write_block(PROG_FILENAME, tmp_buffer, next, PROGRAMSTRUCT_SIZE);
-	file_write_block(PROG_FILENAME, buf2, pos, PROGRAMSTRUCT_SIZE);
-	// swap senadj entries for pid-1 and pid to match the program swap
-	char buf3[SENSOR_ADJUSTMENT_SIZE];
-	file_read_block(SENADJ_FILENAME, tmp_buffer, SENSOR_ADJUSTMENT_SIZE * (pid-1), SENSOR_ADJUSTMENT_SIZE);
-	file_read_block(SENADJ_FILENAME, buf3, SENSOR_ADJUSTMENT_SIZE * pid, SENSOR_ADJUSTMENT_SIZE);
-	file_write_block(SENADJ_FILENAME, buf3, SENSOR_ADJUSTMENT_SIZE * (pid-1), SENSOR_ADJUSTMENT_SIZE);
-	file_write_block(SENADJ_FILENAME, tmp_buffer, SENSOR_ADJUSTMENT_SIZE * pid, SENSOR_ADJUSTMENT_SIZE);
+	if (!file_read_block(PROG_FILENAME, tmp_buffer, pos, PROGRAMSTRUCT_SIZE)) return false;
+	if (!file_read_block(PROG_FILENAME, buf2, next, PROGRAMSTRUCT_SIZE)) return false;
+	if (!file_write_block(PROG_FILENAME, tmp_buffer, next, PROGRAMSTRUCT_SIZE)) return false;
+	if (!file_write_block(PROG_FILENAME, buf2, pos, PROGRAMSTRUCT_SIZE)) return false;
+	// Missing adjustment slots from older firmware are equivalent to disabled.
+	SensorAdjustment previous(SENSOR_UUID_NONE, 0, 0, nullptr);
+	SensorAdjustment current(SENSOR_UUID_NONE, 0, 0, nullptr);
+	SensorAdjustment* adjustment = SensorAdjustment::read(pid - 1, nprograms);
+	if (adjustment) previous = *adjustment;
+	adjustment = SensorAdjustment::read(pid, nprograms);
+	if (adjustment) current = *adjustment;
+	if (!SensorAdjustment::write(&current, pid - 1)) return false;
+	if (!SensorAdjustment::write(&previous, pid)) return false;
+	return true;
 }
 
 void ProgramData::toggle_pause(uint32_t delay) {
@@ -191,8 +196,8 @@ void ProgramData::clear_pause() {
 unsigned char ProgramData::modify(unsigned char pid, ProgramStruct *buf, SensorAdjustment *adj) {
 	if (pid >= nprograms)  return 0;
 	uint32_t pos = 1+(uint32_t)pid*PROGRAMSTRUCT_SIZE;
-	file_write_block(PROG_FILENAME, buf, pos, PROGRAMSTRUCT_SIZE);
-	if (adj) SensorAdjustment::write(adj, pid);
+	if (!file_write_block(PROG_FILENAME, buf, pos, PROGRAMSTRUCT_SIZE)) return 0;
+	if (adj && !SensorAdjustment::write(adj, pid)) return 0;
 	return 1;
 }
 
@@ -203,24 +208,27 @@ unsigned char ProgramData::del(unsigned char pid) {
 	uint32_t pos = 1+(uint32_t)(pid+1)*PROGRAMSTRUCT_SIZE;
 	// erase by copying backward
 	for (; pos < 1+(uint32_t)nprograms*PROGRAMSTRUCT_SIZE; pos+=PROGRAMSTRUCT_SIZE) {
-		file_copy_block(PROG_FILENAME, pos, pos-PROGRAMSTRUCT_SIZE, PROGRAMSTRUCT_SIZE, tmp_buffer);
+		if (!file_copy_block(PROG_FILENAME, pos, pos-PROGRAMSTRUCT_SIZE, PROGRAMSTRUCT_SIZE, tmp_buffer)) return 0;
 	}
 	for (int i = pid; i < nprograms-1; i++) {
-		file_copy_block(SENADJ_FILENAME, SENSOR_ADJUSTMENT_SIZE * (i+1), SENSOR_ADJUSTMENT_SIZE * i, SENSOR_ADJUSTMENT_SIZE, tmp_buffer);
+		SensorAdjustment shifted(SENSOR_UUID_NONE, 0, 0, nullptr);
+		SensorAdjustment* adjustment = SensorAdjustment::read(i + 1, nprograms);
+		if (adjustment) shifted = *adjustment;
+		if (!SensorAdjustment::write(&shifted, i)) return 0;
 	}
-	nprograms --;
-	save_count();
+	if (!file_write_byte(PROG_FILENAME, 0, nprograms - 1)) return 0;
+	nprograms--;
 	return 1;
 }
 
 // set the enable bit
 unsigned char ProgramData::set_flagbit(unsigned char pid, unsigned char bid, unsigned char value) {
 	if (pid >= nprograms)  return 0;
-	unsigned char flag = file_read_byte(PROG_FILENAME, 1+(uint32_t)pid*PROGRAMSTRUCT_SIZE);
+	unsigned char flag;
+	if (!file_read_block(PROG_FILENAME, &flag, 1+(uint32_t)pid*PROGRAMSTRUCT_SIZE, 1)) return 0;
 	if(value) flag|=(1<<bid);
 	else flag&=(~(1<<bid));
-	file_write_byte(PROG_FILENAME, 1+(uint32_t)pid*PROGRAMSTRUCT_SIZE, flag);
-	return 1;
+	return file_write_byte(PROG_FILENAME, 1+(uint32_t)pid*PROGRAMSTRUCT_SIZE, flag) ? 1 : 0;
 }
 
 /** Decode a sunrise/sunset start time to actual start time */

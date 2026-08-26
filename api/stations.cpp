@@ -118,13 +118,14 @@ void server_json_station_special(OTF_PARAMS_DEF) {
 void server_change_stations(OTF_PARAMS_DEF) {
 	if (!process_password(OTF_PARAMS)) return;
 
+	bool storage_ok = true;
 	unsigned char sid;
 	char key[5] = {'s', 0, 0, 0, 0};
 	for (sid = 0; sid < os.nstations; sid++) {
 		snprintf(key + 1, 4, "%d", sid);
 		if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, key)) {
 			strReplaceQuoteBackslash(tmp_buffer);
-			os.set_station_name(sid, tmp_buffer);
+			if (!os.set_station_name(sid, tmp_buffer)) storage_ok = false;
 		}
 	}
 
@@ -168,15 +169,15 @@ void server_change_stations(OTF_PARAMS_DEF) {
 					handle_return(HTML_DATA_OUTOFBOUND);
 				}
 			}
-			file_write_block(STATIONS_FILENAME, tmp_buffer,
+			if (!file_write_block(STATIONS_FILENAME, tmp_buffer,
 				(uint32_t)sid * sizeof(StationData) + offsetof(StationData, type),
-				STATION_SPECIAL_DATA_SIZE + 1);
+				STATION_SPECIAL_DATA_SIZE + 1)) storage_ok = false;
 		} else {
 			handle_return(HTML_DATA_MISSING);
 		}
 	}
 
 	change_board_attribute(FKV_SOURCE, 'p', os.attrib_spe);
-	os.attribs_save();
-	handle_return(HTML_SUCCESS);
+	if (!os.attribs_save()) storage_ok = false;
+	handle_return(storage_ok ? HTML_SUCCESS : HTML_INTERNAL_ERROR);
 }

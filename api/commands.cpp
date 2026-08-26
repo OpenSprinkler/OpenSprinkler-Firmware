@@ -96,8 +96,8 @@ uint8_t execute_change_values(const ParamSource& params, uint16_t allowed_action
 
 	if ((allowed_actions & CV_ACTION_ENABLE) &&
 		params.get(tmp_buffer, TMP_BUFFER_SIZE, PSTR("en"), true)) {
-		if (tmp_buffer[0] == '1' && !os.status.enabled) os.enable();
-		else if (tmp_buffer[0] == '0' && os.status.enabled) os.disable();
+		if (tmp_buffer[0] == '1' && !os.status.enabled && !os.enable()) return HTML_INTERNAL_ERROR;
+		else if (tmp_buffer[0] == '0' && os.status.enabled && !os.disable()) return HTML_INTERNAL_ERROR;
 	}
 
 	if ((allowed_actions & CV_ACTION_RAIN_DELAY) &&
@@ -117,10 +117,16 @@ uint8_t execute_change_values(const ParamSource& params, uint16_t allowed_action
 		params.get(tmp_buffer, TMP_BUFFER_SIZE, PSTR("re"), true)) {
 		if (tmp_buffer[0] == '1' && !os.iopts[IOPT_REMOTE_EXT_MODE]) {
 			os.iopts[IOPT_REMOTE_EXT_MODE] = 1;
-			os.iopts_save();
+			if (!os.iopts_save()) {
+				os.iopts[IOPT_REMOTE_EXT_MODE] = 0;
+				return HTML_INTERNAL_ERROR;
+			}
 		} else if (tmp_buffer[0] == '0' && os.iopts[IOPT_REMOTE_EXT_MODE]) {
 			os.iopts[IOPT_REMOTE_EXT_MODE] = 0;
-			os.iopts_save();
+			if (!os.iopts_save()) {
+				os.iopts[IOPT_REMOTE_EXT_MODE] = 1;
+				return HTML_INTERNAL_ERROR;
+			}
 		}
 	}
 
@@ -250,7 +256,8 @@ uint8_t execute_runonce(const ParamSource& params) {
 			strncat(program.name, annotation_program.name,
 				PROGRAM_NAME_SIZE - strlen(program.name) - 1);
 			program.name[PROGRAM_NAME_SIZE - 1] = 0;
-			if (!pd.add(&program)) return HTML_DATA_OUTOFBOUND;
+			if (pd.nprograms >= MAX_NUM_PROGRAMS) return HTML_DATA_OUTOFBOUND;
+			if (!pd.add(&program)) return HTML_INTERNAL_ERROR;
 		}
 	}
 

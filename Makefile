@@ -54,7 +54,7 @@ test-hardware-detection:
 .PHONY: test-storage-files
 test-storage-files:
 	@set -e; output=$$(mktemp); data=$$(mktemp -d); trap 'rm -f "$$output"; rm -rf "$$data"' EXIT; \
-		$(CXX) -std=gnu++14 -DDEMO -I. tests/storage_files_test.cpp storage/files.cpp -o "$$output"; \
+		$(CXX) -std=gnu++14 -DDEMO -I. tests/storage_files_test.cpp storage/files.cpp storage/maintenance.cpp -o "$$output"; \
 		"$$output" "$$data"
 
 .PHONY: test-firmware-release

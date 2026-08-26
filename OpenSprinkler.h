@@ -384,7 +384,7 @@ public:
 	static void get_station_data(unsigned char sid, StationData* data); // get station data
 	static void set_station_data(unsigned char sid, StationData* data); // set station data
 	static void get_station_name(unsigned char sid, char buf[]); // get station name
-	static void set_station_name(unsigned char sid, char buf[]); // set station name
+	static bool set_station_name(unsigned char sid, char buf[]); // set station name
 	static unsigned char get_station_type(unsigned char sid); // get station type
 	static unsigned char is_sequential_station(unsigned char sid);
 	static unsigned char is_master_station(unsigned char sid);
@@ -399,7 +399,7 @@ public:
 	static void set_station_gid(unsigned char sid, unsigned char gid);
 
 	//static StationAttrib get_station_attrib(unsigned char sid); // get station attribute
-	static void attribs_save(); // repackage attrib bits and save (backward compatibility)
+	static bool attribs_save(); // repackage attrib bits and save (backward compatibility)
 	static void attribs_load(); // load and repackage attrib bits (backward compatibility)
 	static bool parse_rfstation_code(RFStationData *data, RFStationCode *code); // parse rf code into on/off/time sections
 	static void switch_rfstation(RFStationData *data, bool turnon);  // switch rf station
@@ -410,23 +410,23 @@ public:
 
 	// -- options and data storeage
 	static void nvdata_load();
-	static void nvdata_save();
+	static bool nvdata_save();
 
 	static void options_setup();
 	static void pre_factory_reset();
 	static void factory_reset();
 	static void load_iopt_defaults();   // populate iopts[] from iopt_defs[].def_val
 	static void iopts_load();
-	static void iopts_save();
-	static bool sopt_save(unsigned char oid, const char *buf);
+	static bool iopts_save();
+	static bool sopt_save(unsigned char oid, const char *buf, bool *changed = nullptr);
 	static void sopt_load(unsigned char oid, char *buf, uint16_t maxlen=MAX_SOPTS_SIZE);
 	static String sopt_load(unsigned char oid);
 	static void populate_master();
 	static unsigned char password_verify(const char *pw);  // verify password
 
 	// -- controller operation
-	static void enable();   // enable controller operation
-	static void disable();  // disable controller operation, all stations will be closed immediately
+	static bool enable();   // enable controller operation
+	static bool disable();  // disable controller operation, all stations will be closed immediately
 	static void raindelay_start();  // start raindelay
 	static void raindelay_stop();   // stop rain delay
 	static void detect_binarysensor_status(time_os_t curr_time);// update binary (rain, soil) sensor status

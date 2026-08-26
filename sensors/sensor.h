@@ -191,9 +191,9 @@ public:
 
 	static Sensor *parse(os_file_type file);         // statically allocated, do not delete
 	static Sensor *get(uint8_t index);               // statically allocated, do not delete
-	static void    write(Sensor *sensor, uint8_t index);
+	static bool    write(Sensor *sensor, uint8_t index);
 	static void    load_count();
-	static void    save_count();
+	static bool    save_count();
 	static unsigned char add(Sensor *sensor);
 	static unsigned char modify(uint8_t index, Sensor *sensor); // index is positional index
 	static unsigned char del(uint8_t index); // index is positional index
@@ -282,7 +282,7 @@ public:
 	SensorAdjustment(uint16_t uuid, uint8_t point_count, uint8_t flag, sensor_adjustment_point_t *points);
 
 	static SensorAdjustment *read(uint8_t index, uint8_t nprograms); // returns statically allocated object, do not delete
-	static void              write(SensorAdjustment *adj, uint8_t index);
+	static bool              write(SensorAdjustment *adj, uint8_t index);
 
 	float get_adjustment_factor(sensor_memory_t *sensors);
 

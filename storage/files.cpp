@@ -1,6 +1,9 @@
-#include "files.h"
+#include "storage/files.h"
 
-#include "../defines.h"
+#include "defines.h"
+#include "storage/maintenance.h"
+
+#include <cerrno>
 
 #if defined(ARDUINO)
 
@@ -62,12 +65,13 @@ char* get_filename_fullpath(const char* filename) {
 
 #endif
 
-void remove_file(const char* filename) {
+bool remove_file(const char* filename) {
 	#if defined(ARDUINO)
-	if (!LittleFS.exists(filename)) return;
-	LittleFS.remove(filename);
+	if (!LittleFS.exists(filename)) return true;
+	return LittleFS.remove(filename);
 #else
-	remove(get_filename_fullpath(filename));
+	if (remove(get_filename_fullpath(filename)) == 0) return true;
+	return errno == ENOENT;
 #endif
 }
 
@@ -207,32 +211,54 @@ uint32_t file_size(os_file_type file) {
 #endif
 }
 
-void file_read_block(const char* filename, void* destination, uint32_t position, uint32_t length) {
+bool file_read_block(const char* filename, void* destination, uint32_t position, uint32_t length) {
 	os_file_type file = file_open(filename, FileOpenMode::Read);
-	if (!file) return;
-	file_seek(file, position);
-	file_read(file, destination, length);
+	if (!file) return false;
+	bool ok = file_seek(file, position) && file_read(file, destination, length) == (int)length;
 	file_close(file);
+	return ok;
 }
 
-void file_write_block(const char* filename, const void* source, uint32_t position, uint32_t length) {
+static bool file_write_block_once(const char* filename, const void* source, uint32_t position, uint32_t length) {
 	os_file_type file = file_open(filename, FileOpenMode::ReadWrite);
-	if (!file) return;
-	file_seek(file, position);
-	file_write(file, source, length);
+	if (!file) return false;
+	bool ok = file_seek(file, position) && file_write(file, source, length) == (int)length;
 	file_close(file);
+	return ok;
 }
 
-void file_copy_block(const char* filename, uint32_t from, uint32_t to, uint32_t length,
+bool file_write_block(const char* filename, const void* source, uint32_t position, uint32_t length) {
+	if (file_write_block_once(filename, source, position, length)) return true;
+#if defined(ARDUINO)
+	if (embedded_storage_is_low()) {
+		maintain_embedded_storage();
+		return file_write_block_once(filename, source, position, length);
+	}
+#endif
+	return false;
+}
+
+static bool file_copy_block_once(const char* filename, uint32_t from, uint32_t to, uint32_t length,
 	void* temporary_buffer) {
-	if (!temporary_buffer) return;
 	os_file_type file = file_open(filename, FileOpenMode::ReadWrite);
-	if (!file) return;
-	file_seek(file, from);
-	file_read(file, temporary_buffer, length);
-	file_seek(file, to);
-	file_write(file, temporary_buffer, length);
+	if (!file) return false;
+	bool ok = file_seek(file, from) && file_read(file, temporary_buffer, length) == (int)length &&
+		file_seek(file, to) && file_write(file, temporary_buffer, length) == (int)length;
 	file_close(file);
+	return ok;
+}
+
+bool file_copy_block(const char* filename, uint32_t from, uint32_t to, uint32_t length,
+	void* temporary_buffer) {
+	if (!temporary_buffer) return false;
+	if (file_copy_block_once(filename, from, to, length, temporary_buffer)) return true;
+#if defined(ARDUINO)
+	if (embedded_storage_is_low()) {
+		maintain_embedded_storage();
+		return file_copy_block_once(filename, from, to, length, temporary_buffer);
+	}
+#endif
+	return false;
 }
 
 unsigned char file_cmp_block(const char* filename, const char* value, uint32_t position) {
@@ -255,6 +281,6 @@ unsigned char file_read_byte(const char* filename, uint32_t position) {
 	return value;
 }
 
-void file_write_byte(const char* filename, uint32_t position, unsigned char value) {
-	file_write_block(filename, &value, position, 1);
+bool file_write_byte(const char* filename, uint32_t position, unsigned char value) {
+	return file_write_block(filename, &value, position, 1);
 }

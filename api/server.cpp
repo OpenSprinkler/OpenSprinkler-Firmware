@@ -31,6 +31,7 @@
 #include "../services/firmware_update.h"
 #include "../core/scheduler.h"
 #include "../storage/logging.h"
+#include "storage/maintenance.h"
 #include "handlers.h"
 #include "routes.h"
 #include "api/commands.h"
@@ -136,6 +137,7 @@ void on_ap_change_config(OTF_PARAMS_DEF) {
 	if(os.get_wifi_mode()!=OS_WIFI_MODE_AP) return;
 	char *ssid = req.getQueryParameter("ssid");
 	if(ssid!=NULL&&strlen(ssid)!=0) {
+		bool storage_ok = true;
 		os.wifi_ssid = ssid;
 		os.wifi_pass = req.getQueryParameter("pass");
 		char *extra = req.getQueryParameter("extra");
@@ -150,15 +152,19 @@ void on_ap_change_config(OTF_PARAMS_DEF) {
 				otf_send_result(OTF_PARAMS, HTML_DATA_OUTOFBOUND, "channel");
 				return;
 			}
-			os.sopt_save(SOPT_STA_BSSID_CHL, extra); // save string to flash first
+			if (!os.sopt_save(SOPT_STA_BSSID_CHL, extra)) storage_ok = false;
 			*mac=0; // terminate bssid string
 			str2mac(extra, os.wifi_bssid); // update controller variables
 			os.wifi_channel = chl;
 		} else {
-			os.sopt_save(SOPT_STA_BSSID_CHL, DEFAULT_EMPTY_STRING); // if extra is not present, write empty string
+			if (!os.sopt_save(SOPT_STA_BSSID_CHL, DEFAULT_EMPTY_STRING)) storage_ok = false;
 		}
-		os.sopt_save(SOPT_STA_SSID, os.wifi_ssid.c_str());
-		os.sopt_save(SOPT_STA_PASS, os.wifi_pass.c_str());
+		if (!os.sopt_save(SOPT_STA_SSID, os.wifi_ssid.c_str())) storage_ok = false;
+		if (!os.sopt_save(SOPT_STA_PASS, os.wifi_pass.c_str())) storage_ok = false;
+		if (!storage_ok) {
+			otf_send_result(OTF_PARAMS, HTML_INTERNAL_ERROR, "storage");
+			return;
+		}
 		otf_send_result(OTF_PARAMS, HTML_SUCCESS, nullptr);
 		os.state = OS_STATE_TRY_CONNECT;
 		os.lcd.setCursor(0, 2);
@@ -249,9 +255,9 @@ void server_delete_program(OTF_PARAMS_DEF) {
 
 	int pid=atoi(tmp_buffer);
 	if (pid == -1) {
-		pd.eraseall();
-	} else if (pid < pd.nprograms) {
-		pd.del(pid);
+		if (!pd.eraseall()) handle_return(HTML_INTERNAL_ERROR);
+	} else if (pid >= 0 && pid < pd.nprograms) {
+		if (!pd.del(pid)) handle_return(HTML_INTERNAL_ERROR);
 	} else {
 		handle_return(HTML_DATA_OUTOFBOUND);
 	}
@@ -275,7 +281,7 @@ void server_moveup_program(OTF_PARAMS_DEF) {
 	if (!(pid>=1 && pid< pd.nprograms))
 		handle_return(HTML_DATA_OUTOFBOUND);
 
-	pd.moveup(pid);
+	if (!pd.moveup(pid)) handle_return(HTML_INTERNAL_ERROR);
 
 	handle_return(HTML_SUCCESS);
 }
@@ -313,15 +319,15 @@ void server_change_program(OTF_PARAMS_DEF) {
 	// check if "en" parameter is present
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("en"), true)) {
 		if(pid<0) handle_return(HTML_DATA_OUTOFBOUND);
-		pd.set_flagbit(pid, PROGRAMSTRUCT_EN_BIT, (tmp_buffer[0]=='0')?0:1);
-		handle_return(HTML_SUCCESS);
+		handle_return(pd.set_flagbit(pid, PROGRAMSTRUCT_EN_BIT, (tmp_buffer[0]=='0')?0:1) ?
+			HTML_SUCCESS : HTML_INTERNAL_ERROR);
 	}
 
 	// check if "uwt" parameter is present
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("uwt"), true)) {
 		if(pid<0) handle_return(HTML_DATA_OUTOFBOUND);
-		pd.set_flagbit(pid, PROGRAMSTRUCT_UWT_BIT, (tmp_buffer[0]=='0')?0:1);
-		handle_return(HTML_SUCCESS);
+		handle_return(pd.set_flagbit(pid, PROGRAMSTRUCT_UWT_BIT, (tmp_buffer[0]=='0')?0:1) ?
+			HTML_SUCCESS : HTML_INTERNAL_ERROR);
 	}
 
 	// parse program name
@@ -431,9 +437,10 @@ void server_change_program(OTF_PARAMS_DEF) {
 	}
 
 	if (pid==-1) {
-		if(!pd.add(&prog, snadj_ptr)) handle_return(HTML_DATA_OUTOFBOUND);
+		if (pd.nprograms >= MAX_NUM_PROGRAMS) handle_return(HTML_DATA_OUTOFBOUND);
+		if(!pd.add(&prog, snadj_ptr)) handle_return(HTML_INTERNAL_ERROR);
 	} else {
-		if(!pd.modify(pid, &prog, snadj_ptr)) handle_return(HTML_DATA_OUTOFBOUND);
+		if(!pd.modify(pid, &prog, snadj_ptr)) handle_return(HTML_INTERNAL_ERROR);
 	}
 	handle_return(HTML_SUCCESS);
 }
@@ -811,20 +818,22 @@ void string_remove_space(char *src) {
 void server_change_scripturl(OTF_PARAMS_DEF) {
 	if(!process_password(OTF_PARAMS)) return;
 
-#if defined(DEMO)
+	#if defined(DEMO)
 	handle_return(HTML_REDIRECT_HOME);
-#endif
+	#endif
+	bool storage_ok = true;
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("jsp"), true)) {
 		tmp_buffer[TMP_BUFFER_SIZE-1]=0;	// make sure we don't exceed the maximum size
 		// trim unwanted space characters
 		string_remove_space(tmp_buffer);
-		os.sopt_save(SOPT_JAVASCRIPTURL, tmp_buffer);
+		if (!os.sopt_save(SOPT_JAVASCRIPTURL, tmp_buffer)) storage_ok = false;
 	}
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("wsp"), true)) {
 		tmp_buffer[TMP_BUFFER_SIZE-1]=0;
 		string_remove_space(tmp_buffer);
-		os.sopt_save(SOPT_WEATHERURL, tmp_buffer);
+		if (!os.sopt_save(SOPT_WEATHERURL, tmp_buffer)) storage_ok = false;
 	}
+	if (!storage_ok) handle_return(HTML_INTERNAL_ERROR);
 	begin_response(res);
 	print_header(OTF_PARAMS, CT_HTML);
 	bfill.emit_p(PSTR("$F"), htmlReturnHome);
@@ -847,6 +856,7 @@ void server_change_options(OTF_PARAMS_DEF)
 	bool time_change = false;
 	bool weather_change = false;
 	bool sensor_change = false;
+	bool storage_ok = true;
 	#if defined(ARDUINO)
 	bool tpdv_change = false;
 	bool httpport_requested = false;
@@ -923,13 +933,17 @@ void server_change_options(OTF_PARAMS_DEF)
 
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("loc"), true)) {
 		strReplaceQuoteBackslash(tmp_buffer);
-		if (os.sopt_save(SOPT_LOCATION, tmp_buffer)) { // if location string has changed
+		bool changed = false;
+		if (!os.sopt_save(SOPT_LOCATION, tmp_buffer, &changed)) storage_ok = false;
+		if (changed) {
 			weather_change = true;
 		}
 	}
 	uint8_t keyfound = 0;
 	if(findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("wto"), true)) {
-		if (os.sopt_save(SOPT_WEATHER_OPTS, tmp_buffer)) {
+		bool changed = false;
+		if (!os.sopt_save(SOPT_WEATHER_OPTS, tmp_buffer, &changed)) storage_ok = false;
+		if (changed) {
 			os.sopt_load(SOPT_WEATHER_OPTS, tmp_buffer+1); // make room for the leading '{'
 			parse_wto(tmp_buffer); // parse wto
 			apply_monthly_adjustment(os.now_tz());
@@ -939,41 +953,41 @@ void server_change_options(OTF_PARAMS_DEF)
 
 	keyfound = 0;
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("ifkey"), true, &keyfound)) {
-		os.sopt_save(SOPT_IFTTT_KEY, tmp_buffer);
+		if (!os.sopt_save(SOPT_IFTTT_KEY, tmp_buffer)) storage_ok = false;
 	} else if (keyfound) {
 		tmp_buffer[0]=0;
-		os.sopt_save(SOPT_IFTTT_KEY, tmp_buffer);
+		if (!os.sopt_save(SOPT_IFTTT_KEY, tmp_buffer)) storage_ok = false;
 	}
 
 	keyfound = 0;
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("otc"), true, &keyfound)) {
-		os.sopt_save(SOPT_OTC_OPTS, tmp_buffer);
+		if (!os.sopt_save(SOPT_OTC_OPTS, tmp_buffer)) storage_ok = false;
 	} else if (keyfound) {
 		tmp_buffer[0]=0;
-		os.sopt_save(SOPT_OTC_OPTS, tmp_buffer);
+		if (!os.sopt_save(SOPT_OTC_OPTS, tmp_buffer)) storage_ok = false;
 	}
 
 	keyfound = 0;
 	if(findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("mqtt"), true, &keyfound)) {
-		os.sopt_save(SOPT_MQTT_OPTS, tmp_buffer);
+		if (!os.sopt_save(SOPT_MQTT_OPTS, tmp_buffer)) storage_ok = false;
 		os.status.req_mqtt_restart = true;
 	} else if (keyfound) {
 		tmp_buffer[0]=0;
-		os.sopt_save(SOPT_MQTT_OPTS, tmp_buffer);
+		if (!os.sopt_save(SOPT_MQTT_OPTS, tmp_buffer)) storage_ok = false;
 		os.status.req_mqtt_restart = true;
 	}
 
 	keyfound = 0;
 	if(findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("email"), true, &keyfound)) {
-		os.sopt_save(SOPT_EMAIL_OPTS, tmp_buffer);
+		if (!os.sopt_save(SOPT_EMAIL_OPTS, tmp_buffer)) storage_ok = false;
 	} else if (keyfound) {
 		tmp_buffer[0]=0;
-		os.sopt_save(SOPT_EMAIL_OPTS, tmp_buffer);
+		if (!os.sopt_save(SOPT_EMAIL_OPTS, tmp_buffer)) storage_ok = false;
 	}
 
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("dname"), true)) {
 		strReplaceQuoteBackslash(tmp_buffer);
-		os.sopt_save(SOPT_DEVICE_NAME, tmp_buffer);
+		if (!os.sopt_save(SOPT_DEVICE_NAME, tmp_buffer)) storage_ok = false;
 	}
 
 	// if not using NTP and manually setting time
@@ -991,7 +1005,8 @@ void server_change_options(OTF_PARAMS_DEF)
 	}
 	if (err)	handle_return(HTML_DATA_OUTOFBOUND);
 
-	os.iopts_save();
+	if (!os.iopts_save()) storage_ok = false;
+	if (!storage_ok) handle_return(HTML_INTERNAL_ERROR);
 	os.populate_master();
 
 #if defined(ARDUINO)
@@ -1041,8 +1056,7 @@ void server_change_password(OTF_PARAMS_DEF) {
 		const int pwBufferSize = TMP_BUFFER_SIZE/2;
 		char *tbuf2 = tmp_buffer + pwBufferSize;	// use the second half of tmp_buffer
 		if (findKeyVal(FKV_SOURCE, tbuf2, pwBufferSize, PSTR("cpw"), true) && strncmp(tmp_buffer, tbuf2, pwBufferSize) == 0) {
-			os.sopt_save(SOPT_PASSWORD, tmp_buffer);
-			handle_return(HTML_SUCCESS);
+			handle_return(os.sopt_save(SOPT_PASSWORD, tmp_buffer) ? HTML_SUCCESS : HTML_INTERNAL_ERROR);
 		} else {
 			handle_return(HTML_MISMATCH);
 		}
@@ -1230,9 +1244,7 @@ void server_delete_log(OTF_PARAMS_DEF) {
 	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("day"), true))
 		handle_return(HTML_DATA_MISSING);
 
-	delete_log(tmp_buffer);
-
-	handle_return(HTML_SUCCESS);
+	handle_return(delete_log(tmp_buffer) ? HTML_SUCCESS : HTML_INTERNAL_ERROR);
 }
 
 /**
@@ -1670,28 +1682,28 @@ void server_change_sensor(OTF_PARAMS_DEF) {
 		}
 	}
 
-	os.sensors[sid].interval = interval;
-	os.sensors[sid].flag = static_cast<uint8_t>(flag);
-	os.sensors[sid].next_update = 0;
-	os.sensors[sid].value = 0.f;
-
 	if (is_new) {
 		// Assign a new UUID for this sensor
+		uint16_t previous_uuid = os.nvdata.last_sensor_uuid;
 		uint16_t new_uuid = os.nvdata.last_sensor_uuid + 1;
 		if (new_uuid == SENSOR_UUID_NONE) new_uuid = 1;
 		os.nvdata.last_sensor_uuid = new_uuid;
-		os.nvdata_save();
+		if (!os.nvdata_save()) {
+			os.nvdata.last_sensor_uuid = previous_uuid;
+			delete result_sensor;
+			handle_return(HTML_INTERNAL_ERROR);
+		}
 		result_sensor->uuid = new_uuid;
 
 		if (!Sensor::add(result_sensor)) {
 			delete result_sensor;
-			handle_return(HTML_DATA_OUTOFBOUND);
+			handle_return(HTML_INTERNAL_ERROR);
 		}
 	} else {
 		result_sensor->uuid = os.sensors[sid].uuid;
 		if (!Sensor::modify(sid, result_sensor)) {
 			delete result_sensor;
-			handle_return(HTML_DATA_OUTOFBOUND);
+			handle_return(HTML_INTERNAL_ERROR);
 		}
 	}
 
@@ -1742,8 +1754,12 @@ void server_delete_sensor(OTF_PARAMS_DEF) {
 
 	if (delete_all) {
 		// Delete all sensors
+		uint8_t previous_count = os.nsensors;
 		os.nsensors = 0;
-		Sensor::save_count();
+		if (!Sensor::save_count()) {
+			os.nsensors = previous_count;
+			handle_return(HTML_INTERNAL_ERROR);
+		}
 		for (uint8_t i = 0; i < MAX_SENSORS; i++) {
 			os.sensors[i].interval = 0;
 			os.sensors[i].uuid = 0;
@@ -2446,6 +2462,9 @@ static uint32_t freeHeap() {
 void server_json_debug(OTF_PARAMS_DEF) {
 	begin_response(res);
 	print_header(OTF_PARAMS);
+	#if defined(ARDUINO)
+	EmbeddedStorageUsage storage = get_embedded_storage_usage();
+	#endif
 
 	bfill.emit_p(PSTR("{\"date\":\"$S\",\"time\":\"$S\",\"heap\":$L"), __DATE__, __TIME__,
 	#if defined(ESP8266)
@@ -2453,9 +2472,9 @@ void server_json_debug(OTF_PARAMS_DEF) {
 	bfill.emit_p(PSTR(",\"maxblock\":$L,\"frag\":$D"),
 		(uint32_t)ESP.getMaxFreeBlockSize(),
 		(uint8_t)ESP.getHeapFragmentation());
-	FSInfo fs_info;
-	LittleFS.info(fs_info);
-	bfill.emit_p(PSTR(",\"flash\":$D,\"used\":$D,\"devip\":\"$S\","), fs_info.totalBytes, fs_info.usedBytes, (useEth?eth.localIP():WiFi.localIP()).toString().c_str());
+	bfill.emit_p(PSTR(",\"flash\":$L,\"used\":$L,\"free\":$L,\"pruned\":$L,\"devip\":\"$S\","),
+		storage.total_bytes, storage.used_bytes, storage.free_bytes, embedded_storage_pruned_files(),
+		(useEth?eth.localIP():WiFi.localIP()).toString().c_str());
 	if(useEth) {
 		bfill.emit_p(PSTR("\"isW5500\":$D,\"spi_clock\":$L,\"arp_size\":$D}"), eth.isW5500, ETHER_SPI_CLOCK, ARP_TABLE_SIZE);
 	} else {
@@ -2481,8 +2500,8 @@ void server_json_debug(OTF_PARAMS_DEF) {
 	#elif defined(ESP32)
 	ESP.getFreeHeap());
 	bfill.emit_p(PSTR(",\"maxblock\":$L"), (uint32_t)ESP.getMaxAllocHeap());
-	bfill.emit_p(PSTR(",\"flash\":$L,\"used\":$L,\"devip\":\"$S\","),
-		(uint32_t)LittleFS.totalBytes(), (uint32_t)LittleFS.usedBytes(),
+	bfill.emit_p(PSTR(",\"flash\":$L,\"used\":$L,\"free\":$L,\"pruned\":$L,\"devip\":\"$S\","),
+		storage.total_bytes, storage.used_bytes, storage.free_bytes, embedded_storage_pruned_files(),
 		(useEth ? ETH.localIP() : WiFi.localIP()).toString().c_str());
 	if (useEth) {
 		bfill.emit_p(PSTR("\"isW5500\":1,\"spi_clock\":$L}"), (uint32_t)ETHER_SPI_CLOCK);

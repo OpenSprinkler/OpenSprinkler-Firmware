@@ -1,4 +1,5 @@
 #include "storage/files.h"
+#include "storage/maintenance.h"
 
 #include <cassert>
 #include <cstring>
@@ -9,7 +10,7 @@ int main(int argc, char** argv) {
 
 	const char* filename = "storage-test.dat";
 	const char initial[] = "abcdef";
-	file_write_block(filename, initial, 0, sizeof(initial));
+	assert(file_write_block(filename, initial, 0, sizeof(initial)));
 	assert(file_exists(filename));
 
 	os_file_type file = file_open(filename, FileOpenMode::ReadWrite);
@@ -25,15 +26,35 @@ int main(int argc, char** argv) {
 	assert(strcmp(result, "abXYef") == 0);
 
 	char temporary[2];
-	file_copy_block(filename, 2, 4, 2, temporary);
-	file_read_block(filename, result, 0, sizeof(result));
+	assert(file_copy_block(filename, 2, 4, 2, temporary));
+	assert(file_read_block(filename, result, 0, sizeof(result)));
 	assert(strcmp(result, "abXYXY") == 0);
 	assert(file_cmp_block(filename, "abXYXY", 0) == 0);
 	assert(file_cmp_block(filename, "abXYef", 0) != 0);
+	assert(!file_read_block(filename, result, sizeof(result) + 1, 1));
+	assert(!file_copy_block(filename, sizeof(result) + 1, 0, 1, temporary));
 
-	file_write_byte(filename, 1, 'Z');
+	assert(file_write_byte(filename, 1, 'Z'));
 	assert(file_read_byte(filename, 1) == 'Z');
-	remove_file(filename);
+	assert(remove_file(filename));
+	assert(remove_file(filename));
 	assert(!file_exists(filename));
+	assert(!file_write_block("missing/dir.dat", initial, 0, sizeof(initial)));
+	assert(!file_copy_block(filename, 0, 1, 1, nullptr));
+
+	EmbeddedStorageUsage usage = {2UL * 1024UL * 1024UL, 0, 0, 8192, true};
+	assert(embedded_storage_reserve_bytes(usage) == 64UL * 1024UL);
+	usage.total_bytes = 128UL * 1024UL;
+	assert(embedded_storage_reserve_bytes(usage) == 32UL * 1024UL);
+	usage.valid = false;
+	assert(embedded_storage_reserve_bytes(usage) == 0);
+
+	assert(is_sprinkler_log_filename("20690.txt"));
+	assert(is_sprinkler_log_filename("/logs/20690.txt"));
+	assert(is_sprinkler_log_filename("logs/0.txt"));
+	assert(!is_sprinkler_log_filename("notes.txt"));
+	assert(!is_sprinkler_log_filename("20690.csv"));
+	assert(!is_sprinkler_log_filename(".txt"));
+	assert(!is_sprinkler_log_filename("12345678901.txt"));
 	return 0;
 }

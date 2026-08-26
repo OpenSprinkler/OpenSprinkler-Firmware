@@ -149,16 +149,16 @@ public:
 	static void dequeue(unsigned char qid);  // this removes an element from the queue
 
 	static void init();
-	static void eraseall();
+	static bool eraseall();
 	static void read(unsigned char pid, ProgramStruct *buf);
 	static unsigned char add(ProgramStruct *buf, SensorAdjustment *adj = nullptr);
 	static unsigned char modify(unsigned char pid, ProgramStruct *buf, SensorAdjustment *adj = nullptr);
 	static unsigned char set_flagbit(unsigned char pid, unsigned char bid, unsigned char value);
-	static void moveup(unsigned char pid);
+	static bool moveup(unsigned char pid);
 	static unsigned char del(unsigned char pid);
 	static void drem_to_relative(unsigned char days[2]); // absolute to relative reminder conversion
 	static void drem_to_absolute(unsigned char days[2]);
 private:
 	static void load_count();
-	static void save_count();
+	static bool save_count();
 };

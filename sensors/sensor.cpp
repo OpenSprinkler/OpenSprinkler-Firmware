@@ -290,31 +290,18 @@ SensorAdjustment *SensorAdjustment::read(uint8_t index, uint8_t nprograms) {
 	return nullptr;
 }
 
-void SensorAdjustment::write(SensorAdjustment *adj, uint8_t index) {
+bool SensorAdjustment::write(SensorAdjustment *adj, uint8_t index) {
 	uint32_t pos = (uint32_t)SENSOR_ADJUSTMENT_SIZE * index;
-
-	os_file_type file = file_open(SENADJ_FILENAME, FileOpenMode::ReadWrite);
-	if (file) {
-		SensorAdjustment disabled(SENSOR_UUID_NONE, 0, 0, nullptr);
-
-		uint32_t cur_size = file_size(file);
-		if (cur_size < pos) {
-			file_seek(file, 0, FileSeekMode::End);
-			while (cur_size < pos) {
-				file_write(file, &disabled, SENSOR_ADJUSTMENT_SIZE);
-				cur_size += SENSOR_ADJUSTMENT_SIZE;
-			}
-		}
-
-		file_seek(file, pos, FileSeekMode::Set);
-		SensorAdjustment *to_write = adj ? adj : &disabled;
-		file_write(file, to_write, SENSOR_ADJUSTMENT_SIZE);
-
-		file_close(file);
-	} else {
-		DEBUG_PRINT("Failed to open file: ");
-		DEBUG_PRINTLN(SENADJ_FILENAME);
+	SensorAdjustment disabled(SENSOR_UUID_NONE, 0, 0, nullptr);
+	os_file_type file = file_open(SENADJ_FILENAME, FileOpenMode::Read);
+	uint32_t cur_size = file ? file_size(file) : 0;
+	if (file) file_close(file);
+	while (cur_size < pos) {
+		if (!file_write_block(SENADJ_FILENAME, &disabled, cur_size, SENSOR_ADJUSTMENT_SIZE)) return false;
+		cur_size += SENSOR_ADJUSTMENT_SIZE;
 	}
+	SensorAdjustment *to_write = adj ? adj : &disabled;
+	return file_write_block(SENADJ_FILENAME, to_write, pos, SENSOR_ADJUSTMENT_SIZE);
 }
 
 // ---------------------------------------------------------------------------
@@ -392,22 +379,14 @@ Sensor *Sensor::get(uint8_t index) {
 	}
 }
 
-void Sensor::write(Sensor *sensor, uint8_t index) {
+bool Sensor::write(Sensor *sensor, uint8_t index) {
 	const uint32_t slot_size = TMP_BUFFER_SIZE;
 	uint32_t pos = 1 + slot_size * index;
 
 	memset(tmp_buffer, 0, slot_size);
 	if (sensor) sensor->serialize(tmp_buffer);
 
-	os_file_type file = file_open(SENSORS_FILENAME, FileOpenMode::ReadWrite);
-	if (file) {
-		file_seek(file, pos, FileSeekMode::Set);
-		file_write(file, tmp_buffer, slot_size);
-		file_close(file);
-	} else {
-		DEBUG_PRINT("Failed to open file: ");
-		DEBUG_PRINTLN(SENSORS_FILENAME);
-	}
+	return file_write_block(SENSORS_FILENAME, tmp_buffer, pos, slot_size);
 }
 
 void Sensor::load_count() {
@@ -417,24 +396,23 @@ void Sensor::load_count() {
 	}
 }
 
-void Sensor::save_count() {
-	file_write_byte(SENSORS_FILENAME, 0, OpenSprinkler::nsensors);
+bool Sensor::save_count() {
+	return file_write_byte(SENSORS_FILENAME, 0, OpenSprinkler::nsensors);
 }
 
 unsigned char Sensor::add(Sensor *sensor) {
 	if (OpenSprinkler::nsensors >= MAX_SENSORS) return 0;
 
-	Sensor::write(sensor, OpenSprinkler::nsensors);
+	if (!Sensor::write(sensor, OpenSprinkler::nsensors)) return 0;
+	if (!file_write_byte(SENSORS_FILENAME, 0, OpenSprinkler::nsensors + 1)) return 0;
 	sensor_memory_init(OpenSprinkler::sensors[OpenSprinkler::nsensors], sensor);
-
 	OpenSprinkler::nsensors++;
-	Sensor::save_count();
 	return 1;
 }
 
 unsigned char Sensor::modify(uint8_t index, Sensor *sensor) {
 	if (index >= OpenSprinkler::nsensors) return 0;
-	Sensor::write(sensor, index);
+	if (!Sensor::write(sensor, index)) return 0;
 	sensor_memory_init(OpenSprinkler::sensors[index], sensor);
 	return 1;
 }
@@ -446,16 +424,17 @@ unsigned char Sensor::del(uint8_t index) {
 	const uint32_t slot_size = TMP_BUFFER_SIZE;
 	// erase by copying backward
 	for (uint8_t i = index; i < OpenSprinkler::nsensors - 1; i++) {
-		file_copy_block(SENSORS_FILENAME, 1 + (uint32_t)(i + 1) * slot_size, 1 + (uint32_t)i * slot_size, slot_size, tmp_buffer);
-		// also shift in-memory state
+		if (!file_copy_block(SENSORS_FILENAME, 1 + (uint32_t)(i + 1) * slot_size,
+			1 + (uint32_t)i * slot_size, slot_size, tmp_buffer)) return 0;
+	}
+	if (!file_write_byte(SENSORS_FILENAME, 0, OpenSprinkler::nsensors - 1)) return 0;
+	for (uint8_t i = index; i < OpenSprinkler::nsensors - 1; i++) {
 		OpenSprinkler::sensors[i] = OpenSprinkler::sensors[i + 1];
 	}
-
 	OpenSprinkler::nsensors--;
 	OpenSprinkler::sensors[OpenSprinkler::nsensors].interval = 0;
 	OpenSprinkler::sensors[OpenSprinkler::nsensors].uuid = 0;
 
-	Sensor::save_count();
 	return 1;
 }
 

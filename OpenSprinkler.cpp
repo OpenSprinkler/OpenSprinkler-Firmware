@@ -32,6 +32,7 @@
 #endif
 #include "core/program.h"
 #include "services/weather.h"
+#include "storage/maintenance.h"
 #include "external/ArduinoJson.hpp"
 
 #if defined(ESP32)
@@ -902,6 +903,8 @@ void OpenSprinkler::begin() {
 		lcd.setCursor(0, 0);
 		lcd_print_pgm(PSTR("Error Code: 0x2D"));
 		delay(5000);
+	} else {
+		maintain_embedded_storage();
 	}
 
 	state = OS_STATE_INITIAL;
@@ -1437,14 +1440,16 @@ void OpenSprinkler::get_station_name(unsigned char sid, char tmp[]) {
 }
 
 /** Set station name */
-void OpenSprinkler::set_station_name(unsigned char sid, char tmp[]) {
+bool OpenSprinkler::set_station_name(unsigned char sid, char tmp[]) {
 	tmp[STATION_NAME_SIZE]=0;
-	char n0[STATION_NAME_SIZE+1];
+	char n0[STATION_NAME_SIZE+1] = {};
 	get_station_name(sid, n0);
 	size_t len = strlen(n0);
 	if(len!=strlen(tmp) || memcmp(n0, tmp, len)!=0) { // only write if the name has changed
-		file_write_block(STATIONS_FILENAME, tmp, (uint32_t)sid*sizeof(StationData)+offsetof(StationData, name), STATION_NAME_SIZE);
+		return file_write_block(STATIONS_FILENAME, tmp,
+			(uint32_t)sid*sizeof(StationData)+offsetof(StationData, name), STATION_NAME_SIZE);
 	}
+	return true;
 }
 
 /** Get station type */
@@ -1529,14 +1534,17 @@ void OpenSprinkler::set_station_gid(unsigned char sid, unsigned char gid) {
 }
 
 /** Save all station attribs to file (backward compatibility) */
-void OpenSprinkler::attribs_save() {
+bool OpenSprinkler::attribs_save() {
 	// re-package attribute bits and save
 	unsigned char bid, s, sid=0;
 	StationAttrib at, at0;
 	memset(&at, 0, sizeof(StationAttrib));
 	unsigned char ty = STN_TYPE_STANDARD, ty0;
+	bool ok = true;
 	for(bid=0;bid<MAX_NUM_BOARDS && sid<nstations;bid++) {
 		for(s=0;s<8 && sid<nstations;s++,sid++) {
+			memset(&at0, 0xFF, sizeof(at0));
+			ty0 = 0xFF;
 			at.mas = (attrib_mas[bid]>>s) & 1;
 			at.igs = (attrib_igs[0][bid]>>s) & 1;
 			at.mas2= (attrib_mas2[bid]>>s)& 1;
@@ -1553,18 +1561,21 @@ void OpenSprinkler::attribs_save() {
 			// only write if content has changed: this is important for LittleFS as otherwise the overhead is too large
 			file_read_block(STATIONS_FILENAME, &at0, (uint32_t)sid*sizeof(StationData)+offsetof(StationData, attrib), sizeof(StationAttrib));
 			if(memcmp(&at,&at0,sizeof(StationAttrib))!=0) {
-				file_write_block(STATIONS_FILENAME, &at, (uint32_t)sid*sizeof(StationData)+offsetof(StationData, attrib), sizeof(StationAttrib)); // attribte bits are 1 byte long
+				ok = file_write_block(STATIONS_FILENAME, &at,
+					(uint32_t)sid*sizeof(StationData)+offsetof(StationData, attrib), sizeof(StationAttrib)) && ok;
 			}
 			if(attrib_spe[bid]>>s==0) {
 				// if station special bit is 0, make sure to write type STANDARD
 				// only write if content has changed
 				file_read_block(STATIONS_FILENAME, &ty0, (uint32_t)sid*sizeof(StationData)+offsetof(StationData, type), 1);
 				if(ty!=ty0) {
-					file_write_block(STATIONS_FILENAME, &ty, (uint32_t)sid*sizeof(StationData)+offsetof(StationData, type), 1); // attribte bits are 1 byte long
+					ok = file_write_block(STATIONS_FILENAME, &ty,
+						(uint32_t)sid*sizeof(StationData)+offsetof(StationData, type), 1) && ok;
 				}
 			}
 		}
 	}
+	return ok;
 }
 
 /** Load all station attribs from file (backward compatibility) */
@@ -2255,8 +2266,8 @@ void OpenSprinkler::nvdata_load() {
 }
 
 /** Save non-volatile controller status data */
-void OpenSprinkler::nvdata_save() {
-	file_write_block(NVCON_FILENAME, &nvdata, 0, sizeof(NVConData));
+bool OpenSprinkler::nvdata_save() {
+	return file_write_block(NVCON_FILENAME, &nvdata, 0, sizeof(NVConData));
 }
 
 void parse_wto(char* wto);
@@ -2314,11 +2325,13 @@ void OpenSprinkler::populate_master() {
 }
 
 /** Save integer options to file */
-void OpenSprinkler::iopts_save() {
-	file_write_block(IOPTS_FILENAME, iopts, 0, NUM_IOPTS);
+bool OpenSprinkler::iopts_save() {
+	bool ok = file_write_block(IOPTS_FILENAME, iopts, 0, NUM_IOPTS);
+	if (!ok) return false;
 	nboards = iopts[IOPT_EXT_BOARDS]+1;
 	nstations = nboards * 8;
 	status.enabled = iopts[IOPT_DEVICE_ENABLE];
+	return true;
 }
 
 /** Load a string option from file */
@@ -2336,17 +2349,20 @@ String OpenSprinkler::sopt_load(unsigned char oid) {
 }
 
 /** Save a string option to file */
-bool OpenSprinkler::sopt_save(unsigned char oid, const char *buf) {
+bool OpenSprinkler::sopt_save(unsigned char oid, const char *buf, bool *changed) {
+	if (changed) *changed = false;
 	// smart save: if value hasn't changed, don't write
-	if(file_cmp_block(SOPTS_FILENAME, buf, (uint32_t)MAX_SOPTS_SIZE*oid)==0) return false;
+	if(file_cmp_block(SOPTS_FILENAME, buf, (uint32_t)MAX_SOPTS_SIZE*oid)==0) return true;
 	int len = strlen(buf);
+	bool ok;
 	if(len>=MAX_SOPTS_SIZE) {
-		file_write_block(SOPTS_FILENAME, buf, (uint32_t)MAX_SOPTS_SIZE*oid, MAX_SOPTS_SIZE);
+		ok = file_write_block(SOPTS_FILENAME, buf, (uint32_t)MAX_SOPTS_SIZE*oid, MAX_SOPTS_SIZE);
 	} else {
 		// copy ending 0 too
-		file_write_block(SOPTS_FILENAME, buf, (uint32_t)MAX_SOPTS_SIZE*oid, len+1);
+		ok = file_write_block(SOPTS_FILENAME, buf, (uint32_t)MAX_SOPTS_SIZE*oid, len+1);
 	}
-	return true;
+	if (changed) *changed = ok;
+	return ok;
 }
 
 // ==============================
@@ -2354,17 +2370,27 @@ bool OpenSprinkler::sopt_save(unsigned char oid, const char *buf) {
 // ==============================
 
 /** Enable controller operation */
-void OpenSprinkler::enable() {
+bool OpenSprinkler::enable() {
+	const uint8_t previous_enabled = status.enabled;
+	const uint8_t previous_option = iopts[IOPT_DEVICE_ENABLE];
 	status.enabled = 1;
 	iopts[IOPT_DEVICE_ENABLE] = 1;
-	iopts_save();
+	if (iopts_save()) return true;
+	status.enabled = previous_enabled;
+	iopts[IOPT_DEVICE_ENABLE] = previous_option;
+	return false;
 }
 
 /** Disable controller operation */
-void OpenSprinkler::disable() {
+bool OpenSprinkler::disable() {
+	const uint8_t previous_enabled = status.enabled;
+	const uint8_t previous_option = iopts[IOPT_DEVICE_ENABLE];
 	status.enabled = 0;
 	iopts[IOPT_DEVICE_ENABLE] = 0;
-	iopts_save();
+	if (iopts_save()) return true;
+	status.enabled = previous_enabled;
+	iopts[IOPT_DEVICE_ENABLE] = previous_option;
+	return false;
 }
 
 /** Start rain delay */
@@ -2445,6 +2471,9 @@ void OpenSprinkler::log_sensor(uint8_t sid, float value) {
 		             hdr.max_files == SENSOR_LOG_MAX_FILES &&
 		             hdr.records_per_file == SENSOR_LOG_RECORDS_PER_FILE);
 	}
+	char current_filename[24];
+	get_sensor_log_filename(current_filename, hdr_valid ? hdr.cur_file : 0);
+	if (!prepare_log_write(!hdr_valid || !file_exists(current_filename))) return;
 
 	if (!hdr_valid) {
 		// First use or firmware upgrade: ensure directory exists, wipe stale data files, write fresh header
@@ -2464,7 +2493,11 @@ void OpenSprinkler::log_sensor(uint8_t sid, float value) {
 			DEBUG_PRINTLN("Failed to create sensor log header");
 			return;
 		}
-		file_write(hfile, &hdr, sizeof(hdr));
+		if (file_write(hfile, &hdr, sizeof(hdr)) != (int)sizeof(hdr)) {
+			file_close(hfile);
+			DEBUG_PRINTLN("Failed to write sensor log header");
+			return;
+		}
 		file_close(hfile);
 	}
 
@@ -2477,6 +2510,10 @@ void OpenSprinkler::log_sensor(uint8_t sid, float value) {
 	uint32_t count = file_size(dfile) / sizeof(SensorLogRecord);
 
 	if (count >= hdr.records_per_file) {
+		if (!prepare_log_write(true)) {
+			file_close(dfile);
+			return;
+		}
 		// Current file is full — rotate to next slot
 		file_close(dfile);
 		hdr.cur_file = (uint16_t)((hdr.cur_file + 1) % hdr.max_files);
@@ -2487,7 +2524,12 @@ void OpenSprinkler::log_sensor(uint8_t sid, float value) {
 
 		// Persist updated header (only written on rotation, not on every record)
 		hfile = open_sensor_log_header(FileOpenMode::WriteTruncate);
-		if (hfile) { file_write(hfile, &hdr, sizeof(hdr)); file_close(hfile); }
+		if (!hfile || file_write(hfile, &hdr, sizeof(hdr)) != (int)sizeof(hdr)) {
+			if (hfile) file_close(hfile);
+			DEBUG_PRINTLN("Failed to update sensor log header");
+			return;
+		}
+		file_close(hfile);
 
 		dfile = open_sensor_log(hdr.cur_file, FileOpenMode::Append);
 		if (!dfile) {
@@ -2500,7 +2542,9 @@ void OpenSprinkler::log_sensor(uint8_t sid, float value) {
 	rec.timestamp = now();
 	rec.value     = value;
 	rec.uuid      = sensors[sid].uuid;
-	file_write(dfile, &rec, sizeof(rec));
+	if (file_write(dfile, &rec, sizeof(rec)) != (int)sizeof(rec)) {
+		DEBUG_PRINTLN("Failed to write sensor log record");
+	}
 	file_close(dfile);
 }
 

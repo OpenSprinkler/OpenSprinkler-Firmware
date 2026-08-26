@@ -8,8 +8,9 @@
 static char option_value[MAX_SOPTS_SIZE + 1];
 static std::string streamed;
 
-void file_read_block(const char *, void *destination, uint32_t, uint32_t length) {
+bool file_read_block(const char *, void *destination, uint32_t, uint32_t length) {
 	memcpy(destination, option_value, length);
+	return true;
 }
 
 char dec2hexchar(unsigned char value) {
