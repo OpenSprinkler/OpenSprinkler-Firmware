@@ -61,6 +61,59 @@ checkout. That is load-bearing: `OpenSprinkler::update_dev()` implements in-app 
 update by shelling out to `cd $(get_data_dir()) && ./updater.sh`, so on OSPi **the data dir
 must be the git checkout**. The Docker image sets `-d /data` and therefore cannot self-update.
 
+## Syncing with upstream
+
+This is a fork of [OpenSprinkler/OpenSprinkler-Firmware](https://github.com/OpenSprinkler/OpenSprinkler-Firmware)
+that adds Docker packaging. The firmware itself is upstream's, so pulling their changes in is a
+routine operation rather than a special event:
+
+```bash
+git fetch upstream
+git merge upstream/master
+git submodule update --init --recursive   # upstream moves the pins under external/
+make clean && make VERSION=OSPI           # or ./build.sh -s demo for the hardware-free path
+```
+
+`upstream`'s push URL is deliberately set to `DISABLED`; this fork never pushes there.
+
+**Expect conflicts in these files.** The fork is not purely additive — it edits upstream-owned
+files as well as adding its own:
+
+| File | Why it diverges |
+|---|---|
+| `defines.h` | `OS_FW_MINOR` bumped 5 → 6; OSPi default HTTP port is 88, not 8080 |
+| `OpenSprinkler.cpp` | `reboot()` exits instead of spinning when the syscall is denied |
+| `Makefile` | builds `smtp.c` with the project flags instead of make's built-in rule |
+| `Dockerfile` | the fork's own multi-arch build |
+| `.github/workflows/build-ci.yml` | publishes to GHCR and Docker Hub |
+| `README.md`, `docs/docs/2.2.1/221_5_manual.md` | document the fork and the port change |
+
+Files the fork adds outright — `docker-compose.yaml`, `docker-compose.pi.yaml`, `.env`,
+`CLAUDE.md` — never conflict.
+
+**`OS_FW_MINOR` is a standing collision.** This fork reports 2.2.1(6) while being based on
+upstream's `221(5)` tag — the fork point *is* that tag, exactly. When upstream ships their own
+2.2.1(6) the line conflicts, and the two builds then claim the same version while differing.
+Resolve it deliberately; do not take either side automatically.
+
+`build.sh` re-syncs and checks out `external/` at pinned revisions on every run, so it discards
+local edits inside the submodules. Fork changes do not belong there.
+
+### Releasing
+
+`build-ci.yml` publishes `:master` on every push to master, but `:release` and `:latest` fire
+only on a published GitHub release. Anything pinning this image — notably the
+[Home Assistant add-on](https://github.com/rbhr/ha-app-OpenSprinkler-Server) — needs a real tag:
+
+```bash
+git tag v2.2.1.5-ospi.1 && git push origin v2.2.1.5-ospi.1
+gh release create v2.2.1.5-ospi.1
+```
+
+The scheme is `v<upstream firmware version>-ospi.<packaging revision>`. Upstream's own tags
+(`221(5)`) cannot be reused: parentheses are not legal in a Docker tag, and `metadata-action`'s
+`type=ref,event=tag` uses the git tag verbatim as the image tag.
+
 ## Generated files — do not hand-edit
 
 `htmls.h` (tracked in git) is generated from `html/*.html` by `compress_htmls.mjs`
