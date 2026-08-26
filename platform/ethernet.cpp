@@ -156,6 +156,8 @@ bool CH390NetworkInterface::begin(SPIClass& spi, int8_t cs, int8_t irq,
 	eth_phy_config_t phy_config = ETH_PHY_DEFAULT_CONFIG();
 	phy_config.phy_addr = 1;
 	phy_config.reset_gpio_num = reset;
+	phy_config.hw_reset_assert_time_us = 10000;
+	phy_config.post_hw_reset_delay_ms = 25;
 
 	eth_ch390_config_t ch390_config = {};
 	ch390_config.int_gpio_num = irq;
@@ -296,6 +298,14 @@ bool WiredEthernet::begin(const uint8_t* mac_address) {
 	}
 }
 #elif defined(ESP32)
+void WiredEthernet::set_spi_drive(EthernetController controller) {
+	// CH390 traffic on the OS4 shared-bus path requires slower C6 output edges.
+	const gpio_drive_cap_t drive = controller == EthernetController::CH390 ?
+		GPIO_DRIVE_CAP_0 : GPIO_DRIVE_CAP_DEFAULT;
+	(void)gpio_set_drive_capability(static_cast<gpio_num_t>(PIN_SPI_SCK), drive);
+	(void)gpio_set_drive_capability(static_cast<gpio_num_t>(PIN_SPI_MOSI), drive);
+}
+
 bool WiredEthernet::begin(SPIClass& spi, int8_t cs, int8_t irq, int8_t reset,
 	uint32_t spi_clock_hz) {
 	_spi_clock_hz = spi_clock_hz;

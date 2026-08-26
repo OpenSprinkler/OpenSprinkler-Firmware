@@ -29,6 +29,7 @@ public:
 #if defined(ESP8266)
 	bool begin(const uint8_t* mac_address);
 #elif defined(ESP32)
+	void set_spi_drive(EthernetController controller);
 	bool begin(SPIClass& spi, int8_t cs, int8_t irq, int8_t reset,
 		uint32_t spi_clock_hz);
 #endif

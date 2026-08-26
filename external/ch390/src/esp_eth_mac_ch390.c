@@ -813,9 +813,10 @@ static esp_err_t emac_ch390_receive(esp_eth_mac_t *mac, uint8_t *buf, uint32_t *
                 ch390_drop_frame(emac, *length);
                 *length = 0;
                 return ESP_ERR_INVALID_RESPONSE;
-            } else if (*length > ETH_MAX_PACKET_SIZE) {
+            } else if (*length < ETH_CRC_LEN || *length > ETH_MAX_PACKET_SIZE) {
                 /* reset rx memory pointer */
                 ESP_GOTO_ON_ERROR(ch390_io_register_write(emac, CH390_MPTRCR, MPTRCR_RST_RX), err, TAG, "reset rx pointer failed");
+                *length = 0;
                 return ESP_ERR_INVALID_RESPONSE;
             } else {
                 ESP_GOTO_ON_ERROR(ch390_io_memory_read(emac, buf, *length), err, TAG, "read rx data failed");

@@ -440,17 +440,22 @@ unsigned char OpenSprinkler::start_network() {
 unsigned char OpenSprinkler::start_ether() {
 	if(!osboard::has(osboard::CAP_ETHERNET)) return 0;
 	#if defined(ESP32)
-	SPI.begin(PIN_SPI_SCK, PIN_SPI_MISO, PIN_SPI_MOSI, PIN_ETHER_CS);
 	pinMode(PIN_FLASH_CS, OUTPUT);
 	digitalWrite(PIN_FLASH_CS, HIGH);
+	pinMode(PIN_ETHER_CS, OUTPUT);
+	digitalWrite(PIN_ETHER_CS, HIGH);
+	SPI.begin(PIN_SPI_SCK, PIN_SPI_MISO, PIN_SPI_MOSI, PIN_ETHER_CS);
 	pinMode(PIN_ETHER_RESET, OUTPUT);
 	digitalWrite(PIN_ETHER_RESET, LOW);
 	delay(2);
 	digitalWrite(PIN_ETHER_RESET, HIGH);
 	delay(25);
 
+	eth.set_spi_drive(EthernetController::CH390);
 	const bool has_ch390 = ch390_probe(SPI, PIN_ETHER_CS,
-		osboard::CH390_SPI_CLOCK_HZ);
+		osboard::CH390_PROBE_SPI_CLOCK_HZ);
+	eth.set_spi_drive(has_ch390 ?
+		EthernetController::CH390 : EthernetController::W5500);
 	eth.select(has_ch390 ? EthernetController::CH390 : EthernetController::W5500);
 	const uint32_t spi_clock = has_ch390 ? osboard::CH390_SPI_CLOCK_HZ : ETHER_SPI_CLOCK;
 	if (!eth.begin(SPI, PIN_ETHER_CS, PIN_ETHER_IRQ, PIN_ETHER_RESET,

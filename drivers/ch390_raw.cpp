@@ -109,7 +109,10 @@ bool ch390_probe(SPIClass& spi, int8_t cs, uint32_t clock_hz) {
   write_register(kNcr, kNcrReset);
   const uint32_t started = millis();
   while ((read_register(kNcr) & kNcrReset) != 0) {
-    if (millis() - started > 250) return false;
+    if (millis() - started > 250) {
+      DEBUG_PRINTLN(F("CH390 probe: software reset timed out"));
+      return false;
+    }
     delay(1);
   }
   write_register(kGpr, 0x00);
@@ -119,6 +122,8 @@ bool ch390_probe(SPIClass& spi, int8_t cs, uint32_t clock_hz) {
   const uint8_t vid_high = read_register(kVidHigh);
   const uint8_t pid_low = read_register(kPidLow);
   const uint8_t pid_high = read_register(kPidHigh);
+  DEBUG_PRINTF("CH390 probe: VID=%02X%02X PID=%02X%02X\n",
+    vid_high, vid_low, pid_high, pid_low);
   return vid_low == 0x00 && vid_high == 0x1C &&
     pid_low == 0x51 && pid_high == 0x91;
 }
