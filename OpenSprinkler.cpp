@@ -31,6 +31,7 @@
 	#endif
 #endif
 #include "core/program.h"
+#include "drivers/ch390_raw.h"
 #include "services/weather.h"
 #include "storage/maintenance.h"
 #include "external/ArduinoJson.hpp"
@@ -381,7 +382,7 @@ bool OpenSprinkler::load_hardware_mac(unsigned char* buffer, bool wired) {
 	#if defined(ESP32)
 	if (wired) {
 		// Report the address assigned to the active Ethernet interface.
-		if (ETH.macAddress(buffer)) return true;
+		if (eth.macAddress(buffer)) return true;
 		return esp_read_mac(buffer, ESP_MAC_ETH) == ESP_OK;
 	}
 	// Reading the eFuse-derived STA address does not require WiFi to be enabled.
@@ -440,21 +441,33 @@ unsigned char OpenSprinkler::start_ether() {
 	if(!osboard::has(osboard::CAP_ETHERNET)) return 0;
 	#if defined(ESP32)
 	SPI.begin(PIN_SPI_SCK, PIN_SPI_MISO, PIN_SPI_MOSI, PIN_ETHER_CS);
+	pinMode(PIN_FLASH_CS, OUTPUT);
+	digitalWrite(PIN_FLASH_CS, HIGH);
+	pinMode(PIN_ETHER_RESET, OUTPUT);
+	digitalWrite(PIN_ETHER_RESET, LOW);
+	delay(2);
+	digitalWrite(PIN_ETHER_RESET, HIGH);
+	delay(25);
+
+	const bool has_ch390 = ch390_probe(SPI, PIN_ETHER_CS,
+		osboard::CH390_SPI_CLOCK_HZ);
+	eth.select(has_ch390 ? EthernetController::CH390 : EthernetController::W5500);
+	const uint32_t spi_clock = has_ch390 ? osboard::CH390_SPI_CLOCK_HZ : ETHER_SPI_CLOCK;
+	if (!eth.begin(SPI, PIN_ETHER_CS, PIN_ETHER_IRQ, PIN_ETHER_RESET,
+		spi_clock)) return 0;
 	if (iopts[IOPT_USE_DHCP] == 0) {
 		IPAddress staticip(iopts + IOPT_STATIC_IP1);
 		IPAddress gateway(iopts + IOPT_GATEWAY_IP1);
 		IPAddress dns(iopts + IOPT_DNS_IP1);
 		IPAddress subnet(iopts + IOPT_SUBNET_MASK1);
-		ETH.config(staticip, gateway, subnet, dns);
+		if (!eth.config(staticip, gateway, subnet, dns)) return 0;
 	}
-	if (!ETH.begin(ETH_PHY_W5500, 1, PIN_ETHER_CS, PIN_ETHER_IRQ,
-		PIN_ETHER_RESET, SPI, ETHER_SPI_CLOCK / 1000000UL)) return 0;
 	lcd_print_line_clear_pgm(PSTR("Start wired link"), 1);
-	lcd_print_line_clear_pgm(PSTR("  [w5500]    "), 2);
+	lcd_print_line_clear_pgm(has_ch390 ? PSTR("  [ch390]    ") : PSTR("  [w5500]    "), 2);
 	uint32_t timeout = millis() + 10000UL;
 	uint32_t next_count = millis();
 	uint8_t timecount = 1;
-	while ((!ETH.linkUp() || (uint32_t)ETH.localIP() == 0) &&
+	while (!eth.connected() &&
 		(int32_t)((uint32_t)millis() - timeout) < 0) {
 		if ((int32_t)((uint32_t)millis() - next_count) >= 0) {
 			lcd.setCursor(13, 2);
@@ -464,27 +477,32 @@ unsigned char OpenSprinkler::start_ether() {
 		delay(200);
 	}
 	lcd_print_line_clear_pgm(PSTR(""), 2);
-	if (ETH.linkUp() && (uint32_t)ETH.localIP() != 0) {
-		ETH.setDefault();
+	if (eth.connected()) {
+		eth.setDefault();
 		if (iopts[IOPT_USE_DHCP]) {
-			memcpy(iopts + IOPT_STATIC_IP1, &(ETH.localIP()[0]), 4);
-			memcpy(iopts + IOPT_GATEWAY_IP1, &(ETH.gatewayIP()[0]), 4);
-			memcpy(iopts + IOPT_DNS_IP1, &(ETH.dnsIP()[0]), 4);
-			memcpy(iopts + IOPT_SUBNET_MASK1, &(ETH.subnetMask()[0]), 4);
+			memcpy(iopts + IOPT_STATIC_IP1, &(eth.localIP()[0]), 4);
+			memcpy(iopts + IOPT_GATEWAY_IP1, &(eth.gatewayIP()[0]), 4);
+			memcpy(iopts + IOPT_DNS_IP1, &(eth.dnsIP()[0]), 4);
+			memcpy(iopts + IOPT_SUBNET_MASK1, &(eth.subnetMask()[0]), 4);
 			iopts_save();
 		}
 		return 1;
 	}
 	return iopts[IOPT_FORCE_WIRED] ? 1 : 0;
 	#else
-	eth.isW5500 = (hw_rev==2)?false:true; // os 3.2 uses enc28j60 and 3.3 uses w5500
+	eth.select(hw_rev == 2 ? EthernetController::ENC28J60 : EthernetController::None);
 
 	SPI.begin();
 	SPI.setBitOrder(MSBFIRST);
 	SPI.setDataMode(SPI_MODE0);
 	SPI.setFrequency(ETHER_SPI_CLOCK); // set SPI frequency
 
-	if(eth.isW5500) {
+	if (hw_rev != 2 && ch390_probe(SPI, PIN_ETHER_CS,
+		osboard::CH390_SPI_CLOCK_HZ)) {
+		eth.select(EthernetController::CH390);
+		DEBUG_PRINTLN(F("detected CH390"));
+	} else if (hw_rev != 2) {
+		eth.select(EthernetController::W5500);
 		DEBUG_PRINTLN(F("detect existence of W5500"));
 		/* this is copied from w5500.cpp wizchip_sw_reset
 		 * perform a software reset and see if we get a correct response
@@ -554,7 +572,8 @@ unsigned char OpenSprinkler::start_ether() {
 	eth.setDefault();
 	if(!eth.begin((uint8_t*)tmp_buffer))	return 0;
 	lcd_print_line_clear_pgm(PSTR("Start wired link"), 1);
-	lcd_print_line_clear_pgm(eth.isW5500 ? PSTR("  [w5500]    ") : PSTR(" [enc28j60]  "), 2);
+	lcd_print_line_clear_pgm(eth.is_ch390() ? PSTR("  [ch390]    ") :
+		eth.is_w5500() ? PSTR("  [w5500]    ") : PSTR(" [enc28j60]  "), 2);
 
 	uint32_t timeout = millis()+60000; // 60 seconds time out
 	unsigned char timecount = 1;
@@ -585,11 +604,7 @@ unsigned char OpenSprinkler::start_ether() {
 
 bool OpenSprinkler::network_connected(void) {
 	if(useEth)
-		#if defined(ESP32)
-		return ETH.linkUp() && (uint32_t)ETH.localIP() != 0;
-		#else
 		return eth.connected();
-		#endif
 	else
 		return (get_wifi_mode()==OS_WIFI_MODE_STA && WiFi.status()==WL_CONNECTED && state==OS_STATE_CONNECTED);
 }
@@ -2837,11 +2852,7 @@ void OpenSprinkler::lcd_print_screen(char c) {
 	lcd.setCursor(LCD_CURSOR_NETWORK, 1);
 #if defined(ARDUINO)
 	if(useEth) {
-		#if defined(ESP8266)
 		lcd.write(eth.connected()?ICON_ETHER_CONNECTED:ICON_ETHER_DISCONNECTED);
-		#else
-		lcd.write(ETH.linkUp()?ICON_ETHER_CONNECTED:ICON_ETHER_DISCONNECTED);
-		#endif
 	}
 	else {
 		lcd.write(WiFi.status()==WL_CONNECTED?ICON_WIFI_CONNECTED:ICON_WIFI_DISCONNECTED);

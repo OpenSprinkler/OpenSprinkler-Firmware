@@ -49,9 +49,6 @@ extern OTF::OpenThingsFramework *otf;
 	#include "../services/espconnect.h"
 	#if defined(ESP8266)
 	extern ESP8266WebServer *update_server;
-	extern ENC28J60lwIP enc28j60;
-	extern Wiznet5500lwIP w5500;
-	extern lwipEth eth;
 	#elif defined(ESP32)
 	#include <WebServer.h>
 	#include <Update.h>
@@ -2476,7 +2473,8 @@ void server_json_debug(OTF_PARAMS_DEF) {
 		storage.total_bytes, storage.used_bytes, storage.free_bytes, embedded_storage_pruned_files(),
 		(useEth?eth.localIP():WiFi.localIP()).toString().c_str());
 	if(useEth) {
-		bfill.emit_p(PSTR("\"isW5500\":$D,\"spi_clock\":$L,\"arp_size\":$D}"), eth.isW5500, ETHER_SPI_CLOCK, ARP_TABLE_SIZE);
+		bfill.emit_p(PSTR("\"eth_controller\":\"$S\",\"isW5500\":$D,\"spi_clock\":$L,\"arp_size\":$D}"),
+			eth.controller_name(), eth.is_w5500(), eth.spi_clock(), ARP_TABLE_SIZE);
 	} else {
 		bfill.emit_p(PSTR("\"rssi\":$D,\"bssid\":\"$S\",\"bssidchl\":\"$O\"}"),
 		WiFi.RSSI(), WiFi.BSSIDstr().c_str(), SOPT_STA_BSSID_CHL);
@@ -2502,9 +2500,10 @@ void server_json_debug(OTF_PARAMS_DEF) {
 	bfill.emit_p(PSTR(",\"maxblock\":$L"), (uint32_t)ESP.getMaxAllocHeap());
 	bfill.emit_p(PSTR(",\"flash\":$L,\"used\":$L,\"free\":$L,\"pruned\":$L,\"devip\":\"$S\","),
 		storage.total_bytes, storage.used_bytes, storage.free_bytes, embedded_storage_pruned_files(),
-		(useEth ? ETH.localIP() : WiFi.localIP()).toString().c_str());
+		(useEth ? eth.localIP() : WiFi.localIP()).toString().c_str());
 	if (useEth) {
-		bfill.emit_p(PSTR("\"isW5500\":1,\"spi_clock\":$L}"), (uint32_t)ETHER_SPI_CLOCK);
+		bfill.emit_p(PSTR("\"eth_controller\":\"$S\",\"isW5500\":$D,\"spi_clock\":$L}"),
+			eth.controller_name(), eth.is_w5500(), eth.spi_clock());
 	} else {
 		bfill.emit_p(PSTR("\"rssi\":$D,\"bssid\":\"$S\",\"bssidchl\":\"$O\"}"),
 			WiFi.RSSI(), WiFi.BSSIDstr().c_str(), SOPT_STA_BSSID_CHL);

@@ -38,9 +38,6 @@
 	#include <Arduino.h>
 	ESP8266WebServer *update_server = NULL;
 	DNSServer *dns = NULL;
-	ENC28J60lwIP enc28j60(PIN_ETHER_CS); // ENC28J60 lwip for wired Ether
-	Wiznet5500lwIP w5500(PIN_ETHER_CS); // W5500 lwip for wired Ether
-	lwipEth eth;
 	bool useEth = false; // tracks whether we are using WiFi or wired Ether connection
 	uint32_t getNtpTime();
 #elif defined(ESP32)
@@ -254,11 +251,8 @@ void ui_state_machine() {
 					os.lcd.setAutoDisplay(false);
 					os.lcd.clear(0, 1);
 					os.lcd.setCursor(0, 0);
-					#if defined(ESP8266)
+					#if defined(ARDUINO)
 						if (useEth) { os.lcd.print(eth.gatewayIP()); }
-						else { os.lcd.print(WiFi.gatewayIP()); }
-					#elif defined(ESP32)
-						if (useEth) { os.lcd.print(ETH.gatewayIP()); }
 						else { os.lcd.print(WiFi.gatewayIP()); }
 					#else
 						route_t route = get_route();
@@ -280,11 +274,8 @@ void ui_state_machine() {
 				os.lcd.setAutoDisplay(false);
 				os.lcd.clear(0, 1);
 				os.lcd.setCursor(0, 0);
-				#if defined(ESP8266)
+				#if defined(ARDUINO)
 					if (useEth) { os.lcd.print(eth.localIP()); }
-					else { os.lcd.print(WiFi.localIP()); }
-				#elif defined(ESP32)
-					if (useEth) { os.lcd.print(ETH.localIP()); }
 					else { os.lcd.print(WiFi.localIP()); }
 				#else
 					route_t route = get_route();
