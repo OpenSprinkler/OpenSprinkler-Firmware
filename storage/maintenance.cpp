@@ -12,13 +12,70 @@
 #include <Arduino.h>
 #include <FS.h>
 #include <LittleFS.h>
+#else
+#include <dirent.h>
+#include <limits.h>
 #endif
 
 namespace {
 
 uint32_t pruned_files = 0;
+uint32_t legacy_removed_files = 0;
 constexpr uint32_t MIN_RESERVE_BYTES = 64UL * 1024UL;
 constexpr uint32_t SMALL_FS_THRESHOLD = 256UL * 1024UL;
+constexpr uint8_t LEGACY_DELETE_BATCH_SIZE = 32;
+constexpr uint8_t LEGACY_PROGRESS_INTERVAL = 4;
+
+uint32_t scan_legacy_sprinkler_logs(uint32_t days[], uint8_t capacity) {
+	uint32_t total = 0;
+#if defined(ESP8266)
+	Dir dir = LittleFS.openDir(LOG_DIR);
+	while (dir.next()) {
+		String name = dir.fileName();
+		if (!is_sprinkler_log_filename(name.c_str())) continue;
+		if (days && total < capacity)
+			days[total] = (uint32_t)strtoul(name.c_str(), nullptr, 10);
+		total++;
+		if ((total & 0x0f) == 0) yield();
+	}
+#elif defined(ESP32)
+	File dir = LittleFS.open(LOG_DIR);
+	if (!dir || !dir.isDirectory()) return 0;
+	for (File file = dir.openNextFile(); file; file = dir.openNextFile()) {
+		String name = file.name();
+		file.close();
+		if (!is_sprinkler_log_filename(name.c_str())) continue;
+		const char* base = strrchr(name.c_str(), '/');
+		base = base ? base + 1 : name.c_str();
+		if (days && total < capacity)
+			days[total] = (uint32_t)strtoul(base, nullptr, 10);
+		total++;
+		if ((total & 0x0f) == 0) yield();
+	}
+	dir.close();
+#else
+	char directory_name[PATH_MAX];
+	strncpy(directory_name, get_filename_fullpath(LOG_DIR), sizeof(directory_name) - 1);
+	directory_name[sizeof(directory_name) - 1] = 0;
+	DIR* dir = opendir(directory_name);
+	if (!dir) return 0;
+	struct dirent* entry;
+	while ((entry = readdir(dir)) != nullptr) {
+		if (!is_sprinkler_log_filename(entry->d_name)) continue;
+		if (days && total < capacity)
+			days[total] = (uint32_t)strtoul(entry->d_name, nullptr, 10);
+		total++;
+	}
+	closedir(dir);
+#endif
+	return total;
+}
+
+bool remove_legacy_sprinkler_log(uint32_t day) {
+	char filename[24];
+	snprintf(filename, sizeof(filename), "%s%lu.txt", LOG_DIR, (unsigned long)day);
+	return remove_file(filename);
+}
 
 #if defined(ARDUINO)
 
@@ -186,6 +243,10 @@ uint32_t embedded_storage_pruned_files() {
 	return pruned_files;
 }
 
+uint32_t embedded_storage_legacy_removed_files() {
+	return legacy_removed_files;
+}
+
 bool maintain_embedded_storage(uint32_t additional_free_bytes) {
 #if !defined(ARDUINO)
 	(void)additional_free_bytes;
@@ -295,4 +356,75 @@ bool embedded_storage_is_low() {
 #else
 	return false;
 #endif
+}
+
+LegacySprinklerLogMigrationResult migrate_legacy_sprinkler_logs(
+	LegacySprinklerLogMigrationProgress progress) {
+	LegacySprinklerLogMigrationResult result = {};
+	uint32_t days[LEGACY_DELETE_BATCH_SIZE];
+	uint32_t remaining = scan_legacy_sprinkler_logs(days, LEGACY_DELETE_BATCH_SIZE);
+	result.total = remaining;
+	if (remaining == 0) {
+		result.complete = true;
+		return result;
+	}
+	if (progress) progress(0, result.total);
+
+#if defined(ARDUINO)
+	bool maintenance_retried = false;
+#endif
+	uint32_t displayed = 0;
+	while (remaining > 0) {
+		const uint8_t batch_count = remaining < LEGACY_DELETE_BATCH_SIZE ?
+			(uint8_t)remaining : LEGACY_DELETE_BATCH_SIZE;
+		uint8_t removed_this_batch = 0;
+		for (uint8_t i = 0; i < batch_count; i++) {
+			if (!remove_legacy_sprinkler_log(days[i])) continue;
+			removed_this_batch++;
+			result.removed++;
+			legacy_removed_files++;
+			const uint32_t processed = result.total > remaining ? result.total - remaining : 0;
+			const uint32_t current = processed + removed_this_batch;
+			if (progress && (current == result.total || current - displayed >= LEGACY_PROGRESS_INTERVAL)) {
+				progress(current, result.total);
+				displayed = current;
+			}
+#if defined(ARDUINO)
+			yield();
+#endif
+		}
+
+		if (removed_this_batch == 0) {
+#if defined(ARDUINO)
+			if (!maintenance_retried && embedded_storage_is_low()) {
+				maintenance_retried = true;
+				maintain_embedded_storage();
+				remaining = scan_legacy_sprinkler_logs(days, LEGACY_DELETE_BATCH_SIZE);
+				continue;
+			}
+#endif
+			break;
+		}
+		const uint32_t next_remaining =
+			scan_legacy_sprinkler_logs(days, LEGACY_DELETE_BATCH_SIZE);
+		const uint32_t actual_removed = remaining > next_remaining ?
+			remaining - next_remaining : 0;
+		if (removed_this_batch > actual_removed) {
+			const uint32_t overcount = removed_this_batch - actual_removed;
+			result.removed -= overcount;
+			legacy_removed_files -= overcount;
+		}
+		if (next_remaining >= remaining) break;
+		remaining = next_remaining;
+	}
+
+	result.remaining = scan_legacy_sprinkler_logs(nullptr, 0);
+	result.complete = result.remaining == 0;
+	const uint32_t processed = result.total >= result.remaining ?
+		result.total - result.remaining : result.removed;
+	if (progress && processed != displayed) progress(processed, result.total);
+	DEBUG_PRINTF("sprinkler log migration: total=%lu removed=%lu remaining=%lu\n",
+		(unsigned long)result.total, (unsigned long)result.removed,
+		(unsigned long)result.remaining);
+	return result;
 }

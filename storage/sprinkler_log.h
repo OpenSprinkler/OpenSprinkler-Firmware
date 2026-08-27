@@ -70,8 +70,6 @@ static_assert(sizeof(SprinklerLogDescriptor) == 16, "sprinkler descriptor size")
 using SprinklerLogVisitor = bool (*)(const SprinklerLogRecord& record, bool live, void* context);
 
 struct SprinklerLogCursor {
-	uint32_t legacy_day;
-	uint32_t legacy_offset;
 	uint32_t ring_generation;
 	uint16_t ring_record;
 };

@@ -70,6 +70,9 @@ extern OpenSprinkler os;
 extern ProgramData pd;
 extern uint32_t flow_count;
 
+static uint32_t sprinkler_log_failures = 0;
+static uint32_t sprinkler_log_mismatches = 0;
+
 static const char htmlMobileHeader[] PROGMEM =
 	"<meta name=\"viewport\" content=\"width=device-width,initial-scale=1.0,minimum-scale=1.0,user-scalable=no\">"
 ;
@@ -1276,7 +1279,7 @@ void server_json_log(OTF_PARAMS_DEF) {
 		// records would cost substantially more RAM on ESP8266.
 		if (!sprinkler_log_query(start, end, cursor, count, count_sprinkler_log_record,
 			nullptr, next_cursor, scanned_slots, done)) handle_return(HTML_INTERNAL_ERROR);
-		char cursor_text[32];
+		char cursor_text[16];
 		sprinkler_log_cursor_format(next_cursor, cursor_text, sizeof(cursor_text));
 		print_header(OTF_PARAMS, CT_BINARY);
 		res.writeHeader(F("X-OS-Page-Done"), done ? 1 : 0);
@@ -1294,7 +1297,20 @@ void server_json_log(OTF_PARAMS_DEF) {
 		uint32_t emitted_slots = 0;
 		bool emitted_done = false;
 		if (!sprinkler_log_query(start, end, cursor, count, emit_sprinkler_log_record,
-			&context, emitted_cursor, emitted_slots, emitted_done)) return;
+			&context, emitted_cursor, emitted_slots, emitted_done)) {
+			sprinkler_log_failures++;
+			DEBUG_PRINTF("sprinkler log: body pass failed after header scan=%lu valid=%u\n",
+				(unsigned long)scanned_slots, res.isValid() ? 1 : 0);
+			return;
+		}
+		if (emitted_slots != scanned_slots || emitted_done != done ||
+			emitted_cursor.ring_generation != next_cursor.ring_generation ||
+			emitted_cursor.ring_record != next_cursor.ring_record) {
+			sprinkler_log_mismatches++;
+			DEBUG_PRINTF("sprinkler log: body/header mismatch scan=%lu/%lu done=%u/%u\n",
+				(unsigned long)scanned_slots, (unsigned long)emitted_slots,
+				done ? 1 : 0, emitted_done ? 1 : 0);
+		}
 		return;
 	}
 
@@ -1302,7 +1318,12 @@ void server_json_log(OTF_PARAMS_DEF) {
 	print_header(OTF_PARAMS);
 	bfill.emit_p(PSTR("["));
 	if (!sprinkler_log_query(start, end, cursor, count, emit_sprinkler_log_record,
-		&context, next_cursor, scanned_slots, done)) return;
+		&context, next_cursor, scanned_slots, done)) {
+		sprinkler_log_failures++;
+		DEBUG_PRINTF("sprinkler log: JSON query failed scan=%lu valid=%u\n",
+			(unsigned long)scanned_slots, res.isValid() ? 1 : 0);
+		return;
+	}
 	bfill.emit_p(PSTR("]"));
 }
 /**
@@ -2559,9 +2580,12 @@ void server_json_debug(OTF_PARAMS_DEF) {
 	bfill.emit_p(PSTR(",\"maxblock\":$L,\"frag\":$D"),
 		(uint32_t)ESP.getMaxFreeBlockSize(),
 		(uint8_t)ESP.getHeapFragmentation());
-	bfill.emit_p(PSTR(",\"flash\":$L,\"used\":$L,\"free\":$L,\"pruned\":$L,\"devip\":\"$S\","),
+	bfill.emit_p(PSTR(",\"flash\":$L,\"used\":$L,\"free\":$L,\"pruned\":$L,\"legacy_removed\":$L,\"devip\":\"$S\","),
 		storage.total_bytes, storage.used_bytes, storage.free_bytes, embedded_storage_pruned_files(),
+		embedded_storage_legacy_removed_files(),
 		(useEth?eth.localIP():WiFi.localIP()).toString().c_str());
+	bfill.emit_p(PSTR("\"sprlog_fail\":$L,\"sprlog_mismatch\":$L,"),
+		sprinkler_log_failures, sprinkler_log_mismatches);
 	if(useEth) {
 		bfill.emit_p(PSTR("\"isW5500\":$D,\"spi_clock\":$L,\"arp_size\":$D}"), eth.isW5500, ETHER_SPI_CLOCK, ARP_TABLE_SIZE);
 	} else {
@@ -2587,9 +2611,12 @@ void server_json_debug(OTF_PARAMS_DEF) {
 	#elif defined(ESP32)
 	ESP.getFreeHeap());
 	bfill.emit_p(PSTR(",\"maxblock\":$L"), (uint32_t)ESP.getMaxAllocHeap());
-	bfill.emit_p(PSTR(",\"flash\":$L,\"used\":$L,\"free\":$L,\"pruned\":$L,\"devip\":\"$S\","),
+	bfill.emit_p(PSTR(",\"flash\":$L,\"used\":$L,\"free\":$L,\"pruned\":$L,\"legacy_removed\":$L,\"devip\":\"$S\","),
 		storage.total_bytes, storage.used_bytes, storage.free_bytes, embedded_storage_pruned_files(),
+		embedded_storage_legacy_removed_files(),
 		(useEth ? ETH.localIP() : WiFi.localIP()).toString().c_str());
+	bfill.emit_p(PSTR("\"sprlog_fail\":$L,\"sprlog_mismatch\":$L,"),
+		sprinkler_log_failures, sprinkler_log_mismatches);
 	if (useEth) {
 		bfill.emit_p(PSTR("\"isW5500\":1,\"spi_clock\":$L}"), (uint32_t)ETHER_SPI_CLOCK);
 	} else {
@@ -2598,7 +2625,8 @@ void server_json_debug(OTF_PARAMS_DEF) {
 	}
 	#else
 	(uint32_t)freeHeap());
-	bfill.emit_p(PSTR("}"));
+	bfill.emit_p(PSTR(",\"sprlog_fail\":$L,\"sprlog_mismatch\":$L}"),
+		sprinkler_log_failures, sprinkler_log_mismatches);
 #endif
 	handle_return(HTML_OK);
 }

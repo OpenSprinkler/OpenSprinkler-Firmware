@@ -28,6 +28,7 @@ In addition, OpenSprinkler v3 is available in three power models:
 * **Extended Master Support:** This firmware supports up to **four master stations**, with independent on/off adjustments and per-zone selection of which masters apply.
 * **Additional Built-in Sensor Ports (SN3/SN4):** This firmware enables two additional built-in sensor ports on OpenSprinkler v3.4, for a total of four: `SN1`–`SN4`.
 * **Extended Watering Durations:** Weather- and sensor-adjusted station runtimes may now exceed the previous 18-hour limit, up to the firmware's seven-day runtime limit. Programmed water times remain limited to 18 hours.
+* **Bounded Sprinkler Log Storage:** Sprinkler Logs now use a compact binary ring with predictable flash usage and paginated export. On OpenSprinkler v3/v4, earlier Sprinkler Logs are removed during a visible one-time update on the first 2.2.1(6) boot; download prior history before upgrading if it must be retained.
 * **OpenSprinkler v2.3 Support Removed:** Firmware 2.2.1(5) supports OpenSprinkler v3.x and OSPi/Linux. Firmware 2.2.1(4) was the final release supporting OpenSprinkler v2.3.
 
 <hr class="double">
@@ -770,7 +771,12 @@ Example: If Zones 1–3 are in Group `A`, and 4–6 in Group `B`, they can opera
 
 OpenSprinkler logs **Zone Activity**, **Rain Delays**, **Built-in Sensor Events**, **Flow Volumes**, and **% Watering Changes** on the controller. To view these records:
 
-<span class="hl">Firmware 2.2.1(6) stores new Sprinkler Logs in a compact, bounded binary ring. Existing logs from an earlier firmware remain readable and age out normally; no conversion is required during upgrade.</span>
+<span class="hl">Firmware 2.2.1(6) stores Sprinkler Logs in a compact, bounded binary ring.</span>
+
+!!! warning "Download prior Sprinkler Logs before upgrading"
+    On OpenSprinkler v3 and v4, the first boot into firmware 2.2.1(6) removes Sprinkler Logs created by earlier firmware. The LCD shows the one-time update progress; do not power off the controller until it finishes. Programs, settings, station names, and Expanded Sensor logs are preserved.
+
+    Linux and OSPi leave earlier text log files on disk, but those files are no longer displayed through the Sprinkler Logs page or returned by `/jl`.
 
 ![Logs](images/logs.png)
 

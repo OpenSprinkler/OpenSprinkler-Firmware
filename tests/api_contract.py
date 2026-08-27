@@ -4,7 +4,6 @@
 import argparse
 import json
 import socket
-import struct
 import subprocess
 import tempfile
 import time
@@ -302,7 +301,7 @@ def check_sprinkler_logs(server):
     scanned = int(headers["X-OS-Scanned-Slots"])
     assert 0 <= scanned <= 2500
     assert headers["X-OS-Record-Size"] == "16"
-    assert len(headers["X-OS-Next-Cursor"]) == 28
+    assert len(headers["X-OS-Next-Cursor"]) == 12
     assert len(body) % 16 == 0 and len(body) // 16 <= scanned
     assert server.get_json("jl", {"hist": 1, "fmt": "binary"})["result"] == 0x12
 
@@ -313,30 +312,29 @@ def check_sprinkler_logs(server):
         "[3,2,90,864100]\n[0,\"wl\",100,864200]\n", encoding="ascii"
     )
     window = {"start": day * 86400, "end": (day + 1) * 86400 - 1}
-    assert server.get_json("jl", window) == [[3, 2, 90, 864100]]
-    assert server.get_json("jl", {**window, "type": "wl"}) == [[0, "wl", 100, 864200]]
+    # Legacy daily files remain on Linux, but /jl is ring-only in 2.2.1(6).
+    assert server.get_json("jl", window) == []
+    assert server.get_json("jl", {**window, "type": "wl"}) == []
 
     binary_params = {**window, "fmt": "binary", "page": 1, "count": 1}
     _, first_headers, first_body = server.get_response("jl", binary_params)
-    assert first_headers["X-OS-Page-Done"] == "0"
-    assert first_headers["X-OS-Scanned-Slots"] == "1"
-    assert len(first_body) == 16
-    timestamp, duration, aux, record_type, program, station, flags = struct.unpack(
-        "<III4B", first_body
-    )
-    assert (timestamp, duration, aux) == (864100, 90, 0)
-    assert (record_type, program, station, flags) == (0, 3, 2, 0)
-
-    binary_params["cursor"] = first_headers["X-OS-Next-Cursor"]
-    _, second_headers, second_body = server.get_response("jl", binary_params)
-    assert second_headers["X-OS-Page-Done"] == "1"
-    assert second_headers["X-OS-Scanned-Slots"] == "1"
-    assert second_body == b""  # Filtered records still consume physical slots.
+    assert first_headers["X-OS-Page-Done"] == "1"
+    assert first_headers["X-OS-Scanned-Slots"] == "0"
+    assert first_body == b""
+    assert server.get_json("jl", {
+        **binary_params, "cursor": "0000000000000000000000000000"
+    })["result"] == 0x12
 
     assert server.get_json("dl", {"day": day})["result"] == 1
     assert server.get_json("jl", window) == []
     assert server.get_json("dl", {"before": 1})["result"] == 1
     print("PASS sprinkler log API")
+
+
+def check_debug(value):
+    require_keys("db", value, ["sprlog_fail", "sprlog_mismatch"])
+    assert value["sprlog_fail"] == 0
+    assert value["sprlog_mismatch"] == 0
 
 
 def run_contract(server):
@@ -349,6 +347,7 @@ def run_contract(server):
         ("jsd", check_sensor_definitions),
         ("jpa", check_program_adjustments),
         ("ja", check_combined),
+        ("db", check_debug),
     ]
     for endpoint, check in checks:
         check(server.get_json(endpoint))

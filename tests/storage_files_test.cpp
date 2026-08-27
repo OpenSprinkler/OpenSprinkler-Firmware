@@ -3,9 +3,79 @@
 #include "storage/maintenance.h"
 
 #include <cassert>
+#include <cstdio>
 #include <cstring>
+#include <limits.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 char tmp_buffer[TMP_BUFFER_ALLOC_SIZE];
+
+namespace {
+
+uint32_t progress_calls = 0;
+uint32_t progress_value = 0;
+uint32_t progress_total = 0;
+
+void migration_progress(uint32_t processed, uint32_t total) {
+	progress_calls++;
+	progress_value = processed;
+	progress_total = total;
+}
+
+void write_test_file(const char* filename) {
+	os_file_type file = file_open(filename, FileOpenMode::WriteTruncate);
+	assert(file);
+	const char value[] = "test";
+	assert(file_write(file, value, sizeof(value)) == (int)sizeof(value));
+	file_close(file);
+}
+
+void test_legacy_log_migration(const char* data_dir) {
+	assert(ensure_log_dir());
+	write_test_file(LOG_DIR "spr.hdr");
+	write_test_file(LOG_DIR "spr.log000");
+	write_test_file(LOG_DIR "sens.log000");
+	write_test_file("config.dat");
+	for (uint32_t day = 20000; day < 20070; day++) {
+		char filename[32];
+		snprintf(filename, sizeof(filename), "%s%lu.txt", LOG_DIR, (unsigned long)day);
+		write_test_file(filename);
+	}
+
+	LegacySprinklerLogMigrationResult result =
+		migrate_legacy_sprinkler_logs(migration_progress);
+	assert(result.total == 70);
+	assert(result.removed == 70);
+	assert(result.remaining == 0);
+	assert(result.complete);
+	assert(progress_calls > 1);
+	assert(progress_value == 70 && progress_total == 70);
+	assert(embedded_storage_legacy_removed_files() == 70);
+	assert(file_exists(LOG_DIR "spr.hdr"));
+	assert(file_exists(LOG_DIR "spr.log000"));
+	assert(file_exists(LOG_DIR "sens.log000"));
+	assert(file_exists("config.dat"));
+
+	// A matching directory simulates an undeletable entry. Migration must stop
+	// without looping, then complete when the entry can be removed next time.
+	char blocked_path[PATH_MAX];
+	snprintf(blocked_path, sizeof(blocked_path), "%s%s99999.txt",
+		data_dir, data_dir[strlen(data_dir) - 1] == '/' ? "logs/" : "/logs/");
+	assert(mkdir(blocked_path, 0755) == 0);
+	write_test_file(LOG_DIR "99999.txt/child");
+	result = migrate_legacy_sprinkler_logs();
+	assert(result.total == 1 && result.removed == 0 && result.remaining == 1);
+	assert(!result.complete);
+	assert(remove_file(LOG_DIR "99999.txt/child"));
+	assert(rmdir(blocked_path) == 0);
+	write_test_file(LOG_DIR "99999.txt");
+	result = migrate_legacy_sprinkler_logs();
+	assert(result.total == 1 && result.removed == 1 && result.remaining == 0);
+	assert(result.complete);
+}
+
+} // namespace
 
 int main(int argc, char** argv) {
 	assert(argc == 2);
@@ -63,5 +133,7 @@ int main(int argc, char** argv) {
 	assert(!is_sprinkler_log_filename("20690.csv"));
 	assert(!is_sprinkler_log_filename(".txt"));
 	assert(!is_sprinkler_log_filename("12345678901.txt"));
+
+	test_legacy_log_migration(argv[1]);
 	return 0;
 }

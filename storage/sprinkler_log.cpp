@@ -8,7 +8,6 @@
 #include <cerrno>
 #include <climits>
 #include <cstdio>
-#include <cstdlib>
 #include <cstring>
 #include <memory>
 #include <new>
@@ -17,9 +16,6 @@
 #include <Arduino.h>
 #include <FS.h>
 #include <LittleFS.h>
-#else
-#include <dirent.h>
-#include <sys/stat.h>
 #endif
 
 extern char tmp_buffer[];
@@ -549,131 +545,6 @@ uint32_t file_allocation(uint32_t size, uint32_t block_size) {
 	return ((size + 4 + block_size - 1) / block_size) * block_size;
 }
 
-bool special_type_from_name(const char* name, uint8_t& type) {
-	if (strncmp(name, "s1", 2) == 0) type = LOGDATA_SENSOR1;
-	else if (strncmp(name, "rd", 2) == 0) type = LOGDATA_RAINDELAY;
-	else if (strncmp(name, "wl", 2) == 0) type = LOGDATA_WATERLEVEL;
-	else if (strncmp(name, "fl", 2) == 0) type = LOGDATA_FLOWSENSE;
-	else if (strncmp(name, "s2", 2) == 0) type = LOGDATA_SENSOR2;
-	else if (strncmp(name, "s3", 2) == 0) type = LOGDATA_SENSOR3;
-	else if (strncmp(name, "s4", 2) == 0) type = LOGDATA_SENSOR4;
-	else if (strncmp(name, "cu", 2) == 0) type = LOGDATA_CURRENT;
-	else return false;
-	return true;
-}
-
-bool parse_uint32(char*& cursor, uint32_t& value) {
-	while (*cursor == ' ' || *cursor == '\t') cursor++;
-	char* end = nullptr;
-	unsigned long parsed = strtoul(cursor, &end, 10);
-	if (end == cursor || parsed > UINT32_MAX) return false;
-	value = (uint32_t)parsed;
-	cursor = end;
-	return true;
-}
-
-bool consume_char(char*& cursor, char expected) {
-	while (*cursor == ' ' || *cursor == '\t') cursor++;
-	if (*cursor != expected) return false;
-	cursor++;
-	return true;
-}
-
-bool parse_legacy_record(char* line, SprinklerLogRecord& record) {
-	record = {};
-	char* cursor = line;
-	if (!consume_char(cursor, '[')) return false;
-	uint32_t first = 0;
-	if (!parse_uint32(cursor, first) || !consume_char(cursor, ',')) return false;
-	while (*cursor == ' ' || *cursor == '\t') cursor++;
-	if (*cursor == '"') {
-		cursor++;
-		if (!special_type_from_name(cursor, record.type)) return false;
-		cursor += 2;
-		if (!consume_char(cursor, '"') || !consume_char(cursor, ',')) return false;
-		uint32_t value = 0;
-		uint32_t timestamp = 0;
-		record.aux = first;
-		if (!parse_uint32(cursor, value) || !consume_char(cursor, ',') ||
-			!parse_uint32(cursor, timestamp)) return false;
-		record.value = value;
-		record.timestamp = timestamp;
-	} else {
-		uint32_t station = 0;
-		uint32_t duration = 0;
-		uint32_t timestamp = 0;
-		if (!parse_uint32(cursor, station) || !consume_char(cursor, ',') ||
-			!parse_uint32(cursor, duration) || !consume_char(cursor, ',') ||
-			!parse_uint32(cursor, timestamp) || first > UINT8_MAX || station > UINT8_MAX) return false;
-		record.type = LOGDATA_STATION;
-		record.program = (uint8_t)first;
-		record.station = (uint8_t)station;
-		record.value = duration;
-		record.timestamp = timestamp;
-		while (*cursor == ' ' || *cursor == '\t') cursor++;
-		if (*cursor == ',') {
-			cursor++;
-			char* end = nullptr;
-			float flow = strtof(cursor, &end);
-			if (end == cursor) return false;
-			record.flags |= SPRINKLER_LOG_FLAG_FLOW;
-			float scaled = flow * 100.0f;
-			if (scaled > 0.0f)
-				record.aux = scaled >= 4294967295.0f ? UINT32_MAX : (uint32_t)(scaled + 0.5f);
-			cursor = end;
-		}
-	}
-	return record.timestamp != 0;
-}
-
-bool find_next_legacy_day(uint32_t from_day, uint32_t end_day, uint32_t& result) {
-	bool found = false;
-	uint32_t best = UINT32_MAX;
-#if defined(ESP8266)
-	Dir dir = LittleFS.openDir(LOG_DIR);
-	while (dir.next()) {
-		cooperative_yield();
-		String name = dir.fileName();
-		if (!is_sprinkler_log_filename(name.c_str())) continue;
-		uint32_t day = (uint32_t)strtoul(name.c_str(), nullptr, 10);
-		if (day >= from_day && day <= end_day && day < best) { best = day; found = true; }
-	}
-	#elif defined(ESP32)
-	File dir = LittleFS.open(LOG_DIR);
-	if (!dir || !dir.isDirectory()) return false;
-	for (File file = dir.openNextFile(); file; file = dir.openNextFile()) {
-		cooperative_yield();
-		String name = file.name();
-		file.close();
-		if (!is_sprinkler_log_filename(name.c_str())) continue;
-		const char* base = strrchr(name.c_str(), '/');
-		base = base ? base + 1 : name.c_str();
-		uint32_t day = (uint32_t)strtoul(base, nullptr, 10);
-		if (day >= from_day && day <= end_day && day < best) { best = day; found = true; }
-	}
-	dir.close();
-	#else
-	char directory_name[PATH_MAX];
-	strncpy(directory_name, get_filename_fullpath(LOG_DIR), sizeof(directory_name) - 1);
-	directory_name[sizeof(directory_name) - 1] = 0;
-	DIR* dir = opendir(directory_name);
-	if (!dir) return false;
-	struct dirent* entry;
-	while ((entry = readdir(dir)) != nullptr) {
-		if (!is_sprinkler_log_filename(entry->d_name)) continue;
-		uint32_t day = (uint32_t)strtoul(entry->d_name, nullptr, 10);
-		if (day >= from_day && day <= end_day && day < best) { best = day; found = true; }
-	}
-	closedir(dir);
-	#endif
-	if (found) result = best;
-	return found;
-}
-
-void legacy_filename(uint32_t day, char* output, size_t output_size) {
-	snprintf(output, output_size, "%s%lu.txt", LOG_DIR, (unsigned long)day);
-}
-
 uint32_t day_start_timestamp(uint32_t day) {
 	constexpr uint32_t max_day = UINT32_MAX / 86400UL;
 	return day >= max_day ? max_day * 86400UL : day * 86400UL;
@@ -683,119 +554,6 @@ uint32_t day_end_timestamp(uint32_t day) {
 	constexpr uint32_t max_day = UINT32_MAX / 86400UL;
 	return day >= max_day ? UINT32_MAX : (day + 1) * 86400UL;
 }
-
-class LegacyIterator {
-public:
-	LegacyIterator(uint32_t start_day, uint32_t end_day, uint32_t cursor_day, uint32_t cursor_offset)
-		: start_day_(start_day), end_day_(end_day), day_(cursor_day ? cursor_day : start_day),
-		  offset_(cursor_offset), file_(os_file_type()), file_day_(UINT32_MAX), peeked_(false),
-		  done_(cursor_day == UINT32_MAX) {
-		if (day_ < start_day_) { day_ = start_day_; offset_ = 0; }
-		if (day_ > end_day_) done_ = true;
-	}
-
-	~LegacyIterator() { close_file(); }
-
-	bool peek(SprinklerLogRecord& record, bool& live) {
-		if (peeked_) { record = peek_record_; live = peek_live_; return true; }
-		while (!done_) {
-			if (!file_ && !open_next_file()) { done_ = true; break; }
-			uint32_t line_start = offset_;
-			bool overflow = false;
-			uint32_t length = 0;
-			char byte = 0;
-			while (file_read(file_, &byte, 1) == 1) {
-				offset_++;
-				if (byte == '\n') break;
-				if (byte == '\r') continue;
-				if (length + 1 < TMP_BUFFER_SIZE) tmp_buffer[length++] = byte;
-				else overflow = true;
-			}
-			if (length == 0 && byte != '\n') {
-				uint32_t completed_day = file_day_;
-				close_file();
-				if (completed_day == UINT32_MAX || completed_day == UINT32_MAX - 1) {
-					done_ = true;
-					break;
-				}
-				day_ = completed_day + 1;
-				offset_ = 0;
-				continue;
-			}
-			tmp_buffer[length] = 0;
-			peek_day_ = file_day_;
-			peek_offset_ = line_start;
-			peek_next_offset_ = offset_;
-			peek_record_ = {};
-			peek_live_ = !overflow && parse_legacy_record(tmp_buffer, peek_record_);
-			if (!peek_live_) peek_record_.timestamp = file_day_ * 86400UL;
-			uint32_t record_day = peek_record_.timestamp / 86400UL;
-			if (record_day < start_day_ || record_day > end_day_) continue;
-			peeked_ = true;
-			record = peek_record_;
-			live = peek_live_;
-			return true;
-		}
-		return false;
-	}
-
-	void consume() {
-		if (!peeked_) return;
-		day_ = peek_day_;
-		offset_ = peek_next_offset_;
-		peeked_ = false;
-	}
-
-	void cursor(uint32_t& day, uint32_t& offset) const {
-		if (done_) { day = UINT32_MAX; offset = 0; return; }
-		day = peeked_ ? peek_day_ : day_;
-		offset = peeked_ ? peek_offset_ : offset_;
-	}
-
-private:
-	bool open_next_file() {
-		while (day_ <= end_day_) {
-			uint32_t next_day = 0;
-			if (!find_next_legacy_day(day_, end_day_, next_day)) return false;
-			char filename[24];
-			legacy_filename(next_day, filename, sizeof(filename));
-			file_ = file_open(filename, FileOpenMode::Read);
-			if (!file_) {
-				if (next_day == UINT32_MAX) return false;
-				day_ = next_day + 1;
-				offset_ = 0;
-				continue;
-			}
-			file_day_ = next_day;
-			if (next_day != day_) offset_ = 0;
-			day_ = next_day;
-			if (!offset_ || file_seek(file_, offset_)) return true;
-			close_file();
-			return false;
-		}
-		return false;
-	}
-
-	void close_file() {
-		if (file_) file_close(file_);
-		file_ = os_file_type();
-		file_day_ = UINT32_MAX;
-	}
-
-	uint32_t start_day_;
-	uint32_t end_day_;
-	uint32_t day_;
-	uint32_t offset_;
-	os_file_type file_;
-	uint32_t file_day_;
-	bool peeked_;
-	bool done_;
-	uint32_t peek_day_;
-	uint32_t peek_offset_;
-	uint32_t peek_next_offset_;
-	SprinklerLogRecord peek_record_;
-	bool peek_live_;
-};
 
 class RingIterator {
 public:
@@ -1085,26 +843,19 @@ uint32_t sprinkler_log_allocated_bytes(uint32_t block_size) {
 }
 
 SprinklerLogCursor sprinkler_log_cursor_begin() {
-	SprinklerLogCursor cursor = {};
-	cursor.legacy_day = 0;
-	return cursor;
+	return {};
 }
 
 bool sprinkler_log_cursor_parse(const char* value, SprinklerLogCursor& cursor) {
-	if (!value || strlen(value) != 28) return false;
-	for (uint8_t i = 0; i < 28; i++) {
+	if (!value || strlen(value) != 12) return false;
+	for (uint8_t i = 0; i < 12; i++) {
 		char c = value[i];
 		if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') ||
 			(c >= 'A' && c <= 'F'))) return false;
 	}
-	unsigned long legacy_day = 0;
-	unsigned long legacy_offset = 0;
 	unsigned long ring_generation = 0;
 	unsigned int ring_record = 0;
-	if (sscanf(value, "%8lx%8lx%8lx%4x", &legacy_day, &legacy_offset,
-		&ring_generation, &ring_record) != 4) return false;
-	cursor.legacy_day = (uint32_t)legacy_day;
-	cursor.legacy_offset = (uint32_t)legacy_offset;
+	if (sscanf(value, "%8lx%4x", &ring_generation, &ring_record) != 2) return false;
 	cursor.ring_generation = (uint32_t)ring_generation;
 	cursor.ring_record = (uint16_t)ring_record;
 	return true;
@@ -1113,8 +864,7 @@ bool sprinkler_log_cursor_parse(const char* value, SprinklerLogCursor& cursor) {
 void sprinkler_log_cursor_format(const SprinklerLogCursor& cursor,
 	char* output, size_t output_size) {
 	if (!output || output_size == 0) return;
-	snprintf(output, output_size, "%08lx%08lx%08lx%04x",
-		(unsigned long)cursor.legacy_day, (unsigned long)cursor.legacy_offset,
+	snprintf(output, output_size, "%08lx%04x",
 		(unsigned long)cursor.ring_generation, cursor.ring_record);
 }
 
@@ -1126,49 +876,30 @@ bool sprinkler_log_query(uint32_t start_day, uint32_t end_day,
 
 	#if defined(ESP8266)
 	// Forwarded OTC requests already have a deep WebSocket callback stack on
-	// ESP8266. Keep the two filesystem iterators off that continuation stack.
-	std::unique_ptr<LegacyIterator> legacy_owner(new (std::nothrow) LegacyIterator(
-		start_day, end_day, cursor.legacy_day, cursor.legacy_offset));
+	// ESP8266. Keep the filesystem iterator off that continuation stack.
 	std::unique_ptr<RingIterator> ring_owner(new (std::nothrow) RingIterator(
 		start_day, end_day, cursor.ring_generation, cursor.ring_record));
-	if (!legacy_owner || !ring_owner) return false;
-	LegacyIterator& legacy = *legacy_owner;
+	if (!ring_owner) return false;
 	RingIterator& ring = *ring_owner;
 #else
-	LegacyIterator legacy(start_day, end_day, cursor.legacy_day, cursor.legacy_offset);
 	RingIterator ring(start_day, end_day, cursor.ring_generation, cursor.ring_record);
 #endif
-	SprinklerLogRecord legacy_record = {};
 	SprinklerLogRecord ring_record = {};
-	bool legacy_live = false;
 	bool ring_live = false;
-	bool has_legacy = legacy.peek(legacy_record, legacy_live);
 	bool has_ring = ring.peek(ring_record, ring_live);
 	scanned_slots = 0;
 
-	while (scanned_slots < max_physical_slots && (has_legacy || has_ring)) {
-		// Legacy wins timestamp ties, keeping a deterministic order during the
-		// transition where old daily files and ring segments overlap.
-		bool use_legacy = has_legacy &&
-			(!has_ring || legacy_record.timestamp <= ring_record.timestamp);
-		const SprinklerLogRecord& record = use_legacy ? legacy_record : ring_record;
-		bool live = use_legacy ? legacy_live : ring_live;
-		if (!visitor(record, live, context)) return false;
-		if (use_legacy) {
-			legacy.consume();
-			has_legacy = legacy.peek(legacy_record, legacy_live);
-		} else {
-			ring.consume();
-			has_ring = ring.peek(ring_record, ring_live);
-		}
+	while (scanned_slots < max_physical_slots && has_ring) {
+		if (!visitor(ring_record, ring_live, context)) return false;
+		ring.consume();
+		has_ring = ring.peek(ring_record, ring_live);
 		scanned_slots++;
 		#if defined(ARDUINO)
 		if ((scanned_slots & 0x3f) == 0) yield();
 		#endif
 	}
 
-	legacy.cursor(next_cursor.legacy_day, next_cursor.legacy_offset);
 	ring.cursor(next_cursor.ring_generation, next_cursor.ring_record);
-	done = !has_legacy && !has_ring;
+	done = !has_ring;
 	return true;
 }

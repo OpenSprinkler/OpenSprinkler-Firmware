@@ -59,9 +59,15 @@ void test_codec() {
 	encoded[15] = 0x40;
 	assert(!sprinkler_log_decode_record(encoded, output));
 	SprinklerLogCursor cursor = {};
-	char invalid_cursor[] = "0000000000000000000000000000";
-	invalid_cursor[27] = 'g';
-	assert(!sprinkler_log_cursor_parse(invalid_cursor, cursor));
+	assert(sprinkler_log_cursor_parse("1234abcd0010", cursor));
+	assert(cursor.ring_generation == 0x1234abcdUL);
+	assert(cursor.ring_record == 0x10);
+	char cursor_text[16];
+	sprinkler_log_cursor_format(cursor, cursor_text, sizeof(cursor_text));
+	assert(strcmp(cursor_text, "1234abcd0010") == 0);
+	assert(!sprinkler_log_cursor_parse("1234abcd001g", cursor));
+	assert(!sprinkler_log_cursor_parse("1234abcd001", cursor));
+	assert(!sprinkler_log_cursor_parse("0000000000000000000000000000", cursor));
 }
 
 void test_append_rotate_and_recover() {
@@ -138,15 +144,17 @@ void test_partial_tail_recovery() {
 	assert(sprinkler_log_clear());
 }
 
-void test_merged_query_and_cursor() {
+void test_ring_query_and_cursor() {
 	const uint32_t day = 20;
 	char legacy[160];
 	snprintf(legacy, sizeof(legacy),
 		"[2,1,10,%lu]\n[3,2,20,%lu]\n",
-		(unsigned long)(day * 86400UL + 100),
-		(unsigned long)(day * 86400UL + 300));
+		(unsigned long)(day * 86400UL + 150),
+		(unsigned long)(day * 86400UL + 350));
 	write_legacy_file(day, legacy);
-	assert(sprinkler_log_append(make_record(day * 86400UL + 200, 11)));
+	assert(sprinkler_log_append(make_record(day * 86400UL + 100, 10)));
+	assert(sprinkler_log_append(make_record(day * 86400UL + 100, 11)));
+	assert(sprinkler_log_append(make_record(day * 86400UL + 300, 20)));
 	assert(sprinkler_log_append(make_record(day * 86400UL + 400, 21)));
 
 	SprinklerLogCursor cursor = sprinkler_log_cursor_begin();
@@ -158,7 +166,9 @@ void test_merged_query_and_cursor() {
 		next, scanned, done));
 	assert(scanned == 2 && !done && records.size() == 2);
 	assert(records[0].timestamp == day * 86400UL + 100);
-	assert(records[1].timestamp == day * 86400UL + 200);
+	assert(records[0].value == 10);
+	assert(records[1].timestamp == day * 86400UL + 100);
+	assert(records[1].value == 11);
 
 	char encoded_cursor[32];
 	sprinkler_log_cursor_format(next, encoded_cursor, sizeof(encoded_cursor));
@@ -172,27 +182,13 @@ void test_merged_query_and_cursor() {
 	assert(records[1].timestamp == day * 86400UL + 400);
 
 	assert(sprinkler_log_clear());
-	remove_legacy_file(day);
-
-	// Advancing past EOF must continue with the next retained legacy day.
-	write_legacy_file(day + 1, "[4,3,10,1814401]\n");
-	write_legacy_file(day + 3, "[5,4,20,1987201]\n");
+	// Legacy files remain on native filesystems but are no longer returned.
 	cursor = sprinkler_log_cursor_begin();
 	records.clear();
-	assert(sprinkler_log_query(day + 1, day + 3, cursor, 4, collect_record, &records,
-		next, scanned, done));
-	assert(done && scanned == 2 && records.size() == 2);
-	assert(records[0].timestamp == (day + 1) * 86400UL + 1);
-	assert(records[1].timestamp == (day + 3) * 86400UL + 1);
-	remove_legacy_file(day + 1);
-	remove_legacy_file(day + 3);
-
-	// A missing ring and no legacy files is a valid empty result.
-	cursor = sprinkler_log_cursor_begin();
-	records.clear();
-	assert(sprinkler_log_query(day, day, cursor, 2, collect_record, &records,
+	assert(sprinkler_log_query(day, day, cursor, 4, collect_record, &records,
 		next, scanned, done));
 	assert(done && scanned == 0 && records.empty());
+	remove_legacy_file(day);
 }
 
 void test_full_wrap_and_prune() {
@@ -262,7 +258,7 @@ int main(int argc, char** argv) {
 	test_append_rotate_and_recover();
 	test_deletion_and_clear();
 	test_partial_tail_recovery();
-	test_merged_query_and_cursor();
+	test_ring_query_and_cursor();
 	test_full_wrap_and_prune();
 	test_delete_before();
 	puts("sprinkler log tests passed");

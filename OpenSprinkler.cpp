@@ -904,6 +904,15 @@ void OpenSprinkler::begin() {
 		lcd_print_pgm(PSTR("Error Code: 0x2D"));
 		delay(5000);
 	} else {
+		LegacySprinklerLogMigrationResult migration = migrate_legacy_sprinkler_logs(
+			[](uint32_t processed, uint32_t total) {
+				OpenSprinkler::lcd_print_log_migration(processed, total);
+			});
+		if (migration.total > 0) {
+			lcd_print_log_migration(migration.total - migration.remaining, migration.total,
+				true, migration.complete);
+			delay(migration.complete ? 750 : 2000);
+		}
 		maintain_embedded_storage();
 	}
 
@@ -2770,6 +2779,51 @@ void OpenSprinkler::lcd_print_update(const char *message, int16_t percent) {
 		lcd.print(percent > 100 ? 100 : percent);
 		lcd.print('%');
 	}
+	lcd.display();
+#endif
+	lcd.setAutoDisplay(true);
+}
+
+void OpenSprinkler::lcd_print_log_migration(uint32_t processed, uint32_t total,
+	bool finished, bool complete) {
+	lcd.setAutoDisplay(false);
+	lcd.clear();
+
+#if defined(ARDUINO)
+	const uint8_t percent = total == 0 ? 100 :
+		(uint8_t)(processed >= total ? 100 : (processed * 100UL) / total);
+	lcd.setColor(WHITE);
+	lcd.setTextAlignment(TEXT_ALIGN_CENTER);
+	lcd.setFont(Monospaced_plain_13);
+	if (!finished) {
+		lcd.drawString(64, 0, F("Updating logs"));
+		lcd.drawString(64, 15, F("Do not power off"));
+		lcd.drawProgressBar(14, 34, 100, 6, percent);
+		char count[24];
+		snprintf(count, sizeof(count), "%lu / %lu", (unsigned long)processed,
+			(unsigned long)total);
+		lcd.drawString(64, 43, count);
+	} else if (complete) {
+		lcd.drawString(64, 8, F("Log update"));
+		lcd.drawString(64, 24, F("complete"));
+		lcd.drawProgressBar(14, 46, 100, 6, 100);
+	} else {
+		lcd.drawString(64, 0, F("Log update"));
+		lcd.drawString(64, 15, F("incomplete"));
+		lcd.drawString(64, 30, F("Retry next boot"));
+		lcd.drawProgressBar(14, 50, 100, 6, percent);
+	}
+	lcd.display();
+	lcd.setTextAlignment(TEXT_ALIGN_LEFT);
+	lcd.setFont(Monospaced_plain_13);
+#else
+	lcd.setCursor(0, 0);
+	lcd_print_pgm(finished ? (complete ? "Log update complete" : "Log update incomplete") :
+		"Updating log storage");
+	lcd.setCursor(0, 1);
+	lcd.print(processed);
+	lcd.print('/');
+	lcd.print(total);
 	lcd.display();
 #endif
 	lcd.setAutoDisplay(true);
