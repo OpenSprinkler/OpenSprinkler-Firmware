@@ -79,7 +79,7 @@
 #define SENADJ_FILENAME       "senadj.dat"  // external sensor adjustment data for programs
 #endif
 #if defined(ARDUINO)
-#define LOG_DIR                     "/logs/"   // absolute path on LittleFS; parent dir created implicitly
+#define LOG_DIR                     "/logs/"   // absolute path on LittleFS; writers must ensure parent exists
 #else
 #define LOG_DIR                     "logs/"    // relative to data dir on Linux; get_filename_fullpath prepends it
 #endif
@@ -185,15 +185,19 @@ enum {
 #define MAX_SOPTS_SIZE    320   // maximum string option size
 
 #if defined(ARDUINO)
-#define LOG_SPRINKLER_MAX_KB  1200  // max total size of sprinkler .txt log files in KB (~1.2 MB)
+#define LOG_SPRINKLER_MAX_KB  1200  // max combined legacy and binary sprinkler logs in KB
 #endif
 
 #define MAX_SENSORS 64
 #define SENSOR_LOG_MAGIC            0x55
 #define SENSOR_LOG_VERSION          0x01
 #define SENSOR_LOG_MAX_FILES        50    // number of data files in the rotation
-#if defined(ARDUINO)
-	#define SENSOR_LOG_RECORDS_PER_FILE 819    // records per file; 819×10 B = 8 190 B fits in one 8 KB LittleFS block
+#if defined(ESP32)
+	// 818 x 10 B = 8,180 B, below the two-block ESP32 LittleFS ceiling (8,188 B).
+	#define SENSOR_LOG_RECORDS_PER_FILE 818
+#elif defined(ARDUINO)
+	// 819 x 10 B = 8,190 B, which fits in one 8 KB ESP8266 LittleFS block.
+	#define SENSOR_LOG_RECORDS_PER_FILE 819
 #else
 	// Linux/OSPi/DEMO: 50 × 16 384 = 819 200 records (about 8.2 MB).
 	#define SENSOR_LOG_RECORDS_PER_FILE 16384

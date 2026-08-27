@@ -3,6 +3,7 @@
 #include "defines.h"
 #include "sensors/sensor.h"
 #include "storage/files.h"
+#include "storage/sprinkler_log.h"
 
 #include <cstdlib>
 #include <cstring>
@@ -34,6 +35,12 @@ uint32_t pruned_sprinkler_files = 0;
 uint32_t pruned_sensor_files = 0;
 uint8_t log_check_counter = 0;
 
+uint32_t allocated_file_size(uint32_t size, uint32_t block_size) {
+	if (size == 0 || block_size == 0) return 0;
+	if (size <= block_size) return block_size;
+	return ((size + 4 + block_size - 1) / block_size) * block_size;
+}
+
 bool candidate_precedes(uint32_t day, const char* filename,
 	const SprinklerLogCandidate& candidate) {
 	return day < candidate.day ||
@@ -55,7 +62,8 @@ void insert_candidate(SprinklerLogCandidate candidates[], uint8_t& count,
 	count = new_count;
 }
 
-uint8_t collect_oldest_sprinkler_logs(SprinklerLogCandidate candidates[], uint32_t* total_size) {
+uint8_t collect_oldest_sprinkler_logs(SprinklerLogCandidate candidates[], uint32_t block_size,
+	uint32_t* total_size) {
 	uint8_t count = 0;
 	uint32_t total = 0;
 #if defined(ESP8266)
@@ -65,7 +73,7 @@ uint8_t collect_oldest_sprinkler_logs(SprinklerLogCandidate candidates[], uint32
 		if (!is_sprinkler_log_filename(name.c_str())) continue;
 		char filename[24];
 		snprintf(filename, sizeof(filename), "%s%s", LOG_DIR, name.c_str());
-		uint32_t size = dir.fileSize();
+		uint32_t size = allocated_file_size(dir.fileSize(), block_size);
 		total += size;
 		insert_candidate(candidates, count,
 			(uint32_t)strtoul(name.c_str(), nullptr, 10), size, filename);
@@ -78,7 +86,7 @@ uint8_t collect_oldest_sprinkler_logs(SprinklerLogCandidate candidates[], uint32
 	}
 	for (File file = dir.openNextFile(); file; file = dir.openNextFile()) {
 		String name = file.name();
-		uint32_t size = file.size();
+		uint32_t size = allocated_file_size(file.size(), block_size);
 		file.close();
 		if (!is_sprinkler_log_filename(name.c_str())) continue;
 		const char* base = strrchr(name.c_str(), '/');
@@ -190,7 +198,9 @@ bool maintain_embedded_storage(uint32_t additional_free_bytes) {
 		UINT32_MAX : reserve + additional_free_bytes;
 	SprinklerLogCandidate candidates[SPRINKLER_PRUNE_BATCH_SIZE];
 	uint32_t sprinkler_size = 0;
-	uint8_t candidate_count = collect_oldest_sprinkler_logs(candidates, &sprinkler_size);
+	uint8_t candidate_count = collect_oldest_sprinkler_logs(
+		candidates, before.block_size, &sprinkler_size);
+	sprinkler_size += sprinkler_log_allocated_bytes(before.block_size);
 	const uint32_t sprinkler_limit = (uint32_t)LOG_SPRINKLER_MAX_KB * 1024UL;
 	const uint32_t sprinkler_removed_before = pruned_sprinkler_files;
 	const uint32_t sensor_removed_before = pruned_sensor_files;
@@ -216,8 +226,23 @@ bool maintain_embedded_storage(uint32_t additional_free_bytes) {
 		usage = get_embedded_storage_usage();
 		if (!usage.valid) break;
 		if (sprinkler_size >= sprinkler_limit || usage.free_bytes < target_free) {
-			candidate_count = collect_oldest_sprinkler_logs(candidates, nullptr);
+			candidate_count = collect_oldest_sprinkler_logs(
+				candidates, usage.block_size, nullptr);
 		}
+	}
+
+	// Preserve the active segment. Under pressure, retire completed binary
+	// segments only after all legacy daily files have been pruned.
+	while (usage.valid &&
+		(sprinkler_size >= sprinkler_limit || usage.free_bytes < target_free)) {
+		uint32_t previous_free = usage.free_bytes;
+		if (!sprinkler_log_remove_oldest_completed()) break;
+		pruned_files++;
+		pruned_sprinkler_files++;
+		yield();
+		usage = get_embedded_storage_usage();
+		if (!usage.valid || usage.free_bytes <= previous_free) break;
+		sprinkler_size = sprinkler_log_allocated_bytes(usage.block_size);
 	}
 
 	while (usage.valid && usage.free_bytes < target_free) {

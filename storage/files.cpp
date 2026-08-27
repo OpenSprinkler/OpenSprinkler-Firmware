@@ -9,6 +9,9 @@
 
 #include <FS.h>
 #include <LittleFS.h>
+#if defined(ESP32)
+#include <unistd.h>
+#endif
 
 #else
 
@@ -75,19 +78,53 @@ bool remove_file(const char* filename) {
 #endif
 }
 
-void ensure_log_dir() {
+bool rename_file(const char* source, const char* destination) {
+	#if defined(ARDUINO)
+	return LittleFS.rename(source, destination);
+	#else
+	char source_path[PATH_MAX];
+	char destination_path[PATH_MAX];
+	strncpy(source_path, get_filename_fullpath(source), sizeof(source_path) - 1);
+	source_path[sizeof(source_path) - 1] = 0;
+	strncpy(destination_path, get_filename_fullpath(destination), sizeof(destination_path) - 1);
+	destination_path[sizeof(destination_path) - 1] = 0;
+	return rename(source_path, destination_path) == 0;
+	#endif
+}
+
+bool truncate_file(const char* filename, uint32_t length) {
+	#if defined(ESP8266)
+	File file = LittleFS.open(filename, "r+");
+	if (!file) return false;
+	bool ok = file.truncate(length);
+	file.close();
+	return ok;
+	#elif defined(ESP32)
+	char path[64];
+	int written = snprintf(path, sizeof(path), "/littlefs%s", filename);
+	return written > 0 && (size_t)written < sizeof(path) &&
+		truncate(path, (off_t)length) == 0;
+	#else
+	return truncate(get_filename_fullpath(filename), (off_t)length) == 0;
+	#endif
+}
+
+bool ensure_log_dir() {
 	#if defined(ESP32)
-	if (!LittleFS.exists(LOG_DIR)) LittleFS.mkdir(LOG_DIR);
+	if (LittleFS.exists(LOG_DIR)) return true;
+	return LittleFS.mkdir(LOG_DIR);
 	#elif !defined(ARDUINO)
-	const char* directory = get_filename_fullpath(LOG_DIR);
-	struct stat status;
-	if (stat(directory, &status) != 0) {
-		mkdir(directory,
+		const char* directory = get_filename_fullpath(LOG_DIR);
+		struct stat status;
+		if (stat(directory, &status) == 0) return S_ISDIR(status.st_mode);
+		if (errno != ENOENT) return false;
+		return mkdir(directory,
 			S_IRUSR | S_IWUSR | S_IXUSR |
 			S_IRGRP | S_IWGRP | S_IXGRP |
-			S_IROTH | S_IWOTH | S_IXOTH);
-	}
-#endif
+			S_IROTH | S_IWOTH | S_IXOTH) == 0 || errno == EEXIST;
+	#else
+	return true; // ESP8266 LittleFS creates parent directories on create-open.
+	#endif
 }
 
 bool file_exists(const char* filename) {

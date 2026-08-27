@@ -770,6 +770,8 @@ Example: If Zones 1–3 are in Group `A`, and 4–6 in Group `B`, they can opera
 
 OpenSprinkler logs **Zone Activity**, **Rain Delays**, **Built-in Sensor Events**, **Flow Volumes**, and **% Watering Changes** on the controller. To view these records:
 
+<span class="hl">Firmware 2.2.1(6) stores new Sprinkler Logs in a compact, bounded binary ring. Existing logs from an earlier firmware remain readable and age out normally; no conversion is required during upgrade.</span>
+
 ![Logs](images/logs.png)
 
 * Use Footer Menu → **Sprinkler Logs** (`Alt+L`) to display a graph of recorded data.

@@ -32,6 +32,7 @@
 #include "../core/scheduler.h"
 #include "../storage/logging.h"
 #include "storage/maintenance.h"
+#include "storage/sprinkler_log.h"
 #include "handlers.h"
 #include "routes.h"
 #include "api/commands.h"
@@ -1104,23 +1105,9 @@ void server_change_manual(OTF_PARAMS_DEF) {
 }
 
 
-#if defined(ARDUINO)
-int file_fgets(File file, char* buf, int maxsize) {
-	int index=0;
-	while(index<maxsize) {
-		int c = file.read();
-		if(c<0||c=='\n') break;
-		if(c=='\r') continue; // skip \r
-		*buf++ = (char)c;
-		index++;
-	}
-	return index;
-}
-#endif
-
 /**
  * Get log data
- * Command: /jl?start=x&end=x&hist=x&type=x
+ * Command: /jl?start=x&end=x&hist=x&type=x&fmt=x&page=1&cursor=x&count=x
  *
  * hist:  history (past n days)
  *        when hist is speceified, the start
@@ -1130,105 +1117,193 @@ int file_fgets(File file, char* buf, int maxsize) {
  * type:  type of log records (optional)
  *        rs, rd, wl
  *        if unspecified, output all records
+ * fmt:   json (default) or binary
+ * page:  binary output requires page=1 and returns an opaque next cursor
+ * cursor: opaque cursor returned by X-OS-Next-Cursor
+ * count: maximum physical slots to scan (server-capped at 2500)
  */
+namespace {
+
+constexpr uint32_t SPRINKLER_LOG_PAGE_MAX = 2500;
+
+const char* sprinkler_log_type_name(uint8_t type) {
+	switch (type) {
+	case LOGDATA_SENSOR1: return "s1";
+	case LOGDATA_RAINDELAY: return "rd";
+	case LOGDATA_WATERLEVEL: return "wl";
+	case LOGDATA_FLOWSENSE: return "fl";
+	case LOGDATA_SENSOR2: return "s2";
+	case LOGDATA_SENSOR3: return "s3";
+	case LOGDATA_SENSOR4: return "s4";
+	case LOGDATA_CURRENT: return "cu";
+	default: return nullptr;
+	}
+}
+
+struct SprinklerLogOutputContext {
+	OTF::Response* response;
+	const char* type;
+	bool type_specified;
+	bool binary;
+	bool comma;
+};
+
+bool sprinkler_log_record_matches(const SprinklerLogRecord& record,
+	const SprinklerLogOutputContext& context) {
+	const char* name = sprinkler_log_type_name(record.type);
+	if (context.type_specified) return name && strncmp(context.type, name, 2) == 0;
+	return record.type != LOGDATA_WATERLEVEL && record.type != LOGDATA_FLOWSENSE;
+}
+
+bool emit_sprinkler_log_record(const SprinklerLogRecord& record, bool live, void* opaque) {
+	SprinklerLogOutputContext& context = *(SprinklerLogOutputContext*)opaque;
+	if (!live || !sprinkler_log_record_matches(record, context)) return true;
+	if (context.binary) {
+		uint8_t encoded[sizeof(SprinklerLogRecord)];
+		sprinkler_log_encode_record(record, encoded);
+		context.response->writeBodyData((const char*)encoded, sizeof(encoded));
+		return context.response->isValid();
+	}
+
+	if (context.comma) bfill.emit_p(PSTR(","));
+	context.comma = true;
+	if (record.type == LOGDATA_STATION) {
+		if (record.flags & SPRINKLER_LOG_FLAG_FLOW) {
+			snprintf(tmp_buffer, TMP_BUFFER_SIZE,
+				"[%u,%u,%" PRIu32 ",%" PRIu32 ",%5.2f]",
+				record.program, record.station, record.value, record.timestamp,
+				record.aux / 100.0);
+		} else {
+			snprintf(tmp_buffer, TMP_BUFFER_SIZE,
+				"[%u,%u,%" PRIu32 ",%" PRIu32 "]",
+				record.program, record.station, record.value, record.timestamp);
+		}
+	} else {
+		const char* name = sprinkler_log_type_name(record.type);
+		if (!name) return true;
+		snprintf(tmp_buffer, TMP_BUFFER_SIZE,
+			"[%" PRIu32 ",\"%s\",%" PRIu32 ",%" PRIu32 "]",
+			record.aux, name, record.value, record.timestamp);
+	}
+	bfill.emit_p(PSTR("$S"), tmp_buffer);
+	return !bfill.overflowed();
+}
+
+bool count_sprinkler_log_record(const SprinklerLogRecord&, bool, void*) {
+	return true;
+}
+
+bool parse_uint32_parameter(const char* value, uint32_t& output) {
+	if (!value || !*value || *value == '-') return false;
+	char* end = nullptr;
+	unsigned long parsed = strtoul(value, &end, 0);
+	if (*end != 0 || parsed > UINT32_MAX) return false;
+	output = (uint32_t)parsed;
+	return true;
+}
+
+} // namespace
+
 void server_json_log(OTF_PARAMS_DEF) {
 	if(!process_password(OTF_PARAMS)) return;
+	bool binary = false;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("fmt"), true)) {
+		if (strcmp(tmp_buffer, "binary") == 0) binary = true;
+		else if (strcmp(tmp_buffer, "json") != 0) handle_return(HTML_DATA_FORMATERROR);
+	}
+	bool page_mode = false;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("page"), true)) {
+		if (strcmp(tmp_buffer, "1") == 0) page_mode = true;
+		else if (strcmp(tmp_buffer, "0") != 0) handle_return(HTML_DATA_FORMATERROR);
+	}
+	if (binary != page_mode) handle_return(HTML_DATA_FORMATERROR);
 
-	unsigned int start, end;
-
-	// past n day history
+	uint32_t start = 0;
+	uint32_t end = 0;
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("hist"), true)) {
-		int hist = atoi(tmp_buffer);
-		if (hist< 0 || hist > 365) handle_return(HTML_DATA_OUTOFBOUND);
-		end = os.now_tz() / 86400L;
-		start = end - hist;
+		end = (uint32_t)(os.now_tz() / 86400L);
+		if (strcmp(tmp_buffer, "all") == 0) {
+			if (!binary) handle_return(HTML_DATA_FORMATERROR);
+			start = 0;
+		} else {
+			uint32_t history = 0;
+			if (!parse_uint32_parameter(tmp_buffer, history)) handle_return(HTML_DATA_FORMATERROR);
+			if (!binary && history > 365) handle_return(HTML_DATA_OUTOFBOUND);
+			start = history > end ? 0 : end - history;
+		}
+	} else {
+		if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("start"), true))
+			handle_return(HTML_DATA_MISSING);
+		uint32_t start_timestamp = 0;
+		if (!parse_uint32_parameter(tmp_buffer, start_timestamp)) handle_return(HTML_DATA_FORMATERROR);
+		start = start_timestamp / 86400UL;
+		if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("end"), true))
+			handle_return(HTML_DATA_MISSING);
+		uint32_t end_timestamp = 0;
+		if (!parse_uint32_parameter(tmp_buffer, end_timestamp)) handle_return(HTML_DATA_FORMATERROR);
+		end = end_timestamp / 86400UL;
+		if (start > end || (!binary && end - start > 365)) handle_return(HTML_DATA_OUTOFBOUND);
 	}
-	else
-	{
-		if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("start"), true)) handle_return(HTML_DATA_MISSING);
 
-		start = strtoul(tmp_buffer, NULL, 0) / 86400L;
-
-		if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("end"), true)) handle_return(HTML_DATA_MISSING);
-
-		end = strtoul(tmp_buffer, NULL, 0) / 86400L;
-
-		// start must be prior to end, and can't retrieve more than 365 days of data
-		if ((start>end) || (end-start)>365)  handle_return(HTML_DATA_OUTOFBOUND);
-	}
-
-	// extract the type parameter
 	char type[4] = {0};
-	bool type_specified = false;
-	if (findKeyVal(FKV_SOURCE, type, 4, PSTR("type"), true))
-		type_specified = true;
+	bool type_specified =
+		findKeyVal(FKV_SOURCE, type, sizeof(type), PSTR("type"), true) != 0;
 
-	// as the log data can be large, we will use ESP8266's sendContent function to
-	// send multiple packets of data, instead of the standard way of using send().
+	SprinklerLogCursor cursor = sprinkler_log_cursor_begin();
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("cursor"), true)) {
+		if (!binary || !sprinkler_log_cursor_parse(tmp_buffer, cursor))
+			handle_return(HTML_DATA_FORMATERROR);
+	}
+	uint32_t count = binary ? 100 : UINT32_MAX;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("count"), true)) {
+		if (!binary) handle_return(HTML_DATA_FORMATERROR);
+		if (strcmp(tmp_buffer, "max") == 0 || strcmp(tmp_buffer, "all") == 0) {
+			count = SPRINKLER_LOG_PAGE_MAX;
+		} else if (!parse_uint32_parameter(tmp_buffer, count)) {
+			handle_return(HTML_DATA_FORMATERROR);
+		}
+		if (count == 0) handle_return(HTML_DATA_OUTOFBOUND);
+		if (count > SPRINKLER_LOG_PAGE_MAX) count = SPRINKLER_LOG_PAGE_MAX;
+	}
+
+	SprinklerLogOutputContext context = {&res, type, type_specified, binary, false};
+	SprinklerLogCursor next_cursor = {};
+	uint32_t scanned_slots = 0;
+	bool done = false;
+	if (binary) {
+		// Determine the opaque resume cursor before sending headers, then repeat
+		// the same bounded scan to stream the body. Buffering up to 2500 packed
+		// records would cost substantially more RAM on ESP8266.
+		if (!sprinkler_log_query(start, end, cursor, count, count_sprinkler_log_record,
+			nullptr, next_cursor, scanned_slots, done)) handle_return(HTML_INTERNAL_ERROR);
+		char cursor_text[32];
+		sprinkler_log_cursor_format(next_cursor, cursor_text, sizeof(cursor_text));
+		print_header(OTF_PARAMS, CT_BINARY);
+		res.writeHeader(F("X-OS-Page-Done"), done ? 1 : 0);
+		res.writeHeader(F("X-OS-Scanned-Slots"), (int)scanned_slots);
+		res.writeHeader(F("X-OS-Record-Size"), (int)sizeof(SprinklerLogRecord));
+		res.writeHeader(F("Access-Control-Expose-Headers"),
+			F("X-OS-Next-Cursor, X-OS-Page-Done, X-OS-Scanned-Slots, X-OS-Record-Size"));
+		// Append the cursor explicitly. OTF versions before 0.2.5 could route a
+		// two-argument bprintf(format, char*) call to the va_list overload on RISC-V.
+		res.bprintf(F("X-OS-Next-Cursor: "));
+		res.write(cursor_text, strlen(cursor_text));
+		res.bprintf(F("\r\n"));
+		res.writeBodyData("", 0);
+		SprinklerLogCursor emitted_cursor = {};
+		uint32_t emitted_slots = 0;
+		bool emitted_done = false;
+		if (!sprinkler_log_query(start, end, cursor, count, emit_sprinkler_log_record,
+			&context, emitted_cursor, emitted_slots, emitted_done)) return;
+		return;
+	}
+
 	begin_response(res);
 	print_header(OTF_PARAMS);
-
 	bfill.emit_p(PSTR("["));
-
-	bool comma = 0;
-	for(unsigned int i=start;i<=end;i++) {
-		snprintf(tmp_buffer, TMP_BUFFER_ALLOC_SIZE , "%d", i);
-		make_logfile_name(tmp_buffer);
-
-	#if defined(ARDUINO)
-		File file = LittleFS.open(tmp_buffer, "r");
-		if(!file) continue;
-#else // prepare to open log file for Linux
-		FILE *file = fopen(get_filename_fullpath(tmp_buffer), "rb");
-		if(!file) continue;
-#endif // prepare to open log file
-		int result;
-		while(true) {
-		#if defined(ARDUINO)
-			// do not use file.read_byte or read_byteUntil because it's very slow
-			result = file_fgets(file, tmp_buffer, TMP_BUFFER_SIZE);
-			if (result <= 0) {
-				file.close();
-				break;
-			}
-			tmp_buffer[result]=0;
-		#else
-			if(fgets(tmp_buffer, TMP_BUFFER_SIZE, file)) {
-				result = strlen(tmp_buffer);
-			} else {
-				result = 0;
-			}
-			if (result <= 0) {
-				fclose(file);
-				break;
-			}
-		#endif
-			// check record type
-			// records are all in the form of [x,"xx",...]
-			// where x is program index (>0) if this is a station record
-			// and "xx" is the type name if this is a special record (e.g. wl, fl, rs)
-
-			// search string until we find the first comma
-			char *ptype = tmp_buffer;
-			tmp_buffer[TMP_BUFFER_SIZE-1]=0; // make sure the search will end
-			while(*ptype && *ptype != ',') ptype++;
-			if(*ptype != ',') continue; // didn't find comma, move on
-			ptype++;  // move past comma
-
-			if (type_specified && strncmp(type, ptype+1, 2))
-				continue;
-			// if type is not specified, output everything except "wl" and "fl" records
-			if (!type_specified && (!strncmp("wl", ptype+1, 2) || !strncmp("fl", ptype+1, 2)))
-				continue;
-			// if this is the first record, do not print comma
-			if (comma)	bfill.emit_p(PSTR(","));
-			else {comma=1;}
-			bfill.emit_p(PSTR("$S"), tmp_buffer);
-		}
-	}
-
+	if (!sprinkler_log_query(start, end, cursor, count, emit_sprinkler_log_record,
+		&context, next_cursor, scanned_slots, done)) return;
 	bfill.emit_p(PSTR("]"));
-	handle_return(HTML_OK);
 }
 /**
  * Delete log
@@ -1241,10 +1316,22 @@ void server_json_log(OTF_PARAMS_DEF) {
  */
 void server_delete_log(OTF_PARAMS_DEF) {
 	if(!process_password(OTF_PARAMS)) return;
-	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("day"), true))
+	uint8_t day_found = 0;
+	findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("day"), true, &day_found);
+	if (day_found) {
+		if (strcmp(tmp_buffer, "all") != 0) {
+			uint32_t day = 0;
+			if (!parse_uint32_parameter(tmp_buffer, day)) handle_return(HTML_DATA_FORMATERROR);
+			if (day > UINT32_MAX / 86400UL) handle_return(HTML_DATA_OUTOFBOUND);
+		}
+		handle_return(delete_log(tmp_buffer) ? HTML_SUCCESS : HTML_INTERNAL_ERROR);
+	}
+	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("before"), true))
 		handle_return(HTML_DATA_MISSING);
-
-	handle_return(delete_log(tmp_buffer) ? HTML_SUCCESS : HTML_INTERNAL_ERROR);
+	uint32_t before = 0;
+	if (!parse_uint32_parameter(tmp_buffer, before)) handle_return(HTML_DATA_FORMATERROR);
+	if (before > UINT32_MAX / 86400UL) handle_return(HTML_DATA_OUTOFBOUND);
+	handle_return(delete_logs_before(before) ? HTML_SUCCESS : HTML_INTERNAL_ERROR);
 }
 
 /**

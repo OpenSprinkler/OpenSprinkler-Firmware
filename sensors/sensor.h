@@ -75,6 +75,9 @@ struct __attribute__((packed)) SensorLogRecord {
 	uint16_t uuid;         // sensor UUID; 0 marks a tombstone while preserving timestamp
 };
 
+static_assert(sizeof(SensorLogHeader) == 16, "sensor log header size");
+static_assert(sizeof(SensorLogRecord) == 10, "sensor log record size");
+
 enum class SensorType : uint8_t {
 	Aggregate = 0,
 	ADS1115,

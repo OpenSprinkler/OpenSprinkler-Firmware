@@ -2477,7 +2477,10 @@ void OpenSprinkler::log_sensor(uint8_t sid, float value) {
 
 	if (!hdr_valid) {
 		// First use or firmware upgrade: ensure directory exists, wipe stale data files, write fresh header
-		ensure_log_dir();
+		if (!ensure_log_dir()) {
+			DEBUG_PRINTLN("Failed to create sensor log directory");
+			return;
+		}
 		char fname[24];
 		for (uint16_t i = 0; i < SENSOR_LOG_MAX_FILES; i++) {
 			get_sensor_log_filename(fname, i);

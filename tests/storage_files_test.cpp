@@ -1,8 +1,11 @@
+#include "defines.h"
 #include "storage/files.h"
 #include "storage/maintenance.h"
 
 #include <cassert>
 #include <cstring>
+
+char tmp_buffer[TMP_BUFFER_ALLOC_SIZE];
 
 int main(int argc, char** argv) {
 	assert(argc == 2);
@@ -36,6 +39,10 @@ int main(int argc, char** argv) {
 
 	assert(file_write_byte(filename, 1, 'Z'));
 	assert(file_read_byte(filename, 1) == 'Z');
+	assert(truncate_file(filename, 4));
+	file = file_open(filename, FileOpenMode::Read);
+	assert(file && file_size(file) == 4);
+	file_close(file);
 	assert(remove_file(filename));
 	assert(remove_file(filename));
 	assert(!file_exists(filename));

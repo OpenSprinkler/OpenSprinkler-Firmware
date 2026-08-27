@@ -2,7 +2,9 @@
 
 #include "../OpenSprinkler.h"
 #include "../core/program.h"
+#include "storage/files.h"
 #include "storage/maintenance.h"
+#include "storage/sprinkler_log.h"
 
 #if defined(ARDUINO)
 	#include <FS.h>
@@ -28,121 +30,57 @@ void make_logfile_name(char *name) {
 	strcat_P(tmp_buffer, PSTR(".txt"));
 }
 
-// Each fixed-width name occupies three bytes in program memory.
-static const char log_type_names[] PROGMEM =
-	"  \0"
-	"s1\0"
-	"rd\0"
-	"wl\0"
-	"fl\0"
-	"s2\0"
-	"s3\0"
-	"s4\0"
-	"cu\0";
-
 void write_log(unsigned char type, time_os_t curr_time) {
 	if (!os.iopts[IOPT_ENABLE_LOGGING]) return;
+	SprinklerLogRecord record = {};
+	record.timestamp = (uint32_t)curr_time;
+	record.type = type;
 
-	snprintf(tmp_buffer, TMP_BUFFER_SIZE, "%" PRIu32, (uint32_t)curr_time / 86400);
-	make_logfile_name(tmp_buffer);
-
-	#if defined(ARDUINO)
-	bool new_file = !LittleFS.exists(tmp_buffer);
-	if (!prepare_log_write(new_file)) return;
-	File file = LittleFS.open(tmp_buffer, "r+");
-	if(!file) {
-		file = LittleFS.open(tmp_buffer, "w");
-		if(!file) return;
-	}
-	file.seek(0, SeekEnd);
-	#else
-	struct stat st;
-	if(stat(get_filename_fullpath(LOG_DIR), &st)) {
-		if(mkdir(get_filename_fullpath(LOG_DIR), S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IWGRP | S_IXGRP | S_IROTH | S_IWOTH | S_IXOTH)) {
-			return;
-		}
-	}
-	FILE *file = fopen(get_filename_fullpath(tmp_buffer), "rb+");
-	if(!file) {
-		file = fopen(get_filename_fullpath(tmp_buffer), "wb");
-		if (!file) return;
-	}
-	fseek(file, 0, SEEK_END);
-	#endif
-
-	strcpy_P(tmp_buffer, PSTR("["));
-
-	if(type == LOGDATA_STATION) {
-		size_t size = strlen(tmp_buffer);
-		snprintf(tmp_buffer + size, TMP_BUFFER_SIZE - size, "%d", pd.lastrun.program);
-		strcat_P(tmp_buffer, PSTR(","));
-		size = strlen(tmp_buffer);
-		snprintf(tmp_buffer + size, TMP_BUFFER_SIZE - size, "%d", pd.lastrun.station);
-		strcat_P(tmp_buffer, PSTR(","));
-		size = strlen(tmp_buffer);
-		snprintf(tmp_buffer + size, TMP_BUFFER_SIZE - size, "%" PRIu32, (uint32_t)pd.lastrun.duration);
-	} else {
-		uint32_t lvalue=0;
-		if(type==LOGDATA_FLOWSENSE) {
-			lvalue = (flow_count>os.flowcount_log_start)?(flow_count-os.flowcount_log_start):0;
-		}
-
-		size_t size = strlen(tmp_buffer);
-		snprintf(tmp_buffer + size, TMP_BUFFER_SIZE - size, "%" PRIu32, lvalue);
-		strcat_P(tmp_buffer, PSTR(",\""));
-		strcat_P(tmp_buffer, log_type_names+type*3);
-		strcat_P(tmp_buffer, PSTR("\","));
-
-		switch(type) {
-			case LOGDATA_FLOWSENSE:
-			case LOGDATA_SENSOR1:
-			case LOGDATA_SENSOR2:
-			case LOGDATA_SENSOR3:
-			case LOGDATA_SENSOR4: {
-				int8_t sidx = sensor_index_from_log_code(type);
-				time_os_t t = (sidx >= 0) ? os.sn_sensors[sidx].active_lasttime : 0;
-				lvalue = (curr_time>t) ? (curr_time-t) : 0;
-				break;
+	if (type == LOGDATA_STATION) {
+		record.program = pd.lastrun.program;
+		record.station = pd.lastrun.station;
+		record.value = pd.lastrun.duration;
+		if (os.iopts[IOPT_SENSOR1_TYPE] == SENSOR_TYPE_FLOW) {
+			record.flags |= SPRINKLER_LOG_FLAG_FLOW;
+			float scaled = flow_last_gpm * 100.0f;
+			if (scaled > 0.0f) {
+				record.aux = scaled >= 4294967295.0f ? UINT32_MAX : (uint32_t)(scaled + 0.5f);
 			}
-			case LOGDATA_RAINDELAY:
-				lvalue = (curr_time>os.raindelay_on_lasttime)?(curr_time-os.raindelay_on_lasttime):0;
-				break;
-			case LOGDATA_WATERLEVEL:
-				lvalue = os.iopts[IOPT_WATER_PERCENTAGE];
-				break;
 		}
-		size = strlen(tmp_buffer);
-		snprintf(tmp_buffer + size, TMP_BUFFER_SIZE - size, "%" PRIu32, lvalue);
+	} else {
+		if (type == LOGDATA_FLOWSENSE) {
+			record.aux = flow_count > os.flowcount_log_start ?
+				flow_count - os.flowcount_log_start : 0;
+		}
+		switch (type) {
+		case LOGDATA_FLOWSENSE:
+		case LOGDATA_SENSOR1:
+		case LOGDATA_SENSOR2:
+		case LOGDATA_SENSOR3:
+		case LOGDATA_SENSOR4: {
+			int8_t sidx = sensor_index_from_log_code(type);
+			time_os_t t = sidx >= 0 ? os.sn_sensors[sidx].active_lasttime : 0;
+			record.value = curr_time > t ? curr_time - t : 0;
+			break;
+		}
+		case LOGDATA_RAINDELAY:
+			record.value = curr_time > os.raindelay_on_lasttime ?
+				curr_time - os.raindelay_on_lasttime : 0;
+			break;
+		case LOGDATA_WATERLEVEL:
+			record.value = os.iopts[IOPT_WATER_PERCENTAGE];
+			break;
+		}
 	}
-	strcat_P(tmp_buffer, PSTR(","));
-	size_t size = strlen(tmp_buffer);
-	snprintf(tmp_buffer + size, TMP_BUFFER_SIZE - size, "%" PRIu32, (uint32_t)curr_time);
-	if((os.iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_FLOW) && (type==LOGDATA_STATION)) {
-		strcat_P(tmp_buffer, PSTR(","));
-		#if defined(ARDUINO)
-		dtostrf(flow_last_gpm,5,2,tmp_buffer+strlen(tmp_buffer));
-		#else
-		snprintf(tmp_buffer+strlen(tmp_buffer), TMP_BUFFER_SIZE, "%5.2f", flow_last_gpm);
-		#endif
-	}
-	strcat_P(tmp_buffer, PSTR("]\r\n"));
-
-	#if defined(ARDUINO)
-	const size_t length = strlen(tmp_buffer);
-	if (file.write((const uint8_t*)tmp_buffer, length) != length) {
-		DEBUG_PRINTLN(F("sprinkler log write failed"));
-	}
-	file.close();
-	#else
-	fwrite(tmp_buffer, 1, strlen(tmp_buffer), file);
-	fclose(file);
-	#endif
+	if (!sprinkler_log_append(record)) DEBUG_PRINTLN(F("sprinkler log write failed"));
 }
 
 bool delete_log(char *name) {
 	bool ok = true;
+	bool delete_all = strncmp(name, "all", 3) == 0;
+	uint32_t day = delete_all ? 0 : (uint32_t)strtoul(name, nullptr, 10);
 	#if defined(ESP8266)
-	if (strncmp(name, "all", 3) == 0) {
+	if (delete_all) {
 		while (true) {
 			String filename;
 			Dir dir = LittleFS.openDir(LOG_DIR);
@@ -160,7 +98,7 @@ bool delete_log(char *name) {
 		if (LittleFS.exists(tmp_buffer)) ok = LittleFS.remove(tmp_buffer);
 	}
 	#elif defined(ESP32)
-	if (strncmp(name, "all", 3) == 0) {
+	if (delete_all) {
 		while (true) {
 			String filename;
 			File dir = LittleFS.open(LOG_DIR);
@@ -179,7 +117,7 @@ bool delete_log(char *name) {
 		if (LittleFS.exists(tmp_buffer)) ok = LittleFS.remove(tmp_buffer);
 	}
 	#else
-	if (strncmp(name, "all", 3) == 0) {
+	if (delete_all) {
 		char log_dir[PATH_MAX];
 		strcpy(log_dir, get_filename_fullpath(LOG_DIR));
 		DIR *d = opendir(log_dir);
@@ -198,5 +136,62 @@ bool delete_log(char *name) {
 		if (remove(get_filename_fullpath(tmp_buffer)) != 0 && errno != ENOENT) ok = false;
 	}
 	#endif
-	return ok;
+	bool ring_ok = delete_all ? sprinkler_log_clear() : sprinkler_log_delete_day(day);
+	return ok && ring_ok;
+}
+
+bool delete_logs_before(uint32_t day) {
+	bool ok = true;
+	#if defined(ESP8266)
+	while (true) {
+		String filename;
+		Dir dir = LittleFS.openDir(LOG_DIR);
+		while (dir.next()) {
+			if (!is_sprinkler_log_filename(dir.fileName().c_str())) continue;
+			if ((uint32_t)strtoul(dir.fileName().c_str(), nullptr, 10) >= day) continue;
+			filename = String(LOG_DIR) + dir.fileName();
+			break;
+		}
+		if (filename.length() == 0) break;
+		if (!LittleFS.remove(filename)) { ok = false; break; }
+		yield();
+	}
+	#elif defined(ESP32)
+	while (true) {
+		String filename;
+		File dir = LittleFS.open(LOG_DIR);
+		if (!dir || !dir.isDirectory()) break;
+		for (File file = dir.openNextFile(); file; file = dir.openNextFile()) {
+			String candidate = file.name();
+			file.close();
+			if (!is_sprinkler_log_filename(candidate.c_str())) continue;
+			const char* base = strrchr(candidate.c_str(), '/');
+			base = base ? base + 1 : candidate.c_str();
+			if ((uint32_t)strtoul(base, nullptr, 10) >= day) continue;
+			filename = candidate;
+			break;
+		}
+		dir.close();
+		if (filename.length() == 0) break;
+		if (!LittleFS.remove(filename)) { ok = false; break; }
+		yield();
+	}
+	#else
+	char log_dir[PATH_MAX];
+	strcpy(log_dir, get_filename_fullpath(LOG_DIR));
+	DIR *directory = opendir(log_dir);
+	if (directory) {
+		int log_dir_fd = dirfd(directory);
+		struct dirent *entry;
+		while ((entry = readdir(directory)) != nullptr) {
+			if (!is_sprinkler_log_filename(entry->d_name)) continue;
+			if ((uint32_t)strtoul(entry->d_name, nullptr, 10) >= day) continue;
+			if (unlinkat(log_dir_fd, entry->d_name, 0) != 0) ok = false;
+		}
+		closedir(directory);
+	} else if (errno != ENOENT) {
+		ok = false;
+	}
+	#endif
+	return sprinkler_log_delete_before(day) && ok;
 }

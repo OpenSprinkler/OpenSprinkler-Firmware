@@ -4,6 +4,7 @@
 import argparse
 import json
 import socket
+import struct
 import subprocess
 import tempfile
 import time
@@ -86,6 +87,15 @@ class DemoServer:
         url = f"http://127.0.0.1:{self.port}/{endpoint}?{query}"
         with urllib.request.urlopen(url, timeout=3) as response:
             return json.load(response)
+
+    def get_response(self, endpoint, params=None):
+        query_params = {"pw": PASSWORD_HASH}
+        if params:
+            query_params.update(params)
+        query = urllib.parse.urlencode(query_params)
+        url = f"http://127.0.0.1:{self.port}/{endpoint}?{query}"
+        with urllib.request.urlopen(url, timeout=3) as response:
+            return response.status, response.headers, response.read()
 
     def raw_http(self, headers, body_parts=(), shutdown_write=False):
         with socket.create_connection(("127.0.0.1", self.port), timeout=3) as sock:
@@ -281,6 +291,54 @@ def check_control_commands(server):
     print("PASS shared control command behavior")
 
 
+def check_sprinkler_logs(server):
+    assert isinstance(server.get_json("jl", {"hist": 1}), list)
+    status, headers, body = server.get_response(
+        "jl", {"hist": "all", "fmt": "binary", "page": 1, "count": 2500}
+    )
+    assert status == 200
+    assert headers.get_content_type() == "application/octet-stream"
+    assert headers["X-OS-Page-Done"] == "1"
+    scanned = int(headers["X-OS-Scanned-Slots"])
+    assert 0 <= scanned <= 2500
+    assert headers["X-OS-Record-Size"] == "16"
+    assert len(headers["X-OS-Next-Cursor"]) == 28
+    assert len(body) % 16 == 0 and len(body) // 16 <= scanned
+    assert server.get_json("jl", {"hist": 1, "fmt": "binary"})["result"] == 0x12
+
+    day = 10
+    log_dir = Path(server.temp_dir.name) / "logs"
+    log_dir.mkdir(exist_ok=True)
+    (log_dir / f"{day}.txt").write_text(
+        "[3,2,90,864100]\n[0,\"wl\",100,864200]\n", encoding="ascii"
+    )
+    window = {"start": day * 86400, "end": (day + 1) * 86400 - 1}
+    assert server.get_json("jl", window) == [[3, 2, 90, 864100]]
+    assert server.get_json("jl", {**window, "type": "wl"}) == [[0, "wl", 100, 864200]]
+
+    binary_params = {**window, "fmt": "binary", "page": 1, "count": 1}
+    _, first_headers, first_body = server.get_response("jl", binary_params)
+    assert first_headers["X-OS-Page-Done"] == "0"
+    assert first_headers["X-OS-Scanned-Slots"] == "1"
+    assert len(first_body) == 16
+    timestamp, duration, aux, record_type, program, station, flags = struct.unpack(
+        "<III4B", first_body
+    )
+    assert (timestamp, duration, aux) == (864100, 90, 0)
+    assert (record_type, program, station, flags) == (0, 3, 2, 0)
+
+    binary_params["cursor"] = first_headers["X-OS-Next-Cursor"]
+    _, second_headers, second_body = server.get_response("jl", binary_params)
+    assert second_headers["X-OS-Page-Done"] == "1"
+    assert second_headers["X-OS-Scanned-Slots"] == "1"
+    assert second_body == b""  # Filtered records still consume physical slots.
+
+    assert server.get_json("dl", {"day": day})["result"] == 1
+    assert server.get_json("jl", window) == []
+    assert server.get_json("dl", {"before": 1})["result"] == 1
+    print("PASS sprinkler log API")
+
+
 def run_contract(server):
     checks = [
         ("jo", check_options),
@@ -297,6 +355,7 @@ def run_contract(server):
         print(f"PASS /{endpoint}")
     check_request_bodies(server)
     check_control_commands(server)
+    check_sprinkler_logs(server)
 
 
 def main():

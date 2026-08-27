@@ -34,7 +34,7 @@ container:
 TEST_HTTP_PORT?=18080
 
 .PHONY: test-api
-test-api: test-board-profiles test-hardware-detection test-storage-files test-firmware-release test-buffer-filler test-string-buffer test-sensor-units test-weather-sensor-cache
+test-api: test-board-profiles test-hardware-detection test-storage-files test-sprinkler-log test-firmware-release test-buffer-filler test-string-buffer test-sensor-units test-weather-sensor-cache
 	$(MAKE) clean
 	$(MAKE) VERSION=DEMO EXTRA_CXXFLAGS="-DHTTP_PORT=$(TEST_HTTP_PORT)"
 	python3 tests/api_contract.py --port $(TEST_HTTP_PORT)
@@ -54,7 +54,16 @@ test-hardware-detection:
 .PHONY: test-storage-files
 test-storage-files:
 	@set -e; output=$$(mktemp); data=$$(mktemp -d); trap 'rm -f "$$output"; rm -rf "$$data"' EXIT; \
-		$(CXX) -std=gnu++14 -DDEMO -I. tests/storage_files_test.cpp storage/files.cpp storage/maintenance.cpp -o "$$output"; \
+		$(CXX) -std=gnu++14 -DDEMO -I. tests/storage_files_test.cpp \
+			storage/files.cpp storage/maintenance.cpp storage/sprinkler_log.cpp -o "$$output"; \
+		"$$output" "$$data"
+
+.PHONY: test-sprinkler-log
+test-sprinkler-log:
+	@set -e; output=$$(mktemp); data=$$(mktemp -d); trap 'rm -f "$$output"; rm -rf "$$data"' EXIT; \
+		$(CXX) -std=gnu++14 -DDEMO -DSPRINKLER_LOG_TEST_SMALL_GEOMETRY -I. \
+			tests/sprinkler_log_test.cpp \
+			storage/sprinkler_log.cpp storage/files.cpp storage/maintenance.cpp -o "$$output"; \
 		"$$output" "$$data"
 
 .PHONY: test-firmware-release
