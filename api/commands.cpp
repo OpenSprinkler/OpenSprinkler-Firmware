@@ -67,6 +67,22 @@ bool get_positive_flag(const ParamSource& params, const char* key) {
 	return params.get(tmp_buffer, TMP_BUFFER_SIZE, key, true) && atoi(tmp_buffer) > 0;
 }
 
+uint8_t find_station_queue_id(uint8_t sid, uint32_t curr_time) {
+	uint8_t queue_id = pd.station_qid[sid];
+	if (queue_id < pd.nqueue) {
+		const RuntimeQueueStruct& entry = pd.queue[queue_id];
+		if (entry.sid == sid && entry.dur && curr_time < entry.deque_time) return queue_id;
+	}
+
+	queue_id = 0xFF;
+	for (uint8_t candidate = 0; candidate < pd.nqueue; candidate++) {
+		const RuntimeQueueStruct& entry = pd.queue[candidate];
+		if (entry.sid != sid || !entry.dur || curr_time >= entry.deque_time) continue;
+		if (queue_id == 0xFF || entry.st < pd.queue[queue_id].st) queue_id = candidate;
+	}
+	return queue_id;
+}
+
 } // namespace
 
 uint8_t execute_change_values(const ParamSource& params, uint16_t allowed_actions) {
@@ -154,7 +170,9 @@ uint8_t execute_manual_station(const ParamSource& params) {
 		uint32_t duration = 0;
 		if (!parse_program_duration(tmp_buffer, &duration)) return HTML_DATA_OUTOFBOUND;
 		if (os.is_master_station(sid)) return HTML_NOT_PERMITTED;
-		if (pd.station_qid[sid] != 0xFF) return HTML_NOT_PERMITTED;
+		if (find_station_queue_id(static_cast<uint8_t>(sid), curr_time) != 0xFF) {
+			return HTML_NOT_PERMITTED;
+		}
 
 		uint8_t queue_option = QUEUE_OPTION_APPEND;
 		if (params.get(tmp_buffer, TMP_BUFFER_SIZE, PSTR("qo"), true)) {
@@ -173,8 +191,9 @@ uint8_t execute_manual_station(const ParamSource& params) {
 		if (params.get(tmp_buffer, TMP_BUFFER_SIZE, PSTR("ssta"), true)) {
 			shift = static_cast<uint8_t>(atoi(tmp_buffer));
 		}
-		uint8_t queue_id = pd.station_qid[sid];
+		uint8_t queue_id = find_station_queue_id(static_cast<uint8_t>(sid), curr_time);
 		if (queue_id == 0xFF) return HTML_DATA_OUTOFBOUND;
+		pd.station_qid[sid] = queue_id;
 		RuntimeQueueStruct* entry = pd.queue + queue_id;
 		entry->deque_time = curr_time;
 		turn_off_station(static_cast<uint8_t>(sid), curr_time, shift);

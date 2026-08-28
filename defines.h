@@ -94,6 +94,7 @@
 #define STN_TYPE_HTTP        0x04	// HTTP station
 #define STN_TYPE_HTTPS       0x05	// HTTPS station
 #define STN_TYPE_REMOTE_OTC  0x06 // Remote OpenSprinkler station (by OTC)
+#define STN_TYPE_BUNDLE      0x07 // physical zone that also claims configured member zones
 #define STN_TYPE_OTHER       0xFF
 
 /** Notification macro defines */

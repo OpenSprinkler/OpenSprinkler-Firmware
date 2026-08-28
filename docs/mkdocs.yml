@@ -9,15 +9,12 @@ nav:
   - 'FAQ':  'faq.md'
   - 'Troubleshooting': 'troubleshooting.md'
   - 'Firmware Update': 'firmware-update.md'
-  - 'Firmware v2.2.1(6) [DEV]':
+  - 'Firmware v2.2.1(6) [NEW]':
     - 'User Manual': '2.2.1/221_6_manual.md'
     - 'API Reference': '2.2.1/221_6_api.md'
   - 'Firmware v2.2.1(5)':
     - 'User Manual': '2.2.1/221_5_manual.md'
     - 'API Reference': '2.2.1/221_5_api.md'
-  - 'Firmware v2.2.1(4)':
-    - 'User Manual': '2.2.1/221_4_manual.md'
-    - 'API Reference': '2.2.1/221_4_api.md'
   - 'Zone Expander':
     - 'User Manual': 'zone-expander.md'
   - 'Sensor Expander [NEW]':

@@ -145,7 +145,7 @@ def check_controller(data):
             "sunset", "eip", "lwc", "lswc", "lupt", "lrbtc", "lrun", "pq",
             "pt", "nq", "ocs", "otc", "otcs", "mac", "loc", "jsp", "wsp",
             "wto", "ifkey", "mqtt", "wtdata", "wterr", "wtrestr", "dname",
-            "email", "wls", "sbits", "ps", "gpio",
+            "email", "wls", "sbits", "bap", "ps", "gpio",
         ],
     )
     assert isinstance(data["lrun"], list) and len(data["lrun"]) == 4
@@ -159,10 +159,11 @@ def check_stations(data):
         [
             "masop", "masop2", "masop3", "masop4", "ignore_rain",
             "ignore_sn1", "ignore_sn2", "stn_dis", "stn_spe", "stn_grp",
-            "snames", "maxlen",
+            "stn_bnd", "bmt", "snames", "maxlen",
         ],
     )
     assert len(data["snames"]) == len(data["stn_grp"])
+    assert data["bmt"] == 1
 
 
 def check_programs(data):
@@ -217,7 +218,9 @@ def check_combined(data):
         data,
         ["settings", "programs", "options", "status", "stations", "sensors"],
     )
-    require_keys("/ja.status", data["status"], ["sn", "nstations"])
+    require_keys("/ja.status", data["status"], ["sn", "bap", "nstations"])
+    require_keys("/ja.stations", data["stations"], ["stn_bnd", "bmt"])
+    assert data["stations"]["bmt"] == 1
     assert len(data["status"]["sn"]) == data["status"]["nstations"]
 
 
@@ -258,6 +261,7 @@ def check_control_commands(server):
     assert result["result"] == 1, result
     status = server.get_json("jc")
     assert status["ps"][0][0] == 99, status["ps"][0]
+    assert status["nq"] == 1, status["nq"]
 
     result = server.get_json("cv", {"rsn": 0, "rbt": 0})
     assert result["result"] == 1, result
@@ -269,8 +273,16 @@ def check_control_commands(server):
     status = server.get_json("jc")
     assert status["ps"][0][0] == 99, status["ps"][0]
 
-    result = server.get_json("cv", {"rsn": 1})
+    result = server.get_json("cm", {"sid": 0, "en": 0})
     assert result["result"] == 1, result
+    deadline = time.monotonic() + 3
+    while time.monotonic() < deadline:
+        status = server.get_json("jc")
+        if status["nq"] == 0 and status["sbits"][0] == 0:
+            break
+        time.sleep(0.05)
+    assert status["nq"] == 0 and status["sbits"][0] == 0, status
+
     result = server.get_json("cm", {"sid": 0, "en": 0})
     assert result["result"] == 0x11, result
 
@@ -288,6 +300,219 @@ def check_control_commands(server):
     result = server.get_json("cr", {"t": "[60,0"})
     assert result["result"] == 0x12, result
     print("PASS shared control command behavior")
+
+
+def check_bundle_commands(server):
+    assert server.get_json("cv", {"rsn": 1})["result"] == 1
+    deadline = time.monotonic() + 3
+    while time.monotonic() < deadline and server.get_json("jc")["nq"]:
+        time.sleep(0.05)
+    assert server.get_json("jc")["nq"] == 0
+
+    station_data = server.get_json("jn")
+    board_count = len(station_data["stn_bnd"])
+    assert board_count >= 1
+
+    def membership(*station_ids):
+        boards = [0] * board_count
+        for sid in station_ids:
+            boards[sid // 8] |= 1 << (sid % 8)
+        return "".join(f"{value:02X}" for value in boards)
+
+    # The advertised member-type capability and API enforcement must agree.
+    # Every setup is asserted independently so an invalid fixture cannot count
+    # as a successful member rejection. Demo intentionally exposes no GPIO pin,
+    # so type 3 is covered by the native type-mask matrix instead.
+    member_type_mask = station_data["bmt"]
+    type_payloads = {
+        0: "0",
+        1: "05331305333C0021",
+        2: "C0A80050005000",
+        4: "example.com,80,on,off",
+        5: "example.com,443,on,off",
+        6: "00000000000000000000000000000000X00",
+        7: membership(7),
+    }
+    candidate_sid = 6
+    for station_type, payload in type_payloads.items():
+        assert server.get_json("cs", {"sid": 0, "st": 0, "sd": "0", "p0": 0})["result"] == 1
+        setup = server.get_json("cs", {
+            "sid": candidate_sid,
+            "st": station_type,
+            "sd": payload,
+            "p0": 0 if station_type == 0 else 1 << candidate_sid,
+        })
+        assert setup["result"] == 1, (station_type, setup)
+        member_result = server.get_json("cs", {
+            "sid": 0, "st": 7, "sd": membership(candidate_sid)
+        })["result"]
+        advertised = bool(member_type_mask & (1 << station_type))
+        assert (member_result == 1) == advertised, (station_type, member_result, member_type_mask)
+
+    assert server.get_json("cs", {"sid": 0, "st": 0, "sd": "0", "p0": 0})["result"] == 1
+    assert server.get_json("cs", {"sid": candidate_sid, "st": 0, "sd": "0", "p0": 0})["result"] == 1
+
+    # Bundle 1 claims stations 2 and 3. Its own bit is forbidden.
+    result = server.get_json("cs", {"sid": 0, "st": 7, "sd": membership(1, 2)})
+    assert result["result"] == 1, result
+    assert server.get_json("je")["0"]["st"] == 7
+    assert server.get_json("cs", {"sid": 0, "st": 7, "sd": membership(0)})["result"] == 0x11
+
+    # Referenced members cannot become any special-station type, and
+    # unsupported special stations cannot be added as bundle members.
+    assert server.get_json("cs", {
+        "sid": 1, "st": 4, "sd": "example.com,80,on,off"
+    })["result"] == 0x30
+    assert server.get_json("cs", {
+        "sid": 1, "st": 7, "sd": membership(3)
+    })["result"] == 0x30
+    assert server.get_json("cs", {
+        "sid": 3, "st": 4, "sd": "example.com,80,on,off", "p0": 9
+    })["result"] == 1
+    assert server.get_json("cs", {
+        "sid": 0, "st": 7, "sd": membership(1, 3)
+    })["result"] == 0x11
+    assert server.get_json("cs", {"sid": 3, "st": 0, "sd": "0", "p0": 1})["result"] == 1
+
+    # A bundle member cannot subsequently become a master.
+    assert server.get_json("co", {"mas": 2})["result"] == 0x11
+
+    # Five member transitions need 1.25 seconds, plus at least one second of
+    # runtime for the final member. Queue timing rounds that up to 3 seconds.
+    assert server.get_json("cs", {
+        "sid": 0, "st": 7, "sd": membership(1, 2, 3, 4, 5)
+    })["result"] == 1
+    assert server.get_json("cm", {"sid": 0, "en": 1, "t": 1})["result"] == 1
+    deadline = time.monotonic() + 3
+    while time.monotonic() < deadline:
+        status = server.get_json("jc")
+        if status["ps"][0][0] != 0:
+            break
+        time.sleep(0.05)
+    assert status["ps"][0][1] >= 3, status["ps"][0]
+    assert server.get_json("cv", {"rsn": 1})["result"] == 1
+    deadline = time.monotonic() + 3
+    while time.monotonic() < deadline:
+        status = server.get_json("jc")
+        if status["nq"] == 0 and status["sbits"][0] == 0:
+            break
+        time.sleep(0.05)
+    assert status["nq"] == 0 and status["sbits"][0] == 0
+    assert server.get_json("cs", {"sid": 0, "st": 7, "sd": membership(1, 2)})["result"] == 1
+
+    # Disabled members are skipped. Re-enabling one while the leader is active
+    # adds its derived claim through the same staggered output path.
+    assert server.get_json("cs", {"d0": 4})["result"] == 1
+    result = server.get_json("cm", {"sid": 0, "en": 1, "t": 60})
+    assert result["result"] == 1, result
+    deadline = time.monotonic() + 5
+    status = None
+    while time.monotonic() < deadline:
+        status = server.get_json("jc")
+        if status["sbits"][0] & 0x03 == 0x03:
+            break
+        time.sleep(0.05)
+    assert status["sbits"][0] & 0x03 == 0x03, status["sbits"]
+    time.sleep(0.5)
+    assert server.get_json("jc")["sbits"][0] & 0x04 == 0
+    assert server.get_json("cs", {"d0": 0})["result"] == 1
+    deadline = time.monotonic() + 3
+    while time.monotonic() < deadline:
+        status = server.get_json("jc")
+        if status["sbits"][0] & 0x07 == 0x07:
+            break
+        time.sleep(0.05)
+    assert status["sbits"][0] & 0x07 == 0x07, status["sbits"]
+    assert status["bap"][0] & 0x07 == 0x06, status["bap"]
+    assert status["ps"][0][0] != 0, status["ps"][0]
+
+    # Derived-only activity is not an individual /cm run.
+    derived_stop = server.get_json("cm", {"sid": 1, "en": 0})
+    assert derived_stop["result"] == 0x11, derived_stop
+    after_derived_stop = server.get_json("jc")
+    assert after_derived_stop["ps"][0][0] != 0, after_derived_stop["ps"][0]
+
+    # Removing an individual claim does not defeat the bundle's OR claim.
+    assert server.get_json("cs", {"g1": 255})["result"] == 1
+    assert server.get_json("cm", {"sid": 1, "en": 1, "t": 1})["result"] == 1
+    deadline = time.monotonic() + 5
+    saw_individual_run = False
+    while time.monotonic() < deadline:
+        status = server.get_json("jc")
+        if status["ps"][1][0] != 0:
+            saw_individual_run = True
+        if saw_individual_run and status["ps"][1][0] == 0:
+            break
+        time.sleep(0.05)
+    assert saw_individual_run and status["ps"][1][0] == 0
+    assert status["sbits"][0] & 0x02
+    assert status["bap"][0] & 0x02
+    assert server.get_json("cs", {"g1": 0})["result"] == 1
+
+    # A member's master binding contributes to the bundle leader's demand window.
+    assert server.get_json("cv", {"rsn": 1})["result"] == 1
+    deadline = time.monotonic() + 3
+    while time.monotonic() < deadline:
+        status = server.get_json("jc")
+        if status["sbits"][0] & 0x07 == 0:
+            break
+        time.sleep(0.05)
+    assert status["sbits"][0] & 0x07 == 0
+    assert server.get_json("cs", {"m0": 2})["result"] == 1
+    assert server.get_json("co", {"mas": 8})["result"] == 1
+    assert server.get_json("cm", {"sid": 0, "en": 1, "t": 60})["result"] == 1
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline:
+        status = server.get_json("jc")
+        if status["sbits"][0] & 0x87 == 0x87:
+            break
+        time.sleep(0.05)
+    assert status["sbits"][0] & 0x87 == 0x87, status["sbits"]
+    assert server.get_json("cv", {"rsn": 1})["result"] == 1
+    deadline = time.monotonic() + 3
+    while time.monotonic() < deadline and server.get_json("jc")["nq"]:
+        time.sleep(0.05)
+    assert server.get_json("co", {"mas": 0})["result"] == 1
+    assert server.get_json("cs", {"m0": 0})["result"] == 1
+
+    # Inserting ahead of a nearly-finished bundle forces it to restart its
+    # physical member sequence. Its resumed duration and following station
+    # must both account for that new startup interval.
+    deadline = time.monotonic() + 3
+    while time.monotonic() < deadline and server.get_json("jc")["nq"]:
+        time.sleep(0.05)
+    assert server.get_json("cs", {"sid": 1, "st": 0, "sd": "0"})["result"] == 1
+    station_data = server.get_json("jn")
+    assert station_data["stn_spe"][0] & 0x02 == 0, station_data["stn_spe"]
+    assert server.get_json("cs", {
+        "sid": 0, "st": 7, "sd": membership(1, 2, 3, 4, 5)
+    })["result"] == 1
+    assert server.get_json("cm", {"sid": 0, "en": 1, "t": 1})["result"] == 1
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline:
+        status = server.get_json("jc")
+        if status["ps"][0][0] != 0 and status["ps"][0][1] <= 2:
+            break
+        time.sleep(0.05)
+    assert status["ps"][0][0] != 0
+    assert server.get_json("cm", {"sid": 6, "en": 1, "t": 2})["result"] == 1
+    deadline = time.monotonic() + 4
+    while time.monotonic() < deadline:
+        status = server.get_json("jc")
+        if status["ps"][0][1] <= 1:
+            break
+        time.sleep(0.05)
+    assert server.get_json("cm", {"sid": 7, "en": 1, "t": 1, "qo": 1})["result"] == 1
+    deadline = time.monotonic() + 4
+    while time.monotonic() < deadline:
+        status = server.get_json("jc")
+        if status["ps"][0][0] != 0 and status["ps"][0][1] >= 3 and status["ps"][6][2]:
+            break
+        time.sleep(0.05)
+    assert status["ps"][0][1] >= 3, status["ps"][0]
+    assert status["ps"][6][2] >= status["ps"][0][2] + 3, (status["ps"][0], status["ps"][6])
+    assert server.get_json("cv", {"rsn": 1})["result"] == 1
+    print("PASS bundle station behavior")
 
 
 def check_sprinkler_logs(server):
@@ -354,6 +579,7 @@ def run_contract(server):
         print(f"PASS /{endpoint}")
     check_request_bodies(server)
     check_control_commands(server)
+    check_bundle_commands(server)
     check_sprinkler_logs(server)
 
 

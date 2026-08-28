@@ -1,6 +1,8 @@
 #include "handler_context.h"
 #include "handlers.h"
 
+#include "core/bundle.h"
+
 #include <cstddef>
 #include <cstdio>
 #include <cstdlib>
@@ -73,6 +75,8 @@ void server_json_stations_main(OTF_PARAMS_DEF) {
 	}
 	emit_board_attribute(PSTR("stn_dis"), os.attrib_dis);
 	emit_board_attribute(PSTR("stn_spe"), os.attrib_spe);
+	emit_board_attribute(PSTR("stn_bnd"), os.attrib_bundle);
+	bfill.emit_p(PSTR("\"bmt\":$L,"), BUNDLE_MEMBER_TYPE_MASK);
 	emit_station_attribute(PSTR("stn_grp"), os.attrib_grp);
 
 	bfill.emit_p(PSTR("\"snames\":["));
@@ -154,7 +158,16 @@ void server_change_stations(OTF_PARAMS_DEF) {
 			findKeyVal(FKV_SOURCE, tmp_buffer + 1, TMP_BUFFER_SIZE - 1, PSTR("sd"), true)) {
 			tmp_buffer[0] -= '0';
 			tmp_buffer[STATION_SPECIAL_DATA_SIZE] = 0;
-			if (tmp_buffer[0] == STN_TYPE_GPIO) {
+			const unsigned char station_type = static_cast<unsigned char>(tmp_buffer[0]);
+			if (station_type != STN_TYPE_STANDARD && bundle_station_is_referenced(sid)) {
+				handle_return(HTML_NOT_PERMITTED);
+			}
+			if (station_type == STN_TYPE_BUNDLE) {
+				if (!bundle_validate_definition(sid, tmp_buffer + 1)) {
+					handle_return(HTML_DATA_OUTOFBOUND);
+				}
+			}
+			if (station_type == STN_TYPE_GPIO) {
 				unsigned char gpio = (tmp_buffer[1] - '0') * 10 + tmp_buffer[2] - '0';
 				unsigned char active_state = tmp_buffer[3] - '0';
 				unsigned char gpio_list[] = PIN_FREE_LIST;
@@ -163,8 +176,8 @@ void server_change_stations(OTF_PARAMS_DEF) {
 					if (gpio_list[index] == gpio) found = true;
 				}
 				if (!found || active_state > 1) handle_return(HTML_DATA_OUTOFBOUND);
-			} else if (tmp_buffer[0] == STN_TYPE_HTTP || tmp_buffer[0] == STN_TYPE_HTTPS ||
-				tmp_buffer[0] == STN_TYPE_REMOTE_OTC) {
+			} else if (station_type == STN_TYPE_HTTP || station_type == STN_TYPE_HTTPS ||
+				station_type == STN_TYPE_REMOTE_OTC) {
 				if (strlen(tmp_buffer + 1) > sizeof(HTTPStationData)) {
 					handle_return(HTML_DATA_OUTOFBOUND);
 				}
@@ -172,12 +185,24 @@ void server_change_stations(OTF_PARAMS_DEF) {
 			if (!file_write_block(STATIONS_FILENAME, tmp_buffer,
 				(uint32_t)sid * sizeof(StationData) + offsetof(StationData, type),
 				STATION_SPECIAL_DATA_SIZE + 1)) storage_ok = false;
+			const unsigned char mask = static_cast<unsigned char>(1U << (sid & 7));
+			if (station_type == STN_TYPE_BUNDLE) {
+				os.attrib_bundle[sid >> 3] |= mask;
+				os.attrib_spe[sid >> 3] |= mask;
+			} else {
+				os.attrib_bundle[sid >> 3] &= ~mask;
+				if (station_type == STN_TYPE_STANDARD) os.attrib_spe[sid >> 3] &= ~mask;
+			}
 		} else {
 			handle_return(HTML_DATA_MISSING);
 		}
 	}
 
 	change_board_attribute(FKV_SOURCE, 'p', os.attrib_spe);
+	for (unsigned char board = 0; board < os.nboards; board++) {
+		os.attrib_spe[board] |= os.attrib_bundle[board];
+	}
+	bundle_invalidate();
 	if (!os.attribs_save()) storage_ok = false;
 	handle_return(storage_ok ? HTML_SUCCESS : HTML_INTERNAL_ERROR);
 }

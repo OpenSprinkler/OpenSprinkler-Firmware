@@ -25,6 +25,7 @@
 
 #include "types.h"
 #include "OpenSprinkler.h"
+#include "core/bundle.h"
 #include "core/program.h"
 #include "services/weather.h"
 #include "api/server.h"
@@ -522,6 +523,11 @@ void handle_web_request(char *p);
 #endif
 
 uint32_t currpoll_timeout = 0;
+#if defined(ARDUINO)
+static unsigned char pending_overcurrent_sid = 0;
+static uint16_t pending_overcurrent_value = 0;
+#endif
+
 void overcurrent_monitor() {
 #if defined(ARDUINO)
 	// If a zone is turning on, do immediate overcurrent monitoring here for ~50ms
@@ -529,15 +535,12 @@ void overcurrent_monitor() {
 		int16_t imax = os.get_imax();
 		if(imax > 0) { // disable overcurrent checking if imax==0
 			imax += OVERCURRENT_INRUSH_EXTRA; // extra margin for inrush current
-			time_os_t tn = os.now_tz();
-			unsigned char sid = curr_alert_sid - 1;
 			for(unsigned char i = 0; i < 10; i++) {
 				uint16_t curr = os.read_current();
 				if(curr > (uint16_t)imax) {
-					turn_off_running_station_immediate(sid, tn);
-					notif.add(NOTIFY_CURR_ALERT, sid, curr, CURR_ALERT_TYPE_OVER_STATION);
-					os.status.overcurrent_sid = curr_alert_sid;
-					currpoll_timeout += 1000; // delay currpoll_timeout by 1 second to give time for solenoid to reset
+					pending_overcurrent_sid = curr_alert_sid;
+					pending_overcurrent_value = curr;
+					os.set_output_rise_blocked(true);
 					break;
 				} else {
 					delay(5);
@@ -546,6 +549,53 @@ void overcurrent_monitor() {
 		}
 		curr_alert_sid = 0;
 	}
+#endif
+}
+
+#if defined(ARDUINO)
+static void stop_output_owner(unsigned char sid, time_os_t curr_time) {
+	unsigned char qid = pd.station_qid[sid];
+	if (qid < pd.nqueue) turn_off_running_station_immediate(sid, curr_time);
+	else {
+		os.set_station_bit(sid, 0);
+		for (RuntimeQueueStruct* q = pd.queue; q < pd.queue + pd.nqueue; q++) {
+			if (q->sid == sid) q->dur = 0;
+		}
+	}
+}
+#endif
+
+static void process_pending_overcurrent() {
+#if defined(ARDUINO)
+	if (!pending_overcurrent_sid) return;
+	const unsigned char physical_sid = pending_overcurrent_sid - 1;
+	const uint16_t current = pending_overcurrent_value;
+	const time_os_t curr_time = os.now_tz();
+	pending_overcurrent_sid = 0;
+	pending_overcurrent_value = 0;
+
+	bool owner_found = false;
+	if (os.is_master_station(physical_sid)) {
+		reset_all_stations_immediate();
+		owner_found = true;
+	} else {
+		if (os.is_running(physical_sid)) {
+			owner_found = true;
+			stop_output_owner(physical_sid, curr_time);
+		}
+		for (unsigned char leader = 0; leader < os.nstations; leader++) {
+			if (!os.is_running(leader) || !bundle_claims_station(leader, physical_sid)) continue;
+			owner_found = true;
+			stop_output_owner(leader, curr_time);
+		}
+	}
+
+	if (!owner_found) reset_all_stations_immediate();
+	notif.add(NOTIFY_CURR_ALERT, physical_sid, current, CURR_ALERT_TYPE_OVER_STATION);
+	os.status.overcurrent_sid = physical_sid + 1;
+	currpoll_timeout += 1000;
+	os.apply_all_station_bits();
+	os.set_output_rise_blocked(false);
 #endif
 }
 
@@ -746,6 +796,8 @@ void do_loop()
 		os.mqtt.subscribe();
 	}
 	os.mqtt.loop();
+	os.apply_all_station_bits(overcurrent_monitor);
+	process_pending_overcurrent();
 
 	// The main control loop runs once every second
 	if (curr_time != last_time) {
@@ -965,9 +1017,6 @@ void do_loop()
 			// process dynamic events
 			process_dynamic_events(curr_time);
 
-			// activate / deactivate valves
-			os.apply_all_station_bits(overcurrent_monitor);
-
 			// check through runtime queue, calculate the last stop time of sequential stations
 			memset(pd.last_seq_stop_times, 0, sizeof(uint32_t)*NUM_SEQ_GROUPS);
 			time_os_t sst;
@@ -1032,7 +1081,7 @@ void do_loop()
 
 					q = pd.queue + pd.station_qid[sid];
 
-					if (os.bound_to_master(q->sid, mas)) {
+					if (bundle_bound_to_master(q->sid, mas)) {
 						// check if timing is within the acceptable range
 						if (curr_time >= q->st + mas_on_adj &&
 							curr_time <= q->st + q->dur + mas_off_adj) {
@@ -1076,6 +1125,7 @@ void do_loop()
 
 		// activate/deactivate valves
 		os.apply_all_station_bits(overcurrent_monitor);
+		process_pending_overcurrent();
 
 #if defined(USE_DISPLAY)
 		// process LCD display

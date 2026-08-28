@@ -30,6 +30,7 @@
 #include "../services/mqtt.h"
 #include "../services/firmware_update.h"
 #include "../core/scheduler.h"
+#include "../core/bundle.h"
 #include "../storage/logging.h"
 #include "storage/maintenance.h"
 #include "storage/sprinkler_log.h"
@@ -42,7 +43,11 @@ extern OTF::OpenThingsFramework *otf;
 #define OTF_PARAMS_DEF const OTF::Request &req,OTF::Response &res
 #define OTF_PARAMS req,res
 #define FKV_SOURCE req
-#define handle_return(x) {if(x!=HTML_OK) otf_send_result(req,res,x); return;}
+#define handle_return(expression) { \
+	const uint8_t result_code = static_cast<uint8_t>(expression); \
+	if(result_code != HTML_OK) otf_send_result(req, res, result_code); \
+	return; \
+}
 
 #if defined(ARDUINO)
 	#include <FS.h>
@@ -721,7 +726,10 @@ void server_json_controller_main(OTF_PARAMS_DEF) {
 	bfill.emit_p(PSTR("\"sbits\":["));
 	// print sbits
 	for(bid=0;bid<os.nboards;bid++)
-		bfill.emit_p(PSTR("$D,"), os.station_bits[bid]);
+		bfill.emit_p(PSTR("$D,"), os.applied_station_bits[bid]);
+	bfill.emit_p(PSTR("0],\"bap\":["));
+	for(bid=0;bid<os.nboards;bid++)
+		bfill.emit_p(PSTR("$D,"), os.applied_station_bits[bid] & os.bundle_station_bits[bid]);
 	bfill.emit_p(PSTR("0],\"ps\":["));
 	// print ps
 	for(sid=0;sid<os.nstations;sid++) {
@@ -861,13 +869,20 @@ void server_change_options(OTF_PARAMS_DEF)
 	bool weather_change = false;
 	bool sensor_change = false;
 	bool storage_ok = true;
+	const unsigned char master_option_ids[NUM_MASTER_ZONES] = {
+		IOPT_MASTER_STATION, IOPT_MASTER_STATION_2,
+		IOPT_MASTER_STATION_3, IOPT_MASTER_STATION_4
+	};
+	unsigned char previous_master_ids[NUM_MASTER_ZONES];
+	for (unsigned char mas = 0; mas < NUM_MASTER_ZONES; mas++) {
+		previous_master_ids[mas] = os.iopts[master_option_ids[mas]];
+	}
 	#if defined(ARDUINO)
 	bool tpdv_change = false;
 	bool httpport_requested = false;
 	const uint8_t previous_httpport_0 = os.iopts[IOPT_HTTPPORT_0];
 	const uint8_t previous_httpport_1 = os.iopts[IOPT_HTTPPORT_1];
 	#endif
-
 	// !!! p and bfill share the same buffer, so don't write
 	// to bfill before you are done analyzing the buffer !!!
 	// process option values
@@ -934,6 +949,16 @@ void server_change_options(OTF_PARAMS_DEF)
 		}
 	}
 	#endif
+	for (unsigned char mas = 0; mas < NUM_MASTER_ZONES; mas++) {
+		const unsigned char oid = master_option_ids[mas];
+		const unsigned char master_id = os.iopts[oid];
+		if (!master_id) continue;
+		const unsigned char master_sid = master_id - 1;
+		if (bundle_is_station(master_sid) || bundle_station_is_referenced(master_sid)) {
+			os.iopts[oid] = previous_master_ids[mas];
+			err = 1;
+		}
+	}
 
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("loc"), true)) {
 		strReplaceQuoteBackslash(tmp_buffer);
@@ -1012,6 +1037,7 @@ void server_change_options(OTF_PARAMS_DEF)
 	if (!os.iopts_save()) storage_ok = false;
 	if (!storage_ok) handle_return(HTML_INTERNAL_ERROR);
 	os.populate_master();
+	bundle_invalidate();
 
 #if defined(ARDUINO)
 	if (tpdv_change) {
@@ -1073,8 +1099,13 @@ void server_json_status_main() {
 	unsigned char sid;
 
 	for (sid=0;sid<os.nstations;sid++) {
-		bfill.emit_p(PSTR("$D"), (os.station_bits[(sid>>3)]>>(sid&0x07))&1);
+		bfill.emit_p(PSTR("$D"), os.get_applied_station_bit(sid));
 		if(sid!=os.nstations-1) bfill.emit_p(PSTR(","));
+	}
+	bfill.emit_p(PSTR("],\"bap\":["));
+	for (unsigned char bid = 0; bid < os.nboards; bid++) {
+		bfill.emit_p(PSTR("$D"), os.applied_station_bits[bid] & os.bundle_station_bits[bid]);
+		if (bid != os.nboards - 1) bfill.emit_p(PSTR(","));
 	}
 	bfill.emit_p(PSTR("],\"nstations\":$D}"), os.nstations);
 }

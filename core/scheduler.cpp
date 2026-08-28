@@ -1,5 +1,7 @@
 #include "scheduler.h"
 
+#include "core/bundle.h"
+#include "core/output_sequencer.h"
 #include "program.h"
 #include "../OpenSprinkler.h"
 #include "../services/notifier.h"
@@ -49,7 +51,7 @@ void apply_master_adjustments(time_os_t curr_time, RuntimeQueueStruct *q, unsign
 
 	for (unsigned char mas = MASTER_1; mas < NUM_MASTER_ZONES; mas++) {
 		unsigned char masid = os.masters[mas][MASOPT_SID];
-		if (masid && os.bound_to_master(q->sid, mas)) {
+		if (masid && bundle_bound_to_master(q->sid, mas)) {
 			int16_t mas_on_adj = os.get_on_adj(mas);
 			int16_t mas_off_adj = os.get_off_adj(mas);
 			start_adj = min(start_adj, mas_on_adj);
@@ -224,8 +226,17 @@ void schedule_all_stations(time_os_t curr_time, unsigned char qo) {
 		gid = os.get_station_gid(q->sid);
 		stagger[gid] = 1;
 	}
-	for(unsigned char i=1;i<NUM_SEQ_GROUPS;i++) {
-		stagger[i] += stagger[i-1];
+	unsigned char active_group_count = 0;
+	for(unsigned char i=0;i<NUM_SEQ_GROUPS;i++) {
+		if (stagger[i]) stagger[i] = 1 + active_group_count++ / OUTPUT_RISES_PER_SECOND;
+	}
+
+	// Bundle members are physically staggered after their leader. Extend short
+	// runs before any queue calculations consume q->dur.
+	for(q=pd.queue;q<pd.queue+pd.nqueue;q++) {
+		if(q->st || !q->dur || !bundle_is_station(q->sid)) continue;
+		const uint16_t minimum = bundle_minimum_duration(q->sid);
+		if (q->dur < minimum) q->dur = minimum;
 	}
 
 	uint32_t seq_start_times[NUM_SEQ_GROUPS];
@@ -243,6 +254,16 @@ void schedule_all_stations(time_os_t curr_time, unsigned char qo) {
 			}
 		}
 
+		uint32_t resume_extensions[NUM_SEQ_GROUPS] = {};
+		for(q=pd.queue;q<pd.queue+pd.nqueue;q++) {
+			if(!q->st || !q->dur || !os.is_sequential_station(q->sid) || re) continue;
+			if(curr_time < q->st || curr_time >= q->st + q->dur || !bundle_is_station(q->sid)) continue;
+			gid = os.get_station_gid(q->sid);
+			const uint32_t remaining = q->dur - (curr_time - q->st);
+			const uint16_t minimum = bundle_minimum_duration(q->sid);
+			if (remaining < minimum) resume_extensions[gid] = minimum - remaining;
+		}
+
 		for(q=pd.queue;q<pd.queue+pd.nqueue;q++) {
 			if(!q->st) continue;
 			if(!q->dur) continue;
@@ -251,16 +272,17 @@ void schedule_all_stations(time_os_t curr_time, unsigned char qo) {
 			gid = os.get_station_gid(q->sid);
 			uint32_t adjustment = seq_adjustments[gid] + stagger[gid];
 			if (adjustment == 0) continue;
+			uint32_t resume_extension = resume_extensions[gid];
 
 			if (curr_time >= q->st && curr_time < q->st + q->dur) {
 				turn_off_station(q->sid, curr_time);
 				uint32_t remaining = q->dur - (curr_time - q->st);
 				q->st = curr_time + adjustment;
-				q->dur = remaining;
-				q->deque_time += adjustment;
+				q->dur = remaining + resume_extension;
+				q->deque_time += adjustment + resume_extension;
 			} else if (curr_time < q->st) {
-				q->st += adjustment;
-				q->deque_time += adjustment;
+				q->st += adjustment + resume_extension;
+				q->deque_time += adjustment + resume_extension;
 			}
 			if (q->st + q->dur > pd.last_seq_stop_times[gid]) {
 				pd.last_seq_stop_times[gid] = q->st + q->dur;
@@ -268,18 +290,18 @@ void schedule_all_stations(time_os_t curr_time, unsigned char qo) {
 		}
 
 		for(unsigned char i=0;i<NUM_SEQ_GROUPS;i++) {
-			seq_start_times[i] = con_start_time + stagger[i];
+			seq_start_times[i] = con_start_time + (stagger[i] ? stagger[i] : 1);
 		}
 	} else {
 		for(unsigned char i=0;i<NUM_SEQ_GROUPS;i++) {
-			seq_start_times[i] = con_start_time + stagger[i];
+			seq_start_times[i] = con_start_time + (stagger[i] ? stagger[i] : 1);
 			if (pd.last_seq_stop_times[i] > curr_time) {
 				seq_start_times[i] = pd.last_seq_stop_times[i] + station_delay;
 			}
 		}
 	}
 
-	con_start_time += (stagger[NUM_SEQ_GROUPS-1] + 1);
+	unsigned char parallel_slot = active_group_count;
 
 	for(q=pd.queue;q<pd.queue+pd.nqueue;q++) {
 		if(q->st) continue;
@@ -291,8 +313,9 @@ void schedule_all_stations(time_os_t curr_time, unsigned char qo) {
 			seq_start_times[gid] += q->dur;
 			seq_start_times[gid] += station_delay;
 		} else {
-			q->st = con_start_time;
-			con_start_time+=1;
+			q->st = con_start_time + 1 + parallel_slot / OUTPUT_RISES_PER_SECOND;
+			if (q->dur == 1 && (parallel_slot % OUTPUT_RISES_PER_SECOND)) q->dur = 2;
+			parallel_slot++;
 		}
 
 		apply_master_adjustments(curr_time, q, gid, seq_start_times);

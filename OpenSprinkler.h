@@ -339,6 +339,8 @@ public:
 	static const char*sopts[]; // string options
 	static unsigned char station_bits[];     // station activation bits. each byte corresponds to a board (8 stations)
 																	// first byte-> master controller, second byte-> ext. board 1, and so on
+	static unsigned char applied_station_bits[]; // outputs that have completed physical transition sequencing
+	static unsigned char bundle_station_bits[];  // outputs currently claimed by active bundle zones
 	// Note: the following attribute bytes are for backward compatibility
 	static unsigned char attrib_mas[];
 	static unsigned char attrib_mas2[];
@@ -349,6 +351,7 @@ public:
 	static unsigned char attrib_igrd[];
 	static unsigned char attrib_dis[];
 	static unsigned char attrib_spe[];
+	static unsigned char attrib_bundle[];
 	static unsigned char attrib_grp[];
 	static unsigned char masters[NUM_MASTER_ZONES][NUM_MASTER_OPTS];
 	static time_os_t masters_last_on[NUM_MASTER_ZONES];
@@ -395,6 +398,7 @@ public:
 	static int16_t get_imin();
 	static int16_t get_imax();
 	static unsigned char is_running(unsigned char sid);
+	static unsigned char get_applied_station_bit(unsigned char sid);
 	static unsigned char get_station_gid(unsigned char sid);
 	static void set_station_gid(unsigned char sid, unsigned char gid);
 
@@ -441,6 +445,8 @@ public:
 
 	static unsigned char set_station_bit(unsigned char sid, unsigned char value, uint32_t dur=0); // set station bit of one station (sid->station index, value->0/1)
 	static unsigned char get_station_bit(unsigned char sid); // get station bit of one station (sid->station index)
+	static void mark_bundle_dirty();
+	static void set_output_rise_blocked(bool blocked);
 	static void switch_special_station(unsigned char sid, unsigned char value, uint32_t dur=0); // swtich special station
 	static void clear_all_station_bits(); // clear all station bits
 	static void apply_all_station_bits(void (*post_activation_callback)()=NULL); // apply all station bits (activate/deactive values)

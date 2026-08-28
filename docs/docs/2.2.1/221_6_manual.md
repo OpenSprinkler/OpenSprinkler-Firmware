@@ -29,6 +29,7 @@ In addition, OpenSprinkler v3 is available in three power models:
 * **Additional Built-in Sensor Ports (SN3/SN4):** This firmware enables two additional built-in sensor ports on OpenSprinkler v3.4, for a total of four: `SN1`–`SN4`.
 * **Extended Watering Durations:** Weather- and sensor-adjusted station runtimes may now exceed the previous 18-hour limit, up to the firmware's seven-day runtime limit. Programmed water times remain limited to 18 hours.
 * **Bounded Sprinkler Log Storage:** Sprinkler Logs now use a compact binary ring with predictable flash usage and paginated export. On OpenSprinkler v3/v4, earlier Sprinkler Logs are removed during a visible one-time update on the first 2.2.1(6) boot; download prior history before upgrading if it must be retained.
+* <span class="hl">**Bundle Zones:** A physical zone can act as a bundle leader and activate any selected set of additional Standard physical zones in parallel. This provides an intuitive way to run several valves together while scheduling multiple bundles sequentially.</span>
 * **OpenSprinkler v2.3 Support Removed:** Firmware 2.2.1(5) supports OpenSprinkler v3.x and OSPi/Linux. Firmware 2.2.1(4) was the final release supporting OpenSprinkler v2.3.
 
 <hr class="double">
@@ -355,7 +356,7 @@ Each zone (station) is shown as a card. Tap the gear ⚙️ icon next to a zone 
     * Parallel (P) zones can run alongside any other zones.
     * The sequential group attribute replaces the old per-zone **Sequential** flag, providing more flexible concurrency control.
 
-* **Station Type** (Virtual Zone): Configure special properties so a station can control devices or actions beyond a standard sprinkler valve. These **special/virtual** station types do NOT consume a physical output - you can define them freely up to the controller’s maximum zone count, even without zone expanders.
+* **Station Type:** Configure special properties for a zone. Most special types are **virtual zones** that control a remote device or action instead of an ordinary valve. <span class="hl">Bundle Zone is the exception: its leader remains a real physical zone.</span>
     * <span class="hllight">**Standard**</span> (default): Regular sprinkler zone.
     * <span class="hllight">**RF:**</span> Controls remote RF (Radio Frequency) power sockets via an external transmitter (requires [RFToy](https://opensprinkler.com/product/rftoy/) for code learning), allowing you to switch powerline devices such as Christmas lights, heaters, pumps.
     * <span class="hllight">**Remote Station (IP):**</span> Triggers a zone on another OpenSprinkler using its **IP, port, and zone index** (both controllers must **share the same device password**).
@@ -363,6 +364,7 @@ Each zone (station) is shown as a card. Tap the gear ⚙️ icon next to a zone 
     * <span class="hllight">**GPIO:**</span> Directly toggles an available GPIO pin on the controller (Active High/Low configurable). This type is disabled for controllers that do not have any available GPIO pins.
     * <span class="hllight">**HTTP:**</span> Sends an HTTP GET request upon zone activity. Provide a `server` (either domain name or IP), `port`, and the `on`/`off` command (excluding the leading slash `/`). Upon zone activation, it sends `server:port/on_command`, and upon deactivation `server:port/off_command`.
     * <span class="hllight">**HTTPS:**</span> Same as HTTP, but using a secure connection.
+    * <span class="hl">**Bundle Zone:** A physical leader zone that also activates selected Standard zone outputs. The selected members remain independently controllable, and any direct or bundle claim keeps a shared member active.</span>
 
 ---
 
@@ -475,6 +477,8 @@ This firmware supports up to **four independent masters**, each configurable as 
     * `+15` → Master turns on `15` seconds **after** an associated zone starts.
     * `-60` → Master turns on `60` seconds **before** a zone starts.
 * **Master Off Adjustment:** Similar to above but for master **deactivation** timing.
+
+When associated zones overlap, master demand uses OR logic: the master remains active whenever at least one zone is within its configured master window. The on/off adjustments are therefore exact for non-overlapping sequential zones, but an already-active master is not cycled merely to reproduce each overlapping zone's individual adjustment.
 
 ---
 
@@ -762,6 +766,23 @@ Example: If Zones 1–3 are in Group `A`, and 4–6 in Group `B`, they can opera
 * **Parallel Group:** Runs independently of all other zones, useful for lights, pumps, heaters or other non-sprinkler devices (which can run in parallel).
 
 <u>**NOTE**</u>: **Earlier firmwares** used a single **Sequential flag** for all zones, which effectively put all zones in a single sequential group. That flag has been replaced by the multi-group system here, which provides greater flexibility by allowing multiple independent groups.
+
+### Bundle Zones
+
+A <span class="hl">**Bundle Zone**</span> behaves like several physical valve wires connected to one logical zone. Starting the bundle leader activates the leader's own output and every enabled member selected in its Bundle Zone configuration. The leader owns the schedule, runtime, rain and sensor behavior, log entry, and notification. Members do not receive synthetic queue entries or countdown times.
+
+Bundle ownership is combined using OR logic:
+
+* A member remains active while it has its own direct run or while any active bundle claims it.
+* Stopping an independently running member removes only its direct run. Stop the bundle leader to remove that bundle's claim.
+* The same physical zone may belong to more than one bundle.
+* Only Standard zones can be members. Special stations, Bundle Zone leaders, and master stations cannot be selected as members.
+* A disabled member remains configured but is skipped while disabled.
+* Member **Use Masters** selections are combined with the leader's selections so required pumps or master valves activate for the bundle.
+
+A Bundle Zone is scheduled as one unit according to the leader's **Sequential Group**. Once the leader starts, its members are activated as derived outputs and their own Sequential Groups are not consulted. A member's group still governs that member whenever it is scheduled directly.
+
+To reduce simultaneous solenoid inrush, all new physical outputs are activated one at a time with a `250 ms` interval. A very short bundle run is automatically extended enough for an isolated bundle's selected members to activate and remain on briefly. Multiple unusually short bundles started concurrently share the same transition sequence, so a heavily contended late member may not activate before its leader's run ends.
 
 <hr class="double">
 
