@@ -84,6 +84,12 @@ bool sprinkler_log_delete_before(uint32_t day);
 bool sprinkler_log_remove_oldest_completed();
 uint32_t sprinkler_log_allocated_bytes(uint32_t block_size);
 bool sprinkler_log_exists();
+void sprinkler_log_prepare();
+
+#if defined(SPRINKLER_LOG_TEST_SMALL_GEOMETRY)
+void sprinkler_log_test_reset_inspections();
+uint32_t sprinkler_log_test_inspections();
+#endif
 
 SprinklerLogCursor sprinkler_log_cursor_begin();
 bool sprinkler_log_cursor_parse(const char* value, SprinklerLogCursor& cursor);

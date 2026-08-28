@@ -42,6 +42,30 @@ void remove_legacy_file(uint32_t day) {
 	assert(remove_file(filename));
 }
 
+void set_descriptor_flags(uint16_t slot, uint8_t flags) {
+	os_file_type file = file_open(LOG_DIR "spr.hdr", FileOpenMode::ReadWrite);
+	assert(file);
+	const uint32_t offset = sizeof(SprinklerLogRingHeader) +
+		(uint32_t)slot * sizeof(SprinklerLogDescriptor) +
+		offsetof(SprinklerLogDescriptor, flags);
+	assert(file_seek(file, offset));
+	assert(file_write(file, &flags, sizeof(flags)) == (int)sizeof(flags));
+	file_close(file);
+}
+
+uint8_t descriptor_flags(uint16_t slot) {
+	os_file_type file = file_open(LOG_DIR "spr.hdr", FileOpenMode::Read);
+	assert(file);
+	const uint32_t offset = sizeof(SprinklerLogRingHeader) +
+		(uint32_t)slot * sizeof(SprinklerLogDescriptor) +
+		offsetof(SprinklerLogDescriptor, flags);
+	assert(file_seek(file, offset));
+	uint8_t flags = 0;
+	assert(file_read(file, &flags, sizeof(flags)) == (int)sizeof(flags));
+	file_close(file);
+	return flags;
+}
+
 void test_codec() {
 	SprinklerLogRecord input = make_record(0x04030201, 0x08070605);
 	input.aux = 0x0c0b0a09;
@@ -97,8 +121,30 @@ void test_append_rotate_and_recover() {
 	// A missing central index is rebuilt from segment generations on append.
 	assert(remove_file(LOG_DIR "spr.hdr"));
 	sprinkler_log_invalidate_cache();
+	SprinklerLogCursor cursor = sprinkler_log_cursor_begin();
+	SprinklerLogCursor next = {};
+	std::vector<SprinklerLogRecord> records;
+	uint32_t scanned = 0;
+	bool done = false;
+	assert(sprinkler_log_query(0, 10, cursor, 32, collect_record, &records,
+		next, scanned, done));
+	assert(done && records.size() == 4);
+	assert(!file_exists(LOG_DIR "spr.hdr"));
 	assert(sprinkler_log_append(make_record(500001)));
 	assert(file_exists(LOG_DIR "spr.hdr"));
+
+	// Reconcile a segment whose file survived but whose descriptor was stale.
+	set_descriptor_flags(0, 0);
+	sprinkler_log_invalidate_cache();
+	sprinkler_log_prepare();
+	assert(descriptor_flags(0) & SPRINKLER_DESCRIPTOR_FLAG_VALID);
+	sprinkler_log_test_reset_inspections();
+	cursor = sprinkler_log_cursor_begin();
+	records.clear();
+	assert(sprinkler_log_query(0, 10, cursor, 32, collect_record, &records,
+		next, scanned, done));
+	assert(done && records.size() == 5);
+	assert(sprinkler_log_test_inspections() == 0);
 }
 
 void test_deletion_and_clear() {
@@ -144,6 +190,32 @@ void test_partial_tail_recovery() {
 	assert(sprinkler_log_clear());
 }
 
+void test_stale_empty_index_cache() {
+	assert(sprinkler_log_append(make_record(800000)));
+	assert(file_exists(LOG_DIR "spr.hdr"));
+	char filename[24];
+	for (uint16_t slot = 0; slot < SPRINKLER_LOG_MAX_FILES; slot++) {
+		snprintf(filename, sizeof(filename), LOG_DIR "spr.log%03u", slot);
+		assert(remove_file(filename));
+	}
+	sprinkler_log_invalidate_cache();
+	sprinkler_log_test_reset_inspections();
+	SprinklerLogCursor cursor = sprinkler_log_cursor_begin();
+	SprinklerLogCursor next = {};
+	std::vector<SprinklerLogRecord> records;
+	uint32_t scanned = 0;
+	bool done = false;
+	assert(sprinkler_log_query(0, 10, cursor, 32, collect_record, &records,
+		next, scanned, done));
+	assert(done && scanned == 0 && records.empty());
+	const uint32_t first_scan = sprinkler_log_test_inspections();
+	assert(first_scan == SPRINKLER_LOG_MAX_FILES);
+	assert(sprinkler_log_query(0, 10, cursor, 32, collect_record, &records,
+		next, scanned, done));
+	assert(sprinkler_log_test_inspections() == first_scan);
+	assert(sprinkler_log_clear());
+}
+
 void test_ring_query_and_cursor() {
 	const uint32_t day = 20;
 	char legacy[160];
@@ -183,11 +255,17 @@ void test_ring_query_and_cursor() {
 
 	assert(sprinkler_log_clear());
 	// Legacy files remain on native filesystems but are no longer returned.
+	sprinkler_log_test_reset_inspections();
 	cursor = sprinkler_log_cursor_begin();
 	records.clear();
 	assert(sprinkler_log_query(day, day, cursor, 4, collect_record, &records,
 		next, scanned, done));
 	assert(done && scanned == 0 && records.empty());
+	const uint32_t empty_scan_inspections = sprinkler_log_test_inspections();
+	assert(empty_scan_inspections == 0);
+	assert(sprinkler_log_query(day, day, cursor, 4, collect_record, &records,
+		next, scanned, done));
+	assert(sprinkler_log_test_inspections() == empty_scan_inspections);
 	remove_legacy_file(day);
 }
 
@@ -240,7 +318,14 @@ void test_delete_before() {
 		next, scanned, done));
 	assert(done && records.size() == 1);
 	assert(records[0].timestamp == 3 * 86400UL + 1);
+	sprinkler_log_prepare();
+	sprinkler_log_test_reset_inspections();
+	assert(sprinkler_log_delete_day(99));
+	assert(sprinkler_log_test_inspections() == 0);
+	sprinkler_log_prepare();
+	sprinkler_log_test_reset_inspections();
 	assert(sprinkler_log_delete_day(3));
+	assert(sprinkler_log_test_inspections() == 0);
 	records.clear();
 	cursor = sprinkler_log_cursor_begin();
 	assert(sprinkler_log_query(0, 4, cursor, 32, collect_record, &records,
@@ -258,6 +343,7 @@ int main(int argc, char** argv) {
 	test_append_rotate_and_recover();
 	test_deletion_and_clear();
 	test_partial_tail_recovery();
+	test_stale_empty_index_cache();
 	test_ring_query_and_cursor();
 	test_full_wrap_and_prune();
 	test_delete_before();

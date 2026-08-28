@@ -43,8 +43,21 @@ struct ActiveCache {
 };
 
 bool ring_cache_valid = false;
+bool ring_cache_absent = false;
+bool ring_index_trusted = false;
 SprinklerLogRingHeader ring_cache = {};
 ActiveCache active_cache = {};
+#if defined(SPRINKLER_LOG_TEST_SMALL_GEOMETRY)
+uint32_t segment_inspection_count = 0;
+#endif
+
+void adopt_ring_state(const SprinklerLogRingHeader& header, bool index_trusted) {
+	ring_cache = header;
+	ring_cache_valid = true;
+	ring_cache_absent = false;
+	ring_index_trusted = index_trusted;
+	active_cache = {};
+}
 
 void cooperative_yield() {
 #if defined(ARDUINO)
@@ -234,6 +247,9 @@ bool create_segment(uint16_t slot, uint32_t generation) {
 
 bool inspect_segment(uint16_t slot, SprinklerLogDescriptor& descriptor,
 	SprinklerLogSegmentHeader* output_header = nullptr) {
+#if defined(SPRINKLER_LOG_TEST_SMALL_GEOMETRY)
+	segment_inspection_count++;
+#endif
 	char filename[24];
 	segment_filename(slot, filename, sizeof(filename));
 	os_file_type file = file_open(filename, FileOpenMode::Read);
@@ -351,7 +367,8 @@ bool write_rebuilt_index(const SprinklerLogRingHeader& header) {
 	return true;
 }
 
-bool rebuild_ring_state(SprinklerLogRingHeader& header, bool persist) {
+bool rebuild_ring_state(SprinklerLogRingHeader& header, bool persist,
+	bool* found_segment = nullptr) {
 	uint32_t highest_generation = 0;
 	uint16_t active_slot = 0;
 	for (uint16_t slot = 0; slot < SPRINKLER_LOG_MAX_FILES; slot++) {
@@ -363,6 +380,7 @@ bool rebuild_ring_state(SprinklerLogRingHeader& header, bool persist) {
 			active_slot = slot;
 		}
 	}
+	if (found_segment) *found_segment = highest_generation != 0;
 	if (highest_generation == 0) return false;
 	header = {};
 	header.magic = SPRINKLER_LOG_MAGIC;
@@ -375,13 +393,47 @@ bool rebuild_ring_state(SprinklerLogRingHeader& header, bool persist) {
 	return !persist || write_rebuilt_index(header);
 }
 
+bool ring_index_matches_segments(const SprinklerLogRingHeader& header) {
+	os_file_type index = file_open(RING_INDEX_FILENAME, FileOpenMode::Read);
+	if (!index) return false;
+	bool matches = true;
+	char filename[24];
+	for (uint16_t slot = 0; slot < header.max_files; slot++) {
+		cooperative_yield();
+		SprinklerLogDescriptor descriptor = {};
+		if (!read_descriptor_from_file(index, slot, descriptor)) {
+			matches = false;
+			break;
+		}
+		segment_filename(slot, filename, sizeof(filename));
+		const bool indexed = (descriptor.flags & SPRINKLER_DESCRIPTOR_FLAG_VALID) != 0;
+		if (indexed != file_exists(filename)) {
+			matches = false;
+			break;
+		}
+	}
+	file_close(index);
+	return matches;
+}
+
 bool load_ring_state(SprinklerLogRingHeader& header, bool persist_recovery) {
 	if (ring_cache_valid) {
 		header = ring_cache;
+		if (persist_recovery && !ring_index_trusted) {
+			if (!rebuild_ring_state(header, true)) return false;
+			adopt_ring_state(header, true);
+		}
 		return true;
 	}
+	if (ring_cache_absent) return false;
+	bool rebuilt = false;
 	if (!read_ring_header(header)) {
-		if (!rebuild_ring_state(header, persist_recovery)) return false;
+		bool found_segment = false;
+		if (!rebuild_ring_state(header, persist_recovery, &found_segment)) {
+			if (!found_segment) ring_cache_absent = true;
+			return false;
+		}
+		rebuilt = true;
 	}
 	SprinklerLogDescriptor descriptor = {};
 	SprinklerLogSegmentHeader segment = {};
@@ -389,10 +441,22 @@ bool load_ring_state(SprinklerLogRingHeader& header, bool persist_recovery) {
 		!(descriptor.flags & SPRINKLER_DESCRIPTOR_FLAG_VALID) ||
 		!read_segment_header(header.active_slot, segment) ||
 		segment.generation != descriptor.generation) {
-		if (!rebuild_ring_state(header, persist_recovery)) return false;
+		bool found_segment = false;
+		if (!rebuild_ring_state(header, persist_recovery, &found_segment)) {
+			if (!found_segment) ring_cache_absent = true;
+			return false;
+		}
+		rebuilt = true;
 	}
-	ring_cache = header;
-	ring_cache_valid = true;
+	if (!rebuilt && !ring_index_matches_segments(header)) {
+		bool found_segment = false;
+		if (!rebuild_ring_state(header, persist_recovery, &found_segment)) {
+			if (!found_segment) ring_cache_absent = true;
+			return false;
+		}
+		rebuilt = true;
+	}
+	adopt_ring_state(header, !rebuilt || persist_recovery);
 	return true;
 }
 
@@ -423,6 +487,21 @@ SprinklerLogDescriptor active_descriptor() {
 	return descriptor;
 }
 
+bool load_slot_descriptor(os_file_type index, const SprinklerLogRingHeader& header,
+	uint16_t slot, SprinklerLogDescriptor& descriptor) {
+	const bool read_ok = read_descriptor_from_file(index, slot, descriptor);
+	if (slot == header.active_slot) {
+		if (!load_active_cache(header)) return false;
+		descriptor = active_descriptor();
+		return true;
+	}
+	if (!read_ok) return inspect_segment(slot, descriptor);
+	if (!(descriptor.flags & SPRINKLER_DESCRIPTOR_FLAG_VALID)) {
+		return !ring_index_trusted && inspect_segment(slot, descriptor);
+	}
+	return true;
+}
+
 bool initialize_ring(SprinklerLogRingHeader& header) {
 	if (!ensure_log_dir() || !prepare_log_write(true)) return false;
 	header = {};
@@ -443,9 +522,7 @@ bool initialize_ring(SprinklerLogRingHeader& header) {
 		remove_file(filename);
 		return false;
 	}
-	ring_cache = header;
-	ring_cache_valid = true;
-	active_cache = {};
+	adopt_ring_state(header, true);
 	return load_active_cache(header);
 }
 
@@ -485,8 +562,7 @@ bool rotate_active(SprinklerLogRingHeader& header) {
 	header.next_generation = generation + 1;
 	if (header.next_generation == 0) header.next_generation = 1;
 	if (!write_index_atomic(header, updates, MAX_INDEX_UPDATES, true)) return false;
-	ring_cache = header;
-	active_cache = {};
+	adopt_ring_state(header, true);
 	return load_active_cache(header);
 }
 
@@ -621,10 +697,7 @@ private:
 			slots_checked_++;
 			cooperative_yield();
 			SprinklerLogDescriptor descriptor = {};
-			if (!read_descriptor_from_file(index_file_, slot, descriptor) ||
-				!(descriptor.flags & SPRINKLER_DESCRIPTOR_FLAG_VALID) || slot == header_.active_slot) {
-				if (!inspect_segment(slot, descriptor)) continue;
-			}
+			if (!load_slot_descriptor(index_file_, header_, slot, descriptor)) continue;
 			if (descriptor.record_count == 0 || descriptor.max_timestamp < start_timestamp_ ||
 				descriptor.min_timestamp >= end_timestamp_) continue;
 			if (cursor_generation_ != 0 && descriptor.generation < cursor_generation_) continue;
@@ -698,9 +771,26 @@ bool sprinkler_log_decode_record(const uint8_t input[16], SprinklerLogRecord& re
 
 void sprinkler_log_invalidate_cache() {
 	ring_cache_valid = false;
+	ring_cache_absent = false;
+	ring_index_trusted = false;
 	ring_cache = {};
 	active_cache = {};
 }
+
+void sprinkler_log_prepare() {
+	SprinklerLogRingHeader header = {};
+	if (load_ring_state(header, true)) load_active_cache(header);
+}
+
+#if defined(SPRINKLER_LOG_TEST_SMALL_GEOMETRY)
+void sprinkler_log_test_reset_inspections() {
+	segment_inspection_count = 0;
+}
+
+uint32_t sprinkler_log_test_inspections() {
+	return segment_inspection_count;
+}
+#endif
 
 bool sprinkler_log_exists() {
 	if (file_exists(RING_INDEX_FILENAME)) return true;
@@ -752,6 +842,7 @@ bool sprinkler_log_clear() {
 		cooperative_yield();
 	}
 	sprinkler_log_invalidate_cache();
+	if (ok) ring_cache_absent = true;
 	return ok;
 }
 
@@ -760,17 +851,22 @@ bool sprinkler_log_delete_day(uint32_t day) {
 	if (!load_ring_state(header, false)) return true;
 	uint32_t first_timestamp = day * 86400UL;
 	uint32_t last_timestamp = day_end_timestamp(day);
+	os_file_type index = file_open(RING_INDEX_FILENAME, FileOpenMode::Read);
+	bool ok = true;
 	for (uint16_t slot = 0; slot < header.max_files; slot++) {
 		cooperative_yield();
 		SprinklerLogDescriptor descriptor = {};
-		if (!inspect_segment(slot, descriptor)) continue;
+		if (!load_slot_descriptor(index, header, slot, descriptor)) continue;
 		if (descriptor.record_count == 0 || descriptor.max_timestamp < first_timestamp ||
 			descriptor.min_timestamp >= last_timestamp) continue;
 		bool changed = false;
-		if (!rewrite_matching_records(slot, first_timestamp, last_timestamp, false, changed)) return false;
+		if (!rewrite_matching_records(slot, first_timestamp, last_timestamp, false, changed)) {
+			ok = false;
+			break;
+		}
 	}
-	sprinkler_log_invalidate_cache();
-	return true;
+	if (index) file_close(index);
+	return ok;
 }
 
 bool sprinkler_log_delete_before(uint32_t day) {
@@ -778,48 +874,73 @@ bool sprinkler_log_delete_before(uint32_t day) {
 	if (!load_ring_state(header, false)) return true;
 	uint32_t cutoff = day * 86400UL;
 	bool removed_segment = false;
+	bool ok = true;
+	os_file_type index = file_open(RING_INDEX_FILENAME, FileOpenMode::Read);
 	for (uint16_t slot = 0; slot < header.max_files; slot++) {
 		cooperative_yield();
 		SprinklerLogDescriptor descriptor = {};
-		if (!inspect_segment(slot, descriptor)) continue;
+		if (!load_slot_descriptor(index, header, slot, descriptor)) continue;
 		if (descriptor.record_count == 0 || descriptor.min_timestamp >= cutoff) continue;
 		if (slot != header.active_slot &&
 			(descriptor.flags & SPRINKLER_DESCRIPTOR_FLAG_CLOSED) &&
 			descriptor.max_timestamp < cutoff) {
 			char filename[24];
 			segment_filename(slot, filename, sizeof(filename));
-			if (!remove_file(filename)) return false;
+			if (!remove_file(filename)) {
+				ok = false;
+				break;
+			}
 			removed_segment = true;
 			continue;
 		}
 		bool changed = false;
-		if (!rewrite_matching_records(slot, cutoff, 0, true, changed)) return false;
+		if (!rewrite_matching_records(slot, cutoff, 0, true, changed)) {
+			ok = false;
+			break;
+		}
 	}
-	if (removed_segment && !rebuild_ring_state(header, true)) {
-		// Every segment may have been removed; an absent ring is a valid empty state.
-		remove_file(RING_INDEX_FILENAME);
+	if (index) file_close(index);
+	if (removed_segment) {
+		bool found_segment = false;
+		if (rebuild_ring_state(header, true, &found_segment)) {
+			adopt_ring_state(header, true);
+		} else {
+			remove_file(RING_INDEX_FILENAME);
+			sprinkler_log_invalidate_cache();
+			if (!found_segment) ring_cache_absent = true;
+		}
 	}
-	sprinkler_log_invalidate_cache();
-	return true;
+	return ok;
 }
 
 bool sprinkler_log_remove_oldest_completed() {
 	SprinklerLogRingHeader header = {};
 	if (!load_ring_state(header, false)) return false;
+	os_file_type index = file_open(RING_INDEX_FILENAME, FileOpenMode::Read);
+	uint16_t candidate = header.max_files;
 	for (uint16_t offset = 1; offset < header.max_files; offset++) {
 		cooperative_yield();
 		uint16_t slot = (uint16_t)((header.active_slot + offset) % header.max_files);
 		SprinklerLogDescriptor descriptor = {};
-		if (!inspect_segment(slot, descriptor) ||
+		if (!load_slot_descriptor(index, header, slot, descriptor) ||
 			!(descriptor.flags & SPRINKLER_DESCRIPTOR_FLAG_CLOSED)) continue;
-		char filename[24];
-		segment_filename(slot, filename, sizeof(filename));
-		if (!remove_file(filename)) return false;
-		if (!rebuild_ring_state(header, true)) remove_file(RING_INDEX_FILENAME);
-		sprinkler_log_invalidate_cache();
-		return true;
+		candidate = slot;
+		break;
 	}
-	return false;
+	if (index) file_close(index);
+	if (candidate >= header.max_files) return false;
+	char filename[24];
+	segment_filename(candidate, filename, sizeof(filename));
+	if (!remove_file(filename)) return false;
+	bool found_segment = false;
+	if (rebuild_ring_state(header, true, &found_segment)) {
+		adopt_ring_state(header, true);
+	} else {
+		remove_file(RING_INDEX_FILENAME);
+		sprinkler_log_invalidate_cache();
+		if (!found_segment) ring_cache_absent = true;
+	}
+	return true;
 }
 
 uint32_t sprinkler_log_allocated_bytes(uint32_t block_size) {

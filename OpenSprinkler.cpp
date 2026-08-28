@@ -33,6 +33,7 @@
 #include "core/program.h"
 #include "services/weather.h"
 #include "storage/maintenance.h"
+#include "storage/sprinkler_log.h"
 #include "external/ArduinoJson.hpp"
 
 #if defined(ESP32)
@@ -914,6 +915,7 @@ void OpenSprinkler::begin() {
 			delay(migration.complete ? 750 : 2000);
 		}
 		maintain_embedded_storage();
+		sprinkler_log_prepare();
 	}
 
 	state = OS_STATE_INITIAL;
@@ -928,7 +930,7 @@ void OpenSprinkler::begin() {
 	RTC.detect();
 
 #else
-	//DEBUG_PRINTLN(get_runtime_path());
+	sprinkler_log_prepare();
 #endif
 
 	for (size_t i = 0; i < 4; i++) {
