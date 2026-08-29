@@ -88,6 +88,7 @@
 #define NOTIFY_CURR_ALERT      0x0400
 #define NOTIFY_SENSOR3         0x0800
 #define NOTIFY_SENSOR4         0x1000
+#define NOTIFY_PRESSURE        0x2000
 
 /** Queue Insertion Mode */
 enum {
@@ -114,6 +115,7 @@ enum {
 #define SENSOR_TYPE_RAIN    0x01  // rain sensor
 #define SENSOR_TYPE_FLOW    0x02  // flow sensor
 #define SENSOR_TYPE_SOIL    0x03  // soil moisture sensor
+#define SENSOR_TYPE_PRESSURE 0x04 // pressure sensor
 #define SENSOR_TYPE_PSWITCH 0xF0  // program switch sensor
 #define SENSOR_TYPE_OTHER   0xFF
 

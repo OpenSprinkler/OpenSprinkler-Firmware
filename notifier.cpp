@@ -359,6 +359,15 @@ static void format_notification(uint16_t type, uint32_t lval, float fval,
 			break;
 		}
 
+		case NOTIFY_PRESSURE: {
+			strncpy_P(bufs.topic, PSTR("sensor/pressure"), bufs.topic_cap - 1);
+			snprintf_P(bufs.payload, bufs.payload_cap, PSTR("{\"state\":%d}"), (int)fval);
+			strcat_P(bufs.body, PSTR("pressure sensor "));
+			strcat_P(bufs.body, ((int)fval) ? PSTR("activated.") : PSTR("de-activated."));
+			set_pstr(bufs.subject_suffix, bufs.subject_suffix_cap, PSTR("pressure sensor event"));
+			break;
+		}
+
 		case NOTIFY_RAINDELAY: {
 			strncpy_P(bufs.topic, PSTR("raindelay"), bufs.topic_cap - 1);
 			snprintf_P(bufs.payload, bufs.payload_cap, PSTR("{\"state\":%d}"), (int)fval);
