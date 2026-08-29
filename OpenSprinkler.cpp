@@ -847,6 +847,7 @@ void OpenSprinkler::begin() {
 	lcd.createChar(ICON_RAINDELAY, _iconimage_raindelay);
 	lcd.createChar(ICON_RAIN, _iconimage_rain);
 	lcd.createChar(ICON_SOIL, _iconimage_soil);
+	lcd.createChar(ICON_PRESSURE, _iconimage_pressure);
 #endif
 
 #if defined(ESP8266)
@@ -2631,7 +2632,7 @@ void OpenSprinkler::lcd_print_screen(char c) {
 				lcd.write(sn_sensors[i].active?ICON_SOIL:(sn_sensors[i].raw?'S':'s'));
 				break;
 			case SENSOR_TYPE_PRESSURE:
-				lcd.write(sn_sensors[i].active?'B':(sn_sensors[i].raw?'B':'b'));
+				lcd.write(sn_sensors[i].active?ICON_PRESSURE:(sn_sensors[i].raw?'B':'b'));
 				break;
 			case SENSOR_TYPE_FLOW:
 				lcd.write(flowcount_rt>0?'F':'f');
