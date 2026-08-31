@@ -20,6 +20,12 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_PUBLIC_HEADER = REPO_ROOT / "services" / "firmware_update_public_key.h"
 DEFAULT_BASE_URL = "https://firmware.opensprinkler.com"
 MAX_DESCRIPTOR_BYTES = 1024
+ESP8266_TARGET = "os3-esp8266"
+ESP32_C6_N8_TARGET = "os4-esp32c6-n8"
+# Development catalogs published before the N8 layout was finalized remain verifiable,
+# but new releases and devices use the flash-specific target above.
+LEGACY_ESP32_C6_TARGET = "os4-esp32c6"
+CATALOG_TARGETS = (ESP8266_TARGET, ESP32_C6_N8_TARGET, LEGACY_ESP32_C6_TARGET)
 
 
 def run(command, *, dry_run=False, capture_output=False):
@@ -128,7 +134,7 @@ def validate_image(path, target):
     if len(header) != 16 or header[0] != 0xE9 or not 1 <= header[1] <= 16:
         raise RuntimeError(f"Firmware artifact has an invalid image header: {path}")
     chip_id = header[12] | (header[13] << 8)
-    if target == "os4-esp32c6":
+    if target in (ESP32_C6_N8_TARGET, LEGACY_ESP32_C6_TARGET):
         valid = chip_id == 0x000D
     else:
         entry = int.from_bytes(header[4:8], "little")
@@ -245,7 +251,7 @@ def validate_catalog_entry(entry):
             entry.get("descriptor") != descriptor or entry.get("signature") != signature or
             not isinstance(targets, list) or not targets or
             len(targets) != len(set(targets)) or
-            not all(target in ("os3-esp8266", "os4-esp32c6") for target in targets)):
+            not all(target in CATALOG_TARGETS for target in targets)):
         raise RuntimeError(f"Invalid release catalog entry: {release_id!r}")
     return release_id
 
@@ -323,12 +329,12 @@ def prepare(args):
                 f"Release id {release_id} already exists; publish the prepared catalog or use a new id")
         releases = previous.get("releases", [])
 
-    esp8266_source = validate_image(args.esp8266, "os3-esp8266")
-    esp32_source = validate_image(args.esp32c6, "os4-esp32c6")
+    esp8266_source = validate_image(args.esp8266, ESP8266_TARGET)
+    esp32_n8_source = validate_image(args.esp32c6_n8, ESP32_C6_N8_TARGET)
     release_dir = output / "releases" / release_id
     release_dir.mkdir(parents=True, exist_ok=True)
     esp8266_name = f"opensprinkler-{release_id}-esp8266.bin"
-    esp32_name = f"opensprinkler-{release_id}-esp32c6.bin32"
+    esp32_n8_name = f"opensprinkler-{release_id}-esp32c6.bin32n8"
 
     descriptor = {
         "schema": 1,
@@ -336,10 +342,10 @@ def prepare(args):
         "version": version,
         "build": build,
         "targets": {
-            "os3-esp8266": artifact(esp8266_source, release_dir / esp8266_name,
+            ESP8266_TARGET: artifact(esp8266_source, release_dir / esp8266_name,
                 f"/v1/releases/{release_id}/{esp8266_name}"),
-            "os4-esp32c6": artifact(esp32_source, release_dir / esp32_name,
-                f"/v1/releases/{release_id}/{esp32_name}", 8 * 1024 * 1024),
+            ESP32_C6_N8_TARGET: artifact(esp32_n8_source, release_dir / esp32_n8_name,
+                f"/v1/releases/{release_id}/{esp32_n8_name}", 8 * 1024 * 1024),
         },
     }
     descriptor_bytes = (
@@ -553,12 +559,12 @@ def resolve_pio(value=None):
 
 def build_firmware(pio=None):
     command = resolve_pio(pio)
-    run([command, "run", "-e", "os3x_esp8266", "-e", "os4_esp32c6"])
+    run([command, "run", "-e", "os3x_esp8266", "-e", "os4_esp32c6_n8"])
     esp8266 = REPO_ROOT / ".pio" / "build" / "os3x_esp8266" / "firmware.bin"
-    esp32c6 = REPO_ROOT / ".pio" / "build" / "os4_esp32c6" / "firmware.bin32"
-    validate_image(esp8266, "os3-esp8266")
-    validate_image(esp32c6, "os4-esp32c6")
-    return esp8266, esp32c6
+    esp32c6_n8 = REPO_ROOT / ".pio" / "build" / "os4_esp32c6_n8" / "firmware.bin32n8"
+    validate_image(esp8266, ESP8266_TARGET)
+    validate_image(esp32c6_n8, ESP32_C6_N8_TARGET)
+    return esp8266, esp32c6_n8
 
 
 def release(args):
@@ -567,22 +573,22 @@ def release(args):
     if not args.no_sync:
         sync_remote_catalog(args.base_url, args.output_dir, point)
     if args.skip_build:
-        if not args.esp8266 or not args.esp32c6:
-            raise RuntimeError("--skip-build requires --esp8266 and --esp32c6")
-        esp8266, esp32c6 = args.esp8266, args.esp32c6
+        if not args.esp8266 or not args.esp32c6_n8:
+            raise RuntimeError("--skip-build requires --esp8266 and --esp32c6-n8")
+        esp8266, esp32c6_n8 = args.esp8266, args.esp32c6_n8
     else:
         detected_version, detected_build = firmware_version()
         if args.version is not None and args.version != detected_version:
             raise RuntimeError("--version does not match OS_FW_VERSION in the firmware being built")
         if args.build is not None and args.build != detected_build:
             raise RuntimeError("--build does not match OS_FW_MINOR in the firmware being built")
-        esp8266, esp32c6 = build_firmware(args.pio)
+        esp8266, esp32c6_n8 = build_firmware(args.pio)
     prepare_args = argparse.Namespace(
         private_key=private_key,
         public_header=args.public_header,
         output_dir=args.output_dir,
         esp8266=esp8266,
-        esp32c6=esp32c6,
+        esp32c6_n8=esp32c6_n8,
         version=args.version,
         build=args.build,
         release_id=args.release_id,
@@ -614,7 +620,7 @@ def add_prepare_arguments(command):
     add_public_header_argument(command)
     command.add_argument("--output-dir", required=True, help="local v1 publication directory")
     command.add_argument("--esp8266", required=True)
-    command.add_argument("--esp32c6", required=True)
+    command.add_argument("--esp32c6-n8", required=True)
     command.add_argument("--version", type=int, help="defaults to OS_FW_VERSION in defines.h")
     command.add_argument("--build", type=int, help="defaults to OS_FW_MINOR in defines.h")
     command.add_argument("--release-id")
@@ -647,7 +653,7 @@ def parser():
     release_command.add_argument("--skip-build", action="store_true")
     release_command.add_argument("--pio")
     release_command.add_argument("--esp8266")
-    release_command.add_argument("--esp32c6")
+    release_command.add_argument("--esp32c6-n8")
     release_command.add_argument("--version", type=int)
     release_command.add_argument("--build", type=int)
     release_command.add_argument("--release-id")

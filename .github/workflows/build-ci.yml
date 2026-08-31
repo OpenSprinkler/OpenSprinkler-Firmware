@@ -53,16 +53,20 @@ jobs:
         run: npm ci
 
       - name: Build PlatformIO Project
-        run: pio run --environment os3x_esp8266
+        run: pio run --environment os3x_esp8266 --environment os4_esp32c6_n8
 
-      - name: Move and rename firmware
-        run: mv .pio/build/os3x_esp8266/firmware.bin ./firmware_os_esp8266.bin
+      - name: Collect firmware artifacts
+        run: |
+          cp .pio/build/os3x_esp8266/firmware.bin ./firmware_os_esp8266.bin
+          cp .pio/build/os4_esp32c6_n8/firmware.bin32n8 ./firmware_os_esp32c6_n8.bin32n8
 
       - name: Upload firmware
         uses: actions/upload-artifact@v4
         with:
           name: firmware
-          path: ./firmware_os_esp8266.bin
+          path: |
+            ./firmware_os_esp8266.bin
+            ./firmware_os_esp32c6_n8.bin32n8
   build-demo:
     name: Build Demo
     runs-on: ubuntu-latest

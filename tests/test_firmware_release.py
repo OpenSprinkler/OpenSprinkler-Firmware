@@ -18,7 +18,7 @@ class FirmwareReleaseTests(unittest.TestCase):
         data = bytearray(1024)
         data[0] = 0xE9
         data[1] = 1
-        if target == "os4-esp32c6":
+        if target == "os4-esp32c6-n8":
             data[12:14] = (0x000D).to_bytes(2, "little")
         else:
             data[4:8] = (0x40100000).to_bytes(4, "little")
@@ -51,6 +51,16 @@ class FirmwareReleaseTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             firmware_release.remote_destination("user@example:relative/path")
 
+    def test_prepare_cli_uses_explicit_n8_artifact(self):
+        args = firmware_release.parser().parse_args([
+            "prepare",
+            "--private-key", "release.pem",
+            "--output-dir", "v1",
+            "--esp8266", "firmware.bin",
+            "--esp32c6-n8", "firmware.bin32n8",
+        ])
+        self.assertEqual(args.esp32c6_n8, "firmware.bin32n8")
+
     def test_rejects_malformed_catalogs_and_unsafe_release_ids(self):
         with self.assertRaises(RuntimeError):
             firmware_release.parse_catalog(b"[]", "test")
@@ -65,19 +75,19 @@ class FirmwareReleaseTests(unittest.TestCase):
     def test_validates_target_specific_image_headers(self):
         with tempfile.TemporaryDirectory() as directory:
             esp8266 = Path(directory) / "firmware.bin"
-            esp32c6 = Path(directory) / "firmware.bin32"
+            esp32c6_n8 = Path(directory) / "firmware.bin32n8"
             esp8266.write_bytes(self.image("os3-esp8266"))
-            esp32c6.write_bytes(self.image("os4-esp32c6"))
+            esp32c6_n8.write_bytes(self.image("os4-esp32c6-n8"))
             self.assertEqual(
                 firmware_release.validate_image(esp8266, "os3-esp8266"),
                 esp8266.resolve())
             self.assertEqual(
-                firmware_release.validate_image(esp32c6, "os4-esp32c6"),
-                esp32c6.resolve())
+                firmware_release.validate_image(esp32c6_n8, "os4-esp32c6-n8"),
+                esp32c6_n8.resolve())
             with self.assertRaises(RuntimeError):
-                firmware_release.validate_image(esp8266, "os4-esp32c6")
+                firmware_release.validate_image(esp8266, "os4-esp32c6-n8")
             with self.assertRaises(RuntimeError):
-                firmware_release.validate_image(esp32c6, "os3-esp8266")
+                firmware_release.validate_image(esp32c6_n8, "os3-esp8266")
 
     def test_embedded_public_key_shape(self):
         point = firmware_release.public_point_from_header(
@@ -93,16 +103,16 @@ class FirmwareReleaseTests(unittest.TestCase):
             firmware_release.keygen(SimpleNamespace(
                 private_key=private_key, public_header=public_header))
             esp8266 = root / "firmware.bin"
-            esp32c6 = root / "firmware.bin32"
+            esp32c6_n8 = root / "firmware.bin32n8"
             esp8266.write_bytes(self.image("os3-esp8266"))
-            esp32c6.write_bytes(self.image("os4-esp32c6"))
+            esp32c6_n8.write_bytes(self.image("os4-esp32c6-n8"))
             output = root / "v1"
             release_id = firmware_release.prepare(SimpleNamespace(
                 private_key=private_key,
                 public_header=public_header,
                 output_dir=output,
                 esp8266=esp8266,
-                esp32c6=esp32c6,
+                esp32c6_n8=esp32c6_n8,
                 version=221,
                 build=6,
                 release_id="2.2.1-6-test",
@@ -125,7 +135,10 @@ class FirmwareReleaseTests(unittest.TestCase):
             parsed = json.loads(descriptor.decode("ascii"))
             self.assertEqual(parsed["id"], release_id)
             self.assertEqual(
-                set(parsed["targets"]), {"os3-esp8266", "os4-esp32c6"})
+                set(parsed["targets"]), {"os3-esp8266", "os4-esp32c6-n8"})
+            n8 = parsed["targets"]["os4-esp32c6-n8"]
+            self.assertTrue(n8["file"].endswith("-esp32c6.bin32n8"))
+            self.assertEqual(n8["min_flash"], 8 * 1024 * 1024)
 
 
 if __name__ == "__main__":

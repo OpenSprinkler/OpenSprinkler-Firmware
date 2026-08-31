@@ -32,8 +32,8 @@ Example Apache configuration:
     Include /etc/apache2/sites-common/ssl.conf
     SSLCertificateFile /etc/apache2/ssl/opensprinkler-origin-2026.crt
     SSLCertificateKeyFile /etc/apache2/ssl/opensprinkler-origin-2026.key
-    AddType application/octet-stream .bin .bin32
-    SetEnvIfNoCase Request_URI "\.(bin|bin32)$" no-gzip dont-vary
+    AddType application/octet-stream .bin .bin32n8 .bin32n16
+    SetEnvIfNoCase Request_URI "\.(bin|bin32n8|bin32n16)$" no-gzip dont-vary
 
     <Directory /var/firmware.opensprinkler.com>
         Require all granted
@@ -76,12 +76,14 @@ python3 tools/firmware_release.py prepare \
   --private-key ~/secure/opensprinkler-firmware-p256.pem \
   --output-dir ~/firmware-publish/v1 \
   --esp8266 .pio/build/os3x_esp8266/firmware.bin \
-  --esp32c6 .pio/build/os4_esp32c6/firmware.bin32 \
+  --esp32c6-n8 .pio/build/os4_esp32c6_n8/firmware.bin32n8 \
   --version 221 --build 6
 ```
 
-The tool gives ESP8266 files a `.bin` extension and ESP32-C6 files a `.bin32` extension and
-calculates SHA-256 for each binary. Every release directory contains `release.json` and
+The tool gives ESP8266 files a `.bin` extension and ESP32-C6-N8 files a `.bin32n8` extension.
+The flash-specific extension prevents the manual updater from selecting an image built for a
+different partition layout; a future N16 target will use `.bin32n16`. The tool calculates
+SHA-256 for each binary. Every release directory contains `release.json` and
 `release.sig`; the descriptor is limited to 1024 bytes and is the only release metadata verified
 by the controller. The top-level `manifest.json` is an unrestricted browser index and may list the
 complete release history. Publish immutable release directories first and the browser index last:
