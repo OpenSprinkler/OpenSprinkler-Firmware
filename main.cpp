@@ -1354,14 +1354,25 @@ void check_weather() {
 	}
 }
 
-/** Perform network check
- * This function pings the router
- * to check if it's still online.
- * If not, it re-initializes Ethernet controller.
+/** Refresh the network status used by scheduled network services.
+ *
+ * Deliberately limited to the ESP8266 W5500 path. This runs only once every
+ * CHECK_NETWORK_INTERVAL seconds, and network_fails suppresses MQTT publishes
+ * and weather queries. Raising it here for WiFi, ESP32, or ENC28J60 would let a
+ * momentary disconnect sampled at this instant keep those services suppressed
+ * for a further full interval after connectivity had already returned. Only the
+ * W5500 path has the one-second health check in service_w5500_recovery() to
+ * clear the counter again promptly, so only it can afford to raise it here.
  */
 static void check_network() {
-	// TODO:
-	// nothing to do for other platforms
+	if (!os.status.req_network) return;
+	os.status.req_network = 0;
+	#if defined(ESP8266)
+	if (!useEth || !eth.isW5500) return;
+	if (eth.fault_pending()) os.status.network_fails = 3;
+	else if (eth.connected()) os.status.network_fails = 0;
+	else if (os.status.network_fails < 3) os.status.network_fails++;
+	#endif
 }
 
 /** Perform NTP sync */
