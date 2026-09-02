@@ -2622,17 +2622,34 @@ void server_json_debug(OTF_PARAMS_DEF) {
 			eth.isW5500, ETHER_SPI_CLOCK, ARP_TABLE_SIZE);
 		if (eth.isW5500) {
 			const W5500Diagnostics& diag = w5500.diagnostics();
+			W5500LiveState live;
+			// eth_live_valid distinguishes "the operation guard refused the
+			// read, so these are zero-initialised" from genuine zero registers.
+			// Without it a rejected read is indistinguishable from a dead chip,
+			// which is the ambiguity the live/fault split exists to remove.
+			bool live_valid = w5500.readLiveState(live);
+			// Current chip state. A healthy interface reads ver 4, sr 0x42
+			// (SOCK_MACRAW) and phy bit0 set; these are what say the W5500 is
+			// alive right now.
+			bfill.emit_p(PSTR(",\"eth_live_valid\":$D,\"eth_rx_rsr\":$D,\"eth_rx_rd\":$D,"
+				"\"eth_rx_wr\":$D,\"eth_tx_fsr\":$D,\"eth_sr\":$D,\"eth_ir\":$D,"
+				"\"eth_phy\":$D,\"eth_ver\":$D"),
+				live_valid, live.rx_rsr, live.rx_rd, live.rx_wr, live.tx_fsr,
+				live.socket_status, live.socket_interrupt, live.phy_config, live.version);
 			bfill.emit_p(PSTR(",\"eth_fault\":$D,\"eth_fault_pending\":$D,\"eth_fault_ms\":$L,"
-				"\"eth_bad_frame\":$L,\"eth_rx_stall\":$L,"
-				"\"eth_timeout\":$L,\"eth_chip_fault\":$L,\"eth_recoveries\":$L,"
-				"\"eth_recovery_failures\":$L,\"eth_rx_rsr\":$D,\"eth_rx_rd\":$D,"
-				"\"eth_rx_wr\":$D,\"eth_sr\":$D,\"eth_ir\":$D,\"eth_phy\":$D,\"eth_ver\":$D"),
+				"\"eth_bad_frame\":$L,\"eth_rx_stall\":$L,\"eth_timeout\":$L,"
+				"\"eth_chip_fault\":$L,\"eth_recoveries\":$L,\"eth_recovery_failures\":$L"),
 				static_cast<uint8_t>(diag.last_fault), w5500.faultPending(),
-				diag.last_fault_ms, diag.bad_frame_count,
-				diag.receive_stall_count, diag.timeout_count, diag.chip_fault_count,
-				diag.recovery_count, diag.recovery_failure_count, diag.rx_rsr,
-				diag.rx_rd, diag.rx_wr, diag.socket_status, diag.socket_interrupt,
-				diag.phy_config, diag.version);
+				diag.last_fault_ms, diag.bad_frame_count, diag.receive_stall_count,
+				diag.timeout_count, diag.chip_fault_count, diag.recovery_count,
+				diag.recovery_failure_count);
+			// Registers as they stood when the last fault latched. All zero
+			// means no fault has ever occurred, not a dead chip.
+			bfill.emit_p(PSTR(",\"eth_f_rx_rsr\":$D,\"eth_f_rx_rd\":$D,\"eth_f_rx_wr\":$D,"
+				"\"eth_f_tx_fsr\":$D,\"eth_f_sr\":$D,\"eth_f_ir\":$D,\"eth_f_phy\":$D,"
+				"\"eth_f_ver\":$D"),
+				diag.rx_rsr, diag.rx_rd, diag.rx_wr, diag.tx_fsr,
+				diag.socket_status, diag.socket_interrupt, diag.phy_config, diag.version);
 		}
 		bfill.emit_p(PSTR("}"));
 	} else {

@@ -53,6 +53,20 @@ struct W5500Diagnostics {
 	os_w5500::Fault last_fault;
 };
 
+// Live register readback, distinct from the fault snapshot in W5500Diagnostics:
+// the snapshot describes the last latched fault and must not move, while these
+// describe the chip right now and are what confirm a healthy interface.
+struct W5500LiveState {
+	uint16_t rx_rsr;
+	uint16_t rx_rd;
+	uint16_t rx_wr;
+	uint16_t tx_fsr;
+	uint8_t socket_status;
+	uint8_t socket_interrupt;
+	uint8_t phy_config;
+	uint8_t version;
+};
+
 class OSWiznet5500 {
 public:
 	OSWiznet5500(int8_t cs = SS, SPIClass& spi = SPI, int8_t intr = -1);
@@ -65,6 +79,7 @@ public:
 	bool isLinked();
 	constexpr bool isLinkDetectable() const { return true; }
 
+	bool readLiveState(W5500LiveState& state);
 	bool faultPending() const { return _fault_pending; }
 	os_w5500::Fault faultCode() const { return _diagnostics.last_fault; }
 	const W5500Diagnostics& diagnostics() const { return _diagnostics; }

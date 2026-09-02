@@ -241,6 +241,24 @@ bool OSWiznet5500::isLinked() {
 	return (readRegister(BLOCK_COMMON, PHYCFGR) & PHY_LINK_ON) != 0;
 }
 
+bool OSWiznet5500::readLiveState(W5500LiveState& state) {
+	memset(&state, 0, sizeof(state));
+	// Safe to call from the API handler: beginOperation() refuses while the
+	// receive path owns the socket, so this can never interleave with a
+	// half-committed frame.
+	if (!beginOperation()) return false;
+	state.socket_status = readRegister(BLOCK_SOCKET0, Sn_SR);
+	state.socket_interrupt = readRegister(BLOCK_SOCKET0, Sn_IR);
+	state.rx_rsr = readWord(BLOCK_SOCKET0, Sn_RX_RSR);
+	state.rx_rd = readWord(BLOCK_SOCKET0, Sn_RX_RD);
+	state.rx_wr = readWord(BLOCK_SOCKET0, Sn_RX_WR);
+	state.tx_fsr = readWord(BLOCK_SOCKET0, Sn_TX_FSR);
+	state.phy_config = readRegister(BLOCK_COMMON, PHYCFGR);
+	state.version = readRegister(BLOCK_COMMON, VERSIONR);
+	endOperation();
+	return true;
+}
+
 bool OSWiznet5500::healthCheck() {
 	if (_fault_pending) return false;
 	if (!beginOperation()) return true;
