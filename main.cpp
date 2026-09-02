@@ -40,7 +40,7 @@
 	ESP8266WebServer *update_server = NULL;
 	DNSServer *dns = NULL;
 	ENC28J60lwIP enc28j60(PIN_ETHER_CS); // ENC28J60 lwip for wired Ether
-	Wiznet5500lwIP w5500(PIN_ETHER_CS); // W5500 lwip for wired Ether
+	OSWiznet5500lwIP w5500(PIN_ETHER_CS); // owned W5500 lwIP backend
 	lwipEth eth;
 	bool useEth = false; // tracks whether we are using WiFi or wired Ether connection
 	uint32_t getNtpTime();

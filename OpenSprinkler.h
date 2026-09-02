@@ -48,7 +48,7 @@
 	#if defined(ESP8266)
 		#include <ESP8266WebServer.h>
 		#include <ENC28J60lwIP.h>
-		#include <W5500lwIP.h>
+		#include "drivers/os_w5500.h"
 		#include <Ticker.h>
 		#include "services/EMailSender.h"
 	#elif defined(ESP32)
@@ -83,7 +83,7 @@
 #if defined(ESP8266)
 	extern ESP8266WebServer *update_server;
 	extern ENC28J60lwIP enc28j60;
-	extern Wiznet5500lwIP w5500;
+	extern OSWiznet5500lwIP w5500;
 	struct lwipEth {
 		bool isW5500 = false;
 		inline boolean config(const IPAddress& local_ip, const IPAddress& arg1, const IPAddress& arg2, const IPAddress& arg3 = IPADDR_NONE, const IPAddress& dns2 = IPADDR_NONE) {
@@ -91,6 +91,15 @@
 		}
 		inline boolean begin(const uint8_t *macAddress = nullptr) {
 			return (isW5500)?w5500.begin(macAddress):enc28j60.begin(macAddress);
+		}
+		inline bool raw_reinit() {
+			return isW5500 && w5500.reinitialize();
+		}
+		inline bool fault_pending() const {
+			return isW5500 && w5500.faultPending();
+		}
+		inline bool health_check() {
+			return !isW5500 || w5500.healthCheck();
 		}
 		inline IPAddress localIP() {
 			return (isW5500)?w5500.localIP():enc28j60.localIP();
