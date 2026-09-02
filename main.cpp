@@ -497,6 +497,9 @@ static void check_network();
 void check_weather();
 static bool process_special_program_command(const char*, uint32_t curr_time);
 static void perform_ntp_sync();
+#if defined(ESP8266)
+static void service_w5500_recovery();
+#endif
 
 #if defined(ARDUINO)
 void start_server_ap();
@@ -563,6 +566,102 @@ static void stop_output_owner(unsigned char sid, time_os_t curr_time) {
 		}
 	}
 }
+
+#if defined(ESP8266)
+#define W5500_RECOVERY_WINDOW_MS   600000UL // recoveries are counted over 10 minutes
+#define W5500_MAX_RECOVERIES       3        // recoveries allowed within that window
+#define W5500_HEALTHY_QUALIFY_MS   60000UL  // uninterrupted healthy time that re-arms rebooting
+
+/* Schedule a controlled reboot after W5500 recovery has failed or repeated too
+ * often. Returns false when the reboot is deliberately suppressed.
+ *
+ * The first network-failure reboot is always allowed. After one, another is
+ * permitted only if this boot subsequently maintained a healthy connection for
+ * W5500_HEALTHY_QUALIFY_MS. A time-based cooldown would merely pace an endless
+ * reboot cycle on permanently faulty hardware; requiring a proven-healthy
+ * interval ends it, because a W5500 that never comes up can never re-arm the
+ * reboot. Such a controller keeps retrying the raw reset indefinitely instead,
+ * which costs nothing and leaves watering untouched.
+ */
+static bool request_w5500_reboot(bool network_was_healthy) {
+	if (os.last_reboot_cause == REBOOT_CAUSE_NETWORK_FAIL && !network_was_healthy)
+		return false;
+	os.nvdata.reboot_cause = REBOOT_CAUSE_NETWORK_FAIL;
+	os.status.safe_reboot = 1;
+	reboot_timer = os.now_tz();
+	#if defined(USE_DISPLAY)
+	if (!ui_state) {
+		os.lcd_print_line_clear_pgm(PSTR("Ethernet failed"), 1);
+		os.lcd_print_line_clear_pgm(PSTR("Reboot pending"), 2);
+	}
+	#endif
+	return true;
+}
+
+static void service_w5500_recovery() {
+	if (!useEth || !eth.isW5500) return;
+	static uint32_t next_health_check = 0;
+	static uint32_t recovery_window_started = 0;
+	static uint8_t recovery_attempts = 0;
+	static bool reboot_scheduled = false;
+	static uint32_t healthy_since = 0;
+	static bool sustained_healthy = false;
+	uint32_t now = millis();
+
+	if (!eth.fault_pending() && static_cast<int32_t>(now - next_health_check) >= 0) {
+		next_health_check = now + 1000UL;
+		if (eth.health_check() && eth.connected()) {
+			os.status.network_fails = 0;
+			// Track uninterrupted health so a fault later in this boot can
+			// still escalate to a reboot. The flag latches: once this boot has
+			// proven the interface works, a reboot remains a sane response.
+			if (!healthy_since) healthy_since = now ? now : 1;
+			else if (now - healthy_since >= W5500_HEALTHY_QUALIFY_MS) sustained_healthy = true;
+		} else {
+			healthy_since = 0;
+		}
+	}
+	if (!eth.fault_pending() || reboot_scheduled) return;
+
+	os.status.network_fails = 3;
+
+	// Escalate to a reboot once too many recoveries land inside one window. If
+	// the boot-loop guard suppresses that reboot, fall through to waiting the
+	// window out and retrying the raw reset rather than giving up entirely.
+	if (recovery_window_started && now - recovery_window_started < W5500_RECOVERY_WINDOW_MS &&
+		recovery_attempts >= W5500_MAX_RECOVERIES) {
+		reboot_scheduled = request_w5500_reboot(sustained_healthy);
+		return;
+	}
+	if (!recovery_window_started || now - recovery_window_started >= W5500_RECOVERY_WINDOW_MS) {
+		recovery_window_started = now;
+		recovery_attempts = 0;
+	}
+	recovery_attempts++;
+
+	#if defined(USE_DISPLAY)
+	if (!ui_state) {
+		os.lcd_print_line_clear_pgm(PSTR("Ethernet recovery"), 1);
+		os.lcd_print_line_clear_pgm(PSTR("Please wait..."), 2);
+	}
+	#endif
+
+	if (eth.raw_reinit()) {
+		os.status.network_fails = eth.connected() ? 0 : 1;
+		os.status.req_mqtt_restart = true;
+		next_health_check = now + 1000UL;
+		#if defined(USE_DISPLAY)
+		if (!ui_state) {
+			os.lcd_print_line_clear_pgm(PSTR("Ethernet restored"), 1);
+			os.lcd_print_line_clear_pgm(PSTR(""), 2);
+		}
+		#endif
+		return;
+	}
+
+	reboot_scheduled = request_w5500_reboot(sustained_healthy);
+}
+#endif
 #endif
 
 static void process_pending_overcurrent() {
@@ -651,6 +750,10 @@ void do_loop()
 	os.status.mas3= os.iopts[IOPT_MASTER_STATION_3];
 	os.status.mas4= os.iopts[IOPT_MASTER_STATION_4];
 	time_os_t curr_time = os.now_tz();
+
+	#if defined(ESP8266)
+	service_w5500_recovery();
+	#endif
 
 	// ====== Process Ethernet packets ======
 	#if defined(ARDUINO)	// Process Ethernet packets for Arduino

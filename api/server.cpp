@@ -56,7 +56,7 @@ extern OTF::OpenThingsFramework *otf;
 	#if defined(ESP8266)
 	extern ESP8266WebServer *update_server;
 	extern ENC28J60lwIP enc28j60;
-	extern Wiznet5500lwIP w5500;
+	extern OSWiznet5500lwIP w5500;
 	extern lwipEth eth;
 	#elif defined(ESP32)
 	#include <WebServer.h>
@@ -2618,7 +2618,23 @@ void server_json_debug(OTF_PARAMS_DEF) {
 	bfill.emit_p(PSTR("\"sprlog_fail\":$L,\"sprlog_mismatch\":$L,"),
 		sprinkler_log_failures, sprinkler_log_mismatches);
 	if(useEth) {
-		bfill.emit_p(PSTR("\"isW5500\":$D,\"spi_clock\":$L,\"arp_size\":$D}"), eth.isW5500, ETHER_SPI_CLOCK, ARP_TABLE_SIZE);
+		bfill.emit_p(PSTR("\"isW5500\":$D,\"spi_clock\":$L,\"arp_size\":$D"),
+			eth.isW5500, ETHER_SPI_CLOCK, ARP_TABLE_SIZE);
+		if (eth.isW5500) {
+			const W5500Diagnostics& diag = w5500.diagnostics();
+			bfill.emit_p(PSTR(",\"eth_fault\":$D,\"eth_fault_pending\":$D,\"eth_fault_ms\":$L,"
+				"\"eth_bad_frame\":$L,\"eth_rx_stall\":$L,"
+				"\"eth_timeout\":$L,\"eth_chip_fault\":$L,\"eth_recoveries\":$L,"
+				"\"eth_recovery_failures\":$L,\"eth_rx_rsr\":$D,\"eth_rx_rd\":$D,"
+				"\"eth_rx_wr\":$D,\"eth_sr\":$D,\"eth_ir\":$D,\"eth_phy\":$D,\"eth_ver\":$D"),
+				static_cast<uint8_t>(diag.last_fault), w5500.faultPending(),
+				diag.last_fault_ms, diag.bad_frame_count,
+				diag.receive_stall_count, diag.timeout_count, diag.chip_fault_count,
+				diag.recovery_count, diag.recovery_failure_count, diag.rx_rsr,
+				diag.rx_rd, diag.rx_wr, diag.socket_status, diag.socket_interrupt,
+				diag.phy_config, diag.version);
+		}
+		bfill.emit_p(PSTR("}"));
 	} else {
 		bfill.emit_p(PSTR("\"rssi\":$D,\"bssid\":\"$S\",\"bssidchl\":\"$O\"}"),
 		WiFi.RSSI(), WiFi.BSSIDstr().c_str(), SOPT_STA_BSSID_CHL);
