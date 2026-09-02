@@ -34,7 +34,7 @@ container:
 TEST_HTTP_PORT?=18080
 
 .PHONY: test-api
-test-api: test-board-profiles test-hardware-detection test-storage-files test-sprinkler-log test-firmware-release test-buffer-filler test-string-buffer test-sensor-units test-weather-sensor-cache test-output-sequencer test-bundle-codec
+test-api: test-board-profiles test-hardware-detection test-storage-files test-sprinkler-log test-firmware-release test-buffer-filler test-string-buffer test-sensor-units test-weather-sensor-cache test-output-sequencer test-bundle-codec test-w5500-frame
 	$(MAKE) clean
 	$(MAKE) VERSION=DEMO EXTRA_CXXFLAGS="-DHTTP_PORT=$(TEST_HTTP_PORT)"
 	python3 tests/api_contract.py --port $(TEST_HTTP_PORT)
@@ -122,4 +122,10 @@ test-bundle-codec:
 			-Iexternal/TinyWebsockets/tiny_websockets_lib/include \
 			-Iexternal/OpenThings-Framework-Firmware-Library \
 			tests/bundle_codec_test.cpp core/bundle.cpp -Wl,--gc-sections -o "$$output"; \
+		"$$output"
+
+.PHONY: test-w5500-frame
+test-w5500-frame:
+	@set -e; output=$$(mktemp); trap 'rm -f "$$output"' EXIT; \
+		$(CXX) -std=gnu++14 -I. tests/w5500_frame_test.cpp drivers/w5500_frame.cpp -o "$$output"; \
 		"$$output"
