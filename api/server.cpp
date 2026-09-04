@@ -970,6 +970,7 @@ void server_change_options(OTF_PARAMS_DEF)
 	}
 	uint8_t keyfound = 0;
 	if(findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("wto"), true)) {
+		strStripOuterBraces(tmp_buffer);
 		bool changed = false;
 		if (!os.sopt_save(SOPT_WEATHER_OPTS, tmp_buffer, &changed)) storage_ok = false;
 		if (changed) {
@@ -990,6 +991,7 @@ void server_change_options(OTF_PARAMS_DEF)
 
 	keyfound = 0;
 	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("otc"), true, &keyfound)) {
+		strStripOuterBraces(tmp_buffer);
 		if (!os.sopt_save(SOPT_OTC_OPTS, tmp_buffer)) storage_ok = false;
 	} else if (keyfound) {
 		tmp_buffer[0]=0;
@@ -998,6 +1000,7 @@ void server_change_options(OTF_PARAMS_DEF)
 
 	keyfound = 0;
 	if(findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("mqtt"), true, &keyfound)) {
+		strStripOuterBraces(tmp_buffer);
 		if (!os.sopt_save(SOPT_MQTT_OPTS, tmp_buffer)) storage_ok = false;
 		os.status.req_mqtt_restart = true;
 	} else if (keyfound) {
@@ -1008,6 +1011,7 @@ void server_change_options(OTF_PARAMS_DEF)
 
 	keyfound = 0;
 	if(findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("email"), true, &keyfound)) {
+		strStripOuterBraces(tmp_buffer);
 		if (!os.sopt_save(SOPT_EMAIL_OPTS, tmp_buffer)) storage_ok = false;
 	} else if (keyfound) {
 		tmp_buffer[0]=0;

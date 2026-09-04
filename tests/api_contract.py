@@ -256,6 +256,42 @@ def check_request_bodies(server):
     print("PASS HTTP request body handling")
 
 
+def check_nested_option_encodings(server):
+    legacy_values = {
+        "wto": {"h": 20, "t": 50, "r": 100},
+        "otc": {"en": 0, "token": "legacy-token"},
+        "mqtt": {"en": 0, "host": "legacy-broker", "port": 1883},
+        "email": {"en": 0, "host": "legacy-mail", "port": 465},
+    }
+    braced_values = {
+        "wto": {"h": 30, "t": 60, "r": 90},
+        "otc": {"en": 0, "token": "braced-token"},
+        "mqtt": {"en": 0, "host": "braced-broker", "extra": {"nested": 1}},
+        "email": {"en": 0, "host": "braced-mail", "port": 587},
+    }
+
+    for key, value in legacy_values.items():
+        encoded = json.dumps(value, separators=(",", ":"))[1:-1]
+        result = server.get_json("co", {key: encoded})
+        assert result["result"] == 1, (key, result)
+        assert server.get_json("jc")[key] == value, key
+
+    for key, value in braced_values.items():
+        encoded = json.dumps(value, separators=(",", ":"))
+        result = server.get_json("co", {key: encoded})
+        assert result["result"] == 1, (key, result)
+        assert server.get_json("jc")[key] == value, key
+
+    # Empty complete objects normalize to empty stored fragments and remain
+    # objects when emitted by /jc and /ja.
+    for key in braced_values:
+        result = server.get_json("co", {key: "{}"})
+        assert result["result"] == 1, (key, result)
+        assert server.get_json("jc")[key] == {}, key
+    server.get_json("ja")
+    print("PASS nested option object encodings")
+
+
 def check_control_commands(server):
     result = server.get_json("cm", {"sid": 0, "en": 1, "t": 64800, "qo": 0})
     assert result["result"] == 1, result
@@ -581,6 +617,7 @@ def run_contract(server):
     check_control_commands(server)
     check_bundle_commands(server)
     check_sprinkler_logs(server)
+    check_nested_option_encodings(server)
 
 
 def main():

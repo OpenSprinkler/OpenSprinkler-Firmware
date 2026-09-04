@@ -325,6 +325,15 @@ void strReplaceQuoteBackslash(char *buf) {
 	strReplace(buf, '\\', '/');
 }
 
+void strStripOuterBraces(char *buf) {
+	if (!buf) return;
+	size_t len = strlen(buf);
+	if (len >= 2 && buf[0] == '{' && buf[len - 1] == '}') {
+		memmove(buf, buf + 1, len - 2);
+		buf[len - 2] = 0;
+	}
+}
+
 static const unsigned char month_days[] = {31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
 
 bool isLastDayofMonth(unsigned char month, unsigned char day) {

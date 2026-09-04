@@ -14,6 +14,23 @@ int main() {
 	assert(long_value[10] == '\'');
 	assert(long_value[290] == '/');
 
+	char legacy_object_body[] = "\"en\":0,\"host\":\"broker\"";
+	strStripOuterBraces(legacy_object_body);
+	assert(strcmp(legacy_object_body, "\"en\":0,\"host\":\"broker\"") == 0);
+
+	char complete_object[] = "{\"en\":0,\"extra\":{\"nested\":1}}";
+	strStripOuterBraces(complete_object);
+	assert(strcmp(complete_object, "\"en\":0,\"extra\":{\"nested\":1}") == 0);
+
+	char empty_object[] = "{}";
+	strStripOuterBraces(empty_object);
+	assert(empty_object[0] == 0);
+
+	char unmatched_brace[] = "{\"en\":0";
+	strStripOuterBraces(unmatched_brace);
+	assert(strcmp(unmatched_brace, "{\"en\":0") == 0);
+	strStripOuterBraces(nullptr);
+
 	char copied[301];
 	strncpy_P0(copied, long_value.c_str(), 300);
 	assert(copied[300] == 0);
