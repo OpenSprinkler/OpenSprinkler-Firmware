@@ -325,6 +325,62 @@ def check_control_commands(server):
     result = server.get_json("cv", {"rd": -1})
     assert result["result"] == 0x11, result
 
+    # A timed pause must keep the station off through the expiration tick.
+    # Previously pause_state remained set for one tick after pause_timer reached
+    # zero, allowing the scheduler to pulse the station on before resuming it.
+    try:
+        result = server.get_json("cv", {"rsn": 1})
+        assert result["result"] == 1, result
+        deadline = time.monotonic() + 3
+        while time.monotonic() < deadline:
+            status = server.get_json("jc")
+            if status["nq"] == 0:
+                break
+            time.sleep(0.05)
+        assert status["nq"] == 0, status
+
+        result = server.get_json("cm", {"sid": 0, "en": 1, "t": 12, "qo": 2})
+        assert result["result"] == 1, result
+
+        deadline = time.monotonic() + 3
+        while time.monotonic() < deadline:
+            status = server.get_json("jc")
+            if status["sbits"][0] & 1:
+                break
+            time.sleep(0.05)
+        assert status["sbits"][0] & 1, status
+
+        result = server.get_json("pq", {"repl": 2})
+        assert result["result"] == 1, result
+
+        deadline = time.monotonic() + 3
+        while time.monotonic() < deadline:
+            status = server.get_json("jc")
+            if status["pq"] == 1 and not (status["sbits"][0] & 1):
+                break
+            time.sleep(0.05)
+        assert status["pq"] == 1 and not (status["sbits"][0] & 1), status
+
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline:
+            status = server.get_json("jc")
+            if status["pq"] == 0:
+                break
+            assert not (status["sbits"][0] & 1), status
+            time.sleep(0.05)
+        assert status["pq"] == 0, status
+
+        deadline = time.monotonic() + 3
+        while time.monotonic() < deadline:
+            status = server.get_json("jc")
+            if status["sbits"][0] & 1:
+                break
+            time.sleep(0.05)
+        assert status["sbits"][0] & 1, status
+    finally:
+        server.get_json("cv", {"rsn": 1})
+        server.get_json("pq", {"repl": 0})
+
     program_count = server.get_json("jp")["nprogs"]
     # Extra entries from a previously larger station setup remain compatible.
     result = server.get_json("cr", {"t": "[64800,0,0,0,0,0,0,0,999]", "cnt": 0})

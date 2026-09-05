@@ -1201,7 +1201,8 @@ void do_loop()
 		if (os.status.pause_state) {
 			if (os.pause_timer > 0) {
 				os.pause_timer--;
-			} else {
+			}
+			if (os.pause_timer == 0) {
 				os.clear_all_station_bits();
 				pd.clear_pause();
 			}
