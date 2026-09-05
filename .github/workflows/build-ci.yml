@@ -35,14 +35,15 @@ jobs:
           path: |
             ~/.cache/pip
             ~/.platformio/.cache
-          key: ${{ runner.os }}-pio
-      # - uses: actions/setup-python@v5
-      #   with:
-      #     python-version: '3.13'
-      - name: Install python
-        run: sudo apt-get install python3 python3-pip
+          key: ${{ runner.os }}-pio-6.1.19
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
       - name: Install PlatformIO Core
-        run: pip install --upgrade platformio
+        run: python -m pip install platformio==6.1.19
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -67,6 +68,24 @@ jobs:
           path: |
             ./firmware_os_esp8266.bin
             ./firmware_os_esp32c6_n8.bin32n8
+
+  test-api:
+    name: Native and API Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libmosquitto-dev libssl-dev
+
+      - name: Run native and API tests
+        run: make test-api
+
   build-demo:
     name: Build Demo
     runs-on: ubuntu-latest
@@ -129,29 +148,10 @@ jobs:
           push: false
           cache-from: type=registry,ref=ghcr.io/${{ steps.lower-owner.outputs.owner }}/opensprinkler-build-cache:ospi
           cache-to: ${{ steps.cache-target.outputs.cache-to }}
-  release-pio:
-    name: Release PlatformIO
-    runs-on: ubuntu-latest
-    needs: [build-pio, build-demo, build-docker]
-    if: ${{ github.event_name == 'release' }}
-    permissions:
-      contents: write
-    steps:
-      - name: Download firmware
-        uses: actions/download-artifact@v4
-        with:
-          name: firmware
-          path: ./firmware
-
-      - name: Attach firmware to release
-        run: gh release upload "${{ github.event.release.tag_name }}" ./firmware/firmware_os_esp8266.bin --clobber
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
   release-docker:
     name: Release Docker
     runs-on: ubuntu-latest
-    needs: [build-pio, build-demo, build-docker]
+    needs: [build-pio, test-api, build-demo, build-docker]
     if: ${{ github.event_name == 'push' || github.event_name == 'release' }}
     steps:
       - name: Checkout
