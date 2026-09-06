@@ -65,7 +65,15 @@ static void getweather_callback(char* buffer) {
 	// first check errCode, only update lswc timestamp if errCode is 0
 	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("errCode"), true)) {
 		wt_errCode = atoi(tmp_buffer);
-		if(wt_errCode==0) os.checkwt_success_lasttime = tnow;
+		if(wt_errCode==0) {
+			os.checkwt_success_lasttime = tnow;
+			// persist the last-success time (rate-limited) so the stale-weather
+			// watchdog in check_weather() survives a reboot
+			if(tnow > os.nvdata.weather_success_lasttime + 3600) {
+				os.nvdata.weather_success_lasttime = tnow;
+				save_nvdata = true;
+			}
+		}
 	}
 
 	// then only parse scale if errCode is 0

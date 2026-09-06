@@ -1107,29 +1107,41 @@ static bool process_special_program_command(const char* pname, uint32_t curr_tim
 
 /** Make weather query */
 void check_weather() {
-	// do not check weather if
-	// - network check has failed, or
-	// - the controller is in remote extension mode
-	if (os.status.network_fails>0 || os.iopts[IOPT_REMOTE_EXT_MODE]) return;
 	if (os.status.program_busy) return;
 
-	if (!os.network_connected()) return;
-
 	time_os_t ntz = os.now_tz();
-	if (os.checkwt_success_lasttime && (ntz > os.checkwt_success_lasttime + CHECK_WEATHER_SUCCESS_TIMEOUT)) {
-		// if last successful weather call timestamp is more than allowed threshold
-		// and if the selected adjustment method is not one of the manual methods
-		// reset watering percentage to 100
+
+	// If there has been no successful weather call within the allowed window,
+	// reset the watering level to 100%. This guards against a weather-service
+	// outage leaving watering stuck at a stale value - a 0% rain adjustment or an
+	// above-100% heat adjustment - long after the conditions that produced it.
+	// checkwt_success_lasttime is seeded from NVConData on boot, so a reboot does
+	// not restart the clock; powerup_lasttime is the fallback when the service has
+	// never been reached. This runs even when the network is down.
+	time_os_t last_success = os.checkwt_success_lasttime ? os.checkwt_success_lasttime : os.powerup_lasttime;
+	if (last_success && (ntz > last_success + CHECK_WEATHER_SUCCESS_TIMEOUT)) {
+		// if the selected adjustment method is not one of the manual methods
 		os.checkwt_success_lasttime = 0;
 		unsigned char method = os.iopts[IOPT_USE_WEATHER];
 		if(!(method==WEATHER_METHOD_MANUAL || method==WEATHER_METHOD_AUTORAINDELAY || method==WEATHER_METHOD_MONTHLY)) {
-			os.iopts[IOPT_WATER_PERCENTAGE] = 100; // reset watering percentage to 100%
+			if (os.iopts[IOPT_WATER_PERCENTAGE] != 100) {
+				os.iopts[IOPT_WATER_PERCENTAGE] = 100; // reset watering percentage to 100%
+				os.iopts_save(); // persist so a reboot does not restore the stale value
+				os.weather_update_flag |= WEATHER_UPDATE_WL; // notify the user of the reset
+			}
 			wt_restricted = 0; // reset wt_rawData, errCode, and md_scales array
 			wt_rawData[0] = 0;
 			wt_errCode = HTTP_RQT_NOT_RECEIVED;
 			md_N = 0;
 		}
-	} else if (!os.checkwt_lasttime || (ntz > os.checkwt_lasttime + CHECK_WEATHER_TIMEOUT)) {
+	}
+
+	// the weather query itself needs the network, and is not made in remote
+	// extension mode
+	if (os.status.network_fails>0 || os.iopts[IOPT_REMOTE_EXT_MODE]) return;
+	if (!os.network_connected()) return;
+
+	if (!os.checkwt_lasttime || (ntz > os.checkwt_lasttime + CHECK_WEATHER_TIMEOUT)) {
 		os.checkwt_lasttime = ntz;
 		#if defined(USE_DISPLAY)
 		if (!ui_state) {
