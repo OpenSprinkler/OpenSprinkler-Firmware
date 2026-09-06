@@ -60,6 +60,7 @@
 OTF::OpenThingsFramework *otf = NULL;
 
 #if defined(ARDUINO)
+static constexpr uint32_t OTC_BOOT_CONNECTION_DELAY_MS = 25000UL;
 static uint16_t led_blink_ms = LED_FAST_BLINK;
 #else
 static uint16_t led_blink_ms = 0;
@@ -72,6 +73,18 @@ static inline bool firmware_update_display_active() {
 	return false;
 #endif
 }
+
+#if defined(ARDUINO)
+static bool otc_boot_delay_elapsed() {
+	static bool elapsed = false;
+	if (!elapsed && millis() >= OTC_BOOT_CONNECTION_DELAY_MS) elapsed = true;
+	return elapsed;
+}
+
+static inline void loop_otf(bool network_available = true) {
+	if (otf) otf->loop(network_available && otc_boot_delay_elapsed());
+}
+#endif
 
 #define STRINGIFY(x) #x
 #define TOSTRING(x) STRINGIFY(x)
@@ -838,7 +851,7 @@ void do_loop()
 
 	case OS_STATE_WAIT_REBOOT:
 		if(dns) dns->processNextRequest();
-		if(otf) otf->loop();
+		loop_otf();
 		if(update_server) update_server->handleClient();
 		#if defined(ESP32)
 		if(reboot_deadline && (int32_t)((uint32_t)millis() - reboot_deadline) >= 0) ESP.restart();
@@ -849,7 +862,7 @@ void do_loop()
 		if(os.get_wifi_mode() == OS_WIFI_MODE_AP) {
 			dns->processNextRequest();
 			if(update_server) update_server->handleClient();
-			otf->loop();
+			loop_otf();
 			connecting_timeout = 0;
 			if(os.get_wifi_mode()==OS_WIFI_MODE_STA) {
 				// already in STA mode, waiting to reboot
@@ -863,7 +876,7 @@ void do_loop()
 		} else {
 			if(useEth || WiFi.status() == WL_CONNECTED) {
 				if(update_server) update_server->handleClient();
-				otf->loop(os.network_connected());
+				loop_otf(os.network_connected());
 				connecting_timeout = 0;
 			} else {
 				#if defined(ESP32)
