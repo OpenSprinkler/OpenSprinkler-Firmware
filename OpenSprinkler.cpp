@@ -2147,6 +2147,10 @@ void OpenSprinkler::options_setup() {
 /** Load non-volatile controller status data from file */
 void OpenSprinkler::nvdata_load() {
 	file_read_block(NVCON_FILENAME, &nvdata, 0, sizeof(NVConData));
+	// seed the in-RAM last-success time from nvdata so the stale-weather watchdog
+	// in check_weather() is not reset by a reboot (an old, shorter nvdata file
+	// reads this field back as 0, which is handled)
+	checkwt_success_lasttime = nvdata.weather_success_lasttime;
 	old_status = status;
 }
 

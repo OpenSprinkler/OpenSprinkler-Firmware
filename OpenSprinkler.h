@@ -125,6 +125,7 @@ struct NVConData {
 	uint32_t external_ip;        // external ip
 	uint8_t  reboot_cause;       // reboot cause
 	uint16_t last_sensor_uuid;   // counter for sensor UUID generation; next sensor gets ++this
+	uint32_t weather_success_lasttime; // last time the weather service returned errCode==0 (0 = never)
 };
 
 struct StationAttrib {  // station attributes
