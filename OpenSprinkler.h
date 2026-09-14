@@ -349,7 +349,7 @@ public:
 	static unsigned char station_bits[];     // station activation bits. each byte corresponds to a board (8 stations)
 																	// first byte-> master controller, second byte-> ext. board 1, and so on
 	static unsigned char applied_station_bits[]; // outputs that have completed physical transition sequencing
-	static unsigned char bundle_station_bits[];  // outputs currently claimed by active bundle zones
+	static unsigned char bundle_station_bits[];  // outputs currently claimed by active bundle stations
 	// Note: the following attribute bytes are for backward compatibility
 	static unsigned char attrib_mas[];
 	static unsigned char attrib_mas2[];

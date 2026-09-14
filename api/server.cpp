@@ -789,7 +789,7 @@ void server_home(OTF_PARAMS_DEF)
 
 /**
  * Change controller variables
- * Command: /cv?pw=xxx&rsn=x&rrsn=x&rbt=x&en=x&rd=x&rocs=x&re=x&ap=x
+ * Command: /cv?pw=xxx&rsn=x&rrsn=x&rbt=x&en=x&rd=x&rocs=x&re=x&ap=x&update=x
  *
  * pw:	password
  * rsn: reset all stations (0 or 1)
@@ -895,7 +895,7 @@ void server_change_options(OTF_PARAMS_DEF)
 		// skip options that cannot be set through /co command
 		if (flags & (IOPT_FLAG_RETIRED | IOPT_FLAG_READ_ONLY)) continue;
 		// IOPT_DEVICE_ENABLE and IOPT_REMOTE_EXT_MODE are intentionally excluded from /co
-		// (they're toggled via /jc) and don't fit a generic flag.
+		// (they're toggled via /cv) and don't fit a generic flag.
 		if (oid==IOPT_DEVICE_ENABLE || oid==IOPT_REMOTE_EXT_MODE) continue;
 		prev_value = os.iopts[oid];
 		max_value = iopt_get_max(oid);

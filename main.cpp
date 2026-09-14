@@ -61,6 +61,8 @@ OTF::OpenThingsFramework *otf = NULL;
 
 #if defined(ARDUINO)
 static constexpr uint32_t OTC_BOOT_CONNECTION_DELAY_MS = 25000UL;
+static constexpr uint32_t WIFI_BSSID_CONNECT_TIMEOUT_MS = 15000UL;
+static constexpr uint32_t WIFI_CONNECT_TIMEOUT_MS = 30000UL;
 static uint16_t led_blink_ms = LED_FAST_BLINK;
 #else
 static uint16_t led_blink_ms = 0;
@@ -771,9 +773,16 @@ void do_loop()
 	// ====== Process Ethernet packets ======
 	#if defined(ARDUINO)	// Process Ethernet packets for Arduino
 	static uint32_t connecting_timeout;
+	static bool wifi_bssid_attempt_enabled = true;
+	static bool wifi_bssid_configured = false;
+	static bool connecting_with_bssid = false;
+	#if defined(ESP8266)
+	static uint32_t wifi_bssid_fallback_at = 0;
+	#endif
 	switch(os.state) {
 	case OS_STATE_INITIAL:
 		if(useEth) {
+			connecting_with_bssid = false;
 			led_blink_ms = 0;
 			os.set_screen_led(LOW);
 			os.lcd.clear();
@@ -782,6 +791,7 @@ void do_loop()
 			os.state = OS_STATE_CONNECTED;
 			connecting_timeout = 0;
 		} else if(os.get_wifi_mode()==OS_WIFI_MODE_AP) {
+			connecting_with_bssid = false;
 			start_server_ap();
 			dns->setErrorReplyCode(DNSReplyCode::NoError);
 			dns->start(53, "*", WiFi.softAPIP());
@@ -793,7 +803,10 @@ void do_loop()
 			if(WiFi.getMode()!=WIFI_STA) WiFi.mode(WIFI_STA);
 			os.config_ip();
 			#endif
-			if(os.sopt_load(SOPT_STA_BSSID_CHL).length()>0 && os.wifi_channel<255) {
+			wifi_bssid_configured = os.sopt_load(SOPT_STA_BSSID_CHL).length()>0 &&
+				os.wifi_channel<255;
+			connecting_with_bssid = wifi_bssid_attempt_enabled && wifi_bssid_configured;
+			if(connecting_with_bssid) {
 				start_network_sta(os.wifi_ssid.c_str(), os.wifi_pass.c_str(), (int32_t)os.wifi_channel, os.wifi_bssid);
 			}
 			else
@@ -802,7 +815,8 @@ void do_loop()
 			os.config_ip();
 			#endif
 			os.state = OS_STATE_CONNECTING;
-			connecting_timeout = millis() + 120000L;
+			connecting_timeout = millis() +
+				(connecting_with_bssid ? WIFI_BSSID_CONNECT_TIMEOUT_MS : WIFI_CONNECT_TIMEOUT_MS);
 			os.lcd.setCursor(0, -1);
 			os.lcd.print(F("Connecting to..."));
 			os.lcd.setCursor(0, 2);
@@ -829,6 +843,10 @@ void do_loop()
 
 	case OS_STATE_CONNECTING:
 		if(WiFi.status() == WL_CONNECTED) {
+			connecting_with_bssid = false;
+			#if defined(ESP8266)
+			wifi_bssid_fallback_at = 0;
+			#endif
 			led_blink_ms = 0;
 			os.set_screen_led(LOW);
 			os.lcd.clear();
@@ -838,6 +856,12 @@ void do_loop()
 			connecting_timeout = 0;
 		} else {
 			if((int32_t)((uint32_t)millis()-connecting_timeout)>0) {
+				if(connecting_with_bssid) {
+					// A saved BSSID is only a fast-connect target. Fall back to
+					// an unrestricted SSID scan for the rest of this boot.
+					wifi_bssid_attempt_enabled = false;
+				}
+				connecting_with_bssid = false;
 				os.state = OS_STATE_INITIAL;
 				#if defined(ESP32)
 				WiFi.disconnect(false, false);
@@ -878,15 +902,28 @@ void do_loop()
 				if(update_server) update_server->handleClient();
 				loop_otf(os.network_connected());
 				connecting_timeout = 0;
+				#if defined(ESP8266)
+				wifi_bssid_fallback_at = 0;
+				#endif
 			} else {
 				#if defined(ESP32)
-				static uint32_t reconnect_at = 0;
-				if ((int32_t)((uint32_t)millis() - reconnect_at) >= 0) {
-					reconnect_at = millis() + 30000UL;
-					os.state = OS_STATE_INITIAL;
-				}
+					static uint32_t reconnect_at = 0;
+					if ((int32_t)((uint32_t)millis() - reconnect_at) >= 0) {
+						reconnect_at = millis() + 30000UL;
+						os.state = OS_STATE_INITIAL;
+					}
 				#else
-				// ESP8266 handles reconnection internally.
+					// The ESP8266 core normally handles reconnection. A configured
+					// BSSID can prevent failover, so retry without it after 30 seconds.
+					if(wifi_bssid_configured) {
+						if(!wifi_bssid_fallback_at) {
+							wifi_bssid_fallback_at = millis() + WIFI_CONNECT_TIMEOUT_MS;
+						} else if((int32_t)((uint32_t)millis() - wifi_bssid_fallback_at) >= 0) {
+							wifi_bssid_attempt_enabled = false;
+							wifi_bssid_fallback_at = 0;
+							os.state = OS_STATE_INITIAL;
+						}
+					}
 				#endif
 			}
 		}
