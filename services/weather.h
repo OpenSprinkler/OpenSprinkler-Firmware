@@ -69,6 +69,11 @@ bool weather_build_http_request(char *output, size_t output_size,
 	char *scratch, size_t scratch_size, const char *endpoint,
 	const char *extra_query, const char *user_agent,
 	weather_option_loader_t option_loader, WeatherHttpTarget *target);
+void weather_response_mark_success(uint32_t now_ms);
+void weather_response_reset();
+bool weather_response_is_current(uint32_t now_ms);
+uint8_t effective_weather_water_percent(bool response_current);
+bool weather_converge_stale_state(uint32_t now_ms);
 
 extern char wt_rawData[];
 extern int wt_errCode;

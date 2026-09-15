@@ -34,9 +34,9 @@ container:
 TEST_HTTP_PORT?=18080
 
 .PHONY: test-api
-test-api: test-board-profiles test-hardware-detection test-storage-files test-sprinkler-log test-firmware-release test-buffer-filler test-string-buffer test-sensor-units test-weather-sensor-cache test-output-sequencer test-bundle-codec test-w5500-frame
+test-api: test-board-profiles test-hardware-detection test-storage-files test-sprinkler-log test-firmware-release test-buffer-filler test-string-buffer test-sensor-units test-weather-sensor-cache test-weather-failsafe test-output-sequencer test-bundle-codec test-w5500-frame
 	$(MAKE) clean
-	$(MAKE) VERSION=DEMO EXTRA_CXXFLAGS="-DHTTP_PORT=$(TEST_HTTP_PORT)"
+	$(MAKE) VERSION=DEMO EXTRA_CXXFLAGS="-DHTTP_PORT=$(TEST_HTTP_PORT) -DWEATHER_RESPONSE_TEST_MAX_AGE_MS=2000"
 	python3 tests/api_contract.py --port $(TEST_HTTP_PORT)
 
 .PHONY: test-board-profiles
@@ -105,8 +105,16 @@ test-weather-sensor-cache:
 			-Iexternal/TinyWebsockets/tiny_websockets_lib/include \
 			-Iexternal/OpenThings-Framework-Firmware-Library \
 			-ffunction-sections -fdata-sections \
-			tests/weather_sensor_cache_test.cpp services/weather.cpp \
+			tests/weather_sensor_cache_test.cpp services/weather.cpp services/weather_failsafe.cpp \
+			platform/monotonic_clock.cpp \
 			-Wl,--gc-sections -o "$$output"; \
+		"$$output"
+
+.PHONY: test-weather-failsafe
+test-weather-failsafe:
+	@set -e; output=$$(mktemp); trap 'rm -f "$$output"' EXIT; \
+		$(CXX) -std=gnu++14 -I. tests/weather_failsafe_test.cpp \
+			services/weather_failsafe.cpp -o "$$output"; \
 		"$$output"
 
 .PHONY: test-output-sequencer

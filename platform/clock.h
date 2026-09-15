@@ -2,6 +2,10 @@
 
 #include "types.h"
 
+// Milliseconds elapsed on a monotonic clock. This deliberately does not use
+// OTF's Linux millis(), which is based on wall-clock time.
+uint32_t monotonic_millis();
+
 #if !defined(ARDUINO)
 
 #include <cstdint>

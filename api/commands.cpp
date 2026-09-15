@@ -3,6 +3,8 @@
 #include "OpenSprinkler.h"
 #include "core/program.h"
 #include "core/scheduler.h"
+#include "platform/clock.h"
+#include "services/weather.h"
 #include "util/utils.h"
 
 #include <cstdlib>
@@ -282,7 +284,8 @@ uint8_t execute_runonce(const ParamSource& params) {
 
 	uint8_t watering_level = 100;
 	if (params.get(tmp_buffer, TMP_BUFFER_SIZE, PSTR("uwt"), true) && tmp_buffer[0] == '1') {
-		watering_level = os.iopts[IOPT_WATER_PERCENTAGE];
+		watering_level = effective_weather_water_percent(
+			weather_response_is_current(monotonic_millis()));
 	}
 
 	uint8_t queue_option = QUEUE_OPTION_REPLACE;

@@ -27,6 +27,7 @@
 #include "OpenSprinkler.h"
 #include "core/bundle.h"
 #include "core/program.h"
+#include "platform/clock.h"
 #include "services/weather.h"
 #include "api/server.h"
 #include "services/mqtt.h"
@@ -98,7 +99,6 @@ const char *user_agent_string = "OpenSprinkler/" TOSTRING(OS_FW_VERSION) "#" TOS
 #define NTP_SYNC_INTERVAL       86413L  // NTP sync interval (in seconds)
 #define CHECK_NETWORK_INTERVAL  601     // Network checking timeout (in seconds)
 #define CHECK_WEATHER_TIMEOUT   21613L  // Weather check interval (in seconds)
-#define CHECK_WEATHER_SUCCESS_TIMEOUT 86400L // Weather check success interval (in seconds)
 #define LCD_BACKLIGHT_TIMEOUT     15    // LCD backlight timeout (in seconds))
 #define PING_TIMEOUT              200   // Ping test timeout (in ms)
 #define UI_STATE_MACHINE_INTERVAL 50    // how often does ui_state_machine run (in ms)
@@ -1099,7 +1099,8 @@ void do_loop()
 						notif.add(NOTIFY_PROGRAM_SCHED, notif_pid, prog.use_weather?wl:100, 0, sensor_adj);
 					} else {
 						// program being skipped e.g. due to 0% watering level
-						notif.add(NOTIFY_PROGRAM_SCHED, notif_pid, -1, wt_restricted);
+						notif.add(NOTIFY_PROGRAM_SCHED, notif_pid, -1,
+							weather_response_is_current(monotonic_millis()) ? wt_restricted : 0);
 					}
 					//delete run-once if on final runtime (stations have already been queued)
 					if(will_delete){
@@ -1371,38 +1372,29 @@ void check_weather() {
 	// Cache expiration is local state maintenance and must not depend on the
 	// network or on whether a program is currently running.
 	MaintainWeatherSensors();
-	// do not check weather if
-	// - network check has failed, or
-	// - the controller is in remote extension mode
-	if (os.status.network_fails>0 || os.iopts[IOPT_REMOTE_EXT_MODE]) return;
-	if (os.status.program_busy) return;
+	bool can_query = os.status.network_fails == 0 &&
+		!os.iopts[IOPT_REMOTE_EXT_MODE] && !os.status.program_busy &&
+		os.network_connected();
+	if (can_query) {
+		CheckWeatherSensors();
 
-	if (!os.network_connected()) return;
-	CheckWeatherSensors();
-
-	time_os_t ntz = os.now_tz();
-	if (os.checkwt_success_lasttime && (ntz > os.checkwt_success_lasttime + CHECK_WEATHER_SUCCESS_TIMEOUT)) {
-		// if last successful weather call timestamp is more than allowed threshold
-		// and if the selected adjustment method is not one of the manual methods
-		// reset watering percentage to 100
-		os.checkwt_success_lasttime = 0;
-		unsigned char method = os.iopts[IOPT_USE_WEATHER];
-		if(!(method==WEATHER_METHOD_MANUAL || method==WEATHER_METHOD_AUTORAINDELAY || method==WEATHER_METHOD_MONTHLY)) {
-			os.iopts[IOPT_WATER_PERCENTAGE] = 100; // reset watering percentage to 100%
-			wt_restricted = 0; // reset wt_rawData, errCode, and md_scales array
-			wt_rawData[0] = 0;
-			wt_errCode = HTTP_RQT_NOT_RECEIVED;
-			md_N = 0;
+		time_os_t ntz = os.now_tz();
+		if (!os.checkwt_lasttime || (ntz > os.checkwt_lasttime + CHECK_WEATHER_TIMEOUT)) {
+			os.checkwt_lasttime = ntz;
+			#if defined(USE_DISPLAY)
+			if (!ui_state) {
+				os.lcd_print_line_clear_pgm(PSTR("Check Weather..."),1);
+			}
+			#endif
+			GetWeather();
 		}
-	} else if (!os.checkwt_lasttime || (ntz > os.checkwt_lasttime + CHECK_WEATHER_TIMEOUT)) {
-		os.checkwt_lasttime = ntz;
-		#if defined(USE_DISPLAY)
-		if (!ui_state) {
-			os.lcd_print_line_clear_pgm(PSTR("Check Weather..."),1);
-		}
-		#endif
-		GetWeather();
 	}
+
+	// A query gets the first chance to refresh the response. If that did not
+	// happen, converge stale persisted/UI state without depending on connectivity.
+	// Defer configuration writes while watering; consumers already use the safe
+	// effective value even when this cleanup has not run yet.
+	if (!os.status.program_busy) weather_converge_stale_state(monotonic_millis());
 }
 
 /** Refresh the network status used by scheduled network services.

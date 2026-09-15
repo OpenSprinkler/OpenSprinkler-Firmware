@@ -2,10 +2,12 @@
 """Smoke-test the public JSON contract against a fresh Demo instance."""
 
 import argparse
+import http.server
 import json
 import socket
 import subprocess
 import tempfile
+import threading
 import time
 import urllib.error
 import urllib.parse
@@ -14,6 +16,8 @@ from pathlib import Path
 
 
 PASSWORD_HASH = "a6d82bced638de3def1e9bbb4983225c"
+MAX_SOPTS_SIZE = 320
+SOPT_WEATHER_URL = 3
 
 
 def require_keys(name, value, keys):
@@ -117,6 +121,62 @@ class DemoServer:
                     break
                 response.extend(chunk)
             return bytes(response)
+
+    def set_string_option(self, option_id, value):
+        encoded = value.encode("ascii")
+        if len(encoded) >= MAX_SOPTS_SIZE:
+            raise ValueError("string option is too long")
+        path = Path(self.temp_dir.name) / "sopts.dat"
+        with path.open("r+b", buffering=0) as options:
+            options.seek(option_id * MAX_SOPTS_SIZE)
+            options.write(encoded + b"\0" * (MAX_SOPTS_SIZE - len(encoded)))
+
+
+class WeatherMock:
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            body = self.server.weather_body.encode("ascii")
+            response = (
+                b"HTTP/1.0 200 OK\r\n"
+                b"Content-Type: text/plain\r\n"
+                + f"Content-Length: {len(body)}\r\n".encode("ascii")
+                + b"Connection: close\r\n\r\n"
+                + body
+            )
+            # The Linux firmware client performs one blocking read. Send the
+            # complete response in one write so this fixture matches that
+            # existing transport contract.
+            self.connection.sendall(response)
+            self.close_connection = True
+
+        def log_message(self, _format, *_args):
+            pass
+
+    def __init__(self):
+        self.server = http.server.ThreadingHTTPServer(
+            ("127.0.0.1", 0), self.Handler
+        )
+        self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
+
+    def __enter__(self):
+        self.set_response(100, 0)
+        self.thread.start()
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.server.shutdown()
+        self.server.server_close()
+        self.thread.join(timeout=3)
+
+    @property
+    def url(self):
+        return f"http://127.0.0.1:{self.server.server_port}"
+
+    def set_response(self, scale, restricted):
+        self.server.weather_body = (
+            f"&errCode=0&scale={scale}&restricted={restricted}"
+            '&rawData={"provider":"test"}'
+        )
 
 
 def check_options(data):
@@ -392,6 +452,122 @@ def check_control_commands(server):
     result = server.get_json("cr", {"t": "[60,0"})
     assert result["result"] == 0x12, result
     print("PASS shared control command behavior")
+
+
+def check_weather_failsafe(server):
+    original_options = server.get_json("jo")
+    original_weather_url = server.get_json("jc")["wsp"]
+    program_id = None
+
+    def reset_queue():
+        result = server.get_json("cv", {"rsn": 1})
+        assert result["result"] == 1, result
+        deadline = time.monotonic() + 3
+        while time.monotonic() < deadline:
+            status = server.get_json("jc")
+            if status["nq"] == 0:
+                return
+            time.sleep(0.05)
+        raise AssertionError(("queue did not reset", status))
+
+    def wait_for_weather(scale, restricted):
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline:
+            status = server.get_json("jc")
+            options = server.get_json("jo")
+            if (status["wterr"] == 0 and status["wtrestr"] == restricted and
+                    options["wl"] == scale):
+                return
+            time.sleep(0.05)
+        raise AssertionError(("weather response not applied", status, options))
+
+    def start_guard_station():
+        result = server.get_json("cm", {"sid": 7, "en": 1, "t": 120, "qo": 2})
+        assert result["result"] == 1, result
+        deadline = time.monotonic() + 3
+        while time.monotonic() < deadline:
+            status = server.get_json("jc")
+            if status["ps"][7][0] == 99:
+                return
+            time.sleep(0.05)
+        raise AssertionError(("guard station did not start", status))
+
+    def assert_scaled_runs(expected_duration):
+        result = server.get_json(
+            "cr", {"t": "[100,0,0,0,0,0,0,0]", "uwt": 1, "qo": 0}
+        )
+        assert result["result"] == 1, result
+        result = server.get_json("mp", {"pid": program_id, "uwt": 1, "qo": 0})
+        assert result["result"] == 1, result
+        deadline = time.monotonic() + 3
+        while time.monotonic() < deadline:
+            status = server.get_json("jc")
+            if status["ps"][0][0] and status["ps"][1][0]:
+                break
+            time.sleep(0.05)
+        assert status["ps"][0][1] == expected_duration, status["ps"][0]
+        assert status["ps"][1][1] == expected_duration, status["ps"][1]
+
+    with WeatherMock() as weather:
+        try:
+            server.set_string_option(SOPT_WEATHER_URL, weather.url)
+            program_id = server.get_json("jp")["nprogs"]
+            packed_program = json.dumps(
+                [3, 127, 0, [0, 0, 0, 0], [0, 100, 0, 0, 0, 0, 0, 0]],
+                separators=(",", ":"),
+            )
+            result = server.get_json("cp", {
+                "pid": -1,
+                "v": packed_program,
+                "name": "Weather fail-safe test",
+            })
+            assert result["result"] == 1, result
+
+            # A fresh restricted Zimmerman response with wl=0 would suppress
+            # both runs. Keep cleanup deferred while its short test freshness
+            # horizon expires; the consumers must then ignore both values.
+            weather.set_response(0, 1)
+            result = server.get_json("co", {"uwt": 1, "wl": 0})
+            assert result["result"] == 1, result
+            wait_for_weather(0, 1)
+            start_guard_station()
+            time.sleep(2.2)
+            status = server.get_json("jc")
+            assert status["wtrestr"] == 1, status
+            assert server.get_json("jo")["wl"] == 0
+            assert_scaled_runs(100)
+
+            # Restrictions also expire under Manual, but the locally selected
+            # water level remains effective.
+            reset_queue()
+            weather.set_response(40, 1)
+            result = server.get_json("co", {"uwt": 0, "wl": 40})
+            assert result["result"] == 1, result
+            wait_for_weather(40, 1)
+            start_guard_station()
+            time.sleep(2.2)
+            status = server.get_json("jc")
+            assert status["wtrestr"] == 1, status
+            assert_scaled_runs(40)
+        finally:
+            reset_queue()
+            if program_id is not None and program_id < server.get_json("jp")["nprogs"]:
+                server.get_json("dp", {"pid": program_id})
+
+            # Force a final weather-state reset, restore the original settings,
+            # and let the mock satisfy the resulting immediate query before its
+            # URL is removed.
+            alternate_method = 0 if original_options["uwt"] != 0 else 1
+            server.get_json("co", {"uwt": alternate_method})
+            weather.set_response(original_options["wl"], 0)
+            server.get_json("co", {
+                "uwt": original_options["uwt"],
+                "wl": original_options["wl"],
+            })
+            wait_for_weather(original_options["wl"], 0)
+            server.set_string_option(SOPT_WEATHER_URL, original_weather_url)
+
+    print("PASS stale weather fail-safe integration")
 
 
 def check_bundle_commands(server):
@@ -671,6 +847,7 @@ def run_contract(server):
         print(f"PASS /{endpoint}")
     check_request_bodies(server)
     check_control_commands(server)
+    check_weather_failsafe(server)
     check_bundle_commands(server)
     check_sprinkler_logs(server)
     check_nested_option_encodings(server)

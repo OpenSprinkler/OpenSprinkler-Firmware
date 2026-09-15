@@ -8,6 +8,7 @@
 #include "../sensors/sensor.h"
 #include "../storage/logging.h"
 #include "../services/weather.h"
+#include "platform/clock.h"
 
 extern OpenSprinkler os;
 extern ProgramData pd;
@@ -397,9 +398,10 @@ void reset_all_stations(bool running_ones_only) {
 
 uint8_t get_program_water_percent(const ProgramStruct &prog) {
 	if (!prog.use_weather) return 100;
-	if (wt_restricted > 0) return 0;
-	uint8_t wl = os.iopts[IOPT_WATER_PERCENTAGE];
-	if (mda == 100 && prog.type == PROGRAM_TYPE_INTERVAL && md_N > 0) {
+	bool response_current = weather_response_is_current(monotonic_millis());
+	if (response_current && wt_restricted > 0) return 0;
+	uint8_t wl = effective_weather_water_percent(response_current);
+	if (response_current && mda == 100 && prog.type == PROGRAM_TYPE_INTERVAL && md_N > 0) {
 		wl = ((unsigned int)prog.days[1] - 1 < md_N) ? md_scales[prog.days[1] - 1] : md_scales[md_N - 1];
 	}
 	return wl;
