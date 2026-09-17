@@ -1,8 +1,13 @@
 # Name,   Type, SubType, Offset,   Size,     Flags
-# 3008 KiB OTA slots leave a full 2 MiB LittleFS partition plus coredump space.
+# 3008 KiB OTA slots; reserve Zigbee data partitions before OS4 ships.
+# zb_storage MUST stay subtype nvs: ESP-Zigbee SDK 2.x requires it (1.x used fat).
+# The Arduino core's bundled Zigbee CSVs still use fat; do not change this to match.
 nvs,      data, nvs,     0x9000,   0x5000,
 otadata,  data, ota,     0xe000,   0x2000,
 app0,     app,  ota_0,   0x10000,  0x2F0000,
 app1,     app,  ota_1,   0x300000, 0x2F0000,
-spiffs,   data, spiffs,  0x5F0000, 0x200000,
+spiffs,   data, spiffs,  0x5F0000, 0x1F0000,
+zb_storage, data, nvs,    0x7E0000, 0x8000,
+zb_fct,   data, fat,     0x7E8000, 0x1000,
+# 0x7E9000-0x7EFFFF remains unallocated for future use.
 coredump, data, coredump,0x7F0000, 0x10000,
