@@ -544,7 +544,8 @@ All supported controllers provide two independent built-in sensor ports (`SN1/SN
     * `SN3`: Starts `Program 3` (OpenSprinkler v3.4 only)
     * `SN4`: Starts `Program 4` (OpenSprinkler v3.4 only)
     * Activated if the switch / button is pressed for more than 1 second.
-* **Flow Sensor:** Detect flow pulses to measure **real-time flow rate** and **log total flow volume** at the end of each station run and program cycle.
+* **Flow Sensor:** Detect flow pulses to show **real-time flow rate**, record a settled average for each station run, and log total pulse count for each program cycle.
+    * The station's logged average flow rate is measured after a 90-second settling period. Runs too short to collect two pulses after that period report zero average flow rate; their pulses still count toward the program-cycle total.
     * Supports all **dry-contact, 2-wire** flow sensors (recommended). ![Flow Sensor](../assets/images/flow_sensor_example.png){ .img-shadow width="150" style="float: right; margin: 5px 5px 5px 5px;"}
         * Connect the two wires to **SN1 + GND**.
         * They are essentially reed switches that open and close repeatedly as water flows through the meter. They do not need power and the two wires have no polarity.

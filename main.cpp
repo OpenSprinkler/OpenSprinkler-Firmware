@@ -35,6 +35,7 @@
 #include "storage/logging.h"
 #include "services/notifier.h"
 #include "services/firmware_update.h"
+#include "sensors/flow_rate_window.h"
 
 #if defined(ESP8266)
 	#include <Arduino.h>
@@ -117,32 +118,21 @@ ProgramData pd;   // ProgramdData object
 NotifQueue notif; // NotifQueue object
 
 /* ====== Robert Hillman (RAH)'s implementation of flow sensor ======
- * flow_begin - time when valve turns on
- * flow_start - time when flow starts being measured (i.e. 2 mins after flow_begin approx
- * flow_stop - time when valve turns off (last rising edge pulse detected before off)
- * flow_gallons - total # of gallons+1 from flow_start to flow_stop
+ * flow_start - first pulse of the station run
+ * flow_begin - first pulse after the 90-second settling period
+ * flow_stop - last falling edge pulse detected before the valve turns off
+ * flow_gallons - one sentinel plus pulses collected after the warm-up
  * flow_last_gpm - last flow rate measured (averaged over flow_gallons) from last valve stopped (used to write to log file). */
-uint32_t flow_begin, flow_start, flow_stop, flow_gallons, flow_rt_reset, last_flow_rt;
+uint32_t flow_begin, flow_start, flow_stop, flow_gallons;
 uint32_t flow_count = 0;
 unsigned char prev_flow_state = HIGH;
 float flow_last_gpm = 0;
-int32_t flow_rt_period = -1;
+static FlowRateWindow flow_rate_window;
 uint32_t reboot_timer = 0;
 unsigned char curr_alert_sid = 0;
 
 void flow_poll() {
-	uint32_t curr = millis();
-
-	// Resets counter if timeout occurs
-	if (flow_rt_reset && curr > flow_rt_reset) {
-		os.flowcount_rt = 0;
-		flow_rt_period = -1;
-		flow_rt_reset = 0;
-	}
-
-	if (flow_rt_period < 0) {
-		last_flow_rt = curr;
-	}
+	uint32_t curr = monotonic_millis();
 
 	#if defined(ESP8266)
 	if(os.hw_rev>=2) {
@@ -155,6 +145,7 @@ void flow_poll() {
 	unsigned char curr_flow_state = digitalReadExt(PIN_SENSOR1);
 	if((!prev_flow_state) || curr_flow_state) { // only record on falling edge
 		prev_flow_state = curr_flow_state;
+		os.flowcount_rt = flow_rate_window.update(curr, flow_count, FLOWCOUNT_RT_WINDOW);
 		return;
 	}
 	prev_flow_state = curr_flow_state;
@@ -175,29 +166,10 @@ void flow_poll() {
 		}
 	}
 
-	// Use exponential moving average (alpha=0.2) if flow has been previosuly calculated, otherwise just set the value
-	uint32_t curr_period = curr - last_flow_rt;
-	if (flow_rt_period > 0) {
-		flow_rt_period = (curr_period  / 5 + flow_rt_period * 4 / 5);
-	} else {
-		flow_rt_period = curr_period;
-	}
-
-	// calculates the flow rate scaled by the window size to simulated a fixed point number
-	if (flow_rt_period > 0) {
-		os.flowcount_rt = (uint32_t) (FLOWCOUNT_RT_WINDOW * 1000L / flow_rt_period);
-		// Sets the timeout to be 10x the last period
-		flow_rt_reset = curr + (curr - last_flow_rt) * 10;
-	} else {
-		os.flowcount_rt = 0;
-		flow_rt_reset = 0;
-	}
-
-	last_flow_rt = curr;
-
 	flow_stop = curr; // get time in ms for stop
 	flow_gallons++;  // increment gallon count for each poll
 	/* End of RAH implementation of flow sensor */
+	os.flowcount_rt = flow_rate_window.update(curr, flow_count, FLOWCOUNT_RT_WINDOW);
 }
 
 #if defined(USE_DISPLAY)
@@ -717,10 +689,18 @@ static void process_pending_overcurrent() {
 void do_loop()
 {
 	static uint32_t flowpoll_timeout = 0;
-	if(os.iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_FLOW) {
+	static bool flow_was_enabled = false;
+	bool flow_enabled = os.iopts[IOPT_SENSOR1_TYPE] == SENSOR_TYPE_FLOW;
+	if (flow_enabled != flow_was_enabled) {
+		flow_rate_window.reset();
+		os.flowcount_rt = 0;
+		prev_flow_state = digitalReadExt(PIN_SENSOR1);
+		flow_was_enabled = flow_enabled;
+	}
+	if(flow_enabled) {
 	// handle flow sensor using polling. Maximum freq is 1/(2*FLOWPOLL_INTERVAL)
 	// e.g. if FLOWPOLL_INTERVAL is 3ms, maximum freq is 166Hz
-		uint32_t tm = millis();
+		uint32_t tm = monotonic_millis();
 		if((int32_t)(tm-flowpoll_timeout) > 0) { // overflow proof timeout
 			flowpoll_timeout = tm+FLOWPOLL_INTERVAL;
 			flow_poll();
@@ -1272,7 +1252,8 @@ void do_loop()
 					os.masters_last_on[mas] = curr_time;
 				}
 				if(laston > 0 && !masbit) { // master is about to turn off
-					notif.add(NOTIFY_STATION_OFF, mas_id - 1, (curr_time>laston) ? (curr_time-laston) : 0);
+					notif.add(NOTIFY_STATION_OFF, mas_id - 1,
+						(curr_time>laston) ? (curr_time-laston) : 0, 0, flow_last_gpm);
 					os.masters_last_on[mas] = 0;
 				}
 			}

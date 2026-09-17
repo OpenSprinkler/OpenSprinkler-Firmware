@@ -6,6 +6,7 @@
 #include "../OpenSprinkler.h"
 #include "../services/notifier.h"
 #include "../sensors/sensor.h"
+#include "sensors/flow_rate.h"
 #include "../storage/logging.h"
 #include "../services/weather.h"
 #include "platform/clock.h"
@@ -139,12 +140,9 @@ void turn_off_station(unsigned char sid, time_os_t curr_time, unsigned char shif
 
 	os.set_station_bit(sid, 0);
 
-	if (flow_gallons > 1) {
-		if(flow_stop <= flow_begin) flow_last_gpm = 0;
-		else flow_last_gpm = (float)60000 / (float)((flow_stop-flow_begin) / (flow_gallons - 1));
-	} else {
-		flow_last_gpm = 0;
-	}
+	// flow_gallons includes one settling-period sentinel; the rest are measured pulses.
+	flow_last_gpm = flow_gallons > 1 ?
+		flow_rate_from_pulse_span(flow_gallons - 1, flow_stop - flow_begin) : 0.0f;
 
 	if (curr_time >= q->st) {
 		if (!os.is_master_station(sid)) {
@@ -154,8 +152,8 @@ void turn_off_station(unsigned char sid, time_os_t curr_time, unsigned char shif
 			pd.lastrun.endtime = curr_time;
 
 			write_log(LOGDATA_STATION, curr_time);
-			notif.add(NOTIFY_STATION_OFF, sid, pd.lastrun.duration);
-			notif.add(NOTIFY_FLOW_ALERT, sid, pd.lastrun.duration);
+			notif.add(NOTIFY_STATION_OFF, sid, pd.lastrun.duration, 0, flow_last_gpm);
+			notif.add(NOTIFY_FLOW_ALERT, sid, pd.lastrun.duration, 0, flow_last_gpm);
 		}
 	}
 

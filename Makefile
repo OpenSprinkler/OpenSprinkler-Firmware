@@ -34,7 +34,7 @@ container:
 TEST_HTTP_PORT?=18080
 
 .PHONY: test-api
-test-api: test-board-profiles test-hardware-detection test-storage-files test-sprinkler-log test-firmware-release test-buffer-filler test-string-buffer test-sensor-units test-weather-sensor-cache test-weather-failsafe test-output-sequencer test-bundle-codec test-w5500-frame
+test-api: test-board-profiles test-hardware-detection test-storage-files test-sprinkler-log test-firmware-release test-buffer-filler test-string-buffer test-sensor-units test-weather-sensor-cache test-weather-failsafe test-output-sequencer test-bundle-codec test-w5500-frame test-flow-rate-window
 	$(MAKE) clean
 	$(MAKE) VERSION=DEMO EXTRA_CXXFLAGS="-DHTTP_PORT=$(TEST_HTTP_PORT) -DWEATHER_RESPONSE_TEST_MAX_AGE_MS=2000"
 	python3 tests/api_contract.py --port $(TEST_HTTP_PORT)
@@ -43,6 +43,12 @@ test-api: test-board-profiles test-hardware-detection test-storage-files test-sp
 test-board-profiles:
 	@set -e; output=$$(mktemp); trap 'rm -f "$$output"' EXIT; \
 		$(CXX) -std=gnu++14 -I. tests/board_profile_test.cpp boards/board_profile.cpp -o "$$output"; \
+		"$$output"
+
+.PHONY: test-flow-rate-window
+test-flow-rate-window:
+	@set -e; output=$$(mktemp); trap 'rm -f "$$output"' EXIT; \
+		$(CXX) -std=gnu++14 -I. tests/flow_rate_window_test.cpp -o "$$output"; \
 		"$$output"
 
 .PHONY: test-hardware-detection
