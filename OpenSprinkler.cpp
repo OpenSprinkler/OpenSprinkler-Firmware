@@ -3303,7 +3303,13 @@ void OpenSprinkler::flash_screen() {
 	lcd.drawXbm(0, 0, OpenSprinkler_Logo_width, OpenSprinkler_Logo_height,
 		(const unsigned char*)OpenSprinkler_Logo_image);
 
+	#if defined(ESP32)
+	lcd.drawXbm(78, 24, OS4_ESP32_Tag_width, OS4_ESP32_Tag_height,
+		(const unsigned char*)OS4_ESP32_Tag_image);
+	lcd.setCursor(1, 2);
+	#else
 	lcd.setCursor(2, 1);
+	#endif
 	lcd.print(F("FW "));
 	lcd.print((char)('0' + (OS_FW_VERSION / 100)));
 	lcd.print('.');
@@ -3318,7 +3324,11 @@ void OpenSprinkler::flash_screen() {
 	lcd.setCursor(3, 2);
 	lcd.print(F("HW OSPi AC"));
 	#else
+	#if defined(ESP32)
+	lcd.setCursor(1, 1);
+	#else
 	lcd.setCursor((hw_type == HW_TYPE_LATCH) ? 2 : 3, 2);
+	#endif
 	lcd.print(F("HW "));
 	lcd.print((char)('0' + (OS_HW_VERSION / 10)));
 	lcd.print('.');
