@@ -16,4 +16,8 @@ extern uint32_t flow_count;
 #define OTF_PARAMS_DEF const OTF::Request &req, OTF::Response &res
 #define OTF_PARAMS req, res
 #define FKV_SOURCE req
-#define handle_return(code) { if ((code) != HTML_OK) otf_send_result(req, res, (code)); return; }
+#define handle_return(expression) { \
+	const uint8_t result_code = static_cast<uint8_t>(expression); \
+	if (result_code != HTML_OK) otf_send_result(req, res, result_code); \
+	return; \
+}

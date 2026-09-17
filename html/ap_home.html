@@ -89,6 +89,25 @@
             cursor: not-allowed;
         }
 
+        .ap-actions {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .ap-actions button {
+            width: auto;
+            flex: 1;
+            padding: 10px;
+            color: var(--accent);
+            background: transparent;
+            border: 1px solid var(--accent);
+        }
+
+        #bssid {
+            margin-bottom: 8px;
+        }
+
         /* --- Responsive Table Container --- */
         .table-container {
             overflow-x: auto; /* Makes the container scrollable horizontally */
@@ -159,19 +178,20 @@
     <div id='div_input'>
         <div class="form-group">
             <label for="ssid">SSID</label>
-            <input type='text' id='ssid'>
+            <input type='text' id='ssid' oninput='selectedSsid=-1;clearAccessPoint()'>
         </div>
         <div class="form-group">
             <label for="pass">Password</label>
             <input type='password' id='pass'>
         </div>
         <div class="form-group">
-            <label for="bssid">BSSID (optional)</label>
-            <input type='text' id='bssid' placeholder='(optional)'>
-        </div>
-        <div class="form-group">
-            <label for="channel">Channel (optional)</label>
-            <input type='text' id='channel' placeholder='(optional)'>
+            <label>Use selected BSSID and Channel (optional)</label>
+            <div class="ap-actions">
+                <button type='button' onclick='useSelectedAccessPoint()'>Copy from selected network</button>
+                <button type='button' onclick='clearAccessPoint()'>Clear</button>
+            </div>
+            <input type='text' id='bssid' placeholder='BSSID' aria-label='BSSID'>
+            <input type='text' id='channel' placeholder='Channel' aria-label='Channel'>
         </div>
     </div>
 
@@ -181,8 +201,17 @@
 
 <script>
 function id(s) {return document.getElementById(s);}
-function sel(i) {id('ssid').value=ssids[i][0];id('bssid').value=ssids[i][1];id('channel').value=ssids[i][3];}
-var tci, ssids;
+function clearAccessPoint() {id('bssid').value='';id('channel').value='';}
+function sel(i) {selectedSsid=i;id('ssid').value=ssids[i][0];clearAccessPoint();}
+function useSelectedAccessPoint() {
+  if(selectedSsid<0) {alert('Select a detected network first.');return;}
+  id('bssid').value=ssids[selectedSsid][1];id('channel').value=ssids[selectedSsid][3];
+}
+function setConfigDisabled(disabled) {
+  var controls=document.querySelectorAll('#div_input input,#div_input button');
+  for(var i=0;i<controls.length;i++) controls[i].disabled=disabled;
+}
+var tci, ssids, selectedSsid=-1;
 function tryConnect() {
   var xhr=new XMLHttpRequest();
   xhr.onreadystatechange=function() {
@@ -210,8 +239,7 @@ function sf() {
       tci=setInterval(tryConnect, 1000); return; }
       id('msg').innerHTML='<b><font color=red>Error code: '+jd.result+', item: '+jd.item+'</font></b>';
       id('butt').innerHTML='Submit';
-      var inputs = document.querySelectorAll('#div_input input');
-      for(var i = 0; i < inputs.length; i++) { inputs[i].disabled = false; }
+      setConfigDisabled(false);
       id('butt').disabled=false;
     }
   };
@@ -221,8 +249,7 @@ function sf() {
     else comm+='&extra='+encodeURIComponent(id('bssid').value+'@0');
   }
   xhr.open('POST', comm, true); xhr.send();
-  var inputs = document.querySelectorAll('#div_input input');
-  for(var i = 0; i < inputs.length; i++) { inputs[i].disabled = true; }
+  setConfigDisabled(true);
   id('butt').disabled=true;
 }
 function truncateStr(s,n) {if(s.length<=n) return s; else return s.slice(0,n)+'...';}

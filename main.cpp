@@ -25,7 +25,9 @@
 
 #include "types.h"
 #include "OpenSprinkler.h"
+#include "core/bundle.h"
 #include "core/program.h"
+#include "platform/clock.h"
 #include "services/weather.h"
 #include "api/server.h"
 #include "services/mqtt.h"
@@ -33,6 +35,8 @@
 #include "storage/logging.h"
 #include "services/notifier.h"
 #include "services/firmware_update.h"
+#include "sensors/flow_rate.h"
+#include "sensors/flow_rate_window.h"
 
 #if defined(ESP8266)
 	#include <Arduino.h>
@@ -56,6 +60,9 @@
 OTF::OpenThingsFramework *otf = NULL;
 
 #if defined(ARDUINO)
+static constexpr uint32_t OTC_BOOT_CONNECTION_DELAY_MS = 25000UL;
+static constexpr uint32_t WIFI_BSSID_CONNECT_TIMEOUT_MS = 15000UL;
+static constexpr uint32_t WIFI_CONNECT_TIMEOUT_MS = 30000UL;
 static uint16_t led_blink_ms = LED_FAST_BLINK;
 #else
 static uint16_t led_blink_ms = 0;
@@ -69,6 +76,18 @@ static inline bool firmware_update_display_active() {
 #endif
 }
 
+#if defined(ARDUINO)
+static bool otc_boot_delay_elapsed() {
+	static bool elapsed = false;
+	if (!elapsed && millis() >= OTC_BOOT_CONNECTION_DELAY_MS) elapsed = true;
+	return elapsed;
+}
+
+static inline void loop_otf(bool network_available = true) {
+	if (otf) otf->loop(network_available && otc_boot_delay_elapsed());
+}
+#endif
+
 #define STRINGIFY(x) #x
 #define TOSTRING(x) STRINGIFY(x)
 
@@ -79,7 +98,6 @@ const char *user_agent_string = "OpenSprinkler/" TOSTRING(OS_FW_VERSION) "#" TOS
 #define NTP_SYNC_INTERVAL       86413L  // NTP sync interval (in seconds)
 #define CHECK_NETWORK_INTERVAL  601     // Network checking timeout (in seconds)
 #define CHECK_WEATHER_TIMEOUT   21613L  // Weather check interval (in seconds)
-#define CHECK_WEATHER_SUCCESS_TIMEOUT 86400L // Weather check success interval (in seconds)
 #define LCD_BACKLIGHT_TIMEOUT     15    // LCD backlight timeout (in seconds))
 #define PING_TIMEOUT              200   // Ping test timeout (in ms)
 #define UI_STATE_MACHINE_INTERVAL 50    // how often does ui_state_machine run (in ms)
@@ -98,32 +116,21 @@ ProgramData pd;   // ProgramdData object
 NotifQueue notif; // NotifQueue object
 
 /* ====== Robert Hillman (RAH)'s implementation of flow sensor ======
- * flow_begin - time when valve turns on
- * flow_start - time when flow starts being measured (i.e. 2 mins after flow_begin approx
- * flow_stop - time when valve turns off (last rising edge pulse detected before off)
- * flow_gallons - total # of gallons+1 from flow_start to flow_stop
+ * flow_start - first pulse of the station run
+ * flow_begin - first pulse after the 90-second settling period
+ * flow_stop - last falling edge pulse detected before the valve turns off
+ * flow_gallons - one sentinel plus pulses collected after the warm-up
  * flow_last_gpm - last flow rate measured (averaged over flow_gallons) from last valve stopped (used to write to log file). */
-uint32_t flow_begin, flow_start, flow_stop, flow_gallons, flow_rt_reset, last_flow_rt;
+uint32_t flow_begin, flow_start, flow_stop, flow_gallons;
 uint32_t flow_count = 0;
 unsigned char prev_flow_state = HIGH;
 float flow_last_gpm = 0;
-int32_t flow_rt_period = -1;
+static FlowRateWindow flow_rate_window;
 uint32_t reboot_timer = 0;
 unsigned char curr_alert_sid = 0;
 
 void flow_poll() {
-	uint32_t curr = millis();
-
-	// Resets counter if timeout occurs
-	if (flow_rt_reset && curr > flow_rt_reset) {
-		os.flowcount_rt = 0;
-		flow_rt_period = -1;
-		flow_rt_reset = 0;
-	}
-
-	if (flow_rt_period < 0) {
-		last_flow_rt = curr;
-	}
+	uint32_t curr = monotonic_millis();
 
 	#if defined(ESP8266)
 	if(os.hw_rev>=2) {
@@ -136,6 +143,7 @@ void flow_poll() {
 	unsigned char curr_flow_state = digitalReadExt(PIN_SENSOR1);
 	if((!prev_flow_state) || curr_flow_state) { // only record on falling edge
 		prev_flow_state = curr_flow_state;
+		os.flowcount_rt = flow_rate_window.update(curr, flow_count, FLOWCOUNT_RT_WINDOW);
 		return;
 	}
 	prev_flow_state = curr_flow_state;
@@ -156,29 +164,10 @@ void flow_poll() {
 		}
 	}
 
-	// Use exponential moving average (alpha=0.2) if flow has been previosuly calculated, otherwise just set the value
-	uint32_t curr_period = curr - last_flow_rt;
-	if (flow_rt_period > 0) {
-		flow_rt_period = (curr_period  / 5 + flow_rt_period * 4 / 5);
-	} else {
-		flow_rt_period = curr_period;
-	}
-
-	// calculates the flow rate scaled by the window size to simulated a fixed point number
-	if (flow_rt_period > 0) {
-		os.flowcount_rt = (uint32_t) (FLOWCOUNT_RT_WINDOW * 1000L / flow_rt_period);
-		// Sets the timeout to be 10x the last period
-		flow_rt_reset = curr + (curr - last_flow_rt) * 10;
-	} else {
-		os.flowcount_rt = 0;
-		flow_rt_reset = 0;
-	}
-
-	last_flow_rt = curr;
-
 	flow_stop = curr; // get time in ms for stop
 	flow_gallons++;  // increment gallon count for each poll
 	/* End of RAH implementation of flow sensor */
+	os.flowcount_rt = flow_rate_window.update(curr, flow_count, FLOWCOUNT_RT_WINDOW);
 }
 
 #if defined(USE_DISPLAY)
@@ -487,6 +476,9 @@ static void check_network();
 void check_weather();
 static bool process_special_program_command(const char*, uint32_t curr_time);
 static void perform_ntp_sync();
+#if defined(ESP8266)
+static void service_w5500_recovery();
+#endif
 
 #if defined(ARDUINO)
 void start_server_ap();
@@ -513,6 +505,11 @@ void handle_web_request(char *p);
 #endif
 
 uint32_t currpoll_timeout = 0;
+#if defined(ARDUINO)
+static unsigned char pending_overcurrent_sid = 0;
+static uint16_t pending_overcurrent_value = 0;
+#endif
+
 void overcurrent_monitor() {
 #if defined(ARDUINO)
 	// If a zone is turning on, do immediate overcurrent monitoring here for ~50ms
@@ -520,15 +517,12 @@ void overcurrent_monitor() {
 		int16_t imax = os.get_imax();
 		if(imax > 0) { // disable overcurrent checking if imax==0
 			imax += OVERCURRENT_INRUSH_EXTRA; // extra margin for inrush current
-			time_os_t tn = os.now_tz();
-			unsigned char sid = curr_alert_sid - 1;
 			for(unsigned char i = 0; i < 10; i++) {
 				uint16_t curr = os.read_current();
 				if(curr > (uint16_t)imax) {
-					turn_off_running_station_immediate(sid, tn);
-					notif.add(NOTIFY_CURR_ALERT, sid, curr, CURR_ALERT_TYPE_OVER_STATION);
-					os.status.overcurrent_sid = curr_alert_sid;
-					currpoll_timeout += 1000; // delay currpoll_timeout by 1 second to give time for solenoid to reset
+					pending_overcurrent_sid = curr_alert_sid;
+					pending_overcurrent_value = curr;
+					os.set_output_rise_blocked(true);
 					break;
 				} else {
 					delay(5);
@@ -540,14 +534,165 @@ void overcurrent_monitor() {
 #endif
 }
 
+#if defined(ARDUINO)
+static void stop_output_owner(unsigned char sid, time_os_t curr_time) {
+	unsigned char qid = pd.station_qid[sid];
+	if (qid < pd.nqueue) turn_off_running_station_immediate(sid, curr_time);
+	else {
+		os.set_station_bit(sid, 0);
+		for (RuntimeQueueStruct* q = pd.queue; q < pd.queue + pd.nqueue; q++) {
+			if (q->sid == sid) q->dur = 0;
+		}
+	}
+}
+
+#if defined(ESP8266)
+#define W5500_RECOVERY_WINDOW_MS   600000UL // recoveries are counted over 10 minutes
+#define W5500_MAX_RECOVERIES       3        // recoveries allowed within that window
+#define W5500_HEALTHY_QUALIFY_MS   60000UL  // uninterrupted healthy time that re-arms rebooting
+
+/* Schedule a controlled reboot after W5500 recovery has failed or repeated too
+ * often. Returns false when the reboot is deliberately suppressed.
+ *
+ * The first network-failure reboot is always allowed. After one, another is
+ * permitted only if this boot subsequently maintained a healthy connection for
+ * W5500_HEALTHY_QUALIFY_MS. A time-based cooldown would merely pace an endless
+ * reboot cycle on permanently faulty hardware; requiring a proven-healthy
+ * interval ends it, because a W5500 that never comes up can never re-arm the
+ * reboot. Such a controller keeps retrying the raw reset indefinitely instead,
+ * which costs nothing and leaves watering untouched.
+ */
+static bool request_w5500_reboot(bool network_was_healthy) {
+	if (os.last_reboot_cause == REBOOT_CAUSE_NETWORK_FAIL && !network_was_healthy)
+		return false;
+	os.nvdata.reboot_cause = REBOOT_CAUSE_NETWORK_FAIL;
+	os.status.safe_reboot = 1;
+	reboot_timer = os.now_tz();
+	#if defined(USE_DISPLAY)
+	if (!ui_state) {
+		os.lcd_print_line_clear_pgm(PSTR("Ethernet failed"), 1);
+		os.lcd_print_line_clear_pgm(PSTR("Reboot pending"), 2);
+	}
+	#endif
+	return true;
+}
+
+static void service_w5500_recovery() {
+	if (!useEth || !eth.is_w5500()) return;
+	static uint32_t next_health_check = 0;
+	static uint32_t recovery_window_started = 0;
+	static uint8_t recovery_attempts = 0;
+	static bool reboot_scheduled = false;
+	static uint32_t healthy_since = 0;
+	static bool sustained_healthy = false;
+	uint32_t now = millis();
+
+	if (!eth.fault_pending() && static_cast<int32_t>(now - next_health_check) >= 0) {
+		next_health_check = now + 1000UL;
+		if (eth.health_check() && eth.connected()) {
+			os.status.network_fails = 0;
+			// Track uninterrupted health so a fault later in this boot can
+			// still escalate to a reboot. The flag latches: once this boot has
+			// proven the interface works, a reboot remains a sane response.
+			if (!healthy_since) healthy_since = now ? now : 1;
+			else if (now - healthy_since >= W5500_HEALTHY_QUALIFY_MS) sustained_healthy = true;
+		} else {
+			healthy_since = 0;
+		}
+	}
+	if (!eth.fault_pending() || reboot_scheduled) return;
+
+	os.status.network_fails = 3;
+
+	// Escalate to a reboot once too many recoveries land inside one window. If
+	// the boot-loop guard suppresses that reboot, fall through to waiting the
+	// window out and retrying the raw reset rather than giving up entirely.
+	if (recovery_window_started && now - recovery_window_started < W5500_RECOVERY_WINDOW_MS &&
+		recovery_attempts >= W5500_MAX_RECOVERIES) {
+		reboot_scheduled = request_w5500_reboot(sustained_healthy);
+		return;
+	}
+	if (!recovery_window_started || now - recovery_window_started >= W5500_RECOVERY_WINDOW_MS) {
+		recovery_window_started = now;
+		recovery_attempts = 0;
+	}
+	recovery_attempts++;
+
+	#if defined(USE_DISPLAY)
+	if (!ui_state) {
+		os.lcd_print_line_clear_pgm(PSTR("Ethernet recovery"), 1);
+		os.lcd_print_line_clear_pgm(PSTR("Please wait..."), 2);
+	}
+	#endif
+
+	if (eth.raw_reinit()) {
+		os.status.network_fails = eth.connected() ? 0 : 1;
+		os.status.req_mqtt_restart = true;
+		next_health_check = now + 1000UL;
+		#if defined(USE_DISPLAY)
+		if (!ui_state) {
+			os.lcd_print_line_clear_pgm(PSTR("Ethernet restored"), 1);
+			os.lcd_print_line_clear_pgm(PSTR(""), 2);
+		}
+		#endif
+		return;
+	}
+
+	reboot_scheduled = request_w5500_reboot(sustained_healthy);
+}
+#endif
+#endif
+
+static void process_pending_overcurrent() {
+#if defined(ARDUINO)
+	if (!pending_overcurrent_sid) return;
+	const unsigned char physical_sid = pending_overcurrent_sid - 1;
+	const uint16_t current = pending_overcurrent_value;
+	const time_os_t curr_time = os.now_tz();
+	pending_overcurrent_sid = 0;
+	pending_overcurrent_value = 0;
+
+	bool owner_found = false;
+	if (os.is_master_station(physical_sid)) {
+		reset_all_stations_immediate();
+		owner_found = true;
+	} else {
+		if (os.is_running(physical_sid)) {
+			owner_found = true;
+			stop_output_owner(physical_sid, curr_time);
+		}
+		for (unsigned char leader = 0; leader < os.nstations; leader++) {
+			if (!os.is_running(leader) || !bundle_claims_station(leader, physical_sid)) continue;
+			owner_found = true;
+			stop_output_owner(leader, curr_time);
+		}
+	}
+
+	if (!owner_found) reset_all_stations_immediate();
+	notif.add(NOTIFY_CURR_ALERT, physical_sid, current, CURR_ALERT_TYPE_OVER_STATION);
+	os.status.overcurrent_sid = physical_sid + 1;
+	currpoll_timeout += 1000;
+	os.apply_all_station_bits();
+	os.set_output_rise_blocked(false);
+#endif
+}
+
 /** Main Loop */
 void do_loop()
 {
 	static uint32_t flowpoll_timeout = 0;
-	if(os.iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_FLOW) {
+	static bool flow_was_enabled = false;
+	bool flow_enabled = os.iopts[IOPT_SENSOR1_TYPE] == SENSOR_TYPE_FLOW;
+	if (flow_enabled != flow_was_enabled) {
+		flow_rate_window.reset();
+		os.flowcount_rt = 0;
+		prev_flow_state = digitalReadExt(PIN_SENSOR1);
+		flow_was_enabled = flow_enabled;
+	}
+	if(flow_enabled) {
 	// handle flow sensor using polling. Maximum freq is 1/(2*FLOWPOLL_INTERVAL)
 	// e.g. if FLOWPOLL_INTERVAL is 3ms, maximum freq is 166Hz
-		uint32_t tm = millis();
+		uint32_t tm = monotonic_millis();
 		if((int32_t)(tm-flowpoll_timeout) > 0) { // overflow proof timeout
 			flowpoll_timeout = tm+FLOWPOLL_INTERVAL;
 			flow_poll();
@@ -593,12 +738,23 @@ void do_loop()
 	os.status.mas4= os.iopts[IOPT_MASTER_STATION_4];
 	time_os_t curr_time = os.now_tz();
 
+	#if defined(ESP8266)
+	service_w5500_recovery();
+	#endif
+
 	// ====== Process Ethernet packets ======
 	#if defined(ARDUINO)	// Process Ethernet packets for Arduino
 	static uint32_t connecting_timeout;
+	static bool wifi_bssid_attempt_enabled = true;
+	static bool wifi_bssid_configured = false;
+	static bool connecting_with_bssid = false;
+	#if defined(ESP8266)
+	static uint32_t wifi_bssid_fallback_at = 0;
+	#endif
 	switch(os.state) {
 	case OS_STATE_INITIAL:
 		if(useEth) {
+			connecting_with_bssid = false;
 			led_blink_ms = 0;
 			os.set_screen_led(LOW);
 			os.lcd.clear();
@@ -607,6 +763,7 @@ void do_loop()
 			os.state = OS_STATE_CONNECTED;
 			connecting_timeout = 0;
 		} else if(os.get_wifi_mode()==OS_WIFI_MODE_AP) {
+			connecting_with_bssid = false;
 			start_server_ap();
 			dns->setErrorReplyCode(DNSReplyCode::NoError);
 			dns->start(53, "*", WiFi.softAPIP());
@@ -618,7 +775,10 @@ void do_loop()
 			if(WiFi.getMode()!=WIFI_STA) WiFi.mode(WIFI_STA);
 			os.config_ip();
 			#endif
-			if(os.sopt_load(SOPT_STA_BSSID_CHL).length()>0 && os.wifi_channel<255) {
+			wifi_bssid_configured = os.sopt_load(SOPT_STA_BSSID_CHL).length()>0 &&
+				os.wifi_channel<255;
+			connecting_with_bssid = wifi_bssid_attempt_enabled && wifi_bssid_configured;
+			if(connecting_with_bssid) {
 				start_network_sta(os.wifi_ssid.c_str(), os.wifi_pass.c_str(), (int32_t)os.wifi_channel, os.wifi_bssid);
 			}
 			else
@@ -627,7 +787,8 @@ void do_loop()
 			os.config_ip();
 			#endif
 			os.state = OS_STATE_CONNECTING;
-			connecting_timeout = millis() + 120000L;
+			connecting_timeout = millis() +
+				(connecting_with_bssid ? WIFI_BSSID_CONNECT_TIMEOUT_MS : WIFI_CONNECT_TIMEOUT_MS);
 			os.lcd.setCursor(0, -1);
 			os.lcd.print(F("Connecting to..."));
 			os.lcd.setCursor(0, 2);
@@ -654,6 +815,10 @@ void do_loop()
 
 	case OS_STATE_CONNECTING:
 		if(WiFi.status() == WL_CONNECTED) {
+			connecting_with_bssid = false;
+			#if defined(ESP8266)
+			wifi_bssid_fallback_at = 0;
+			#endif
 			led_blink_ms = 0;
 			os.set_screen_led(LOW);
 			os.lcd.clear();
@@ -663,6 +828,12 @@ void do_loop()
 			connecting_timeout = 0;
 		} else {
 			if((int32_t)((uint32_t)millis()-connecting_timeout)>0) {
+				if(connecting_with_bssid) {
+					// A saved BSSID is only a fast-connect target. Fall back to
+					// an unrestricted SSID scan for the rest of this boot.
+					wifi_bssid_attempt_enabled = false;
+				}
+				connecting_with_bssid = false;
 				os.state = OS_STATE_INITIAL;
 				#if defined(ESP32)
 				WiFi.disconnect(false, false);
@@ -676,7 +847,7 @@ void do_loop()
 
 	case OS_STATE_WAIT_REBOOT:
 		if(dns) dns->processNextRequest();
-		if(otf) otf->loop();
+		loop_otf();
 		if(update_server) update_server->handleClient();
 		#if defined(ESP32)
 		if(reboot_deadline && (int32_t)((uint32_t)millis() - reboot_deadline) >= 0) ESP.restart();
@@ -687,7 +858,7 @@ void do_loop()
 		if(os.get_wifi_mode() == OS_WIFI_MODE_AP) {
 			dns->processNextRequest();
 			if(update_server) update_server->handleClient();
-			otf->loop();
+			loop_otf();
 			connecting_timeout = 0;
 			if(os.get_wifi_mode()==OS_WIFI_MODE_STA) {
 				// already in STA mode, waiting to reboot
@@ -701,17 +872,30 @@ void do_loop()
 		} else {
 			if(useEth || WiFi.status() == WL_CONNECTED) {
 				if(update_server) update_server->handleClient();
-				otf->loop(os.network_connected());
+				loop_otf(os.network_connected());
 				connecting_timeout = 0;
+				#if defined(ESP8266)
+				wifi_bssid_fallback_at = 0;
+				#endif
 			} else {
 				#if defined(ESP32)
-				static uint32_t reconnect_at = 0;
-				if ((int32_t)((uint32_t)millis() - reconnect_at) >= 0) {
-					reconnect_at = millis() + 30000UL;
-					os.state = OS_STATE_INITIAL;
-				}
+					static uint32_t reconnect_at = 0;
+					if ((int32_t)((uint32_t)millis() - reconnect_at) >= 0) {
+						reconnect_at = millis() + 30000UL;
+						os.state = OS_STATE_INITIAL;
+					}
 				#else
-				// ESP8266 handles reconnection internally.
+					// The ESP8266 core normally handles reconnection. A configured
+					// BSSID can prevent failover, so retry without it after 30 seconds.
+					if(wifi_bssid_configured) {
+						if(!wifi_bssid_fallback_at) {
+							wifi_bssid_fallback_at = millis() + WIFI_CONNECT_TIMEOUT_MS;
+						} else if((int32_t)((uint32_t)millis() - wifi_bssid_fallback_at) >= 0) {
+							wifi_bssid_attempt_enabled = false;
+							wifi_bssid_fallback_at = 0;
+							os.state = OS_STATE_INITIAL;
+						}
+					}
 				#endif
 			}
 		}
@@ -737,6 +921,8 @@ void do_loop()
 		os.mqtt.subscribe();
 	}
 	os.mqtt.loop();
+	os.apply_all_station_bits(overcurrent_monitor);
+	process_pending_overcurrent();
 
 	// The main control loop runs once every second
 	if (curr_time != last_time) {
@@ -885,7 +1071,8 @@ void do_loop()
 						notif.add(NOTIFY_PROGRAM_SCHED, notif_pid, prog.use_weather?wl:100, 0, sensor_adj);
 					} else {
 						// program being skipped e.g. due to 0% watering level
-						notif.add(NOTIFY_PROGRAM_SCHED, notif_pid, -1, wt_restricted);
+						notif.add(NOTIFY_PROGRAM_SCHED, notif_pid, -1,
+							weather_response_is_current(monotonic_millis()) ? wt_restricted : 0);
 					}
 					//delete run-once if on final runtime (stations have already been queued)
 					if(will_delete){
@@ -956,9 +1143,6 @@ void do_loop()
 			// process dynamic events
 			process_dynamic_events(curr_time);
 
-			// activate / deactivate valves
-			os.apply_all_station_bits(overcurrent_monitor);
-
 			// check through runtime queue, calculate the last stop time of sequential stations
 			memset(pd.last_seq_stop_times, 0, sizeof(uint32_t)*NUM_SEQ_GROUPS);
 			time_os_t sst;
@@ -993,7 +1177,7 @@ void do_loop()
 				// log flow sensor reading if flow sensor is used
 				if(os.iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_FLOW) {
 					write_log(LOGDATA_FLOWSENSE, curr_time);
-					notif.add(NOTIFY_FLOWSENSOR, (flow_count>os.flowcount_log_start)?(flow_count-os.flowcount_log_start):0);
+					notif.add(NOTIFY_FLOWSENSOR, flow_pulses_since(os.flowcount_log_start, flow_count));
 				}
 
 				// in case some options have changed while executing the program
@@ -1023,7 +1207,7 @@ void do_loop()
 
 					q = pd.queue + pd.station_qid[sid];
 
-					if (os.bound_to_master(q->sid, mas)) {
+					if (bundle_bound_to_master(q->sid, mas)) {
 						// check if timing is within the acceptable range
 						if (curr_time >= q->st + mas_on_adj &&
 							curr_time <= q->st + q->dur + mas_off_adj) {
@@ -1040,7 +1224,8 @@ void do_loop()
 		if (os.status.pause_state) {
 			if (os.pause_timer > 0) {
 				os.pause_timer--;
-			} else {
+			}
+			if (os.pause_timer == 0) {
 				os.clear_all_station_bits();
 				pd.clear_pause();
 			}
@@ -1059,7 +1244,8 @@ void do_loop()
 					os.masters_last_on[mas] = curr_time;
 				}
 				if(laston > 0 && !masbit) { // master is about to turn off
-					notif.add(NOTIFY_STATION_OFF, mas_id - 1, (curr_time>laston) ? (curr_time-laston) : 0);
+					notif.add(NOTIFY_STATION_OFF, mas_id - 1,
+						(curr_time>laston) ? (curr_time-laston) : 0, 0, flow_last_gpm);
 					os.masters_last_on[mas] = 0;
 				}
 			}
@@ -1067,6 +1253,7 @@ void do_loop()
 
 		// activate/deactivate valves
 		os.apply_all_station_bits(overcurrent_monitor);
+		process_pending_overcurrent();
 
 #if defined(USE_DISPLAY)
 		// process LCD display
@@ -1158,48 +1345,50 @@ void check_weather() {
 	// Cache expiration is local state maintenance and must not depend on the
 	// network or on whether a program is currently running.
 	MaintainWeatherSensors();
-	// do not check weather if
-	// - network check has failed, or
-	// - the controller is in remote extension mode
-	if (os.status.network_fails>0 || os.iopts[IOPT_REMOTE_EXT_MODE]) return;
-	if (os.status.program_busy) return;
+	bool can_query = os.status.network_fails == 0 &&
+		!os.iopts[IOPT_REMOTE_EXT_MODE] && !os.status.program_busy &&
+		os.network_connected();
+	if (can_query) {
+		CheckWeatherSensors();
 
-	if (!os.network_connected()) return;
-	CheckWeatherSensors();
-
-	time_os_t ntz = os.now_tz();
-	if (os.checkwt_success_lasttime && (ntz > os.checkwt_success_lasttime + CHECK_WEATHER_SUCCESS_TIMEOUT)) {
-		// if last successful weather call timestamp is more than allowed threshold
-		// and if the selected adjustment method is not one of the manual methods
-		// reset watering percentage to 100
-		os.checkwt_success_lasttime = 0;
-		unsigned char method = os.iopts[IOPT_USE_WEATHER];
-		if(!(method==WEATHER_METHOD_MANUAL || method==WEATHER_METHOD_AUTORAINDELAY || method==WEATHER_METHOD_MONTHLY)) {
-			os.iopts[IOPT_WATER_PERCENTAGE] = 100; // reset watering percentage to 100%
-			wt_restricted = 0; // reset wt_rawData, errCode, and md_scales array
-			wt_rawData[0] = 0;
-			wt_errCode = HTTP_RQT_NOT_RECEIVED;
-			md_N = 0;
+		time_os_t ntz = os.now_tz();
+		if (!os.checkwt_lasttime || (ntz > os.checkwt_lasttime + CHECK_WEATHER_TIMEOUT)) {
+			os.checkwt_lasttime = ntz;
+			#if defined(USE_DISPLAY)
+			if (!ui_state) {
+				os.lcd_print_line_clear_pgm(PSTR("Check Weather..."),1);
+			}
+			#endif
+			GetWeather();
 		}
-	} else if (!os.checkwt_lasttime || (ntz > os.checkwt_lasttime + CHECK_WEATHER_TIMEOUT)) {
-		os.checkwt_lasttime = ntz;
-		#if defined(USE_DISPLAY)
-		if (!ui_state) {
-			os.lcd_print_line_clear_pgm(PSTR("Check Weather..."),1);
-		}
-		#endif
-		GetWeather();
 	}
+
+	// A query gets the first chance to refresh the response. If that did not
+	// happen, converge stale persisted/UI state without depending on connectivity.
+	// Defer configuration writes while watering; consumers already use the safe
+	// effective value even when this cleanup has not run yet.
+	if (!os.status.program_busy) weather_converge_stale_state(monotonic_millis());
 }
 
-/** Perform network check
- * This function pings the router
- * to check if it's still online.
- * If not, it re-initializes Ethernet controller.
+/** Refresh the network status used by scheduled network services.
+ *
+ * Deliberately limited to the ESP8266 W5500 path. This runs only once every
+ * CHECK_NETWORK_INTERVAL seconds, and network_fails suppresses MQTT publishes
+ * and weather queries. Raising it here for WiFi, ESP32, or ENC28J60 would let a
+ * momentary disconnect sampled at this instant keep those services suppressed
+ * for a further full interval after connectivity had already returned. Only the
+ * W5500 path has the one-second health check in service_w5500_recovery() to
+ * clear the counter again promptly, so only it can afford to raise it here.
  */
 static void check_network() {
-	// TODO:
-	// nothing to do for other platforms
+	if (!os.status.req_network) return;
+	os.status.req_network = 0;
+	#if defined(ESP8266)
+	if (!useEth || !eth.is_w5500()) return;
+	if (eth.fault_pending()) os.status.network_fails = 3;
+	else if (eth.connected()) os.status.network_fails = 0;
+	else if (os.status.network_fails < 3) os.status.network_fails++;
+	#endif
 }
 
 /** Perform NTP sync */

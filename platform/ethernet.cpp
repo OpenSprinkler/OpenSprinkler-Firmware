@@ -7,15 +7,16 @@
 #if defined(ESP8266)
 
 #include <ENC28J60lwIP.h>
-#include <W5500lwIP.h>
 #include <lwip/dns.h>
 
 #include "drivers/ch390_raw.h"
+#include "drivers/os_w5500.h"
+
+OSWiznet5500lwIP w5500(PIN_ETHER_CS);
 
 namespace {
 
 ENC28J60lwIP enc28j60(PIN_ETHER_CS);
-Wiznet5500lwIP w5500(PIN_ETHER_CS);
 CH390lwIP ch390(PIN_ETHER_CS);
 
 } // namespace
@@ -296,6 +297,18 @@ bool WiredEthernet::begin(const uint8_t* mac_address) {
 	case EthernetController::CH390: return ch390.begin(mac_address);
 	default: return false;
 	}
+}
+
+bool WiredEthernet::fault_pending() const {
+	return is_w5500() && w5500.faultPending();
+}
+
+bool WiredEthernet::health_check() {
+	return !is_w5500() || w5500.healthCheck();
+}
+
+bool WiredEthernet::raw_reinit() {
+	return is_w5500() && w5500.reinitialize();
 }
 #elif defined(ESP32)
 void WiredEthernet::set_spi_drive(EthernetController controller) {

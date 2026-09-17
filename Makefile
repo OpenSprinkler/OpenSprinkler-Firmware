@@ -34,15 +34,21 @@ container:
 TEST_HTTP_PORT?=18080
 
 .PHONY: test-api
-test-api: test-board-profiles test-hardware-detection test-storage-files test-firmware-release test-buffer-filler test-string-buffer test-sensor-units test-weather-sensor-cache
+test-api: test-board-profiles test-hardware-detection test-storage-files test-sprinkler-log test-firmware-release test-buffer-filler test-string-buffer test-sensor-units test-weather-sensor-cache test-weather-failsafe test-output-sequencer test-bundle-codec test-w5500-frame test-flow-rate-window
 	$(MAKE) clean
-	$(MAKE) VERSION=DEMO EXTRA_CXXFLAGS="-DHTTP_PORT=$(TEST_HTTP_PORT)"
+	$(MAKE) VERSION=DEMO EXTRA_CXXFLAGS="-DHTTP_PORT=$(TEST_HTTP_PORT) -DWEATHER_RESPONSE_TEST_MAX_AGE_MS=2000"
 	python3 tests/api_contract.py --port $(TEST_HTTP_PORT)
 
 .PHONY: test-board-profiles
 test-board-profiles:
 	@set -e; output=$$(mktemp); trap 'rm -f "$$output"' EXIT; \
 		$(CXX) -std=gnu++14 -I. tests/board_profile_test.cpp boards/board_profile.cpp -o "$$output"; \
+		"$$output"
+
+.PHONY: test-flow-rate-window
+test-flow-rate-window:
+	@set -e; output=$$(mktemp); trap 'rm -f "$$output"' EXIT; \
+		$(CXX) -std=gnu++14 -I. tests/flow_rate_window_test.cpp -o "$$output"; \
 		"$$output"
 
 .PHONY: test-hardware-detection
@@ -54,7 +60,16 @@ test-hardware-detection:
 .PHONY: test-storage-files
 test-storage-files:
 	@set -e; output=$$(mktemp); data=$$(mktemp -d); trap 'rm -f "$$output"; rm -rf "$$data"' EXIT; \
-		$(CXX) -std=gnu++14 -DDEMO -I. tests/storage_files_test.cpp storage/files.cpp storage/maintenance.cpp -o "$$output"; \
+		$(CXX) -std=gnu++14 -DDEMO -I. tests/storage_files_test.cpp \
+			storage/files.cpp storage/maintenance.cpp storage/sprinkler_log.cpp -o "$$output"; \
+		"$$output" "$$data"
+
+.PHONY: test-sprinkler-log
+test-sprinkler-log:
+	@set -e; output=$$(mktemp); data=$$(mktemp -d); trap 'rm -f "$$output"; rm -rf "$$data"' EXIT; \
+		$(CXX) -std=gnu++14 -DDEMO -DSPRINKLER_LOG_TEST_SMALL_GEOMETRY -I. \
+			tests/sprinkler_log_test.cpp \
+			storage/sprinkler_log.cpp storage/files.cpp storage/maintenance.cpp -o "$$output"; \
 		"$$output" "$$data"
 
 .PHONY: test-firmware-release
@@ -96,6 +111,35 @@ test-weather-sensor-cache:
 			-Iexternal/TinyWebsockets/tiny_websockets_lib/include \
 			-Iexternal/OpenThings-Framework-Firmware-Library \
 			-ffunction-sections -fdata-sections \
-			tests/weather_sensor_cache_test.cpp services/weather.cpp \
+			tests/weather_sensor_cache_test.cpp services/weather.cpp services/weather_failsafe.cpp \
+			platform/monotonic_clock.cpp \
 			-Wl,--gc-sections -o "$$output"; \
+		"$$output"
+
+.PHONY: test-weather-failsafe
+test-weather-failsafe:
+	@set -e; output=$$(mktemp); trap 'rm -f "$$output"' EXIT; \
+		$(CXX) -std=gnu++14 -I. tests/weather_failsafe_test.cpp \
+			services/weather_failsafe.cpp -o "$$output"; \
+		"$$output"
+
+.PHONY: test-output-sequencer
+test-output-sequencer:
+	@set -e; output=$$(mktemp); trap 'rm -f "$$output"' EXIT; \
+		$(CXX) -std=gnu++14 -I. tests/output_sequencer_test.cpp core/output_sequencer.cpp -o "$$output"; \
+		"$$output"
+
+.PHONY: test-bundle-codec
+test-bundle-codec:
+	@set -e; output=$$(mktemp); trap 'rm -f "$$output"' EXIT; \
+		$(CXX) -std=gnu++14 -DDEMO -ffunction-sections -fdata-sections -I. \
+			-Iexternal/TinyWebsockets/tiny_websockets_lib/include \
+			-Iexternal/OpenThings-Framework-Firmware-Library \
+			tests/bundle_codec_test.cpp core/bundle.cpp -Wl,--gc-sections -o "$$output"; \
+		"$$output"
+
+.PHONY: test-w5500-frame
+test-w5500-frame:
+	@set -e; output=$$(mktemp); trap 'rm -f "$$output"' EXIT; \
+		$(CXX) -std=gnu++14 -I. tests/w5500_frame_test.cpp drivers/w5500_frame.cpp -o "$$output"; \
 		"$$output"

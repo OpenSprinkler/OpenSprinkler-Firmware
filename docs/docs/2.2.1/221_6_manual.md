@@ -28,6 +28,8 @@ In addition, OpenSprinkler v3 is available in three power models:
 * **Extended Master Support:** This firmware supports up to **four master stations**, with independent on/off adjustments and per-zone selection of which masters apply.
 * **Additional Built-in Sensor Ports (SN3/SN4):** This firmware enables two additional built-in sensor ports on OpenSprinkler v3.4, for a total of four: `SN1`–`SN4`.
 * **Extended Watering Durations:** Weather- and sensor-adjusted station runtimes may now exceed the previous 18-hour limit, up to the firmware's seven-day runtime limit. Programmed water times remain limited to 18 hours.
+* **Bounded Sprinkler Log Storage:** Sprinkler Logs now use a compact binary ring with predictable flash usage and paginated export. On OpenSprinkler v3/v4, earlier Sprinkler Logs are removed during a visible one-time update on the first 2.2.1(6) boot; download prior history before upgrading if it must be retained.
+* <span class="hl">**Bundle Stations:** A physical zone can act as a bundle leader and activate any selected set of additional Standard physical zones in parallel. This provides an intuitive way to run several valves together while scheduling multiple bundles sequentially.</span>
 * **OpenSprinkler v2.3 Support Removed:** Firmware 2.2.1(5) supports OpenSprinkler v3.x and OSPi/Linux. Firmware 2.2.1(4) was the final release supporting OpenSprinkler v2.3.
 
 <hr class="double">
@@ -354,7 +356,7 @@ Each zone (station) is shown as a card. Tap the gear ⚙️ icon next to a zone 
     * Parallel (P) zones can run alongside any other zones.
     * The sequential group attribute replaces the old per-zone **Sequential** flag, providing more flexible concurrency control.
 
-* **Station Type** (Virtual Zone): Configure special properties so a station can control devices or actions beyond a standard sprinkler valve. These **special/virtual** station types do NOT consume a physical output - you can define them freely up to the controller’s maximum zone count, even without zone expanders.
+* **Station Type:** Configure special properties for a zone. Most special types are **virtual zones** that control a remote device or action instead of an ordinary valve. <span class="hl">Bundle Station is the exception: its leader remains a real physical zone.</span>
     * <span class="hllight">**Standard**</span> (default): Regular sprinkler zone.
     * <span class="hllight">**RF:**</span> Controls remote RF (Radio Frequency) power sockets via an external transmitter (requires [RFToy](https://opensprinkler.com/product/rftoy/) for code learning), allowing you to switch powerline devices such as Christmas lights, heaters, pumps.
     * <span class="hllight">**Remote Station (IP):**</span> Triggers a zone on another OpenSprinkler using its **IP, port, and zone index** (both controllers must **share the same device password**).
@@ -362,6 +364,7 @@ Each zone (station) is shown as a card. Tap the gear ⚙️ icon next to a zone 
     * <span class="hllight">**GPIO:**</span> Directly toggles an available GPIO pin on the controller (Active High/Low configurable). This type is disabled for controllers that do not have any available GPIO pins.
     * <span class="hllight">**HTTP:**</span> Sends an HTTP GET request upon zone activity. Provide a `server` (either domain name or IP), `port`, and the `on`/`off` command (excluding the leading slash `/`). Upon zone activation, it sends `server:port/on_command`, and upon deactivation `server:port/off_command`.
     * <span class="hllight">**HTTPS:**</span> Same as HTTP, but using a secure connection.
+    * <span class="hl">**Bundle Station:** A physical leader zone that also activates selected Standard zone outputs. The selected members remain independently controllable, and any direct or bundle claim keeps a shared member active.</span>
 
 ---
 
@@ -475,6 +478,8 @@ This firmware supports up to **four independent masters**, each configurable as 
     * `-60` → Master turns on `60` seconds **before** a zone starts.
 * **Master Off Adjustment:** Similar to above but for master **deactivation** timing.
 
+When associated zones overlap, master demand uses OR logic: the master remains active whenever at least one zone is within its configured master window. The on/off adjustments are therefore exact for non-overlapping sequential zones, but an already-active master is not cycled merely to reproduce each overlapping zone's individual adjustment.
+
 ---
 
 ### Station Handling
@@ -539,7 +544,9 @@ All supported controllers provide two independent built-in sensor ports (`SN1/SN
     * `SN3`: Starts `Program 3` (OpenSprinkler v3.4 only)
     * `SN4`: Starts `Program 4` (OpenSprinkler v3.4 only)
     * Activated if the switch / button is pressed for more than 1 second.
-* **Flow Sensor:** Detect flow pulses to measure **real-time flow rate** and **log total flow volume** at the end of each station run and program cycle.
+* **Flow Sensor:** Detect flow pulses to show **real-time flow rate**, record a settled average for each station run, and log total pulse count for each program cycle.
+    * The station's logged average flow rate is measured after a 90-second settling period. Runs too short to collect two pulses after that period report zero average flow rate; their pulses still count toward the program-cycle total.
+    * One flow sensor measures the combined flow of all open stations. During overlapping runs, per-station logged rates and flow alerts cannot reliably be attributed to an individual station.
     * Supports all **dry-contact, 2-wire** flow sensors (recommended). ![Flow Sensor](../assets/images/flow_sensor_example.png){ .img-shadow width="150" style="float: right; margin: 5px 5px 5px 5px;"}
         * Connect the two wires to **SN1 + GND**.
         * They are essentially reed switches that open and close repeatedly as water flows through the meter. They do not need power and the two wires have no polarity.
@@ -762,6 +769,23 @@ Example: If Zones 1–3 are in Group `A`, and 4–6 in Group `B`, they can opera
 
 <u>**NOTE**</u>: **Earlier firmwares** used a single **Sequential flag** for all zones, which effectively put all zones in a single sequential group. That flag has been replaced by the multi-group system here, which provides greater flexibility by allowing multiple independent groups.
 
+### Bundle Stations
+
+A <span class="hl">**Bundle Station**</span> behaves like several physical valve wires connected to one logical zone. Starting the bundle leader activates the leader's own output and every enabled member selected in its Bundle Station configuration. The leader owns the schedule, runtime, rain and sensor behavior, log entry, and notification. Members do not receive synthetic queue entries or countdown times.
+
+Bundle ownership is combined using OR logic:
+
+* A member remains active while it has its own direct run or while any active bundle claims it.
+* Stopping an independently running member removes only its direct run. Stop the bundle leader to remove that bundle's claim.
+* The same physical zone may belong to more than one bundle.
+* Only Standard zones can be members. Special stations, Bundle Station leaders, and master stations cannot be selected as members.
+* A disabled member remains configured but is skipped while disabled.
+* Member **Use Masters** selections are combined with the leader's selections so required pumps or master valves activate for the bundle.
+
+A Bundle Station is scheduled as one unit according to the leader's **Sequential Group**. Once the leader starts, its members are activated as derived outputs and their own Sequential Groups are not consulted. A member's group still governs that member whenever it is scheduled directly.
+
+To reduce simultaneous solenoid inrush, all new physical outputs are activated one at a time with a `250 ms` interval. A very short bundle run is automatically extended enough for an isolated bundle's selected members to activate and remain on briefly. Multiple unusually short bundles started concurrently share the same transition sequence, so a heavily contended late member may not activate before its leader's run ends.
+
 <hr class="double">
 
 ## Logs
@@ -769,6 +793,13 @@ Example: If Zones 1–3 are in Group `A`, and 4–6 in Group `B`, they can opera
 ### Sprinkler Logs
 
 OpenSprinkler logs **Zone Activity**, **Rain Delays**, **Built-in Sensor Events**, **Flow Volumes**, and **% Watering Changes** on the controller. To view these records:
+
+<span class="hl">Firmware 2.2.1(6) stores Sprinkler Logs in a compact, bounded binary ring.</span>
+
+!!! warning "Download prior Sprinkler Logs before upgrading"
+    On OpenSprinkler v3 and v4, the first boot into firmware 2.2.1(6) removes Sprinkler Logs created by earlier firmware. The LCD shows the one-time update progress; do not power off the controller until it finishes. Programs, settings, station names, and Expanded Sensor logs are preserved.
+
+    Linux and OSPi leave earlier text log files on disk, but those files are no longer displayed through the Sprinkler Logs page or returned by `/jl`.
 
 ![Logs](images/logs.png)
 

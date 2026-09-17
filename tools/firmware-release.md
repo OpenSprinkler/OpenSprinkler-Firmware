@@ -24,7 +24,7 @@ python3 tools/firmware_release.py release \
 ```
 
 The command imports the current catalog and verifies its signed releases,
-builds ESP8266 and ESP32-C6, reads the version and build from `defines.h`, and
+builds ESP8266 and ESP32-C6-N8, reads the version and build from `defines.h`, and
 prepares architecture-specific immutable artifacts. Each release directory gets
 a compact signed `release.json` descriptor. The unrestricted top-level
 `manifest.json` is only a browser index. Nothing is published unless

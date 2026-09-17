@@ -15,6 +15,7 @@ This is the OpenSprinkler unified firmware for ESP8266/Arduino and Linux/Raspber
 - `make test-board-profiles`, `make test-hardware-detection`, `make test-storage-files`: run focused native tests.
 - `npm ci && node compress_htmls.mjs`: regenerate `html/htmls.h` reproducibly from `html/*.html`.
 - `pio run -e os3x_esp8266`: build ESP8266 firmware with PlatformIO.
+- `pio run -e os4_esp32c6_n8`: build the ESP32-C6-N8 firmware and its `.bin32n8` release artifact.
 - `docker build -t opensprinkler .`: build the container image.
 
 ## Coding Style & Naming Conventions

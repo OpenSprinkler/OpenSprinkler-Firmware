@@ -2,10 +2,12 @@
 """Smoke-test the public JSON contract against a fresh Demo instance."""
 
 import argparse
+import http.server
 import json
 import socket
 import subprocess
 import tempfile
+import threading
 import time
 import urllib.error
 import urllib.parse
@@ -14,6 +16,8 @@ from pathlib import Path
 
 
 PASSWORD_HASH = "a6d82bced638de3def1e9bbb4983225c"
+MAX_SOPTS_SIZE = 320
+SOPT_WEATHER_URL = 3
 
 
 def require_keys(name, value, keys):
@@ -87,6 +91,15 @@ class DemoServer:
         with urllib.request.urlopen(url, timeout=3) as response:
             return json.load(response)
 
+    def get_response(self, endpoint, params=None):
+        query_params = {"pw": PASSWORD_HASH}
+        if params:
+            query_params.update(params)
+        query = urllib.parse.urlencode(query_params)
+        url = f"http://127.0.0.1:{self.port}/{endpoint}?{query}"
+        with urllib.request.urlopen(url, timeout=3) as response:
+            return response.status, response.headers, response.read()
+
     def raw_http(self, headers, body_parts=(), shutdown_write=False):
         with socket.create_connection(("127.0.0.1", self.port), timeout=3) as sock:
             sock.settimeout(4)
@@ -108,6 +121,62 @@ class DemoServer:
                     break
                 response.extend(chunk)
             return bytes(response)
+
+    def set_string_option(self, option_id, value):
+        encoded = value.encode("ascii")
+        if len(encoded) >= MAX_SOPTS_SIZE:
+            raise ValueError("string option is too long")
+        path = Path(self.temp_dir.name) / "sopts.dat"
+        with path.open("r+b", buffering=0) as options:
+            options.seek(option_id * MAX_SOPTS_SIZE)
+            options.write(encoded + b"\0" * (MAX_SOPTS_SIZE - len(encoded)))
+
+
+class WeatherMock:
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            body = self.server.weather_body.encode("ascii")
+            response = (
+                b"HTTP/1.0 200 OK\r\n"
+                b"Content-Type: text/plain\r\n"
+                + f"Content-Length: {len(body)}\r\n".encode("ascii")
+                + b"Connection: close\r\n\r\n"
+                + body
+            )
+            # The Linux firmware client performs one blocking read. Send the
+            # complete response in one write so this fixture matches that
+            # existing transport contract.
+            self.connection.sendall(response)
+            self.close_connection = True
+
+        def log_message(self, _format, *_args):
+            pass
+
+    def __init__(self):
+        self.server = http.server.ThreadingHTTPServer(
+            ("127.0.0.1", 0), self.Handler
+        )
+        self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
+
+    def __enter__(self):
+        self.set_response(100, 0)
+        self.thread.start()
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.server.shutdown()
+        self.server.server_close()
+        self.thread.join(timeout=3)
+
+    @property
+    def url(self):
+        return f"http://127.0.0.1:{self.server.server_port}"
+
+    def set_response(self, scale, restricted):
+        self.server.weather_body = (
+            f"&errCode=0&scale={scale}&restricted={restricted}"
+            '&rawData={"provider":"test"}'
+        )
 
 
 def check_options(data):
@@ -136,7 +205,7 @@ def check_controller(data):
             "sunset", "eip", "lwc", "lswc", "lupt", "lrbtc", "lrun", "pq",
             "pt", "nq", "ocs", "otc", "otcs", "mac", "loc", "jsp", "wsp",
             "wto", "ifkey", "mqtt", "wtdata", "wterr", "wtrestr", "dname",
-            "email", "wls", "sbits", "ps", "gpio",
+            "email", "wls", "sbits", "bap", "ps", "gpio",
         ],
     )
     assert isinstance(data["lrun"], list) and len(data["lrun"]) == 4
@@ -150,10 +219,11 @@ def check_stations(data):
         [
             "masop", "masop2", "masop3", "masop4", "ignore_rain",
             "ignore_sn1", "ignore_sn2", "stn_dis", "stn_spe", "stn_grp",
-            "snames", "maxlen",
+            "stn_bnd", "bmt", "snames", "maxlen",
         ],
     )
     assert len(data["snames"]) == len(data["stn_grp"])
+    assert data["bmt"] == 1
 
 
 def check_programs(data):
@@ -208,7 +278,9 @@ def check_combined(data):
         data,
         ["settings", "programs", "options", "status", "stations", "sensors"],
     )
-    require_keys("/ja.status", data["status"], ["sn", "nstations"])
+    require_keys("/ja.status", data["status"], ["sn", "bap", "nstations"])
+    require_keys("/ja.stations", data["stations"], ["stn_bnd", "bmt"])
+    assert data["stations"]["bmt"] == 1
     assert len(data["status"]["sn"]) == data["status"]["nstations"]
 
 
@@ -244,11 +316,48 @@ def check_request_bodies(server):
     print("PASS HTTP request body handling")
 
 
+def check_nested_option_encodings(server):
+    legacy_values = {
+        "wto": {"h": 20, "t": 50, "r": 100},
+        "otc": {"en": 0, "token": "legacy-token"},
+        "mqtt": {"en": 0, "host": "legacy-broker", "port": 1883},
+        "email": {"en": 0, "host": "legacy-mail", "port": 465},
+    }
+    braced_values = {
+        "wto": {"h": 30, "t": 60, "r": 90},
+        "otc": {"en": 0, "token": "braced-token"},
+        "mqtt": {"en": 0, "host": "braced-broker", "extra": {"nested": 1}},
+        "email": {"en": 0, "host": "braced-mail", "port": 587},
+    }
+
+    for key, value in legacy_values.items():
+        encoded = json.dumps(value, separators=(",", ":"))[1:-1]
+        result = server.get_json("co", {key: encoded})
+        assert result["result"] == 1, (key, result)
+        assert server.get_json("jc")[key] == value, key
+
+    for key, value in braced_values.items():
+        encoded = json.dumps(value, separators=(",", ":"))
+        result = server.get_json("co", {key: encoded})
+        assert result["result"] == 1, (key, result)
+        assert server.get_json("jc")[key] == value, key
+
+    # Empty complete objects normalize to empty stored fragments and remain
+    # objects when emitted by /jc and /ja.
+    for key in braced_values:
+        result = server.get_json("co", {key: "{}"})
+        assert result["result"] == 1, (key, result)
+        assert server.get_json("jc")[key] == {}, key
+    server.get_json("ja")
+    print("PASS nested option object encodings")
+
+
 def check_control_commands(server):
     result = server.get_json("cm", {"sid": 0, "en": 1, "t": 64800, "qo": 0})
     assert result["result"] == 1, result
     status = server.get_json("jc")
     assert status["ps"][0][0] == 99, status["ps"][0]
+    assert status["nq"] == 1, status["nq"]
 
     result = server.get_json("cv", {"rsn": 0, "rbt": 0})
     assert result["result"] == 1, result
@@ -260,13 +369,77 @@ def check_control_commands(server):
     status = server.get_json("jc")
     assert status["ps"][0][0] == 99, status["ps"][0]
 
-    result = server.get_json("cv", {"rsn": 1})
+    result = server.get_json("cm", {"sid": 0, "en": 0})
     assert result["result"] == 1, result
+    deadline = time.monotonic() + 3
+    while time.monotonic() < deadline:
+        status = server.get_json("jc")
+        if status["nq"] == 0 and status["sbits"][0] == 0:
+            break
+        time.sleep(0.05)
+    assert status["nq"] == 0 and status["sbits"][0] == 0, status
+
     result = server.get_json("cm", {"sid": 0, "en": 0})
     assert result["result"] == 0x11, result
 
     result = server.get_json("cv", {"rd": -1})
     assert result["result"] == 0x11, result
+
+    # A timed pause must keep the station off through the expiration tick.
+    # Previously pause_state remained set for one tick after pause_timer reached
+    # zero, allowing the scheduler to pulse the station on before resuming it.
+    try:
+        result = server.get_json("cv", {"rsn": 1})
+        assert result["result"] == 1, result
+        deadline = time.monotonic() + 3
+        while time.monotonic() < deadline:
+            status = server.get_json("jc")
+            if status["nq"] == 0:
+                break
+            time.sleep(0.05)
+        assert status["nq"] == 0, status
+
+        result = server.get_json("cm", {"sid": 0, "en": 1, "t": 12, "qo": 2})
+        assert result["result"] == 1, result
+
+        deadline = time.monotonic() + 3
+        while time.monotonic() < deadline:
+            status = server.get_json("jc")
+            if status["sbits"][0] & 1:
+                break
+            time.sleep(0.05)
+        assert status["sbits"][0] & 1, status
+
+        result = server.get_json("pq", {"repl": 2})
+        assert result["result"] == 1, result
+
+        deadline = time.monotonic() + 3
+        while time.monotonic() < deadline:
+            status = server.get_json("jc")
+            if status["pq"] == 1 and not (status["sbits"][0] & 1):
+                break
+            time.sleep(0.05)
+        assert status["pq"] == 1 and not (status["sbits"][0] & 1), status
+
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline:
+            status = server.get_json("jc")
+            if status["pq"] == 0:
+                break
+            assert not (status["sbits"][0] & 1), status
+            time.sleep(0.05)
+        assert status["pq"] == 0, status
+
+        deadline = time.monotonic() + 3
+        while time.monotonic() < deadline:
+            status = server.get_json("jc")
+            if status["sbits"][0] & 1:
+                break
+            time.sleep(0.05)
+        assert status["sbits"][0] & 1, status
+    finally:
+        server.get_json("cv", {"rsn": 1})
+        server.get_json("pq", {"repl": 0})
 
     program_count = server.get_json("jp")["nprogs"]
     # Extra entries from a previously larger station setup remain compatible.
@@ -281,6 +454,382 @@ def check_control_commands(server):
     print("PASS shared control command behavior")
 
 
+def check_weather_failsafe(server):
+    original_options = server.get_json("jo")
+    original_weather_url = server.get_json("jc")["wsp"]
+    program_id = None
+
+    def reset_queue():
+        result = server.get_json("cv", {"rsn": 1})
+        assert result["result"] == 1, result
+        deadline = time.monotonic() + 3
+        while time.monotonic() < deadline:
+            status = server.get_json("jc")
+            if status["nq"] == 0:
+                return
+            time.sleep(0.05)
+        raise AssertionError(("queue did not reset", status))
+
+    def wait_for_weather(scale, restricted):
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline:
+            status = server.get_json("jc")
+            options = server.get_json("jo")
+            if (status["wterr"] == 0 and status["wtrestr"] == restricted and
+                    options["wl"] == scale):
+                return
+            time.sleep(0.05)
+        raise AssertionError(("weather response not applied", status, options))
+
+    def start_guard_station():
+        result = server.get_json("cm", {"sid": 7, "en": 1, "t": 120, "qo": 2})
+        assert result["result"] == 1, result
+        deadline = time.monotonic() + 3
+        while time.monotonic() < deadline:
+            status = server.get_json("jc")
+            if status["ps"][7][0] == 99:
+                return
+            time.sleep(0.05)
+        raise AssertionError(("guard station did not start", status))
+
+    def assert_scaled_runs(expected_duration):
+        result = server.get_json(
+            "cr", {"t": "[100,0,0,0,0,0,0,0]", "uwt": 1, "qo": 0}
+        )
+        assert result["result"] == 1, result
+        result = server.get_json("mp", {"pid": program_id, "uwt": 1, "qo": 0})
+        assert result["result"] == 1, result
+        deadline = time.monotonic() + 3
+        while time.monotonic() < deadline:
+            status = server.get_json("jc")
+            if status["ps"][0][0] and status["ps"][1][0]:
+                break
+            time.sleep(0.05)
+        assert status["ps"][0][1] == expected_duration, status["ps"][0]
+        assert status["ps"][1][1] == expected_duration, status["ps"][1]
+
+    with WeatherMock() as weather:
+        try:
+            server.set_string_option(SOPT_WEATHER_URL, weather.url)
+            program_id = server.get_json("jp")["nprogs"]
+            packed_program = json.dumps(
+                [3, 127, 0, [0, 0, 0, 0], [0, 100, 0, 0, 0, 0, 0, 0]],
+                separators=(",", ":"),
+            )
+            result = server.get_json("cp", {
+                "pid": -1,
+                "v": packed_program,
+                "name": "Weather fail-safe test",
+            })
+            assert result["result"] == 1, result
+
+            # A fresh restricted Zimmerman response with wl=0 would suppress
+            # both runs. Keep cleanup deferred while its short test freshness
+            # horizon expires; the consumers must then ignore both values.
+            weather.set_response(0, 1)
+            result = server.get_json("co", {"uwt": 1, "wl": 0})
+            assert result["result"] == 1, result
+            wait_for_weather(0, 1)
+            start_guard_station()
+            time.sleep(2.2)
+            status = server.get_json("jc")
+            assert status["wtrestr"] == 1, status
+            assert server.get_json("jo")["wl"] == 0
+            assert_scaled_runs(100)
+
+            # Restrictions also expire under Manual, but the locally selected
+            # water level remains effective.
+            reset_queue()
+            weather.set_response(40, 1)
+            result = server.get_json("co", {"uwt": 0, "wl": 40})
+            assert result["result"] == 1, result
+            wait_for_weather(40, 1)
+            start_guard_station()
+            time.sleep(2.2)
+            status = server.get_json("jc")
+            assert status["wtrestr"] == 1, status
+            assert_scaled_runs(40)
+        finally:
+            reset_queue()
+            if program_id is not None and program_id < server.get_json("jp")["nprogs"]:
+                server.get_json("dp", {"pid": program_id})
+
+            # Force a final weather-state reset, restore the original settings,
+            # and let the mock satisfy the resulting immediate query before its
+            # URL is removed.
+            alternate_method = 0 if original_options["uwt"] != 0 else 1
+            server.get_json("co", {"uwt": alternate_method})
+            weather.set_response(original_options["wl"], 0)
+            server.get_json("co", {
+                "uwt": original_options["uwt"],
+                "wl": original_options["wl"],
+            })
+            wait_for_weather(original_options["wl"], 0)
+            server.set_string_option(SOPT_WEATHER_URL, original_weather_url)
+
+    print("PASS stale weather fail-safe integration")
+
+
+def check_bundle_commands(server):
+    assert server.get_json("cv", {"rsn": 1})["result"] == 1
+    deadline = time.monotonic() + 3
+    while time.monotonic() < deadline and server.get_json("jc")["nq"]:
+        time.sleep(0.05)
+    assert server.get_json("jc")["nq"] == 0
+
+    station_data = server.get_json("jn")
+    board_count = len(station_data["stn_bnd"])
+    assert board_count >= 1
+
+    def membership(*station_ids):
+        boards = [0] * board_count
+        for sid in station_ids:
+            boards[sid // 8] |= 1 << (sid % 8)
+        return "".join(f"{value:02X}" for value in boards)
+
+    # The advertised member-type capability and API enforcement must agree.
+    # Every setup is asserted independently so an invalid fixture cannot count
+    # as a successful member rejection. Demo intentionally exposes no GPIO pin,
+    # so type 3 is covered by the native type-mask matrix instead.
+    member_type_mask = station_data["bmt"]
+    type_payloads = {
+        0: "0",
+        1: "05331305333C0021",
+        2: "C0A80050005000",
+        4: "example.com,80,on,off",
+        5: "example.com,443,on,off",
+        6: "00000000000000000000000000000000X00",
+        7: membership(7),
+    }
+    candidate_sid = 6
+    for station_type, payload in type_payloads.items():
+        assert server.get_json("cs", {"sid": 0, "st": 0, "sd": "0", "p0": 0})["result"] == 1
+        setup = server.get_json("cs", {
+            "sid": candidate_sid,
+            "st": station_type,
+            "sd": payload,
+            "p0": 0 if station_type == 0 else 1 << candidate_sid,
+        })
+        assert setup["result"] == 1, (station_type, setup)
+        member_result = server.get_json("cs", {
+            "sid": 0, "st": 7, "sd": membership(candidate_sid)
+        })["result"]
+        advertised = bool(member_type_mask & (1 << station_type))
+        assert (member_result == 1) == advertised, (station_type, member_result, member_type_mask)
+
+    assert server.get_json("cs", {"sid": 0, "st": 0, "sd": "0", "p0": 0})["result"] == 1
+    assert server.get_json("cs", {"sid": candidate_sid, "st": 0, "sd": "0", "p0": 0})["result"] == 1
+
+    # Bundle 1 claims stations 2 and 3. Its own bit is forbidden.
+    result = server.get_json("cs", {"sid": 0, "st": 7, "sd": membership(1, 2)})
+    assert result["result"] == 1, result
+    assert server.get_json("je")["0"]["st"] == 7
+    assert server.get_json("cs", {"sid": 0, "st": 7, "sd": membership(0)})["result"] == 0x11
+
+    # Referenced members cannot become any special-station type, and
+    # unsupported special stations cannot be added as bundle members.
+    assert server.get_json("cs", {
+        "sid": 1, "st": 4, "sd": "example.com,80,on,off"
+    })["result"] == 0x30
+    assert server.get_json("cs", {
+        "sid": 1, "st": 7, "sd": membership(3)
+    })["result"] == 0x30
+    assert server.get_json("cs", {
+        "sid": 3, "st": 4, "sd": "example.com,80,on,off", "p0": 9
+    })["result"] == 1
+    assert server.get_json("cs", {
+        "sid": 0, "st": 7, "sd": membership(1, 3)
+    })["result"] == 0x11
+    assert server.get_json("cs", {"sid": 3, "st": 0, "sd": "0", "p0": 1})["result"] == 1
+
+    # A bundle member cannot subsequently become a master.
+    assert server.get_json("co", {"mas": 2})["result"] == 0x11
+
+    # Five member transitions need 1.25 seconds, plus at least one second of
+    # runtime for the final member. Queue timing rounds that up to 3 seconds.
+    assert server.get_json("cs", {
+        "sid": 0, "st": 7, "sd": membership(1, 2, 3, 4, 5)
+    })["result"] == 1
+    assert server.get_json("cm", {"sid": 0, "en": 1, "t": 1})["result"] == 1
+    deadline = time.monotonic() + 3
+    while time.monotonic() < deadline:
+        status = server.get_json("jc")
+        if status["ps"][0][0] != 0:
+            break
+        time.sleep(0.05)
+    assert status["ps"][0][1] >= 3, status["ps"][0]
+    assert server.get_json("cv", {"rsn": 1})["result"] == 1
+    deadline = time.monotonic() + 3
+    while time.monotonic() < deadline:
+        status = server.get_json("jc")
+        if status["nq"] == 0 and status["sbits"][0] == 0:
+            break
+        time.sleep(0.05)
+    assert status["nq"] == 0 and status["sbits"][0] == 0
+    assert server.get_json("cs", {"sid": 0, "st": 7, "sd": membership(1, 2)})["result"] == 1
+
+    # Disabled members are skipped. Re-enabling one while the leader is active
+    # adds its derived claim through the same staggered output path.
+    assert server.get_json("cs", {"d0": 4})["result"] == 1
+    result = server.get_json("cm", {"sid": 0, "en": 1, "t": 60})
+    assert result["result"] == 1, result
+    deadline = time.monotonic() + 5
+    status = None
+    while time.monotonic() < deadline:
+        status = server.get_json("jc")
+        if status["sbits"][0] & 0x03 == 0x03:
+            break
+        time.sleep(0.05)
+    assert status["sbits"][0] & 0x03 == 0x03, status["sbits"]
+    time.sleep(0.5)
+    assert server.get_json("jc")["sbits"][0] & 0x04 == 0
+    assert server.get_json("cs", {"d0": 0})["result"] == 1
+    deadline = time.monotonic() + 3
+    while time.monotonic() < deadline:
+        status = server.get_json("jc")
+        if status["sbits"][0] & 0x07 == 0x07:
+            break
+        time.sleep(0.05)
+    assert status["sbits"][0] & 0x07 == 0x07, status["sbits"]
+    assert status["bap"][0] & 0x07 == 0x06, status["bap"]
+    assert status["ps"][0][0] != 0, status["ps"][0]
+
+    # Derived-only activity is not an individual /cm run.
+    derived_stop = server.get_json("cm", {"sid": 1, "en": 0})
+    assert derived_stop["result"] == 0x11, derived_stop
+    after_derived_stop = server.get_json("jc")
+    assert after_derived_stop["ps"][0][0] != 0, after_derived_stop["ps"][0]
+
+    # Removing an individual claim does not defeat the bundle's OR claim.
+    assert server.get_json("cs", {"g1": 255})["result"] == 1
+    assert server.get_json("cm", {"sid": 1, "en": 1, "t": 1})["result"] == 1
+    deadline = time.monotonic() + 5
+    saw_individual_run = False
+    while time.monotonic() < deadline:
+        status = server.get_json("jc")
+        if status["ps"][1][0] != 0:
+            saw_individual_run = True
+        if saw_individual_run and status["ps"][1][0] == 0:
+            break
+        time.sleep(0.05)
+    assert saw_individual_run and status["ps"][1][0] == 0
+    assert status["sbits"][0] & 0x02
+    assert status["bap"][0] & 0x02
+    assert server.get_json("cs", {"g1": 0})["result"] == 1
+
+    # A member's master binding contributes to the bundle leader's demand window.
+    assert server.get_json("cv", {"rsn": 1})["result"] == 1
+    deadline = time.monotonic() + 3
+    while time.monotonic() < deadline:
+        status = server.get_json("jc")
+        if status["sbits"][0] & 0x07 == 0:
+            break
+        time.sleep(0.05)
+    assert status["sbits"][0] & 0x07 == 0
+    assert server.get_json("cs", {"m0": 2})["result"] == 1
+    assert server.get_json("co", {"mas": 8})["result"] == 1
+    assert server.get_json("cm", {"sid": 0, "en": 1, "t": 60})["result"] == 1
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline:
+        status = server.get_json("jc")
+        if status["sbits"][0] & 0x87 == 0x87:
+            break
+        time.sleep(0.05)
+    assert status["sbits"][0] & 0x87 == 0x87, status["sbits"]
+    assert server.get_json("cv", {"rsn": 1})["result"] == 1
+    deadline = time.monotonic() + 3
+    while time.monotonic() < deadline and server.get_json("jc")["nq"]:
+        time.sleep(0.05)
+    assert server.get_json("co", {"mas": 0})["result"] == 1
+    assert server.get_json("cs", {"m0": 0})["result"] == 1
+
+    # Inserting ahead of a nearly-finished bundle forces it to restart its
+    # physical member sequence. Its resumed duration and following station
+    # must both account for that new startup interval.
+    deadline = time.monotonic() + 3
+    while time.monotonic() < deadline and server.get_json("jc")["nq"]:
+        time.sleep(0.05)
+    assert server.get_json("cs", {"sid": 1, "st": 0, "sd": "0"})["result"] == 1
+    station_data = server.get_json("jn")
+    assert station_data["stn_spe"][0] & 0x02 == 0, station_data["stn_spe"]
+    assert server.get_json("cs", {
+        "sid": 0, "st": 7, "sd": membership(1, 2, 3, 4, 5)
+    })["result"] == 1
+    assert server.get_json("cm", {"sid": 0, "en": 1, "t": 1})["result"] == 1
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline:
+        status = server.get_json("jc")
+        if status["ps"][0][0] != 0 and status["ps"][0][1] <= 2:
+            break
+        time.sleep(0.05)
+    assert status["ps"][0][0] != 0
+    assert server.get_json("cm", {"sid": 6, "en": 1, "t": 2})["result"] == 1
+    deadline = time.monotonic() + 4
+    while time.monotonic() < deadline:
+        status = server.get_json("jc")
+        if status["ps"][0][1] <= 1:
+            break
+        time.sleep(0.05)
+    assert server.get_json("cm", {"sid": 7, "en": 1, "t": 1, "qo": 1})["result"] == 1
+    deadline = time.monotonic() + 4
+    while time.monotonic() < deadline:
+        status = server.get_json("jc")
+        if status["ps"][0][0] != 0 and status["ps"][0][1] >= 3 and status["ps"][6][2]:
+            break
+        time.sleep(0.05)
+    assert status["ps"][0][1] >= 3, status["ps"][0]
+    assert status["ps"][6][2] >= status["ps"][0][2] + 3, (status["ps"][0], status["ps"][6])
+    assert server.get_json("cv", {"rsn": 1})["result"] == 1
+    print("PASS bundle station behavior")
+
+
+def check_sprinkler_logs(server):
+    assert isinstance(server.get_json("jl", {"hist": 1}), list)
+    status, headers, body = server.get_response(
+        "jl", {"hist": "all", "fmt": "binary", "page": 1, "count": 2500}
+    )
+    assert status == 200
+    assert headers.get_content_type() == "application/octet-stream"
+    assert headers["X-OS-Page-Done"] == "1"
+    scanned = int(headers["X-OS-Scanned-Slots"])
+    assert 0 <= scanned <= 2500
+    assert headers["X-OS-Record-Size"] == "16"
+    assert len(headers["X-OS-Next-Cursor"]) == 12
+    assert len(body) % 16 == 0 and len(body) // 16 <= scanned
+    assert server.get_json("jl", {"hist": 1, "fmt": "binary"})["result"] == 0x12
+
+    day = 10
+    log_dir = Path(server.temp_dir.name) / "logs"
+    log_dir.mkdir(exist_ok=True)
+    (log_dir / f"{day}.txt").write_text(
+        "[3,2,90,864100]\n[0,\"wl\",100,864200]\n", encoding="ascii"
+    )
+    window = {"start": day * 86400, "end": (day + 1) * 86400 - 1}
+    # Legacy daily files remain on Linux, but /jl is ring-only in 2.2.1(6).
+    assert server.get_json("jl", window) == []
+    assert server.get_json("jl", {**window, "type": "wl"}) == []
+
+    binary_params = {**window, "fmt": "binary", "page": 1, "count": 1}
+    _, first_headers, first_body = server.get_response("jl", binary_params)
+    assert first_headers["X-OS-Page-Done"] == "1"
+    assert first_headers["X-OS-Scanned-Slots"] == "0"
+    assert first_body == b""
+    assert server.get_json("jl", {
+        **binary_params, "cursor": "0000000000000000000000000000"
+    })["result"] == 0x12
+
+    assert server.get_json("dl", {"day": day})["result"] == 1
+    assert server.get_json("jl", window) == []
+    assert server.get_json("dl", {"before": 1})["result"] == 1
+    print("PASS sprinkler log API")
+
+
+def check_debug(value):
+    require_keys("db", value, ["sprlog_fail", "sprlog_mismatch"])
+    assert value["sprlog_fail"] == 0
+    assert value["sprlog_mismatch"] == 0
+
+
 def run_contract(server):
     checks = [
         ("jo", check_options),
@@ -291,12 +840,17 @@ def run_contract(server):
         ("jsd", check_sensor_definitions),
         ("jpa", check_program_adjustments),
         ("ja", check_combined),
+        ("db", check_debug),
     ]
     for endpoint, check in checks:
         check(server.get_json(endpoint))
         print(f"PASS /{endpoint}")
     check_request_bodies(server)
     check_control_commands(server)
+    check_weather_failsafe(server)
+    check_bundle_commands(server)
+    check_sprinkler_logs(server)
+    check_nested_option_encodings(server)
 
 
 def main():

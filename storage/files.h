@@ -27,8 +27,10 @@ enum class FileSeekMode {
 };
 
 bool remove_file(const char* filename);
+bool rename_file(const char* source, const char* destination);
+bool truncate_file(const char* filename, uint32_t length);
 bool file_exists(const char* filename);
-void ensure_log_dir();
+bool ensure_log_dir();
 
 os_file_type file_open(const char* filename, FileOpenMode mode);
 void file_close(os_file_type file);

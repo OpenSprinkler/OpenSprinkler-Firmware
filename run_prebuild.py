@@ -47,14 +47,14 @@ except Exception as e:
     env.Exit(1)
 
 
-def create_esp32_release_artifact(source, target, env):
+def create_esp32_n8_release_artifact(source, target, env):
     source_path = env.subst("$BUILD_DIR/${PROGNAME}.bin")
-    release_path = env.subst("$BUILD_DIR/${PROGNAME}.bin32")
+    release_path = env.subst("$BUILD_DIR/${PROGNAME}.bin32n8")
     shutil.copy2(source_path, release_path)
-    print(f"Created ESP32-C6 release artifact: {release_path}")
+    print(f"Created ESP32-C6-N8 release artifact: {release_path}")
 
 
 # PlatformIO expects firmware.bin for its upload pipeline. Keep that internal
 # artifact and also emit the architecture-specific file used for releases.
-if env.get("PIOENV") == "os4_esp32c6":
-    env.AddPostAction("$BUILD_DIR/${PROGNAME}.bin", create_esp32_release_artifact)
+if env.get("PIOENV") == "os4_esp32c6_n8":
+    env.AddPostAction("$BUILD_DIR/${PROGNAME}.bin", create_esp32_n8_release_artifact)

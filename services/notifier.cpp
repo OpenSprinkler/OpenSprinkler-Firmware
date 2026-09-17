@@ -25,6 +25,7 @@
 #include "../core/program.h"
 #include "external/ArduinoJson.hpp"
 #include "../api/server.h"
+#include "sensors/flow_rate.h"
 #if defined(ESP32)
 #include "EMailSender.h"
 #endif
@@ -38,7 +39,6 @@ extern OpenSprinkler os;
 extern ProgramData pd;
 extern char tmp_buffer[];
 extern char ether_buffer[];
-extern float flow_last_gpm;
 
 extern const char *user_agent_string;
 
@@ -214,7 +214,7 @@ static void format_notification(uint16_t type, uint32_t lval, float fval,
 				snprintf_P(bufs.payload + strlen(bufs.payload), bufs.payload_cap - strlen(bufs.payload),
 				           PSTR(",\"duration\":%d"), (int)fval);
 				if (os.iopts[IOPT_SENSOR1_TYPE] == SENSOR_TYPE_FLOW) {
-					float gpm = flow_last_gpm * flowrate100 / 100.f;
+					float gpm = fval2 * flowrate100 / 100.f;
 					snprintf_P(bufs.payload + strlen(bufs.payload), bufs.payload_cap - strlen(bufs.payload),
 					           PSTR(",\"flow\":%.2f"), gpm);
 				}
@@ -230,7 +230,7 @@ static void format_notification(uint16_t type, uint32_t lval, float fval,
 				           PSTR(" %d minutes %d seconds."), (int)fval/60, (int)fval%60);
 			}
 			if (os.iopts[IOPT_SENSOR1_TYPE] == SENSOR_TYPE_FLOW) {
-				float gpm = flow_last_gpm * flowrate100 / 100.f;
+				float gpm = fval2 * flowrate100 / 100.f;
 				snprintf_P(bufs.body + strlen(bufs.body), bufs.body_cap - strlen(bufs.body),
 				           PSTR(" Flow rate: %.2f"), gpm);
 			}
@@ -245,19 +245,19 @@ static void format_notification(uint16_t type, uint32_t lval, float fval,
 			os.get_station_name(lval, tmp_station_name);
 
 			bool flow_alert_flag = false;
-			if (flow_last_gpm > 0 && strlen(tmp_station_name) > 5) {
+			if (fval2 > 0 && strlen(tmp_station_name) > 5) {
 				const char *station_name_last_five_chars = tmp_station_name + strlen(tmp_station_name) - 5;
 				char *endptr;
 				flow_gpm_alert_setpoint = strtod(station_name_last_five_chars, &endptr);
 				if (endptr != station_name_last_five_chars &&
-				    (flow_last_gpm * flowrate100 / 100.f) > flow_gpm_alert_setpoint) {
+				    (fval2 * flowrate100 / 100.f) > flow_gpm_alert_setpoint) {
 					flow_alert_flag = true;
 				}
 			}
 			if (!flow_alert_flag) break;   // leaves all bufs empty → no dispatch
 
 			snprintf_P(bufs.topic, bufs.topic_cap, PSTR("station/%d/alert/flow"), lval);
-			float gpm = flow_last_gpm * flowrate100 / 100.f;
+			float gpm = fval2 * flowrate100 / 100.f;
 			snprintf_P(bufs.payload, bufs.payload_cap,
 			           PSTR("{\"flow_rate\":%.2f,\"duration\":%d,\"alert_setpoint\":%.4f}"),
 			           gpm, (int)fval, flow_gpm_alert_setpoint);
@@ -376,7 +376,7 @@ static void format_notification(uint16_t type, uint32_t lval, float fval,
 		}
 
 		case NOTIFY_FLOWSENSOR: {
-			float vol = lval * flowrate100 / 100.f;
+			float vol = flow_volume_from_pulses(lval, flowrate100);
 			strncpy_P(bufs.topic, PSTR("sensor/flow"), bufs.topic_cap - 1);
 			snprintf_P(bufs.payload, bufs.payload_cap, PSTR("{\"count\":%d,\"volume\":%.2f}"), (int)lval, vol);
 			snprintf_P(bufs.body + strlen(bufs.body), bufs.body_cap - strlen(bufs.body),

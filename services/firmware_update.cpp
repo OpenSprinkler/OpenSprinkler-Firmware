@@ -147,16 +147,20 @@ bool FirmwareUpdateService::configured() const {
 const char *FirmwareUpdateService::target() const {
 #if defined(ESP8266)
 	return "os3-esp8266";
+#elif defined(ESP32) && defined(OS4_FLASH_N8)
+	return "os4-esp32c6-n8";
 #else
-	return "os4-esp32c6";
+	#error "Define an explicit firmware update target for this embedded platform"
 #endif
 }
 
 const char *FirmwareUpdateService::file_extension() const {
 #if defined(ESP8266)
 	return ".bin";
+#elif defined(ESP32) && defined(OS4_FLASH_N8)
+	return ".bin32n8";
 #else
-	return ".bin32";
+	#error "Define an explicit firmware update file extension for this embedded platform"
 #endif
 }
 

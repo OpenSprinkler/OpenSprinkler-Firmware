@@ -22,6 +22,9 @@
  */
 
 #include "OpenSprinkler.h"
+
+#include "core/bundle.h"
+#include "core/output_sequencer.h"
 #include "api/server.h"
 #include "platform/gpio.h"
 #include "boards/hardware_detection.h"
@@ -34,6 +37,7 @@
 #include "drivers/ch390_raw.h"
 #include "services/weather.h"
 #include "storage/maintenance.h"
+#include "storage/sprinkler_log.h"
 #include "external/ArduinoJson.hpp"
 
 #if defined(ESP32)
@@ -54,6 +58,8 @@ unsigned char OpenSprinkler::nboards;
 unsigned char OpenSprinkler::nstations;
 unsigned char OpenSprinkler::nsensors;
 unsigned char OpenSprinkler::station_bits[MAX_NUM_BOARDS];
+unsigned char OpenSprinkler::applied_station_bits[MAX_NUM_BOARDS];
+unsigned char OpenSprinkler::bundle_station_bits[MAX_NUM_BOARDS];
 unsigned char OpenSprinkler::engage_booster;
 uint16_t OpenSprinkler::baseline_current;
 
@@ -132,6 +138,7 @@ unsigned char OpenSprinkler::attrib_igs[NUM_SENSORS][MAX_NUM_BOARDS];
 unsigned char OpenSprinkler::attrib_igrd[MAX_NUM_BOARDS];
 unsigned char OpenSprinkler::attrib_dis[MAX_NUM_BOARDS];
 unsigned char OpenSprinkler::attrib_spe[MAX_NUM_BOARDS];
+unsigned char OpenSprinkler::attrib_bundle[MAX_NUM_BOARDS];
 unsigned char OpenSprinkler::attrib_grp[MAX_NUM_STATIONS];
 unsigned char OpenSprinkler::masters[NUM_MASTER_ZONES][NUM_MASTER_OPTS];
 time_os_t OpenSprinkler::masters_last_on[NUM_MASTER_ZONES];
@@ -142,6 +149,17 @@ extern char ether_buffer[];
 extern ProgramData pd;
 extern const char* user_agent_string;
 extern unsigned char curr_alert_sid;
+
+namespace {
+
+OutputSequencer output_sequencer;
+bool bundle_output_dirty = true;
+bool hardware_output_initialized = false;
+bool output_rise_blocked = false;
+uint32_t last_hardware_output_write_ms = 0;
+constexpr uint32_t HARDWARE_OUTPUT_REFRESH_MS = 1000;
+
+} // namespace
 
 #if defined(USE_DISPLAY)
 	#if defined(ESP32)
@@ -924,7 +942,17 @@ void OpenSprinkler::begin() {
 		lcd_print_pgm(PSTR("Error Code: 0x2D"));
 		delay(5000);
 	} else {
+		LegacySprinklerLogMigrationResult migration = migrate_legacy_sprinkler_logs(
+			[](uint32_t processed, uint32_t total) {
+				OpenSprinkler::lcd_print_log_migration(processed, total);
+			});
+		if (migration.total > 0) {
+			lcd_print_log_migration(migration.total - migration.remaining, migration.total,
+				true, migration.complete);
+			delay(migration.complete ? 750 : 2000);
+		}
 		maintain_embedded_storage();
+		sprinkler_log_prepare();
 	}
 
 	state = OS_STATE_INITIAL;
@@ -939,7 +967,7 @@ void OpenSprinkler::begin() {
 	RTC.detect();
 
 #else
-	//DEBUG_PRINTLN(get_runtime_path());
+	sprinkler_log_prepare();
 #endif
 
 	for (size_t i = 0; i < 4; i++) {
@@ -1137,7 +1165,7 @@ void OpenSprinkler::latch_apply_all_station_bits() {
 			unsigned char bid=i>>3;
 			unsigned char s=i&0x07;
 			unsigned char mask=(unsigned char)1<<s;
-			if(station_bits[bid] & mask) {
+			if(applied_station_bits[bid] & mask) {
 				if(prev_station_bits[bid] & mask) continue; // already set
 				latch_open(i);
 			} else {
@@ -1146,7 +1174,7 @@ void OpenSprinkler::latch_apply_all_station_bits() {
 			}
 		}
 		engage_booster = 0;
-		memcpy(prev_station_bits, station_bits, MAX_NUM_BOARDS);
+		memcpy(prev_station_bits, applied_station_bits, MAX_NUM_BOARDS);
 	}
 }
 #endif
@@ -1155,6 +1183,35 @@ void OpenSprinkler::latch_apply_all_station_bits() {
  * !!! This will activate/deactivate valves !!!
  */
 void OpenSprinkler::apply_all_station_bits(void (*post_activation_callback)()) {
+	if (bundle_output_dirty) {
+		bundle_resolve(bundle_station_bits, MAX_NUM_BOARDS);
+		bundle_output_dirty = false;
+	}
+
+	unsigned char desired_bits[MAX_NUM_BOARDS] = {};
+	unsigned char priority_bits[MAX_NUM_BOARDS] = {};
+	for (unsigned char bid = 0; bid < nboards; bid++) {
+		desired_bits[bid] = station_bits[bid] | bundle_station_bits[bid];
+	}
+	for (unsigned char mas = 0; mas < NUM_MASTER_ZONES; mas++) {
+		unsigned char mas_id = masters[mas][MASOPT_SID];
+		if (mas_id && mas_id <= nstations) {
+			unsigned char sid = mas_id - 1;
+			priority_bits[sid >> 3] |= static_cast<unsigned char>(1U << (sid & 7));
+		}
+	}
+
+	const uint32_t now_ms = millis();
+	OutputTransition transition = output_sequencer.advance(desired_bits, priority_bits,
+		applied_station_bits, nstations, now_ms, !output_rise_blocked);
+	const bool refresh_due = hardware_output_initialized &&
+		static_cast<uint32_t>(now_ms - last_hardware_output_write_ms) >= HARDWARE_OUTPUT_REFRESH_MS;
+	if (transition.changed || !hardware_output_initialized || refresh_due) {
+		if (transition.rising_sid >= 0) {
+			engage_booster = true;
+			curr_alert_sid = static_cast<unsigned char>(transition.rising_sid + 1);
+		}
+		if (hw_type == HW_TYPE_LATCH && transition.changed) engage_booster = true;
 
 #if defined(ESP8266)
 	if(hw_type==HW_TYPE_LATCH) {
@@ -1177,17 +1234,17 @@ void OpenSprinkler::apply_all_station_bits(void (*post_activation_callback)()) {
 		if(drio->type==IOEXP_TYPE_9555) {
 			/* revision >= 1 uses PCA9555 with active high logic */
 			uint16_t reg = drio->i2c_read(NXP_OUTPUT_REG);  // read current output reg value
-			reg = (reg&0xFF00) | station_bits[0]; // output channels are the low 8-bit
+			reg = (reg&0xFF00) | applied_station_bits[0]; // output channels are the low 8-bit
 			drio->i2c_write(NXP_OUTPUT_REG, reg); // write value to register
 		} else if(drio->type==IOEXP_TYPE_8574) {
 			/* revision 0 uses PCF8574 with active low logic, so all bits must be flipped */
-			drio->i2c_write(NXP_OUTPUT_REG, ~station_bits[0]);
+			drio->i2c_write(NXP_OUTPUT_REG, ~applied_station_bits[0]);
 		}
 
 		// Handle expansion boards
 		for(int i=0;i<MAX_EXT_BOARDS/2;i++) {
-			uint16_t data = station_bits[i*2+2];
-			data = (data<<8) + station_bits[i*2+1];
+			uint16_t data = applied_station_bits[i*2+2];
+			data = (data<<8) + applied_station_bits[i*2+1];
 			if(expanders[i]->type==IOEXP_TYPE_9555) {
 				expanders[i]->i2c_write(NXP_OUTPUT_REG, data);
 			} else {
@@ -1207,11 +1264,11 @@ void OpenSprinkler::apply_all_station_bits(void (*post_activation_callback)()) {
 	}
 	if(drio) {
 		uint16_t reg = drio->i2c_read(NXP_OUTPUT_REG);
-		reg = (reg & 0xFF00) | station_bits[0];
+		reg = (reg & 0xFF00) | applied_station_bits[0];
 		drio->i2c_write(NXP_OUTPUT_REG, reg);
 	}
 	for(int i=0;i<MAX_EXT_BOARDS/2;i++) {
-		uint16_t data = ((uint16_t)station_bits[i*2+2] << 8) | station_bits[i*2+1];
+		uint16_t data = ((uint16_t)applied_station_bits[i*2+2] << 8) | applied_station_bits[i*2+1];
 		if(expanders[i]->type==IOEXP_TYPE_9555) {
 			expanders[i]->i2c_write(NXP_OUTPUT_REG, data);
 		} else {
@@ -1227,7 +1284,7 @@ void OpenSprinkler::apply_all_station_bits(void (*post_activation_callback)()) {
 	// from the highest bit to the lowest
 	for(bid=0;bid<=MAX_EXT_BOARDS;bid++) {
 		if (status.enabled) // TODO: checking enabled bit here is inconsistent with Arduino implementation
-			sbits = station_bits[MAX_EXT_BOARDS-bid];
+			sbits = applied_station_bits[MAX_EXT_BOARDS-bid];
 		else
 			sbits = 0;
 
@@ -1244,9 +1301,16 @@ void OpenSprinkler::apply_all_station_bits(void (*post_activation_callback)()) {
 	digitalWrite(PIN_SR_LATCH, HIGH);
 
 #endif
+		hardware_output_initialized = true;
+		last_hardware_output_write_ms = millis();
+		if (transition.rising_sid >= 0 && bundle_is_station(static_cast<unsigned char>(transition.rising_sid))) {
+			bundle_output_dirty = true;
+		}
 
-	// If a post activation callback function is defined, call it here
-	if(post_activation_callback) post_activation_callback();
+		// If a post activation callback function is defined, call it here.
+		if(transition.rising_sid >= 0 && post_activation_callback) post_activation_callback();
+		if(transition.rising_sid >= 0) output_sequencer.complete_rise(millis());
+	}
 
 	if(iopts[IOPT_SPE_AUTO_REFRESH]) {
 		// handle refresh of RF and remote stations
@@ -1259,7 +1323,7 @@ void OpenSprinkler::apply_all_station_bits(void (*post_activation_callback)()) {
 			lastnow = _now;
 			next_sid_to_refresh = (next_sid_to_refresh+1) % MAX_NUM_STATIONS;
 			unsigned char bid=next_sid_to_refresh>>3,s=next_sid_to_refresh&0x07;
-			if(os.attrib_spe[bid]&(1<<s)) { // check if this is a special station
+			if((os.attrib_spe[bid]&(1<<s)) && !bundle_is_station(next_sid_to_refresh)) {
 				bid=next_sid_to_refresh>>3;
 				s=next_sid_to_refresh&0x07;
 				bool on = (station_bits[bid]>>s)&0x01;
@@ -1494,6 +1558,10 @@ unsigned char OpenSprinkler::is_running(unsigned char sid) {
 	return station_bits[(sid >> 3)] >> (sid & 0x07) & 1;
 }
 
+unsigned char OpenSprinkler::get_applied_station_bit(unsigned char sid) {
+	return applied_station_bits[(sid >> 3)] >> (sid & 0x07) & 1;
+}
+
 unsigned char OpenSprinkler::get_master_id(unsigned char mas) {
 	return masters[mas][MASOPT_SID];
 }
@@ -1612,6 +1680,7 @@ void OpenSprinkler::attribs_load() {
 	memset(attrib_igrd, 0, nboards);
 	memset(attrib_dis, 0, nboards);
 	memset(attrib_spe, 0, nboards);
+	memset(attrib_bundle, 0, nboards);
 	memset(attrib_grp, 0, MAX_NUM_STATIONS);
 
 	for(bid=0;bid<MAX_NUM_BOARDS;bid++) {
@@ -1632,8 +1701,10 @@ void OpenSprinkler::attribs_load() {
 			if(ty!=STN_TYPE_STANDARD) {
 				attrib_spe[bid] |= (1<<s);
 			}
+			if(ty==STN_TYPE_BUNDLE) attrib_bundle[bid] |= (1<<s);
 		}
 	}
+	bundle_invalidate();
 }
 
 /** verify if a string matches password */
@@ -1710,8 +1781,7 @@ unsigned char OpenSprinkler::set_station_bit(unsigned char sid, unsigned char va
 		if((*data)&mask) return 0;  // if bit is already set, return no change
 		else {
 			(*data) = (*data) | mask;
-			engage_booster = true; // if bit is changing from 0 to 1, set engage_booster
-			curr_alert_sid = sid+1; // record the zone that's turning on (starting from 1)
+			if (bundle_is_station(sid)) bundle_output_dirty = true;
 			switch_special_station(sid, 1, dur); // handle special stations
 			return 1;
 		}
@@ -1719,14 +1789,20 @@ unsigned char OpenSprinkler::set_station_bit(unsigned char sid, unsigned char va
 		if(!((*data)&mask)) return 0; // if bit is already reset, return no change
 		else {
 			(*data) = (*data) & (~mask);
-			if(hw_type == HW_TYPE_LATCH) {
-				engage_booster = true;  // if LATCH controller, engage booster when bit changes
-			}
+			if (bundle_is_station(sid)) bundle_output_dirty = true;
 			switch_special_station(sid, 0); // handle special stations
 			return 255;
 		}
 	}
 	return 0;
+}
+
+void OpenSprinkler::mark_bundle_dirty() {
+	bundle_output_dirty = true;
+}
+
+void OpenSprinkler::set_output_rise_blocked(bool blocked) {
+	output_rise_blocked = blocked;
 }
 
 unsigned char OpenSprinkler::get_station_bit(unsigned char sid) {
@@ -2497,7 +2573,10 @@ void OpenSprinkler::log_sensor(uint8_t sid, float value) {
 
 	if (!hdr_valid) {
 		// First use or firmware upgrade: ensure directory exists, wipe stale data files, write fresh header
-		ensure_log_dir();
+		if (!ensure_log_dir()) {
+			DEBUG_PRINTLN("Failed to create sensor log directory");
+			return;
+		}
 		char fname[24];
 		for (uint16_t i = 0; i < SENSOR_LOG_MAX_FILES; i++) {
 			get_sensor_log_filename(fname, i);
@@ -2792,6 +2871,51 @@ void OpenSprinkler::lcd_print_update(const char *message, int16_t percent) {
 	lcd.setAutoDisplay(true);
 }
 
+void OpenSprinkler::lcd_print_log_migration(uint32_t processed, uint32_t total,
+	bool finished, bool complete) {
+	lcd.setAutoDisplay(false);
+	lcd.clear();
+
+#if defined(ARDUINO)
+	const uint8_t percent = total == 0 ? 100 :
+		(uint8_t)(processed >= total ? 100 : (processed * 100UL) / total);
+	lcd.setColor(WHITE);
+	lcd.setTextAlignment(TEXT_ALIGN_CENTER);
+	lcd.setFont(Monospaced_plain_13);
+	if (!finished) {
+		lcd.drawString(64, 0, F("Updating logs"));
+		lcd.drawString(64, 15, F("Do not power off"));
+		lcd.drawProgressBar(14, 34, 100, 6, percent);
+		char count[24];
+		snprintf(count, sizeof(count), "%lu / %lu", (unsigned long)processed,
+			(unsigned long)total);
+		lcd.drawString(64, 43, count);
+	} else if (complete) {
+		lcd.drawString(64, 8, F("Log update"));
+		lcd.drawString(64, 24, F("complete"));
+		lcd.drawProgressBar(14, 46, 100, 6, 100);
+	} else {
+		lcd.drawString(64, 0, F("Log update"));
+		lcd.drawString(64, 15, F("incomplete"));
+		lcd.drawString(64, 30, F("Retry next boot"));
+		lcd.drawProgressBar(14, 50, 100, 6, percent);
+	}
+	lcd.display();
+	lcd.setTextAlignment(TEXT_ALIGN_LEFT);
+	lcd.setFont(Monospaced_plain_13);
+#else
+	lcd.setCursor(0, 0);
+	lcd_print_pgm(finished ? (complete ? "Log update complete" : "Log update incomplete") :
+		"Updating log storage");
+	lcd.setCursor(0, 1);
+	lcd.print(processed);
+	lcd.print('/');
+	lcd.print(total);
+	lcd.display();
+#endif
+	lcd.setAutoDisplay(true);
+}
+
 /** print station bits */
 void OpenSprinkler::lcd_print_screen(char c) {
 	lcd.setAutoDisplay(false); // reduce screen drawing time by turning off display() when drawing individual characters
@@ -2806,7 +2930,7 @@ void OpenSprinkler::lcd_print_screen(char c) {
 	if (!status.enabled) {
 		lcd.print(F("-Disabled!-"));
 	} else {
-		unsigned char bitvalue = station_bits[status.display_board];
+		unsigned char bitvalue = applied_station_bits[status.display_board];
 		for (unsigned char s=0; s<8; s++) {
 			unsigned char sid = (unsigned char)status.display_board<<3;
 			sid += (s+1);
@@ -3195,7 +3319,13 @@ void OpenSprinkler::flash_screen() {
 	lcd.drawXbm(0, 0, OpenSprinkler_Logo_width, OpenSprinkler_Logo_height,
 		(const unsigned char*)OpenSprinkler_Logo_image);
 
+	#if defined(ESP32)
+	lcd.drawXbm(78, 24, OS4_ESP32_Tag_width, OS4_ESP32_Tag_height,
+		(const unsigned char*)OS4_ESP32_Tag_image);
+	lcd.setCursor(1, 2);
+	#else
 	lcd.setCursor(2, 1);
+	#endif
 	lcd.print(F("FW "));
 	lcd.print((char)('0' + (OS_FW_VERSION / 100)));
 	lcd.print('.');
@@ -3210,7 +3340,11 @@ void OpenSprinkler::flash_screen() {
 	lcd.setCursor(3, 2);
 	lcd.print(F("HW OSPi AC"));
 	#else
+	#if defined(ESP32)
+	lcd.setCursor(1, 1);
+	#else
 	lcd.setCursor((hw_type == HW_TYPE_LATCH) ? 2 : 3, 2);
+	#endif
 	lcd.print(F("HW "));
 	lcd.print((char)('0' + (OS_HW_VERSION / 10)));
 	lcd.print('.');

@@ -48,6 +48,7 @@
 	#include "drivers/ch224.h"
 	#if defined(ESP8266)
 		#include <ESP8266WebServer.h>
+		#include "drivers/os_w5500.h"
 		#include <Ticker.h>
 		#include "services/EMailSender.h"
 	#elif defined(ESP32)
@@ -80,6 +81,7 @@
 
 #if defined(ESP8266)
 	extern ESP8266WebServer *update_server;
+	extern OSWiznet5500lwIP w5500;
 	extern bool useEth;
 #elif defined(ESP32)
 	class WebServer;
@@ -304,6 +306,8 @@ public:
 	static const char*sopts[]; // string options
 	static unsigned char station_bits[];     // station activation bits. each byte corresponds to a board (8 stations)
 																	// first byte-> master controller, second byte-> ext. board 1, and so on
+	static unsigned char applied_station_bits[]; // outputs that have completed physical transition sequencing
+	static unsigned char bundle_station_bits[];  // outputs currently claimed by active bundle stations
 	// Note: the following attribute bytes are for backward compatibility
 	static unsigned char attrib_mas[];
 	static unsigned char attrib_mas2[];
@@ -314,6 +318,7 @@ public:
 	static unsigned char attrib_igrd[];
 	static unsigned char attrib_dis[];
 	static unsigned char attrib_spe[];
+	static unsigned char attrib_bundle[];
 	static unsigned char attrib_grp[];
 	static unsigned char masters[NUM_MASTER_ZONES][NUM_MASTER_OPTS];
 	static time_os_t masters_last_on[NUM_MASTER_ZONES];
@@ -360,6 +365,7 @@ public:
 	static int16_t get_imin();
 	static int16_t get_imax();
 	static unsigned char is_running(unsigned char sid);
+	static unsigned char get_applied_station_bit(unsigned char sid);
 	static unsigned char get_station_gid(unsigned char sid);
 	static void set_station_gid(unsigned char sid, unsigned char gid);
 
@@ -406,6 +412,8 @@ public:
 
 	static unsigned char set_station_bit(unsigned char sid, unsigned char value, uint32_t dur=0); // set station bit of one station (sid->station index, value->0/1)
 	static unsigned char get_station_bit(unsigned char sid); // get station bit of one station (sid->station index)
+	static void mark_bundle_dirty();
+	static void set_output_rise_blocked(bool blocked);
 	static void switch_special_station(unsigned char sid, unsigned char value, uint32_t dur=0); // swtich special station
 	static void clear_all_station_bits(); // clear all station bits
 	static void apply_all_station_bits(void (*post_activation_callback)()=NULL); // apply all station bits (activate/deactive values)
@@ -426,6 +434,8 @@ public:
 	static void lcd_print_ip(const unsigned char *ip, unsigned char endian);  // print ip
 	static void lcd_print_mac(const unsigned char *mac);  // print mac
 	static void lcd_print_update(const char *message, int16_t percent); // percent < 0 means indeterminate
+	static void lcd_print_log_migration(uint32_t processed, uint32_t total,
+		bool finished = false, bool complete = false);
 	static void lcd_print_screen(char c);  // print station bits of the board selected by display_board
 	static void lcd_print_version(unsigned char v);  // print version number
 	static void lcd_set_brightness(unsigned char value=1);

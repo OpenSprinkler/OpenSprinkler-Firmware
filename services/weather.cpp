@@ -26,6 +26,8 @@
 #include "util/utils.h"
 #include "../api/server.h"
 #include "weather.h"
+#include "services/weather_failsafe.h"
+#include "platform/clock.h"
 #include "../core/scheduler.h"
 #include "../storage/logging.h"
 #include "../types.h"
@@ -41,6 +43,7 @@ char wt_rawData[TMP_BUFFER_SIZE];
 int wt_errCode = HTTP_RQT_NOT_RECEIVED;
 unsigned char wt_monthly[12] = {100,100,100,100,100,100,100,100,100,100,100,100};
 unsigned char wt_restricted = 0;
+static WeatherResponseFreshness weather_response_freshness;
 
 static float weather_sensor_values[static_cast<uint8_t>(WeatherAction::MAX_VALUE)] = {};
 static uint16_t weather_sensor_valid = 0;
@@ -54,6 +57,44 @@ static uint32_t weather_sensor_next_request = 0;
 extern const char *user_agent_string;
 
 unsigned char parseMdScalesArray (const char* input);
+
+void weather_response_mark_success(uint32_t now_ms) {
+	weather_response_freshness.mark_success(now_ms);
+}
+
+void weather_response_reset() {
+	weather_response_freshness.reset();
+}
+
+bool weather_response_is_current(uint32_t now_ms) {
+	return weather_response_freshness.is_current(now_ms);
+}
+
+uint8_t effective_weather_water_percent(bool response_current) {
+	return weather_policy_water_percent(os.iopts[IOPT_WATER_PERCENTAGE],
+		weather_method_uses_remote_scale(os.iopts[IOPT_USE_WEATHER]), response_current);
+}
+
+bool weather_converge_stale_state(uint32_t now_ms) {
+	if (weather_response_is_current(now_ms)) return false;
+
+	WeatherStaleActions actions = weather_stale_actions(
+		weather_method_uses_remote_scale(os.iopts[IOPT_USE_WEATHER]),
+		os.iopts[IOPT_WATER_PERCENTAGE], wt_restricted, wt_rawData[0] != 0,
+		md_N, wt_errCode);
+	if (!actions.any()) return false;
+
+	if (actions.reset_water_percent) {
+		os.iopts[IOPT_WATER_PERCENTAGE] = 100;
+		os.iopts_save();
+		os.weather_update_flag |= WEATHER_UPDATE_WL;
+	}
+	if (actions.clear_restriction) wt_restricted = 0;
+	if (actions.clear_raw_data) wt_rawData[0] = 0;
+	if (actions.clear_multi_day) md_N = 0;
+	if (actions.set_no_response_error) wt_errCode = HTTP_RQT_NOT_RECEIVED;
+	return true;
+}
 
 static uint8_t weather_action_group(WeatherAction action) {
 	if (action <= WeatherAction::CurrentRaining) return WEATHER_SENSOR_GROUP_CURRENT;
@@ -403,7 +444,10 @@ static void getweather_callback(char* buffer) {
 	// first check errCode, only update lswc timestamp if errCode is 0
 	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("errCode"), true)) {
 		wt_errCode = atoi(tmp_buffer);
-		if(wt_errCode==0) os.checkwt_success_lasttime = tnow;
+		if(wt_errCode==0) {
+			os.checkwt_success_lasttime = tnow;
+			weather_response_mark_success(monotonic_millis());
+		}
 	}
 
 	// then only parse scale if errCode is 0
@@ -417,10 +461,12 @@ static void getweather_callback(char* buffer) {
 		}
 	}
 
-	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("restricted"), true)) {
-		wt_restricted = atoi(tmp_buffer);
-	} else {
-		wt_restricted = 0;
+	if (wt_errCode == 0) {
+		if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("restricted"), true)) {
+			wt_restricted = atoi(tmp_buffer);
+		} else {
+			wt_restricted = 0;
+		}
 	}
 
 	if (findKeyVal(p, tmp_buffer, TMP_BUFFER_SIZE, PSTR("sunrise"), true)) {
