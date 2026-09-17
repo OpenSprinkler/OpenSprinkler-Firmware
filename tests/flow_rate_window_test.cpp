@@ -13,6 +13,11 @@ int main() {
 	assert(flow_rate_from_pulse_span(30, 28900) > 60.20f);
 	assert(flow_rate_from_pulse_span(30, 28900) < 60.21f);
 	assert(flow_rate_from_pulse_span(301, 30000) == 600.0f);
+	assert(flow_pulses_since(100, 100) == 0);
+	assert(flow_pulses_since(100, 125) == 25);
+	assert(flow_pulses_since(UINT32_MAX - 2, 2) == 5);
+	assert(flow_volume_from_pulses(50, 100) == 50.0f);
+	assert(flow_volume_from_pulses(100000, 65535) == 65535000.0f);
 
 	FlowRateWindow rate;
 	uint32_t count = 0;

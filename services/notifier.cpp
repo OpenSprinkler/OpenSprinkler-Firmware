@@ -25,6 +25,7 @@
 #include "../core/program.h"
 #include "external/ArduinoJson.hpp"
 #include "../api/server.h"
+#include "sensors/flow_rate.h"
 #if defined(ESP32)
 #include "EMailSender.h"
 #endif
@@ -375,7 +376,7 @@ static void format_notification(uint16_t type, uint32_t lval, float fval,
 		}
 
 		case NOTIFY_FLOWSENSOR: {
-			float vol = lval * flowrate100 / 100.f;
+			float vol = flow_volume_from_pulses(lval, flowrate100);
 			strncpy_P(bufs.topic, PSTR("sensor/flow"), bufs.topic_cap - 1);
 			snprintf_P(bufs.payload, bufs.payload_cap, PSTR("{\"count\":%d,\"volume\":%.2f}"), (int)lval, vol);
 			snprintf_P(bufs.body + strlen(bufs.body), bufs.body_cap - strlen(bufs.body),

@@ -2,6 +2,7 @@
 
 #include "../OpenSprinkler.h"
 #include "../core/program.h"
+#include "sensors/flow_rate.h"
 #include "storage/files.h"
 #include "storage/maintenance.h"
 #include "storage/sprinkler_log.h"
@@ -49,8 +50,7 @@ void write_log(unsigned char type, time_os_t curr_time) {
 		}
 	} else {
 		if (type == LOGDATA_FLOWSENSE) {
-			record.aux = flow_count > os.flowcount_log_start ?
-				flow_count - os.flowcount_log_start : 0;
+			record.aux = flow_pulses_since(os.flowcount_log_start, flow_count);
 		}
 		switch (type) {
 		case LOGDATA_FLOWSENSE:

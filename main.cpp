@@ -35,6 +35,7 @@
 #include "storage/logging.h"
 #include "services/notifier.h"
 #include "services/firmware_update.h"
+#include "sensors/flow_rate.h"
 #include "sensors/flow_rate_window.h"
 
 #if defined(ESP8266)
@@ -1185,7 +1186,7 @@ void do_loop()
 				// log flow sensor reading if flow sensor is used
 				if(os.iopts[IOPT_SENSOR1_TYPE]==SENSOR_TYPE_FLOW) {
 					write_log(LOGDATA_FLOWSENSE, curr_time);
-					notif.add(NOTIFY_FLOWSENSOR, (flow_count>os.flowcount_log_start)?(flow_count-os.flowcount_log_start):0);
+					notif.add(NOTIFY_FLOWSENSOR, flow_pulses_since(os.flowcount_log_start, flow_count));
 				}
 
 				// in case some options have changed while executing the program
