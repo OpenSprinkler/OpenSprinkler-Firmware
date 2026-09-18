@@ -1,13 +1,17 @@
 CXX=g++
 # -std=gnu++17
 VERSION?=OSPI
-CXXFLAGS=-std=gnu++14 -D$(VERSION) -DSMTP_OPENSSL -Wall -include string.h -include cstdint -Iexternal/TinyWebsockets/tiny_websockets_lib/include -Iexternal/OpenThings-Framework-Firmware-Library/
+CXXFLAGS=-std=gnu++14 -D$(VERSION) -DSMTP_OPENSSL -Wall -I. -include string.h -include cstdint -Iexternal/TinyWebsockets/tiny_websockets_lib/include -Iexternal/OpenThings-Framework-Firmware-Library/ $(EXTRA_CXXFLAGS)
 LD=$(CXX)
-LIBS=pthread mosquitto ssl crypto i2c lgpio
+LIBS=pthread mosquitto ssl crypto
+ifeq ($(VERSION),OSPI)
+LIBS+=i2c lgpio
+endif
 LDFLAGS=$(addprefix -l,$(LIBS))
 BINARY=OpenSprinkler
-SOURCES=main.cpp OpenSprinkler.cpp notifier.cpp program.cpp opensprinkler_server.cpp utils.cpp weather.cpp gpio.cpp mqtt.cpp smtp.c RCSwitch.cpp i2cd.cpp ads1115.cpp $(wildcard sensors/*.cpp) $(wildcard external/TinyWebsockets/tiny_websockets_lib/src/*.cpp) $(wildcard external/OpenThings-Framework-Firmware-Library/*.cpp)
-HEADERS=$(wildcard *.h) $(wildcard *.hpp) $(wildcard sensors/*.h)
+SERVICE_SOURCES=$(filter-out services/EMailSender.cpp services/espconnect.cpp,$(wildcard services/*.cpp)) $(wildcard services/*.c)
+SOURCES=main.cpp OpenSprinkler.cpp $(wildcard api/*.cpp) $(wildcard boards/*.cpp) $(wildcard core/*.cpp) $(wildcard drivers/*.cpp) $(wildcard platform/*.cpp) $(wildcard sensors/*.cpp) $(SERVICE_SOURCES) $(wildcard storage/*.cpp) $(wildcard util/*.cpp) $(wildcard external/TinyWebsockets/tiny_websockets_lib/src/*.cpp) $(wildcard external/OpenThings-Framework-Firmware-Library/*.cpp)
+HEADERS=$(wildcard *.h) $(wildcard *.hpp) $(wildcard api/*.h) $(wildcard boards/*.h) $(wildcard core/*.h) $(wildcard drivers/*.h) $(wildcard platform/*.h) $(wildcard sensors/*.h) $(wildcard services/*.h) $(wildcard storage/*.h) $(wildcard util/*.h) external/ArduinoJson.hpp
 OBJECTS=$(addsuffix .o,$(basename $(SOURCES)))
 
 .PHONY: all
@@ -21,8 +25,121 @@ $(BINARY): $(OBJECTS)
 
 .PHONY: clean
 clean:
-	rm -f $(OBJECTS) $(BINARY)
+	rm -f $(OBJECTS) gpio.o i2cd.o RCSwitch.o ads1115.o program.o notifier.o weather.o mqtt.o smtp.o EMailSender.o espconnect.o utils.o $(BINARY)
 
 .PHONY: container
 container:
 	docker build .
+
+TEST_HTTP_PORT?=18080
+
+.PHONY: test-api
+test-api: test-board-profiles test-hardware-detection test-storage-files test-sprinkler-log test-firmware-release test-buffer-filler test-string-buffer test-sensor-units test-weather-sensor-cache test-weather-failsafe test-output-sequencer test-bundle-codec test-w5500-frame test-flow-rate-window
+	$(MAKE) clean
+	$(MAKE) VERSION=DEMO EXTRA_CXXFLAGS="-DHTTP_PORT=$(TEST_HTTP_PORT) -DWEATHER_RESPONSE_TEST_MAX_AGE_MS=2000"
+	python3 tests/api_contract.py --port $(TEST_HTTP_PORT)
+
+.PHONY: test-board-profiles
+test-board-profiles:
+	@set -e; output=$$(mktemp); trap 'rm -f "$$output"' EXIT; \
+		$(CXX) -std=gnu++14 -I. tests/board_profile_test.cpp boards/board_profile.cpp -o "$$output"; \
+		"$$output"
+
+.PHONY: test-flow-rate-window
+test-flow-rate-window:
+	@set -e; output=$$(mktemp); trap 'rm -f "$$output"' EXIT; \
+		$(CXX) -std=gnu++14 -I. tests/flow_rate_window_test.cpp -o "$$output"; \
+		"$$output"
+
+.PHONY: test-hardware-detection
+test-hardware-detection:
+	@set -e; output=$$(mktemp); trap 'rm -f "$$output"' EXIT; \
+		$(CXX) -std=gnu++14 -I. tests/hardware_detection_test.cpp boards/hardware_detection.cpp -o "$$output"; \
+		"$$output"
+
+.PHONY: test-storage-files
+test-storage-files:
+	@set -e; output=$$(mktemp); data=$$(mktemp -d); trap 'rm -f "$$output"; rm -rf "$$data"' EXIT; \
+		$(CXX) -std=gnu++14 -DDEMO -I. tests/storage_files_test.cpp \
+			storage/files.cpp storage/maintenance.cpp storage/sprinkler_log.cpp -o "$$output"; \
+		"$$output" "$$data"
+
+.PHONY: test-sprinkler-log
+test-sprinkler-log:
+	@set -e; output=$$(mktemp); data=$$(mktemp -d); trap 'rm -f "$$output"; rm -rf "$$data"' EXIT; \
+		$(CXX) -std=gnu++14 -DDEMO -DSPRINKLER_LOG_TEST_SMALL_GEOMETRY -I. \
+			tests/sprinkler_log_test.cpp \
+			storage/sprinkler_log.cpp storage/files.cpp storage/maintenance.cpp -o "$$output"; \
+		"$$output" "$$data"
+
+.PHONY: test-firmware-release
+test-firmware-release:
+	python3 -B -m unittest tests/test_firmware_release.py
+
+.PHONY: test-sensor-units
+test-sensor-units:
+	@set -e; output=$$(mktemp); trap 'rm -f "$$output"' EXIT; \
+		$(CXX) -std=gnu++14 -DDEMO -I. \
+			-Iexternal/TinyWebsockets/tiny_websockets_lib/include \
+			-Iexternal/OpenThings-Framework-Firmware-Library \
+			-ffunction-sections -fdata-sections \
+			tests/sensor_unit_test.cpp sensors/sensor.cpp sensors/weather_sensor.cpp \
+			-Wl,--gc-sections -o "$$output"; \
+		"$$output"
+
+.PHONY: test-buffer-filler
+test-buffer-filler:
+	@set -e; output=$$(mktemp); trap 'rm -f "$$output"' EXIT; \
+		$(CXX) -std=gnu++14 -DDEMO -I. tests/bfiller_test.cpp -o "$$output"; \
+		"$$output"
+
+.PHONY: test-string-buffer
+test-string-buffer:
+	@set -e; output=$$(mktemp); trap 'rm -f "$$output"' EXIT; \
+		$(CXX) -std=gnu++14 -DDEMO -I. \
+			-Iexternal/TinyWebsockets/tiny_websockets_lib/include \
+			-Iexternal/OpenThings-Framework-Firmware-Library \
+			-ffunction-sections -fdata-sections \
+			tests/string_buffer_test.cpp util/utils.cpp api/http.cpp \
+			-Wl,--gc-sections -o "$$output"; \
+		"$$output"
+
+.PHONY: test-weather-sensor-cache
+test-weather-sensor-cache:
+	@set -e; output=$$(mktemp); trap 'rm -f "$$output"' EXIT; \
+		$(CXX) -std=gnu++14 -DDEMO -I. \
+			-Iexternal/TinyWebsockets/tiny_websockets_lib/include \
+			-Iexternal/OpenThings-Framework-Firmware-Library \
+			-ffunction-sections -fdata-sections \
+			tests/weather_sensor_cache_test.cpp services/weather.cpp services/weather_failsafe.cpp \
+			platform/monotonic_clock.cpp \
+			-Wl,--gc-sections -o "$$output"; \
+		"$$output"
+
+.PHONY: test-weather-failsafe
+test-weather-failsafe:
+	@set -e; output=$$(mktemp); trap 'rm -f "$$output"' EXIT; \
+		$(CXX) -std=gnu++14 -I. tests/weather_failsafe_test.cpp \
+			services/weather_failsafe.cpp -o "$$output"; \
+		"$$output"
+
+.PHONY: test-output-sequencer
+test-output-sequencer:
+	@set -e; output=$$(mktemp); trap 'rm -f "$$output"' EXIT; \
+		$(CXX) -std=gnu++14 -I. tests/output_sequencer_test.cpp core/output_sequencer.cpp -o "$$output"; \
+		"$$output"
+
+.PHONY: test-bundle-codec
+test-bundle-codec:
+	@set -e; output=$$(mktemp); trap 'rm -f "$$output"' EXIT; \
+		$(CXX) -std=gnu++14 -DDEMO -ffunction-sections -fdata-sections -I. \
+			-Iexternal/TinyWebsockets/tiny_websockets_lib/include \
+			-Iexternal/OpenThings-Framework-Firmware-Library \
+			tests/bundle_codec_test.cpp core/bundle.cpp -Wl,--gc-sections -o "$$output"; \
+		"$$output"
+
+.PHONY: test-w5500-frame
+test-w5500-frame:
+	@set -e; output=$$(mktemp); trap 'rm -f "$$output"' EXIT; \
+		$(CXX) -std=gnu++14 -I. tests/w5500_frame_test.cpp drivers/w5500_frame.cpp -o "$$output"; \
+		"$$output"

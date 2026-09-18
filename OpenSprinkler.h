@@ -25,31 +25,36 @@
 
 #include "types.h"
 #include "defines.h"
-#include "utils.h"
-#include "gpio.h"
-#include "images.h"
-#include "mqtt.h"
-#include "RCSwitch.h"
+#include "util/utils.h"
+#include "platform/gpio.h"
+#include "drivers/images.h"
+#include "services/mqtt.h"
+#include "drivers/rf_switch.h"
 #include <cmath>
 #include <new>
 
-#if defined(ESP8266) // headers for Arduino
+#if defined(ARDUINO)
 	#include <Arduino.h>
 	#include <Wire.h>
 	#include <SPI.h>
-	#include <RCSwitch.h>
-	#include "I2CRTC.h"
+	#include "drivers/i2c_rtc.h"
 
 	#include <FS.h>
 	#include <LittleFS.h>
-	#include <ENC28J60lwIP.h>
-	#include <W5500lwIP.h>
 	#include <OpenThingsFramework.h>
 	#include <DNSServer.h>
-	#include <Ticker.h>
-	#include "espconnect.h"
-	#include "EMailSender.h"
-	#include "ch224.h"
+	#include "services/espconnect.h"
+	#include "drivers/ch224.h"
+	#if defined(ESP8266)
+		#include <ESP8266WebServer.h>
+		#include <ENC28J60lwIP.h>
+		#include "drivers/os_w5500.h"
+		#include <Ticker.h>
+		#include "services/EMailSender.h"
+	#elif defined(ESP32)
+		#include <WiFi.h>
+		#include <ETH.h>
+	#endif
 
 #else // headers for RPI/LINUX
 	#include <time.h>
@@ -59,12 +64,12 @@
 	#include <sys/stat.h>
 	#include "OpenThingsFramework.h"
 	#include "etherport.h"
-	#include "rpitime.h"
-	#include "smtp.h"
+	#include "platform/clock.h"
+	#include "services/smtp.h"
 #endif // end of headers
 
 #if defined(USE_DISPLAY)
-	#include "SSD1306Display.h"
+	#include "drivers/ssd1306_display.h"
 #endif
 
 #include "sensors/sensor.h"
@@ -72,13 +77,13 @@
 #include "sensors/weather_sensor.h"
 #include "sensors/system_internal_sensor.h"
 #include "sensors/onboard_digital_sensor.h"
-#include "ads1115.h"
+#include "drivers/ads1115.h"
 #include "sensors/ads1115_sensor.h"
 
 #if defined(ESP8266)
 	extern ESP8266WebServer *update_server;
 	extern ENC28J60lwIP enc28j60;
-	extern Wiznet5500lwIP w5500;
+	extern OSWiznet5500lwIP w5500;
 	struct lwipEth {
 		bool isW5500 = false;
 		inline boolean config(const IPAddress& local_ip, const IPAddress& arg1, const IPAddress& arg2, const IPAddress& arg3 = IPADDR_NONE, const IPAddress& dns2 = IPADDR_NONE) {
@@ -86,6 +91,15 @@
 		}
 		inline boolean begin(const uint8_t *macAddress = nullptr) {
 			return (isW5500)?w5500.begin(macAddress):enc28j60.begin(macAddress);
+		}
+		inline bool raw_reinit() {
+			return isW5500 && w5500.reinitialize();
+		}
+		inline bool fault_pending() const {
+			return isW5500 && w5500.faultPending();
+		}
+		inline bool health_check() {
+			return !isW5500 || w5500.healthCheck();
 		}
 		inline IPAddress localIP() {
 			return (isW5500)?w5500.localIP():enc28j60.localIP();
@@ -110,6 +124,10 @@
 		}
 	};
 	extern lwipEth eth;
+	extern bool useEth;
+#elif defined(ESP32)
+	class WebServer;
+	extern WebServer *update_server;
 	extern bool useEth;
 #else
 	// OSPI/Linux specific
@@ -230,6 +248,7 @@ extern const uint8_t  sensor_log_codes[NUM_SENSORS];    // LOGDATA_SENSOR1..4 co
 // Helper accessors for sensor metadata. These index iopts[] which is RAM, so
 // they're plain inline reads (no pgm_read_byte needed for the iopts side).
 unsigned char sensor_pin(uint8_t i);  // implemented in OpenSprinkler.cpp
+unsigned char sensor_pullup_pin(uint8_t i);
 bool sensor_available(uint8_t i);     // true if the physical SN input exists
 int8_t sensor_index_from_log_code(uint8_t type);
 
@@ -329,6 +348,8 @@ public:
 	static const char*sopts[]; // string options
 	static unsigned char station_bits[];     // station activation bits. each byte corresponds to a board (8 stations)
 																	// first byte-> master controller, second byte-> ext. board 1, and so on
+	static unsigned char applied_station_bits[]; // outputs that have completed physical transition sequencing
+	static unsigned char bundle_station_bits[];  // outputs currently claimed by active bundle stations
 	// Note: the following attribute bytes are for backward compatibility
 	static unsigned char attrib_mas[];
 	static unsigned char attrib_mas2[];
@@ -339,6 +360,7 @@ public:
 	static unsigned char attrib_igrd[];
 	static unsigned char attrib_dis[];
 	static unsigned char attrib_spe[];
+	static unsigned char attrib_bundle[];
 	static unsigned char attrib_grp[];
 	static unsigned char masters[NUM_MASTER_ZONES][NUM_MASTER_OPTS];
 	static time_os_t masters_last_on[NUM_MASTER_ZONES];
@@ -374,7 +396,7 @@ public:
 	static void get_station_data(unsigned char sid, StationData* data); // get station data
 	static void set_station_data(unsigned char sid, StationData* data); // set station data
 	static void get_station_name(unsigned char sid, char buf[]); // get station name
-	static void set_station_name(unsigned char sid, char buf[]); // set station name
+	static bool set_station_name(unsigned char sid, char buf[]); // set station name
 	static unsigned char get_station_type(unsigned char sid); // get station type
 	static unsigned char is_sequential_station(unsigned char sid);
 	static unsigned char is_master_station(unsigned char sid);
@@ -385,11 +407,12 @@ public:
 	static int16_t get_imin();
 	static int16_t get_imax();
 	static unsigned char is_running(unsigned char sid);
+	static unsigned char get_applied_station_bit(unsigned char sid);
 	static unsigned char get_station_gid(unsigned char sid);
 	static void set_station_gid(unsigned char sid, unsigned char gid);
 
 	//static StationAttrib get_station_attrib(unsigned char sid); // get station attribute
-	static void attribs_save(); // repackage attrib bits and save (backward compatibility)
+	static bool attribs_save(); // repackage attrib bits and save (backward compatibility)
 	static void attribs_load(); // load and repackage attrib bits (backward compatibility)
 	static bool parse_rfstation_code(RFStationData *data, RFStationCode *code); // parse rf code into on/off/time sections
 	static void switch_rfstation(RFStationData *data, bool turnon);  // switch rf station
@@ -400,23 +423,23 @@ public:
 
 	// -- options and data storeage
 	static void nvdata_load();
-	static void nvdata_save();
+	static bool nvdata_save();
 
 	static void options_setup();
 	static void pre_factory_reset();
 	static void factory_reset();
 	static void load_iopt_defaults();   // populate iopts[] from iopt_defs[].def_val
 	static void iopts_load();
-	static void iopts_save();
-	static bool sopt_save(unsigned char oid, const char *buf);
+	static bool iopts_save();
+	static bool sopt_save(unsigned char oid, const char *buf, bool *changed = nullptr);
 	static void sopt_load(unsigned char oid, char *buf, uint16_t maxlen=MAX_SOPTS_SIZE);
 	static String sopt_load(unsigned char oid);
 	static void populate_master();
 	static unsigned char password_verify(const char *pw);  // verify password
 
 	// -- controller operation
-	static void enable();   // enable controller operation
-	static void disable();  // disable controller operation, all stations will be closed immediately
+	static bool enable();   // enable controller operation
+	static bool disable();  // disable controller operation, all stations will be closed immediately
 	static void raindelay_start();  // start raindelay
 	static void raindelay_stop();   // stop rain delay
 	static void detect_binarysensor_status(time_os_t curr_time);// update binary (rain, soil) sensor status
@@ -431,6 +454,8 @@ public:
 
 	static unsigned char set_station_bit(unsigned char sid, unsigned char value, uint32_t dur=0); // set station bit of one station (sid->station index, value->0/1)
 	static unsigned char get_station_bit(unsigned char sid); // get station bit of one station (sid->station index)
+	static void mark_bundle_dirty();
+	static void set_output_rise_blocked(bool blocked);
 	static void switch_special_station(unsigned char sid, unsigned char value, uint32_t dur=0); // swtich special station
 	static void clear_all_station_bits(); // clear all station bits
 	static void apply_all_station_bits(void (*post_activation_callback)()=NULL); // apply all station bits (activate/deactive values)
@@ -450,6 +475,9 @@ public:
 	static void lcd_print_time(time_os_t t);  // print current time
 	static void lcd_print_ip(const unsigned char *ip, unsigned char endian);  // print ip
 	static void lcd_print_mac(const unsigned char *mac);  // print mac
+	static void lcd_print_update(const char *message, int16_t percent); // percent < 0 means indeterminate
+	static void lcd_print_log_migration(uint32_t processed, uint32_t total,
+		bool finished = false, bool complete = false);
 	static void lcd_print_screen(char c);  // print station bits of the board selected by display_board
 	static void lcd_print_version(unsigned char v);  // print version number
 	static void lcd_set_brightness(unsigned char value=1);
@@ -483,17 +511,17 @@ public:
 	static void ui_set_options(int oid);		// ui for setting options (oid-> starting option index)
 #endif
 
-#if defined(ESP8266) // LCD functions for Arduino
+#if defined(ARDUINO) // LCD functions for Arduino
 	static void lcd_print_pgm(PGM_P str); // ESP8266 does not allow PGM_P followed by PROGMEM
 	static void lcd_print_line_clear_pgm(PGM_P str, unsigned char line);
 
-	static IOEXP *mainio, *drio;
+	static IOEXP *drio;
 	static IOEXP *expanders[];
 	static CH224 usbpd;
 	static uint8_t actual_pd_voltage;
 
 	static void detect_expanders();
-	static unsigned char get_wifi_mode() { if (useEth) return WIFI_MODE_STA; else return wifi_testmode ? WIFI_MODE_STA : iopts[IOPT_WIFI_MODE];}
+	static unsigned char get_wifi_mode() { if (useEth) return OS_WIFI_MODE_STA; else return wifi_testmode ? OS_WIFI_MODE_STA : iopts[IOPT_WIFI_MODE];}
 	static unsigned char wifi_testmode;
 	static String wifi_ssid, wifi_pass;
 	static unsigned char wifi_bssid[6], wifi_channel;

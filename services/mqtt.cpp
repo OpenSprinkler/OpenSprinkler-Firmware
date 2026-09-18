@@ -1,0 +1,535 @@
+/* OpenSprinkler Unified Firmware
+ * Copyright (C) 2015 by Ray Wang (ray@opensprinkler.com)
+ *
+ * OpenSprinkler library
+ * Feb 2015 @ OpenSprinkler.com
+ *
+ * This file is part of the OpenSprinkler library
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see
+ * <http://www.gnu.org/licenses/>.
+ */
+
+#if defined(ARDUINO)
+	#include <Arduino.h>
+	#if defined(ESP8266)
+	#include <ESP8266WiFi.h>
+	#else
+	#include <WiFi.h>
+	#endif
+	#define MQTT_SOCKET_TIMEOUT 5
+	#include <PubSubClient.h>
+
+	struct PubSubClient *mqtt_client = NULL;
+
+#else
+	#include <time.h>
+	#include <stdio.h>
+	#include <mosquitto.h>
+
+	struct mosquitto *mqtt_client = NULL;
+#endif
+
+#include "../OpenSprinkler.h"
+#include "api/commands.h"
+#include "../types.h"
+#include "mqtt.h"
+#include "external/ArduinoJson.hpp"
+
+// Debug routines to help identify any blocking of the event loop for an extended period
+
+#if defined(ENABLE_DEBUG)
+	#if defined(ARDUINO)
+		#include "platform/TimeLib.h"
+		#define DEBUG_TIMESTAMP(msg, ...) {time_os_t t = os.now_tz(); Serial.printf("%02d-%02d-%02d %02d:%02d:%02d - ", year(t), month(t), day(t), hour(t), minute(t), second(t));}
+	#else
+		#include <sys/time.h>
+		#define DEBUG_TIMESTAMP()         {char tstr[21]; time_t t = time(NULL); struct tm *tm = localtime(&t); strftime(tstr, 21, "%y-%m-%d %H:%M:%S - ", tm);printf("%s", tstr);}
+	#endif
+	#define DEBUG_LOGF(msg, ...)        {DEBUG_TIMESTAMP(); DEBUG_PRINTF(msg, ##__VA_ARGS__);}
+
+	static uint32_t _lastMillis = 0; // Holds the timestamp associated with the last call to DEBUG_DURATION()
+	inline uint32_t DEBUG_DURATION() {uint32_t dur = millis() - _lastMillis; _lastMillis = millis(); return dur;}
+#else
+	#define DEBUG_LOGF(msg, ...)    {}
+	#define DEBUG_DURATION()        {}
+#endif
+
+extern OpenSprinkler os;
+extern char tmp_buffer[];
+
+#define OS_MQTT_KEEPALIVE      60
+#define MQTT_DEFAULT_PORT    1883  // Default port for MQTT. Can be overwritten through App config
+#define MQTT_MAX_HOST_LEN      50  // Maximum broker/host name length
+#define MQTT_MAX_USERNAME_LEN  50  // Maximum username length
+#define MQTT_MAX_PASSWORD_LEN 100  // Maximum password length
+#define MQTT_MAX_TOPIC_LEN	   24  // Maximum topic length
+#define MQTT_MAX_ID_LEN        16  // MQTT Client Id to uniquely reference this unit
+#define MQTT_RECONNECT_DELAY  120  // Minumum of 60 seconds between reconnect attempts
+
+#define MQTT_AVAILABILITY_TOPIC	"availability"
+#define MQTT_ONLINE_PAYLOAD  "online"
+#define MQTT_OFFLINE_PAYLOAD "offline"
+
+#define MQTT_SUCCESS    0  // Returned when function operated successfully
+#define MQTT_ERROR      1  // Returned whan function failed
+
+char OSMqtt::_id[MQTT_MAX_ID_LEN + 1] = {0};     // Id to identify the client to the broker
+char OSMqtt::_host[MQTT_MAX_HOST_LEN + 1] = {0}; // IP or host name of the broker
+char OSMqtt::_username[MQTT_MAX_USERNAME_LEN + 1] = {0};  // username to connect to the broker
+char OSMqtt::_password[MQTT_MAX_PASSWORD_LEN + 1] = {0};  // password to connect to the broker
+int OSMqtt::_port = MQTT_DEFAULT_PORT;  // Port of the broker (default 1883)
+bool OSMqtt::_enabled = false;          // Flag indicating whether MQTT is enabled
+char OSMqtt::_pub_topic[MQTT_MAX_TOPIC_LEN + 1] = {0}; // topic for publishing data
+char OSMqtt::_sub_topic[MQTT_MAX_TOPIC_LEN + 1] = {0}; // topic for subscribing
+bool OSMqtt::_done_subscribed = false;		//Flag indicating if command topic has been subscribed to
+
+// MQTT callbacks run synchronously from os.mqtt.loop() on the main thread, after
+// OTF has finished handling any local request. Shared scratch buffers are not in
+// concurrent use while command execution runs.
+uint8_t dispatch_mqtt_command(const uint8_t* payload, size_t length) {
+	if (!payload || length < 2 || memchr(payload, 0, length)) return HTML_DATA_FORMATERROR;
+
+	// Parse only the query portion. This preserves legacy payloads without a
+	// '?' because their first parameter begins immediately after the command.
+	ParamSource params(payload + 2, length - 2);
+	if (!os.iopts[IOPT_IGNORE_PASSWORD]) {
+		if (!params.get(tmp_buffer, TMP_BUFFER_SIZE, PSTR("pw"), true) ||
+			!os.password_verify(tmp_buffer)) {
+			return HTML_UNAUTHORIZED;
+		}
+	}
+
+	uint8_t result = HTML_PAGE_NOT_FOUND;
+	if (payload[0] == 'c') {
+		if (payload[1] == 'v') result = execute_change_values(params, CV_ACTIONS_MQTT);
+		else if (payload[1] == 'm') result = execute_manual_station(params);
+		else if (payload[1] == 'r') result = execute_runonce(params);
+	} else if (payload[0] == 'm' && payload[1] == 'p') {
+		result = execute_manual_program(params);
+	}
+
+	if (result != HTML_SUCCESS) DEBUG_LOGF("MQTT command failed: %u\r\n", result);
+	return result;
+}
+
+//****************************** MQTT FUNCTIONS ******************************//
+
+// Initialise the client libraries and event handlers.
+void OSMqtt::init(void) {
+	DEBUG_LOGF("MQTT Init\r\n");
+
+	uint8_t mac[6] = {0};
+	#if defined(ARDUINO)
+	os.load_hardware_mac(mac, useEth);
+	#else
+	os.load_hardware_mac(mac, true);
+	#endif
+	snprintf(_id, MQTT_MAX_ID_LEN, "OS-%02X%02X%02X%02X%02X%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+	_id[MQTT_MAX_ID_LEN] = 0;
+
+	_init();
+};
+
+// Start the MQTT service and connect to the MQTT broker using the stored configuration.
+void OSMqtt::begin(void) {
+	DEBUG_LOGF("MQTT Begin\r\n");
+	_port = MQTT_DEFAULT_PORT;
+	_enabled = 0;
+	_done_subscribed = false;
+	_host[0] = 0;
+	_username[0] = 0;
+	_password[0] = 0;
+	_pub_topic[0] = 0;
+	_sub_topic[0] = 0;
+
+	// JSON configuration settings in the form of {"en":0|1,"host":"server_name|IP address","port":1883,"user:"","pass":"","pubt":"","subt":""}
+	char *config = tmp_buffer + 1;
+	os.sopt_load(SOPT_MQTT_OPTS, config);
+
+	if(*config != 0) {
+		// Add the wrapping curly braces to the string
+		config = tmp_buffer;
+		config[0] = '{';
+		int len = strlen(config);
+		config[len] = '}';
+		config[len+1] = 0;
+
+		ArduinoJson::JsonDocument doc;
+		ArduinoJson::DeserializationError error = ArduinoJson::deserializeJson(doc, config);
+
+		// Test the parsing otherwise parse
+		if (error) {
+				DEBUG_PRINT(F("mqtt: deserializeJson() failed: "));
+				DEBUG_PRINTLN(error.c_str());
+		} else {
+				_enabled = (bool)doc["en"];
+				const char *host_val = doc["host"];
+				if(host_val) strncpy(_host, host_val, MQTT_MAX_HOST_LEN);
+				_port = doc["port"];
+				const char *username_val = doc["user"];
+				if(username_val) strncpy(_username, username_val, MQTT_MAX_USERNAME_LEN);
+				const char *password_val = doc["pass"];
+				if(password_val) strncpy(_password, password_val, MQTT_MAX_PASSWORD_LEN);
+				const char *pubt_val = doc["pubt"];
+				if(pubt_val) strncpy(_pub_topic, pubt_val, MQTT_MAX_TOPIC_LEN);
+				const char *subt_val = doc["subt"];
+				if(subt_val) strncpy(_sub_topic, subt_val, MQTT_MAX_TOPIC_LEN);
+		}
+
+		// properly end all strings to make sure 
+		_host[MQTT_MAX_HOST_LEN] = 0;
+		_username[MQTT_MAX_USERNAME_LEN] = 0;
+		_password[MQTT_MAX_PASSWORD_LEN] = 0;
+		_pub_topic[MQTT_MAX_TOPIC_LEN] = 0;
+		_sub_topic[MQTT_MAX_TOPIC_LEN] = 0;
+	}
+
+	if(_pub_topic[0] == 0) { // publish topic is empty
+		DEBUG_LOGF("No pub_topic found\r\n");
+		strcpy_P(_pub_topic, PSTR("opensprinkler"));
+	}
+
+	if(_sub_topic[0] == 0) { // subscribe topic is empty
+		DEBUG_LOGF("No sub_topic found\r\n");
+	}
+
+	DEBUG_LOGF("MQTT Begin: Config (%s:%d %s) %s\r\n", _host, _port, _username, _enabled ? "Enabled" : "Disabled");
+
+	if (mqtt_client == NULL || os.status.network_fails > 0) return;
+
+	if (_connected()) {
+		_disconnect();
+	}
+
+	if (_enabled) {
+		_connect();
+	}
+
+}
+
+// Publish an MQTT message to a specific topic
+void OSMqtt::publish(const char *topic, const char *payload) {
+	DEBUG_LOGF("MQTT Publish: %s %s\r\n", topic, payload);
+
+	if (mqtt_client == NULL || !_enabled || os.status.network_fails > 0) return;
+
+	if (!_connected()) {
+		DEBUG_LOGF("MQTT Publish: Not connected\r\n");
+		return;
+	}
+
+	_publish(topic, payload);
+}
+
+//Subscribe to a specific topic
+void OSMqtt::subscribe(void){
+	if(_sub_topic[0] == 0) { _done_subscribed = true; return; }
+
+	if (mqtt_client == NULL || !_enabled || os.status.network_fails > 0) return;
+
+	if (!_connected()) {
+		return;
+	}
+	DEBUG_LOGF("MQTT Subscribe: %s\r\n", _sub_topic);
+	_done_subscribed = (_subscribe() == MQTT_SUCCESS);
+}
+
+// Regularly call the loop function to ensure "keep alive" messages are sent to the broker and to reconnect if needed.
+void OSMqtt::loop(void) {
+	static uint32_t last_reconnect_attempt = 0;
+
+	if (mqtt_client == NULL || !_enabled || os.status.network_fails > 0) return;
+
+	// Only attemp to reconnect every MQTT_RECONNECT_DELAY seconds to avoid blocking the main loop
+	if (!_connected() && (millis() - last_reconnect_attempt >= MQTT_RECONNECT_DELAY * 1000UL)) {
+		DEBUG_LOGF("MQTT Loop: Reconnecting\r\n");
+		_done_subscribed = false;
+		_connect();
+		last_reconnect_attempt = millis();
+	}
+
+	if(!_done_subscribed){
+		subscribe();
+	}
+
+#if defined(ENABLE_DEBUG)
+	int state = _loop();
+#else
+	(void) _loop();
+#endif
+
+#if defined(ENABLE_DEBUG)
+	// Print a diagnostic message whenever the MQTT state changes
+	bool network = os.network_connected(), mqtt = _connected();
+	static bool last_network = 0, last_mqtt = 0;
+	static int last_state = 999;
+
+	if (last_state != state || last_network != network || last_mqtt != mqtt) {
+		DEBUG_LOGF("MQTT Loop: Network %s, MQTT %s, State - %s\r\n",
+					network ? "UP" : "DOWN",
+					mqtt ? "UP" : "DOWN",
+					_state_string(state));
+		last_state = state; last_network = network; last_mqtt = mqtt;
+	}
+#endif
+}
+
+/**************************** ESP8266 ********************************************/
+#if defined(ARDUINO)
+WiFiClient wifiClient;
+
+int OSMqtt::_init(void) {
+	Client * client = NULL;
+
+	if (mqtt_client) {
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdelete-non-virtual-dtor"
+		delete mqtt_client;
+#pragma GCC diagnostic pop
+		mqtt_client = 0;
+	}
+
+	#if defined(ARDUINO)
+		client = &wifiClient;
+	#else
+		client = &ethClient;
+	#endif
+
+	mqtt_client = new PubSubClient(*client);
+	mqtt_client->setKeepAlive(OS_MQTT_KEEPALIVE);
+
+	if (mqtt_client == NULL) {
+		DEBUG_LOGF("MQTT Init: Failed to initialise client\r\n");
+		return MQTT_ERROR;
+	}
+
+	return MQTT_SUCCESS;
+}
+
+int OSMqtt::_connect(void) {
+	mqtt_client->setServer(_host, _port);
+	boolean state;
+	#define MQTT_CONNECT_NTRIES 2
+	unsigned char tries = 0;
+	String avail_topic(_pub_topic);
+	avail_topic += "/";
+	avail_topic += MQTT_AVAILABILITY_TOPIC;
+	do {
+		DEBUG_PRINT(F("mqtt: "));
+		DEBUG_PRINTLN(_host);
+		if (_username[0])
+			state = mqtt_client->connect(_id, _username, _password, avail_topic.c_str(), 0, true, MQTT_OFFLINE_PAYLOAD);
+		else
+			state = mqtt_client->connect(_id, NULL, NULL, avail_topic.c_str(), 0, true, MQTT_OFFLINE_PAYLOAD);
+		if(state) break;
+		tries++;
+	} while(tries<MQTT_CONNECT_NTRIES);
+
+	if(tries==MQTT_CONNECT_NTRIES) {
+		DEBUG_LOGF("MQTT Connect: Failed (%d)\r\n", mqtt_client->state());
+		return MQTT_ERROR;
+	} else {
+		mqtt_client->publish(avail_topic.c_str(), MQTT_ONLINE_PAYLOAD, true);
+	}
+	return MQTT_SUCCESS;
+}
+
+int OSMqtt::_disconnect(void) {
+	mqtt_client->disconnect();
+	return MQTT_SUCCESS;
+}
+
+bool OSMqtt::_connected(void) { return mqtt_client->connected(); }
+
+int OSMqtt::_publish(const char *topic, const char *payload) {
+	String total_topic(_pub_topic); // concatenate root topic with specific topic
+	total_topic += "/";
+	total_topic += topic;
+	if (!mqtt_client->publish(total_topic.c_str(), payload)) {
+		DEBUG_LOGF("MQTT Publish: Failed (%d)\r\n", mqtt_client->state());
+		return MQTT_ERROR;
+	}
+	return MQTT_SUCCESS;
+}
+
+void subscribe_callback(char *topic, unsigned char *payload, unsigned int length) {
+	DEBUG_LOGF("Subscribe Callback\r\n");
+	(void)topic;
+	dispatch_mqtt_command(payload, length);
+}
+
+int OSMqtt::_subscribe(void){
+	mqtt_client->setCallback(subscribe_callback);
+	if (!mqtt_client->subscribe(_sub_topic)) {
+		DEBUG_LOGF("MQTT Subscribe: Failed (%d)\r\n", mqtt_client->state());
+		return MQTT_ERROR;
+	}
+	return MQTT_SUCCESS;
+}
+
+int OSMqtt::_loop(void) {
+	mqtt_client->loop();
+	return mqtt_client->state();
+}
+
+const char * OSMqtt::_state_string(int rc) {
+	switch (rc) {
+		case MQTT_CONNECTION_TIMEOUT:  return "The server didn't respond within the keepalive time";
+		case MQTT_CONNECTION_LOST:     return "The network connection was lost";
+		case MQTT_CONNECT_FAILED:      return "The network connection failed";
+		case MQTT_DISCONNECTED:        return "The client has cleanly disconnected";
+		case MQTT_CONNECTED:           return "The client is connected";
+		case MQTT_CONNECT_BAD_PROTOCOL: return "The server doesn't support the requested version of MQTT";
+		case MQTT_CONNECT_BAD_CLIENT_ID: return "The server rejected the client identifier";
+		case MQTT_CONNECT_UNAVAILABLE:  return "The server was unavailable to accept the connection";
+		case MQTT_CONNECT_BAD_CREDENTIALS: return "The username/password were rejected";
+		case MQTT_CONNECT_UNAUTHORIZED: return "The client was not authorized to connect";
+		default:  return "Unrecognised state";
+	}
+}
+#else
+
+/************************** RASPBERRY PI / Linux ****************************************/
+
+static bool _connected = false;
+
+static void _mqtt_connection_cb(struct mosquitto *mqtt_client, void *obj, int reason) {
+	DEBUG_LOGF("MQTT Connnection Callback: %s (%d)\r\n", mosquitto_strerror(reason), reason);
+
+	::_connected = (reason == 0);
+	
+	String avail_topic(OSMqtt::get_pub_topic());
+	avail_topic += "/";
+	avail_topic += MQTT_AVAILABILITY_TOPIC;
+
+	if (reason == 0) {
+		int rc = mosquitto_publish(mqtt_client, NULL, avail_topic.c_str(), strlen(MQTT_ONLINE_PAYLOAD), MQTT_ONLINE_PAYLOAD, 0, true);
+		if (rc != MOSQ_ERR_SUCCESS) {
+			DEBUG_LOGF("MQTT Publish: Failed (%s)\r\n", mosquitto_strerror(rc));
+		}
+	}
+}
+
+static void _mqtt_disconnection_cb(struct mosquitto *mqtt_client, void *obj, int reason) {
+	DEBUG_LOGF("MQTT Disconnnection Callback: %s (%d)\r\n", mosquitto_strerror(reason), reason);
+
+	::_connected = false;
+}
+
+static void _mqtt_log_cb(struct mosquitto *mqtt_client, void *obj, int level, const char *message){
+	if (level != MOSQ_LOG_DEBUG )
+		DEBUG_LOGF("MQTT Log Callback: %s (%d)\r\n", message, level);
+}
+
+int OSMqtt::_init(void) {
+	int major, minor, revision;
+
+	mosquitto_lib_init();
+	mosquitto_lib_version(&major, &minor, &revision);
+	DEBUG_LOGF("MQTT Init: Mosquitto Library v%d.%d.%d\r\n", major, minor, revision);
+
+	if (mqtt_client) { mosquitto_destroy(mqtt_client); mqtt_client = NULL; };
+
+	mqtt_client = mosquitto_new("OS", true, NULL);
+	if (mqtt_client == NULL) {
+		DEBUG_PRINTF("MQTT Init: Failed to initialise client\r\n");
+		return MQTT_ERROR;
+	}
+
+	mosquitto_connect_callback_set(mqtt_client, _mqtt_connection_cb);
+	mosquitto_disconnect_callback_set(mqtt_client, _mqtt_disconnection_cb);
+	mosquitto_log_callback_set(mqtt_client, _mqtt_log_cb);
+
+	return MQTT_SUCCESS;
+}
+
+int OSMqtt::_connect(void) {
+	int rc;
+	::_connected = false;
+	String avail_topic(_pub_topic);
+	avail_topic += "/";
+	avail_topic += MQTT_AVAILABILITY_TOPIC;
+	mosquitto_will_clear(mqtt_client);
+	rc = mosquitto_will_set(mqtt_client, avail_topic.c_str(), strlen(MQTT_OFFLINE_PAYLOAD),
+		MQTT_OFFLINE_PAYLOAD, 0, true);
+	if (rc != MOSQ_ERR_SUCCESS) {
+		DEBUG_LOGF("MQTT Will: Failed (%s)\r\n", mosquitto_strerror(rc));
+		return MQTT_ERROR;
+	}
+	if (_username[0]) {
+		rc = mosquitto_username_pw_set(mqtt_client, _username, _password);
+		if (rc != MOSQ_ERR_SUCCESS) {
+			DEBUG_LOGF("MQTT Connect: Connection Failed (%s)\r\n", mosquitto_strerror(rc));
+			return MQTT_ERROR;
+		}
+	}
+	rc = mosquitto_connect(mqtt_client, _host, _port, OS_MQTT_KEEPALIVE);
+	if (rc != MOSQ_ERR_SUCCESS) {
+		DEBUG_LOGF("MQTT Connect: Connection Failed (%s)\r\n", mosquitto_strerror(rc));
+		return MQTT_ERROR;
+	}
+
+	// Allow 10ms for the Broker's ack to be received. We need this on start-up so that the
+	// connection is registered before we attempt to send our first NOTIFY_REBOOT notification.
+	usleep(10000);
+
+	return MQTT_SUCCESS;
+}
+
+int OSMqtt::_disconnect(void) {
+	int rc = mosquitto_disconnect(mqtt_client);
+	return rc == MOSQ_ERR_SUCCESS ? MQTT_SUCCESS : MQTT_ERROR;
+}
+
+bool OSMqtt::_connected(void) { return ::_connected; }
+
+int OSMqtt::_publish(const char *topic, const char *payload) {
+	String total_topic(_pub_topic); // concatenate root topic with specific topic
+	total_topic += "/";
+	total_topic += topic;
+	int rc = mosquitto_publish(mqtt_client, NULL, total_topic.c_str(), strlen(payload), payload, 0, false);
+	if (rc != MOSQ_ERR_SUCCESS) {
+		DEBUG_LOGF("MQTT Publish: Failed (%s)\r\n", mosquitto_strerror(rc));
+		return MQTT_ERROR;
+	}
+	return MQTT_SUCCESS;
+}
+
+void subscribe_callback(struct mosquitto *mosq, void *obj, const struct mosquitto_message *message){
+	DEBUG_LOGF("Callback\r\n");
+	(void)mosq;
+	(void)obj;
+	if (!message) return;
+	dispatch_mqtt_command(static_cast<const uint8_t*>(message->payload), message->payloadlen);
+}
+
+int OSMqtt::_subscribe(void) {
+	mosquitto_message_callback_set(mqtt_client, subscribe_callback);
+	int rc = mosquitto_subscribe(mqtt_client, NULL, _sub_topic, 0);
+	if (rc != MOSQ_ERR_SUCCESS) {
+		DEBUG_LOGF("MQTT Subscribe: Failed (%s)\r\n", mosquitto_strerror(rc));
+		return MQTT_ERROR;
+	}
+	return MQTT_SUCCESS;
+}
+
+int OSMqtt::_loop(void) {
+	return mosquitto_loop(mqtt_client, 0 , 1);
+}
+
+const char * OSMqtt::_state_string(int error) {
+	return mosquitto_strerror(error);
+}
+#endif

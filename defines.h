@@ -32,7 +32,7 @@
 														// if this number is different from the one stored in non-volatile memory
 														// a device reset will be automatically triggered
 
-#define OS_FW_MINOR      5  // Firmware minor version
+#define OS_FW_MINOR      6  // Firmware minor version
 
 /** Hardware version base numbers */
 #define OS_HW_VERSION_BASE   0x00 // OpenSprinkler
@@ -45,24 +45,46 @@
 #define HW_TYPE_LATCH        0x1A   // DC powered, for DC latching solenoids only, with boost converter and H-bridges
 #define HW_TYPE_UNKNOWN      0xFF
 
+#if defined(ESP32)
+#define HAS_TARGET_PD_VOLTAGE(revision, type) ((type) == HW_TYPE_DC)
+#elif defined(ESP8266)
+#define HAS_TARGET_PD_VOLTAGE(revision, type) ((revision) == 4 && (type) == HW_TYPE_DC)
+#else
+#define HAS_TARGET_PD_VOLTAGE(revision, type) false
+#endif
+
 /** Data file names */
+#if defined(ESP32)
+#define IOPTS_FILENAME        "/iopts.dat"
+#define SOPTS_FILENAME        "/sopts.dat"
+#define STATIONS_FILENAME     "/stns.dat"
+#define NVCON_FILENAME        "/nvcon.dat"
+#define PROG_FILENAME         "/prog.dat"
+#define DONE_FILENAME         "/done.dat"
+#else
 #define IOPTS_FILENAME        "iopts.dat"   // integer options data file
 #define SOPTS_FILENAME        "sopts.dat"   // string options data file
 #define STATIONS_FILENAME     "stns.dat"    // stations data file
 #define NVCON_FILENAME        "nvcon.dat"   // non-volatile controller data file, see OpenSprinkler.h --> struct NVConData
 #define PROG_FILENAME         "prog.dat"    // program data file
 #define DONE_FILENAME         "done.dat"    // used to indicate the completion of all files
+#endif
 // External sensor board (ADS1115-based analog inputs, see sensor.h).
 // Unrelated to the onboard SENSOR1/SENSOR2 GPIO inputs.
+#if defined(ESP32)
+#define SENSORS_FILENAME      "/sens.dat"
+#define SENADJ_FILENAME       "/senadj.dat"
+#else
 #define SENSORS_FILENAME      "sens.dat"    // external sensor definitions
-#if defined(ESP8266)
-#define LOG_DIR                     "/logs/"   // absolute path on LittleFS; parent dir created implicitly
+#define SENADJ_FILENAME       "senadj.dat"  // external sensor adjustment data for programs
+#endif
+#if defined(ARDUINO)
+#define LOG_DIR                     "/logs/"   // absolute path on LittleFS; writers must ensure parent exists
 #else
 #define LOG_DIR                     "logs/"    // relative to data dir on Linux; get_filename_fullpath prepends it
 #endif
 #define SENSORS_LOG_FILENAME        LOG_DIR "sens.log" // external sensor log data (…sens.log000 … sens.logNNN)
 #define SENSORS_LOG_HEADER_FILENAME LOG_DIR "sens.hdr" // external sensor log header
-#define SENADJ_FILENAME       "senadj.dat"  // external sensor adjustment data for programs
 
 /** Station macro defines */
 #define STN_TYPE_STANDARD    0x00 // standard solenoid station
@@ -72,6 +94,7 @@
 #define STN_TYPE_HTTP        0x04	// HTTP station
 #define STN_TYPE_HTTPS       0x05	// HTTPS station
 #define STN_TYPE_REMOTE_OTC  0x06 // Remote OpenSprinkler station (by OTC)
+#define STN_TYPE_BUNDLE      0x07 // physical zone that also claims configured member zones
 #define STN_TYPE_OTHER       0xFF
 
 /** Notification macro defines */
@@ -136,8 +159,8 @@ enum {
 
 
 /** WiFi defines */
-#define WIFI_MODE_AP       0xA9
-#define WIFI_MODE_STA      0x2A
+#define OS_WIFI_MODE_AP       0xA9
+#define OS_WIFI_MODE_STA      0x2A
 
 #define OS_STATE_INITIAL        0
 #define OS_STATE_CONNECTING     1
@@ -149,7 +172,7 @@ enum {
 #define LED_SLOW_BLINK 500
 
 /** Storage / zone expander defines */
-#if defined(ESP8266)
+#if defined(ARDUINO)
 	#define MAX_EXT_BOARDS    8  // maximum number of 8-zone expanders (each 16-zone expander counts as 2)
 #else
 	#define MAX_EXT_BOARDS    24 // allow more zones for linux-based firmwares
@@ -162,16 +185,20 @@ enum {
 #define STATION_NAME_SIZE 32    // maximum number of characters in each station name
 #define MAX_SOPTS_SIZE    320   // maximum string option size
 
-#if defined(ESP8266)
-#define LOG_SPRINKLER_MAX_KB  1200  // max total size of sprinkler .txt log files in KB (~1.2 MB)
+#if defined(ARDUINO)
+#define LOG_SPRINKLER_MAX_KB  1200  // max combined legacy and binary sprinkler logs in KB
 #endif
 
 #define MAX_SENSORS 64
 #define SENSOR_LOG_MAGIC            0x55
 #define SENSOR_LOG_VERSION          0x01
 #define SENSOR_LOG_MAX_FILES        50    // number of data files in the rotation
-#if defined(ESP8266)
-	#define SENSOR_LOG_RECORDS_PER_FILE 819    // records per file; 819×10 B = 8 190 B fits in one 8 KB LittleFS block
+#if defined(ESP32)
+	// 818 x 10 B = 8,180 B, below the two-block ESP32 LittleFS ceiling (8,188 B).
+	#define SENSOR_LOG_RECORDS_PER_FILE 818
+#elif defined(ARDUINO)
+	// 819 x 10 B = 8,190 B, which fits in one 8 KB ESP8266 LittleFS block.
+	#define SENSOR_LOG_RECORDS_PER_FILE 819
 #else
 	// Linux/OSPi/DEMO: 50 × 16 384 = 819 200 records (about 8.2 MB).
 	#define SENSOR_LOG_RECORDS_PER_FILE 16384
@@ -189,6 +216,7 @@ enum {
 #define DEFAULT_OTC_PORT_DEV       80
 #define DEFAULT_OTC_SERVER_APP    "cloud.openthings.io"
 #define DEFAULT_OTC_PORT_APP       443
+#define FIRMWARE_UPDATE_PORT       8080
 #define DEFAULT_OTC_TOKEN_LENGTH   32
 #define DEFAULT_DEVICE_NAME       "My OpenSprinkler"
 #define DEFAULT_EMPTY_STRING      ""
@@ -354,18 +382,37 @@ enum {
 #undef OS_HW_VERSION
 
 /** Hardware defines */
+#include "boards/board_profile.h"
+
+// Compatibility names for callers while pin access migrates to board profiles.
+#define PIN_BUTTON_1    (osboard::active().pins.buttons[0])
+#define PIN_BUTTON_2    (osboard::active().pins.buttons[1])
+#define PIN_BUTTON_3    (osboard::active().pins.buttons[2])
+#define PIN_SENSOR1     (osboard::active().pins.sensors[0])
+#define PIN_SENSOR2     (osboard::active().pins.sensors[1])
+#define PIN_SENSOR3     (osboard::active().pins.sensors[2])
+#define PIN_SENSOR4     (osboard::active().pins.sensors[3])
+#define PIN_RFRX        (osboard::active().pins.rf_rx)
+#define PIN_RFTX        (osboard::active().pins.rf_tx)
+#define PIN_BOOST       (osboard::active().pins.boost)
+#define PIN_BOOST_EN    (osboard::active().pins.boost_enable)
+#define PIN_LATCH_COM   (osboard::active().pins.latch_common)
+#define PIN_LATCH_COMA  (osboard::active().pins.latch_common_anode)
+#define PIN_LATCH_COMK  (osboard::active().pins.latch_common_cathode)
+#define PIN_IOEXP_INT   (osboard::active().pins.io_expander_interrupt)
+
 #if defined(ESP8266) // for ESP8266
 
 	#define OS_HW_VERSION    (OS_HW_VERSION_BASE+30)
-	#define IOEXP_PIN        0x80 // base for pins on main IO expander
-	#define MAIN_I2CADDR     0x20 // main IO expander I2C address
-	#define ACDR_I2CADDR     0x21 // ac driver I2C address
-	#define DCDR_I2CADDR     0x22 // dc driver I2C address
-	#define LADR_I2CADDR     0x23 // latch driver I2C address
-	#define EXP_I2CADDR_BASE 0x24 // base of expander I2C address
-	#define LCD_I2CADDR      0x3C // 128x64 OLED display I2C address
-	#define EEPROM_I2CADDR   0x50 // 24C02 EEPROM I2C address
-	#define CH224_I2CADDR    0x22 // CH224A/Q I2C address
+	#define IOEXP_PIN        osboard::IO_EXPANDER_PIN_BASE
+	#define MAIN_I2CADDR     osboard::MAIN_IO_EXPANDER_ADDRESS
+	#define ACDR_I2CADDR     osboard::AC_DRIVER_ADDRESS
+	#define DCDR_I2CADDR     osboard::DC_DRIVER_ADDRESS
+	#define LADR_I2CADDR     osboard::LATCH_DRIVER_ADDRESS
+	#define EXP_I2CADDR_BASE osboard::EXPANDER_ADDRESS_BASE
+	#define LCD_I2CADDR      osboard::LCD_ADDRESS
+	#define EEPROM_I2CADDR   osboard::EEPROM_ADDRESS
+	#define CH224_I2CADDR    osboard::CH224_ADDRESS
 
 	#define PIN_CURR_SENSE    A0    // current sensing pin
 	#define PIN_LATCH_VOLT_SENSE A0 // latch voltage sensing pin
@@ -373,98 +420,46 @@ enum {
 	#define ETHER_BUFFER_SIZE   2048
 	#define ETHER_BUFFER_ALLOC_SIZE   ETHER_BUFFER_SIZE
 
-	#define PIN_ETHER_CS       16 // Ethernet CS (chip select pin) is 16 on OS 3.2 and above
-	#define ETHER_SPI_CLOCK    10000000L // SPI clock for Ethernet (e.g. 10MHz)
+	#define PIN_ETHER_CS       osboard::ETHERNET_CS_PIN
+	#define ETHER_SPI_CLOCK    osboard::ETHERNET_SPI_CLOCK_HZ
 
-	/* To accommodate different OS30 versions, we use software defines pins */
-	extern unsigned char PIN_BUTTON_1;
-	extern unsigned char PIN_BUTTON_2;
-	extern unsigned char PIN_BUTTON_3;
-	extern unsigned char PIN_RFRX;
-	extern unsigned char PIN_RFTX;
-	extern unsigned char PIN_BOOST;
-	extern unsigned char PIN_BOOST_EN;
-	extern unsigned char PIN_LATCH_COM;
-	extern unsigned char PIN_LATCH_COMA;
-	extern unsigned char PIN_LATCH_COMK;
-	extern unsigned char PIN_SENSOR1;
-	extern unsigned char PIN_SENSOR2;
-	extern unsigned char PIN_SENSOR3;
-	extern unsigned char PIN_SENSOR4;
-	extern unsigned char PIN_IOEXP_INT;
+	#define USE_DISPLAY
 
-	/* Original OS30 pin defines */
-	//#define V0_MAIN_INPUTMASK 0b00001010 // main input pin mask
-	// pins on main PCF8574 IO expander have pin numbers IOEXP_PIN+i
-	#define V0_PIN_BUTTON_1      IOEXP_PIN+1 // button 1
-	#define V0_PIN_BUTTON_2      0           // button 2
-	#define V0_PIN_BUTTON_3      IOEXP_PIN+3 // button 3
-	#define V0_PIN_RFRX          14
-	#define V0_PIN_PWR_RX        IOEXP_PIN+0
-	#define V0_PIN_RFTX          16
-	#define V0_PIN_PWR_TX        IOEXP_PIN+2
-	#define V0_PIN_BOOST         IOEXP_PIN+6
-	#define V0_PIN_BOOST_EN      IOEXP_PIN+7
-	#define V0_PIN_SENSOR1       12 // sensor 1
-	#define V0_PIN_SENSOR2       13 // sensor 2
+#elif defined(ESP32) // OpenSprinkler v4.0 ESP32-C6
 
-	/* OS31 pin defines */
-	// pins on PCA9555A IO expander have pin numbers IOEXP_PIN+i
-	#define V1_IO_CONFIG         0x1F00 // config bits
-	#define V1_IO_OUTPUT         0x1F00 // output bits
-	#define V1_PIN_BUTTON_1      IOEXP_PIN+10 // button 1
-	#define V1_PIN_BUTTON_2      IOEXP_PIN+11 // button 2
-	#define V1_PIN_BUTTON_3      IOEXP_PIN+12 // button 3
-	#define V1_PIN_RFRX          14
-	#define V1_PIN_RFTX          16
-	#define V1_PIN_IOEXP_INT     12
-	#define V1_PIN_BOOST         IOEXP_PIN+13
-	#define V1_PIN_BOOST_EN      IOEXP_PIN+14
-	#define V1_PIN_LATCH_COM     IOEXP_PIN+15
-	#define V1_PIN_SENSOR1       IOEXP_PIN+8 // sensor 1
-	#define V1_PIN_SENSOR2       IOEXP_PIN+9 // sensor 2
+	#define OS_HW_VERSION    (OS_HW_VERSION_BASE + osboard::OS40_HARDWARE_VERSION)
+	#define IOEXP_PIN        osboard::IO_EXPANDER_PIN_BASE
+	#define MAIN_I2CADDR     osboard::MAIN_IO_EXPANDER_ADDRESS
+	#define EXP_I2CADDR_BASE osboard::EXPANDER_ADDRESS_BASE
+	#define LCD_I2CADDR      osboard::LCD_ADDRESS
+	#define RTC_I2CADDR      osboard::RTC_ADDRESS
+	#define CH224_I2CADDR    osboard::CH224_ADDRESS
 
-	/* OS32 pin defines */
-	// pins on PCA9555A IO expander have pin numbers IOEXP_PIN+i
-	#define V2_IO_CONFIG         0x1000 // config bits
-	#define V2_IO_OUTPUT         0x1E00 // output bits
-	#define V2_PIN_BUTTON_1      2 // button 1
-	#define V2_PIN_BUTTON_2      0 // button 2
-	#define V2_PIN_BUTTON_3      IOEXP_PIN+12 // button 3
-	#define V2_PIN_RFTX          15
-	#define V2_PIN_BOOST         IOEXP_PIN+13
-	#define V2_PIN_BOOST_EN      IOEXP_PIN+14
-	#define V2_PIN_LATCH_COMA    IOEXP_PIN+8  // latch COM+ (anode)
-	#define V2_PIN_SRLAT         IOEXP_PIN+9  // shift register latch
-	#define V2_PIN_SRCLK         IOEXP_PIN+10 // shift register clock
-	#define V2_PIN_SRDAT         IOEXP_PIN+11 // shift register data
-	#define V2_PIN_LATCH_COMK    IOEXP_PIN+15 // latch COM- (cathode)
-	#define V2_PIN_SENSOR1       3  // sensor 1
-	#define V2_PIN_SENSOR2       10 // sensor 2
-	#define V2_PIN_SENSOR3       IOEXP_PIN+10 // sensor 3 (OS 3.4 only — IO expander pin)
-	#define V2_PIN_SENSOR4       IOEXP_PIN+11 // sensor 4 (OS 3.4 only — IO expander pin)
-	#define V2_PIN_BOOST_SEL     IOEXP_PIN+8
+	#define PIN_CURR_SENSE   osboard::OS40_CURRENT_SENSE_PIN
+	#define PIN_FLASH_CS     osboard::OS40_EXTERNAL_FLASH_CS_PIN
+	#define PIN_ETHER_IRQ    osboard::OS40_ETHERNET_IRQ_PIN
+	#define PIN_ETHER_RESET  osboard::OS40_ETHERNET_RESET_PIN
+	#define PIN_ETHER_CS     osboard::OS40_ETHERNET_CS_PIN
+	#define PIN_SPI_MOSI     osboard::OS40_SPI_MOSI_PIN
+	#define PIN_SPI_MISO     osboard::OS40_SPI_MISO_PIN
+	#define PIN_SPI_SCK      osboard::OS40_SPI_CLOCK_PIN
+	#define PIN_I2C_SCL      osboard::OS40_I2C_CLOCK_PIN
+	#define PIN_I2C_SDA      osboard::OS40_I2C_DATA_PIN
+	#define ETHER_SPI_CLOCK  osboard::ETHERNET_SPI_CLOCK_HZ
+	#define ETHER_BUFFER_SIZE 4096
+	#define ETHER_BUFFER_ALLOC_SIZE ETHER_BUFFER_SIZE
+	#define PIN_FREE_LIST    {}
 
 	#define USE_DISPLAY
 
 #elif defined(OSPI) // for OSPi
 
 	#define OS_HW_VERSION    OSPI_HW_VERSION_BASE
-	#define PIN_SR_LATCH      22    // shift register latch pin
-	#define PIN_SR_DATA       27    // shift register data pin
-	#define PIN_SR_DATA_ALT   21    // shift register data pin (alternative, for RPi 1 rev. 1 boards)
-	#define PIN_SR_CLOCK       4    // shift register clock pin
-	#define PIN_SR_OE         17    // shift register output enable pin
-	#define PIN_SENSOR1       14
-	#define PIN_SENSOR2       23
-	// SN3/SN4 don't exist on OSPi hardware; sentinel values are referenced by
-	// sensor_pin() but never reached at runtime (sensor_available() returns false).
-	#define PIN_SENSOR3       255
-	#define PIN_SENSOR4       255
-	#define PIN_RFTX          15    // RF transmitter pin
-	#define PIN_BUTTON_1      24    // button 1
-	#define PIN_BUTTON_2      18    // button 2
-	#define PIN_BUTTON_3      10    // button 3
+	#define PIN_SR_LATCH      osboard::OSPI_SHIFT_LATCH_PIN
+	#define PIN_SR_DATA       osboard::OSPI_SHIFT_DATA_PIN
+	#define PIN_SR_DATA_ALT   osboard::OSPI_SHIFT_DATA_ALT_PIN
+	#define PIN_SR_CLOCK      osboard::OSPI_SHIFT_CLOCK_PIN
+	#define PIN_SR_OE         osboard::OSPI_SHIFT_OUTPUT_ENABLE_PIN
 
 	#define PIN_FREE_LIST       {5,6,7,8,9,11,12,13,16,19,20,21,23,25,26}  // free GPIO pins
 	#define ETHER_BUFFER_SIZE   8192
@@ -486,11 +481,6 @@ enum {
 	#define PIN_SR_DATA     0
 	#define PIN_SR_CLOCK    0
 	#define PIN_SR_OE       0
-	#define PIN_SENSOR1     0
-	#define PIN_SENSOR2     0
-	#define PIN_SENSOR3     0
-	#define PIN_SENSOR4     0
-	#define PIN_RFTX        0
 	#define PIN_FREE_LIST  {}
 	#define ETHER_BUFFER_SIZE   8192  // HTTP client send/receive (weather, notifier, remote station)
 	#define ETHER_BUFFER_ALLOC_SIZE   ETHER_BUFFER_SIZE
@@ -499,7 +489,7 @@ enum {
 
 #if defined(ENABLE_DEBUG) /** Serial debug functions */
 
-	#if defined(ESP8266)
+	#if defined(ARDUINO)
 		#define DEBUG_BEGIN(x)   {Serial.begin(x);}
 		#define DEBUG_PRINT(x)   {Serial.print(x);}
 		#define DEBUG_PRINTLN(x) {Serial.println(x);}
@@ -516,7 +506,7 @@ enum {
 #else
 
 	#if defined(ESP8266)
-	// work-around for PIN_SENSOR1 on OS3.2 and above
+	// Work around the ESP8266 serial RX conflict with PIN_SENSOR1 on OS3.2+.
 	#define DEBUG_BEGIN(x)   {Serial.begin(115200); Serial.end();}
 	#else
 	#define DEBUG_BEGIN(x)   {}
@@ -528,7 +518,7 @@ enum {
 #endif
 
 /** Re-define arduino-specific (e.g. PGM) types to use standard types */
-#if !defined(ESP8266)
+#if !defined(ARDUINO)
 	#include <stdio.h>
 	#include <stdlib.h>
 	#include <string.h>

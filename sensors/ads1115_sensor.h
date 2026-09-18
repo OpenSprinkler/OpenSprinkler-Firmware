@@ -2,7 +2,7 @@
 
 #include "../defines.h"
 #include "sensor.h"
-#include "../ads1115.h"
+#include "../drivers/ads1115.h"
 
 #define ADS1115_DEFAULT_SCALE   1
 #define ADS1115_DEFAULT_OFFSET  0

@@ -1,25 +1,32 @@
 # Firmware Update
 
-## OpenSprinkler v3 {: .hltitle}
+## OpenSprinkler v3 and v4 {: .hltitle}
 
-Supports **OTA (over-the-air)** updates - you can upload firmware directly through the web UI. The update page must be accessed locally using the controller's IP address; it is **NOT** available through an OpenThings Cloud (OTC) connection.
+Firmware updates use the controller's local update page. Open it through the controller's IP address, not through an OpenThings Cloud (OTC) connection. The update page uses port `8080` for uploads, so that port must be reachable from your browser.
 
 !!! warning "Back Up Before Updating"
     Before update, please back up your configurations (Sidebar → **Export Configuration**) so you can quickly restore programs and settings if needed.
 
-    * A **Dotted Version Update**, e.g. 2.2.0→2.2.1, triggers a factory reset and **erases all programs, settings, and logs**.
-    * A **Build Number Update**, e.g. 2.2.1(2)→2.2.1(5), **preserves all settings**.
+    * A **Dotted Version Update**, e.g. 2.2.0 to 2.2.1, triggers a factory reset and **erases all programs, settings, and logs**.
+    * A **Build Number Update**, e.g. 2.2.1(5) to 2.2.1(6), normally preserves programs and settings. On v3, the 2.2.1(6) upgrade removes old sprinkler logs while migrating to the new bounded log format.
 
-1. [**Download** the firmware file](https://raysfiles.com/os_compiled_firmware/v3.x/) (`.bin` format). The latest is `os_221_rev5.bin`.
-2. **Open the Firmware Update page:** At the controller's homepage, swipe from left to right to open the side menu, then choose **Update Firmware**.
-3. **Upload the firmware:** Select the `.bin` file downloaded in Step 1, enter your device password, and click **Submit**.
-4. **Wait for completion:** The controller will reboot automatically when the update finishes.
+1. **Open the Firmware Update page:** From the controller's local homepage, open the side menu and choose **Update Firmware**, or go directly to `http://os-ip/update` (replace `os-ip` with the controller's IP address).
+2. **Choose the firmware:** On 2.2.1(6) or later, select an available release and follow the prompts. The page downloads the image; the controller verifies its signature and checksum before installing it. A controller running older firmware needs a manual upload to reach 2.2.1(6) first.
+3. **Wait for completion:** Keep the controller powered and the browser open until the update finishes and the controller reboots.
+
+### Manual Upload
+
+If the controller is running older firmware or cannot use the online release list, download the correct 2.2.1(6) image and select it with the file upload control on the local update page:
+
+* [OpenSprinkler v3 (ESP8266): `.bin`](https://firmware.opensprinkler.com/v1/releases/2.2.1-6/opensprinkler-2.2.1-6-esp8266.bin)
+* [OpenSprinkler v4 (ESP32-C6-N8): `.bin32n8`](https://firmware.opensprinkler.com/v1/releases/2.2.1-6/opensprinkler-2.2.1-6-esp32c6.bin32n8)
+
+Select the image for your hardware and enter the controller password when prompted. Do not install a v3 image on v4 or a v4 image on v3.
 
 ---
 
 ### Alternative Methods to Open the Firmware Update Page
 
-* **Direct IP address:** Open `http://os-ip/update` in a browser, where `os-ip` is the controller's IP address. Click button **B1** on the controller to display its IP address.
 * **WiFi AP mode:** If your controller is currently in WiFi AP mode, connect your computer or phone to the AP SSID shown on the controller's LCD, then open `http://192.168.4.1/update` in a browser.
 
 ---
@@ -27,7 +34,8 @@ Supports **OTA (over-the-air)** updates - you can upload firmware directly throu
 ### Troubleshooting
 
 * **Blank Homepage:** If the device homepage is blank or showing an error, and you need to export configuration before updating, see [Blank Page Troubleshooting](troubleshooting.md#ui-app-time-and-lcd).
-* **Upload Connection Failure:** The firmware upload uses port `8080`. Make sure this port is not blocked by your computer, router, or firewall, then retry the upload.
+* **No Available Firmware:** Use the manual upload if your browser cannot reach the firmware release site, or if the controller's firmware predates the online release list.
+* **Upload Connection Failure:** Make sure port `8080` is not blocked by your computer, router, or firewall, then retry the upload.
 * **Controller Stops Responding:** Unplug and reconnect power, then retry the update.
 * **Update via Wired Ethernet:** If your controller is connected via wired Ethernet:
     * If it runs firmware `2.2.0` or newer, follow the same steps as WiFi.

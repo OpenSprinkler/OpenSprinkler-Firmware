@@ -4,120 +4,162 @@
     <title>OpenSprinkler Firmware Update</title>
     <meta name='viewport' content='width=device-width, initial-scale=1'>
     <style>
-        :root{
-          --bg:#f6f7fb; --fg:#0f172a; --muted:#586380;
-          --card:#fff; --border:#e2e8f0;
-          --accent:#2563eb;
-          --warning-bg: #fffbe6; --warning-fg: #8b5d0b; --warning-border: #fde68a;
-        }
-        @media (prefers-color-scheme: dark){
-          :root{
-            --bg:#0b1220; --fg:#e6eaff; --muted:#a3acc7;
-            --card:#0f172a; --border:#1e293b;
-            --accent:#60a5fa;
-            --warning-bg: #2e240b; --warning-fg: #fde047; --warning-border: #713f12;
-          }
-        }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: var(--bg);
-            margin: 0;
-            padding: 20px;
-            color: var(--fg);
-        }
-        main {
-            max-width: 600px;
-            margin: 0 auto;
-            background-color: var(--card);
-            padding: 25px 30px;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-        }
-        h1 {
-            text-align: center;
-            color: var(--fg);
-            margin-top: 0;
-            margin-bottom: 25px;
-        }
-        .form-group {
-            margin-bottom: 18px;
-        }
-        label {
-            display: block;
-            font-weight: 600;
-            margin-bottom: 6px;
-        }
-        input[type="password"],
-        input[type="file"] {
-            width: 100%;
-            padding: 10px;
-            font-size: 16px;
-            border: 1px solid var(--border);
-            border-radius: 5px;
-            box-sizing: border-box;
-            background-color: transparent;
-            color: inherit;
-        }
-        input[type="file"]::file-selector-button {
-            font-weight: 600;
-            color: var(--accent);
-            background-color: transparent;
-            border: 1px solid var(--accent);
-            border-radius: 5px;
-            padding: 8px 12px;
-            cursor: pointer;
-            margin-right: 10px;
-        }
-        button {
-            width: 100%;
-            padding: 12px;
-            font-size: 16px;
-            font-weight: 600;
-            color: #fff;
-            background-color: var(--accent);
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-        }
-        #msg {
-            text-align: left;
-            font-weight: 600;
-            margin: 20px 0;
-            min-height: 20px;
-        }
-        .warning-box {
-            background-color: var(--warning-bg);
-            color: var(--warning-fg);
-            border: 1px solid var(--warning-border);
-            padding: 15px;
-            margin-bottom: 20px;
-            border-radius: 5px;
-            font-size: 16px;
-        }
+    :root{
+      --bg:#f4f5f7; --fg:#111827; --muted:#6b7280;
+      --card:#ffffff; --border:#e5e7eb; --input-border:#d1d5db;
+      --accent:#2563eb; --accent-hover:#1d4ed8; --accent-fg:#ffffff;
+      --head-bg:#f7f7f7; --head-fg:#262626;
+      --focus:rgba(37,99,235,.22);
+      --imp-bg:#fff7ed; --imp-fg:#7c2d12; --imp-accent:#ea580c;
+    }
+    @media (prefers-color-scheme: dark){
+      :root{
+        --bg:#0b1220; --fg:#e6eaf2; --muted:#9aa4b8;
+        --card:#111a2e; --border:#2a3344; --input-border:#3a4658;
+        --accent:#3b82f6; --accent-hover:#60a5fa; --accent-fg:#ffffff;
+        --head-bg:#1b2130; --head-fg:#cbd5e1;
+        --focus:rgba(59,130,246,.30);
+        --imp-bg:#3a2412; --imp-fg:#fed7aa; --imp-accent:#fb923c;
+      }
+    }
+    *{ box-sizing:border-box; }
+    body{
+      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+      background:var(--bg); color:var(--fg); margin:0; padding:24px 16px; line-height:1.45;
+    }
+    main{ max-width:560px; margin:0 auto; }
+    h1{ text-align:center; font-size:22px; margin:0 0 22px; }
+    .important{
+      background:var(--imp-bg); color:var(--imp-fg);
+      border-left:4px solid var(--imp-accent); border-radius:6px;
+      padding:12px 16px; margin-bottom:22px; font-size:15px;
+    }
+    .important b{ color:var(--imp-accent); letter-spacing:.3px; }
+    section{
+      margin-bottom:16px; background:var(--card);
+      border:1px solid var(--border); border-radius:8px; overflow:hidden;
+    }
+    section[hidden]{ display:none; }
+    section > h2{
+      margin:0; padding:10px 16px;
+      background:var(--head-bg); color:var(--head-fg); border-bottom:1px solid var(--border);
+      font-size:13px; font-weight:700; letter-spacing:.5px; text-transform:uppercase;
+    }
+    .body{ padding:16px; }
+    .field{ margin-bottom:14px; }
+    .field:last-of-type{ margin-bottom:0; }
+    label{ display:block; font-weight:600; font-size:13px; color:var(--muted); margin-bottom:6px; }
+    input[type="password"],input[type="file"],select{
+      width:100%; padding:10px 12px; font-size:16px; color:inherit;
+      background:transparent; border:1px solid var(--input-border); border-radius:6px;
+    }
+    input:focus,select:focus{ border-color:var(--accent); box-shadow:0 0 0 3px var(--focus); outline:none; }
+	.release-row{ display:grid; grid-template-columns:minmax(0,1fr) 44px; gap:8px; }
+	.icon-button{
+	  width:44px; height:44px; padding:0; display:flex; align-items:center; justify-content:center;
+	  font-size:25px; line-height:1;
+	}
+    input[type="file"]::file-selector-button{
+      font-weight:600; color:var(--accent); background:transparent;
+      border:1px solid var(--accent); border-radius:6px; padding:8px 12px; margin-right:10px; cursor:pointer;
+    }
+    button,.button-link{
+      width:100%; padding:12px; font-size:16px; font-weight:600;
+      color:var(--accent-fg); background:var(--accent); border:none; border-radius:6px; cursor:pointer;
+    }
+    .button-link{ display:block; text-align:center; text-decoration:none; }
+    button:hover:not(:disabled),.button-link:hover{ background:var(--accent-hover); }
+    button.secondary,.button-link.secondary{ color:var(--accent); background:transparent; border:1px solid var(--accent); }
+    button.secondary:hover:not(:disabled),.button-link.secondary:hover{ background:var(--focus); }
+    button + button,button + .button-link,.button-link + button{ margin-top:8px; }
+    button:disabled{ opacity:.5; cursor:default; }
+    .help{ color:var(--muted); font-size:13px; margin-top:6px; }
+    .modal{
+      position:fixed; inset:0; z-index:10; display:flex; align-items:center; justify-content:center;
+      padding:20px; background:rgba(0,0,0,.55);
+    }
+    .modal[hidden]{ display:none; }
+    .modal-panel{
+      width:min(680px,100%); max-height:85vh; display:flex; flex-direction:column;
+      background:var(--card); border:1px solid var(--border); border-radius:8px; overflow:hidden;
+    }
+    .modal-header{
+      display:flex; align-items:center; gap:12px; padding:12px 16px;
+      background:var(--head-bg); border-bottom:1px solid var(--border);
+    }
+    .modal-header h2{ flex:1; margin:0; font-size:17px; }
+    .modal-close{ width:auto; padding:5px 9px; color:var(--fg); background:transparent; font-size:20px; }
+    .modal-close:hover:not(:disabled){ background:var(--focus); }
+    .release-notes{ margin:0; padding:18px; overflow:auto; white-space:pre-wrap; font:14px/1.5 inherit; }
+    .modal-footer{ padding:12px 16px; border-top:1px solid var(--border); }
+    .status-panel{
+      position:sticky; top:8px; z-index:5; padding:12px 16px; margin-bottom:16px;
+      background:var(--card); border:1px solid var(--border); border-radius:8px;
+    }
+    .status-panel[hidden]{ display:none; }
+    #msg{ text-align:center; font-weight:600; margin:0 0 8px; }
+    progress{ width:100%; height:12px; }
     </style>
 </head>
 <body>
 
 <main>
     <h1>OpenSprinkler Firmware Update</h1>
-    <form method='POST' action='/update' id='fm' enctype='multipart/form-data'>
-        <div class="form-group">
-            <label for="file">Firmware File (.bin)</label>
-            <input type='file' name='file' accept='.bin' id='file'>
-        </div>
-        <div class="form-group">
-            <label for="pw">Device Password</label>
-            <input type='password' name='pw' id='pw'>
-        </div>
 
-        <div class="warning-box">
-            <b>IMPORTANT:</b> Firmware updates across major revisions (e.g., from 2.2.1 to 2.2.2) will trigger a factory reset. Please save a copy of your current configurations before proceeding.
-        </div>
+	<div class="important"><b>IMPORTANT:</b> Please back up your configuration before proceeding. In the OpenSprinkler App/UI, select <b>Export Configurations</b> from the side menu.</div>
 
-        <p id='msg'></p>
-        <button type='button' id='btn_submit'>Upload Firmware</button>
-    </form>
+	<section>
+		<h2>Device Password</h2>
+		<div class="body">
+			<input type="password" id="pw" autocomplete="current-password" aria-label="Device password">
+		</div>
+	</section>
+
+	<div class="status-panel" id="status_panel" aria-live="polite" hidden>
+		<p id="msg"></p>
+		<progress id="progress" value="0" max="100" hidden></progress>
+	</div>
+
+	<section id="online_section" hidden>
+		<h2>One-Click Firmware Update</h2>
+		<div class="body">
+			<div class="field">
+				<div class="release-row">
+					<select id="release" aria-label="Firmware version" disabled><option>Checking for releases...</option></select>
+					<button type="button" class="secondary icon-button" id="btn_refresh" aria-label="Refresh firmware list" title="Refresh firmware list">&#8635;</button>
+				</div>
+				<p class="help" id="release_details"></p>
+			</div>
+			<button type="button" class="secondary" id="btn_notes" disabled>View Release Notes</button>
+			<button type="button" id="btn_install" disabled>Install Selected Version</button>
+		</div>
+	</section>
+
+	<section>
+		<h2>Manual Firmware Upload</h2>
+		<div class="body">
+			<div class="field">
+				<label for="file" id="file_label">Firmware File</label>
+				<input type="file" name="file" id="file" autocomplete="off">
+			</div>
+			<button type="button" id="btn_submit">Upload Selected Firmware</button>
+		</div>
+	</section>
+
 </main>
+
+<div class="modal" id="notes_modal" role="dialog" aria-modal="true" aria-labelledby="notes_title" hidden>
+	<div class="modal-panel">
+		<div class="modal-header">
+			<h2 id="notes_title">Release Notes</h2>
+			<button type="button" class="modal-close" id="btn_notes_close" aria-label="Close">&times;</button>
+		</div>
+		<pre class="release-notes" id="notes_body">Loading...</pre>
+		<div class="modal-footer">
+			<a class="button-link secondary" id="notes_github" href="https://github.com/OpenSprinkler/OpenSprinkler-Firmware/releases" target="_blank" rel="noopener">Open on GitHub</a>
+		</div>
+	</div>
+</div>
 
 <script>
     /**
@@ -306,69 +348,476 @@
         return temp.toLowerCase();
     }
 
+	function sha256_bytes(bytes) {
+		const constants = [
+			0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,
+			0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,
+			0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,
+			0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,
+			0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,
+			0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,
+			0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,
+			0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2
+		];
+		const state = new Uint32Array([
+			0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,
+			0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19
+		]);
+		const words = new Uint32Array(64);
+		const total = Math.ceil((bytes.length + 9) / 64) * 64;
+		const bitHigh = Math.floor(bytes.length / 0x20000000);
+		const bitLow = (bytes.length << 3) >>> 0;
+		function byte_at(position) {
+			if (position < bytes.length) return bytes[position];
+			if (position === bytes.length) return 0x80;
+			if (position >= total - 8) {
+				const offset = position - (total - 8);
+				const value = offset < 4 ? bitHigh : bitLow;
+				return (value >>> ((3 - (offset & 3)) * 8)) & 0xff;
+			}
+			return 0;
+		}
+		function rotate_right(value, bits) {
+			return (value >>> bits) | (value << (32 - bits));
+		}
+		for (let block = 0; block < total; block += 64) {
+			for (let i = 0; i < 16; i++) {
+				const position = block + i * 4;
+				words[i] = ((byte_at(position) << 24) | (byte_at(position + 1) << 16) |
+					(byte_at(position + 2) << 8) | byte_at(position + 3)) >>> 0;
+			}
+			for (let i = 16; i < 64; i++) {
+				const s0 = rotate_right(words[i - 15], 7) ^ rotate_right(words[i - 15], 18) ^
+					(words[i - 15] >>> 3);
+				const s1 = rotate_right(words[i - 2], 17) ^ rotate_right(words[i - 2], 19) ^
+					(words[i - 2] >>> 10);
+				words[i] = (words[i - 16] + s0 + words[i - 7] + s1) >>> 0;
+			}
+			let a=state[0],b=state[1],c=state[2],d=state[3];
+			let e=state[4],f=state[5],g=state[6],h=state[7];
+			for (let i = 0; i < 64; i++) {
+				const sum1 = rotate_right(e, 6) ^ rotate_right(e, 11) ^ rotate_right(e, 25);
+				const choice = (e & f) ^ (~e & g);
+				const temp1 = (h + sum1 + choice + constants[i] + words[i]) >>> 0;
+				const sum0 = rotate_right(a, 2) ^ rotate_right(a, 13) ^ rotate_right(a, 22);
+				const majority = (a & b) ^ (a & c) ^ (b & c);
+				const temp2 = (sum0 + majority) >>> 0;
+				h=g; g=f; f=e; e=(d+temp1)>>>0; d=c; c=b; b=a; a=(temp1+temp2)>>>0;
+			}
+			state[0]=(state[0]+a)>>>0; state[1]=(state[1]+b)>>>0;
+			state[2]=(state[2]+c)>>>0; state[3]=(state[3]+d)>>>0;
+			state[4]=(state[4]+e)>>>0; state[5]=(state[5]+f)>>>0;
+			state[6]=(state[6]+g)>>>0; state[7]=(state[7]+h)>>>0;
+		}
+		return Array.from(state, function(value) {
+			return value.toString(16).padStart(8, '0');
+		}).join('');
+	}
+
+	async function sha256_file(file) {
+		const bytes = new Uint8Array(await file.arrayBuffer());
+		if (window.crypto && window.crypto.subtle) {
+			try {
+				const digest = await window.crypto.subtle.digest('SHA-256', bytes);
+				return Array.from(new Uint8Array(digest), function(value) {
+					return value.toString(16).padStart(2, '0');
+				}).join('');
+			} catch (error) {}
+		}
+		return sha256_bytes(bytes);
+	}
+
 
     // --- Main page logic ---
     function id(s) { return document.getElementById(s); }
-    function show_msg(s, c) {
-        const msgEl = id('msg');
-        msgEl.innerHTML = `<font color=${c}>${s}</font>`;
+    const apiBase = '//' + window.location.hostname + ':8080/update';
+    let deviceInfo = null;
+    let firmwareBase = '';
+    let releases = [];
+
+	function clear_firmware_file() {
+		id('file').value = '';
+	}
+
+	window.addEventListener('pageshow', clear_firmware_file);
+	clear_firmware_file();
+
+    function show_msg(text, color) {
+        const message = id('msg');
+        message.textContent = text;
+        message.style.color = color || 'inherit';
+		id('status_panel').hidden = !text && id('progress').hidden;
     }
 
-    id('btn_submit').addEventListener('click', function(e){
-        e.preventDefault();
+    function set_busy(busy) {
+		if (busy) {
+			id('progress').hidden = true;
+			id('progress').value = 0;
+		}
+        id('btn_install').disabled = busy || !releases.length;
+        id('btn_refresh').disabled = busy;
+		id('btn_notes').disabled = busy || !releases.length;
+        id('btn_submit').disabled = busy;
+		id('release').disabled = busy || !releases.length;
+    }
+
+		function wait(milliseconds) {
+			return new Promise(function(resolve) { setTimeout(resolve, milliseconds); });
+		}
+
+		async function fetch_with_timeout(url, options, timeout) {
+			const controller = new AbortController();
+			const timer = setTimeout(function() { controller.abort(); }, timeout || 15000);
+			try {
+				return await fetch(url, Object.assign({}, options || {}, {signal: controller.signal}));
+			} catch (error) {
+				if (error.name === 'AbortError') throw new Error('The request timed out.');
+				throw error;
+			} finally {
+				clearTimeout(timer);
+			}
+		}
+
+		async function fetch_with_retry(url, options) {
+			let failure;
+			for (let attempt = 1; attempt <= 3; attempt++) {
+				try {
+					const response = await fetch_with_timeout(url, options, 20000);
+				if (response.ok || response.status < 500) return response;
+				failure = new Error('Server returned HTTP ' + response.status + '.');
+			} catch (error) {
+				failure = error;
+			}
+			if (attempt < 3) await wait(attempt * 500);
+		}
+		throw failure;
+	}
+
+    function password_hash() {
+		const password = id('pw').value;
+		if (!password && !confirm('You did not input a device password. Continue?')) throw new Error('Cancelled');
+		return password ? md5(password) : '';
+    }
+
+    async function load_releases() {
+        set_busy(true);
+        show_msg('Loading update information...', 'gray');
+        try {
+			const infoResponse = await fetch_with_timeout(apiBase + '/info', {cache: 'no-store'});
+            if (!infoResponse.ok) throw new Error('The controller did not return update information.');
+            deviceInfo = await infoResponse.json();
+            id('file').accept = deviceInfo.extension || '';
+            id('file_label').textContent = 'Firmware File (' + (deviceInfo.extension || 'device firmware') + ')';
+			id('online_section').hidden = !!deviceInfo.ap_mode;
+			if (deviceInfo.ap_mode) {
+				releases = [];
+				show_msg('', 'inherit');
+				return;
+			}
+			show_msg('Checking for firmware releases...', 'gray');
+            const select = id('release');
+            select.textContent = '';
+            releases = [];
+            if (!deviceInfo.configured) {
+                select.add(new Option('Online updates are not configured', ''));
+                select.disabled = true;
+                show_msg('Manual firmware upload is available below.', 'gray');
+                return;
+            }
+
+			firmwareBase = deviceInfo.base_url.replace(/\/$/, '');
+			const response = await fetch_with_retry(
+				firmwareBase + '/v1/manifest.json', {cache: 'no-store'});
+			if (!response.ok) throw new Error('The release catalog is unavailable.');
+			const catalog = await response.json();
+			if (catalog.schema !== 2 || !Array.isArray(catalog.releases))
+				throw new Error('The release catalog format is invalid.');
+
+			catalog.releases.forEach(function(release) {
+				if (!release || typeof release.id !== 'string' ||
+					!Array.isArray(release.targets) || !release.targets.includes(deviceInfo.target) ||
+					typeof release.descriptor !== 'string' ||
+					typeof release.signature !== 'string' ||
+					!release.descriptor.startsWith('/v1/releases/') ||
+					!release.signature.startsWith('/v1/releases/')) return;
+				releases.push(Object.assign({}, release, {label: release_label(release)}));
+			});
+			releases.forEach(function(release, index) {
+				select.add(new Option((index === 0 ? 'Latest: ' : '') + release.label, release.id));
+			});
+			select.disabled = !releases.length;
+            update_release_details();
+            show_msg(releases.length ? 'Firmware releases are available.' : 'No compatible releases found.', releases.length ? 'green' : 'red');
+        } catch (error) {
+            releases = [];
+            show_msg('Unable to check for updates: ' + error.message, 'red');
+        } finally {
+            set_busy(false);
+        }
+    }
+
+    function selected_release() {
+        return releases.find(function(release) { return release.id === id('release').value; });
+    }
+
+    function release_label(release) {
+        const version = String(release.version);
+        return /^\d{3}$/.test(version) ? version.split('').join('.') + '(' + release.build + ')' : release.id;
+    }
+
+	function close_release_notes() {
+		id('notes_modal').hidden = true;
+		document.body.style.overflow = '';
+	}
+
+	async function open_release_notes() {
+		const release = selected_release();
+		if (!release) return;
+		const modal = id('notes_modal');
+		const notes = id('notes_body');
+		const github = id('notes_github');
+		modal.hidden = false;
+		document.body.style.overflow = 'hidden';
+		id('notes_title').textContent = 'Release Notes';
+		notes.textContent = 'Loading...';
+		github.href = 'https://github.com/OpenSprinkler/OpenSprinkler-Firmware/releases';
+		id('btn_notes_close').focus();
+		try {
+			await load_release_descriptor(release);
+			const tag = String(release.version) + '(' + release.build + ')';
+			const response = await fetch_with_timeout(
+				'https://api.github.com/repos/OpenSprinkler/OpenSprinkler-Firmware/releases/tags/' +
+				encodeURIComponent(tag),
+				{cache: 'no-store', headers: {'Accept': 'application/vnd.github+json'}}, 20000);
+			id('notes_title').textContent = 'Release Notes - ' + release.label;
+			if (response.status === 404) {
+				notes.textContent = 'Release notes for ' + release.label + ' have not been published yet.';
+				return;
+			}
+			if (!response.ok) throw new Error('GitHub returned HTTP ' + response.status + '.');
+			const data = await response.json();
+			id('notes_title').textContent = 'Release Notes - ' + (data.name || tag);
+			notes.textContent = data.body || 'No release notes were provided for this version.';
+			if (typeof data.html_url === 'string' &&
+				data.html_url.startsWith('https://github.com/OpenSprinkler/OpenSprinkler-Firmware/releases/'))
+				github.href = data.html_url;
+		} catch (error) {
+			notes.textContent = 'Unable to load release notes: ' + error.message;
+		}
+	}
+
+	async function load_release_descriptor(release) {
+		if (release.descriptorPromise) return release.descriptorPromise;
+		release.descriptorPromise = (async function() {
+			const responses = await Promise.all([
+				fetch_with_retry(new URL(release.descriptor, firmwareBase).href, {cache: 'no-store'}),
+				fetch_with_retry(new URL(release.signature, firmwareBase).href, {cache: 'no-store'})
+			]);
+			if (!responses[0].ok || !responses[1].ok)
+				throw new Error('The signed release information is unavailable.');
+			const descriptorBytes = new Uint8Array(await responses[0].arrayBuffer());
+			const signature = (await responses[1].text()).trim();
+			const descriptor = JSON.parse(new TextDecoder().decode(descriptorBytes));
+			const artifact = descriptor.targets && descriptor.targets[deviceInfo.target];
+			if (descriptor.schema !== 1 || descriptor.id !== release.id || !signature ||
+				!artifact || typeof artifact.file !== 'string' ||
+				!artifact.file.startsWith('/v1/releases/') || !artifact.size ||
+				typeof artifact.sha256 !== 'string')
+				throw new Error('The signed release information is invalid.');
+			release.version = descriptor.version;
+			release.build = descriptor.build;
+			release.label = release_label(descriptor);
+			release.artifact = artifact;
+			release.url = new URL(artifact.file, firmwareBase).href;
+			release.descriptorBytes = descriptorBytes;
+			release.descriptorSignature = signature;
+			Array.from(id('release').options).forEach(function(option, index) {
+				if (option.value === release.id)
+					option.textContent = (index === 0 ? 'Latest: ' : '') + release.label;
+			});
+			return release;
+		})();
+		return release.descriptorPromise;
+	}
+
+	async function update_release_details() {
+		const release = selected_release();
+		if (!release) {
+			id('release_details').textContent = '';
+			return;
+		}
+		id('release_details').textContent = 'Loading...';
+		try {
+			await load_release_descriptor(release);
+			if (selected_release() === release)
+				id('release_details').textContent = Math.ceil(release.artifact.size / 1024) + ' KB';
+		} catch (error) {
+			if (selected_release() === release) id('release_details').textContent = 'Unavailable';
+		}
+	}
+
+    function download_firmware(release, attempt) {
+		attempt = attempt || 1;
+        return new Promise(function(resolve, reject) {
+            const xhr = new XMLHttpRequest();
+			function retry(error) {
+				if (attempt >= 3) return reject(error);
+				show_msg('Firmware download failed; retrying (' + attempt + '/3)...', 'gray');
+				setTimeout(function() {
+					download_firmware(release, attempt + 1).then(resolve, reject);
+				}, attempt * 500);
+			}
+            xhr.open('GET', release.url, true);
+            xhr.responseType = 'blob';
+			xhr.timeout = 60000;
+            xhr.onprogress = function(event) {
+                if (!event.lengthComputable) return;
+                const pct = Math.round(event.loaded * 100 / event.total);
+                id('progress').hidden = false;
+                id('progress').value = pct;
+                show_msg('Downloading firmware (' + pct + '%)...', 'gray');
+            };
+            xhr.onload = function() {
+				if (xhr.status >= 500) return retry(new Error('Firmware download failed.'));
+				if (xhr.status !== 200) return reject(new Error('Firmware download failed.'));
+                if (!xhr.response || xhr.response.size !== release.artifact.size)
+                    return reject(new Error('Downloaded firmware size does not match the catalog.'));
+                resolve(xhr.response);
+            };
+			xhr.onerror = function() { retry(new Error('A network error occurred during firmware download.')); };
+			xhr.ontimeout = function() { retry(new Error('Firmware download timed out.')); };
+            xhr.send();
+        });
+    }
+
+    async function prepare_update(release, allowDowngrade, password) {
+		const query = new URLSearchParams({
+			pw: password,
+			id: release.id,
+			sig: release.descriptorSignature,
+			allow_downgrade: allowDowngrade ? '1' : '0'
+		});
+		const response = await fetch_with_timeout(apiBase + '/prepare?' + query, {
+			method: 'POST',
+			headers: {'Content-Type': 'application/octet-stream'},
+			body: release.descriptorBytes
+		}, 20000);
+        const result = await response.json();
+		if (result.result === 2)
+			throw new Error('Authentication failed. Check the device password.');
+        if (result.result !== 1 || !result.upload_token)
+			throw new Error(result.item || 'The controller rejected the signed release.');
+        return result.upload_token;
+    }
+
+	function upload_firmware(file, filename, credential, verified, sha256) {
+        return new Promise(function(resolve, reject) {
+            const data = new FormData();
+            data.append('file', file, filename);
+            const xhr = new XMLHttpRequest();
+            const endpoint = verified ? '/upload' : '';
+			const query = new URLSearchParams();
+			if (verified) {
+				query.set('token', credential);
+			} else {
+				query.set('pw', credential);
+				query.set('size', file.size);
+				query.set('sha256', sha256);
+			}
+			xhr.open('POST', apiBase + endpoint + '?' + query.toString(), true);
+            xhr.timeout = 300000;
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState !== 4) return;
+                if (xhr.status !== 200) return reject(new Error('Could not connect to the update server.'));
+                try {
+                    const result = JSON.parse(xhr.responseText);
+					if (result.result === 2)
+						return reject(new Error('Authentication failed. Check the device password.'));
+                    if (result.result !== 1) return reject(new Error(result.item || 'Firmware upload failed.'));
+                    resolve();
+                } catch (error) { reject(new Error('The device returned an invalid response.')); }
+            };
+            xhr.upload.onprogress = function(event) {
+                if (!event.lengthComputable) return;
+                const pct = Math.round(event.loaded * 100 / event.total);
+                id('progress').hidden = false;
+                id('progress').value = pct;
+                show_msg('Uploading firmware (' + pct + '%)...', 'gray');
+            };
+            xhr.onerror = function() { reject(new Error('A network error occurred during upload.')); };
+            xhr.ontimeout = function() { reject(new Error('Firmware upload timed out.')); };
+            xhr.send(data);
+        });
+    }
+
+    id('release').addEventListener('change', update_release_details);
+    id('btn_refresh').addEventListener('click', load_releases);
+	id('btn_notes').addEventListener('click', open_release_notes);
+	id('btn_notes_close').addEventListener('click', close_release_notes);
+	id('notes_modal').addEventListener('click', function(event) {
+		if (event.target === id('notes_modal')) close_release_notes();
+	});
+	document.addEventListener('keydown', function(event) {
+		if (event.key === 'Escape' && !id('notes_modal').hidden) close_release_notes();
+	});
+	id('btn_install').addEventListener('click', async function() {
+		const release = selected_release();
+		if (!release) return;
+		try {
+			await load_release_descriptor(release);
+		} catch (error) {
+			show_msg(error.message, 'red');
+			return;
+		}
+		const newer = release.version > deviceInfo.current_version ||
+            (release.version === deviceInfo.current_version && release.build > deviceInfo.current_build);
+        let allowDowngrade = false;
+        if (!newer) {
+            allowDowngrade = confirm('This version is not newer than the installed firmware. Install it anyway?');
+            if (!allowDowngrade) return;
+        } else if (!confirm('Install firmware ' + release.label + ' and reboot the controller?')) return;
+        set_busy(true);
+        try {
+            const firmware = await download_firmware(release);
+			const password = password_hash();
+			const uploadToken = await prepare_update(release, allowDowngrade, password);
+            const filename = release.artifact.file.split('/').pop();
+            await upload_firmware(firmware, filename, uploadToken, true);
+            show_msg('Update successful. The controller is rebooting.', 'green');
+            id('pw').value = '';
+        } catch (error) {
+            if (error.message !== 'Cancelled') show_msg(error.message, 'red');
+        } finally {
+            set_busy(false);
+        }
+    });
+
+    id('btn_submit').addEventListener('click', async function() {
         const files = id('file').files;
-        if (files.length === 0) {
+        if (!files.length) {
             show_msg('Please select a firmware file.', 'red');
             return;
         }
-
-        let password = id('pw').value;
-        if (password === '') {
-            if (!confirm('You did not input a device password. Are you sure you want to continue?')) return;
+        set_busy(true);
+        try {
+			const file = files[0];
+			const expected = deviceInfo && deviceInfo.extension;
+			if (expected && !file.name.endsWith(expected)) throw new Error('Select a ' + expected + ' firmware file for this controller.');
+			show_msg('Calculating firmware checksum...', 'gray');
+			const sha256 = await sha256_file(file);
+			const password = password_hash();
+			await upload_firmware(file, file.name, password, false, sha256);
+            show_msg('Update successful. The controller is rebooting.', 'green');
+            id('pw').value = '';
+			clear_firmware_file();
+        } catch (error) {
+            if (error.message !== 'Cancelled') show_msg(error.message, 'red');
+        } finally {
+            set_busy(false);
         }
-
-        show_msg('Uploading... Please wait.', 'gray');
-
-        const fd = new FormData();
-        const file = files[0];
-        fd.append('file', file, file.name);
-        // Hash the password if it's not empty, otherwise send empty string
-        fd.append('pw', password ? md5(password) : '');
-
-        const xhr = new XMLHttpRequest();
-        xhr.onreadystatechange = function() {
-            if (xhr.readyState === 4 && xhr.status === 200) {
-                try {
-                    const jd = JSON.parse(xhr.responseText);
-                    if (jd.result === 1) {
-                        show_msg('Update successful! The device is rebooting. You may close this page.', 'green');
-                        id('pw').value = ''; // Clear password on success
-                    } else if (jd.result === 2) {
-                        show_msg('Authentication failed. Check device password and try again.', 'red');
-                    } else {
-                        show_msg('Update failed. An unknown error occurred.', 'red');
-                    }
-                } catch (e) {
-                    show_msg('Update failed. Received an invalid response from the device.', 'red');
-                }
-            } else if (xhr.readyState === 4) {
-                show_msg('Upload failed. Could not connect to the update server.', 'red');
-            }
-        };
-        xhr.upload.onprogress = function (evt) {
-            if (evt.lengthComputable) {
-                const pct = Math.max(5, Math.min(100, Math.round((evt.loaded / evt.total) * 100)));
-                show_msg('Uploading... (' + pct + '%) Please wait.', 'gray');
-            }
-        };
-
-        const uploadUrl = '//' + window.location.hostname + ':8080/update';
-        xhr.open('POST', uploadUrl, true);
-        xhr.timeout = 300000; // 5 minutes timeout
-        xhr.ontimeout = function(){ show_msg('Upload timed out. Please check the device connection and try again.', 'red'); };
-        xhr.onerror   = function(){ show_msg('A network error occurred during the upload.', 'red'); };
-        xhr.send(fd);
     });
+
+    load_releases();
 </script>
 
 </body>

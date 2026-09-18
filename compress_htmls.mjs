@@ -4,8 +4,8 @@ import path from "path";
 import zlib from "zlib";
 import { minify } from "html-minifier-terser";
 
-const WEB_DIR = path.resolve("html");        // <-- adjust if needed
-const OUT_H   = path.resolve("./htmls.h");// output header
+const WEB_DIR = path.resolve("html");
+const OUT_H = path.resolve("html/htmls.h");
 
 const MINIFY_OPTIONS = {
   collapseWhitespace: true,

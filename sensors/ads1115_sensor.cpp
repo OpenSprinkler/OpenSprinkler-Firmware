@@ -48,7 +48,7 @@ void ADS1115Sensor::emit_description_json(BufferFiller* bfill) {
 	// equal to 0, the UI shows a "required hardware not detected" message.
 	// On DEMO/SIM the mock backend is always present, so the field is
 	// omitted entirely — UI default is "available."
-#if defined(ESP8266) || defined(OSPI)
+#if defined(ARDUINO) || defined(OSPI)
 	bfill->emit_p(PSTR(
 		"{\"n\":\"ADS1115 Sensor\","
 		"\"hwd\":$D,"
