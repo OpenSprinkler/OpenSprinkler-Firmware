@@ -1,7 +1,7 @@
 ## Troubleshooting Instructions
 
 !!! note
-    This page covers the most common troubleshooting steps. For additional technical support, visit the [Support Portal](https://support.openthings.io) or the [Community Forums](https://opensprinkler.com/forums/). Before submitting a support ticket, make sure you have carefully read the [User Manual](manual.md), [FAQs](faq.md), and common issues listed on this page.
+    This page covers the most common troubleshooting steps. For additional technical support, visit the [Support Portal](https://support.opensprinkler.com) or the [Community Forums](https://opensprinkler.com/forums/). Before submitting a support ticket, make sure you have carefully read the [User Manual](manual.md), [FAQs](faq.md), and common issues listed on this page.
 
 ### Identify Your Hardware & Firmware
 
@@ -12,13 +12,13 @@ Before seeking support, you must identify your OpenSprinkler's hardware and firm
 * **From App/Web UI:** At the homepage, swipe left to right to open the side menu. Tap **About**; you will see the hardware version listed there.
 * **During Reboot:** Power cycle the controller; the hardware version is briefly shown on the LCD during booting.
 * **Check Label:** The back panel of your controller usually has a label showing the version.
-* **Otherwise:** Check your order details, attach a clear photo of your controller in a support ticket.
+* **Otherwise:** Check your order details, and attach a clear photo of your controller in a support ticket.
 
 ---
 
 **Find your Firmware Version**
 
-* **From App/Web UI:** At the homepage, swipe left to right to open the side menu. Tap **About**, you will see the firmware version listed there.
+* **From App/Web UI:** At the homepage, swipe left to right to open the side menu. Tap **About**, you will see the firmware version there.
 * **During Reboot:** Power cycle the controller; the firmware version is briefly shown on the LCD during booting.
 
 ---
@@ -27,8 +27,8 @@ Before seeking support, you must identify your OpenSprinkler's hardware and firm
 <span class="vsp1"></span>
 The **About** page shows three different version numbers:
 
-* **Hardware** refers to the physical version. Example: `v3.3`, `OSPi`. The only way to upgrade hardware is to buy a new controller.
-* **Firmware** refers to the software running on the controller. Example: `2.2.1(3)`. It consists of a **dotted version** (e.g. `2.2.1`) and **build number** in parentheses. Firmware can be updated, though it is not automatic: you must manually upload a new firmware to it.
+* **Hardware** refers to the physical version. Example: `v3.4`, `v4.0`, or `OSPi`. The only way to upgrade hardware is to buy a new controller.
+* **Firmware** refers to the software running on the controller. Example: `2.2.1(6)`. It consists of a **dotted version** (e.g. `2.2.1`) and **build number** in parentheses. Current firmware supports one-click updates; manual firmware upload is also available.
 * **App** refers to the mobile app or web UI running on your phone or browser. Example: `2.4.90`. The app/UI updates automatically on your phone when a new release is available.
 
 <hr class="double">
@@ -39,13 +39,14 @@ The **About** page shows three different version numbers:
 <span class="vsp1"></span>
 Before powering on the system for the first time, please perform a solenoid resistance test. This test can quickly and effectively determine if a problem is with faulty solenoids and wiring. You will need a **multimeter** set to measure **Resistance** (Ω).
 
-1. Power off the system. Do **NOT** measure resistance when the system is alive.
+1. Power off the system. Do **NOT** measure resistance while the system is powered.
 2. Measure the resistance between the **COM** (common) wire and **each zone** wire individually.
 3. Check results:
     * A **Normal** 24VAC solenoid should measure 20-60 Ω.
     * **Very low** resistance (~0 Ω) indicates a shorted solenoid or wiring.
     * **Very high** resistance (>1000 Ω) indicates a burnt-out solenoid or broken wire.
     * **Low but not 0** resistance (4-10 Ω) indicates Latching solenoid valves. You should confirm by checking the valve body to see if there is any 'Latch/Latching' label.
+
 ---
 
 **AC voltage is present between COM and a zone even when that zone is OFF.**
@@ -66,11 +67,11 @@ Same root cause as above: you likely used a **DC adapter** on an **AC-powered** 
 
 ---
 
-**None of my zones turns on, or the current draw is very low (e.g. <100mA).**
+**None of my zones turn on, or the current draw is very low (e.g. <100 mA).**
 
 * Check if the controller still powers on (e.g. if the LCD displays anything). If not, the power adapter may be dead and need to be replaced. Verify with a multimeter.
 * Double-check the **COM** (common) wire - a loose or broken COM wire prevents all zones from activating.
-* Inspect the **fuse** inside the controller: unplug power, open the enclosure, and inspect the fuse on the lower-left of the circuit board. If the fuse is burnt, replace it with a similar rating.
+* Inspect the **fuse** inside the controller: unplug power, open the enclosure, and inspect the fuse on the lower-left of the circuit board. If the fuse is burnt, replace it with one of the same rating.
 * Generally, a broken fuse indicates a shorted solenoid, wiring, or opening too many zones at the same time. Perform a [solenoid resistance test](#wiring-and-solenoids) right away.
 
 ---
@@ -83,14 +84,14 @@ First, perform a [solenoid resistance test](#wiring-and-solenoids) to rule out s
 
 ### Power and Expander
 
-For Zone Expander compatibility, wiring, DIP-switch settings, and configuration, see the [Zone Expander User Manual](zone-expander.md).
+For Zone Expander compatibility, wiring, DIP-switch settings, and configuration, see the [Zone Expander User Manual](zone-expander.md). For analog-sensor hardware and detection, see the [Sensor Expander User Manual](sensor-expander.md).
 
 **My controller doesn't power on.**
 <span class="vsp1"></span>
 If the controller no longer powers on (and the LCD displays nothing), follow these steps:
 
 1. **Disconnect everything:** Unplug power and remove all peripherals (expanders, wired Ethernet module, sensors).
-2. **Check the power adapter:** Use a multimeter to check the output of your power adapter. For example, a 24VAC power adapter should output an **AC** voltage about 24-30V; a 7.5VDC adapter should output a DC voltage of 7.5V. If it reads 0 or very low, replace it.
+2. **Check the power adapter:** Use a multimeter to check the output of your power adapter. For example, a 24VAC power adapter should output an **AC** voltage of about 24–30 V; a 7.5VDC adapter should output a DC voltage of 7.5 V. If it reads 0 or very low, replace it.
 3. **Visual inspection**: Open the enclosure, visually inspect the components. Check the fuse, and visible damage (burn marks/discoloration, bulged components).
 4. **Contact support:** If the adapter is good and there is no visual damage, plug in power again (but keep all other peripherals disconnected for now). If the problem persists, submit a support ticket and attach a clear, well-lit photo of the circuit board.
 
@@ -119,6 +120,12 @@ This happens when the expander is accidentally plugged into the **wired Ethernet
 **I don't see any expanded zones.**
 <span class="vsp1"></span>
 First confirm the expander is detected (see the question above). Note that detection does **not** auto-enable expanded zones. You need to manually choose how many to enable using the dropdown list.  
+
+---
+
+**The Sensor Expander or its analog inputs are not detected.**
+<span class="vsp1"></span>
+The Sensor Expander is detected only during controller startup. Power off the controller, verify that the ribbon cable is connected to the **Expander** port with the correct orientation, then power the controller back on. In **Edit Sensors**, an ADS1115 sensor displays a hardware warning if the Sensor Expander is not detected. See the [Sensor Expander User Manual](sensor-expander.md#detection-and-troubleshooting) for wiring and voltage checks.
 
 ---
 
@@ -169,7 +176,7 @@ You can use buttons on the controller to bypass the device password. To do so:
 
 **I changed my WiFi router/SSID/password. How do I reset WiFi?**
 <span class="vsp1"></span>
-**Reset to AP (Access Point) mode**: hold **B3**, then press **B2** within 1-2 seconds (similar to pressing Ctrl+C on a keyboard). Confirm on the LCD when prompted. The unit will reboot into AP mode. Follow the [WiFi Configuration step](manual.md#step-4-setting-up-wifi-ethernet) in the user manual.
+**Reset to AP (Access Point) mode**: hold **B3**, then press **B2** within 1–2 seconds (similar to pressing Ctrl+C on a keyboard). Confirm on the LCD when prompted. The unit will reboot into AP mode. Follow the [WiFi Configuration step](manual.md#step-4-setting-up-wifi-ethernet) in the user manual.
 
 If Reset to AP doesn't work, perform a Factory Reset (see below).
 
@@ -208,23 +215,23 @@ See [Blank page troubleshooting](#ui-app-time-and-lcd) below. In Step 4, use the
 
 **WiFi connection issues**
 <span class="vsp1"></span>
-If your OpenSprinkler v3.x fails to join or stay connected to your WiFi network, try these steps:
+If your OpenSprinkler v3 or v4 fails to join or stay connected to your WiFi network, try these steps:
 
 1. **Check the mode:** Is the controller still in **AP** (Access Point) mode (LCD shows 4 lines, with a fast-blinking dot)? If so, follow WiFi Configuration in the user manual.
 2. **Changed router/SSID/password recently?** Follow the [Reset WiFi](#reset-and-configurations) instructions above. 
 3. **Router compatibility checklist:**
-    * **2.4 GHz only:** The controller's ESP8266 chip is compatible with 2.4 GHz only. Make sure your router has 2.4 GHz enabled and uses a different SSID than 5 GHz.
+    * **2.4 GHz only:** OpenSprinkler v3 and v4 use 2.4 GHz WiFi. Make sure your router has 2.4 GHz enabled and, while troubleshooting, use a different SSID from the 5 GHz network.
     * **Security:** Use **WPA2-PSK (AES)** or WPA2/WPA mixed. **Avoid WPA3-only** and **Enterprise**.
-    * **Radio mode:** Set 2.4 GHz to Wi-Fi mode to **b/g/n (no ax)**.
+    * **Radio mode:** Use a mixed 2.4 GHz mode that includes **b/g/n** rather than an `ax`-only mode. OpenSprinkler v4 supports newer WiFi hardware, but mixed mode remains the most compatible troubleshooting setting.
     * **Channeling:** **20 MHz** width; prefer channels **1/6/11**.
     * **Band steering:** **Disable** band steering / Smart Connect.
     * **PMF/802.11w** (if applicable): Set to **Optional (not Required)**.
     * **Isolation/filters:** **Disable AP isolation**, **MAC filtering**, and **captive portal** requirements.
     * Turn on **legacy mode** on 2.4 GHz, **disable WMM and airtime fairness**.
     * Ensure the controller isn’t blocked by firewall rules.
-4. **Additional troubleshooting:** If problems persist, there may be an ad-hoc compatibility issue between ESP8266 and your router. Try:
+4. **Additional troubleshooting:** If problems persist, there may be a compatibility issue between your router and the controller's WiFi chipset (ESP8266 on v3 or ESP32-C6 on v4). Try:
     * A different WiFi network (e.g. your phone's 2.4 GHz hotspot) to see if it works.
-    * Look up your router model + `ESP8266` for known issues and fixes. For example, if your router is Asus BE7200, search (or use generative AI) `ESP8266 issues Asus BE7200`.
+    * Search for your router model together with `ESP8266` (v3) or `ESP32-C6` (v4) to find known compatibility issues.
 5. **Use wired Ethernet:** Use a [wired Ethernet module](https://opensprinkler.com/product/wired_ethernet/) to bypass WiFi entirely.
 
 **<u>For OSPi</u>:** Wi-Fi is managed by the Raspberry Pi. Ensure adequate Pi power (OSPi supplies up to 500 mA. RPi 3/4/5 may need extra power via USB, otherwise WiFi may be unstable). 
@@ -235,11 +242,12 @@ If your OpenSprinkler v3.x fails to join or stay connected to your WiFi network,
 <span class="vsp1"></span>
 If your controller can't connect or stay connected via wired Ethernet, try these steps: 
 
-1. **Check the LEDs:** On your controller's RJ-45 jack, one LED should be solid (link), and the other blinks on traffic. If not, try a known-good cable and different router/switch port.
-2. **Disable PoE** (Power-over-Ethernet) on that port: OpenSprinkler’s wired module is **not PoE-compatible**. PoE-enabled port can cause it to malfunction.
-3. **DHCP Setting:** Leave the controller on DHCP, and set a **DHCP reservation** (IP-to-Mac) on your router to assign it a fixed IP. If you must use Static IP, verify **Gateway IP, DNS, Subnet Mask** are all correct and compatible with your router settings.
-4. **Use a dedicated router:** If your wired network is very busy, the most effective solution is to place OpenSprinkler on a dedicated router to isolate it from heavy traffic. 
-5. **Set an auto-reboot program:** If the controller connects initially but doesn't stay connected, a work-around is to set an auto-reboot program (daily or any regular interval of your choice). See [Program Name Annotation](manual.md#program-name-annotations) in the user manual.
+1. **Update firmware:** Firmware 2.2.1(6) adds automatic fault detection and recovery. Update before relying on reboot workarounds.
+2. **Check the LEDs:** On your controller's RJ-45 jack, one LED should be solid (link), and the other should blink with traffic. If not, try a known-good cable and a different router/switch port.
+3. **Disable PoE** (Power-over-Ethernet) on that port: OpenSprinkler’s wired module is **not PoE-compatible**. A PoE-enabled port can cause it to malfunction.
+4. **DHCP setting:** Leave the controller on DHCP, and set a **DHCP reservation** (IP-to-MAC) on your router to assign it a fixed IP. If you must use a static IP, verify that **Gateway IP, DNS, and Subnet Mask** are correct and compatible with your router settings.
+5. **Use a dedicated router:** If your wired network is very busy, placing OpenSprinkler on a dedicated router can isolate it from heavy traffic.
+6. **Set an auto-reboot program:** On older firmware or legacy Ethernet hardware, if the controller connects initially but doesn't stay connected, a workaround is to set an auto-reboot program (daily or at another regular interval). See [Program Name Annotation](manual.md#program-name-annotations) in the user manual.
 
 **<u>For OSPi</u>:** Networking is managed by RPi. Ensure RPi has adequate power (OSPi supplies up to 500 mA. RPi 3/4/5 may need extra power via USB, otherwise network may be unstable).
 
@@ -255,7 +263,7 @@ Remote access requires using an **OpenThings Cloud (OTC) token**. To check OTC s
 
 **Blank page when opening the controller's homepage**
 
-1. **Firmware too old:** If your controller's firmware is **older than `2.2.0`**, update to the latest. Older firmwares can't parse newer weather data format, causing corruption and blank homepage. See [firmware update instructions](firmware-update.md).
+1. **Firmware too old:** If your controller's firmware is **older than `2.2.0`**, update to the latest. Older firmware versions can't parse the newer weather data format, causing corruption and a blank homepage. See [firmware update instructions](firmware-update.md).
 2. **Check for errors:** On a desktop/laptop, open a browser window, turn on **Developer Console** (e.g. in Chrome, go to **Settings** → **More Tools** → **Developer Tools** → click the **Console** tab). Open the controller's homepage and note any errors in the console window.
 3. **Reset UI Source:** If you used a custom UI, reset it to the default: visit `http://os-ip/su` where `os-ip` is your controller's IP address. Reset the `UI Source` to the default.
 4. **Diagnose with API test script:** [Download the API test script](assets/scripts/TestOSAPI220.html){: download="TestOSAPI220.html" }. Open it in a browser, test your controller with the `/ja` (JSON All) endpoint. If you see an **INVALID JSON** error, the stored data is corrupted, which is why the homepage hangs.
@@ -266,7 +274,7 @@ Remote access requires using an **OpenThings Cloud (OTC) token**. To check OTC s
 
 **New program or changes to existing programs won't save.**
 <span class="vsp1"></span>
-This is typically an issue with older firmwares. Update your firmware to the latest.
+This is typically an issue with older firmware. Update to the latest version.
 
 ---
 
@@ -275,10 +283,9 @@ This is typically an issue with older firmwares. Update your firmware to the lat
 Starting with firmware 2.2.0, the old **Sequential** flag is replaced by a more flexible, zone-level **Sequential Group** attribute:
 
 * Each zone can be assigned to **one of four Sequential groups** or to the **Parallel** group.
-* Putting a zone in **Parallel** group is equivalent to removing the **Sequential** flag in older firmwares.
+* Putting a zone in the **Parallel** group is equivalent to removing the **Sequential** flag in older firmware.
 
 For details, refer to the [Firmware User Manual](manual.md#zones-group-attribute) and the [Video Tutorial](https://openthings.freshdesk.com/support/solutions/articles/5000860920-videos-introduction-to-opensprinkler-v3).
-
 
 ---
 
@@ -291,13 +298,19 @@ This happens if the requested log data is excessively large, or a corruption exi
 
 ---
 
+**My older sprinkler logs disappeared after upgrading to firmware 2.2.1(6).**
+<span class="vsp1"></span>
+On OpenSprinkler v3, the first boot into firmware 2.2.1(6) removes legacy sprinkler logs while changing to the new log format. Programs and settings are preserved, but those older logs cannot be recovered from the controller. Download any logs you need before upgrading other controllers.
+
+---
+
 **The time on my controller is wrong.**
 <span class="vsp1"></span>
 OpenSprinkler sets time automatically from two data sources: **your location** (for time zone via weather queries) and **NTP** (network time). If the time is incorrect, try:
 
 1. **Check Location & Internet**
     * Homepage → **Edit Options** → **Location**: ensure it's correct.
-    * **If using Static IP**, verify **Gateway IP, DNS, Subnet Mask** are all correct.
+    * **If using a static IP**, verify that **Gateway IP, DNS, and Subnet Mask** are all correct.
     * Confirm the controller has Internet access and is not blocked by a firewall.
 2. **Set Time Zone Manually** (if needed)
     * An incorrect time zone is often caused by failed weather queries, and should be fixed by re-checking Location and Internet connection first.
@@ -325,13 +338,19 @@ This is usually caused by that zone being set to `Ignore Rain` or `Ignore Sensor
 
 ---
 
+**A Bundle Station member is active but has no countdown, or cannot be turned off individually.**
+<span class="vsp1"></span>
+This is expected when the member was activated by a Bundle Station. The bundle leader owns the queue entry and runtime, so derived member activity has no separate countdown. Stop the bundle leader to release its members. If a member is also running directly or belongs to another active bundle, it remains on until every run that requires it has ended.
+
+---
+
 **My program didn't run as scheduled.**
 
 * Check if the program's **Enabled** flag is on.
 * Check if the controller's **time is correct**.
 * Check for any active **Rain Delay** or **Rain Sensor**.
 * If the program's **Use Weather** flag is on, check if the current **Watering Level** is 0%, or there is any active **Watering Restriction**.
-* **Enable a notification method** (Email, MQTT, or IFTTT) and turn on the **Program Start** event - you will be alerted when a program is scheduled but skipped due to 0% Watering Level or active Watering Restriction. 
+* **Enable a notification method** (email, MQTT, or IFTTT) and turn on the **Program Start** event. You will be alerted when a program is scheduled but skipped due to 0% Watering Level or an active Watering Restriction.
 
 ---
 
@@ -341,16 +360,23 @@ From the homepage, swipe left to right to open the side menu, tap **System Diagn
 
 ---
 
+**A Weather Sensor has no value or shows a stale warning.**
+<span class="vsp1"></span>
+Verify that **Location** and the weather provider are configured correctly and that the controller has Internet access. Weather data is refreshed at most once every six hours; failed refreshes retry every 15 minutes, and values are marked stale after 12 hours without a successful refresh. Changing the Sensor Interval does not make the weather service refresh more frequently. See the [Sensor Expander User Manual](sensor-expander.md#configure-other-sensor-types) for details.
+
+---
+
 **How do I save log data as a spreadsheet?**
 <span class="vsp1"></span>
 [Download the log helper script](assets/scripts/TestOSLogWithCSV.html){: download="TestOSLogWithCSV.html" } and open it in a browser to export log data as a `.csv` file.
+
 ---
 
 **The LCD is malfunctioning. How do I replace it?**
 <span class="vsp1"></span>
 If you purchased your OpenSprinkler within one year, it’s covered under warranty: submit a support ticket to receive a replacement display at no cost.
 
-If your purchase is out of warranty: replace it with an off-the-shelf module from [Amazon](https://www.amazon.com) or [Aliexpress](https://www.aliexpress.com). For OpenSprinkler v3.x and OSPi v2.x, search `"I2C OLED 0.96"` (the part number is `SSD1315` or `SSD1306`). The pin order must be `GND, VCC, SCL, SDA` (most common type). Do **NOT** use ones with pins ordered VCC, GND, SCL, SDA as that's incompatible.
+If your purchase is out of warranty: replace it with an off-the-shelf module from [Amazon](https://www.amazon.com) or [AliExpress](https://www.aliexpress.com). For OpenSprinkler v3, v4, and OSPi v2, search `"I2C OLED 0.96"` (the part number is `SSD1315` or `SSD1306`). The pin order must be `GND, VCC, SCL, SDA` (most common type). Do **NOT** use one with pins ordered `VCC, GND, SCL, SDA`, as that is incompatible.
 
 To replace: power off the controller; open the enclosure; carefully unplug the existing LCD; plug in the new LCD to the same position; power on and verify.
 
@@ -376,7 +402,7 @@ If the Pi won't power on, or WiFi drops constantly, try these steps:
 
 * **Power off OSPi**, remove peripherals (expanders, sensors), and separate RPi from OSPi.
 * **Power RPi directly with a USB cable**: if it powers on and WiFi is stable, the Pi is fine and the issue is with OSPi. Otherwise, the problem is RPi itself and you will need to replace it.
-* **Check the power adapter:** Use a multimeter to check the output of your 24VAC power adapter - it should output an **AC** voltage about 24-30V.
+* **Check the power adapter:** Use a multimeter to check the output of your 24VAC power adapter; it should output an **AC** voltage of about 24–30 V.
 * **Check for shorts:** Measure the **resistance** between **+5V**/VIN and GND on OSPi: red probe on +5V, black probe on GND. These pins are located at the top-right of the board. The resistance may fluctuate but should settle at `>4.5 kΩ`. If it's less than 4 kΩ, there is a short.
 * **Visual inspection:** Check the **fuse**, and look for any component with burn marks, discoloration, or bulges.
 * **Check OSPi +5V rail**: If the adapter is good, there are no shorts, and no visual damage, plug in power again (but leave RPi and all peripherals **disconnected**). The LED on OSPi should light up; and the **DC voltage** between +5V/VIN and GND should be ~5.0V.

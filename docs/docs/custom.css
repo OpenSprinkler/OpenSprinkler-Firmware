@@ -49,6 +49,10 @@ table th,
 table td {
   padding: 6px 10px;
 }
+.rst-content .archive-table + table th,
+.rst-content .archive-table + table td {
+  padding: 10px 16px;
+}
 .rst-content .button-function-table + table th:first-child,
 .rst-content .button-function-table + table td:first-child {
   width: 1%;

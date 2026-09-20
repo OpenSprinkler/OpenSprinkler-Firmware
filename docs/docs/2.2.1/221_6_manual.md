@@ -15,25 +15,25 @@ In addition, OpenSprinkler v3 is available in three power models (*v4 is current
 
 * **AC-powered** – Comes with a <span class="hl_red">**Red**</span> power barrel (v3.4 and v4) or an <span class="hl_orange">**Orange**</span> terminal block (v3.0-3.3). Requires a 24VAC transformer (NOT included by default; available for purchase as an add-on, or use your own 24VAC transformer).
 * **DC-powered** – Comes with **USB-C** connector (v3.4) or a **Black** power barrel (v3.0-3.3). A compatible power adapter is included. It can operate on 6V–24VDC, including a 12VDC solar panel. Despite DC input power, it is designed to operate 24VAC sprinkler valves, as well as DC non-latching valves.
-* **LATCH** – Comes with a **Black** power barrel and a 7.5VDC adapter. It's specifically designed for use with **latching solenoid valves only**.
+* **Latch** – Comes with a **Black** power barrel and a 7.5VDC adapter. It's specifically designed for use with **latching solenoid valves only**.
 
 <hr class="double">
 
 ## What's New in this Firmware?
 
 * **OpenSprinkler v4 Support:** Adds support for the new v4 hardware, built around the ESP32-C6.
-* **Bundle Stations:** A physical zone can act as a Bundle Station and activate any selected set of additional Standard zones together. This makes it easier to run several valves at the same time while scheduling multiple bundles in sequence.
-* **Weather Sensor:** Expanded Sensors can now use weather values such as current conditions, today's forecast, previous-day observations, and reference evapotranspiration (ETo). These values can be displayed, logged, and used to adjust program watering.
-* **Bounded Sprinkler Log Storage:** Sprinkler Logs now use a compact, fixed-size storage area, preventing them from gradually consuming all available storage.
-* **Easier Firmware Updates:** OpenSprinkler v3 and v4 can now check for available firmware and perform a one-click firmware update, while manual firmware upload remains available.
+* [**Bundle Stations:**](#station-type) A physical zone can act as a Bundle Station and activate any selected set of additional Standard zones together. This makes it easier to run several valves at the same time while scheduling multiple bundles in sequence.
+* [**Weather Sensor:**](../sensor-expander.md#configure-other-sensor-types) Expanded Sensors can now use weather values such as current conditions, today's forecast, previous-day observations, and reference evapotranspiration (ETo). These values can be displayed, logged, and used to adjust program watering.
+* [**Bounded Sprinkler Log Storage:**](#sprinkler-logs) Sprinkler Logs now use a compact, fixed-size storage area, preventing them from gradually consuming all available storage.
+* [**One-Click Firmware Updates:**](../firmware-update.md#one-click-firmware-update) Firmware 2.2.1(6) introduces one-click updates for OpenSprinkler v3 and v4. The controller can check for compatible releases and install them from its local update page, while manual firmware upload remains available when needed.
 
 <hr class="double">
 
 ## Hardware Interface
 
-### OpenSprinkler v3.4 {: .hltitle}
+### OpenSprinkler v3.4 and v4 {: .hltitle}
 
-![OpenSprinkler v3.4](images/os34_hardware_interface_new.jpg)
+![OpenSprinkler v3.4 and v4](images/os34_hardware_interface_new.jpg)
 
 <hr>
 
@@ -104,9 +104,9 @@ OpenSprinkler uses **removable terminal blocks** for easy wiring. To detach a bl
 
 **Power:**
 
-* **OpenSprinkler v3.4 AC:** Plug the 24VAC transformer into the <span class="hl_red">**Red**</span> barrel jack.
+* **OpenSprinkler v3.4 and v4 AC:** Plug the 24VAC transformer into the <span class="hl_red">**Red**</span> barrel jack.
     * If your transformer has bare wire, use the included screw-terminal-to-plug adapter.
-* **OpenSprinkler v3.0-3.3 AC & OSPi:** Connect 24VAC wires to the <span class="hl_orange">**Orange**</span> terminal block.
+* **OpenSprinkler v3.0-3.3 AC and OSPi:** Connect 24VAC wires to the <span class="hl_orange">**Orange**</span> terminal block.
     * AC has no polarity, so the two wires have no distinction.
 * **OpenSprinkler v3.4 DC:** Plug the USB-C cable into the USB-C port marked **PWR**.
 * **OpenSprinkler v3.0-3.3 DC and Latch:** Insert the DC adapter into the **Black** barrel jack.
@@ -117,7 +117,7 @@ OpenSprinkler uses **removable terminal blocks** for easy wiring. To detach a bl
 
 These instructions apply to digital sensors connected directly to the main controller's built-in sensor ports. For analog sensors, refer to the [**Sensor Expander User Manual**](../sensor-expander.md).
 
-* Connect each sensor's signal wire to an available sensor port and its ground wire to **GND**. All supported controllers provide **SN1** and **SN2**; OpenSprinkler v3.4 additionally provides **SN3** and **SN4**.
+* Connect each sensor's signal wire to an available sensor port and its ground wire to **GND**. All supported controllers provide **SN1** and **SN2**; OpenSprinkler v3.4 and v4 additionally provide **SN3** and **SN4**.
     * OpenSprinkler uses **GND** (NOT COM) as the common terminal for sensor inputs. **DO NOT** connect sensor signal wires to **COM**.
 * On an **AC-powered model**, if a sensor requires 24VAC power (e.g. wireless sensors), you may connect its **power wires** to COM and GND, which supply 24VAC.
     * **DC-powered and Latch** models do **NOT** output 24VAC and therefore cannot power these sensors.
@@ -146,22 +146,22 @@ Detailed compatibility, wiring, and software configuration instructions are avai
 
 ### Step 4: Setting Up WiFi / Ethernet
 
-**WiFi (OpenSprinkler v3 all versions)**
+**WiFi (OpenSprinkler v3 and v4)**
 
 1. On first boot (or after WiFi reset), OpenSprinkler starts in **AP (Access Point) mode**, broadcasting an SSID like `OS_xxxxxx` shown on the LCD. Connect your phone/computer to this open SSID.
     * *On Android*: if you see a "WiFi has no Internet" warning, tap Accept to stay connected.
-2. Open a browser and go to `192.168.4.1` to access the **WiFi Configuration** page. Follow the instructions there. Specifically, select (or manually enter) your home WiFi's SSID and its password (this is your router's WiFi password, NOT OpenSprinkler's password!). The BSSID and Channel fields are filled automatically, but you may leave them empty if preferred.
+2. Open a browser and go to `192.168.4.1` to access the **WiFi Configuration** page. Follow the instructions there. Specifically, select (or manually enter) your home WiFi's SSID and its password (this is your router's WiFi password, NOT OpenSprinkler's password!). Leave the optional BSSID and Channel fields empty for normal use. To pin the controller to a specific access point, select a detected network and click **Copy from selected network**.
 3. Click **Connect**. On successful connection, the controller will reboot into WiFi Station mode.
 4. Press button **B1** on OpenSprinkler to display the **device IP** assigned by your router. Type in that device IP in a **browser** or the **OpenSprinkler mobile app** to access the web interface.
     * <span class="hl">The default device password is **opendoor**. For security, change this immediately after setup.</span>
 
 ---
 
-**Wired Ethernet (OpenSprinkler v3.2 and later)**
+**Wired Ethernet (OpenSprinkler v3.2-3.4 and v4)**
 
 * **Power off** the main controller.
-* **OpenSprinkler v3.4:** Firmly plug the ribbon cable connector into the port on the controller marked **Ether** (it's on the **right** side of the controller).
-    * Do **NOT** plug into the port marked **Expander** - that's for expanders ONLY!
+* **OpenSprinkler v3.4 and v4:** Firmly plug the ribbon cable connector into the port on the controller marked **Ether** (it's on the **right** side of the controller).
+    * Do **NOT** plug into the port marked **Expander** — that's for expanders ONLY!
     ![Wired Ether](images/os33_wired_ether.png){ .img-shadow style="float: right; margin: 5px 5px 5px 5px;"}
 
 <span class="vsp2"></span>
@@ -210,13 +210,13 @@ All settings will be cleared and returned to factory defaults.
 
 ![OpenSprinkler LCD Display](images/lcd_display.png){: .img-border .img-shadow}
 
-* Master stations, if enabled, are shown as letters: **Master 1** as `M`, **Master 2** as `N`, **Master 3** as `U`, and **Master 4** as `V`. All four masters are supported on OpenSprinkler v3 and OSPi.
+* Master stations, if enabled, are shown as letters: **Master 1** as `M`, **Master 2** as `N`, **Master 3** as `U`, and **Master 4** as `V`.
 * By default the LCD shows the status of the first 8 zones on the main controller (`MC`). Each running zone is displayed with a three-letter animation: `. o O`
 * Click **B3** to cycle through each group of 8 zones (`E1`, `E2`, `E3`...) on expanders.
 * When no zones are running, a `(System Idle)` message is shown at the top.
 * When the controller is in **Remote Extension** mode, a radar icon 📡 is shown.
 * When **Pause Queue** or **Rain Delay** is active, a clock icon 🕒 is shown.
-* If a **Built-in Sensor** is configured, a letter is shown to indicate its type. All supported controllers display **SN1** and **SN2**; OpenSprinkler v3.4 additionally displays **SN3** and **SN4**.
+* If a **Built-in Sensor** is configured, a letter is shown to indicate its type. All supported controllers display **SN1** and **SN2**; OpenSprinkler v3.4 and v4 additionally display **SN3** and **SN4**.
     * `r`: Rain sensor
     * `s`: Soil sensor
     * `p`: Program switch
@@ -238,7 +238,7 @@ All settings will be cleared and returned to factory defaults.
 |**B1+B2**   |Hold **B1**, then while holding it press **B2**, like `Ctrl+C`. Display gateway (router) IP|
 |**B2+B1**   |Display external (WAN) IP|
 |**B2+B3**   |Display timestamp of the last weather server response|
-|**B3+B2**   |For OpenSprinkler v3: reset to AP mode (for WiFi re-config)|
+|**B3+B2**   |For OpenSprinkler v3 and v4: reset to AP mode (for WiFi re-config)|
 |**B1+B3**   |*(Internal testing only)* Start a quick test program (2s per zone)|
 |**B3+B1**   |Display last system reboot timestamp and reboot reason|
 
@@ -264,7 +264,7 @@ OpenSprinkler’s web interface works on phones, tablets, and computers, enablin
 **Local Access**
 
 * On the controller, press button **B1** to find its **device IP** and **HTTP port**. We denote the IP as `os-ip` (e.g. `192.168.1.122`).
-* Open a browser and visit `http://os-ip`. The default HTTP port is `80` on **OpenSprinkler v3** (e.g. `http://192.168.1.122`), and `8080` on **OSPi** (e.g. `http://192.168.1.122:8080`). If you changed the HTTP port (e.g. `8765`), include it in the URL (e.g. `http://os-ip:8765`).
+* Open a browser and visit `http://os-ip`. The default HTTP port is `80` on **OpenSprinkler v3 and v4** (e.g. `http://192.168.1.122`), and `8080` on **OSPi** (e.g. `http://192.168.1.122:8080`). If you changed the HTTP port (e.g. `8765`), include it in the URL (e.g. `http://os-ip:8765`).
 * <span class="hl">The default device password is **opendoor**</span>. For security, change it upon first use.
 * When using the OpenSprinkler mobile app, choose **Manually Add a Device**. Type in a custom name, and enter the device IP and password.
 * Using the IP to access the controller works as long as you are on the same local network.
@@ -306,7 +306,7 @@ The homepage provides an overview of all zones, current system status, and weath
 * **Disable Operation:** Disable zone operations. Use it when the system will be idle for an extended period.
 * **Change Password:** Change the device password.
 * **Reboot OpenSprinkler:** Perform a software reboot.
-* **Update Firmware:** Opens the Firmware Update page (available on OpenSprinkler v3).
+* **Update Firmware:** Opens the Firmware Update page (available on OpenSprinkler v3 and v4).
 * **System Diagnostics:** View detailed diagnostic data, including timestamp and reason of the last reboot, the last weather call, response code, weather data, and OpenThings Cloud (OTC) connection status.
 
 ---
@@ -318,7 +318,8 @@ The footer banner reports system status, prioritizing the following information 
 1. System enable/disable state
 2. Currently running stations
 3. Active Pause Queue / Rain Delay status
-4. If idle, the Last Run station, or **System Idle** if no such data is available.
+4. An activated Built-in Sensor, identified by its type and port (for example, **Rain Sensor (SN1) Activated**). Tap this message to open the Built-in Sensor settings.
+5. If idle, the Last Run station, or **System Idle** if no such data is available.
 
 The footer may also display:
 
@@ -336,10 +337,10 @@ Each zone (station) is shown as a card. Tap the gear ⚙️ icon next to a zone 
 
 **Basic Tab:**
 
-* **Station Name:** A custom name (up to 32 letters).<br>
+* **Station Name:** A custom name (up to 32 characters).<br>
 **Annotation:** If a flow sensor is enabled (see [Sensor Setup](#built-in-sensors)) and the last 5 characters represent a numerical value, a **Flow Alert** notification will trigger when the flow rate exceeds this value after the zone finishes. Example: station name is **Front Yard 1.357**, a flow alert will trigger if the flow rate `>1.357` after the zone finishes.
 * **Use Masters:** Select which configured Masters should activate when this zone runs. If Master 1 is configured, Use Master 1 is checked by default; additional masters are unchecked by default.
-* **Ignore Rain/SN1-SN4:** Each option lets the zone bypass rain delay or the corresponding built-in sensor. Unchecked by default. (*SN3/SN4 are available only on OpenSprinkler v3.4*).
+* **Ignore Rain/SN1-SN4:** Each option lets the zone bypass rain delay or the corresponding built-in sensor. Unchecked by default. (*SN3/SN4 are available only on OpenSprinkler v3.4 and v4*).
 * **Disable:** Disable and hide this zone. To unhide, use the [Footer Menu](#footer-menu).
 
 **Advanced Tab:**
@@ -351,7 +352,7 @@ Each zone (station) is shown as a card. Tap the gear ⚙️ icon next to a zone 
     * Parallel (P) zones can run alongside any other zones.
     * The sequential group attribute replaces the old per-zone **Sequential** flag, providing more flexible concurrency control.
 
-* **Station Type:** Configure special properties for a zone. Most special types are **virtual zones** that control a remote device or action instead of an ordinary valve. <span class="hl">Bundle Station is the exception: its leader remains a real physical zone.</span>
+* <span id="station-type"></span>**Station Type:** Configure special properties for a zone. **Bundle Station** is a new station type introduced in this firmware.
     * <span class="hllight">**Standard**</span> (default): Regular sprinkler zone.
     * <span class="hllight">**RF:**</span> Controls remote RF (Radio Frequency) power sockets via an external transmitter (requires [RFToy](https://opensprinkler.com/product/rftoy/) for code learning), allowing you to switch powerline devices such as Christmas lights, heaters, pumps.
     * <span class="hllight">**Remote Station (IP):**</span> Triggers a zone on another OpenSprinkler using its **IP, port, and zone index** (both controllers must **share the same device password**).
@@ -359,7 +360,35 @@ Each zone (station) is shown as a card. Tap the gear ⚙️ icon next to a zone 
     * <span class="hllight">**GPIO:**</span> Directly toggles an available GPIO pin on the controller (Active High/Low configurable). This type is disabled for controllers that do not have any available GPIO pins.
     * <span class="hllight">**HTTP:**</span> Sends an HTTP GET request upon zone activity. Provide a `server` (either domain name or IP), `port`, and the `on`/`off` command (excluding the leading slash `/`). Upon zone activation, it sends `server:port/on_command`, and upon deactivation `server:port/off_command`.
     * <span class="hllight">**HTTPS:**</span> Same as HTTP, but using a secure connection.
-    * <span class="hl">**Bundle Station:** A physical leader zone that also activates selected Standard zone outputs. The selected members remain independently controllable, and any direct or bundle claim keeps a shared member active.</span>
+    * <span class="hllight">**Bundle Station:**</span> A leader zone that, when activated, turns on its own physical output together with its selected bundle members. This makes it easy to define groups of simultaneously running zones. See details below for behavior and restrictions.
+
+    The homepage displays a badge on each special-station card:
+
+    * **RF:** RF
+    * **RS:** Remote Station (IP or OTC)
+    * **IO:** GPIO
+    * **HT:** HTTP or HTTPS
+    * **BS:** Bundle Station
+    * **bm:** Bundle member
+    * **SP:** Fallback for an unrecognized special-station type
+    * **No badge:** Standard station (neither a special station nor a bundle member)
+
+<hr>
+
+#### Bundle Stations {: .hltitle}
+
+A **Bundle Station** behaves like several physical zone wires bundled together into one logical zone. Starting the bundle leader activates its own output and every selected member in its configuration.
+
+* Only **Standard** stations can be bundle members. Special stations and other bundle leaders cannot be members. Neither a bundle leader nor a member may be a Master station.
+* Bundle members remain independently controllable. A member may be activated via a bundle leader, or it may be directly activated as an independent zone.
+* The same zone may belong to multiple bundles. It remains on while its own direct run or any active bundle still requires it (logic `OR`), and turns off only after all such requests have ended.
+* The bundle leader owns the schedule, runtime, rain delay, and sensor behavior. A member's own **Ignore Rain**, **Ignore Sensor**, and **Sequential Group** attributes are ignored when it is activated by a bundle leader. These attributes still govern when the member is activated directly (not via a bundle).
+* Members' **Use Master** attributes are obeyed and combined with the leader's selections. This ensures that a pump or master valve required by any physical zone in the bundle is activated.
+* Only the bundle leader appears in Program Preview, is logged, and triggers notification events. Members do not receive separate preview entries, queue entries, countdown times, or log records for bundle-derived activity.
+* A member activated by a bundle leader cannot be turned off individually; stop the bundle leader to remove that bundle's claim.
+* A disabled member remains configured but will not run while disabled.
+
+To reduce simultaneous solenoid inrush current, new physical outputs are activated one at a time using a short stagger interval (`250 ms`). A very short bundle run is automatically extended enough for an isolated bundle's selected members to activate and remain on briefly. Multiple unusually short bundles started concurrently share the same transition sequence, so a heavily contended late member may not activate before its leader's run ends.
 
 ---
 
@@ -517,7 +546,7 @@ When associated zones overlap, master demand uses OR logic: the master remains a
 !!! note "Built-in vs. Expanded Sensors"
     This section covers the controller's **built-in** sensor ports. For **analog sensors** connected via the **Sensor Expander** (such as temperature, soil moisture, light, etc.) and sensor-based program adjustment, see the dedicated [**Sensor Expander User Manual**](../sensor-expander.md).
 
-All supported controllers provide two independent built-in sensor ports (`SN1/SN2`). OpenSprinkler v3.4 provides two additional ports (`SN3/SN4`). Each port can be configured as **Rain**, **Soil** (binary output only), or **Program Switch**; and **Flow** is supported only on `SN1`.
+All supported controllers provide two independent built-in sensor ports (`SN1/SN2`). OpenSprinkler v3.4 and v4 provide two additional ports (`SN3/SN4`). Each port can be configured as **Rain**, **Soil** (binary output only), or **Program Switch**; and **Flow** is supported only on `SN1`.
 
 * **Connections:**
     * Connect the sensor's **two signal wires** to **GND** and an available sensor port of your choice (**SN1**–**SN4**).
@@ -536,8 +565,8 @@ All supported controllers provide two independent built-in sensor ports (`SN1/SN
 * **Program Switch:** Use a dry-contact switch / button to start a program.
     * `SN1`: Starts `Program 1`
     * `SN2`: Starts `Program 2`
-    * `SN3`: Starts `Program 3` (OpenSprinkler v3.4 only)
-    * `SN4`: Starts `Program 4` (OpenSprinkler v3.4 only)
+    * `SN3`: Starts `Program 3` (OpenSprinkler v3.4 and v4 only)
+    * `SN4`: Starts `Program 4` (OpenSprinkler v3.4 and v4 only)
     * Activated if the switch / button is pressed for more than 1 second.
 * **Flow Sensor:** Detect flow pulses to show **real-time flow rate**, record a settled average for each station run, and log total pulse count for each program cycle.
     * The station's logged average flow rate is measured after a 90-second settling period. Runs too short to collect two pulses after that period report zero average flow rate; their pulses still count toward the program-cycle total.
@@ -582,8 +611,8 @@ All supported controllers provide two independent built-in sensor ports (`SN1/SN
 
 ### Advanced Settings
 
-* **HTTP Port:** Change the device's HTTP port. Changing the port requires a restart. Default: `80` on OpenSprinkler v3 and `8080` on OSPi.
-    * On OpenSprinkler v3, do **NOT** use `8080` as it's reserved for OTA firmware update.
+* **HTTP Port:** Change the device's HTTP port. Changing the port requires a restart. Default: `80` on OpenSprinkler v3 and v4, and `8080` on OSPi.
+    * On OpenSprinkler v3 and v4, do **NOT** use `8080` as it's reserved for OTA firmware update.
 * **Undercurrent Threshold:** Triggers Undercurrent notification if a zone’s current draw (`mA`) falls below this threshold at the end of its run (e.g. due to broken wire or faulty solenoid). Default: `100 mA`.
     * The ideal value is half the typical holding current of your solenoid.
     * Set to `0` to disable this detection.
@@ -595,7 +624,7 @@ All supported controllers provide two independent built-in sensor ports (`SN1/SN
     * Set to `0` to use the system default.
     * Set to `2550` (max) to disable this feature (<span class="hl_red">**NOT recommended**</span> as disabling it exposes the controller to potential overcurrent damage).
     * To diagnose the cause of overcurrent, perform a [**Solenoid Resistance Test**](../troubleshooting.md#wiring-and-solenoids).
-    * This feature is only available on AC/DC-powered OpenSprinkler v3.x (other controllers like OSPi and Latch models lack current-sensing capability).
+    * This feature is only available on AC/DC-powered OpenSprinkler v3 and v4 (other controllers like OSPi and Latch models lack current-sensing capability).
 * **Boost Time (DC/Latch models only):** Voltage-boost duration (`0-1000ms`). Default: `320ms`.
     * Increase when using a weak/low-current DC adapter that takes more time to boost voltage.
 * **Target PD Voltage (DC v3.4 only):** Set the desired USB-C PD (Power Delivery) voltage.
@@ -603,7 +632,7 @@ All supported controllers provide two independent built-in sensor ports (`SN1/SN
     * The **ideal value** is your solenoid's **holding current** multiplied by its **coil resistance** (e.g. `0.25 A × 30 Ω = 7.5 V`). The **holding current** is listed in the solenoid's datasheet; the **coil resistance** can be measured using a multimeter.
     * This option is shown only when the power supply supports PD, PPS, or AVS.
     * The **Actual Voltage** (shown beneath the option name) is the closest supported voltage your adapter can provide to match the target value.
-* **Latch On/Off Voltages (Latch model only):** Customize boost voltages for activating and deactivating latching solenoids. Maximum: `24V`.
+* **Latch On/Off Voltages (Latch model only):** Customize boost voltages (up to `24V`) for activating and deactivating latching solenoids. Default: `9V`.
 * **NTP IP Address:** Custom NTP server for time sync. Set to `0.0.0.0` to use system defaults.
 * **Ignore Password:** When enabled, accepts any device password (i.e. bypass password).
 * **Special Station Auto-Refresh:** Periodically resends commands to Virtual Stations (RF/Remote/HTTP) to keep them synchronized with the main controller.
@@ -624,7 +653,7 @@ All supported controllers provide two independent built-in sensor ports (`SN1/SN
 * **Reset All Options:** Restore all options back to factory defaults.
 * **Delete All Programs:** Erase all programs.
 * **Reset Station Attributes:** Restore all station settings to factory defaults.
-* **Reset Wireless** (v3 only): Reset to WiFi AP mode for re-configuring WiFi.
+* **Reset Wireless** (v3 and v4 only): Reset to WiFi AP mode for re-configuring WiFi.
 
 <hr class="double">
 
@@ -733,6 +762,7 @@ To verify all programs are set correctly, use Footer Menu → **Preview Programs
 * **Today’s schedule** is shown by default; use the arrows ⬅️ / ➡️ to browse other days.
 * **Current time** is shown as a pink vertical line. You can **zoom** or **drag** the plot to view different time windows.
 * **Colored bars** represent each station's runtime and program name; clicking a bar opens the corresponding program editor.
+* For a Bundle Station, only the bundle leader appears in the preview; its members do not appear as separate bars.
 
 
 **Simulation Accuracy:** The preview uses a simulation of the same scheduling algorithm as the controller firmware, fully accounting for settings such as **Master Zones**, **Station Delay**, **Master On/Off Adjustments**, and **Sequential Groups**.
@@ -764,44 +794,22 @@ Example: If Zones 1–3 are in Group `A`, and 4–6 in Group `B`, they can opera
 
 <u>**NOTE**</u>: **Earlier firmwares** used a single **Sequential flag** for all zones, which effectively put all zones in a single sequential group. That flag has been replaced by the multi-group system here, which provides greater flexibility by allowing multiple independent groups.
 
-### Bundle Stations
-
-A <span class="hl">**Bundle Station**</span> behaves like several physical valve wires connected to one logical zone. Starting the bundle leader activates the leader's own output and every enabled member selected in its Bundle Station configuration. The leader owns the schedule, runtime, rain and sensor behavior, log entry, and notification. Members do not receive synthetic queue entries or countdown times.
-
-Bundle ownership is combined using OR logic:
-
-* A member remains active while it has its own direct run or while any active bundle claims it.
-* Stopping an independently running member removes only its direct run. Stop the bundle leader to remove that bundle's claim.
-* The same physical zone may belong to more than one bundle.
-* Only Standard zones can be members. Special stations, Bundle Station leaders, and master stations cannot be selected as members.
-* A disabled member remains configured but is skipped while disabled.
-* Member **Use Masters** selections are combined with the leader's selections so required pumps or master valves activate for the bundle.
-
-A Bundle Station is scheduled as one unit according to the leader's **Sequential Group**. Once the leader starts, its members are activated as derived outputs and their own Sequential Groups are not consulted. A member's group still governs that member whenever it is scheduled directly.
-
-To reduce simultaneous solenoid inrush, all new physical outputs are activated one at a time with a `250 ms` interval. A very short bundle run is automatically extended enough for an isolated bundle's selected members to activate and remain on briefly. Multiple unusually short bundles started concurrently share the same transition sequence, so a heavily contended late member may not activate before its leader's run ends.
-
 <hr class="double">
 
 ## Logs
 
 ### Sprinkler Logs
 
-OpenSprinkler logs **Zone Activity**, **Rain Delays**, **Built-in Sensor Events**, **Flow Volumes**, and **% Watering Changes** on the controller. To view these records:
-
-<span class="hl">Firmware 2.2.1(6) stores Sprinkler Logs in a compact, bounded binary ring.</span>
-
-!!! warning "Download prior Sprinkler Logs before upgrading"
-    On OpenSprinkler v3 and v4, the first boot into firmware 2.2.1(6) removes Sprinkler Logs created by earlier firmware. The LCD shows the one-time update progress; do not power off the controller until it finishes. Programs, settings, station names, and Expanded Sensor logs are preserved.
-
-    Linux and OSPi leave earlier text log files on disk, but those files are no longer displayed through the Sprinkler Logs page or returned by `/jl`.
-
 ![Logs](images/logs.png)
+
+OpenSprinkler logs **Zone Activity**, **Rain Delays**, **Built-in Sensor Events**, **Flow Volumes**, and **% Watering Changes** on the controller. To view these records:
 
 * Use Footer Menu → **Sprinkler Logs** (`Alt+L`) to display a graph of recorded data.
 * Use the **Options** tab to select a start and end date (default: last 7 days).
     * For large datasets or slow loading, limit the range to a single day.
 * Click **Table** at the top to switch to a tabular view.
+
+**NOTE:** Firmware 2.2.1(6) stores Sprinkler Logs in a compact, bounded binary ring.
 
 For details on the log data format and example scripts to export logs (e.g. as spreadsheets), refer to the [OpenSprinkler API documentation](221_6_api.md#get-sprinkler-log-data-jl).
 
@@ -832,13 +840,13 @@ Follow the [firmware update instructions](../firmware-update.md).
 
 ## Specifications
 
-|                   | OpenSprinkler v3 | OpenSprinkler Pi (OSPi) |
+|                   | OpenSprinkler v3 and v4 | OpenSprinkler Pi (OSPi) |
 |:------------------|:-----------------|:------------------------|
 |**Input Voltage:** | **AC** model: 22-28V **AC**<br>**DC/Latch**: 6V-24V **DC** | 22-28V **AC** |
 |**Power Draw:**    |0.5-0.9 W         |0.5 W + RPi's Power Draw |
 |**Num. of Zones:** |Main controller: 8;<br>Expandable to 72|Main controller: 8;<br>Expandable to 200|
 |**Solenoid Driver:**|**AC**: 1 A/zone (triac)<br>**DC**: 2 A/zone (MOSFET)<br>**Latch**: 6A instant/zone|1 A/zone (triac)|
-|**Dimensions:**    | **v3.4**: 125×79×25 mm<br>(4.9×3.1×1.0 in)<br><br>**v3.0-3.3**: 140×56×33 mm<br>(5.5×2.2×1.3 in)|135×105×38 mm<br>(5.3×4.1×1.5 in)|
+|**Dimensions:**    | **v3.4 & v4**: 125×79×25 mm<br>(4.9×3.1×1.0 in)<br><br>**v3.0-3.3**: 140×56×33 mm<br>(5.5×2.2×1.3 in)|135×105×38 mm<br>(5.3×4.1×1.5 in)|
 |**Weight:**        | 140 g (5 oz) | 200 g (7 oz) |
 
 <hr class="double">
@@ -855,7 +863,8 @@ OpenSprinkler supports standard 433 MHz and 315 MHz **RF (Radio Frequency) trans
 
 **Connecting the RF Transmitter:**
 
-* **OpenSprinkler v3** and **OSPi v2** have a built-in **3-pin RF header**. Plug the RF transmitter directly into this header, with **component side up** (see [Hardware Interface Diagram](#hardware-interface)).
+* **OpenSprinkler v3, v4,** and **OSPi v2** have a built-in **3-pin RF header**. Plug the RF transmitter directly into this header, with **component side up** (see [Hardware Interface Diagram](#hardware-interface)).
+    * The middle pin is the power pin. It supplies `3.3V` on OpenSprinkler v4 and `5V` on the other controllers.
 ![RF Transmitter](images/rf_transmitter.png){ .img-border .img-shadow width="180" style="float: right; margin: 5px 5px 5px 5px;"}
 * **OSPi v1:** No dedicated shrouded header, but `DATA/VIN/GND` pads are available on the PCB for soldering the transmitter to these pins.
 
