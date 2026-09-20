@@ -6,14 +6,14 @@
 
 The OpenSprinkler hardware comes in two product families:
 
-* **OpenSprinkler v3** – Features built-in WiFi, two independent sensor ports on v3.0–v3.3 or four on v3.4, and an optional wired Ethernet module. It is fully assembled and pre-loaded with firmware.
+* **OpenSprinkler v3 and v4** – Fully assembled controllers pre-loaded with firmware. Both feature built-in WiFi and support an optional wired Ethernet module. OpenSprinkler v3 is powered by an ESP8266 microcontroller, while v4 is powered by an ESP32-C6. OpenSprinkler v3.0-3.3 provides two independent sensor ports; v3.4 and v4 provide four.
 * **OpenSprinkler Pi (OSPi)** – Powered by a Raspberry Pi (RPi), requiring some assembly (such as connecting the RPi) and firmware installation.
 
-Each controller provides 8 zones, with expansion possible via zone expanders (each adding 16 zones): **OpenSprinkler v3** supports up to **72** zones, and **OSPi** supports up to **200** zones.
+Each controller provides 8 zones, with expansion possible via Zone Expanders (each adding 16 zones): **OpenSprinkler v3 and v4** support up to **72** zones, and **OSPi** supports up to **200** zones.
 <a id="power-models"></a>
-In addition, OpenSprinkler v3 is available in three power models:
+In addition, OpenSprinkler v3 is available in three power models (*v4 is currently available in the AC-powered model only*):
 
-* **AC-powered** – Comes with an <span class="hl_red">**Red**</span> power barrel (v3.4) or <span class="hl_orange">**Orange**</span> terminal block (v3.0-3.3). Requires a 24VAC transformer (NOT included by default; available for purchase as an add-on, or use your own 24VAC transformer).
+* **AC-powered** – Comes with a <span class="hl_red">**Red**</span> power barrel (v3.4 and v4) or an <span class="hl_orange">**Orange**</span> terminal block (v3.0-3.3). Requires a 24VAC transformer (NOT included by default; available for purchase as an add-on, or use your own 24VAC transformer).
 * **DC-powered** – Comes with **USB-C** connector (v3.4) or a **Black** power barrel (v3.0-3.3). A compatible power adapter is included. It can operate on 6V–24VDC, including a 12VDC solar panel. Despite DC input power, it is designed to operate 24VAC sprinkler valves, as well as DC non-latching valves.
 * **LATCH** – Comes with a **Black** power barrel and a 7.5VDC adapter. It's specifically designed for use with **latching solenoid valves only**.
 
@@ -21,16 +21,11 @@ In addition, OpenSprinkler v3 is available in three power models:
 
 ## What's New in this Firmware?
 
-* **Expanded Sensor Support & Sensor Expander:** A new framework for Expanded Sensors, including analog sensors connected through the **Sensor Expander** and virtual sensors such as Aggregate and System Internal, with per-sensor logging. Expanded Sensor readings can automatically scale program watering through configurable adjustment curves. Refer to the dedicated [Sensor Expander](../sensor-expander.md) documentation.
-* **Sensor Terminology**: we distinguish between the following two categories of sensors:
-    * **Built-in Sensors** refer to sensor ports on the main controller, identified by `SN1`–`SN4` where available. They support digital sensors such as rain, flow, and program switch.
-    * **Expanded Sensors** are configurable sensors managed through **Edit Sensors**. They include analog as well as virtual sensors managed through the Expanded Sensor interface, and they can be used for program adjustment.
-* **Extended Master Support:** This firmware supports up to **four master stations**, with independent on/off adjustments and per-zone selection of which masters apply.
-* **Additional Built-in Sensor Ports (SN3/SN4):** This firmware enables two additional built-in sensor ports on OpenSprinkler v3.4, for a total of four: `SN1`–`SN4`.
-* **Extended Watering Durations:** Weather- and sensor-adjusted station runtimes may now exceed the previous 18-hour limit, up to the firmware's seven-day runtime limit. Programmed water times remain limited to 18 hours.
-* **Bounded Sprinkler Log Storage:** Sprinkler Logs now use a compact binary ring with predictable flash usage and paginated export. On OpenSprinkler v3/v4, earlier Sprinkler Logs are removed during a visible one-time update on the first 2.2.1(6) boot; download prior history before upgrading if it must be retained.
-* <span class="hl">**Bundle Stations:** A physical zone can act as a bundle leader and activate any selected set of additional Standard physical zones in parallel. This provides an intuitive way to run several valves together while scheduling multiple bundles sequentially.</span>
-* **OpenSprinkler v2.3 Support Removed:** Firmware 2.2.1(5) supports OpenSprinkler v3.x and OSPi/Linux. Firmware 2.2.1(4) was the final release supporting OpenSprinkler v2.3.
+* **OpenSprinkler v4 Support:** Adds support for the new v4 hardware, built around the ESP32-C6.
+* **Bundle Stations:** A physical zone can act as a Bundle Station and activate any selected set of additional Standard zones together. This makes it easier to run several valves at the same time while scheduling multiple bundles in sequence.
+* **Weather Sensor:** Expanded Sensors can now use weather values such as current conditions, today's forecast, previous-day observations, and reference evapotranspiration (ETo). These values can be displayed, logged, and used to adjust program watering.
+* **Bounded Sprinkler Log Storage:** Sprinkler Logs now use a compact, fixed-size storage area, preventing them from gradually consuming all available storage.
+* **Easier Firmware Updates:** OpenSprinkler v3 and v4 can now check for available firmware and perform a one-click firmware update, while manual firmware upload remains available.
 
 <hr class="double">
 
