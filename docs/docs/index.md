@@ -15,6 +15,14 @@ This GitHub repository contains the firmware source code and documentation for O
 * [Zone Expander User Manual](zone-expander.md)
 * [Sensor Expander User Manual](sensor-expander.md)
 
+## Guides
+
+* [Remote Access with OpenThings Cloud (OTC)](guides/remote-access-otc.md)
+* [Using Weather Adjustments](guides/weather-adjustments.md)
+* [Using MQTT](guides/mqtt.md)
+* [Setting Up Email Notifications](guides/email-notifications.md)
+* [Installing and Updating OpenSprinkler Pi Firmware](ospi/firmware-installation.md)
+
 ## Development
 
 * [Firmware Compilation](firmware-compilation.md)

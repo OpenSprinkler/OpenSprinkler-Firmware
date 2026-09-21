@@ -70,12 +70,12 @@ Do not install a v3 image on v4, or a v4 image on v3.
 
 ## OpenSprinkler v2.3 {: .hltitle}
 
-Requires a USB cable for firmware update. Follow the legacy [v2.3 Firmware Update Instructions](https://openthings.freshdesk.com/a/solutions/articles/5000832311).
+Requires a USB cable for firmware update. Follow the legacy [v2.3 Firmware Update Instructions](https://openthings.freshdesk.com/support/solutions/articles/5000832311).
 
 <hr class="double">
 
 ## OpenSprinkler Pi (OSPi) {: .hltitle}
 
-Update is done directly on the RPi. Follow [OSPi Firmware Update Instructions](https://openthings.freshdesk.com/a/solutions/articles/5000631599).
+Update is done directly on the RPi. Follow [OSPi Firmware Update Instructions](https://openthings.freshdesk.com/support/solutions/articles/5000631599).
 
 <hr class="double">

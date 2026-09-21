@@ -1,7 +1,6 @@
 # OpenSprinkler API Reference
 
 <link rel="canonical" href="https://opensprinkler.github.io/OpenSprinkler-Firmware/2.2.1/221_6_api/">
-<meta http-equiv="refresh" content="0; url=../2.2.1/221_6_api/">
 <script>
 window.location.replace("../2.2.1/221_6_api/" + window.location.hash);
 </script>

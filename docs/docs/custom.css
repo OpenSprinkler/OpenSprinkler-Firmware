@@ -113,6 +113,12 @@ ul > li {
   border-radius: 4px;       /* Optional: nice rounded corners */
   padding: 4px;             /* Optional: space between image and border */
 }
+.img-center {
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+  max-width: 100%;
+}
 /* You could also make a class for a shadow, which often looks nicer */
 .img-shadow {
   box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2);

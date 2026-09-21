@@ -57,7 +57,7 @@ Most analog sensors provide the following three connections. Check the sensor's 
 
 ---
 
-### 3. Detection and Troubleshooting
+### 3. Detection and Troubleshooting {#detection-and-troubleshooting}
 
 After wiring is complete, power on the controller and open **Edit Sensors**. When adding an ADS1115 sensor (the default sensor type), the interface shows a warning if the required analog hardware is not detected. If detection fails:
 
