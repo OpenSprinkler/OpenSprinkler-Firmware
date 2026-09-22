@@ -519,7 +519,7 @@ When associated zones overlap, master demand uses OR logic: the master remains a
 
 * **Adjustment Method:** Select a weather-based adjustment method.
     * **Manual** (default): set **% Watering** manually.
-    * Other methods calculate adjustments automatically. Detailed explanations of supported methods are available on [OpenSprinkler Support](https://openthings.freshdesk.com/support/solutions/articles/5000823370).
+    * Other methods calculate adjustments automatically. Detailed explanations of supported methods are available in [Using Weather Adjustments](../guides/weather-adjustments.md).
 * **Adjustment Method Options:** Configure parameters for the selected method.
 * **Adjust Interval Programs using Multi-Day Average:** This option is available for **Zimmerman or ETo** methods. Enabling it allows **all interval programs** to apply the **average watering level** across the program's interval, rather than just the previous day's. For instance, a program that runs every `4` days uses the 4-day average. For programs that don't run daily, this provides more accurate adjustments that reflect all weather changes since the last run.
     * Applies only if the **Use Weather** flag is enabled for that program.
@@ -587,10 +587,10 @@ All supported controllers provide two independent built-in sensor ports (`SN1/SN
 
 ### Integration
 
-* **OTC:** Configure **OpenThings Cloud (OTC)** token for remote access. See [**OTC Support Article**](https://openthings.freshdesk.com/support/solutions/articles/5000879535).
-* **MQTT:** Configure MQTT parameters. See [**MQTT Support Article**](https://openthings.freshdesk.com/support/solutions/articles/5000859089).
-* **Email Notifications:** Configure Email settings. See [**Email Notifications Support Article**](https://openthings.freshdesk.com/support/solutions/articles/5000889759).
-* **IFTTT:** Configure IFTTT Webhooks key. See [**IFTTT Support Article**](https://openthings.freshdesk.com/support/solutions/articles/5000716372).
+* **OTC:** Configure **OpenThings Cloud (OTC)** token for remote access. See [**Remote Access with OTC**](../guides/remote-access-otc.md).
+* **MQTT:** Configure MQTT parameters. See [**Using MQTT**](../guides/mqtt.md).
+* **Email Notifications:** Configure Email settings. See [**Setting Up Email Notifications**](../guides/email-notifications.md).
+* **IFTTT:** Configure IFTTT Webhooks key. See [**Setting Up IFTTT Notifications**](../guides/ifttt-notifications.md).
 * **Notification Events:** Select events that trigger MQTT/Email/IFTTT notifications.
 
     !!! warning "Avoid Too Many Events"

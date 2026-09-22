@@ -87,7 +87,7 @@ OpenSprinkler's weather service offers multiple weather provider options for fle
 | [OpenWeatherMap](https://openweathermap.org/) | Yes | Historical: 1 day; Forecast: 8 days. |
 | [Open-Meteo](https://open-meteo.com/) | No | **Free and open-source.** Historical: 7 days; Forecast: 7 days. |
 | [DWD (Germany Only)](https://brightsky.dev/) | No | **Only works for German locations.** Historical: 7 days; Forecast: 7 days. |
-| [Weather Underground](https://www.wunderground.com/) | Yes | **Requires the location to be a PWS station.** Historical: 6 days; Forecast: 6 days. |
+| [Weather Underground](weather-underground.md) | Yes | **Requires the location to be a PWS station.** Historical: 6 days; Forecast: 6 days. |
 
 <br>
 

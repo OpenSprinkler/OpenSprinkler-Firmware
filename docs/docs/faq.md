@@ -299,7 +299,7 @@ Yes. Once programmed, OpenSprinkler runs all schedules offline. The controller h
 
 **Q: Do you support push notifications?**
 <br>
-Yes. Current firmware supports notifications via email, MQTT, and IFTTT (see [support documentation](https://openthings.freshdesk.com/solution/folders/5000099525)).
+Yes. Current firmware supports notifications via [email](guides/email-notifications.md), [MQTT](guides/mqtt.md), and [IFTTT](guides/ifttt-notifications.md).
 
 ---
 

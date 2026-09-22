@@ -125,11 +125,10 @@ Here is the list of topics that firmware 2.2.1(6) publishes:
   !!! note
       Station overcurrent is detected immediately after a station is turned on (so the firmware can detect the offending station). System overcurrent is detected during the operation of the system, not associated with opening a zone.
 
-!!! warning "Important Notice"
+!!! note "Notification events and availability"
     Starting **from 2.2.1(1)**, MQTT notifications are managed through the **Notification Events** setting, just like IFTTT and email notifications. To receive event messages, you must **enable the corresponding Notification Events**. If no events are selected, the controller still publishes its availability state but does not publish event notifications.
 
-!!! note
-    In addition to the above topics, OpenSprinkler publishes `publish_topic/availability` with the retained payload `online` or `offline` (i.e. non-JSON). If your MQTT client requires strict JSON format (such as [ThingsBoard](https://thingsboard.io/)), configure your client to filter out non-JSON payloads or set up an Uplink Data Converter.
+    OpenSprinkler publishes `publish_topic/availability` with the retained payload `online` or `offline` (i.e. non-JSON). If your MQTT client requires strict JSON format (such as [ThingsBoard](https://thingsboard.io/)), configure your client to filter out non-JSON payloads or set up an Uplink Data Converter.
 
 ---
 
