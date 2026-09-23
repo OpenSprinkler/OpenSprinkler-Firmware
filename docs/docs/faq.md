@@ -74,13 +74,13 @@ Yes. You can choose among a variety of [weather data providers](guides/weather-a
 
 **Q: Does it require a cloud connection?**
 <br>
-No. OpenSprinkler is **local-first** — by default it connects only to your local network and does NOT rely on the Internet. Cloud connection is optional and only needed for remote access.
+No. OpenSprinkler is **local-first**: it runs schedules without an Internet connection. Internet access is needed for optional services such as OTC remote access, weather updates, and one-click firmware updates.
 
 ---
 
 **Q: Is there a subscription fee for cloud access, app, or weather data?**
 <br>
-No. OpenSprinkler is a one-time purchase. All features are **completely free** without a recurring fee.
+OpenSprinkler does not charge a subscription for its app, OTC remote access, or default weather data. Optional third-party services, such as IFTTT Webhooks and some weather providers, may have their own fees.
 
 ---
 
@@ -92,12 +92,11 @@ OS v3 and v4 are compatible with 2.4GHz WiFi. They do **NOT** currently support 
 
 **Q: How is OpenSprinkler different from competitors?**
 
-* It has a built-in web interface for local control, and runs programs on its own, without relying on proprietary or cloud-only software.
-* Advanced features, such as second-precision watering times, simultaneous zone runs, multiple onboard sensors and master zones, pause, support for flow and analog sensors, email notifications, and special station types (Remote, RF, HTTP(S), and Bundle Station).
-* Supports both WiFi and wired Ethernet options.
-* Easy expansion to `72` zones (or `200` with OSPi) at a much lower cost than competitors.
-* Cloud access is optional: your controller works locally even if your internet is down.
-* Built on **open-source hardware and software**: its design files are public, allowing for customization and extension.
+* **Local-first Control:** Its built-in web interface provides direct local access, and it runs programs on its own without requiring an Internet connection or cloud service.
+* **Advanced Features:** Second-precision watering times, simultaneous zone runs, multiple onboard sensors and master zones, pause, support for flow and analog sensors, email notifications, and special station types (Remote, RF, HTTP(S), and Bundle Station).
+* **Flexible Connectivity:** Supports both WiFi and wired Ethernet options.
+* **Easy Expansion:** Expand to `72` zones (or `200` with OSPi) at low cost.
+* **Open Source:** Hardware designs and the source code for the firmware, app, and weather service are public, allowing for customization and extension.
 
 ---
 
