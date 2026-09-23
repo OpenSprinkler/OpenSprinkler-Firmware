@@ -59,15 +59,15 @@ By following these recommendations, you can set up email notifications without a
 * Navigate to [this page](https://www.google.com/intl/en-US/gmail/about/) to create a new personal Gmail account. Even if you already have a Gmail account, consider creating a separate one dedicated to notifications.
 * After creating this account, navigate to [myaccount.google.com](https://myaccount.google.com). Once there, select the **Security** tab and scroll down to **2-Step Verification**. Google will not let you create an app password without this enabled. See the screenshot below.
 
-![2-Factor Authentication screen](images/2FactorAuth.png){ .img-border .img-center }
+![2-Factor Authentication screen](images/2FactorAuth.png){ .img-border .img-center .guide-screenshot }
 
 * Follow the steps to activate 2-Step verification, then go back to [myaccount.google.com](https://myaccount.google.com) and enter **app passwords** into the search bar at the top. Select **App Passwords** in the search results.
 
-![App Passwords search](images/appPassSearch.png){ .img-border .img-center }
+![App Passwords search](images/appPassSearch.png){ .img-border .img-center .guide-screenshot }
 
 * On the app passwords screen, enter an App name (e.g. **opensprinkler**) and press **Create**.
 
-![App Password entry](images/appPassEntry.png){ .img-border .img-center width="450" }
+![App Password entry](images/appPassEntry.png){ .img-border .img-center .guide-screenshot width="450" }
 
 * A popup window will show a 16-character password in the format `"xxxx xxxx xxxx xxxx"`. Save it securely because this is the **only time it is shown**. When entering it in OpenSprinkler, omit the spaces. If you lose it, create a new app password.
 
@@ -80,18 +80,18 @@ By following these recommendations, you can set up email notifications without a
 
 * Navigate to the [Zoho Mail website](https://www.zoho.com/mail/) to create a **personal account**. Make sure to select **Personal Email**, not the default **Business Email**.
 
-![Zoho Create Account screen](images/zohoCreateAccount.png){ .img-border .img-center width="300" }
+![Zoho Create Account screen](images/zohoCreateAccount.png){ .img-border .img-center .guide-screenshot width="300" }
 
 * Once you have created your account and logged in, navigate to [accounts.zoho.com](https://accounts.zoho.com). Select the **Security** tab, find **Application-Specific Passwords**, and click **Generate New Password**.
 
-![Zoho Settings menu](images/zohoSettingsMenu.png){ .img-border .img-center }
+![Zoho Settings menu](images/zohoSettingsMenu.png){ .img-border .img-center .guide-screenshot }
 
 * A window will open to create a new app password. Enter an **app name** (for example, **OpenSprinkler**) and click **Generate**. Save the password securely because this is the **only time it is shown**. If you lose it, create a new app password.
 
 !!! note
     In some cases, Zoho may ask you to verify your account password. Complete the prompt, return to the app-password page, and click **Generate** again.
 
-![Zoho App Password entry](images/zohoAppPassEntry.png){ .img-border .img-center width="450" }
+![Zoho App Password entry](images/zohoAppPassEntry.png){ .img-border .img-center .guide-screenshot width="450" }
 
 ---
 
@@ -111,7 +111,7 @@ On the OpenSprinkler homepage, navigate to **Edit Options** → **Integration**.
 
 For Zoho Mail, use the SMTP hostname shown in your account's server-configuration details if it differs from `smtp.zoho.com`.
 
-![Email Settings input](images/emailSettingsInput.png){ .img-border .img-center width="400" }
+![Email Settings input](images/emailSettingsInput.png){ .img-border .img-center .guide-screenshot width="400" }
 
 ---
 
@@ -135,7 +135,7 @@ The final step is to choose **which events will trigger email notifications** an
 For Bundle Station runs, only the bundle leader generates Station Start and Station Finish notifications; other stations in the bundle do not generate separate messages.
 
 !!! warning
-    If your controller runs many zones daily, consider disabling high-frequency events such as **Station Start** and **Station Finish**. This helps avoid provider sending limits. Because each email connection takes time, **too many notification events can cause delays, slow web/app responses, and skipped short watering cycles**.
+    If your controller runs many stations daily, consider disabling high-frequency events such as **Station Start** and **Station Finish**. This helps avoid provider sending limits. Because each email connection takes time, **too many notification events can cause delays, slow web/app responses, and skipped short watering cycles**.
 
 Below **Notification Events**, you can enter a custom **Device Name**. This Device Name is included in all email messages, making it easier to identify which controller sent the message. This is especially helpful if you manage multiple OpenSprinkler devices.
 

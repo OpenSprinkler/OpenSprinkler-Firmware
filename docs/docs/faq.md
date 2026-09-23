@@ -68,7 +68,7 @@ Up to `40` programs. Each program supports per-station durations (`0–18` h, **
 
 **Q: Does the weather feature work outside North America?**
 <br>
-Yes. You can choose among a variety of weather data providers, including Apple Weather, Open-Meteo, AccuWeather, and Weather Underground, most of which are available worldwide.
+Yes. You can choose among a variety of [weather data providers](guides/weather-adjustments.md), including Apple Weather, Open-Meteo, AccuWeather, and Weather Underground, most of which are available worldwide.
 
 ---
 

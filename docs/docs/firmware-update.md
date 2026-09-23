@@ -76,6 +76,6 @@ Requires a USB cable for firmware update. Follow the legacy [v2.3 Firmware Updat
 
 ## OpenSprinkler Pi (OSPi) {: .hltitle}
 
-Update is done directly on the RPi. Follow [OSPi Firmware Update Instructions](https://openthings.freshdesk.com/support/solutions/articles/5000631599).
+Update is done directly on the RPi. Follow the [OSPi Firmware Update Instructions](ospi/firmware-installation.md).
 
 <hr class="double">

@@ -2,122 +2,103 @@
 
 ## Background
 
-This guide assumes you have a working Raspberry Pi setup with either SSH access available or a keyboard and monitor connected.
+This guide assumes you have a Raspberry Pi running Raspberry Pi OS, reachable over SSH or with a keyboard and monitor connected.
 
-!!! note
-    Do **NOT** enable 1-wire in raspi-config. The default 1-wire pin (GPIO 4) conflicts with OSPi and will prevent the RPi from sending signals correctly to OSPi. If you must use 1-wire, you can follow the RPi instructions to assign a different pin.
+!!! note "Supported Raspberry Pi OS versions"
+    Firmware 2.2.1(6) supports Raspberry Pi OS **Bookworm** and **Trixie** (either 64-bit or 32-bit). Older versions (e.g., Bullseye) may require installing the `lgpio` library manually. If your OS is very old (e.g., Buster), upgrade the OS before proceeding.
+
+!!! warning "GPIO 4 conflict"
+    Do **NOT** enable 1-wire on its default GPIO 4. OSPi uses GPIO 4 to control its shift register, so this conflict prevents it from operating stations correctly. If 1-wire was previously enabled, inspect `/etc/modules` with `sudo nano /etc/modules`, comment out any line containing `w1-gpio`, and reboot. If you must use 1-wire, configure it to use a different GPIO.
+
+---
 
 ## New Installation of the Unified Firmware on a Raspberry Pi
 
-!!! note
-    The current firmware 2.2.1(4) supports both Raspberry Pi OS **Bookworm** and **Trixie** (either 64-bit or 32-bit). Older versions (e.g. Bullseye) may require installing the `lgpio` library manually. If your OS is very old (e.g. Buster), an upgrade should be made before proceeding.
-
 1. Open an SSH connection to the Raspberry Pi (or connect a keyboard and monitor to the device).
-2. Run the following command:
+2. Run the following commands:
 
-    ```
-    sudo apt-get install git
-    cd ~
-    git clone --recurse-submodules https://github.com/OpenSprinkler/OpenSprinkler-Firmware.git
-    ```
+        sudo apt-get install git
+        cd ~
+        git clone --recurse-submodules https://github.com/OpenSprinkler/OpenSprinkler-Firmware.git
 
 3. Change the directory to the firmware folder:
 
-    ```
-    cd OpenSprinkler-Firmware
-    ```
+        cd OpenSprinkler-Firmware
 
 4. Build OpenSprinkler:
 
-    ```
-    sudo ./build.sh ospi
-    ```
+        sudo ./build.sh ospi
 
-    * This will generate an executable program called OpenSprinkler in the firmware folder, as well as setting up a script for auto-run at startup.
-    * If you are using a BeagleBone Black, please replace **ospi** with **osbo**.
-    * If you are compiling a demo to run on any Linux system, please replace **ospi** with **demo**.
+    * This generates an executable named `OpenSprinkler` in the firmware folder and offers to install a systemd service that starts OpenSprinkler at boot.
+    * The script may enable I2C and set its bus speed to 400 kHz. Reboot the Raspberry Pi if the script says a reboot is required.
+    * To compile the Demo target on a Debian-based Linux system, first run `sudo apt-get update`, then replace **ospi** with **demo**.
 
-5. If you answered yes to the startup script, you should be completely setup and ready.
+5. If you accepted the startup-service prompt, OpenSprinkler is now set up to run automatically. If you declined, run it manually with `sudo ./OpenSprinkler`, or rerun `sudo ./build.sh ospi` and accept the prompt.
 
-    !!! note
-        It has come to our attention that some Raspbian systems installed by NOOBs will take over GPIO 4 for 1-wire interface. However, OSPi needs GPIO 4 to send control signals to the solenoid valves. If you found that the firmware runs correctly but OSPi does not turn on valves correctly, one solution is to `sudo open /etc/modules`, and comment out the line containing `w1-gpio`, then reboot. Another solution is to reinstall Raspbian OS from scratch without using NOOBs.
+6. On the Raspberry Pi itself, open <http://localhost:8080>. From another device on the same network, open `http://<pi-ip-address>:8080`. The default password is **opendoor**.
 
-6. The web interface should now be accessible from: <http://localhost:8080>. The default password to log into the web interface is **opendoor**.
+---
 
 ## Update a Previously Installed Unified Firmware
 
 !!! warning
-    **The firmware update process will set your controller back to factory defaults.** This includes controller settings, program settings, and device password (which will be set back to the default: **opendoor**). Please ensure you backup your current configurations (e.g. Export Configurations) **before proceeding with a firmware update.**
-
-!!! note
-    The current firmware 2.2.1(4) supports both Raspberry Pi OS **Bookworm** and **Trixie** (either 64-bit or 32-bit). Older versions (e.g. Bullseye) may require installing the `lgpio` library manually. If your OS is very old (e.g. Buster), an upgrade should be made before proceeding.
+    **Always export your configuration using Export Configurations before updating the firmware.** Updating to a new base firmware version (for example, 2.2.0 → 2.2.1) resets the controller to factory defaults, including controller settings, programs, and the device password (which returns to the default: **opendoor**). Revision updates within the same base version, such as 2.2.1(4) → 2.2.1(6), normally retain your settings, but a backup protects you if anything goes wrong.
 
 1. Open an SSH connection to your Raspberry Pi.
-2. Change directory to your firmware folder. By default it is:
+2. Change to the firmware folder:
 
-    ```
-    cd /home/pi/OpenSprinkler-Firmware
-    ```
+        cd ~/OpenSprinkler-Firmware
 
-3. Update OpenSprinkler firmware source code from github:
+3. Run the updater:
 
-    ```
-    git fetch
-    git pull --recurse-submodules
-    ```
+        sudo ./updater.sh
 
-4. Re-build OpenSprinkler:
+    The updater performs a fast-forward-only Git pull, synchronizes the pinned submodules, rebuilds the firmware, and restarts the OpenSprinkler service.
 
-    ```
+### Manual Update
+
+If `updater.sh` is unavailable or you need to troubleshoot an update, run these commands from `~/OpenSprinkler-Firmware`:
+
+    git pull --ff-only
     sudo ./build.sh ospi
-    ```
-
-    * If you are using a BeagleBone Black, please replace **ospi** with **osbo**.
-    * If you are compiling a demo to run on any Linux system, please replace **ospi** with **demo**.
-
-5. Restart OpenSprinkler:
-
-    ```
-    sudo /etc/init.d/OpenSprinkler.sh restart
-    ```
-
-    More recent firmware versions have switched to use systemd. If the above command does not work, try the following:
-
-    ```
     sudo systemctl restart OpenSprinkler.service
-    ```
 
-## Stop All Sprinler Firmware/Software from Starting with the Raspberry Pi
+To compile the Demo target on a Debian-based Linux system, first run `sudo apt-get update`, then replace **ospi** with **demo**. The Demo target does not install or restart the OSPi service.
+
+Older installations may still use the legacy SysV init script. If `systemctl` reports that the service does not exist, restart with:
+
+    sudo /etc/init.d/OpenSprinkler.sh restart
+
+---
+
+## Stop All Sprinkler Firmware/Software from Starting with the Raspberry Pi
 
 1. Open an SSH connection to your Raspberry Pi.
 
-2. Remove unified firmware from system startup:
+2. Stop the unified firmware and remove it from system startup:
 
-    ```
-    sudo /etc/init.d/OpenSprinkler.sh stop
-    sudo rm /etc/init.d/OpenSprinkler.sh
-    sudo update-rc.d OpenSprinkler.sh remove
-    ```
+        sudo systemctl disable --now OpenSprinkler.service
+        sudo rm /etc/systemd/system/OpenSprinkler.service
+        sudo systemctl daemon-reload
 
-    More recent firmware versions have switched to use systemd. If the above commands do not work, try the following:
+    Older installations may still use the legacy SysV init script. If `systemctl` reports that the service does not exist, use:
 
-    ```
-    sudo systemctl stop OpenSprinkler.service
-    sudo rm /etc/systemd/system/OpenSprinkler.service
-    ```
+        sudo /etc/init.d/OpenSprinkler.sh stop
+        sudo rm /etc/init.d/OpenSprinkler.sh
+        sudo update-rc.d OpenSprinkler.sh remove
 
-3. Remove Dan's Python OSPi program:
+### Remove Legacy Sprinkler Software
 
-    ```
+Very old OSPi installations may also contain one of the following programs. Remove only the one that is actually installed.
+
+**Dan's Python OSPi program:**
+
     sudo /etc/init.d/ospi stop
     sudo rm /etc/init.d/ospi
     sudo update-rc.d ospi remove
-    ```
 
-4. Remove Richard Zimmerman's sprinkler_pi program:
+**Richard Zimmerman's `sprinklers_pi` program:**
 
-    ```
     sudo /etc/init.d/sprinklers_pi stop
     sudo rm /etc/init.d/sprinklers_pi
     sudo update-rc.d sprinklers_pi remove
-    ```

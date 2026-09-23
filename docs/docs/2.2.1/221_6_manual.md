@@ -471,7 +471,7 @@ Click Footer Menu → Edit Options (or press `Alt+O`) to configure settings:
 ### System Settings
 
 * **Location:** Tap *Location* to open the map and search for your address; or click the pencil icon ✏️ to manually enter the GPS coordinates.
-    * **PWS location:** When using **WUnderground (WU)** as the weather data provider, you must select a **Personal Weather Station (PWS)** location.
+    * **PWS location:** When using [**Weather Underground (WU)**](../guides/weather-underground.md) as the weather data provider, you must select a **Personal Weather Station (PWS)** location.
         1. First enter and submit a valid **WU API key** in the [Weather Adjustment](#weather-adjustment) tab.
         2. Return to the Location setting - available PWS sites will appear as **blue dots** on the map.
         3. Click one of the blue dots as your PWS location.
@@ -533,7 +533,7 @@ When associated zones overlap, master demand uses OR logic: the master remains a
 
 * **Weather Data Provider:** Choose preferred data provider. Default: **Apple**.
     * If the provider requires an API key, a key input box appears.
-    * Some providers have region limits (e.g. **DWD** = Germany only; **WU** requires PWS location).
+    * Some providers have region limits (e.g. **DWD** = Germany only; [**WU**](../guides/weather-underground.md) requires a PWS location).
 * **% Watering:** Global scaling factor applied to water times. Default: `100%`.
     * Editable only for **Manual** adjustment method (as others calculate this automatically).
     * Example: `75%` → Multiply all station water times by 0.75.

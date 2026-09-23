@@ -1,7 +1,7 @@
 # Firmware Compilation
 
 The firmware compilation instructions below are for OpenSprinkler **v3 and v4** only.
-<br>For RPi and Linux-based OpenSprinkler (OSPi), follow the [OSPi installation instructions](https://openthings.freshdesk.com/support/solutions/articles/5000631599-installing-and-updating-the-unified-firmware-on-ospi).
+<br>For RPi and Linux-based OpenSprinkler (OSPi), follow the [OSPi installation instructions](ospi/firmware-installation.md).
 
 ## Environment Setup
 

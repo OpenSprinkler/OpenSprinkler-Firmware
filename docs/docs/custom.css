@@ -119,6 +119,10 @@ ul > li {
   margin-right: auto;
   max-width: 100%;
 }
+.guide-screenshot {
+  margin-top: 1rem;
+  margin-bottom: 1.5rem;
+}
 /* You could also make a class for a shadow, which often looks nicer */
 .img-shadow {
   box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2);
