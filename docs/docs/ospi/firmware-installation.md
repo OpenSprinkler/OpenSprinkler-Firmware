@@ -65,9 +65,9 @@ If `updater.sh` is unavailable or you need to troubleshoot an update, run these 
 
 To compile the Demo target on a Debian-based Linux system, first run `sudo apt-get update`, then replace **ospi** with **demo**. The Demo target does not install or restart the OSPi service.
 
-Older installations may still use the legacy SysV init script. If `systemctl` reports that the service does not exist, restart with:
+The build script removes the legacy SysV init script when migrating an older installation. If `updater.sh` or `systemctl restart` reports that `OpenSprinkler.service` does not exist, rerun the interactive build and answer **Y** to **Do you want to start OpenSprinkler on startup?**:
 
-    sudo /etc/init.d/OpenSprinkler.sh restart
+    sudo ./build.sh ospi
 
 ---
 
