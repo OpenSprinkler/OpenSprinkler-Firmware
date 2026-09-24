@@ -82,7 +82,7 @@ The diagram below shows how to wire valves on the main controller and expanders.
     If installing outdoors, mount it inside a [**weatherproof enclosure**](https://www.amazon.com/Orbit-57095-Weather-Resistant-Outdoor-Mounted-Controller/dp/B000VYGMF2).
 
 !!! info "Video Guides"
-    **Video Guides and Tutorials** are available on the [OpenSprinkler support site](https://support.opensprinkler.com).
+    **Video Guides and Tutorials** are available in the [OpenSprinkler video collection](https://openthings.freshdesk.com/support/solutions/articles/5000860920-videos-introduction-to-opensprinkler-v3).
 
 ### Step 1: Preparation
 
@@ -257,7 +257,7 @@ All settings will be cleared and returned to factory defaults.
 OpenSprinkler’s web interface works on phones, tablets, and computers, enabling you to view status, adjust settings, check logs, and edit programs from any modern **web browser** or via the free **OpenSprinkler mobile app** (search **OpenSprinkler** in your app store).
 
 !!! info "Video Guides"
-    **Video Guides and Tutorials** are available on the [OpenSprinkler support site](https://support.opensprinkler.com).
+    **Video Guides and Tutorials** are available in the [OpenSprinkler video collection](https://openthings.freshdesk.com/support/solutions/articles/5000860920-videos-introduction-to-opensprinkler-v3).
 
 ---
 
@@ -557,7 +557,6 @@ All supported controllers provide two independent built-in sensor ports (`SN1/SN
 * **Rain / Soil Sensors:** Automatically stop zone runs when rain or high soil moisture is detected.
     * Choose **Normally Open** or **Normally Closed**; Normally Closed is the most common type.
     * Supports only sensors that output **binary ON/OFF signals** (dry-contact switches).
-        * For **Analog Sensors**, use an [**Analog-to-Digital Adapter**](https://opensprinkler.com/product/a2dadapter/), which converts an analog signal to ON/OFF with an adjustable threshold.
     * **Delayed On:** Time sensor must remain active before trigger (prevents false triggers).
     * **Delayed Off:** Hold time after sensor deactivation (prolongs sensor hold). Examples:<br>
      10-minute Delayed On → Sensor regarded as triggered after it's active for 10 minutes.<br>

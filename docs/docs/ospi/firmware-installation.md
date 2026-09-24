@@ -42,7 +42,7 @@ This guide assumes you have a Raspberry Pi running Raspberry Pi OS, reachable ov
 ## Update a Previously Installed Unified Firmware
 
 !!! warning
-    **Always export your configuration using Export Configurations before updating the firmware.** Updating to a new base firmware version (for example, 2.2.0 → 2.2.1) resets the controller to factory defaults, including controller settings, programs, and the device password (which returns to the default: **opendoor**). Revision updates within the same base version, such as 2.2.1(4) → 2.2.1(6), normally retain your settings, but a backup protects you if anything goes wrong.
+    **Always export your configuration using Export Configurations before updating the firmware.** A **Dotted Version Update** (for example, 2.2.0 → 2.2.1) resets the controller to factory defaults, including controller settings, programs, and the device password (which returns to the default: **opendoor**). A **Build Number Update**, such as 2.2.1(4) → 2.2.1(6), normally retains your settings, but a backup protects you if anything goes wrong.
 
 1. Open an SSH connection to your Raspberry Pi.
 2. Change to the firmware folder:
