@@ -56,18 +56,18 @@
                 <li class="toctree-l1"><a class="reference internal" href="../firmware-update/">Firmware Update</a>
                 </li>
               </ul>
-              <p class="caption"><span class="caption-text">Firmware v2.2.1(5) [NEW]</span></p>
+              <p class="caption"><span class="caption-text">Firmware v2.2.1(6) [NEW]</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../2.2.1/221_6_manual/">User Manual</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../2.2.1/221_6_api/">API Reference</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Firmware v2.2.1(5)</span></p>
               <ul>
                   <li class="toctree-l1"><a class="reference internal" href="../2.2.1/221_5_manual/">User Manual</a>
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../2.2.1/221_5_api/">API Reference</a>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Firmware v2.2.1(4)</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../2.2.1/221_4_manual/">User Manual</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../2.2.1/221_4_api/">API Reference</a>
                   </li>
               </ul>
               <p class="caption"><span class="caption-text">Zone Expander</span></p>
@@ -78,6 +78,34 @@
               <p class="caption"><span class="caption-text">Sensor Expander [NEW]</span></p>
               <ul>
                   <li class="toctree-l1"><a class="reference internal" href="../sensor-expander/">User Manual</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Guides</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../guides/remote-access-otc/">Remote Access with OTC</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Weather</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../guides/weather-adjustments/">Using Weather Adjustments</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../guides/weather-underground/">Using Weather Underground</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Integrations</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../guides/email-notifications/">Setting Up Email Notifications</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../guides/mqtt/">Using MQTT</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../guides/ifttt-notifications/">Setting Up IFTTT Notifications</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">OpenSprinkler Pi</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../ospi/firmware-installation/">Installing and Updating Firmware</a>
                   </li>
               </ul>
               <p class="caption"><span class="caption-text">Archived</span></p>
@@ -110,12 +138,12 @@
             <div class="section" itemprop="articleBody">
               
                 <h1 id="firmware-compilation">Firmware Compilation</h1>
-<p>The firmware compilation instructions below are for OpenSprinkler <strong>v3.x and v2.3</strong> only.
-<br>For RPi and Linux-based OpenSprinkler (OSPi), follow the <a href="https://openthings.freshdesk.com/support/solutions/articles/5000631599-installing-and-updating-the-unified-firmware-on-ospi">OSPi installation instructions</a>.</p>
+<p>The firmware compilation instructions below are for OpenSprinkler <strong>v3 and v4</strong> only.
+<br>For RPi and Linux-based OpenSprinkler (OSPi), follow the <a href="../ospi/firmware-installation/">OSPi installation instructions</a>.</p>
 <h2 id="environment-setup">Environment Setup</h2>
 <ol>
 <li>
-<p>Clone this repository with required submodules, then enter the source directory:</p>
+<p>Clone the firmware repository with required submodules, then enter the source directory:</p>
 <pre><code>git clone --recurse-submodules https://github.com/OpenSprinkler/OpenSprinkler-Firmware.git
 cd OpenSprinkler-Firmware
 </code></pre>
@@ -132,9 +160,42 @@ cd OpenSprinkler-Firmware
 <ol>
 <li>In VS Code, click <code>File -&gt; Open Folder</code> and select the <code>OpenSprinkler-Firmware</code> folder.</li>
 <li>PlatformIO will recognize the <code>platformio.ini</code> file in that folder, which contains all the libraries and settings needed to compile the firmware.</li>
-<li>Select <code>os3x_esp8266</code> as the PlatformIO build environment for OpenSprinkler v3.x.</li>
-<li>Click the <strong>PlatformIO: Build</strong> button (with the checkmark icon ✓) in the blue status bar at the bottom of the screen to build the firmware.</li>
+<li>
+<p>Select the PlatformIO build environment for your hardware:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Hardware</th>
+<th style="text-align: left;">PlatformIO environment</th>
+<th style="text-align: left;">OTA firmware artifact</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">OpenSprinkler v3 (ESP8266)</td>
+<td style="text-align: left;"><code>os3x_esp8266</code></td>
+<td style="text-align: left;"><code>.pio/build/os3x_esp8266/firmware.bin</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">OpenSprinkler v4 (ESP32-C6-N8)</td>
+<td style="text-align: left;"><code>os4_esp32c6_n8</code></td>
+<td style="text-align: left;"><code>.pio/build/os4_esp32c6_n8/firmware.bin32n8</code></td>
+</tr>
+</tbody>
+</table>
+</li>
+<li>
+<p>Click the <strong>PlatformIO: Build</strong> button (with the checkmark icon ✓) in the blue status bar at the bottom of the screen to build the firmware.</p>
+</li>
 </ol>
+<p>Alternatively, you can build from a terminal in the source directory:</p>
+<pre><code class="language-sh"># OpenSprinkler v3
+pio run -e os3x_esp8266
+
+# OpenSprinkler v4 (ESP32-C6-N8)
+pio run -e os4_esp32c6_n8
+</code></pre>
+<p>For OpenSprinkler v4, use <code>firmware.bin32n8</code> for a normal firmware upload. PlatformIO also produces <code>firmware.factory.bin</code>, which includes the complete flash layout and is intended for factory or USB-C flashing rather than OTA upload.</p>
 <hr />
               
             </div>

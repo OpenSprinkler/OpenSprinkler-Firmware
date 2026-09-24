@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://OpenSprinkler.github.io/OpenSprinkler-Firmware/guides/mqtt/" />
+      <link rel="shortcut icon" href="../../img/favicon.ico" />
+    <title>Using MQTT - OpenSprinkler Documentation</title>
+    <link rel="stylesheet" href="../../css/theme.css" />
+    <link rel="stylesheet" href="../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../../custom.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Using MQTT";
+        var mkdocs_page_input_path = "guides/mqtt.md";
+        var mkdocs_page_url = "/OpenSprinkler-Firmware/guides/mqtt/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../.." class="icon icon-home"> OpenSprinkler Documentation
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../..">Home</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../faq/">FAQ</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../troubleshooting/">Troubleshooting</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../firmware-update/">Firmware Update</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Firmware v2.2.1(6) [NEW]</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../2.2.1/221_6_manual/">User Manual</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../2.2.1/221_6_api/">API Reference</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Firmware v2.2.1(5)</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../2.2.1/221_5_manual/">User Manual</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../2.2.1/221_5_api/">API Reference</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Zone Expander</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../zone-expander/">User Manual</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Sensor Expander [NEW]</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../sensor-expander/">User Manual</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Guides</span></p>
+              <ul class="current">
+                  <li class="toctree-l1"><a class="reference internal" href="../remote-access-otc/">Remote Access with OTC</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Weather</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../weather-adjustments/">Using Weather Adjustments</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../weather-underground/">Using Weather Underground</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1 current"><a class="reference internal current" >Integrations</a>
+    <ul class="current">
+                <li class="toctree-l2"><a class="reference internal" href="../email-notifications/">Setting Up Email Notifications</a>
+                </li>
+                <li class="toctree-l2 current"><a class="reference internal current" href="#">Using MQTT</a>
+    <ul class="current">
+    <li class="toctree-l3"><a class="reference internal" href="#introduction">Introduction</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#mqtt-configurations">MQTT Configurations</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#understanding-mqtt-broker-and-client">Understanding MQTT Broker and Client</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#understanding-mqtt-topics">Understanding MQTT Topics</a>
+        <ul>
+    <li class="toctree-l4"><a class="reference internal" href="#example-publishing-data-from-opensprinkler">Example: Publishing Data from OpenSprinkler</a>
+    </li>
+    <li class="toctree-l4"><a class="reference internal" href="#subscribing-to-topics">Subscribing to Topics</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#topics-published-by-firmware-2216">Topics Published by Firmware 2.2.1(6)</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#topics-subscribed-by-firmware-221">Topics Subscribed by Firmware 2.2.1</a>
+    </li>
+    </ul>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../ifttt-notifications/">Setting Up IFTTT Notifications</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">OpenSprinkler Pi</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../ospi/firmware-installation/">Installing and Updating Firmware</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Archived</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../archive/">Previous Manuals and API docs</a>
+                  </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../..">OpenSprinkler Documentation</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
+          <li class="breadcrumb-item">Guides</li>
+          <li class="breadcrumb-item">Integrations</li>
+      <li class="breadcrumb-item active">Using MQTT</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/OpenSprinkler/OpenSprinkler-Firmware/edit/master/docs/guides/mqtt.md" class="icon icon-github"> Edit on GitHub</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="how-to-use-mqtt">How to Use MQTT</h1>
+<h2 id="introduction">Introduction</h2>
+<p>Starting from firmware <strong>2.2.1</strong>, the MQTT feature has been expanded to include <strong>subscription support</strong> and <strong>customization of topics</strong>.</p>
+<p><strong>Key Features</strong>:</p>
+<ul>
+<li><strong>Publish</strong>: As before, the controller can publish its status and information to an MQTT broker. An MQTT client can then subscribe to these topics to receive real-time updates.</li>
+<li><strong>Subscribe (New in 2.2.1)</strong>: The controller can now <strong>subscribe</strong> to an MQTT broker, allowing it to receive and act upon specific <strong>commands from an MQTT client</strong>. This enables actions such as:<ul>
+<li>Manually starting a zone</li>
+<li>Running a program</li>
+<li>Rebooting the controller</li>
+</ul>
+</li>
+</ul>
+<p>To use these features, ensure your system meets the <strong>minimum requirements</strong>:</p>
+<ul>
+<li><strong>Firmware Version: 2.2.1</strong> or later</li>
+<li><strong>App/UI Version: 2.4.1</strong> or later</li>
+</ul>
+<hr />
+<h2 id="mqtt-configurations">MQTT Configurations</h2>
+<p>To configure MQTT settings in OpenSprinkler, navigate from the homepage to <strong>Edit Options</strong> → <strong>Integration</strong>. Here you can adjust the MQTT settings:</p>
+<p><img alt="MQTT Settings Menu" class="img-border img-center" src="../images/mqttSettings.png" /></p>
+<ul>
+<li><strong>Broker/Server</strong>: Enter either the <strong>IP address</strong> or <strong>DNS name</strong> of your MQTT broker/server.</li>
+<li><strong>Port</strong>: The default MQTT broker port is 1883. Modify this if your broker uses a different port.</li>
+<li><strong>Username/Password (Optional)</strong>: Provide credentials if your broker requires authentication.</li>
+<li><strong>Publish Topic</strong>: The topic where OpenSprinkler publishes notifications.<ul>
+<li>Default: <strong>opensprinkler</strong> (for backward compatibility)</li>
+<li>Recommended: Change this to a unique name to distinguish between multiple controllers.</li>
+</ul>
+</li>
+<li><strong>Subscribe Topic</strong>: The topic OpenSprinkler listens to for commands. It is initially empty, which disables command subscription. Click <strong>Use Default</strong> to generate a unique topic based on the controller's MAC address, or enter another topic that is unique to this controller.</li>
+</ul>
+<hr />
+<h2 id="understanding-mqtt-broker-and-client">Understanding MQTT Broker and Client</h2>
+<p>If you're new to MQTT, you may want to look up MQTT tutorials or guides for a deeper understanding.</p>
+<ul>
+<li>In <strong>Linux or Raspberry Pi</strong>, you can set up an MQTT broker using <strong>Mosquitto</strong>:</li>
+</ul>
+<pre><code class="language-bash">sudo apt install mosquitto mosquitto-clients
+</code></pre>
+<ul>
+<li>MQTT follows a <strong>publisher/subscriber model</strong>:<ul>
+<li>The MQTT <strong>broker</strong> manages multiple publishers and subscribers.</li>
+<li>A <strong>publisher</strong> sends messages to the <strong>MQTT broker</strong>.</li>
+<li>A <strong>subscriber</strong> receives messages from the <strong>MQTT broker</strong>.</li>
+</ul>
+</li>
+<li>You can use these <strong>command-line tools</strong>:</li>
+<li><strong>Publish a message</strong>:</li>
+</ul>
+<pre><code class="language-bash">mosquitto_pub -h &lt;broker_ip&gt; -t &quot;my_topic&quot; -m &quot;message_content&quot;
+</code></pre>
+<ul>
+<li><strong>Subscribe to a topic</strong>:</li>
+</ul>
+<pre><code class="language-bash">mosquitto_sub -h &lt;broker_ip&gt; -t &quot;my_topic&quot;
+</code></pre>
+<ul>
+<li>Mobile apps are also available for <strong>publishing and subscribing</strong> to MQTT topics.</li>
+</ul>
+<hr />
+<h2 id="understanding-mqtt-topics">Understanding MQTT Topics</h2>
+<p>MQTT data is structured in a <strong>hierarchy of topics</strong> separated by "/".</p>
+<h3 id="example-publishing-data-from-opensprinkler">Example: Publishing Data from OpenSprinkler</h3>
+<ul>
+<li>The OpenSprinkler firmware can <strong>publish</strong> status data to:
+  <code>my_opensprinkler/station/0</code><ul>
+<li>Contains <strong>status information</strong> for <strong>station 0</strong> (first station) of the <strong>my_opensprinkler</strong> controller.</li>
+</ul>
+</li>
+<li>Or <strong>send a sensor event</strong> to:
+  <code>my_opensprinkler/sensor1</code><ul>
+<li>Contains data for <strong>sensor1</strong> of that controller.</li>
+</ul>
+</li>
+</ul>
+<h3 id="subscribing-to-topics">Subscribing to Topics</h3>
+<ul>
+<li>A subscriber can:<ul>
+<li>Listen to a <strong>specific topic</strong>:
+<code>my_opensprinkler/station/0</code></li>
+<li>Use <strong>wildcards</strong> to subscribe to <strong>multiple topics</strong>:<ul>
+<li>Receive <strong>all</strong> topics under <strong>my_opensprinkler/</strong>:
+  <code>my_opensprinkler/#</code></li>
+<li>Receive <strong>ALL</strong> topics from <strong>ALL</strong> controllers:
+  <code>#</code></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p>With these configurations, OpenSprinkler can effectively <strong>integrate with MQTT</strong> enabling seamless automation and real-time updates.</p>
+<hr />
+<h2 id="topics-published-by-firmware-2216">Topics Published by Firmware 2.2.1(6)</h2>
+<p>OpenSprinkler publishes messages to the MQTT broker in a format similar to IFTTT and email notifications.</p>
+<ul>
+<li>The <strong>default root topic</strong> is <code>opensprinkler</code>, but can be customized in the settings.</li>
+<li>The publish topic itself can contain subtopics, such as <code>MA_home/lawn/sprinkler</code>.</li>
+<li>Due to the firmware storage limit, the <strong>maximum topic length is 24 characters</strong>.</li>
+<li>Below we use <code>publish_topic</code> to denote this name.</li>
+</ul>
+<p>Here is the list of topics that firmware 2.2.1(6) publishes:</p>
+<ul>
+<li><strong>Reboot</strong>: <code>publish_topic/system</code> sends <code>{"state":"started","cause":cc}</code> when the controller boots, where <code>cc</code> is the <a href="../../api/#reboot-cause-codes">reboot-cause code</a>.</li>
+<li><strong>Program Start</strong>: <code>publish_topic/program/x</code>, where <code>x</code> is the program index (starting from 0 for the first program).<ul>
+<li>A successfully scheduled program sends <code>{"state":1,"wl":xx,"wa":w,"sa":s,"ta":t}</code>. <code>wl</code> is the weather-adjusted watering percentage; <code>wa</code>, <code>sa</code>, and <code>ta</code> are the weather, sensor, and total adjustment factors.</li>
+<li>A skipped program sends <code>{"state":"skipped","wtrestr":x}</code>. The program may be skipped because its watering level is 0% or because of the weather restriction indicated by <code>wtrestr</code>.</li>
+</ul>
+</li>
+<li><strong>Zone Activity</strong>: <code>publish_topic/station/x</code>, where <code>x</code> is the index (starting from 0 for the first zone).<ul>
+<li>This topic sends <code>{"state":1,"duration":ss}</code> when zone <code>x</code> starts, where <code>ss</code> is the scheduled runtime in seconds.</li>
+<li>It sends <code>{"state":0,"duration":rs}</code> when that zone closes, where <code>rs</code> is the actual runtime in seconds. When SN1 is configured as a flow sensor, the closing payload also includes <code>"flow":ff</code> for a completed run.</li>
+<li>To receive messages for all zones, subscribe to wildcard <code>publish_topic/station/#</code>. Firmware 2.2.1 also publishes <code>{"state":1}</code> on a <strong>master/pump</strong> zone when that zone opens, but the duration is omitted as a master zone runs dynamically based on other zones.</li>
+<li>For a Bundle Station run, only the bundle leader publishes zone activity; its derived bundle members do not publish separate activity messages.</li>
+</ul>
+</li>
+<li><strong>Sensor Events</strong>: <code>publish_topic/sensorN</code> sends <code>{"state":1}</code> when built-in sensor <code>N</code> activates and <code>{"state":0}</code> when it deactivates. <code>N</code> ranges from 1 to 4 where supported by the controller hardware.</li>
+<li><strong>Rain Delay Events</strong>: <code>publish_topic/raindelay</code> is similar to sensor events but for rain delays.</li>
+<li><strong>Flow Sensor Data</strong>: <code>publish_topic/sensor/flow</code> sends <code>{"count":cc,"volume":vv}</code> when the flow sensor generates data, normally after a program finishes. <code>cc</code> is the pulse count and <code>vv</code> is the calculated volume in the unit implied by the configured <strong>Flow Pulse Rate</strong>.</li>
+<li><strong>Weather Adjustment Updates</strong>: <code>publish_topic/weather</code> sends <code>{"water level":pp}</code> when the watering percentage changes, such as after an automatic weather update.</li>
+<li><strong>Flow Alert</strong>: <code>publish_topic/station/x/alert/flow</code> sends <code>{"flow_rate":ff,"duration":ss,"alert_setpoint":aa}</code> when zone <code>x</code> exceeds its configured flow-alert setpoint.</li>
+<li><strong>Current Alert</strong>:<ul>
+<li><strong>Station Under or Overcurrent Alert</strong>: <code>publish_topic/station/x/alert/curr</code>, where <code>x</code> is the station index. This topic sends <code>{"curr_value":cc,"imin_threshold":tt}</code> or <code>{"curr_value":cc,"imax_limit":tt}</code> for under and overcurrent alerts respectively.</li>
+<li><strong>System Overcurrent Alert</strong>: <code>publish_topic/overcurrent</code> sends <code>{"curr_value":cc,"imax_limit":tt}</code>.
+  !!! note
+  Station overcurrent is detected immediately after a station is turned on (so the firmware can detect the offending station). System overcurrent is detected during the operation of the system, not associated with opening a zone.</li>
+</ul>
+</li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Notification events and availability</p>
+<p>Starting <strong>from 2.2.1(1)</strong>, MQTT notifications are managed through the <strong>Notification Events</strong> setting, just like IFTTT and email notifications. To receive event messages, you must <strong>enable the corresponding Notification Events</strong>. If no events are selected, the controller still publishes its availability state but does not publish event notifications.</p>
+<p>OpenSprinkler publishes <code>publish_topic/availability</code> with the retained payload <code>online</code> or <code>offline</code> (i.e. non-JSON). If your MQTT client requires strict JSON format (such as <a href="https://thingsboard.io/">ThingsBoard</a>), configure your client to filter out non-JSON payloads or set up an Uplink Data Converter.</p>
+</div>
+<hr />
+<h2 id="topics-subscribed-by-firmware-221">Topics Subscribed by Firmware 2.2.1</h2>
+<p>Firmware <strong>2.2.1</strong> allows OpenSprinkler to <strong>subscribe</strong> to a user-defined <strong>MQTT topic</strong>, enabling it to receive commands from an MQTT broker. This means an <strong>MQTT client</strong> can send commands to control OpenSprinkler's operations.</p>
+<p>To enable this feature:</p>
+<ul>
+<li>Set a valid <strong>Subscribe Topic</strong> in the <strong>MQTT configuration</strong> above. Click <strong>Use Default</strong> to generate one from the controller's <strong>MAC address</strong> (e.g. <code>OS-112233AABBCC</code>).</li>
+<li>You may enter a custom topic, but each controller should have a <strong>unique subscribe topic</strong>.</li>
+<li>Due to firmware storage limitations, the <strong>maximum length</strong> of a subscribe topic is <strong>24 characters</strong>.</li>
+<li>The <strong>Subscribe Topic is optional</strong>. If left empty, the controller will <strong>not respond to MQTT commands</strong>.</li>
+</ul>
+<p>To control OpenSprinkler, an <strong>MQTT client</strong> must:</p>
+<ol>
+<li><strong>Publish a command message</strong> to the <code>subscribe_topic</code>.</li>
+<li><strong>Include a payload</strong> that specifies the command and parameters.</li>
+</ol>
+<p>The commands must <strong>follow the same format</strong> as OpenSprinkler's <strong>HTTP API</strong> (see the <a href="../../api/">HTTP API reference</a>). Specifically:</p>
+<ul>
+<li>Payload structure:
+  <code>&lt;endpoint&gt;?&lt;parameter1&gt;=&lt;value&gt;&amp;&lt;parameter2&gt;=&lt;value&gt;</code></li>
+<li>The <strong>endpoint</strong> is a <strong>two-letter code</strong> (without a leading "/") as in the HTTP API.</li>
+<li>Parameters are <strong>separated by &amp;</strong>.</li>
+<li>The <strong>device password (<code>pw</code>)</strong> must be included as its lowercase <strong>MD5 hash</strong>, unless <strong>Ignore Password</strong> is enabled.</li>
+</ul>
+<p>MQTT commands are fire-and-forget. The controller does not publish an acknowledgement or error response, so an invalid or rejected command produces no MQTT reply.</p>
+<p>Only a subset of the HTTP API commands are currently supported. Their validation and behavior match the corresponding HTTP endpoints:</p>
+<ul>
+<li><strong>Change Controller Variables</strong> (endpoint: <code>cv</code>) with the following parameters:<ul>
+<li><code>rsn</code>: Reset all stations (include those waiting to run).</li>
+<li><code>rbt</code>: Reboot controller.</li>
+<li><code>en</code>: Operation enable/disable.</li>
+<li><code>rd</code>: Set rain delay time (in hours).</li>
+</ul>
+</li>
+<li><strong>Manual Station Run</strong> (endpoint: <code>cm</code>)</li>
+<li><strong>Manually Start a Program</strong> (endpoint: <code>mp</code>)</li>
+<li><strong>Start Run-Once Program</strong> (endpoint: <code>cr</code>)</li>
+</ul>
+<p>For example, to reset all stations, the payload message would be <code>cv?pw=xxx&amp;rsn=1</code>, where <code>pw=xxx</code> is the lowercase MD5 hash of the device password.</p>
+<p>To use <strong>mosquitto_pub</strong> to send this command, you may run:</p>
+<pre><code class="language-bash">mosquitto_pub -h your_mqtt_broker -p 1883 -t subscribe_topic -m &quot;cv?pw=xxx&amp;rsn=1&quot;
+</code></pre>
+<p>As another example, to manually start zone 1 for 2 minutes and 45 seconds (i.e. a total of 165 seconds), the payload message would be:
+<code>cm?pw=xxx&amp;sid=0&amp;t=165&amp;en=1</code></p>
+<p>Refer to <a href="../../api/#mqtt-command-subscriptions">MQTT Command Subscriptions</a> in the HTTP API reference for the complete command parameters and behavior.</p>
+<div class="admonition note">
+<p class="admonition-title">MQTT packet-size limit</p>
+<p>On OpenSprinkler v3 and v4, the MQTT library limits each complete packet to 256 bytes. The topic and MQTT protocol overhead count toward this limit, so the available command payload is less than 256 bytes and depends on the topic length. Oversized commands are silently discarded before the firmware receives them; this most often affects <code>cr</code> commands containing durations for many stations. OSPi/Linux does not have this firmware-defined limit. Use the HTTP API for commands that do not fit in one MQTT packet.</p>
+</div>
+              
+            </div>
+          </div><footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
+        <a href="../email-notifications/" class="btn btn-neutral float-left" title="Setting Up Email Notifications"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+        <a href="../ifttt-notifications/" class="btn btn-neutral float-right" title="Setting Up IFTTT Notifications">Next <span class="icon icon-circle-arrow-right"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/OpenSprinkler/OpenSprinkler-Firmware" class="fa fa-github" style="color: #fcfcfc"> GitHub</a>
+        </span>
+    
+    
+      <span><a href="../email-notifications/" style="color: #fcfcfc">&laquo; Previous</a></span>
+    
+    
+      <span><a href="../ifttt-notifications/" style="color: #fcfcfc">Next &raquo;</a></span>
+    
+  </span>
+</div>
+    <script src="../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../..";</script>
+    <script src="../../js/theme_extra.js"></script>
+    <script src="../../js/theme.js"></script>
+      <script src="../../js/nav_badges.js"></script>
+      <script src="../../search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

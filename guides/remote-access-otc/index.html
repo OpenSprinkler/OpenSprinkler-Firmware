@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://OpenSprinkler.github.io/OpenSprinkler-Firmware/guides/remote-access-otc/" />
+      <link rel="shortcut icon" href="../../img/favicon.ico" />
+    <title>Remote Access with OTC - OpenSprinkler Documentation</title>
+    <link rel="stylesheet" href="../../css/theme.css" />
+    <link rel="stylesheet" href="../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../../custom.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Remote Access with OTC";
+        var mkdocs_page_input_path = "guides/remote-access-otc.md";
+        var mkdocs_page_url = "/OpenSprinkler-Firmware/guides/remote-access-otc/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../.." class="icon icon-home"> OpenSprinkler Documentation
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../..">Home</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../faq/">FAQ</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../troubleshooting/">Troubleshooting</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../firmware-update/">Firmware Update</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Firmware v2.2.1(6) [NEW]</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../2.2.1/221_6_manual/">User Manual</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../2.2.1/221_6_api/">API Reference</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Firmware v2.2.1(5)</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../2.2.1/221_5_manual/">User Manual</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../2.2.1/221_5_api/">API Reference</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Zone Expander</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../zone-expander/">User Manual</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Sensor Expander [NEW]</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../sensor-expander/">User Manual</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Guides</span></p>
+              <ul class="current">
+                  <li class="toctree-l1 current"><a class="reference internal current" href="#">Remote Access with OTC</a>
+    <ul class="current">
+    <li class="toctree-l2"><a class="reference internal" href="#create-an-otc-token">Create an OTC Token</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#configure-opensprinkler">Configure OpenSprinkler</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#add-the-remote-site">Add the Remote Site</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#direct-browser-access">Direct Browser Access</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#limitations">Limitations</a>
+    </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Weather</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../weather-adjustments/">Using Weather Adjustments</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../weather-underground/">Using Weather Underground</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Integrations</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../email-notifications/">Setting Up Email Notifications</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../mqtt/">Using MQTT</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../ifttt-notifications/">Setting Up IFTTT Notifications</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">OpenSprinkler Pi</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../ospi/firmware-installation/">Installing and Updating Firmware</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Archived</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../archive/">Previous Manuals and API docs</a>
+                  </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../..">OpenSprinkler Documentation</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
+          <li class="breadcrumb-item">Guides</li>
+      <li class="breadcrumb-item active">Remote Access with OTC</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/OpenSprinkler/OpenSprinkler-Firmware/edit/master/docs/guides/remote-access-otc.md" class="icon icon-github"> Edit on GitHub</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="remote-access-with-openthings-cloud-otc">Remote Access with OpenThings Cloud (OTC)</h1>
+<p>OpenThings Cloud (OTC) provides remote access to OpenSprinkler without router port forwarding. The controller maintains an outbound connection to a public OTC server, and the OpenSprinkler App uses an OTC token to reach it from outside the local network.</p>
+<p>OTC is supported on OpenSprinkler v3, v4, OpenSprinkler Pi, and Linux.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Treat an OTC token as a credential. Anyone who has both the token and the device password may access the controller. Keep it private.</p>
+</div>
+<h2 id="create-an-otc-token">Create an OTC Token</h2>
+<ol>
+<li>If you don't yet have an account, go to <a href="https://www.opensprinkler.com">opensprinkler.com</a> and click <strong>My Account</strong> at the top to register.</li>
+<li>Navigate to <a href="https://www.openthings.io">openthings.io</a> and sign in using your opensprinkler.com account. The two websites use the same account credentials.</li>
+<li>
+<p>Select <strong>My OpenThings Devices</strong>. <em>Do </em><em>not</em><em> select </em><em>My OpenThings Blynk Devices</em><em>.</em></p>
+<p><img alt="My OpenThings Devices menu" class="img-border img-center" src="../images/otc-device-menu.png" /></p>
+</li>
+<li>
+<p>Enter a <strong>Description</strong> for the controller and select <strong>OpenSprinkler</strong> as the device type.</p>
+</li>
+<li>Select <strong>Add New Device</strong>.</li>
+<li>
+<p><strong>Copy</strong> the generated 32-character OTC token.</p>
+<p><img alt="Create an OpenSprinkler device and obtain its OTC token" class="img-border img-center" src="../images/otc-create-device.png" /></p>
+</li>
+</ol>
+<hr />
+<h2 id="configure-opensprinkler">Configure OpenSprinkler</h2>
+<ol>
+<li>Open the homepage of your OpenSprinkler controller. Go to <strong>Edit Options</strong> → <strong>Integration</strong>.</li>
+<li><strong>Enable</strong> OTC and paste the 32-character token into the OTC Token field.</li>
+<li>Leave the default server and port unchanged unless you host your own OTC server.</li>
+<li>
+<p><strong>Submit</strong> the changes and <strong>reboot</strong> the controller.</p>
+<p><img alt="OTC settings in the OpenSprinkler App" class="img-border img-center" src="../images/otc-controller-settings.png" width="300" /></p>
+</li>
+</ol>
+<p>After the controller reboots, open <strong>System Diagnostics</strong> from the sidebar to verify the OTC connection:</p>
+<ul>
+<li><strong>Connected</strong>: The controller is connected successfully.</li>
+<li><strong>Connecting...</strong>: Wait up to a minute and check again.</li>
+<li><strong>Not enabled</strong>: OTC is disabled or its settings were not saved.</li>
+<li><strong>Disconnected</strong>: Check the controller's Internet connection, token, and firewall settings.</li>
+</ul>
+<p><img alt="OTC status in System Diagnostics" class="img-border img-center" src="../images/otc-diagnostics.png" width="300" /></p>
+<hr />
+<h2 id="add-the-remote-site">Add the Remote Site</h2>
+<p>In the OpenSprinkler App, select <strong>Add a New Site</strong> or <strong>Manually Add Device</strong>. Enter a name and paste the 32-character OTC token as the <strong>Device Address</strong>.</p>
+<p><img alt="Add an OpenSprinkler site using an OTC token" class="img-border img-center" src="../images/otc-add-site.png" width="300" /></p>
+<p>The OTC site works both locally and remotely. You may still keep a separate site that uses the controller's local IP address for direct local access and firmware updates.</p>
+<p>Instead of installing an app, you may access your controller using the hosted web App at <a href="https://ui.opensprinkler.com">ui.opensprinkler.com</a> and the controller's OTC token.</p>
+<hr />
+<h2 id="direct-browser-access">Direct Browser Access</h2>
+<p>You can remotely access your controller directly in a browser using:</p>
+<pre><code class="language-text">https://cloud.openthings.io/forward/v1/YOUR_OTC_TOKEN
+</code></pre>
+<p>Replace <code>YOUR_OTC_TOKEN</code> with the 32-character token. Avoid sharing screenshots, bookmarks, or browser history containing this address.</p>
+<hr />
+<h2 id="limitations">Limitations</h2>
+<p>OTC is intended for remote access and normal API operations. Firmware updates still require a direct local-network connection and are not available through OTC.</p>
+              
+            </div>
+          </div><footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
+        <a href="../../sensor-expander/" class="btn btn-neutral float-left" title="User Manual"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+        <a href="../weather-adjustments/" class="btn btn-neutral float-right" title="Using Weather Adjustments">Next <span class="icon icon-circle-arrow-right"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/OpenSprinkler/OpenSprinkler-Firmware" class="fa fa-github" style="color: #fcfcfc"> GitHub</a>
+        </span>
+    
+    
+      <span><a href="../../sensor-expander/" style="color: #fcfcfc">&laquo; Previous</a></span>
+    
+    
+      <span><a href="../weather-adjustments/" style="color: #fcfcfc">Next &raquo;</a></span>
+    
+  </span>
+</div>
+    <script src="../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../..";</script>
+    <script src="../../js/theme_extra.js"></script>
+    <script src="../../js/theme.js"></script>
+      <script src="../../js/nav_badges.js"></script>
+      <script src="../../search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

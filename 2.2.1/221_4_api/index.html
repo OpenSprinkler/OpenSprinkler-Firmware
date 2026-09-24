@@ -5,7 +5,7 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://OpenSprinkler.github.io/OpenSprinkler-Firmware/2.2.1/221_4_api/" />
       <link rel="shortcut icon" href="../../img/favicon.ico" />
-    <title>API Reference - OpenSprinkler Documentation</title>
+    <title>221 4 api - OpenSprinkler Documentation</title>
     <link rel="stylesheet" href="../../css/theme.css" />
     <link rel="stylesheet" href="../../css/theme_extra.css" />
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
@@ -13,7 +13,7 @@
     
       <script>
         // Current page data
-        var mkdocs_page_name = "API Reference";
+        var mkdocs_page_name = "221 4 api";
         var mkdocs_page_input_path = "2.2.1/221_4_api.md";
         var mkdocs_page_url = "/OpenSprinkler-Firmware/2.2.1/221_4_api/";
       </script>
@@ -56,72 +56,18 @@
                 <li class="toctree-l1"><a class="reference internal" href="../../firmware-update/">Firmware Update</a>
                 </li>
               </ul>
-              <p class="caption"><span class="caption-text">Firmware v2.2.1(5) [NEW]</span></p>
+              <p class="caption"><span class="caption-text">Firmware v2.2.1(6) [NEW]</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../221_6_manual/">User Manual</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../221_6_api/">API Reference</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Firmware v2.2.1(5)</span></p>
               <ul>
                   <li class="toctree-l1"><a class="reference internal" href="../221_5_manual/">User Manual</a>
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../221_5_api/">API Reference</a>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Firmware v2.2.1(4)</span></p>
-              <ul class="current">
-                  <li class="toctree-l1"><a class="reference internal" href="../221_4_manual/">User Manual</a>
-                  </li>
-                  <li class="toctree-l1 current"><a class="reference internal current" href="./">API Reference</a>
-    <ul class="current">
-    <li class="toctree-l2"><a class="reference internal" href="#0-overview">0. Overview</a>
-    </li>
-    <li class="toctree-l2"><a class="reference internal" href="#1-major-changes">1. Major Changes</a>
-    </li>
-    <li class="toctree-l2"><a class="reference internal" href="#2-get-controller-variables-jc">2. Get Controller Variables /jc</a>
-    </li>
-    <li class="toctree-l2"><a class="reference internal" href="#3-change-controller-variables-cv">3. Change Controller Variables /cv</a>
-    </li>
-    <li class="toctree-l2"><a class="reference internal" href="#4-get-options-jo">4. Get Options /jo</a>
-    </li>
-    <li class="toctree-l2"><a class="reference internal" href="#5-change-options-co">5. Change Options /co</a>
-    </li>
-    <li class="toctree-l2"><a class="reference internal" href="#6-set-device-password-sp">6. Set Device Password /sp</a>
-    </li>
-    <li class="toctree-l2"><a class="reference internal" href="#7-get-station-names-and-attributes-jn">7. Get Station Names and Attributes /jn</a>
-    </li>
-    <li class="toctree-l2"><a class="reference internal" href="#8-get-special-station-data-je">8. Get Special Station Data /je</a>
-    </li>
-    <li class="toctree-l2"><a class="reference internal" href="#9-change-station-names-and-attributes-cs">9. Change Station Names and Attributes /cs</a>
-    </li>
-    <li class="toctree-l2"><a class="reference internal" href="#10-get-station-status-js">10. Get Station Status /js</a>
-    </li>
-    <li class="toctree-l2"><a class="reference internal" href="#11-manual-station-run-cm">11. Manual Station Run /cm</a>
-    </li>
-    <li class="toctree-l2"><a class="reference internal" href="#12-manually-start-a-program-mp">12. Manually Start a Program /mp</a>
-    </li>
-    <li class="toctree-l2"><a class="reference internal" href="#13-get-program-data-jp">13. Get Program Data /jp</a>
-    </li>
-    <li class="toctree-l2"><a class="reference internal" href="#14-change-program-data-cp">14. Change Program Data /cp</a>
-    </li>
-    <li class="toctree-l2"><a class="reference internal" href="#15-delete-programs-dp">15. Delete Program(s) /dp</a>
-    </li>
-    <li class="toctree-l2"><a class="reference internal" href="#16-move-up-re-order-a-program-up">16. Move Up (Re-order) a Program /up</a>
-    </li>
-    <li class="toctree-l2"><a class="reference internal" href="#17-run-once-program-cr">17. Run-Once Program /cr</a>
-    </li>
-    <li class="toctree-l2"><a class="reference internal" href="#18-get-log-data-jl">18. Get Log Data /jl</a>
-    </li>
-    <li class="toctree-l2"><a class="reference internal" href="#19-delete-log-data-dl">19. Delete Log Data /dl</a>
-    </li>
-    <li class="toctree-l2"><a class="reference internal" href="#20-change-script-url-cu">20. Change Script URL /cu</a>
-    </li>
-    <li class="toctree-l2"><a class="reference internal" href="#21-get-all-ja">21. Get All /ja</a>
-    </li>
-    <li class="toctree-l2"><a class="reference internal" href="#22-pause-queue-pq">22. Pause Queue /pq</a>
-    </li>
-    <li class="toctree-l2"><a class="reference internal" href="#23-debug-print-db">23. Debug Print /db</a>
-    </li>
-    <li class="toctree-l2"><a class="reference internal" href="#24-list-of-reboot-causes">24. List of Reboot Causes</a>
-    </li>
-    <li class="toctree-l2"><a class="reference internal" href="#25-list-of-weather-error-codes">25. List of Weather Error Codes</a>
-    </li>
-    </ul>
                   </li>
               </ul>
               <p class="caption"><span class="caption-text">Zone Expander</span></p>
@@ -132,6 +78,34 @@
               <p class="caption"><span class="caption-text">Sensor Expander [NEW]</span></p>
               <ul>
                   <li class="toctree-l1"><a class="reference internal" href="../../sensor-expander/">User Manual</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Guides</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/remote-access-otc/">Remote Access with OTC</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Weather</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../guides/weather-adjustments/">Using Weather Adjustments</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../guides/weather-underground/">Using Weather Underground</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Integrations</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../guides/email-notifications/">Setting Up Email Notifications</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../guides/mqtt/">Using MQTT</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../guides/ifttt-notifications/">Setting Up IFTTT Notifications</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">OpenSprinkler Pi</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../ospi/firmware-installation/">Installing and Updating Firmware</a>
                   </li>
               </ul>
               <p class="caption"><span class="caption-text">Archived</span></p>
@@ -153,8 +127,7 @@
         <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
   <ul class="wy-breadcrumbs">
     <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
-          <li class="breadcrumb-item">Firmware v2.2.1(4)</li>
-      <li class="breadcrumb-item active">API Reference</li>
+      <li class="breadcrumb-item active">221 4 api</li>
     <li class="wy-breadcrumbs-aside">
           <a href="https://github.com/OpenSprinkler/OpenSprinkler-Firmware/edit/master/docs/2.2.1/221_4_api.md" class="icon icon-github"> Edit on GitHub</a>
     </li>
@@ -1572,10 +1545,6 @@ Only stations with <code>stn_spe bit=1</code> appear.</p>
               
             </div>
           </div><footer>
-    <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
-        <a href="../221_4_manual/" class="btn btn-neutral float-left" title="User Manual"><span class="icon icon-circle-arrow-left"></span> Previous</a>
-        <a href="../../zone-expander/" class="btn btn-neutral float-right" title="User Manual">Next <span class="icon icon-circle-arrow-right"></span></a>
-    </div>
 
   <hr/>
 
@@ -1601,10 +1570,6 @@ Only stations with <code>stn_spe bit=1</code> appear.</p>
         </span>
     
     
-      <span><a href="../221_4_manual/" style="color: #fcfcfc">&laquo; Previous</a></span>
-    
-    
-      <span><a href="../../zone-expander/" style="color: #fcfcfc">Next &raquo;</a></span>
     
   </span>
 </div>

@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://OpenSprinkler.github.io/OpenSprinkler-Firmware/ospi/firmware-installation/" />
+      <link rel="shortcut icon" href="../../img/favicon.ico" />
+    <title>Installing and Updating Firmware - OpenSprinkler Documentation</title>
+    <link rel="stylesheet" href="../../css/theme.css" />
+    <link rel="stylesheet" href="../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../../custom.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Installing and Updating Firmware";
+        var mkdocs_page_input_path = "ospi/firmware-installation.md";
+        var mkdocs_page_url = "/OpenSprinkler-Firmware/ospi/firmware-installation/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../.." class="icon icon-home"> OpenSprinkler Documentation
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../..">Home</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../faq/">FAQ</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../troubleshooting/">Troubleshooting</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../firmware-update/">Firmware Update</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Firmware v2.2.1(6) [NEW]</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../2.2.1/221_6_manual/">User Manual</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../2.2.1/221_6_api/">API Reference</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Firmware v2.2.1(5)</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../2.2.1/221_5_manual/">User Manual</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../2.2.1/221_5_api/">API Reference</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Zone Expander</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../zone-expander/">User Manual</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Sensor Expander [NEW]</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../sensor-expander/">User Manual</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Guides</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/remote-access-otc/">Remote Access with OTC</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Weather</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../guides/weather-adjustments/">Using Weather Adjustments</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../guides/weather-underground/">Using Weather Underground</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Integrations</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../guides/email-notifications/">Setting Up Email Notifications</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../guides/mqtt/">Using MQTT</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../guides/ifttt-notifications/">Setting Up IFTTT Notifications</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">OpenSprinkler Pi</span></p>
+              <ul class="current">
+                  <li class="toctree-l1 current"><a class="reference internal current" href="#">Installing and Updating Firmware</a>
+    <ul class="current">
+    <li class="toctree-l2"><a class="reference internal" href="#background">Background</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#new-installation-of-the-unified-firmware-on-a-raspberry-pi">New Installation of the Unified Firmware on a Raspberry Pi</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#update-a-previously-installed-unified-firmware">Update a Previously Installed Unified Firmware</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#manual-update">Manual Update</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#stop-all-sprinkler-firmwaresoftware-from-starting-with-the-raspberry-pi">Stop All Sprinkler Firmware/Software from Starting with the Raspberry Pi</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#remove-legacy-sprinkler-software">Remove Legacy Sprinkler Software</a>
+    </li>
+        </ul>
+    </li>
+    </ul>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Archived</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../archive/">Previous Manuals and API docs</a>
+                  </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../..">OpenSprinkler Documentation</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
+          <li class="breadcrumb-item">OpenSprinkler Pi</li>
+      <li class="breadcrumb-item active">Installing and Updating Firmware</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/OpenSprinkler/OpenSprinkler-Firmware/edit/master/docs/ospi/firmware-installation.md" class="icon icon-github"> Edit on GitHub</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="installing-and-updating-the-ospi-unified-firmware">Installing and Updating the OSPi Unified Firmware</h1>
+<h2 id="background">Background</h2>
+<p>This guide assumes you have a Raspberry Pi running Raspberry Pi OS, reachable over SSH or with a keyboard and monitor connected.</p>
+<div class="admonition note">
+<p class="admonition-title">Supported Raspberry Pi OS versions</p>
+<p>Firmware 2.2.1(6) supports Raspberry Pi OS <strong>Bookworm</strong> and <strong>Trixie</strong> (either 64-bit or 32-bit). Older versions (e.g., Bullseye) may require installing the <code>lgpio</code> library manually. If your OS is very old (e.g., Buster), upgrade the OS before proceeding.</p>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">GPIO 4 conflict</p>
+<p>Do <strong>NOT</strong> enable 1-wire on its default GPIO 4. OSPi uses GPIO 4 to control its shift register, so this conflict prevents it from operating stations correctly. If 1-wire was previously enabled, inspect <code>/etc/modules</code> with <code>sudo nano /etc/modules</code>, comment out any line containing <code>w1-gpio</code>, and reboot. If you must use 1-wire, configure it to use a different GPIO.</p>
+</div>
+<hr />
+<h2 id="new-installation-of-the-unified-firmware-on-a-raspberry-pi">New Installation of the Unified Firmware on a Raspberry Pi</h2>
+<ol>
+<li>Open an SSH connection to the Raspberry Pi (or connect a keyboard and monitor to the device).</li>
+<li>
+<p>Run the following commands:</p>
+<pre><code>sudo apt-get install git
+cd ~
+git clone --recurse-submodules https://github.com/OpenSprinkler/OpenSprinkler-Firmware.git
+</code></pre>
+</li>
+<li>
+<p>Change the directory to the firmware folder:</p>
+<pre><code>cd OpenSprinkler-Firmware
+</code></pre>
+</li>
+<li>
+<p>Build OpenSprinkler:</p>
+<pre><code>sudo ./build.sh ospi
+</code></pre>
+<ul>
+<li>This generates an executable named <code>OpenSprinkler</code> in the firmware folder and offers to install a systemd service that starts OpenSprinkler at boot.</li>
+<li>The script may enable I2C and set its bus speed to 400 kHz. Reboot the Raspberry Pi if the script says a reboot is required.</li>
+<li>To compile the Demo target on a Debian-based Linux system, first run <code>sudo apt-get update</code>, then replace <strong>ospi</strong> with <strong>demo</strong>.</li>
+</ul>
+</li>
+<li>
+<p>If you accepted the startup-service prompt, OpenSprinkler is now set up to run automatically. If you declined, run it manually with <code>sudo ./OpenSprinkler</code>, or rerun <code>sudo ./build.sh ospi</code> and accept the prompt.</p>
+</li>
+<li>
+<p>On the Raspberry Pi itself, open <a href="http://localhost:8080">http://localhost:8080</a>. From another device on the same network, open <code>http://&lt;pi-ip-address&gt;:8080</code>. The default password is <strong>opendoor</strong>.</p>
+</li>
+</ol>
+<hr />
+<h2 id="update-a-previously-installed-unified-firmware">Update a Previously Installed Unified Firmware</h2>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p><strong>Always export your configuration using Export Configurations before updating the firmware.</strong> A <strong>Dotted Version Update</strong> (for example, 2.2.0 → 2.2.1) resets the controller to factory defaults, including controller settings, programs, and the device password (which returns to the default: <strong>opendoor</strong>). A <strong>Build Number Update</strong>, such as 2.2.1(4) → 2.2.1(6), normally retains your settings, but a backup protects you if anything goes wrong.</p>
+</div>
+<ol>
+<li>Open an SSH connection to your Raspberry Pi.</li>
+<li>
+<p>Change to the firmware folder:</p>
+<pre><code>cd ~/OpenSprinkler-Firmware
+</code></pre>
+</li>
+<li>
+<p>Run the updater:</p>
+<pre><code>sudo ./updater.sh
+</code></pre>
+<p>The updater performs a fast-forward-only Git pull, synchronizes the pinned submodules, rebuilds the firmware, and restarts the OpenSprinkler service.</p>
+</li>
+</ol>
+<h3 id="manual-update">Manual Update</h3>
+<p>If <code>updater.sh</code> is unavailable or you need to troubleshoot an update, run these commands from <code>~/OpenSprinkler-Firmware</code>:</p>
+<pre><code>git pull --ff-only
+sudo ./build.sh ospi
+sudo systemctl restart OpenSprinkler.service
+</code></pre>
+<p>To compile the Demo target on a Debian-based Linux system, first run <code>sudo apt-get update</code>, then replace <strong>ospi</strong> with <strong>demo</strong>. The Demo target does not install or restart the OSPi service.</p>
+<p>The build script removes the legacy SysV init script when migrating an older installation. If <code>updater.sh</code> or <code>systemctl restart</code> reports that <code>OpenSprinkler.service</code> does not exist, rerun the interactive build and answer <strong>Y</strong> to <strong>Do you want to start OpenSprinkler on startup?</strong>:</p>
+<pre><code>sudo ./build.sh ospi
+</code></pre>
+<hr />
+<h2 id="stop-all-sprinkler-firmwaresoftware-from-starting-with-the-raspberry-pi">Stop All Sprinkler Firmware/Software from Starting with the Raspberry Pi</h2>
+<ol>
+<li>
+<p>Open an SSH connection to your Raspberry Pi.</p>
+</li>
+<li>
+<p>Stop the unified firmware and remove it from system startup:</p>
+<pre><code>sudo systemctl disable --now OpenSprinkler.service
+sudo rm /etc/systemd/system/OpenSprinkler.service
+sudo systemctl daemon-reload
+</code></pre>
+<p>Older installations may still use the legacy SysV init script. If <code>systemctl</code> reports that the service does not exist, use:</p>
+<pre><code>sudo /etc/init.d/OpenSprinkler.sh stop
+sudo rm /etc/init.d/OpenSprinkler.sh
+sudo update-rc.d OpenSprinkler.sh remove
+</code></pre>
+</li>
+</ol>
+<h3 id="remove-legacy-sprinkler-software">Remove Legacy Sprinkler Software</h3>
+<p>Very old OSPi installations may also contain one of the following programs. Remove only the one that is actually installed.</p>
+<p><strong>Dan's Python OSPi program:</strong></p>
+<pre><code>sudo /etc/init.d/ospi stop
+sudo rm /etc/init.d/ospi
+sudo update-rc.d ospi remove
+</code></pre>
+<p><strong>Richard Zimmerman's <code>sprinklers_pi</code> program:</strong></p>
+<pre><code>sudo /etc/init.d/sprinklers_pi stop
+sudo rm /etc/init.d/sprinklers_pi
+sudo update-rc.d sprinklers_pi remove
+</code></pre>
+              
+            </div>
+          </div><footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
+        <a href="../../guides/ifttt-notifications/" class="btn btn-neutral float-left" title="Setting Up IFTTT Notifications"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+        <a href="../../archive/" class="btn btn-neutral float-right" title="Previous Manuals and API docs">Next <span class="icon icon-circle-arrow-right"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/OpenSprinkler/OpenSprinkler-Firmware" class="fa fa-github" style="color: #fcfcfc"> GitHub</a>
+        </span>
+    
+    
+      <span><a href="../../guides/ifttt-notifications/" style="color: #fcfcfc">&laquo; Previous</a></span>
+    
+    
+      <span><a href="../../archive/" style="color: #fcfcfc">Next &raquo;</a></span>
+    
+  </span>
+</div>
+    <script src="../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../..";</script>
+    <script src="../../js/theme_extra.js"></script>
+    <script src="../../js/theme.js"></script>
+      <script src="../../js/nav_badges.js"></script>
+      <script src="../../search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

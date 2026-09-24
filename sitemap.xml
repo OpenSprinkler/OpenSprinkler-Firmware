@@ -2,72 +2,94 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://OpenSprinkler.github.io/OpenSprinkler-Firmware/</loc>
-         <lastmod>2026-08-02</lastmod>
-         <changefreq>daily</changefreq>
+         <lastmod>2026-09-24</lastmod>
     </url>
     <url>
          <loc>https://OpenSprinkler.github.io/OpenSprinkler-Firmware/api/</loc>
-         <lastmod>2026-08-02</lastmod>
-         <changefreq>daily</changefreq>
+         <lastmod>2026-09-24</lastmod>
     </url>
     <url>
          <loc>https://OpenSprinkler.github.io/OpenSprinkler-Firmware/archive/</loc>
-         <lastmod>2026-08-02</lastmod>
-         <changefreq>daily</changefreq>
+         <lastmod>2026-09-24</lastmod>
     </url>
     <url>
          <loc>https://OpenSprinkler.github.io/OpenSprinkler-Firmware/faq/</loc>
-         <lastmod>2026-08-02</lastmod>
-         <changefreq>daily</changefreq>
+         <lastmod>2026-09-24</lastmod>
     </url>
     <url>
          <loc>https://OpenSprinkler.github.io/OpenSprinkler-Firmware/firmware-compilation/</loc>
-         <lastmod>2026-08-02</lastmod>
-         <changefreq>daily</changefreq>
+         <lastmod>2026-09-24</lastmod>
     </url>
     <url>
          <loc>https://OpenSprinkler.github.io/OpenSprinkler-Firmware/firmware-update/</loc>
-         <lastmod>2026-08-02</lastmod>
-         <changefreq>daily</changefreq>
+         <lastmod>2026-09-24</lastmod>
     </url>
     <url>
          <loc>https://OpenSprinkler.github.io/OpenSprinkler-Firmware/manual/</loc>
-         <lastmod>2026-08-02</lastmod>
-         <changefreq>daily</changefreq>
+         <lastmod>2026-09-24</lastmod>
     </url>
     <url>
          <loc>https://OpenSprinkler.github.io/OpenSprinkler-Firmware/sensor-expander/</loc>
-         <lastmod>2026-08-02</lastmod>
-         <changefreq>daily</changefreq>
+         <lastmod>2026-09-24</lastmod>
     </url>
     <url>
          <loc>https://OpenSprinkler.github.io/OpenSprinkler-Firmware/troubleshooting/</loc>
-         <lastmod>2026-08-02</lastmod>
-         <changefreq>daily</changefreq>
+         <lastmod>2026-09-24</lastmod>
     </url>
     <url>
          <loc>https://OpenSprinkler.github.io/OpenSprinkler-Firmware/zone-expander/</loc>
-         <lastmod>2026-08-02</lastmod>
-         <changefreq>daily</changefreq>
+         <lastmod>2026-09-24</lastmod>
     </url>
     <url>
          <loc>https://OpenSprinkler.github.io/OpenSprinkler-Firmware/2.2.1/221_4_api/</loc>
-         <lastmod>2026-08-02</lastmod>
-         <changefreq>daily</changefreq>
+         <lastmod>2026-09-24</lastmod>
     </url>
     <url>
          <loc>https://OpenSprinkler.github.io/OpenSprinkler-Firmware/2.2.1/221_4_manual/</loc>
-         <lastmod>2026-08-02</lastmod>
-         <changefreq>daily</changefreq>
+         <lastmod>2026-09-24</lastmod>
     </url>
     <url>
          <loc>https://OpenSprinkler.github.io/OpenSprinkler-Firmware/2.2.1/221_5_api/</loc>
-         <lastmod>2026-08-02</lastmod>
-         <changefreq>daily</changefreq>
+         <lastmod>2026-09-24</lastmod>
     </url>
     <url>
          <loc>https://OpenSprinkler.github.io/OpenSprinkler-Firmware/2.2.1/221_5_manual/</loc>
-         <lastmod>2026-08-02</lastmod>
-         <changefreq>daily</changefreq>
+         <lastmod>2026-09-24</lastmod>
+    </url>
+    <url>
+         <loc>https://OpenSprinkler.github.io/OpenSprinkler-Firmware/2.2.1/221_6_api/</loc>
+         <lastmod>2026-09-24</lastmod>
+    </url>
+    <url>
+         <loc>https://OpenSprinkler.github.io/OpenSprinkler-Firmware/2.2.1/221_6_manual/</loc>
+         <lastmod>2026-09-24</lastmod>
+    </url>
+    <url>
+         <loc>https://OpenSprinkler.github.io/OpenSprinkler-Firmware/guides/email-notifications/</loc>
+         <lastmod>2026-09-24</lastmod>
+    </url>
+    <url>
+         <loc>https://OpenSprinkler.github.io/OpenSprinkler-Firmware/guides/ifttt-notifications/</loc>
+         <lastmod>2026-09-24</lastmod>
+    </url>
+    <url>
+         <loc>https://OpenSprinkler.github.io/OpenSprinkler-Firmware/guides/mqtt/</loc>
+         <lastmod>2026-09-24</lastmod>
+    </url>
+    <url>
+         <loc>https://OpenSprinkler.github.io/OpenSprinkler-Firmware/guides/remote-access-otc/</loc>
+         <lastmod>2026-09-24</lastmod>
+    </url>
+    <url>
+         <loc>https://OpenSprinkler.github.io/OpenSprinkler-Firmware/guides/weather-adjustments/</loc>
+         <lastmod>2026-09-24</lastmod>
+    </url>
+    <url>
+         <loc>https://OpenSprinkler.github.io/OpenSprinkler-Firmware/guides/weather-underground/</loc>
+         <lastmod>2026-09-24</lastmod>
+    </url>
+    <url>
+         <loc>https://OpenSprinkler.github.io/OpenSprinkler-Firmware/ospi/firmware-installation/</loc>
+         <lastmod>2026-09-24</lastmod>
     </url>
 </urlset>

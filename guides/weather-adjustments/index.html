@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://OpenSprinkler.github.io/OpenSprinkler-Firmware/guides/weather-adjustments/" />
+      <link rel="shortcut icon" href="../../img/favicon.ico" />
+    <title>Using Weather Adjustments - OpenSprinkler Documentation</title>
+    <link rel="stylesheet" href="../../css/theme.css" />
+    <link rel="stylesheet" href="../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../../custom.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Using Weather Adjustments";
+        var mkdocs_page_input_path = "guides/weather-adjustments.md";
+        var mkdocs_page_url = "/OpenSprinkler-Firmware/guides/weather-adjustments/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../.." class="icon icon-home"> OpenSprinkler Documentation
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../..">Home</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../faq/">FAQ</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../troubleshooting/">Troubleshooting</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../firmware-update/">Firmware Update</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Firmware v2.2.1(6) [NEW]</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../2.2.1/221_6_manual/">User Manual</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../2.2.1/221_6_api/">API Reference</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Firmware v2.2.1(5)</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../2.2.1/221_5_manual/">User Manual</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../2.2.1/221_5_api/">API Reference</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Zone Expander</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../zone-expander/">User Manual</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Sensor Expander [NEW]</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../sensor-expander/">User Manual</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Guides</span></p>
+              <ul class="current">
+                  <li class="toctree-l1"><a class="reference internal" href="../remote-access-otc/">Remote Access with OTC</a>
+                  </li>
+                  <li class="toctree-l1 current"><a class="reference internal current" >Weather</a>
+    <ul class="current">
+                <li class="toctree-l2 current"><a class="reference internal current" href="#">Using Weather Adjustments</a>
+    <ul class="current">
+    <li class="toctree-l3"><a class="reference internal" href="#overview">Overview</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#configuration">Configuration</a>
+        <ul>
+    <li class="toctree-l4"><a class="reference internal" href="#selecting-an-adjustment-method">Selecting an Adjustment Method</a>
+    </li>
+    <li class="toctree-l4"><a class="reference internal" href="#using-multi-day-average-watering-levels">Using Multi-Day Average Watering Levels</a>
+    </li>
+    <li class="toctree-l4"><a class="reference internal" href="#weather-restrictions">Weather Restrictions</a>
+    </li>
+    <li class="toctree-l4"><a class="reference internal" href="#when-weather-data-is-unavailable">When Weather Data Is Unavailable</a>
+    </li>
+    <li class="toctree-l4"><a class="reference internal" href="#selecting-a-weather-data-provider">Selecting a Weather Data Provider</a>
+    </li>
+    <li class="toctree-l4"><a class="reference internal" href="#set-a-program-to-use-weather-adjustment">Set a Program to Use Weather Adjustment</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#technical-details-on-weather-adjustment-methods">Technical Details on Weather Adjustment Methods</a>
+        <ul>
+    <li class="toctree-l4"><a class="reference internal" href="#zimmerman-method">Zimmerman Method</a>
+    </li>
+    <li class="toctree-l4"><a class="reference internal" href="#evapotranspiration-eto-method">Evapotranspiration (ETo) Method</a>
+    </li>
+        </ul>
+    </li>
+    </ul>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../weather-underground/">Using Weather Underground</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Integrations</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../email-notifications/">Setting Up Email Notifications</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../mqtt/">Using MQTT</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../ifttt-notifications/">Setting Up IFTTT Notifications</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">OpenSprinkler Pi</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../ospi/firmware-installation/">Installing and Updating Firmware</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Archived</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../archive/">Previous Manuals and API docs</a>
+                  </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../..">OpenSprinkler Documentation</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
+          <li class="breadcrumb-item">Guides</li>
+          <li class="breadcrumb-item">Weather</li>
+      <li class="breadcrumb-item active">Using Weather Adjustments</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/OpenSprinkler/OpenSprinkler-Firmware/edit/master/docs/guides/weather-adjustments.md" class="icon icon-github"> Edit on GitHub</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="using-weather-adjustments">Using Weather Adjustments</h1>
+<h2 id="overview">Overview</h2>
+<p>OpenSprinkler can use online weather data to adjust scheduled watering times automatically. By default, it uses <a href="https://developer.apple.com/weatherkit/">Apple WeatherKit</a> as the weather data provider, offering global coverage. This guide describes the available weather adjustment methods and their implementation details.</p>
+<hr />
+<h2 id="configuration">Configuration</h2>
+<p>On the controller's homepage, go to <strong>Edit Options</strong> → <strong>Weather Adjustment</strong>, where you can select an <strong>Adjustment Method</strong>, set <strong>Weather Restrictions</strong>, and choose a <strong>Weather Data Provider</strong>. Each adjustment method has parameters that determine how the watering percentage is calculated.</p>
+<p><img alt="Weather Adjustment tab" class="img-border img-center" src="../images/weatherProviderDropdown.jpeg" /></p>
+<h3 id="selecting-an-adjustment-method">Selecting an Adjustment Method</h3>
+<ul>
+<li>
+<p><strong>Manual Adjustment (Default)</strong></p>
+<ul>
+<li>Allows manual setting of the watering percentage (0–250%).</li>
+<li>Programs with <strong>Use Weather Adjustment</strong> enabled scale their watering times by the selected percentage.<ul>
+<li>Example: If a program schedules 60 minutes for a zone and the watering percentage is set to 50%, the zone will water for 30 minutes.</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>
+<p><strong>Zimmerman</strong></p>
+<ul>
+<li>Automatically adjusts the watering percentage based on the previous day's <strong>average temperature</strong>, <strong>average humidity</strong>, and <strong>total precipitation</strong>.</li>
+<li>When selected, the <strong>% Watering</strong> input is disabled because the percentage is calculated dynamically.</li>
+<li>It is a straightforward method suitable for general home irrigation.</li>
+<li>Implementation details of the Zimmerman method and its parameters are explained below.</li>
+</ul>
+</li>
+<li>
+<p><strong>Auto Rain Delay</strong></p>
+<ul>
+<li>Uses the current precipitation data to automatically set a rain delay.</li>
+<li><strong>Does not modify the watering percentage.</strong> It only triggers a rain delay when weather data indicates rain.</li>
+</ul>
+</li>
+<li>
+<p><strong>ETo (Evapotranspiration)</strong></p>
+<ul>
+<li>A more <strong>advanced</strong> method based on industry standards.</li>
+<li>Uses additional parameters, including the location's <strong>coordinates</strong>, <strong>elevation</strong>, <strong>solar radiation</strong>, and <strong>yearly baseline ETo value</strong>.</li>
+<li><strong>Requirements</strong>:<ul>
+<li>You must provide a <strong>Baseline ETo</strong> or click <strong>Detect Baseline ETo</strong> to determine it from your location.</li>
+<li>You must set your <strong>Elevation</strong> for accurate calculations.</li>
+<li>Implementation details about ETo and its parameters are explained below.</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>
+<p><strong>Monthly Adjustment</strong></p>
+<ul>
+<li>Similar to Manual mode, but allows setting a <strong>fixed watering percentage for each month</strong>.</li>
+<li>Useful for <strong>seasonal watering schedules</strong>.</li>
+</ul>
+</li>
+</ul>
+<hr />
+<h3 id="using-multi-day-average-watering-levels">Using Multi-Day Average Watering Levels</h3>
+<p>Starting with <strong>firmware 2.2.1(3)</strong>, multi-day average watering levels can be used to adjust a program's run time. When the selected adjustment method is <strong>Zimmerman</strong> or <strong>ETo</strong>, a checkbox appears that enables this option for interval programs (programs that run on a fixed interval). For example, a program scheduled every 5 days will use the average watering levels from the past 5 days, rather than relying solely on yesterday's value. This provides more accurate adjustments for programs that do not run daily, accounting for all weather changes since the previous run.</p>
+<p>This feature applies <strong>only to interval programs</strong> and does not affect other program types. When enabled, the array of multi-day watering levels is shown in System Diagnostics. The array length depends on the selected weather provider. Apple supports up to 10 days, while other providers may supply fewer days. Refer to each provider's historical weather-data capability in the table below.</p>
+<hr />
+<h3 id="weather-restrictions">Weather Restrictions</h3>
+<p>Starting with <strong>firmware 2.2.1(3)</strong>, the following weather restrictions can be enabled with any adjustment method:</p>
+<ul>
+<li>
+<p><strong>Rain</strong>: Skip watering if the <strong>total forecast rain</strong> exceeds a set amount over a user-defined number of days (e.g., 0.5 inches over the next 3 days). Setting either value to 0 disables this rule.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Forecast capability is limited by the selected weather provider. If the chosen number of days exceeds the available forecast, the maximum available number of days is used. See the table below for each provider's forecast capability.</p>
+</div>
+</li>
+<li>
+<p><strong>Temperature</strong>: Skip watering if the current temperature falls below a set value (e.g., 50&deg;F or 10&deg;C). A value of -40 (either &deg;F or &deg;C) disables this rule.</p>
+</li>
+<li><strong>California Rule</strong>: Legacy option that prevents watering if rainfall in the past 48 hours exceeds 0.1 inches.</li>
+</ul>
+<p>If any weather restriction is active, it is displayed both on the homepage and in System Diagnostics.</p>
+<hr />
+<h3 id="when-weather-data-is-unavailable">When Weather Data Is Unavailable</h3>
+<p>During normal operation, OpenSprinkler uses the last successful weather response for up to 24 hours. If no fresh response is available after a restart, or the last successful response becomes more than 24 hours old, the <strong>Zimmerman</strong> and <strong>ETo</strong> methods revert to 100% watering. This allows programs to continue at their unadjusted durations instead of remaining at a stale weather-derived percentage.</p>
+<p>Stale weather restrictions are also cleared, and stored weather details and multi-day averages are discarded. System Diagnostics reports the weather-response error. <strong>Manual Adjustment</strong> and <strong>Monthly Adjustment</strong> retain their configured percentages because they do not depend on remotely calculated watering levels. Normal weather adjustment resumes after the next successful weather update.</p>
+<hr />
+<h3 id="selecting-a-weather-data-provider">Selecting a Weather Data Provider</h3>
+<p>OpenSprinkler's weather service offers multiple weather provider options for flexibility and accuracy. The table below lists each provider along with its historical and forecast data capabilities.</p>
+<table>
+<thead>
+<tr>
+<th><strong>Provider</strong></th>
+<th><strong>Requires API Key?</strong></th>
+<th><strong>Notes and Capabilities</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://developer.apple.com/weatherkit/">Apple WeatherKit (Default)</a></td>
+<td>No</td>
+<td><strong>Default option. Recommended for general use.</strong> Historical: 10 days; Forecast: 10 days.</td>
+</tr>
+<tr>
+<td><a href="https://www.accuweather.com/">AccuWeather</a></td>
+<td>Yes</td>
+<td>Historical: 1 day; Forecast: 5 days.</td>
+</tr>
+<tr>
+<td><a href="https://pirateweather.net/">Pirate Weather</a></td>
+<td>Yes</td>
+<td><strong>Open-source alternative to Dark Sky with a similar API.</strong> Historical: 1 day; Forecast: 8 days.</td>
+</tr>
+<tr>
+<td><a href="https://openweathermap.org/">OpenWeatherMap</a></td>
+<td>Yes</td>
+<td>Historical: 1 day; Forecast: 8 days.</td>
+</tr>
+<tr>
+<td><a href="https://open-meteo.com/">Open-Meteo</a></td>
+<td>No</td>
+<td><strong>Free and open-source.</strong> Historical: 7 days; Forecast: 7 days.</td>
+</tr>
+<tr>
+<td><a href="https://brightsky.dev/">DWD (Germany Only)</a></td>
+<td>No</td>
+<td><strong>Only works for German locations.</strong> Historical: 7 days; Forecast: 7 days.</td>
+</tr>
+<tr>
+<td><a href="../weather-underground/">Weather Underground</a></td>
+<td>Yes</td>
+<td><strong>Requires the location to be a PWS station.</strong> Historical: 6 days; Forecast: 6 days.</td>
+</tr>
+</tbody>
+</table>
+<p><br></p>
+<p><strong>Entering an API Key (if required):</strong></p>
+<ul>
+<li>If the provider requires an API key, a <strong>Weather API Key</strong> entry box appears.</li>
+<li>Enter your API key and click <strong>Verify</strong> to check its validity. Then submit to save your changes.</li>
+</ul>
+<p><img alt="API Key entry" class="img-border img-center" src="../images/apiKeyScreen.png" /></p>
+<hr />
+<h3 id="set-a-program-to-use-weather-adjustment">Set a Program to Use Weather Adjustment</h3>
+<p>Each sprinkler program can be configured independently to use weather adjustment. The program-editing page contains a <strong>Use Weather Adjustment</strong> checkbox. This option is disabled by default. When enabled, the program's watering times are adjusted automatically using the current weather adjustment method and settings.</p>
+<p><img alt="Use Weather Adjustment checkbox" class="img-border img-center" src="../images/useWeatherAdjustment.png" width="400" /></p>
+<hr />
+<h2 id="technical-details-on-weather-adjustment-methods">Technical Details on Weather Adjustment Methods</h2>
+<h3 id="zimmerman-method">Zimmerman Method</h3>
+<p>The Zimmerman method calculates the watering percentage based on <strong>temperature</strong>, <strong>humidity</strong>, and <strong>precipitation</strong>. It uses a baseline reference, and any deviation from this baseline increases or decreases the watering percentage. The <strong>default parameters</strong> are:</p>
+<ul>
+<li><strong>Temperature</strong>: 70&deg;F (21&deg;C)</li>
+<li><strong>Humidity</strong>: 30%</li>
+<li><strong>Precipitation</strong>: 0 inches</li>
+</ul>
+<p>At these baseline values, the watering percentage remains 100% (i.e. no change to scheduled watering). The adjustment formula is:<br>
+<code>Watering Percentage = 100 + (T - 70) * 4 + (30 - H) - 200 * (P - 0)</code><br>
+Where:</p>
+<ul>
+<li><strong>T</strong> = Average temperature (&deg;F) from the previous day.</li>
+<li><strong>H</strong> = Average humidity (%) from the previous day.</li>
+<li><strong>P</strong> = Total precipitation (inches) from the previous day.</li>
+</ul>
+<p><strong>Clamping Rule</strong>: The final watering percentage is always clamped between <strong>0% and 200%</strong>.</p>
+<p><strong>Example</strong>: Say yesterday's conditions were: T=86&deg;F, H=68%, P=0.12 inches. Using the formula:<br>
+<code>100 + (86 - 70) * 4 + (30 - 68) - 200 * (0.12) = 102%</code><br>
+This means the watering time will be adjusted to <strong>102%</strong> of the original scheduled time.</p>
+<h4 id="customizing-baseline-parameters-and-weights">Customizing Baseline Parameters and Weights</h4>
+<p>Due to regional variations in weather-data accuracy, you can fine-tune the <strong>baseline</strong> values under Adjustment Method Options. Each factor also has a <strong>weight</strong> parameter (0–100%) that controls its influence. This allows you to:</p>
+<ul>
+<li>Modify the baseline parameters if the data consistently <strong>underestimates or overestimates</strong> any of the T, H, or P values.</li>
+<li>Modify the weight of each factor (T, H, P) to <strong>increase or decrease their influence</strong>.</li>
+</ul>
+<p>For example, if your weather data consistently overestimates humidity, you can increase the humidity baseline (<strong>BH</strong>) to compensate. To reduce humidity's influence, decrease its weight (<strong>WH</strong>). To prevent precipitation from affecting the calculation, such as for indoor watering, set its weight (<strong>WP</strong>) to 0.</p>
+<p><img alt="Weather Adjustment options" class="img-border img-center" src="../images/weatherAdjustmentOptions.png" width="300" /></p>
+<p><strong>The final formula</strong> accounting for both baseline and weight adjustments is:<br>
+<code>Watering Percentage = 100 + (T - BT) * 4 * (WT / 100) + (BH - H) * (WH / 100) - 200 * (P - BP) * (WP / 100)</code><br>
+Where:</p>
+<ul>
+<li><strong>BT, BH, BP</strong> = Baseline values for temperature, humidity, and precipitation.</li>
+<li><strong>WT, WH, WP</strong> = Percentage weights for each factor.</li>
+</ul>
+<hr />
+<h3 id="evapotranspiration-eto-method">Evapotranspiration (ETo) Method</h3>
+<p>Evapotranspiration (ET) measures water loss from soil and plants due to evaporation and transpiration. The ETo adjustment method compares the previous day's reference ET index (ETo) and precipitation against the baseline ETo for your location to calculate the watering percentage. Its formula is:<br>
+<code>Watering Percentage = ((Yesterday's ETo - Yesterday's Precip) / Baseline ETo) * 100%</code></p>
+<p><strong>Clamping Rule</strong>: The final watering percentage is always clamped between <strong>0% and 200%</strong>.</p>
+<p>The Baseline ETo represents the average ETo for your location. You can either click <strong>Detect Baseline ETo</strong> to detect it automatically or enter it manually.</p>
+<h4 id="how-is-eto-different-from-zimmerman">How is ETo different from Zimmerman?</h4>
+<ul>
+<li>It is more advanced. It considers coordinates, elevation, and solar radiation in addition to temperature, humidity, and precipitation.</li>
+<li>It is based on the <a href="https://www.fao.org/4/X0490E/X0490E00.htm">FAO-56 Penman-Monteith</a> equation (industry standard).</li>
+</ul>
+<h4 id="precautions-when-transitioning-from-zimmerman-to-eto">Precautions When Transitioning from Zimmerman to ETo</h4>
+<p>If you have previously used Zimmerman and choose to switch to ETo, you may notice <strong>significant differences</strong> in watering percentage calculations. This happens because ETo is a fundamentally different algorithm and accounts for more factors, leading to different results.</p>
+<p>To adjust for this change, set your programmed watering times based on the yearly average instead of summer-only schedules. This way, during hot seasons, the watering percentage will increase above 100%, while in cooler seasons it will drop below 100%.</p>
+<h4 id="fine-tune-eto-calculations">Fine-Tune ETo Calculations</h4>
+<p>The automatically detected baseline ETo may not be accurate for every site. If you find that the ETo method consistently <strong>overestimates or underestimates</strong> watering, adjust the <strong>Baseline ETo</strong> value. For example, if the system overestimates watering by 20%, increase the baseline ETo by 20%:</p>
+<ul>
+<li>If your baseline ETo was 0.112, increase it to 0.134 (a 20% increase).</li>
+<li>Since the formula divides by baseline ETo, this counteracts the overestimate and reduces the watering percentage accordingly.</li>
+</ul>
+<h4 id="manually-calculating-eto">Manually Calculating ETo</h4>
+<p>If you want to manually calculate an ETo value, follow these rules:</p>
+<ul>
+<li>Use potential evapotranspiration, not actual evapotranspiration.</li>
+<li>The ETo must be calculated using the FAO-56 Penman-Monteith method.</li>
+<li>The ETo should use data from the same time of year for which the watering schedule was designed. If you use the same watering schedule all year, use the annual ETo. Otherwise, use the ETo for the season in which your schedule is used.</li>
+</ul>
+              
+            </div>
+          </div><footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
+        <a href="../remote-access-otc/" class="btn btn-neutral float-left" title="Remote Access with OTC"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+        <a href="../weather-underground/" class="btn btn-neutral float-right" title="Using Weather Underground">Next <span class="icon icon-circle-arrow-right"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/OpenSprinkler/OpenSprinkler-Firmware" class="fa fa-github" style="color: #fcfcfc"> GitHub</a>
+        </span>
+    
+    
+      <span><a href="../remote-access-otc/" style="color: #fcfcfc">&laquo; Previous</a></span>
+    
+    
+      <span><a href="../weather-underground/" style="color: #fcfcfc">Next &raquo;</a></span>
+    
+  </span>
+</div>
+    <script src="../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../..";</script>
+    <script src="../../js/theme_extra.js"></script>
+    <script src="../../js/theme.js"></script>
+      <script src="../../js/nav_badges.js"></script>
+      <script src="../../search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

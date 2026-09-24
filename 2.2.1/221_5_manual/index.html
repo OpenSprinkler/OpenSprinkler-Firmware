@@ -56,9 +56,16 @@
                 <li class="toctree-l1"><a class="reference internal" href="../../firmware-update/">Firmware Update</a>
                 </li>
               </ul>
-              <p class="caption"><span class="caption-text">Firmware v2.2.1(5) [NEW]</span></p>
+              <p class="caption"><span class="caption-text">Firmware v2.2.1(6) [NEW]</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../221_6_manual/">User Manual</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../221_6_api/">API Reference</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Firmware v2.2.1(5)</span></p>
               <ul class="current">
-                  <li class="toctree-l1 current"><a class="reference internal current" href="./">User Manual</a>
+                  <li class="toctree-l1 current"><a class="reference internal current" href="#">User Manual</a>
     <ul class="current">
     <li class="toctree-l2"><a class="reference internal" href="#introduction">Introduction</a>
     </li>
@@ -185,13 +192,6 @@
                   <li class="toctree-l1"><a class="reference internal" href="../221_5_api/">API Reference</a>
                   </li>
               </ul>
-              <p class="caption"><span class="caption-text">Firmware v2.2.1(4)</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../221_4_manual/">User Manual</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../221_4_api/">API Reference</a>
-                  </li>
-              </ul>
               <p class="caption"><span class="caption-text">Zone Expander</span></p>
               <ul>
                   <li class="toctree-l1"><a class="reference internal" href="../../zone-expander/">User Manual</a>
@@ -200,6 +200,34 @@
               <p class="caption"><span class="caption-text">Sensor Expander [NEW]</span></p>
               <ul>
                   <li class="toctree-l1"><a class="reference internal" href="../../sensor-expander/">User Manual</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Guides</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/remote-access-otc/">Remote Access with OTC</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Weather</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../guides/weather-adjustments/">Using Weather Adjustments</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../guides/weather-underground/">Using Weather Underground</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Integrations</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../guides/email-notifications/">Setting Up Email Notifications</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../guides/mqtt/">Using MQTT</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../guides/ifttt-notifications/">Setting Up IFTTT Notifications</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">OpenSprinkler Pi</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../ospi/firmware-installation/">Installing and Updating Firmware</a>
                   </li>
               </ul>
               <p class="caption"><span class="caption-text">Archived</span></p>
@@ -221,7 +249,7 @@
         <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
   <ul class="wy-breadcrumbs">
     <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
-          <li class="breadcrumb-item">Firmware v2.2.1(5) [NEW]</li>
+          <li class="breadcrumb-item">Firmware v2.2.1(5)</li>
       <li class="breadcrumb-item active">User Manual</li>
     <li class="wy-breadcrumbs-aside">
           <a href="https://github.com/OpenSprinkler/OpenSprinkler-Firmware/edit/master/docs/2.2.1/221_5_manual.md" class="icon icon-github"> Edit on GitHub</a>
@@ -310,7 +338,7 @@ In addition, OpenSprinkler v3 is available in three power models:</p>
 </div>
 <div class="admonition info">
 <p class="admonition-title">Video Guides</p>
-<p><strong>Video Guides and Tutorials</strong> are available on the <a href="https://support.opensprinkler.com">OpenSprinkler support site</a>.</p>
+<p><strong>Video Guides and Tutorials</strong> are available in the <a href="https://openthings.freshdesk.com/support/solutions/articles/5000860920-videos-introduction-to-opensprinkler-v3">OpenSprinkler video collection</a>.</p>
 </div>
 <h3 id="step-1-preparation">Step 1: Preparation</h3>
 <p>Carefully label and remove wires from your existing sprinkler controller as you disconnect it. You will typically find:</p>
@@ -527,7 +555,7 @@ In addition, OpenSprinkler v3 is available in three power models:</p>
 <p>OpenSprinkler’s web interface works on phones, tablets, and computers, enabling you to view status, adjust settings, check logs, and edit programs from any modern <strong>web browser</strong> or via the free <strong>OpenSprinkler mobile app</strong> (search <strong>OpenSprinkler</strong> in your app store).</p>
 <div class="admonition info">
 <p class="admonition-title">Video Guides</p>
-<p><strong>Video Guides and Tutorials</strong> are available on the <a href="https://support.opensprinkler.com">OpenSprinkler support site</a>.</p>
+<p><strong>Video Guides and Tutorials</strong> are available in the <a href="https://openthings.freshdesk.com/support/solutions/articles/5000860920-videos-introduction-to-opensprinkler-v3">OpenSprinkler video collection</a>.</p>
 </div>
 <hr />
 <p><strong>Local Access</strong></p>
@@ -688,7 +716,7 @@ If there are other queued zones in the <strong>same sequential group</strong>, a
 <h3 id="system-settings">System Settings</h3>
 <ul>
 <li><strong>Location:</strong> Tap <em>Location</em> to open the map and search for your address; or click the pencil icon ✏️ to manually enter the GPS coordinates.<ul>
-<li><strong>PWS location:</strong> When using <strong>WUnderground (WU)</strong> as the weather data provider, you must select a <strong>Personal Weather Station (PWS)</strong> location.<ol>
+<li><strong>PWS location:</strong> When using <a href="../../guides/weather-underground/"><strong>Weather Underground (WU)</strong></a> as the weather data provider, you must select a <strong>Personal Weather Station (PWS)</strong> location.<ol>
 <li>First enter and submit a valid <strong>WU API key</strong> in the <a href="#weather-adjustment">Weather Adjustment</a> tab.</li>
 <li>Return to the Location setting - available PWS sites will appear as <strong>blue dots</strong> on the map.</li>
 <li>Click one of the blue dots as your PWS location.</li>
@@ -738,7 +766,7 @@ If there are other queued zones in the <strong>same sequential group</strong>, a
 <ul>
 <li><strong>Adjustment Method:</strong> Select a weather-based adjustment method.<ul>
 <li><strong>Manual</strong> (default): set <strong>% Watering</strong> manually.</li>
-<li>Other methods calculate adjustments automatically. Detailed explanations of supported methods are available on <a href="https://openthings.freshdesk.com/support/solutions/articles/5000823370">OpenSprinkler Support</a>.</li>
+<li>Other methods calculate adjustments automatically. Detailed explanations of supported methods are available in <a href="../../guides/weather-adjustments/">Using Weather Adjustments</a>.</li>
 </ul>
 </li>
 <li><strong>Adjustment Method Options:</strong> Configure parameters for the selected method.</li>
@@ -761,7 +789,7 @@ If there are other queued zones in the <strong>same sequential group</strong>, a
 <p><strong>Weather Data Provider:</strong> Choose preferred data provider. Default: <strong>Apple</strong>.</p>
 <ul>
 <li>If the provider requires an API key, a key input box appears.</li>
-<li>Some providers have region limits (e.g. <strong>DWD</strong> = Germany only; <strong>WU</strong> requires PWS location).</li>
+<li>Some providers have region limits (e.g. <strong>DWD</strong> = Germany only; <a href="../../guides/weather-underground/"><strong>WU</strong></a> requires a PWS location).</li>
 </ul>
 </li>
 <li><strong>% Watering:</strong> Global scaling factor applied to water times. Default: <code>100%</code>.<ul>
@@ -792,10 +820,7 @@ If there are other queued zones in the <strong>same sequential group</strong>, a
 <p><strong>Rain / Soil Sensors:</strong> Automatically stop zone runs when rain or high soil moisture is detected.</p>
 <ul>
 <li>Choose <strong>Normally Open</strong> or <strong>Normally Closed</strong>; Normally Closed is the most common type.</li>
-<li>Supports only sensors that output <strong>binary ON/OFF signals</strong> (dry-contact switches).<ul>
-<li>For <strong>Analog Sensors</strong>, use an <a href="https://opensprinkler.com/product/a2dadapter/"><strong>Analog-to-Digital Adapter</strong></a>, which converts an analog signal to ON/OFF with an adjustable threshold.</li>
-</ul>
-</li>
+<li>Supports only sensors that output <strong>binary ON/OFF signals</strong> (dry-contact switches).</li>
 <li><strong>Delayed On:</strong> Time sensor must remain active before trigger (prevents false triggers).</li>
 <li><strong>Delayed Off:</strong> Hold time after sensor deactivation (prolongs sensor hold). Examples:<br>
  10-minute Delayed On → Sensor regarded as triggered after it's active for 10 minutes.<br>
@@ -834,10 +859,10 @@ If there are other queued zones in the <strong>same sequential group</strong>, a
 <hr />
 <h3 id="integration">Integration</h3>
 <ul>
-<li><strong>OTC:</strong> Configure <strong>OpenThings Cloud (OTC)</strong> token for remote access. See <a href="https://openthings.freshdesk.com/support/solutions/articles/5000879535"><strong>OTC Support Article</strong></a>.</li>
-<li><strong>MQTT:</strong> Configure MQTT parameters. See <a href="https://openthings.freshdesk.com/support/solutions/articles/5000859089"><strong>MQTT Support Article</strong></a>.</li>
-<li><strong>Email Notifications:</strong> Configure Email settings. See <a href="https://openthings.freshdesk.com/support/solutions/articles/5000889759"><strong>Email Notifications Support Article</strong></a>.</li>
-<li><strong>IFTTT:</strong> Configure IFTTT Webhooks key. See <a href="https://openthings.freshdesk.com/support/solutions/articles/5000716372"><strong>IFTTT Support Article</strong></a>.</li>
+<li><strong>OTC:</strong> Configure <strong>OpenThings Cloud (OTC)</strong> token for remote access. See <a href="../../guides/remote-access-otc/"><strong>Remote Access with OTC</strong></a>.</li>
+<li><strong>MQTT:</strong> Configure MQTT parameters. See <a href="../../guides/mqtt/"><strong>Using MQTT</strong></a>.</li>
+<li><strong>Email Notifications:</strong> Configure Email settings. See <a href="../../guides/email-notifications/"><strong>Setting Up Email Notifications</strong></a>.</li>
+<li><strong>IFTTT:</strong> Configure IFTTT Webhooks key. See <a href="../../guides/ifttt-notifications/"><strong>Setting Up IFTTT Notifications</strong></a>.</li>
 <li>
 <p><strong>Notification Events:</strong> Select events that trigger MQTT/Email/IFTTT notifications.</p>
 <div class="admonition warning">
@@ -1151,7 +1176,7 @@ Example: If Zones 1–3 are in Group <code>A</code>, and 4–6 in Group <code>B<
             </div>
           </div><footer>
     <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
-        <a href="../../firmware-update/" class="btn btn-neutral float-left" title="Firmware Update"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+        <a href="../221_6_api/" class="btn btn-neutral float-left" title="API Reference"><span class="icon icon-circle-arrow-left"></span> Previous</a>
         <a href="../221_5_api/" class="btn btn-neutral float-right" title="API Reference">Next <span class="icon icon-circle-arrow-right"></span></a>
     </div>
 
@@ -1179,7 +1204,7 @@ Example: If Zones 1–3 are in Group <code>A</code>, and 4–6 in Group <code>B<
         </span>
     
     
-      <span><a href="../../firmware-update/" style="color: #fcfcfc">&laquo; Previous</a></span>
+      <span><a href="../221_6_api/" style="color: #fcfcfc">&laquo; Previous</a></span>
     
     
       <span><a href="../221_5_api/" style="color: #fcfcfc">Next &raquo;</a></span>

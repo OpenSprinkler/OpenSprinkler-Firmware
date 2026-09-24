@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://OpenSprinkler.github.io/OpenSprinkler-Firmware/guides/ifttt-notifications/" />
+      <link rel="shortcut icon" href="../../img/favicon.ico" />
+    <title>Setting Up IFTTT Notifications - OpenSprinkler Documentation</title>
+    <link rel="stylesheet" href="../../css/theme.css" />
+    <link rel="stylesheet" href="../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../../custom.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Setting Up IFTTT Notifications";
+        var mkdocs_page_input_path = "guides/ifttt-notifications.md";
+        var mkdocs_page_url = "/OpenSprinkler-Firmware/guides/ifttt-notifications/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../.." class="icon icon-home"> OpenSprinkler Documentation
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../..">Home</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../faq/">FAQ</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../troubleshooting/">Troubleshooting</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../firmware-update/">Firmware Update</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Firmware v2.2.1(6) [NEW]</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../2.2.1/221_6_manual/">User Manual</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../2.2.1/221_6_api/">API Reference</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Firmware v2.2.1(5)</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../2.2.1/221_5_manual/">User Manual</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../2.2.1/221_5_api/">API Reference</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Zone Expander</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../zone-expander/">User Manual</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Sensor Expander [NEW]</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../sensor-expander/">User Manual</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Guides</span></p>
+              <ul class="current">
+                  <li class="toctree-l1"><a class="reference internal" href="../remote-access-otc/">Remote Access with OTC</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Weather</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../weather-adjustments/">Using Weather Adjustments</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../weather-underground/">Using Weather Underground</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1 current"><a class="reference internal current" >Integrations</a>
+    <ul class="current">
+                <li class="toctree-l2"><a class="reference internal" href="../email-notifications/">Setting Up Email Notifications</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../mqtt/">Using MQTT</a>
+                </li>
+                <li class="toctree-l2 current"><a class="reference internal current" href="#">Setting Up IFTTT Notifications</a>
+    <ul class="current">
+    <li class="toctree-l3"><a class="reference internal" href="#step-1-create-an-ifttt-account-and-obtain-a-webhooks-key">Step 1: Create an IFTTT Account and Obtain a Webhooks Key</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#step-2-create-an-ifttt-applet">Step 2: Create an IFTTT Applet</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#step-3-configure-opensprinkler">Step 3: Configure OpenSprinkler</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#troubleshooting">Troubleshooting</a>
+    </li>
+    </ul>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">OpenSprinkler Pi</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../ospi/firmware-installation/">Installing and Updating Firmware</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Archived</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../archive/">Previous Manuals and API docs</a>
+                  </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../..">OpenSprinkler Documentation</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
+          <li class="breadcrumb-item">Guides</li>
+          <li class="breadcrumb-item">Integrations</li>
+      <li class="breadcrumb-item active">Setting Up IFTTT Notifications</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/OpenSprinkler/OpenSprinkler-Firmware/edit/master/docs/guides/ifttt-notifications.md" class="icon icon-github"> Edit on GitHub</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="setting-up-ifttt-notifications">Setting Up IFTTT Notifications</h1>
+<p>OpenSprinkler can send notification events to <a href="https://ifttt.com/">IFTTT</a> through the IFTTT Webhooks service. An IFTTT Applet can then forward those events as push notifications, email, SMS, or any other action supported by IFTTT.</p>
+<div class="admonition note">
+<p class="admonition-title">IFTTT subscription</p>
+<p>IFTTT currently requires a <a href="https://help.ifttt.com/hc/en-us/articles/115010230347-Webhooks-service-FAQ">paid plan for Applets that use the Webhooks service</a>. For a no-subscription alternative, use <a href="../email-notifications/">email notifications</a>.</p>
+</div>
+<hr />
+<h2 id="step-1-create-an-ifttt-account-and-obtain-a-webhooks-key">Step 1: Create an IFTTT Account and Obtain a Webhooks Key</h2>
+<ol>
+<li>Sign in to the <a href="https://ifttt.com/">IFTTT website</a> or mobile app, or create an account.</li>
+<li>
+<p>Open <strong>Explore</strong>, search for <strong>Webhooks</strong>, and select the Webhooks service.</p>
+<p><img alt="Search for Webhooks in IFTTT" class="img-border img-center guide-screenshot" src="../images/ifttt-webhooks-search.png" width="600" /></p>
+<p><img alt="Select the Webhooks service" class="img-border img-center guide-screenshot" src="../images/ifttt-webhooks-service.png" width="500" /></p>
+</li>
+<li>
+<p>If prompted, connect the Webhooks service. In its <strong>About Webhooks</strong> section, select <strong>Documentation</strong>.</p>
+<p><img alt="Open the Webhooks documentation" class="img-border img-center guide-screenshot" src="../images/ifttt-webhooks-documentation.png" width="550" /></p>
+</li>
+<li>
+<p>Copy the Webhooks key shown on the documentation page. Treat this key as a password and do not publish it.</p>
+<p><img alt="Webhooks key on the documentation page" class="img-border img-center guide-screenshot" src="../images/ifttt-webhooks-key.png" width="650" /></p>
+</li>
+</ol>
+<p>If the key stops working, regenerate it in the IFTTT Webhooks settings and update the key in OpenSprinkler.</p>
+<hr />
+<h2 id="step-2-create-an-ifttt-applet">Step 2: Create an IFTTT Applet</h2>
+<p>An IFTTT Applet connects a trigger (<strong>If This</strong>) to an action (<strong>Then That</strong>). OpenSprinkler supplies the trigger through Webhooks.</p>
+<ol>
+<li>Select <strong>Create</strong> in IFTTT.</li>
+<li>
+<p>For <strong>If This</strong>, select <strong>Webhooks</strong>, then choose <strong>Receive a web request</strong>.</p>
+<p><img alt="Choose the Webhooks trigger" class="img-border img-center guide-screenshot" src="../images/ifttt-create-trigger.png" width="650" /></p>
+</li>
+<li>
+<p>Enter <code>sprinkler</code> as the <strong>Event Name</strong>, then select <strong>Create trigger</strong>. This name is fixed by the OpenSprinkler firmware and is case-sensitive.</p>
+<p><img alt="Set the Webhooks event name to sprinkler" class="img-border img-center guide-screenshot" src="../images/ifttt-event-name.png" width="650" /></p>
+</li>
+<li>
+<p>For <strong>Then That</strong>, choose the desired action, such as a push notification, email, or SMS.</p>
+</li>
+<li>
+<p>In the action's message field, insert the <strong>Value1</strong> ingredient. OpenSprinkler places the complete notification message in <code>Value1</code>.</p>
+<p><img alt="Insert Value1 into the IFTTT action" class="img-border img-center guide-screenshot" src="../images/ifttt-value1.png" width="650" /></p>
+</li>
+<li>
+<p>Save and enable the Applet.</p>
+</li>
+</ol>
+<hr />
+<h2 id="step-3-configure-opensprinkler">Step 3: Configure OpenSprinkler</h2>
+<p>On the OpenSprinkler homepage, go to <strong>Edit Options</strong> → <strong>Integration</strong>:</p>
+<ol>
+<li>Enter the Webhooks key in <strong>IFTTT Notifications</strong>.</li>
+<li>Open <strong>Notification Events</strong> and select the events that should trigger notifications.</li>
+<li>Enter a descriptive <strong>Device Name</strong>. It is included in IFTTT and email notification messages and helps you tell multiple controllers apart.</li>
+<li>Submit the changes.</li>
+</ol>
+<p>The selected Notification Events are shared by IFTTT, email, and MQTT. An event is sent through every configured notification method that supports it.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Avoid enabling more events than you need, especially <strong>Station Start</strong> and <strong>Station Finish</strong> on controllers that run many stations. Sending each remote notification takes time; excessive notifications can cause delays, slow web/app responses, or skipped short watering cycles. SMS carriers may also filter frequent messages.</p>
+</div>
+<p>For Bundle Station runs, only the bundle leader generates Station Start and Station Finish notifications. Other stations in the bundle do not generate separate notifications.</p>
+<hr />
+<h2 id="troubleshooting">Troubleshooting</h2>
+<ul>
+<li>Confirm that the Applet uses the exact event name <code>sprinkler</code>.</li>
+<li>Confirm that the action includes the <strong>Value1</strong> ingredient.</li>
+<li>Verify that the Webhooks key in OpenSprinkler matches the current key shown by IFTTT.</li>
+<li>Confirm that at least one Notification Event is selected.</li>
+<li>Confirm that the controller has internet access.</li>
+<li>Use the IFTTT activity log to determine whether the Webhooks trigger ran and whether the selected action succeeded.</li>
+</ul>
+              
+            </div>
+          </div><footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
+        <a href="../mqtt/" class="btn btn-neutral float-left" title="Using MQTT"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+        <a href="../../ospi/firmware-installation/" class="btn btn-neutral float-right" title="Installing and Updating Firmware">Next <span class="icon icon-circle-arrow-right"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/OpenSprinkler/OpenSprinkler-Firmware" class="fa fa-github" style="color: #fcfcfc"> GitHub</a>
+        </span>
+    
+    
+      <span><a href="../mqtt/" style="color: #fcfcfc">&laquo; Previous</a></span>
+    
+    
+      <span><a href="../../ospi/firmware-installation/" style="color: #fcfcfc">Next &raquo;</a></span>
+    
+  </span>
+</div>
+    <script src="../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../..";</script>
+    <script src="../../js/theme_extra.js"></script>
+    <script src="../../js/theme.js"></script>
+      <script src="../../js/nav_badges.js"></script>
+      <script src="../../search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

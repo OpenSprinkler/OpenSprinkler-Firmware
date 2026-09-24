@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://OpenSprinkler.github.io/OpenSprinkler-Firmware/guides/email-notifications/" />
+      <link rel="shortcut icon" href="../../img/favicon.ico" />
+    <title>Setting Up Email Notifications - OpenSprinkler Documentation</title>
+    <link rel="stylesheet" href="../../css/theme.css" />
+    <link rel="stylesheet" href="../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../../custom.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Setting Up Email Notifications";
+        var mkdocs_page_input_path = "guides/email-notifications.md";
+        var mkdocs_page_url = "/OpenSprinkler-Firmware/guides/email-notifications/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../.." class="icon icon-home"> OpenSprinkler Documentation
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../..">Home</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../faq/">FAQ</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../troubleshooting/">Troubleshooting</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../firmware-update/">Firmware Update</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Firmware v2.2.1(6) [NEW]</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../2.2.1/221_6_manual/">User Manual</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../2.2.1/221_6_api/">API Reference</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Firmware v2.2.1(5)</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../2.2.1/221_5_manual/">User Manual</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../2.2.1/221_5_api/">API Reference</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Zone Expander</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../zone-expander/">User Manual</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Sensor Expander [NEW]</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../sensor-expander/">User Manual</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Guides</span></p>
+              <ul class="current">
+                  <li class="toctree-l1"><a class="reference internal" href="../remote-access-otc/">Remote Access with OTC</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Weather</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../weather-adjustments/">Using Weather Adjustments</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../weather-underground/">Using Weather Underground</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1 current"><a class="reference internal current" >Integrations</a>
+    <ul class="current">
+                <li class="toctree-l2 current"><a class="reference internal current" href="#">Setting Up Email Notifications</a>
+    <ul class="current">
+    <li class="toctree-l3"><a class="reference internal" href="#how-email-notifications-work-and-best-practices">How Email Notifications Work and Best Practices</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#step-1-create-a-sender-email-account-and-app-password">Step 1: Create a Sender Email Account and App Password</a>
+        <ul>
+    <li class="toctree-l4"><a class="reference internal" href="#option-1-using-gmail-smtp">Option 1: Using Gmail SMTP</a>
+    </li>
+    <li class="toctree-l4"><a class="reference internal" href="#option-2-using-zoho-smtp-alternative-to-gmail">Option 2: Using Zoho SMTP (Alternative to Gmail)</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#step-2-configure-email-settings">Step 2: Configure Email Settings</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#step-3-choose-notification-events-and-set-device-name">Step 3: Choose Notification Events and Set Device Name</a>
+        <ul>
+    <li class="toctree-l4"><a class="reference internal" href="#important-notes">Important Notes</a>
+    </li>
+        </ul>
+    </li>
+    </ul>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../mqtt/">Using MQTT</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../ifttt-notifications/">Setting Up IFTTT Notifications</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">OpenSprinkler Pi</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../ospi/firmware-installation/">Installing and Updating Firmware</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Archived</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../archive/">Previous Manuals and API docs</a>
+                  </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../..">OpenSprinkler Documentation</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
+          <li class="breadcrumb-item">Guides</li>
+          <li class="breadcrumb-item">Integrations</li>
+      <li class="breadcrumb-item active">Setting Up Email Notifications</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/OpenSprinkler/OpenSprinkler-Firmware/edit/master/docs/guides/email-notifications.md" class="icon icon-github"> Edit on GitHub</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="setting-up-email-notifications">Setting Up Email Notifications</h1>
+<p>Starting with <strong>firmware 2.2.1</strong>, OpenSprinkler supports <strong>email notifications</strong>, offering an alternative to IFTTT Webhooks.</p>
+<p><strong>Requirements</strong>:</p>
+<ul>
+<li>Minimum Firmware Version: <strong>2.2.1</strong></li>
+<li>Minimum App/UI Version: <strong>2.4.1</strong></li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This guide also applies to <strong>OpenGarage firmware 1.2.3</strong> and later, which supports the same email-notification setup.</p>
+</div>
+<hr />
+<h2 id="how-email-notifications-work-and-best-practices">How Email Notifications Work and Best Practices</h2>
+<p>OpenSprinkler sends email notifications using a user-selected <strong>SMTP</strong> (Simple Mail Transfer Protocol) server, such as <a href="https://www.gmail.com">Gmail</a> or <a href="https://www.zoho.com/mail">Zoho Mail</a>.</p>
+<ul>
+<li>When a notification event occurs, the firmware connects to the configured SMTP server and sends the message.</li>
+<li>OpenSprinkler v3 and v4 use implicit TLS, normally on port 465. SMTP providers that require STARTTLS on port 587 may not work with these controllers.</li>
+<li>OSPi supports implicit TLS on port 465, STARTTLS on port 587, and unencrypted SMTP on port 25. Encrypted SMTP is strongly recommended.</li>
+<li>Gmail and Zoho Mail have been verified to work with OpenSprinkler. Other SMTP services may also work if they support a compatible authentication and connection mode.</li>
+</ul>
+<p>To enable email notifications, provide the following SMTP settings:</p>
+<table>
+<thead>
+<tr>
+<th><strong>Parameter</strong></th>
+<th><strong>Description</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>SMTP Server</strong></td>
+<td>e.g. <code>smtp.gmail.com</code> or <code>smtp.zoho.com</code></td>
+</tr>
+<tr>
+<td><strong>Port</strong></td>
+<td><code>465</code> (implicit TLS)</td>
+</tr>
+<tr>
+<td><strong>Sender Email</strong></td>
+<td>The sender (i.e. <strong>"From"</strong>) email address (must belong to a valid email account).</td>
+</tr>
+<tr>
+<td><strong>App Password</strong></td>
+<td>An <strong>application-specific password</strong> generated by your email provider (<strong>NOT</strong> your normal email login password).</td>
+</tr>
+<tr>
+<td><strong>Recipient Email</strong></td>
+<td>The receiver (i.e. <strong>"To"</strong>) email address where notifications will be received.</td>
+</tr>
+</tbody>
+</table>
+<p><br></p>
+<ul>
+<li>The <strong>Sender Email + App Password</strong> act as login credentials for the SMTP server.</li>
+<li>The <strong>Recipient Email</strong> can be any email address and does not have to use the same provider as the sender.</li>
+</ul>
+<p>Most SMTP services limit the number of messages that an account can send each day. As of this writing:</p>
+<ul>
+<li><strong>Gmail:</strong> 500 messages per day</li>
+<li><strong>Zoho Mail:</strong> 50 messages per day</li>
+</ul>
+<p>Limits vary by account type and may change over time. Check the current <a href="https://support.google.com/mail/answer/22839">Gmail sending limits</a> or <a href="https://www.zoho.com/mail/help/adminconsole/rates-and-limits.html">Zoho Mail rates and limits</a>, and confirm that your account permits automated notifications.</p>
+<p>Exceeding a provider's limits may temporarily prevent the sender account from sending mail. We recommend:</p>
+<ul>
+<li>Create a <strong>dedicated sender email and app password just for notifications</strong>.</li>
+<li>Use a <strong>different recipient email</strong> to receive alerts.</li>
+</ul>
+<p>By following these recommendations, you can set up email notifications without affecting your primary email accounts.</p>
+<hr />
+<h2 id="step-1-create-a-sender-email-account-and-app-password">Step 1: Create a Sender Email Account and App Password</h2>
+<h3 id="option-1-using-gmail-smtp">Option 1: Using Gmail SMTP</h3>
+<ul>
+<li>Navigate to <a href="https://www.google.com/intl/en-US/gmail/about/">this page</a> to create a new personal Gmail account. Even if you already have a Gmail account, consider creating a separate one dedicated to notifications.</li>
+<li>After creating this account, navigate to <a href="https://myaccount.google.com">myaccount.google.com</a>. Once there, select the <strong>Security</strong> tab and scroll down to <strong>2-Step Verification</strong>. Google will not let you create an app password without this enabled. See the screenshot below.</li>
+</ul>
+<p><img alt="2-Factor Authentication screen" class="img-border img-center guide-screenshot" src="../images/2FactorAuth.png" /></p>
+<ul>
+<li>Follow the steps to activate 2-Step verification, then go back to <a href="https://myaccount.google.com">myaccount.google.com</a> and enter <strong>app passwords</strong> into the search bar at the top. Select <strong>App Passwords</strong> in the search results.</li>
+</ul>
+<p><img alt="App Passwords search" class="img-border img-center guide-screenshot" src="../images/appPassSearch.png" /></p>
+<ul>
+<li>On the app passwords screen, enter an App name (e.g. <strong>opensprinkler</strong>) and press <strong>Create</strong>.</li>
+</ul>
+<p><img alt="App Password entry" class="img-border img-center guide-screenshot" src="../images/appPassEntry.png" width="450" /></p>
+<ul>
+<li>A popup window will show a 16-character password in the format <code>"xxxx xxxx xxxx xxxx"</code>. Save it securely because this is the <strong>only time it is shown</strong>. When entering it in OpenSprinkler, omit the spaces. If you lose it, create a new app password.</li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Google App Passwords require 2-Step Verification and may not be available for some managed, security-key-only, or Advanced Protection accounts. See <a href="https://support.google.com/accounts/answer/185833">Google's App Password documentation</a> for current requirements.</p>
+</div>
+<hr />
+<h3 id="option-2-using-zoho-smtp-alternative-to-gmail">Option 2: Using Zoho SMTP (Alternative to Gmail)</h3>
+<ul>
+<li>Navigate to the <a href="https://www.zoho.com/mail/">Zoho Mail website</a> to create a <strong>personal account</strong>. Make sure to select <strong>Personal Email</strong>, not the default <strong>Business Email</strong>.</li>
+</ul>
+<p><img alt="Zoho Create Account screen" class="img-border img-center guide-screenshot" src="../images/zohoCreateAccount.png" width="300" /></p>
+<ul>
+<li>Once you have created your account and logged in, navigate to <a href="https://accounts.zoho.com">accounts.zoho.com</a>. Select the <strong>Security</strong> tab, find <strong>Application-Specific Passwords</strong>, and click <strong>Generate New Password</strong>.</li>
+</ul>
+<p><img alt="Zoho Settings menu" class="img-border img-center guide-screenshot" src="../images/zohoSettingsMenu.png" /></p>
+<ul>
+<li>A window will open to create a new app password. Enter an <strong>app name</strong> (for example, <strong>OpenSprinkler</strong>) and click <strong>Generate</strong>. Save the password securely because this is the <strong>only time it is shown</strong>. If you lose it, create a new app password.</li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>In some cases, Zoho may ask you to verify your account password. Complete the prompt, return to the app-password page, and click <strong>Generate</strong> again.</p>
+</div>
+<p><img alt="Zoho App Password entry" class="img-border img-center guide-screenshot" src="../images/zohoAppPassEntry.png" width="450" /></p>
+<hr />
+<h2 id="step-2-configure-email-settings">Step 2: Configure Email Settings</h2>
+<p>On the OpenSprinkler homepage, navigate to <strong>Edit Options</strong> → <strong>Integration</strong>. Click <strong>Tap to Configure</strong> next to <strong>Email Notifications</strong>, enter the required parameters, enable email notifications, and click <strong>Submit</strong>.</p>
+<table>
+<thead>
+<tr>
+<th><strong>Parameter</strong></th>
+<th><strong>Value</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>SMTP Server</strong></td>
+<td><code>smtp.gmail.com</code> (for Gmail) or <code>smtp.zoho.com</code> (for Zoho Mail)</td>
+</tr>
+<tr>
+<td><strong>Port</strong></td>
+<td><code>465</code></td>
+</tr>
+<tr>
+<td><strong>Sender Email</strong></td>
+<td>The email address created in Step 1</td>
+</tr>
+<tr>
+<td><strong>App Password</strong></td>
+<td>The application-specific password generated in Step 1</td>
+</tr>
+<tr>
+<td><strong>Recipient Email</strong></td>
+<td>Any existing email address where you want to receive notifications.</td>
+</tr>
+</tbody>
+</table>
+<p><br></p>
+<p>For Zoho Mail, use the SMTP hostname shown in your account's server-configuration details if it differs from <code>smtp.zoho.com</code>.</p>
+<p><img alt="Email Settings input" class="img-border img-center guide-screenshot" src="../images/emailSettingsInput.png" width="400" /></p>
+<hr />
+<h2 id="step-3-choose-notification-events-and-set-device-name">Step 3: Choose Notification Events and Set Device Name</h2>
+<p>The final step is to choose <strong>which events will trigger email notifications</strong> and configure a custom <strong>Device Name</strong> for easy identification. Go to <strong>Edit Options</strong> → <strong>Integration</strong>, click <strong>Notification Events</strong>, and select from the available events:</p>
+<ul>
+<li><strong>Program Start</strong>: Triggered when a program is scheduled or skipped. The message includes its weather and sensor adjustments when applicable.</li>
+<li><strong>Sensor 1 Update</strong>: Triggered when Sensor 1 is configured and its status changes.</li>
+<li><strong>Sensor 2 Update</strong>: The same as above, but for Sensor 2.</li>
+<li><strong>Sensor 3 Update</strong> and <strong>Sensor 4 Update</strong>: Same as above, for Sensors 3 and 4 (OpenSprinkler v3.4 and v4 only).</li>
+<li><strong>Rain Delay Update</strong>: Triggered when the rain delay status changes.</li>
+<li><strong>Flow Sensor Update</strong>: Triggered after a program cycle finishes if the flow sensor is enabled.</li>
+<li><strong>Weather Adjustment Update</strong>: Triggered when the watering percentage changes.</li>
+<li><strong>Controller Reboot</strong>: Triggered when the controller restarts. On OpenSprinkler v3 and v4, the message includes the reboot cause and device IP address.</li>
+<li><strong>Station Finish</strong>: Triggered when a station (zone) completes its run.</li>
+<li><strong>Station Start</strong>: Triggered when a zone begins running.</li>
+<li><strong>Flow Alert</strong>: Triggered when a zone finishes running and the flow rate exceeds the set threshold.</li>
+<li><strong>Under/Overcurrent Fault</strong>: Triggered when an undercurrent or overcurrent fault is detected. Available starting with firmware 2.2.1(3).</li>
+</ul>
+<p>For Bundle Station runs, only the bundle leader generates Station Start and Station Finish notifications; other stations in the bundle do not generate separate messages.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>If your controller runs many stations daily, consider disabling high-frequency events such as <strong>Station Start</strong> and <strong>Station Finish</strong>. This helps avoid provider sending limits. Because each email connection takes time, <strong>too many notification events can cause delays, slow web/app responses, and skipped short watering cycles</strong>.</p>
+</div>
+<p>Below <strong>Notification Events</strong>, you can enter a custom <strong>Device Name</strong>. This Device Name is included in all email messages, making it easier to identify which controller sent the message. This is especially helpful if you manage multiple OpenSprinkler devices.</p>
+<h3 id="important-notes">Important Notes</h3>
+<ul>
+<li><strong>Notification events apply to MQTT, email, and IFTTT notifications</strong>. If you make changes to the Notification Events selection, keep in mind that the changes apply to all three methods if enabled.</li>
+<li>Multiple OpenSprinkler devices can <strong>share the same email settings</strong>, provided their combined traffic remains within the provider's limits and policies.<ul>
+<li>If needed, create separate sender email accounts for each OpenSprinkler device while keeping the same recipient email for all.</li>
+</ul>
+</li>
+</ul>
+              
+            </div>
+          </div><footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
+        <a href="../weather-underground/" class="btn btn-neutral float-left" title="Using Weather Underground"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+        <a href="../mqtt/" class="btn btn-neutral float-right" title="Using MQTT">Next <span class="icon icon-circle-arrow-right"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/OpenSprinkler/OpenSprinkler-Firmware" class="fa fa-github" style="color: #fcfcfc"> GitHub</a>
+        </span>
+    
+    
+      <span><a href="../weather-underground/" style="color: #fcfcfc">&laquo; Previous</a></span>
+    
+    
+      <span><a href="../mqtt/" style="color: #fcfcfc">Next &raquo;</a></span>
+    
+  </span>
+</div>
+    <script src="../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../..";</script>
+    <script src="../../js/theme_extra.js"></script>
+    <script src="../../js/theme.js"></script>
+      <script src="../../js/nav_badges.js"></script>
+      <script src="../../search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

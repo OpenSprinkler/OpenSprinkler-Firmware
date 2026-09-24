@@ -53,11 +53,15 @@
                 </li>
               </ul>
               <ul class="current">
-                <li class="toctree-l1 current"><a class="reference internal current" href="./">Firmware Update</a>
+                <li class="toctree-l1 current"><a class="reference internal current" href="#">Firmware Update</a>
     <ul class="current">
-    <li class="toctree-l2"><a class="reference internal" href="#opensprinkler-v3">OpenSprinkler v3</a>
+    <li class="toctree-l2"><a class="reference internal" href="#opensprinkler-v3-and-v4">OpenSprinkler v3 and v4</a>
         <ul>
-    <li class="toctree-l3"><a class="reference internal" href="#alternative-methods-to-open-the-firmware-update-page">Alternative Methods to Open the Firmware Update Page</a>
+    <li class="toctree-l3"><a class="reference internal" href="#one-click-firmware-update">One-Click Firmware Update</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#manual-upload">Manual Upload</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#alternative-methods">Alternative Methods</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#troubleshooting">Troubleshooting</a>
     </li>
@@ -70,18 +74,18 @@
     </ul>
                 </li>
               </ul>
-              <p class="caption"><span class="caption-text">Firmware v2.2.1(5) [NEW]</span></p>
+              <p class="caption"><span class="caption-text">Firmware v2.2.1(6) [NEW]</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../2.2.1/221_6_manual/">User Manual</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../2.2.1/221_6_api/">API Reference</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Firmware v2.2.1(5)</span></p>
               <ul>
                   <li class="toctree-l1"><a class="reference internal" href="../2.2.1/221_5_manual/">User Manual</a>
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../2.2.1/221_5_api/">API Reference</a>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Firmware v2.2.1(4)</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../2.2.1/221_4_manual/">User Manual</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../2.2.1/221_4_api/">API Reference</a>
                   </li>
               </ul>
               <p class="caption"><span class="caption-text">Zone Expander</span></p>
@@ -92,6 +96,34 @@
               <p class="caption"><span class="caption-text">Sensor Expander [NEW]</span></p>
               <ul>
                   <li class="toctree-l1"><a class="reference internal" href="../sensor-expander/">User Manual</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Guides</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../guides/remote-access-otc/">Remote Access with OTC</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Weather</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../guides/weather-adjustments/">Using Weather Adjustments</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../guides/weather-underground/">Using Weather Underground</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Integrations</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../guides/email-notifications/">Setting Up Email Notifications</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../guides/mqtt/">Using MQTT</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../guides/ifttt-notifications/">Setting Up IFTTT Notifications</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">OpenSprinkler Pi</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../ospi/firmware-installation/">Installing and Updating Firmware</a>
                   </li>
               </ul>
               <p class="caption"><span class="caption-text">Archived</span></p>
@@ -124,34 +156,50 @@
             <div class="section" itemprop="articleBody">
               
                 <h1 id="firmware-update">Firmware Update</h1>
-<h2 class="hltitle" id="opensprinkler-v3">OpenSprinkler v3</h2>
-<p>Supports <strong>OTA (over-the-air)</strong> updates - you can upload firmware directly through the web UI. The update page must be accessed locally using the controller's IP address; it is <strong>NOT</strong> available through an OpenThings Cloud (OTC) connection.</p>
+<h2 class="hltitle" id="opensprinkler-v3-and-v4">OpenSprinkler v3 and v4</h2>
 <div class="admonition warning">
 <p class="admonition-title">Back Up Before Updating</p>
-<p>Before update, please back up your configurations (Sidebar → <strong>Export Configuration</strong>) so you can quickly restore programs and settings if needed.</p>
+<p>Before updating, back up your configurations (Sidebar → <strong>Export Configurations</strong>) so you can quickly restore programs and settings if needed.</p>
 <ul>
-<li>A <strong>Dotted Version Update</strong>, e.g. 2.2.0→2.2.1, triggers a factory reset and <strong>erases all programs, settings, and logs</strong>.</li>
-<li>A <strong>Build Number Update</strong>, e.g. 2.2.1(2)→2.2.1(5), <strong>preserves all settings</strong>.</li>
+<li>A <strong>Dotted Version Update</strong>, e.g. 2.2.0 to 2.2.1, triggers a factory reset and <strong>erases all programs, settings, and logs</strong>.</li>
+<li>A <strong>Build Number Update</strong>, e.g. 2.2.1(4) to 2.2.1(6), normally preserves programs and settings. On OpenSprinkler v3, the 2.2.1(6) upgrade removes old sprinkler logs while migrating to the new bounded log format. If needed, download the old log records before firmware update.</li>
 </ul>
 </div>
-<ol>
-<li><a href="https://raysfiles.com/os_compiled_firmware/v3.x/"><strong>Download</strong> the firmware file</a> (<code>.bin</code> format). The latest is <code>os_221_rev5.bin</code>.</li>
-<li><strong>Open the Firmware Update page:</strong> At the controller's homepage, swipe from left to right to open the side menu, then choose <strong>Update Firmware</strong>.</li>
-<li><strong>Upload the firmware:</strong> Select the <code>.bin</code> file downloaded in Step 1, enter your device password, and click <strong>Submit</strong>.</li>
-<li><strong>Wait for completion:</strong> The controller will reboot automatically when the update finishes.</li>
-</ol>
 <hr />
-<h3 id="alternative-methods-to-open-the-firmware-update-page">Alternative Methods to Open the Firmware Update Page</h3>
-<ul>
-<li><strong>Direct IP address:</strong> Open <code>http://os-ip/update</code> in a browser, where <code>os-ip</code> is the controller's IP address. Click button <strong>B1</strong> on the controller to display its IP address.</li>
-<li><strong>WiFi AP mode:</strong> If your controller is currently in WiFi AP mode, connect your computer or phone to the AP SSID shown on the controller's LCD, then open <code>http://192.168.4.1/update</code> in a browser.</li>
+<h3 id="one-click-firmware-update">One-Click Firmware Update</h3>
+<p>One-click update is available starting with firmware 2.2.1(6). It automatically checks the official release catalog and installs a compatible firmware version without requiring you to download an image manually. Internet access is required for one-click update.</p>
+<p><img alt="Firmware update page" class="center_wider img-border" src="../assets/images/firmware_update_one_click.png" /></p>
+<ol>
+<li>Connect to the controller through its <strong>local IP address</strong>. One-click update is not available through OTC or while the controller is in WiFi AP mode.</li>
+<li>At the homepage, open the side menu and choose <strong>Update Firmware</strong>; or navigate directly to <code>http://os-ip/update</code> (where <code>os-ip</code> is your controller's IP address).</li>
+<li>Enter the controller's <strong>Device Password</strong>.</li>
+<li>Select the desired version under <strong>One-Click Firmware Update</strong>. Use <strong>View Release Notes</strong> to review the changes before proceeding.</li>
+<li>Tap <strong>Install Selected Version</strong> to proceed. Keep the controller powered and the browser open while the firmware is updating. The controller reboots automatically when finished.</li>
+</ol>
+<p>A controller running firmware older than 2.2.1(6) must first install a current compatible release through <strong>Manual Firmware Upload</strong>. It can then use one-click update for future releases.</p>
+<hr />
+<h3 id="manual-upload">Manual Upload</h3>
+<p>If one-click update is unavailable or does not work, use the <strong>Manual Firmware Upload</strong> panel shown near the bottom of the screenshot above:</p>
+<ol>
+<li>Download the latest compatible image from the OpenSprinkler Compiled Firmware Archive. The latest release is currently firmware 2.2.1(6):<ul>
+<li><a href="https://raysfiles.com/os_compiled_firmware/v3.x/">OpenSprinkler v3 (ESP8266)</a> uses a <code>.bin</code> file.</li>
+<li><a href="https://raysfiles.com/os_compiled_firmware/v4.0/">OpenSprinkler v4 (ESP32-C6-N8)</a> uses a <code>.bin32n8</code> file.</li>
 </ul>
+</li>
+<li>Under <strong>Manual Firmware Upload</strong>, choose the downloaded file, enter the controller's Device Password, and tap <strong>Upload Selected Firmware</strong>.</li>
+<li>Keep the controller powered and the browser open until the installation finishes and the controller reboots.</li>
+</ol>
+<p>Do not install a v3 image on v4, or a v4 image on v3.</p>
+<hr />
+<h3 id="alternative-methods">Alternative Methods</h3>
+<p><strong>WiFi AP mode:</strong> If your controller is currently in WiFi AP mode, connect your computer or phone to the AP SSID shown on the controller's LCD, then open <code>http://192.168.4.1/update</code> in a browser.</p>
 <hr />
 <h3 id="troubleshooting">Troubleshooting</h3>
 <ul>
 <li><strong>Blank Homepage:</strong> If the device homepage is blank or showing an error, and you need to export configuration before updating, see <a href="../troubleshooting/#ui-app-time-and-lcd">Blank Page Troubleshooting</a>.</li>
-<li><strong>Upload Connection Failure:</strong> The firmware upload uses port <code>8080</code>. Make sure this port is not blocked by your computer, router, or firewall, then retry the upload.</li>
-<li><strong>Controller Stops Responding:</strong> Unplug and reconnect power, then retry the update.</li>
+<li><strong>No Available Firmware:</strong> Use Manual Upload if your browser cannot reach the firmware release site, or if the controller's firmware predates one-click update support.</li>
+<li><strong>Upload Connection Failure:</strong> Make sure port <code>8080</code> is not blocked by your computer, router, or firewall, then retry the upload.</li>
+<li><strong>Controller Stops Responding:</strong> Allow several minutes for installation and reboot. If the controller remains unreachable, unplug and reconnect power, then retry the update.</li>
 <li><strong>Update via Wired Ethernet:</strong> If your controller is connected via wired Ethernet:<ul>
 <li>If it runs firmware <code>2.2.0</code> or newer, follow the same steps as WiFi.</li>
 <li>If it runs <code>2.1.9</code> or earlier, update must be done in WiFi mode:<ol>
@@ -164,23 +212,30 @@
 </ul>
 </li>
 <li><strong>AP Mode Password Issues on Legacy Firmware:</strong> Some older AP-mode update pages do not hash the password before submitting it. If your plaintext password fails, try its <strong>MD5 hash</strong> instead (e.g. the MD5 hash of <code>opendoor</code> is <code>a6d82bced638de3def1e9bbb4983225c</code>).</li>
-<li><strong>Firmware Corruption / Device Not Booting</strong>: If device fails to boot after an update, you'll need to re-flash the firmware using a <a href="https://opensprinkler.com/product/usb-programmer/">USB-Serial Programmer</a>.</li>
+<li>
+<p><strong>Firmware Corruption / Device Not Booting:</strong></p>
+<ul>
+<li><strong>OpenSprinkler v3:</strong> Re-flash the controller using a <a href="https://opensprinkler.com/product/usb-programmer/">USB-Serial Programmer</a>.</li>
+<li><strong>OpenSprinkler v4:</strong> Connect its built-in USB-C port directly to a computer. Its built-in USB CDC interface supports firmware recovery without an external USB-Serial Programmer. The same USB connection can provide serial diagnostic messages for firmware debugging.</li>
+</ul>
+<p>Contact <a href="https://support.opensprinkler.com">Support</a> if you need instructions on firmware recovery or USB-based flashing.</p>
+</li>
 </ul>
 <hr class="double">
 
 <h2 class="hltitle" id="opensprinkler-v23">OpenSprinkler v2.3</h2>
-<p>Requires a USB cable for firmware update. Follow the legacy <a href="https://openthings.freshdesk.com/a/solutions/articles/5000832311">v2.3 Firmware Update Instructions</a>.</p>
+<p>Requires a USB cable for firmware update. Follow the legacy <a href="https://openthings.freshdesk.com/support/solutions/articles/5000832311">v2.3 Firmware Update Instructions</a>.</p>
 <hr class="double">
 
 <h2 class="hltitle" id="opensprinkler-pi-ospi">OpenSprinkler Pi (OSPi)</h2>
-<p>Update is done directly on the RPi. Follow <a href="https://openthings.freshdesk.com/a/solutions/articles/5000631599">OSPi Firmware Update Instructions</a>.</p>
+<p>Update is done directly on the RPi. Follow the <a href="../ospi/firmware-installation/">OSPi Firmware Update Instructions</a>.</p>
 <hr class="double">
               
             </div>
           </div><footer>
     <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
         <a href="../troubleshooting/" class="btn btn-neutral float-left" title="Troubleshooting"><span class="icon icon-circle-arrow-left"></span> Previous</a>
-        <a href="../2.2.1/221_5_manual/" class="btn btn-neutral float-right" title="User Manual">Next <span class="icon icon-circle-arrow-right"></span></a>
+        <a href="../2.2.1/221_6_manual/" class="btn btn-neutral float-right" title="User Manual">Next <span class="icon icon-circle-arrow-right"></span></a>
     </div>
 
   <hr/>
@@ -210,7 +265,7 @@
       <span><a href="../troubleshooting/" style="color: #fcfcfc">&laquo; Previous</a></span>
     
     
-      <span><a href="../2.2.1/221_5_manual/" style="color: #fcfcfc">Next &raquo;</a></span>
+      <span><a href="../2.2.1/221_6_manual/" style="color: #fcfcfc">Next &raquo;</a></span>
     
   </span>
 </div>
