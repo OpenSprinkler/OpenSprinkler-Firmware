@@ -13,16 +13,17 @@ document.addEventListener("DOMContentLoaded", function () {
     label.appendChild(badge);
   });
 
-  // The Read the Docs theme emits title-only navigation groups as href="#".
-  // Its startup reset treats every such link as the current location when the
-  // page has no fragment, which opens all title-only groups. Run after the
-  // theme initializes and restore the actual page as the sole current branch.
+  // MkDocs emits title-only navigation groups with href="#" or without href,
+  // depending on its version. Wait for the theme's expand buttons, then
+  // restore the actual page as the sole current branch.
   window.setTimeout(function fixNavigation() {
     var menu = document.querySelector(".wy-menu-vertical");
     if (!menu) return;
 
-    var groupLinks = menu.querySelectorAll('a[href="#"]');
-    if (groupLinks.length && !menu.querySelector('a[href="#"] .toctree-expand')) {
+    var groupLinks = menu.querySelectorAll('a.reference.internal[href="#"], a.reference.internal:not([href])');
+    if (groupLinks.length && !Array.from(groupLinks).every(function (link) {
+      return link.querySelector(".toctree-expand");
+    })) {
       window.setTimeout(fixNavigation, 10);
       return;
     }
@@ -40,7 +41,7 @@ document.addEventListener("DOMContentLoaded", function () {
     if (window.location.hash) return;
 
     var currentPath = window.location.pathname.replace(/\/index\.html$/, "").replace(/\/$/, "");
-    var currentLink = Array.from(menu.querySelectorAll('a.reference.internal:not([href="#"])')).find(function (link) {
+    var currentLink = Array.from(menu.querySelectorAll('a.reference.internal[href]:not([href="#"])')).find(function (link) {
       var url = new URL(link.href, window.location.href);
       var linkPath = url.pathname.replace(/\/index\.html$/, "").replace(/\/$/, "");
       return !url.hash && linkPath === currentPath;
