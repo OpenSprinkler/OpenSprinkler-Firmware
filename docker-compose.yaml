@@ -1,0 +1,15 @@
+name: opensprinkler
+
+volumes:
+  opensprinkler-data:
+
+services:
+  opensprinkler:
+    image: opensprinkler
+    privileged: true
+    volumes:
+      - opensprinkler-data:/data
+      - /dev:/dev
+    ports:
+      - "8080:8080"
+    restart: always
