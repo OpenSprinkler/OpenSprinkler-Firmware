@@ -2,8 +2,12 @@
 
 #include <cmath>
 
-#if defined(ESP8266)
-#include <ESP8266WiFi.h>
+#if defined(ARDUINO)
+	#if defined(ESP8266)
+	#include <ESP8266WiFi.h>
+	#else
+	#include <WiFi.h>
+	#endif
 #include <LittleFS.h>
 extern bool useEth;   // declared in OpenSprinkler.h; for the RSSI guard
 #else
@@ -12,11 +16,13 @@ extern bool useEth;   // declared in OpenSprinkler.h; for the RSSI guard
 
 bool system_metric_is_supported(SystemMetric metric) {
 	switch (metric) {
-#if defined(ESP8266)
-		case SystemMetric::FREE_HEAP:
-		case SystemMetric::FREE_FLASH:
-		case SystemMetric::WIFI_RSSI:
-		case SystemMetric::HEAP_FRAGMENTATION:
+	#if defined(ARDUINO)
+			case SystemMetric::FREE_HEAP:
+			case SystemMetric::FREE_FLASH:
+			case SystemMetric::WIFI_RSSI:
+			#if defined(ESP8266)
+			case SystemMetric::HEAP_FRAGMENTATION:
+			#endif
 			return true;
 #else
 		case SystemMetric::CPU_TEMPERATURE:
@@ -59,7 +65,7 @@ void SystemInternalSensor::emit_description_json(BufferFiller* bfill) {
 			"{\"n\":\"Metric\","
 			 "\"a\":\"metric\","
 			 "\"t\":\"enum\","
-#if defined(ESP8266)
+#if defined(ARDUINO)
 			 "\"d\":\"0\","
 #else
 			 "\"d\":\"3\","
@@ -67,7 +73,7 @@ void SystemInternalSensor::emit_description_json(BufferFiller* bfill) {
 			 "\"o\":["
 	));
 
-#if defined(ESP8266)
+#if defined(ARDUINO)
 	bfill->emit_p(PSTR("{\"id\":0,\"l\":\"Free Heap\","
 	                    "\"dfl\":{\"unit\":$D,\"max\":\"50\"},"
 	                    "\"lk\":[\"unit\"]}"),
@@ -80,10 +86,12 @@ void SystemInternalSensor::emit_description_json(BufferFiller* bfill) {
 	                    "\"dfl\":{\"unit\":$D,\"min\":\"-100\",\"max\":\"-30\"},"
 	                    "\"lk\":[\"unit\"]}"),
 	              static_cast<uint8_t>(SensorUnit::None));
+	#if defined(ESP8266)
 	bfill->emit_p(PSTR(",{\"id\":4,\"l\":\"Heap Fragmentation\","
 	                    "\"dfl\":{\"unit\":$D,\"max\":\"100\"},"
 	                    "\"lk\":[\"unit\"]}"),
 	              static_cast<uint8_t>(SensorUnit::Percent));
+	#endif
 #else
 	bfill->emit_p(PSTR("{\"id\":3,\"l\":\"CPU Temperature\","
 	                    "\"dfl\":{\"unit\":$D,\"min\":\"-40\",\"max\":\"185\"},"
@@ -101,18 +109,23 @@ void SystemInternalSensor::emit_description_json(BufferFiller* bfill) {
 float SystemInternalSensor::_get_raw_value() {
 	float raw = NAN;
 
-#if defined(ESP8266)
+#if defined(ARDUINO)
 	switch (this->metric) {
 		case SystemMetric::FREE_HEAP:
 			raw = (float)ESP.getFreeHeap() / 1024.0f;                        // bytes -> KB
 			raw = roundf(raw * 100.0f) / 100.0f;                             // 2 decimal places
 			break;
 		case SystemMetric::FREE_FLASH: {
+		#if defined(ESP8266)
 			FSInfo info;
 			if (LittleFS.info(info)) {
 				raw = (float)(info.totalBytes - info.usedBytes) / 1024.0f;   // bytes -> KB
 				raw = roundf(raw * 100.0f) / 100.0f;                         // 2 decimal places
 			}
+		#else
+			raw = (float)(LittleFS.totalBytes() - LittleFS.usedBytes()) / 1024.0f;
+			raw = roundf(raw * 100.0f) / 100.0f;
+		#endif
 			break;
 		}
 		case SystemMetric::WIFI_RSSI:
@@ -124,7 +137,9 @@ float SystemInternalSensor::_get_raw_value() {
 			}
 			break;
 		case SystemMetric::HEAP_FRAGMENTATION:
+		#if defined(ESP8266)
 			raw = (float)ESP.getHeapFragmentation();
+		#endif
 			break;
 		default:
 			break;

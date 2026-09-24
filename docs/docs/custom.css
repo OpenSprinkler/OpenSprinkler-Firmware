@@ -49,6 +49,10 @@ table th,
 table td {
   padding: 6px 10px;
 }
+.rst-content .archive-table + table th,
+.rst-content .archive-table + table td {
+  padding: 10px 16px;
+}
 .rst-content .button-function-table + table th:first-child,
 .rst-content .button-function-table + table td:first-child {
   width: 1%;
@@ -108,6 +112,16 @@ ul > li {
   border: 1px solid #ccc;  /* A light gray border */
   border-radius: 4px;       /* Optional: nice rounded corners */
   padding: 4px;             /* Optional: space between image and border */
+}
+.img-center {
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+  max-width: 100%;
+}
+.guide-screenshot {
+  margin-top: 1rem;
+  margin-bottom: 1.5rem;
 }
 /* You could also make a class for a shadow, which often looks nicer */
 .img-shadow {

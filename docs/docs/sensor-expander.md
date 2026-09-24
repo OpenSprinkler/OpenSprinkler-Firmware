@@ -7,7 +7,7 @@
 The **Sensor Expander** provides 16 channels of analog sensor inputs to OpenSprinkler. It allows OpenSprinkler to interface with a wide variety of external sensors, such as temperature, soil moisture, light, pressure, and water-level sensors. The firmware can read, display, and log their values, and use them to adjust watering times automatically based on real-world conditions. Examples include: reducing watering when soil moisture is high, adjusting for temperature, accounting for ambient light levels, or stopping irrigation when a water tank runs low.
 
 !!! note "Compatibility"
-    * The Sensor Expander requires an **OpenSprinkler v3** (v3.0-3.4) main controller, running **Firmware 2.2.1(5)** or newer. The App/UI version must be **2.4.96** or newer.
+    * The Sensor Expander requires an **OpenSprinkler v3 or v4** main controller, running **Firmware 2.2.1(5)** or newer. The App/UI version must be **2.4.96** or newer.
     * Each main controller only supports **one Sensor Expander**.
     * The Sensor Expander may be used together with **Zone Expanders** (up to four).
 
@@ -26,12 +26,11 @@ The Sensor Expander is **NOT** compatible with OpenSprinkler v2.3 or OpenSprinkl
     Always **power off the main controller** before making expander changes (connecting, disconnecting, re-wiring). Never plug in/out a ribbon cable, or install/remove sensors while the main controller is alive.
 
 !!! warning "Use the Correct Expander Port"
-    On **OpenSprinkler v3**, use the port on the left marked **Expander**. Do NOT use the port on the right marked **Ether**; that port is only for the wired Ethernet module.
-
+    On **OpenSprinkler v3 and v4**, use the port on the left marked **Expander**. Do NOT use the port on the right marked **Ether**; that port is only for the wired Ethernet module.
 
 ### 1. Insert Expander Cable
 
-* With the main controller powered off, plug one end of the ribbon cable into the main controller's **Expander** port. On OpenSprinkler v3, this is the port on the left. The connector is keyed and has a raised **bump**, which must align with the **notch** in the receptacle. When correctly oriented as shown below, the red stripe on the ribbon cable is always on the right side of the receptacle. If the connector does not seat easily, stop and check its orientation; never force it.
+* With the main controller powered off, plug one end of the ribbon cable into the main controller's **Expander** port. On OpenSprinkler v3 and v4, this is the port on the left. The connector is keyed and has a raised **bump**, which must align with the **notch** in the receptacle. When correctly oriented as shown below, the red stripe on the ribbon cable is always on the right side of the receptacle. If the connector does not seat easily, stop and check its orientation; never force it.
 
 ![Keyed ribbon cable connector](assets/images/ribbon_connector_keyed.jpg){ .center_wider .img-border }
 
@@ -50,7 +49,7 @@ Most analog sensors provide the following three connections. Check the sensor's 
 #### ⚠️ Important Notes: Supply and Signal Voltage Limits {: .notes-title }
 
 * The expander provides dual voltages: `3.3V` and `5V`. The `5V` rail is denoted `VDD` below.
-* Due to legacy design, on an **AC-powered OpenSprinkler v3**, the expander's `5V` (`VDD`) pin supplies only `4.3V` (one diode drop below `5V`). You should normally use this pin if `4.3V` is sufficient to power your sensor. If your sensor requires a true `5V` supply, you may use the main controller's `+5V` pin. However, the expander's `VDD` remains at a lower voltage, so your sensor's output must **never exceed `VDD + 0.3V`** to avoid any potential damage. For example, with `VDD = 4.3V`, your sensor's output must remain below `4.6V`, regardless of its supply voltage. Exceeding this limit risks damaging the expander's ADC chips.
+* Due to legacy design, on **AC-powered OpenSprinkler v3 and v4**, the expander's `5V` (`VDD`) pin supplies only `4.3V` (one diode drop below `5V`). You should normally use this pin if `4.3V` is sufficient to power your sensor. If your sensor requires a true `5V` supply, you may use the main controller's `+5V` pin. However, the expander's `VDD` remains at a lower voltage, so your sensor's output must **never exceed `VDD + 0.3V`** to avoid any potential damage. For example, with `VDD = 4.3V`, your sensor's output must remain below `4.6V`, regardless of its supply voltage. Exceeding this limit risks damaging the expander's ADC chips.
 * These limits are compatible with many common irrigation sensors. For example, SMT50, VH400, and THERM200 all accept a supply voltage of `4.3V` and produce an output between `0–3V`. They can therefore operate from the expander's VDD while remaining well below the ADC input limit.
 * Before connecting a sensor, carefully check its datasheet for both its required supply voltage and its maximum output voltage, to make sure they are within limits.
 
@@ -58,7 +57,7 @@ Most analog sensors provide the following three connections. Check the sensor's 
 
 ---
 
-### 3. Detection and Troubleshooting
+### 3. Detection and Troubleshooting {#detection-and-troubleshooting}
 
 After wiring is complete, power on the controller and open **Edit Sensors**. When adding an ADS1115 sensor (the default sensor type), the interface shows a warning if the required analog hardware is not detected. If detection fails:
 
@@ -87,7 +86,7 @@ Open **Edit Sensors**, then add a new sensor or modify an existing sensor. Every
 | `Enabled` | Sensor enable flag. |
 | `Logging` | Enable logging of this sensor. |
 | `Show on Home` | Display the latest reading on the homepage. |
-| `Type` | ADS1115, Aggregate, System Internal, or Onboard Digital. |
+| `Type` | ADS1115, Aggregate, Weather Sensor, System Internal, or Onboard Digital. |
 | `Interval` | Time between sensor readings and logging, in minutes. See note below. |
 | `Unit` | Physical unit for this sensor. |
 | `Min/Max` | Output limits. Values outside this range are clamped<br>and marked in the sensor status. |
@@ -95,7 +94,7 @@ Open **Edit Sensors**, then add a new sensor or modify an existing sensor. Every
 <br>Each new sensor is assigned a **stable ID** (`uuid`). Unlike a positional index, a `uuid` does not change when sensors are deleted, modified, or reordered, so logs, program adjustments, and Aggregate Sensors can continue to identify the sensor by its `uuid`.
 
 !!! note "Choosing an Interval"
-    
+
     `Interval` controls how often the sensor is read and logged (if enabled). A shorter value leads to more frequent logging, which can slow down log retrieval and chart display, and reduce the relative log capacity for other sensors. Most irrigation-related measurements change slowly, so we recommend an `Interval` of `15` minutes or longer. Use a smaller value only if your application truly needs it.
 
 ---
@@ -119,8 +118,7 @@ The Edit Sensor interface also allows non-ADS1115 sensors, including:
 * **Aggregate:** Combines up to eight **child** sensors and aggregates their data using operations like `Min`, `Max`, `Average`, `Sum`, `Median`, or `Range`. Each child may have its own `scale` and `offset`. This is useful, for example, when you need to average or denoise readings from multiple soil moisture sensors. Aggregate sensors can themselves be children of other aggregate sensors, allowing flexible hierarchies.
 * **System Internal:** Monitor metrics like available Heap size and Flash size. Combined with logging, this lets you track the microcontroller’s resource usage over time.
 * **Onboard Digital:** Allows you to programmatically link the controller’s built-in digital sensors (e.g., rain, soil) to the Expanded Sensor interface. Normally, built-in sensors affect watering on a per-zone basis (via each zone’s **Ignore Sensor** flag). By routing them through the Expanded Sensor interface, you can use them in program-level adjustments.
-
-(*The **Weather Sensor** type is currently disabled in firmware 2.2.1(5).*)
+* **Weather Sensor** *(available in firmware 2.2.1(6) and later):* Uses weather data such as current conditions, today's forecast, previous-day observations, and reference evapotranspiration (ETo). Weather Sensor values can be displayed, logged, and used for program-level adjustments like other Expanded Sensors. They require a configured location and weather provider, as well as internet access. Weather data is refreshed at most once every six hours, so a shorter Sensor Interval only logs the same cached value more often. Failed refreshes are retried every 15 minutes, and values are marked stale after 12 hours without a successful refresh.
 
 ---
 
@@ -163,7 +161,7 @@ The **Edit Programs** page now includes a new **Use Sensor Adjustment** section.
 
 ### Configure a Sensor Adjustment
 
-Go to **Edit Programs**, add a new program or select an existing program, then enable **Use Sensor Adjustment**. Select a sensor from the dropdown list, then define a custom **Adjustment Curve** by providing up to eight sample points, each a `{sensor_value, watering %}` pair. Values between points are linearly interpolated, and values outside the range use the nearest endpoint factor. Duplicate values are allowed and define a step. The curve is visualized in real time as you add or modify sample points. When available, the current sensor value is shown as a green dotted line for reference. 
+Go to **Edit Programs**, add a new program or select an existing program, then enable **Use Sensor Adjustment**. Select a sensor from the dropdown list, then define a custom **Adjustment Curve** by providing up to eight sample points, each a `{sensor_value, watering %}` pair. Values between points are linearly interpolated, and values outside the range use the nearest endpoint factor. Duplicate values are allowed and define a step. The curve is visualized in real time as you add or modify sample points. When available, the current sensor value is shown as a green dotted line for reference.
 
 If the selected sensor is disabled or deleted, or its reading is unavailable, failed, or stale, the sensor adjustment factor defaults to `100%`.
 

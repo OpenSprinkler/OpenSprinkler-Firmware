@@ -4,13 +4,14 @@
 
 ![OpenSprinkler Zone Expander v3](assets/images/osexp_v3.jpg){ .center }
 
-A **Zone Expander** adds 16 physical zones to an OpenSprinkler controller. The main controller provides the first 8 zones, and each expander adds another 16. OpenSprinkler v3 supports up to four expanders, for a total of **72 zones**. OSPi supports up to **200 zones**.
+A **Zone Expander** adds 16 physical zones to an OpenSprinkler controller. The main controller provides the first 8 zones, and each expander adds another 16. OpenSprinkler v3 and v4 support up to four expanders, for a total of **72 zones**. OSPi supports up to **200 zones**.
 
-* **OpenSprinkler v3 AC/DC:**
+* **OpenSprinkler v3 AC/DC and v4 AC:**
 
     * Compatible with **Zone Expander v3**.
     * Expander cable is a ribbon cable with a **2×5** connector on each end.
-    * **Power model**: an AC-powered OpenSprinkler v3 requires an AC Expander v3, while a DC-powered v3 requires a DC Expander v3.
+    * **Power model**: an AC-powered OpenSprinkler v3 or v4 requires an AC Expander v3, while a DC-powered v3 requires a DC Expander v3.
+    * There is **no expander for the Latch** model.
 
 * **OpenSprinkler v2.3 AC and OSPi (AC only):**
 
@@ -25,12 +26,12 @@ A **Zone Expander** adds 16 physical zones to an OpenSprinkler controller. The m
     Always **power off the main controller** before making expander changes (connecting, disconnecting, re-wiring). Never plug in/out a ribbon cable or change DIP switch while the main controller is alive.
 
 !!! warning "Use the Correct Expander Port"
-    On **OpenSprinkler v3**, use the port on the left marked **Expander**. Do NOT use the port on the right marked **Ether**; that port is only for the wired Ethernet module.
+    On **OpenSprinkler v3 and v4**, use the port on the left marked **Expander**. Do NOT use the port on the right marked **Ether**; that port is only for the wired Ethernet module.
 
 
 ### 1. Insert Expander Cable {: .zone-step-heading }
 
-* With the main controller powered off, plug one end of the ribbon cable into the main controller's **Expander** port. On OpenSprinkler v3, this is the port on the left. The connector is keyed and has a raised **bump**, which must align with the **notch** in the receptacle. When correctly oriented as shown below, the red stripe on the ribbon cable is always on the right side of the receptacle. If the connector does not seat easily, stop and check its orientation; never force it.
+* With the main controller powered off, plug one end of the ribbon cable into the main controller's **Expander** port. On OpenSprinkler v3 and v4, this is the port on the left. The connector is keyed and has a raised **bump**, which must align with the **notch** in the receptacle. When correctly oriented as shown below, the red stripe on the ribbon cable is always on the right side of the receptacle. If the connector does not seat easily, stop and check its orientation; never force it.
 
 ![Keyed ribbon cable connector](assets/images/ribbon_connector_keyed.jpg){ .center_wider .img-border }
 
@@ -55,7 +56,7 @@ A **Zone Expander** adds 16 physical zones to an OpenSprinkler controller. The m
 
 ![DIP Switch](assets/images/dip_switch.png){ .img-border style="float: right; margin: 5px 5px 5px 5px;"}
 
-* For **OpenSprinkler v3**: each expander must have a unique index (`1`-`4`) set by the two DIP switches on its back (see picture on the right). Before making changes to the DIP switches, always power off the main controller.
+* For **OpenSprinkler v3 and v4**: each expander must have a unique index (`1`-`4`) set by the two DIP switches on its back (see picture on the right). Before making changes to the DIP switches, always power off the main controller.
 * For **OpenSprinkler v2.3 and OSPi**: there is no DIP switch - the expander index is implied by the order they are daisy-chained.
 
 | Expander | DIP switch positions | Index | Zones |
@@ -79,7 +80,7 @@ After completing the expander wiring:
 
 **NOTE**:
 
-* While OpenSprinkler v3 can detect expanders, it does not automatically enable them. You must manually set the number of zones to enable.
+* While OpenSprinkler v3 and v4 can detect expanders, they do not automatically enable them. You must manually set the number of zones to enable.
 * If the available zone count is incorrect, power off the controller, verify that every expander has a unique DIP-switch index and that all ribbon cables are connected correctly.
 * You may enable more zones than physically available, to use them as Virtual Zones, such as Remote, HTTP(s), RF, GPIO.
 
