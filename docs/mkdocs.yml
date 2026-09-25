@@ -19,6 +19,17 @@ nav:
     - 'User Manual': 'zone-expander.md'
   - 'Sensor Expander [NEW]':
     - 'User Manual': 'sensor-expander.md'
+  - 'Guides':
+    - 'Remote Access with OTC': 'guides/remote-access-otc.md'
+    - 'Weather':
+      - 'Using Weather Adjustments': 'guides/weather-adjustments.md'
+      - 'Using Weather Underground': 'guides/weather-underground.md'
+    - 'Integrations':
+      - 'Setting Up Email Notifications': 'guides/email-notifications.md'
+      - 'Using MQTT': 'guides/mqtt.md'
+      - 'Setting Up IFTTT Notifications': 'guides/ifttt-notifications.md'
+  - 'OpenSprinkler Pi':
+    - 'Installing and Updating Firmware': 'ospi/firmware-installation.md'
   - 'Archived':
     - 'Previous Manuals and API docs': 'archive.md'
 extra_css:

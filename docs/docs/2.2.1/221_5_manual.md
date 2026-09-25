@@ -85,7 +85,7 @@ The diagram below shows how to wire valves on the main controller and expanders.
     If installing outdoors, mount it inside a [**weatherproof enclosure**](https://www.amazon.com/Orbit-57095-Weather-Resistant-Outdoor-Mounted-Controller/dp/B000VYGMF2).
 
 !!! info "Video Guides"
-    **Video Guides and Tutorials** are available on the [OpenSprinkler support site](https://support.opensprinkler.com).
+    **Video Guides and Tutorials** are available in the [OpenSprinkler video collection](https://openthings.freshdesk.com/support/solutions/articles/5000860920-videos-introduction-to-opensprinkler-v3).
 
 ### Step 1: Preparation
 
@@ -260,7 +260,7 @@ All settings will be cleared and returned to factory defaults.
 OpenSprinkler’s web interface works on phones, tablets, and computers, enabling you to view status, adjust settings, check logs, and edit programs from any modern **web browser** or via the free **OpenSprinkler mobile app** (search **OpenSprinkler** in your app store).
 
 !!! info "Video Guides"
-    **Video Guides and Tutorials** are available on the [OpenSprinkler support site](https://support.opensprinkler.com).
+    **Video Guides and Tutorials** are available in the [OpenSprinkler video collection](https://openthings.freshdesk.com/support/solutions/articles/5000860920-videos-introduction-to-opensprinkler-v3).
 
 ---
 
@@ -444,7 +444,7 @@ Click Footer Menu → Edit Options (or press `Alt+O`) to configure settings:
 ### System Settings
 
 * **Location:** Tap *Location* to open the map and search for your address; or click the pencil icon ✏️ to manually enter the GPS coordinates.
-    * **PWS location:** When using **WUnderground (WU)** as the weather data provider, you must select a **Personal Weather Station (PWS)** location.
+    * **PWS location:** When using [**Weather Underground (WU)**](../guides/weather-underground.md) as the weather data provider, you must select a **Personal Weather Station (PWS)** location.
         1. First enter and submit a valid **WU API key** in the [Weather Adjustment](#weather-adjustment) tab.
         2. Return to the Location setting - available PWS sites will appear as **blue dots** on the map.
         3. Click one of the blue dots as your PWS location.
@@ -490,7 +490,7 @@ This firmware supports up to **four independent masters**, each configurable as 
 
 * **Adjustment Method:** Select a weather-based adjustment method.
     * **Manual** (default): set **% Watering** manually.
-    * Other methods calculate adjustments automatically. Detailed explanations of supported methods are available on [OpenSprinkler Support](https://openthings.freshdesk.com/support/solutions/articles/5000823370).
+    * Other methods calculate adjustments automatically. Detailed explanations of supported methods are available in [Using Weather Adjustments](../guides/weather-adjustments.md).
 * **Adjustment Method Options:** Configure parameters for the selected method.
 * **Adjust Interval Programs using Multi-Day Average:** This option is available for **Zimmerman or ETo** methods. Enabling it allows **all interval programs** to apply the **average watering level** across the program's interval, rather than just the previous day's. For instance, a program that runs every `4` days uses the 4-day average. For programs that don't run daily, this provides more accurate adjustments that reflect all weather changes since the last run.
     * Applies only if the **Use Weather** flag is enabled for that program.
@@ -504,7 +504,7 @@ This firmware supports up to **four independent masters**, each configurable as 
 
 * **Weather Data Provider:** Choose preferred data provider. Default: **Apple**.
     * If the provider requires an API key, a key input box appears.
-    * Some providers have region limits (e.g. **DWD** = Germany only; **WU** requires PWS location).
+    * Some providers have region limits (e.g. **DWD** = Germany only; [**WU**](../guides/weather-underground.md) requires a PWS location).
 * **% Watering:** Global scaling factor applied to water times. Default: `100%`.
     * Editable only for **Manual** adjustment method (as others calculate this automatically).
     * Example: `75%` → Multiply all station water times by 0.75.
@@ -528,7 +528,6 @@ All supported controllers provide two independent built-in sensor ports (`SN1/SN
 * **Rain / Soil Sensors:** Automatically stop zone runs when rain or high soil moisture is detected.
     * Choose **Normally Open** or **Normally Closed**; Normally Closed is the most common type.
     * Supports only sensors that output **binary ON/OFF signals** (dry-contact switches).
-        * For **Analog Sensors**, use an [**Analog-to-Digital Adapter**](https://opensprinkler.com/product/a2dadapter/), which converts an analog signal to ON/OFF with an adjustable threshold.
     * **Delayed On:** Time sensor must remain active before trigger (prevents false triggers).
     * **Delayed Off:** Hold time after sensor deactivation (prolongs sensor hold). Examples:<br>
      10-minute Delayed On → Sensor regarded as triggered after it's active for 10 minutes.<br>
@@ -556,10 +555,10 @@ All supported controllers provide two independent built-in sensor ports (`SN1/SN
 
 ### Integration
 
-* **OTC:** Configure **OpenThings Cloud (OTC)** token for remote access. See [**OTC Support Article**](https://openthings.freshdesk.com/support/solutions/articles/5000879535).
-* **MQTT:** Configure MQTT parameters. See [**MQTT Support Article**](https://openthings.freshdesk.com/support/solutions/articles/5000859089).
-* **Email Notifications:** Configure Email settings. See [**Email Notifications Support Article**](https://openthings.freshdesk.com/support/solutions/articles/5000889759).
-* **IFTTT:** Configure IFTTT Webhooks key. See [**IFTTT Support Article**](https://openthings.freshdesk.com/support/solutions/articles/5000716372).
+* **OTC:** Configure **OpenThings Cloud (OTC)** token for remote access. See [**Remote Access with OTC**](../guides/remote-access-otc.md).
+* **MQTT:** Configure MQTT parameters. See [**Using MQTT**](../guides/mqtt.md).
+* **Email Notifications:** Configure Email settings. See [**Setting Up Email Notifications**](../guides/email-notifications.md).
+* **IFTTT:** Configure IFTTT Webhooks key. See [**Setting Up IFTTT Notifications**](../guides/ifttt-notifications.md).
 * **Notification Events:** Select events that trigger MQTT/Email/IFTTT notifications.
 
     !!! warning "Avoid Too Many Events"
