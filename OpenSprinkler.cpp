@@ -521,10 +521,12 @@ unsigned char OpenSprinkler::start_ether() {
 	SPI.setFrequency(ETHER_SPI_CLOCK); // set SPI frequency
 
 	if (hw_rev != 2 && ch390_probe(SPI, PIN_ETHER_CS,
-		osboard::CH390_SPI_CLOCK_HZ)) {
+		osboard::CH390_PROBE_SPI_CLOCK_HZ)) {
 		eth.select(EthernetController::CH390);
 		DEBUG_PRINTLN(F("detected CH390"));
 	} else if (hw_rev != 2) {
+		// ESP8266 endTransaction() does not restore the previous bus settings.
+		SPI.setFrequency(ETHER_SPI_CLOCK);
 		eth.select(EthernetController::W5500);
 		DEBUG_PRINTLN(F("detect existence of W5500"));
 		/* this is copied from w5500.cpp wizchip_sw_reset

@@ -97,27 +97,7 @@ bool ch390_probe(SPIClass& spi, int8_t cs, uint32_t clock_hz) {
     spi.endTransaction();
     return value;
   };
-  auto write_register = [&](uint8_t address, uint8_t value) {
-    spi.beginTransaction(settings);
-    digitalWrite(cs, LOW);
-    spi.transfer(0x80 | (address & 0x7F));
-    spi.transfer(value);
-    digitalWrite(cs, HIGH);
-    spi.endTransaction();
-  };
-
-  write_register(kNcr, kNcrReset);
-  const uint32_t started = millis();
-  while ((read_register(kNcr) & kNcrReset) != 0) {
-    if (millis() - started > 250) {
-      DEBUG_PRINTLN(F("CH390 probe: software reset timed out"));
-      return false;
-    }
-    delay(1);
-  }
-  write_register(kGpr, 0x00);
-  delay(10);
-
+  // Identification is read-only: no CH390 reset commands on W5500/empty buses.
   const uint8_t vid_low = read_register(kVidLow);
   const uint8_t vid_high = read_register(kVidHigh);
   const uint8_t pid_low = read_register(kPidLow);
@@ -189,7 +169,7 @@ void CH390Raw::discardMemory(uint16_t length) {
 }
 
 bool CH390Raw::probe() {
-  return ch390_probe(_spi, _cs, kSpiClockHz);
+  return ch390_probe(_spi, _cs, osboard::CH390_PROBE_SPI_CLOCK_HZ);
 }
 
 bool CH390Raw::waitPhyReady(uint32_t timeoutUs) {
@@ -282,6 +262,15 @@ bool CH390Raw::begin(const uint8_t* macAddress) {
     DEBUG_PRINTLN(F("CH390 identity check failed"));
     return false;
   }
+
+  writeRegister(kNcr, kNcrReset);
+  const uint32_t started = millis();
+  while (readRegister(kNcr) & kNcrReset) {
+    if ((uint32_t)(millis() - started) >= 250) return false;
+    delay(1);
+  }
+  writeRegister(kGpr, 0);
+  delay(10);
 
   // Conservative MAC defaults. lwIP computes checksums, so hardware checksum
   // offload remains disabled. Accept multicast to support common local-network
