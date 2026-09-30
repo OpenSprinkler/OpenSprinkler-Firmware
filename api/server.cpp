@@ -2600,6 +2600,25 @@ static uint32_t freeHeap() {
 }
 #endif
 
+#if defined(ARDUINO)
+static void emit_ethernet_health() {
+	bfill.emit_p(PSTR(",\"eth_link\":$D,\"eth_has_ip\":$D"),
+		eth.linkUp(), (uint32_t)eth.localIP() != 0);
+	if (!eth.is_ch390()) return;
+	CH390Diagnostics d = {};
+	const bool valid = eth.ch390_diagnostics(d);
+	bfill.emit_p(PSTR(",\"ch_diag_valid\":$D"), valid);
+	if (!valid) return;
+	bfill.emit_p(PSTR(",\"ch_bad_ready\":$L,\"ch_bad_header\":$L,\"ch_rx_errors\":$L,"
+		"\"ch_rx_resets\":$L,\"ch_tx_timeouts\":$L,\"ch_health_failures\":$L,"
+		"\"ch_recoveries\":$L,\"ch_recovery_failures\":$L,\"ch_fault\":$D,"
+		"\"ch_fault_ms\":$L,\"ch_pending\":$D"),
+		d.bad_ready, d.bad_header, d.rx_errors, d.rx_resets, d.tx_timeouts,
+		d.health_failures, d.recoveries, d.recovery_failures, d.last_fault,
+		d.last_fault_ms, d.pending);
+}
+#endif
+
 void server_json_debug(OTF_PARAMS_DEF) {
 	begin_response(res);
 	print_header(OTF_PARAMS);
@@ -2622,6 +2641,7 @@ void server_json_debug(OTF_PARAMS_DEF) {
 	if(useEth) {
 		bfill.emit_p(PSTR("\"eth_controller\":\"$S\",\"isW5500\":$D,\"spi_clock\":$L,\"arp_size\":$D"),
 			eth.controller_name(), eth.is_w5500(), eth.spi_clock(), ARP_TABLE_SIZE);
+		emit_ethernet_health();
 		if (eth.is_w5500()) {
 			const W5500Diagnostics& diag = w5500.diagnostics();
 			W5500LiveState live;
@@ -2684,8 +2704,10 @@ void server_json_debug(OTF_PARAMS_DEF) {
 	bfill.emit_p(PSTR("\"sprlog_fail\":$L,\"sprlog_mismatch\":$L,"),
 		sprinkler_log_failures, sprinkler_log_mismatches);
 	if (useEth) {
-		bfill.emit_p(PSTR("\"eth_controller\":\"$S\",\"isW5500\":$D,\"spi_clock\":$L}"),
+		bfill.emit_p(PSTR("\"eth_controller\":\"$S\",\"isW5500\":$D,\"spi_clock\":$L"),
 			eth.controller_name(), eth.is_w5500(), eth.spi_clock());
+		emit_ethernet_health();
+		bfill.emit_p(PSTR("}"));
 	} else {
 		bfill.emit_p(PSTR("\"rssi\":$D,\"bssid\":\"$S\",\"bssidchl\":\"$O\"}"),
 			WiFi.RSSI(), WiFi.BSSIDstr().c_str(), SOPT_STA_BSSID_CHL);

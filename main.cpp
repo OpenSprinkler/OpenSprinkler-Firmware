@@ -740,6 +740,7 @@ void do_loop()
 
 	#if defined(ESP8266)
 	service_w5500_recovery();
+	if (useEth && eth.service_ch390()) os.status.req_mqtt_restart = true;
 	#endif
 
 	// ====== Process Ethernet packets ======

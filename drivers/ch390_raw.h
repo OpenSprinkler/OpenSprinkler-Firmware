@@ -1,5 +1,7 @@
 #pragma once
 
+#include "external/ch390/include/ch390_health.h"
+
 #if defined(ARDUINO)
 
 #include <Arduino.h>
@@ -23,6 +25,8 @@ class CH390Raw {
 
   bool probe();
   bool isLinked();
+  bool service();
+  CH390Diagnostics diagnostics() const { return _health.diag; }
   constexpr bool isLinkDetectable() const { return true; }
 
  protected:
@@ -44,11 +48,17 @@ class CH390Raw {
   bool writePhy(uint8_t reg, uint16_t value);
   bool waitPhyReady(uint32_t timeoutUs);
   void resetReceivePath();
+  bool initialize();
+  bool healthy();
 
   SPIClass& _spi;
   SPISettings _settings;
   int8_t _cs;
   uint16_t _pendingWireLength;
+  uint8_t _mac[6] = {};
+  bool _busy = false;
+  uint32_t _lastHealthCheck = 0;
+  CH390Health _health = {};
 };
 
 #include <LwipIntfDev.h>

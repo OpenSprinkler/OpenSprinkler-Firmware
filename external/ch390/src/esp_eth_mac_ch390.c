@@ -90,6 +90,13 @@ typedef struct {
     uint8_t                 *rx_buffer;
     uint32_t                rx_len;
     uint8_t                 hash_filter_cnt[CH390_HASH_FILTER_TABLE_SIZE];
+    SemaphoreHandle_t       operation_lock;
+    CH390Health             health;
+    uint32_t                last_health_ms;
+    bool                    initialized;
+    bool                    active;
+    bool                    peer_flow_ctrl;
+    uint8_t                 receive_mode;
 } emac_ch390_t;
 
 static inline bool CH390_SPI_LOCK(eth_spi_info_t *spi)
@@ -463,6 +470,7 @@ static esp_err_t ch390_enable_flow_ctrl(emac_ch390_t *emac, bool enable)
         /* disable flow control */
         ESP_GOTO_ON_ERROR(ch390_io_register_write(emac, CH390_FCR, 0), err, TAG, "write FCR failed");
     }
+    emac->peer_flow_ctrl = enable;
     return ESP_OK;
 err:
     return ret;
@@ -505,6 +513,7 @@ static esp_err_t emac_ch390_start(esp_eth_mac_t *mac)
     ESP_GOTO_ON_ERROR(ch390_io_register_read(emac, CH390_RCR, &rcr), err, TAG, "read RCR failed");
     rcr |= RCR_RXEN;
     ESP_GOTO_ON_ERROR(ch390_io_register_write(emac, CH390_RCR, rcr), err, TAG, "write RCR failed");
+    emac->active = true;
     return ESP_OK;
 err:
     return ret;
@@ -524,6 +533,8 @@ static esp_err_t emac_ch390_stop(esp_eth_mac_t *mac)
     ESP_GOTO_ON_ERROR(ch390_io_register_read(emac, CH390_RCR, &rcr), err, TAG, "read RCR failed");
     rcr &= ~RCR_RXEN;
     ESP_GOTO_ON_ERROR(ch390_io_register_write(emac, CH390_RCR, rcr), err, TAG, "write RCR failed");
+    emac->active = false;
+    emac->health.tx_busy = false;
     return ESP_OK;
 err:
     return ret;
@@ -697,6 +708,7 @@ static esp_err_t emac_ch390_set_promiscuous(esp_eth_mac_t *mac, bool enable)
         rcr &= ~RCR_PRMSC;
     }
     ESP_GOTO_ON_ERROR(ch390_io_register_write(emac, CH390_RCR, rcr), err, TAG, "write RCR failed");
+    emac->receive_mode = rcr & (RCR_PRMSC | RCR_ALL);
     return ESP_OK;
 err:
     return ret;
@@ -718,6 +730,7 @@ static esp_err_t emac_ch390_set_all_multicast(esp_eth_mac_t *mac, bool enable)
         rcr &= ~RCR_ALL;
     }
     ESP_GOTO_ON_ERROR(ch390_io_register_write(emac, CH390_RCR, rcr), err, TAG, "write RCR failed");
+    emac->receive_mode = rcr & (RCR_PRMSC | RCR_ALL);
 err:
     return ret;
 }
@@ -751,14 +764,11 @@ static esp_err_t emac_ch390_transmit(esp_eth_mac_t *mac, uint8_t *buf, uint32_t 
     esp_err_t ret = ESP_OK;
     emac_ch390_t *emac = __containerof(mac, emac_ch390_t, parent);
     uint8_t tcr = 0;
+    if (!emac->active || emac->health.diag.pending) return ESP_ERR_INVALID_STATE;
 
     ESP_GOTO_ON_FALSE(length <= ETH_MAX_PACKET_SIZE, ESP_ERR_INVALID_ARG, err,
                       TAG, "frame size is too big (actual %lu, maximum %u)",
                       length, ETH_MAX_PACKET_SIZE);
-
-    /* copy data to tx memory */
-    ESP_GOTO_ON_ERROR(ch390_io_memory_write(emac, buf, length), err, TAG,
-                      "write memory failed");
 
     /* Check if last transmit complete */
     int64_t wait_time = esp_timer_get_time();
@@ -768,9 +778,20 @@ static esp_err_t emac_ch390_transmit(esp_eth_mac_t *mac, uint8_t *buf, uint32_t 
     } while ((tcr & TCR_TXREQ) && ((esp_timer_get_time() - wait_time) < CH390_MAC_TX_WAIT_TIMEOUT_US));
 
     if (tcr & TCR_TXREQ) {
+        // PHY link notification is asynchronous. Cable removal can precede
+        // set_link(DOWN); that is not a reason to reset the controller.
+        uint8_t nsr = 0;
+        bool linked = ch390_io_register_read(emac, CH390_NSR, &nsr) == ESP_OK &&
+                      nsr != 0xff && (nsr & NSR_LINKST);
+        ch390_tx_timeout(&emac->health, linked, (uint32_t)(esp_timer_get_time() / 1000));
         ESP_LOGE(TAG, "last transmit still in progress, cannot send.");
         return ESP_ERR_INVALID_STATE;
     }
+
+    // Do not advance the write pointer while the previous transmit is busy.
+    emac->health.tx_busy = false;
+    ESP_GOTO_ON_ERROR(ch390_io_memory_write(emac, buf, length), err, TAG,
+                      "write memory failed");
 
     /* set tx length */
     ESP_GOTO_ON_ERROR(ch390_io_register_write(emac, CH390_TXPLL, length & 0xFF), err, TAG, "write TXPLL failed");
@@ -784,10 +805,30 @@ err:
     return ret;
 }
 
+static esp_err_t ch390_reset_rx(emac_ch390_t *emac)
+{
+    if (!ch390_allow_rx_reset(&emac->health, (uint32_t)(esp_timer_get_time() / 1000))) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    esp_err_t result = emac_ch390_stop(&emac->parent);
+    if (result == ESP_OK) {
+        // Preserve upstream's settle interval before resetting the RX pointer.
+        esp_rom_delay_us(1000);
+        result = emac_ch390_start(&emac->parent);
+    }
+    // This function is entered only on an active link. Preserve that intent
+    // when a partial reset fails, so full recovery knows to re-enable RX.
+    emac->active = true;
+    if (result != ESP_OK) emac->health.diag.pending = true;
+    return result;
+}
+
 static esp_err_t emac_ch390_receive(esp_eth_mac_t *mac, uint8_t *buf, uint32_t *length)
 {
     esp_err_t ret = ESP_OK;
     emac_ch390_t *emac = __containerof(mac, emac_ch390_t, parent);
+    *length = 0;
+    if (!emac->active || emac->health.diag.pending) return ESP_ERR_INVALID_STATE;
 
     uint8_t ready;
     /* dummy read, get the most updated data */
@@ -796,9 +837,9 @@ static esp_err_t emac_ch390_receive(esp_eth_mac_t *mac, uint8_t *buf, uint32_t *
 
     // if ready != 1 or 0 reset device
     if (ready & CH390_PKT_ERR) {
-        emac_ch390_stop(mac);
-        esp_rom_delay_us(1000);
-        emac_ch390_start(mac);
+        ++emac->health.diag.bad_ready;
+        ch390_fault(&emac->health, 1, (uint32_t)(esp_timer_get_time() / 1000));
+        ch390_reset_rx(emac);
 
         ESP_LOGE(TAG, "PACK ERR");
         return ESP_ERR_INVALID_RESPONSE;
@@ -809,13 +850,17 @@ static esp_err_t emac_ch390_receive(esp_eth_mac_t *mac, uint8_t *buf, uint32_t *
             ESP_GOTO_ON_ERROR(ch390_io_memory_read(emac, (uint8_t *) & (rx_header), sizeof(rx_header)),
                               err, TAG, "peek rx header failed");
             *length = (rx_header.length_high << 8) + rx_header.length_low;
-            if (rx_header.status & RSR_ERR_MASK) {
-                ch390_drop_frame(emac, *length);
+            // Validate before dropping error frames: never trust a corrupt length
+            // to advance the RX pointer, or subtract the CRC from a short frame.
+            if (rx_header.flag != 1 || !ch390_valid_wire_length(*length, ETH_MAX_PACKET_SIZE)) {
+                ++emac->health.diag.bad_header;
+                ch390_fault(&emac->health, 2, (uint32_t)(esp_timer_get_time() / 1000));
+                ch390_reset_rx(emac);
                 *length = 0;
                 return ESP_ERR_INVALID_RESPONSE;
-            } else if (*length < ETH_CRC_LEN || *length > ETH_MAX_PACKET_SIZE) {
-                /* reset rx memory pointer */
-                ESP_GOTO_ON_ERROR(ch390_io_register_write(emac, CH390_MPTRCR, MPTRCR_RST_RX), err, TAG, "reset rx pointer failed");
+            } else if (rx_header.status & RSR_ERR_MASK) {
+                ++emac->health.diag.rx_errors;
+                ch390_drop_frame(emac, *length);
                 *length = 0;
                 return ESP_ERR_INVALID_RESPONSE;
             } else {
@@ -857,6 +902,11 @@ static esp_err_t emac_ch390_init(esp_eth_mac_t *mac)
     ESP_GOTO_ON_ERROR(ch390_clear_multicast_table(emac), err, TAG, "clear multicast table failed");
     /* get emac address from eeprom */
     ESP_GOTO_ON_ERROR(ch390_get_mac_addr(emac), err, TAG, "fetch ethernet mac address failed");
+    emac->initialized = true;
+    emac->receive_mode = 0;
+#if ESP_IDF_VERSION < ESP_IDF_VERSION_VAL(5, 5, 0)
+    emac->receive_mode = RCR_ALL;
+#endif
     return ESP_OK;
 err:
     if (emac->int_gpio_num >= 0) {
@@ -871,6 +921,7 @@ static esp_err_t emac_ch390_deinit(esp_eth_mac_t *mac)
 {
     emac_ch390_t *emac = __containerof(mac, emac_ch390_t, parent);
     esp_eth_mediator_t *eth = emac->eth;
+    emac->initialized = false;
     mac->stop(mac);
     if (emac->int_gpio_num >= 0) {
         gpio_isr_handler_remove(emac->int_gpio_num);
@@ -883,27 +934,88 @@ static esp_err_t emac_ch390_deinit(esp_eth_mac_t *mac)
     return ESP_OK;
 }
 
+static bool ch390_healthy(emac_ch390_t *emac)
+{
+    uint8_t value;
+    bool good = ch390_verify_id(emac) == ESP_OK;
+    for (int i = 0; i < ETH_ADDR_LEN && good; ++i) {
+        good = ch390_io_register_read(emac, CH390_PAR + i, &value) == ESP_OK && value == emac->addr[i];
+    }
+    if (good && emac->active) {
+        good = ch390_io_register_read(emac, CH390_RCR, &value) == ESP_OK && (value & RCR_RXEN);
+    }
+    return good;
+}
+
+// Called only under operation_lock. Restore the MAC in place, retaining the IDF
+// netif/PHY objects, static IP or DHCP lease, filters and event registrations.
+static esp_err_t ch390_recover(emac_ch390_t *emac)
+{
+    bool active = emac->active;
+    ESP_RETURN_ON_ERROR(ch390_reset(emac), TAG, "recovery reset failed");
+    ESP_RETURN_ON_ERROR(ch390_verify_id(emac), TAG, "recovery ID failed");
+    ESP_RETURN_ON_ERROR(ch390_setup_default(emac), TAG, "recovery setup failed");
+    ESP_RETURN_ON_ERROR(ch390_set_mac_addr(emac), TAG, "recovery address failed");
+    ESP_RETURN_ON_ERROR(ch390_io_register_write(emac, CH390_BCASTCR, 0), TAG, "recovery broadcast failed");
+    for (int group = 0; group < 8; ++group) {
+        uint8_t bits = group == 7 ? 0x80 : 0;
+        for (int bit = 0; bit < 8; ++bit) {
+            if (emac->hash_filter_cnt[group * 8 + bit]) bits |= 1U << bit;
+        }
+        ESP_RETURN_ON_ERROR(ch390_io_register_write(emac, CH390_MAR + group, bits), TAG, "recovery filter failed");
+    }
+    ESP_RETURN_ON_ERROR(ch390_io_register_write(emac, CH390_RCR, RCR_DIS_CRC | emac->receive_mode), TAG, "recovery RCR failed");
+    ESP_RETURN_ON_ERROR(ch390_enable_flow_ctrl(emac, emac->peer_flow_ctrl), TAG, "recovery flow control failed");
+    if (active) ESP_RETURN_ON_ERROR(emac_ch390_start(&emac->parent), TAG, "recovery RX failed");
+    return ch390_healthy(emac) ? ESP_OK : ESP_ERR_INVALID_RESPONSE;
+}
+
+static void ch390_service(emac_ch390_t *emac)
+{
+    uint32_t now = (uint32_t)(esp_timer_get_time() / 1000);
+    if (!emac->initialized || (uint32_t)(now - emac->last_health_ms) < 1000) return;
+    emac->last_health_ms = now;
+    // Link down, DHCP failures and Internet reachability are NOT chip faults.
+    ch390_health_sample(&emac->health, ch390_healthy(emac), now);
+    if (ch390_recovery_due(&emac->health, now)) {
+        ch390_recovery_result(&emac->health, ch390_recover(emac) == ESP_OK);
+    }
+}
+
+esp_err_t esp_eth_mac_ch390_diagnostics(esp_eth_mac_t *mac, CH390Diagnostics *out)
+{
+    if (!mac || !out) return ESP_ERR_INVALID_ARG;
+    emac_ch390_t *emac = __containerof(mac, emac_ch390_t, parent);
+    if (xSemaphoreTakeRecursive(emac->operation_lock, pdMS_TO_TICKS(50)) != pdTRUE) return ESP_ERR_TIMEOUT;
+    *out = emac->health.diag;
+    xSemaphoreGiveRecursive(emac->operation_lock);
+    return ESP_OK;
+}
+
 static void emac_ch390_task(void *arg)
 {
     emac_ch390_t *emac = (emac_ch390_t *)arg;
     uint8_t status = 0;
     uint8_t *buffer;
     while (1) {
-        // check if the task receives any notification
-        if (emac->int_gpio_num >= 0) {                                   // if in interrupt mode
-            if (ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(1000)) == 0 &&   // if no notification ...
-                    gpio_get_level(emac->int_gpio_num) == 0) {               // ...and no interrupt asserted
-                continue;                                                // -> just continue to check again
-            }
-        } else {
-            ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+        // Periodic fallback is independent of the IRQ level. A missed edge or
+        // disconnected INT must not permanently strand queued receive frames.
+        ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(1000));
+        if (xSemaphoreTakeRecursive(emac->operation_lock, pdMS_TO_TICKS(50)) != pdTRUE) continue;
+        ch390_service(emac);
+        if (!emac->initialized || !emac->active || emac->health.diag.pending) {
+            xSemaphoreGiveRecursive(emac->operation_lock);
+            continue;
         }
 
         /* clear interrupt status */
         ch390_io_register_read(emac, CH390_ISR, &status);
         ch390_io_register_write(emac, CH390_ISR, status);
+        xSemaphoreGiveRecursive(emac->operation_lock);
         /* packet received */
-        if (status & ISR_PR) {
+        // Always inspect the FIFO, including after an error cleared ISR.PR.
+        {
+            unsigned frames = 0;
             do {
                 if (emac->parent.receive(&emac->parent, emac->rx_buffer, &emac->rx_len) == ESP_OK) {
                     if (emac->rx_len == 0) {
@@ -926,7 +1038,11 @@ static void emac_ch390_task(void *arg)
                     ESP_LOGE(TAG, "frame read from module failed");
                     break;
                 }
-            } while (1);
+            } while (++frames < 16);
+            if (frames == 16) {
+                xTaskNotifyGive(emac->rx_task_hdl);
+                vTaskDelay(1);
+            }
         }
     }
     vTaskDelete(NULL);
@@ -939,10 +1055,60 @@ static esp_err_t emac_ch390_del(esp_eth_mac_t *mac)
         esp_timer_delete(emac->poll_timer);
     }
     vTaskDelete(emac->rx_task_hdl);
+    vSemaphoreDelete(emac->operation_lock);
     emac->spi.deinit(emac->spi.ctx);
     heap_caps_free(emac->rx_buffer);
     free(emac);
     return ESP_OK;
+}
+
+// The SPI transaction mutex alone cannot protect multi-transaction MAC/PHY
+// operations against recovery. Serialize all externally callable MAC operations.
+#define CH390_LOCKED(name, signature, arguments) \
+    static esp_err_t locked_##name signature { \
+        emac_ch390_t *emac = __containerof(mac, emac_ch390_t, parent); \
+        if (xSemaphoreTakeRecursive(emac->operation_lock, pdMS_TO_TICKS(50)) != pdTRUE) return ESP_ERR_TIMEOUT; \
+        esp_err_t result = emac_ch390_##name arguments; \
+        xSemaphoreGiveRecursive(emac->operation_lock); \
+        return result; \
+    }
+CH390_LOCKED(init, (esp_eth_mac_t *mac), (mac))
+CH390_LOCKED(start, (esp_eth_mac_t *mac), (mac))
+CH390_LOCKED(write_phy_reg, (esp_eth_mac_t *mac, uint32_t addr, uint32_t reg, uint32_t value), (mac, addr, reg, value))
+CH390_LOCKED(read_phy_reg, (esp_eth_mac_t *mac, uint32_t addr, uint32_t reg, uint32_t *value), (mac, addr, reg, value))
+CH390_LOCKED(set_addr, (esp_eth_mac_t *mac, uint8_t *addr), (mac, addr))
+CH390_LOCKED(get_addr, (esp_eth_mac_t *mac, uint8_t *addr), (mac, addr))
+CH390_LOCKED(set_link, (esp_eth_mac_t *mac, eth_link_t link), (mac, link))
+CH390_LOCKED(set_promiscuous, (esp_eth_mac_t *mac, bool enable), (mac, enable))
+CH390_LOCKED(set_peer_pause_ability, (esp_eth_mac_t *mac, uint32_t ability), (mac, ability))
+CH390_LOCKED(enable_flow_ctrl, (esp_eth_mac_t *mac, bool enable), (mac, enable))
+CH390_LOCKED(transmit, (esp_eth_mac_t *mac, uint8_t *buf, uint32_t length), (mac, buf, length))
+CH390_LOCKED(receive, (esp_eth_mac_t *mac, uint8_t *buf, uint32_t *length), (mac, buf, length))
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 5, 0)
+CH390_LOCKED(set_all_multicast, (esp_eth_mac_t *mac, bool enable), (mac, enable))
+CH390_LOCKED(add_mac_filter, (esp_eth_mac_t *mac, uint8_t *addr), (mac, addr))
+CH390_LOCKED(rm_mac_filter, (esp_eth_mac_t *mac, uint8_t *addr), (mac, addr))
+#endif
+#undef CH390_LOCKED
+
+// Lifecycle teardown must wait for the bounded in-flight recovery rather than
+// time out and let callers free an active worker/driver.
+static esp_err_t locked_stop(esp_eth_mac_t *mac)
+{
+    emac_ch390_t *emac = __containerof(mac, emac_ch390_t, parent);
+    xSemaphoreTakeRecursive(emac->operation_lock, portMAX_DELAY);
+    esp_err_t result = emac_ch390_stop(mac);
+    xSemaphoreGiveRecursive(emac->operation_lock);
+    return result;
+}
+
+static esp_err_t locked_deinit(esp_eth_mac_t *mac)
+{
+    emac_ch390_t *emac = __containerof(mac, emac_ch390_t, parent);
+    xSemaphoreTakeRecursive(emac->operation_lock, portMAX_DELAY);
+    esp_err_t result = emac_ch390_deinit(mac);
+    xSemaphoreGiveRecursive(emac->operation_lock);
+    return result;
 }
 
 esp_eth_mac_t *esp_eth_mac_new_ch390(const eth_ch390_config_t *ch390_config, const eth_mac_config_t *mac_config)
@@ -953,6 +1119,8 @@ esp_eth_mac_t *esp_eth_mac_new_ch390(const eth_ch390_config_t *ch390_config, con
     ESP_GOTO_ON_FALSE(mac_config, NULL, err, TAG, "can't set mac config to null");
     emac = calloc(1, sizeof(emac_ch390_t));
     ESP_GOTO_ON_FALSE(emac, NULL, err, TAG, "calloc emac failed");
+    emac->operation_lock = xSemaphoreCreateRecursiveMutex();
+    ESP_GOTO_ON_FALSE(emac->operation_lock, NULL, err, TAG, "create MAC lock failed");
     /* ch390 receive is driven by interrupt or timer signal */
     ESP_GOTO_ON_FALSE((ch390_config->int_gpio_num >= 0) != (ch390_config->poll_period_ms > 0), NULL, err, TAG, "invalid configuration argument combination");
     /* bind methods and attributes */
@@ -960,27 +1128,27 @@ esp_eth_mac_t *esp_eth_mac_new_ch390(const eth_ch390_config_t *ch390_config, con
     emac->int_gpio_num = ch390_config->int_gpio_num;
     emac->poll_period_ms = ch390_config->poll_period_ms;
     emac->parent.set_mediator = emac_ch390_set_mediator;
-    emac->parent.init = emac_ch390_init;
-    emac->parent.deinit = emac_ch390_deinit;
-    emac->parent.start = emac_ch390_start;
-    emac->parent.stop = emac_ch390_stop;
+    emac->parent.init = locked_init;
+    emac->parent.deinit = locked_deinit;
+    emac->parent.start = locked_start;
+    emac->parent.stop = locked_stop;
     emac->parent.del = emac_ch390_del;
-    emac->parent.write_phy_reg = emac_ch390_write_phy_reg;
-    emac->parent.read_phy_reg = emac_ch390_read_phy_reg;
-    emac->parent.set_addr = emac_ch390_set_addr;
-    emac->parent.get_addr = emac_ch390_get_addr;
+    emac->parent.write_phy_reg = locked_write_phy_reg;
+    emac->parent.read_phy_reg = locked_read_phy_reg;
+    emac->parent.set_addr = locked_set_addr;
+    emac->parent.get_addr = locked_get_addr;
     emac->parent.set_speed = emac_ch390_set_speed;
     emac->parent.set_duplex = emac_ch390_set_duplex;
-    emac->parent.set_link = emac_ch390_set_link;
-    emac->parent.set_promiscuous = emac_ch390_set_promiscuous;
-    emac->parent.set_peer_pause_ability = emac_ch390_set_peer_pause_ability;
-    emac->parent.enable_flow_ctrl = emac_ch390_enable_flow_ctrl;
-    emac->parent.transmit = emac_ch390_transmit;
-    emac->parent.receive = emac_ch390_receive;
+    emac->parent.set_link = locked_set_link;
+    emac->parent.set_promiscuous = locked_set_promiscuous;
+    emac->parent.set_peer_pause_ability = locked_set_peer_pause_ability;
+    emac->parent.enable_flow_ctrl = locked_enable_flow_ctrl;
+    emac->parent.transmit = locked_transmit;
+    emac->parent.receive = locked_receive;
 #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 5, 0)
-    emac->parent.set_all_multicast = emac_ch390_set_all_multicast;
-    emac->parent.add_mac_filter = emac_ch390_add_mac_filter;
-    emac->parent.rm_mac_filter = emac_ch390_rm_mac_filter;
+    emac->parent.set_all_multicast = locked_set_all_multicast;
+    emac->parent.add_mac_filter = locked_add_mac_filter;
+    emac->parent.rm_mac_filter = locked_rm_mac_filter;
 #endif
 
     if (ch390_config->custom_spi_driver.init != NULL && ch390_config->custom_spi_driver.deinit != NULL
@@ -1033,6 +1201,7 @@ err:
         if (emac->spi.ctx) {
             emac->spi.deinit(emac->spi.ctx);
         }
+        if (emac->operation_lock) vSemaphoreDelete(emac->operation_lock);
         heap_caps_free(emac->rx_buffer);
         free(emac);
     }

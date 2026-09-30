@@ -253,6 +253,15 @@ bool CH390Raw::initializePhy() {
 }
 
 bool CH390Raw::begin(const uint8_t* macAddress) {
+  if (!macAddress || _busy) return false;
+  memcpy(_mac, macAddress, sizeof(_mac));
+  _busy = true;
+  bool ok = initialize();
+  _busy = false;
+  return ok;
+}
+
+bool CH390Raw::initialize() {
   _pendingWireLength = 0;
   pinMode(_cs, OUTPUT);
   digitalWrite(_cs, HIGH);
@@ -294,11 +303,10 @@ bool CH390Raw::begin(const uint8_t* macAddress) {
   writeRegister(kMar + 7, 0x80);  // Accept Ethernet broadcasts.
 
   for (uint8_t i = 0; i < 6; ++i) {
-    writeRegister(kPar + i, macAddress[i]);
+    writeRegister(kPar + i, _mac[i]);
   }
   DEBUG_PRINTF("CH390 MAC=%02X:%02X:%02X:%02X:%02X:%02X\n",
-               macAddress[0], macAddress[1], macAddress[2], macAddress[3],
-               macAddress[4], macAddress[5]);
+               _mac[0], _mac[1], _mac[2], _mac[3], _mac[4], _mac[5]);
 
   if (!initializePhy()) {
     DEBUG_PRINTLN(F("CH390 PHY initialization failed"));
@@ -320,10 +328,38 @@ void CH390Raw::end() {
 }
 
 bool CH390Raw::isLinked() {
-  return (readRegister(kNsr) & kNsrLink) != 0;
+  if (_busy || _health.diag.pending) return false;
+  const uint8_t nsr = readRegister(kNsr);
+  return nsr != 0xFF && (nsr & kNsrLink) != 0;
+}
+
+bool CH390Raw::service() {
+  const uint32_t now = millis();
+  if (_busy || (uint32_t)(now - _lastHealthCheck) < 1000) return false;
+  _lastHealthCheck = now;
+  ch390_health_sample(&_health, healthy(), now);
+  if (!ch390_recovery_due(&_health, now)) return false;
+  // Guard cooperative lwIP callbacks during initialize()'s bounded waits.
+  // Reinitialize only RawDev; the existing netif, DHCP state and callbacks stay.
+  _busy = true;
+  const bool ok = initialize() && healthy();
+  _busy = false;
+  ch390_recovery_result(&_health, ok);
+  return ok;
+}
+
+bool CH390Raw::healthy() {
+  // No link/IP/cloud tests here: only stable identity and configured MAC state.
+  bool good = readRegister(kVidLow) == 0 && readRegister(kVidHigh) == 0x1C &&
+              readRegister(kPidLow) == 0x51 && readRegister(kPidHigh) == 0x91 &&
+              (readRegister(kRcr) & kRcrReceiveEnable);
+  for (uint8_t i = 0; i < 6; ++i) good = (readRegister(kPar + i) == _mac[i]) && good;
+  return good;
 }
 
 uint16_t CH390Raw::sendFrame(const uint8_t* data, uint16_t length) {
+  if (_busy || _health.diag.pending) return 0;
+  if (!isLinked()) { _health.tx_busy = false; return 0; }
   if (length == 0 || length > 1518) {
     return 0;
   }
@@ -332,11 +368,13 @@ uint16_t CH390Raw::sendFrame(const uint8_t* data, uint16_t length) {
   while ((readRegister(kTcr) & kTcrTxRequest) != 0) {
     if (micros() - started > 20000) {
       DEBUG_PRINTLN(F("CH390 TX busy timeout"));
+      ch390_tx_timeout(&_health, isLinked(), millis());
       return 0;
     }
     delayMicroseconds(10);
   }
 
+  _health.tx_busy = false;
   writeMemory(data, length);
   writeRegister(kTxLengthLow, length & 0xFF);
   writeRegister(kTxLengthHigh, length >> 8);
@@ -345,6 +383,8 @@ uint16_t CH390Raw::sendFrame(const uint8_t* data, uint16_t length) {
 }
 
 void CH390Raw::resetReceivePath() {
+  _pendingWireLength = 0;
+  if (!ch390_allow_rx_reset(&_health, millis())) return;
   const uint8_t rcr = readRegister(kRcr);
   writeRegister(kRcr, rcr & ~kRcrReceiveEnable);
   writeRegister(kMemoryPointerControl, kPointerResetRx);
@@ -354,6 +394,7 @@ void CH390Raw::resetReceivePath() {
 }
 
 uint16_t CH390Raw::readFrameSize() {
+  if (_busy || _health.diag.pending) return 0;
   if (_pendingWireLength != 0) {
     return _pendingWireLength - kEthernetCrcLength;
   }
@@ -363,6 +404,8 @@ uint16_t CH390Raw::readFrameSize() {
   const uint8_t ready = readRegister(kMemoryReadNoIncrement);
   if ((ready & 0xFE) != 0) {
     DEBUG_PRINTF("CH390 invalid RX-ready value 0x%02X\n", ready);
+    ++_health.diag.bad_ready;
+    ch390_fault(&_health, 1, millis());
     resetReceivePath();
     return 0;
   }
@@ -375,17 +418,17 @@ uint16_t CH390Raw::readFrameSize() {
   const uint16_t wireLength =
       (static_cast<uint16_t>(header.lengthHigh) << 8) | header.lengthLow;
 
-  if ((header.status & kReceiveErrorMask) != 0 ||
-      wireLength < kEthernetCrcLength ||
-      wireLength > kMaximumWireFrameLength) {
+  if (header.flag != 1 || !ch390_valid_wire_length(wireLength, kMaximumWireFrameLength)) {
+    ++_health.diag.bad_header;
+    ch390_fault(&_health, 2, millis());
+    resetReceivePath();
+    return 0;
+  }
+  if ((header.status & kReceiveErrorMask) != 0) {
+    ++_health.diag.rx_errors;
     DEBUG_PRINTF("CH390 dropping RX frame: status=0x%02X length=%u\n",
                  header.status, wireLength);
-    if (wireLength >= kEthernetCrcLength &&
-        wireLength <= kMaximumWireFrameLength) {
-      discardMemory(wireLength);
-    } else {
-      resetReceivePath();
-    }
+    discardMemory(wireLength);
     return 0;
   }
 

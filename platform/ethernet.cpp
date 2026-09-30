@@ -44,6 +44,9 @@ public:
 	bool begin(SPIClass& spi, int8_t cs, int8_t irq, int8_t reset,
 		uint32_t spi_clock_hz);
 	void end();
+	bool diagnostics(CH390Diagnostics& out) const {
+		return _mac && esp_eth_mac_ch390_diagnostics(_mac, &out) == ESP_OK;
+	}
 
 protected:
 	size_t printDriverInfo(Print& out) const override {
@@ -154,6 +157,7 @@ bool CH390NetworkInterface::begin(SPIClass& spi, int8_t cs, int8_t irq,
 	if (result != ESP_OK && result != ESP_ERR_INVALID_STATE) return false;
 
 	eth_mac_config_t mac_config = ETH_MAC_DEFAULT_CONFIG();
+	mac_config.sw_reset_timeout_ms = 100;
 	eth_phy_config_t phy_config = ETH_PHY_DEFAULT_CONFIG();
 	phy_config.phy_addr = 1;
 	phy_config.reset_gpio_num = reset;
@@ -289,6 +293,24 @@ bool WiredEthernet::config(const IPAddress& local_ip, const IPAddress& gateway,
 #endif
 }
 
+bool WiredEthernet::ch390_diagnostics(CH390Diagnostics& out) const {
+	if (!is_ch390()) return false;
+#if defined(ESP8266)
+	out = ch390.diagnostics();
+	return true;
+#elif defined(ESP32)
+	return ch390.diagnostics(out);
+#endif
+}
+
+bool WiredEthernet::service_ch390() {
+#if defined(ESP8266)
+	return is_ch390() && ch390.service();
+#else
+	return false; // ESP32 services recovery inside the serialized MAC worker.
+#endif
+}
+
 #if defined(ESP8266)
 bool WiredEthernet::begin(const uint8_t* mac_address) {
 	switch (_controller) {
@@ -409,7 +431,12 @@ bool WiredEthernet::connected() const {
 
 bool WiredEthernet::linkUp() const {
 #if defined(ESP8266)
-	return connected();
+	switch (_controller) {
+	case EthernetController::ENC28J60: return enc28j60.isLinked();
+	case EthernetController::W5500: return w5500.isLinked();
+	case EthernetController::CH390: return ch390.isLinked();
+	default: return false;
+	}
 #elif defined(ESP32)
 	return _controller == EthernetController::CH390 ? ch390.linkUp() :
 		_controller == EthernetController::W5500 ? ETH.linkUp() : false;

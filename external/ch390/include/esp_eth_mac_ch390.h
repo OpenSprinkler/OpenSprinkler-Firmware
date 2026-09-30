@@ -11,6 +11,7 @@
 
 #include "esp_eth_com.h"
 #include "esp_eth_mac.h"
+#include "ch390_health.h"
 
 #include "esp_idf_version.h"
 #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 3, 0)
@@ -56,6 +57,9 @@ typedef struct {
 *      - NULL: create MAC instance failed because some error occurred
 */
 esp_eth_mac_t *esp_eth_mac_new_ch390(const eth_ch390_config_t *ch390_config, const eth_mac_config_t *mac_config);
+
+// OpenSprinkler local extension; snapshots are serialized with MAC operations.
+esp_err_t esp_eth_mac_ch390_diagnostics(esp_eth_mac_t *mac, CH390Diagnostics *out);
 
 #ifdef __cplusplus
 }

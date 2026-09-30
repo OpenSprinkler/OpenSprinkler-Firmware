@@ -13,6 +13,7 @@ SERVICE_SOURCES=$(filter-out services/EMailSender.cpp services/espconnect.cpp,$(
 SOURCES=main.cpp OpenSprinkler.cpp $(wildcard api/*.cpp) $(wildcard boards/*.cpp) $(wildcard core/*.cpp) $(wildcard drivers/*.cpp) $(wildcard platform/*.cpp) $(wildcard sensors/*.cpp) $(SERVICE_SOURCES) $(wildcard storage/*.cpp) $(wildcard util/*.cpp) $(wildcard external/TinyWebsockets/tiny_websockets_lib/src/*.cpp) $(wildcard external/OpenThings-Framework-Firmware-Library/*.cpp)
 HEADERS=$(wildcard *.h) $(wildcard *.hpp) $(wildcard api/*.h) $(wildcard boards/*.h) $(wildcard core/*.h) $(wildcard drivers/*.h) $(wildcard platform/*.h) $(wildcard sensors/*.h) $(wildcard services/*.h) $(wildcard storage/*.h) $(wildcard util/*.h) external/ArduinoJson.hpp
 OBJECTS=$(addsuffix .o,$(basename $(SOURCES)))
+HEADERS+=external/ch390/include/ch390_health.h
 
 .PHONY: all
 all: $(BINARY)
@@ -34,7 +35,7 @@ container:
 TEST_HTTP_PORT?=18080
 
 .PHONY: test-api
-test-api: test-board-profiles test-hardware-detection test-storage-files test-sprinkler-log test-firmware-release test-buffer-filler test-string-buffer test-sensor-units test-weather-sensor-cache test-weather-failsafe test-output-sequencer test-bundle-codec test-w5500-frame test-flow-rate-window
+test-api: test-board-profiles test-hardware-detection test-storage-files test-sprinkler-log test-firmware-release test-buffer-filler test-string-buffer test-sensor-units test-weather-sensor-cache test-weather-failsafe test-output-sequencer test-bundle-codec test-w5500-frame test-ch390 test-flow-rate-window
 	$(MAKE) clean
 	$(MAKE) VERSION=DEMO EXTRA_CXXFLAGS="-DHTTP_PORT=$(TEST_HTTP_PORT) -DWEATHER_RESPONSE_TEST_MAX_AGE_MS=2000"
 	python3 tests/api_contract.py --port $(TEST_HTTP_PORT)
@@ -142,4 +143,13 @@ test-bundle-codec:
 test-w5500-frame:
 	@set -e; output=$$(mktemp); trap 'rm -f "$$output"' EXIT; \
 		$(CXX) -std=gnu++14 -I. tests/w5500_frame_test.cpp drivers/w5500_frame.cpp -o "$$output"; \
+		"$$output"
+
+.PHONY: test-ch390
+test-ch390:
+	@set -e; output=$$(mktemp); trap 'rm -f "$$output"' EXIT; \
+		$(CXX) -std=gnu++14 -Wall -Wextra -I. tests/ch390_health_test.cpp -o "$$output"; \
+		"$$output"; \
+		$(CXX) -std=gnu++14 -Wall -Wextra -DARDUINO -DESP8266 -Itests/ch390_stubs -I. \
+			tests/ch390_raw_test.cpp drivers/ch390_raw.cpp -o "$$output"; \
 		"$$output"

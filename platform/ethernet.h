@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdint.h>
+#include "external/ch390/include/ch390_health.h"
 
 enum class EthernetController : uint8_t {
 	None = 0,
@@ -22,6 +23,8 @@ public:
 	const char* controller_name() const;
 	bool is_w5500() const { return _controller == EthernetController::W5500; }
 	bool is_ch390() const { return _controller == EthernetController::CH390; }
+	bool ch390_diagnostics(CH390Diagnostics& diagnostics) const;
+	bool service_ch390();
 
 	bool config(const IPAddress& local_ip, const IPAddress& gateway,
 		const IPAddress& subnet, const IPAddress& dns);
