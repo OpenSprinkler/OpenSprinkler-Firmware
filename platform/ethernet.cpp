@@ -333,6 +333,11 @@ bool WiredEthernet::raw_reinit() {
 	return is_w5500() && w5500.reinitialize();
 }
 #elif defined(ESP32)
+void WiredEthernet::end() {
+	if (is_ch390()) ch390.end();
+	else if (is_w5500()) ETH.end();
+}
+
 void WiredEthernet::set_spi_drive(EthernetController controller) {
 	// CH390 traffic on the OS4 shared-bus path requires slower C6 output edges.
 	const gpio_drive_cap_t drive = controller == EthernetController::CH390 ?

@@ -477,13 +477,19 @@ unsigned char OpenSprinkler::start_ether() {
 	eth.select(has_ch390 ? EthernetController::CH390 : EthernetController::W5500);
 	const uint32_t spi_clock = has_ch390 ? osboard::CH390_SPI_CLOCK_HZ : ETHER_SPI_CLOCK;
 	if (!eth.begin(SPI, PIN_ETHER_CS, PIN_ETHER_IRQ, PIN_ETHER_RESET,
-		spi_clock)) return 0;
+		spi_clock)) {
+		eth.end();
+		return 0;
+	}
 	if (iopts[IOPT_USE_DHCP] == 0) {
 		IPAddress staticip(iopts + IOPT_STATIC_IP1);
 		IPAddress gateway(iopts + IOPT_GATEWAY_IP1);
 		IPAddress dns(iopts + IOPT_DNS_IP1);
 		IPAddress subnet(iopts + IOPT_SUBNET_MASK1);
-		if (!eth.config(staticip, gateway, subnet, dns)) return 0;
+		if (!eth.config(staticip, gateway, subnet, dns)) {
+			eth.end();
+			return 0;
+		}
 	}
 	lcd_print_line_clear_pgm(PSTR("Start wired link"), 1);
 	lcd_print_line_clear_pgm(has_ch390 ? PSTR("  [ch390]    ") : PSTR("  [w5500]    "), 2);
@@ -511,7 +517,9 @@ unsigned char OpenSprinkler::start_ether() {
 		}
 		return 1;
 	}
-	return iopts[IOPT_FORCE_WIRED] ? 1 : 0;
+	if (iopts[IOPT_FORCE_WIRED]) return 1;
+	eth.end(); // WiFi fallback must not leave a second interface/DHCP client running.
+	return 0;
 	#else
 	eth.select(hw_rev == 2 ? EthernetController::ENC28J60 : EthernetController::None);
 
