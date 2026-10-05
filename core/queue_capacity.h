@@ -3,7 +3,7 @@
 #include <cstdint>
 
 #if defined(ESP8266)
-#define RUNTIME_QUEUE_SIZE 96
+#define RUNTIME_QUEUE_SIZE 72
 #elif defined(ESP32)
 #define RUNTIME_QUEUE_SIZE 120
 #else

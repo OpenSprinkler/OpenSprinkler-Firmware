@@ -27,6 +27,7 @@
 #include "core/output_sequencer.h"
 #include "api/server.h"
 #include "platform/gpio.h"
+#include "platform/tls_heap_probe.h"
 #include "boards/hardware_detection.h"
 #ifdef __has_include
 	#if __has_include("testmode.h")
@@ -1886,7 +1887,7 @@ int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char*
 	if(usessl) {
 		WiFiClientSecure *_c = new WiFiClientSecure();
 		_c->setInsecure();
-		bool mfln = _c->probeMaxFragmentLength(server, port, 512);
+		bool mfln = OS_TLS_MEASURE(HttpProbe, _c->probeMaxFragmentLength(server, port, 512));
 		DEBUG_PRINTF("MFLN supported: %s\n", mfln ? "yes" : "no");
 		if (mfln) {
 			_c->setBufferSizes(512, 512);
@@ -1907,7 +1908,8 @@ int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char*
 		DEBUG_PRINT("(");
 		DEBUG_PRINT(tries);
 		DEBUG_PRINTLN(")");
-		if(client->connect(server, port)==1) break;
+		if((usessl ? OS_TLS_MEASURE(HttpConnect, client->connect(server, port))
+			: client->connect(server, port))==1) break;
 		tries++;
 	} while(tries<HTTP_CONNECT_NTRIES);
 

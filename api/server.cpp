@@ -37,6 +37,7 @@
 #include "handlers.h"
 #include "routes.h"
 #include "api/commands.h"
+#include "platform/tls_heap_probe.h"
 
 // External variables defined in main ion file
 extern OTF::OpenThingsFramework *otf;
@@ -2653,6 +2654,16 @@ void server_json_debug(OTF_PARAMS_DEF) {
 		(uint8_t)ESP.getHeapFragmentation());
 	// Core stack watermark: untouched continuation-stack bytes since boot.
 	bfill.emit_p(PSTR(",\"stack_min\":$L"), (uint32_t)ESP.getFreeContStack());
+	#if defined(OS_TLS_HEAP_PROBE)
+	bfill.emit_p(PSTR(",\"tls_heap\":["));
+	for (unsigned i = 0; i < static_cast<unsigned>(TlsHeapPhase::Count); ++i) {
+		const auto& sample = tls_heap_sample(static_cast<TlsHeapPhase>(i));
+		if (i) bfill.emit_p(PSTR(","));
+		bfill.emit_p(PSTR("{\"calls\":$L,\"successes\":$L,\"before\":$L,\"min\":$L,\"lowest\":$L,\"after\":$L,\"oom\":$L}"),
+			sample.calls, sample.successes, sample.before, sample.minimum, sample.lowest, sample.after, sample.oom);
+	}
+	bfill.emit_p(PSTR("]"));
+	#endif
 	bfill.emit_p(PSTR(",\"flash\":$L,\"used\":$L,\"free\":$L,\"pruned\":$L,\"legacy_removed\":$L,\"devip\":\"$S\","),
 		storage.total_bytes, storage.used_bytes, storage.free_bytes, embedded_storage_pruned_files(),
 		embedded_storage_legacy_removed_files(),

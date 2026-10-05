@@ -72,7 +72,7 @@ test-cycle-soak:
 test-runtime-queue:
 	@set -e; output=$$(mktemp); trap 'rm -f "$$output"' EXIT; \
 		for platform in ESP8266 ESP32 DEMO; do \
-			case "$$platform" in ESP8266) capacity=96;; ESP32) capacity=120;; DEMO) capacity=255;; esac; \
+			case "$$platform" in ESP8266) capacity=72;; ESP32) capacity=120;; DEMO) capacity=255;; esac; \
 			$(CXX) -std=gnu++14 -Wall -Wextra -I. -D$$platform \
 				-DEXPECTED_QUEUE_CAPACITY=$$capacity tests/queue_capacity_test.cpp -o "$$output"; \
 			"$$output"; \
