@@ -107,6 +107,72 @@ static void tick(uint32_t now) {
 	scheduler_rebuild_reservations(now);
 }
 
+static void test_insert_running_duplicate() {
+	reset(); policy(1, 60, 60);
+	admit(0, 120); schedule_all_stations(clock_now); tick(1001);
+	clock_now = 1021;
+	admit(0, 30, 2); admit(1, 60, 2);
+	scheduler_select_jobs();
+	assert(ProgramData::station_qid[0] == 0); // unscheduled duplicate cannot own the output
+	schedule_all_stations(clock_now, QUEUE_OPTION_INSERT_FRONT);
+	assert(!OpenSprinkler::is_running(0));
+	assert(logs.size() == 1 && logs[0].duration == 20);
+	assert(ProgramData::queue[0].dur == 100);
+	for (uint32_t now = 1022; ProgramData::nqueue && now < 1600; now++) {
+		tick(now);
+		assert(!(OpenSprinkler::is_running(0) && OpenSprinkler::is_running(1)));
+	}
+	assert(!ProgramData::nqueue);
+	uint32_t original = 0, inserted = 0;
+	for (const auto& log : logs) if (log.station == 0) {
+		if (log.program == 1) original += log.duration;
+		if (log.program == 2) inserted += log.duration;
+	}
+	assert(original == 120 && inserted == 30);
+}
+
+static void test_replace_cooldown() {
+	uint32_t durations[MAX_NUM_STATIONS] = {};
+	uint8_t order[MAX_NUM_STATIONS];
+	for (uint16_t sid = 0; sid < MAX_NUM_STATIONS; sid++) order[sid] = sid;
+	durations[0] = 60;
+	// Replacement while soaking preserves the actual OFF, not the canceled reservation.
+	reset(); policy(0, 60, 120); admit(0, 120);
+	schedule_all_stations(clock_now); tick(1001); tick(1061);
+	clock_now = 1076;
+	assert(scheduler_enqueue_run(durations, order, 2, true) == RunAdmission::Accepted);
+	schedule_all_stations(clock_now);
+	assert(ProgramData::queue[0].st == 1181);
+	tick(1180); assert(!OpenSprinkler::is_running(0));
+	tick(1181); assert(OpenSprinkler::is_running(0));
+
+	// Active governed and manual-bypass runs both establish cooldown on replacement.
+	for (uint8_t pid : {uint8_t(1), uint8_t(MANUAL_PID)}) {
+		reset(); policy(0, 60, 120); admit(0, 120, pid);
+		schedule_all_stations(clock_now); tick(1001); clock_now = 1016;
+		assert(scheduler_enqueue_run(durations, order, 2, true) == RunAdmission::Accepted);
+		assert(!OpenSprinkler::is_running(0));
+		assert(ProgramData::last_off_until[0] == 1136);
+		schedule_all_stations(clock_now);
+		assert(ProgramData::queue[0].st == 1136);
+	}
+
+	// A canceled station that never ran must not leave a predicted soak behind.
+	reset(); policy(0, 60, 120); admit(1, 300); admit(0, 60);
+	schedule_all_stations(clock_now); tick(1001); clock_now = 1016;
+	assert(scheduler_enqueue_run(durations, order, 2, true) == RunAdmission::Accepted);
+	assert(!ProgramData::last_off_until[0]);
+	schedule_all_stations(clock_now);
+	assert(ProgramData::queue[0].st == 1017);
+
+	// Ordinary immediate reset preserves OFF history; explicit clock reset clears it.
+	tick(1017); clock_now = 1020; reset_all_stations_immediate();
+	assert(!ProgramData::nqueue && ProgramData::last_off_until[0] == 1140);
+	assert(ProgramData::cooldown_until[0] == 1140);
+	ProgramData::reset_runtime();
+	assert(!ProgramData::last_off_until[0] && !ProgramData::cooldown_until[0]);
+}
+
 static void preview_fixtures() {
 	puts("[");
 	for (unsigned scenario = 0; scenario < 10; scenario++) {
@@ -153,6 +219,8 @@ static void preview_fixtures() {
 
 int main(int argc, char** argv) {
 	if (argc == 2 && !strcmp(argv[1], "--preview-fixtures")) { preview_fixtures(); return 0; }
+	test_insert_running_duplicate();
+	test_replace_cooldown();
 	// Waiting on the physical output must not consume the cycle's watering time.
 	reset(); policy(0, 60, 60); delay_output = true;
 	admit(0, 120); schedule_all_stations(clock_now); tick(1001); tick(1010);

@@ -1046,8 +1046,9 @@ void server_change_options(OTF_PARAMS_DEF)
 		uint32_t t;
 		t = strtoul(tmp_buffer, NULL, 0);
 #endif
-		// before chaging time, reset all stations to avoid messing up with timing
+		// A clock change invalidates both queued times and station soak deadlines.
 		reset_all_stations_immediate();
+		pd.reset_runtime();
 #if defined(ARDUINO)
 		setTime(t);
 		RTC.set(t);

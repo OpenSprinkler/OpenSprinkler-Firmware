@@ -688,6 +688,8 @@ void scheduler_select_jobs() {
 	memset(pd.station_qid, 0xff, MAX_NUM_STATIONS);
 	for (uint16_t i = 0; i < pd.nqueue; i++) {
 		const auto& q = pd.queue[i];
+		// Newly admitted duplicates cannot own an output before placement.
+		if (!q.st) continue;
 		if (q.cycle_flags & (CYCLE_TAIL | CYCLE_PAUSED)) continue;
 		const uint8_t old = pd.station_qid[q.sid];
 		if (old < pd.nqueue) {
@@ -830,9 +832,17 @@ void reset_all_stations_immediate(bool running_ones_only) {
 		}
 		os.apply_all_station_bits();
 	} else {
+		const time_os_t now = os.now_tz();
+		scheduler_select_jobs();
+		for (uint16_t qi = 0; qi < pd.nqueue; qi++) {
+			auto& q = pd.queue[qi];
+			if (pd.station_qid[q.sid] == qi && os.is_running(q.sid)) remember_off(q, now);
+		}
 		os.clear_all_station_bits();
 		os.apply_all_station_bits();
-		pd.reset_runtime();
+		pd.reset_runtime(false);
+		// Keep actual OFF history, but discard reservations for canceled work.
+		scheduler_rebuild_reservations(now);
 		pd.clear_pause();
 	}
 }

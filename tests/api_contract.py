@@ -886,6 +886,22 @@ def check_cycle_runtime(server):
         assert path.read_bytes() == original
         assert server.get_json("cv", {"re": 0})["result"] == 1
 
+        # Replacement stops a bypass run but must retain its station-wide soak.
+        assert server.get_json("cm", {"sid": 0, "en": 1, "t": 121})["result"] == 1
+        wait_status(lambda value: value["sbits"][0] & 1)
+        assert server.get_json("cr", {"t": "[121,0,0,0,0,0,0,0]", "qo": 2})["result"] == 1
+        value = server.get_json("jc")
+        assert value["nq"] == 1 and not value["sbits"][0] & 1, value
+        assert value["cs"][0][6] >= value["devt"] + 58, value
+
+        # This disposable DEMO exercises the clock-reset path without setting the host clock.
+        assert server.get_json("co", {"ntp": 0, "ttt": value["devt"]})["result"] == 1
+        assert server.get_json("jc")["nq"] == 0
+        assert server.get_json("cr", {"t": "[121,0,0,0,0,0,0,0]"})["result"] == 1
+        value = wait_status(lambda value: value["sbits"][0] & 1)
+        assert value["cs"][0][2] == 1, value
+        stop()
+
         # A malformed file stays untouched and falls back to ordinary watering.
         path.write_bytes(b"bad file")
         assert server.get_json("cm", {"sid": 0, "en": 1, "t": 121, "cs": 1})["result"] == 1
