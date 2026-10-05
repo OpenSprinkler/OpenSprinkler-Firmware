@@ -311,7 +311,7 @@ int main(int argc, char** argv) {
 	// Direct manual runs bypass by default; opt-in and disabled policy are distinct.
 	reset(); policy(0, 60, 60); auto& bypass = admit(0, 120, MANUAL_PID);
 	schedule_all_stations(clock_now);
-	assert(bypass.dur == 120 && !bypass.cycle.cycle_seconds && bypass.cycle.soak_seconds == 60);
+	assert(bypass.dur == 120 && !(bypass.cycle_flags & CYCLE_GOVERNED) && bypass.cycle.soak_seconds == 60);
 	reset(); policy(0, 60, 60); auto& opted = admit(0, 120, MANUAL_PID);
 	opted.cycle_flags |= CYCLE_MANUAL_OPT_IN; schedule_all_stations(clock_now);
 	assert(opted.dur == 60 && opted.cycle.remaining == 60);
@@ -320,7 +320,7 @@ int main(int argc, char** argv) {
 	assert(disabled.dur == 120 && !disabled.cycle.remaining);
 	reset(); policy(0, 60, 60); OpenSprinkler::iopts[IOPT_REMOTE_EXT_MODE] = 1;
 	auto& remote = admit(0, 120); schedule_all_stations(clock_now);
-	assert(remote.dur == 120 && !remote.cycle.cycle_seconds);
+	assert(remote.dur == 120 && !(remote.cycle_flags & CYCLE_GOVERNED));
 
 	// Cancelling while soaking cannot log a phantom run or re-arm later.
 	reset(); policy(0, 60, 60); admit(0, 120); schedule_all_stations(clock_now);
@@ -365,7 +365,7 @@ int main(int argc, char** argv) {
 	ProgramData::cycle_config_error = false;
 	admit(0, 120); schedule_all_stations(clock_now);
 	assert(ProgramData::cycle_config_error && ProgramData::queue[0].dur == 120);
-	assert(!ProgramData::queue[0].cycle.cycle_seconds);
+	assert(!(ProgramData::queue[0].cycle_flags & CYCLE_GOVERNED));
 
 	// Early resume also clears pause for ordinary runs.
 	reset(); admit(0, 120); schedule_all_stations(clock_now); tick(1001);

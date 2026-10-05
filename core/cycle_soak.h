@@ -15,13 +15,14 @@ struct CycleSoakPolicy {
 // currently assigned segment, including any remaining part after a pause.
 struct CycleSoakState {
 	uint32_t remaining = 0;
-	uint32_t cycles_left = 0;
 	uint32_t soak_until = 0;
 	uint32_t prev_end = 0;
 	uint32_t prev_start = 0;
-	uint16_t cycle_seconds = 0;
+	uint16_t cycles_left = 0;
 	uint16_t soak_seconds = 0;
 };
+
+static_assert(sizeof(CycleSoakState) == 20, "Keep cycle progress compact");
 
 enum class CycleSoakStop { Natural, Cancelled };
 

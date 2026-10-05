@@ -128,12 +128,16 @@ public:
 	uint32_t dur; // effective water time after weather/sensor adjustments
 	unsigned char  sid;
 	unsigned char  pid;
+	uint8_t cycle_flags;
+	uint8_t cycle_tail_mask;
 	time_os_t   deque_time; // deque time, which can be larger than st+dur to allow positive master off adjustment time
 	CycleSoakState cycle;
 	time_os_t cycle_on_time;
-	uint8_t cycle_flags;
-	uint8_t cycle_tail_mask;
 };
+
+static_assert(sizeof(RuntimeQueueStruct) == 40, "Keep runtime queue entries compact");
+static_assert((MAX_RUNTIME_DURATION + CYCLE_SOAK_MIN_SECONDS - 1) / CYCLE_SOAK_MIN_SECONDS <= UINT16_MAX,
+	"Cycle count must fit every supported adjusted runtime");
 
 class ProgramData {
 public:

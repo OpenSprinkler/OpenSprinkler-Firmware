@@ -678,6 +678,16 @@ static void process_pending_overcurrent() {
 #endif
 }
 
+// Release the per-station scratch array before the loop enters networking or
+// output handling. Inlining would put it back on every do_loop call path.
+static __attribute__((noinline)) RunAdmission admit_scheduled_program(
+	const ProgramStruct& prog, uint8_t wl, float sensor_adj,
+	const unsigned char* order, unsigned char queue_pid) {
+	uint32_t durations[MAX_NUM_STATIONS];
+	prepare_program_run(prog, wl, sensor_adj, true, durations);
+	return scheduler_enqueue_run(durations, order, queue_pid, false);
+}
+
 /** Main Loop */
 void do_loop()
 {
@@ -1032,9 +1042,7 @@ void do_loop()
 					unsigned char order[os.nstations];
 					prog.gen_station_runorder(runcount, order);
 
-					uint32_t durations[MAX_NUM_STATIONS];
-					prepare_program_run(prog, wl, sensor_adj, true, durations);
-					const auto admission = scheduler_enqueue_run(durations, order, queue_pid, false);
+					const auto admission = admit_scheduled_program(prog, wl, sensor_adj, order, queue_pid);
 					if(admission == RunAdmission::Accepted) {
 						match_found = true;
 						notif.add(NOTIFY_PROGRAM_SCHED, notif_pid, prog.use_weather?wl:100, 0, sensor_adj);

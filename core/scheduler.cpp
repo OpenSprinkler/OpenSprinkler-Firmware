@@ -27,7 +27,7 @@ extern float flow_last_gpm;
 
 namespace {
 
-bool governed(const RuntimeQueueStruct& q) { return q.cycle.cycle_seconds != 0; }
+bool governed(const RuntimeQueueStruct& q) { return q.cycle_flags & CYCLE_GOVERNED; }
 
 void prepare_cycle(RuntimeQueueStruct& q) {
 	if (q.cycle_flags & CYCLE_INITIALIZED) return;
@@ -48,6 +48,7 @@ void prepare_cycle(RuntimeQueueStruct& q) {
 		return;
 	}
 	q.dur = first;
+	if (apply && policy.enabled) q.cycle_flags |= CYCLE_GOVERNED;
 	// A bypass ignores the deadline itself, but contributes cooldown for later work.
 	if (!apply && policy.enabled) q.cycle.soak_seconds = policy.soak_seconds;
 }

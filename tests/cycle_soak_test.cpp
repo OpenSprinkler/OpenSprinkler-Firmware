@@ -45,8 +45,17 @@ void arithmetic() {
 	CycleSoakState s;
 	uint32_t d;
 	const uint32_t largest = std::numeric_limits<uint32_t>::max();
-	assert(cycle_soak_begin(policy(60, 60), largest, true, 0, s, d));
-	assert(uint64_t(s.remaining) + d == largest && d <= 60);
+	d = 123;
+	assert(!cycle_soak_begin(policy(60, 60), largest, true, 0, s, d));
+	assert(d == 123 && !s.remaining && !s.cycles_left);
+	const auto week = split(7UL * 24 * 60 * 60, 60);
+	assert(week.size() == 10080 && std::all_of(week.begin(), week.end(), [](uint32_t v) { return v == 60; }));
+	const uint32_t limit = uint32_t(UINT16_MAX) * 60;
+	assert(cycle_soak_begin(policy(60, 60), limit, true, 0, s, d));
+	assert(d == 60 && s.cycles_left == UINT16_MAX - 1 && s.remaining == limit - 60);
+	const auto before = s;
+	assert(!cycle_soak_begin(policy(60, 60), limit + 1, true, 0, s, d));
+	assert(d == 60 && s.remaining == before.remaining && s.cycles_left == before.cycles_left);
 }
 
 void policy_and_bundle() {

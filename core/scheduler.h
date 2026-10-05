@@ -9,6 +9,7 @@ enum class StationStopReason { Cancelled, Completed, Pause };
 enum CycleQueueFlags : uint8_t {
 	CYCLE_INITIALIZED = 1, CYCLE_STARTED = 2, CYCLE_TAIL = 4,
 	CYCLE_PAUSED = 8, CYCLE_MANUAL_OPT_IN = 16, CYCLE_APPLIED = 32,
+	CYCLE_GOVERNED = 64,
 };
 
 uint8_t get_program_water_percent(const ProgramStruct &prog);

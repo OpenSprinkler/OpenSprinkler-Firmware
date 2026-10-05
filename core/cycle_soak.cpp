@@ -36,10 +36,11 @@ bool cycle_soak_begin(const CycleSoakPolicy& policy, uint32_t total,
 	uint32_t duration = total;
 	if (apply_policy && policy.enabled) {
 		if (!cycle_soak_policy_valid(policy, bundle_minimum)) return false;
-		next.cycle_seconds = policy.cycle_seconds;
+		const uint32_t cycles = total / policy.cycle_seconds + (total % policy.cycle_seconds != 0);
+		if (cycles > std::numeric_limits<uint16_t>::max()) return false;
 		next.soak_seconds = policy.soak_seconds;
 		next.remaining = total;
-		next.cycles_left = total / policy.cycle_seconds + (total % policy.cycle_seconds != 0);
+		next.cycles_left = static_cast<uint16_t>(cycles);
 		duration = assign_cycle(next);
 	}
 	// Retain the existing short Bundle run extension, including on bypass runs.

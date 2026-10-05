@@ -748,7 +748,7 @@ void server_json_controller_main(OTF_PARAMS_DEF) {
 	bool cycle_comma = false;
 	for (uint16_t i = 0; i < pd.nqueue; i++) {
 		const auto& q = pd.queue[i];
-		if (!q.cycle.cycle_seconds) continue;
+		if (!(q.cycle_flags & CYCLE_GOVERNED)) continue;
 		uint8_t state = 0; // waiting, watering, soaking, paused, master tail
 		uint32_t segment = q.dur;
 		if (q.cycle_flags & CYCLE_TAIL) { state = 4; segment = 0; }

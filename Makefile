@@ -36,6 +36,7 @@ TEST_HTTP_PORT?=18080
 
 .PHONY: test-api
 test-api: test-board-profiles test-hardware-detection test-storage-files test-sprinkler-log test-firmware-release test-buffer-filler test-string-buffer test-sensor-units test-weather-sensor-cache test-weather-failsafe test-output-sequencer test-bundle-codec test-w5500-frame test-ch390 test-flow-rate-window test-cycle-soak test-cycle-scheduler test-runtime-queue test-station-extra
+	python3 -B -m unittest tests/test_esp8266_stack_guard.py
 	$(MAKE) clean
 	$(MAKE) VERSION=DEMO EXTRA_CXXFLAGS="-DHTTP_PORT=$(TEST_HTTP_PORT) -DWEATHER_RESPONSE_TEST_MAX_AGE_MS=2000"
 	python3 tests/api_contract.py --port $(TEST_HTTP_PORT)
@@ -71,7 +72,7 @@ test-cycle-soak:
 test-runtime-queue:
 	@set -e; output=$$(mktemp); trap 'rm -f "$$output"' EXIT; \
 		for platform in ESP8266 ESP32 DEMO; do \
-			capacity=120; if [ "$$platform" = DEMO ]; then capacity=255; fi; \
+			case "$$platform" in ESP8266) capacity=96;; ESP32) capacity=120;; DEMO) capacity=255;; esac; \
 			$(CXX) -std=gnu++14 -Wall -Wextra -I. -D$$platform \
 				-DEXPECTED_QUEUE_CAPACITY=$$capacity tests/queue_capacity_test.cpp -o "$$output"; \
 			"$$output"; \
