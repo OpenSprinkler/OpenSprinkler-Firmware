@@ -538,12 +538,13 @@ void overcurrent_monitor() {
 static void stop_output_owner(unsigned char sid, time_os_t curr_time) {
 	unsigned char qid = pd.station_qid[sid];
 	if (qid < pd.nqueue) turn_off_running_station_immediate(sid, curr_time);
-	else {
-		os.set_station_bit(sid, 0);
-		for (RuntimeQueueStruct* q = pd.queue; q < pd.queue + pd.nqueue; q++) {
-			if (q->sid == sid) q->dur = 0;
-		}
+	os.set_station_bit(sid, 0);
+	// A queued second request must not re-energize an overcurrent owner.
+	for (int i = pd.nqueue; i-- > 0;) {
+		if (pd.queue[i].sid == sid) pd.dequeue(i);
 	}
+	scheduler_rebuild_reservations(curr_time);
+	scheduler_select_jobs();
 }
 
 #if defined(ESP8266)
@@ -729,7 +730,7 @@ void do_loop()
 	static time_os_t last_time = 0;
 	static uint32_t last_minute = 0;
 
-	unsigned char bid, sid, s, pid, qid, gid, bitvalue;
+	unsigned char pid;
 	ProgramStruct prog;
 
 	os.status.mas = os.iopts[IOPT_MASTER_STATION];
@@ -990,12 +991,12 @@ void do_loop()
 
 		// ===== Check program switch status =====
 		unsigned char pswitch = os.detect_programswitch_status(curr_time);
-		if(pswitch > 0) {
-			reset_all_stations_immediate(); // immediately stop all stations
-		}
+		bool switch_replaced = false;
 		for (uint8_t i = 0; i < NUM_SENSORS; i++) {
 			if ((pswitch & (1 << i)) && pd.nprograms > i) {
-				manual_start_program(i + 1, 0, QUEUE_OPTION_INSERT_FRONT);
+				const auto result = manual_start_program(i + 1, 0,
+					switch_replaced ? QUEUE_OPTION_INSERT_FRONT : QUEUE_OPTION_REPLACE);
+				if (result == RunAdmission::Accepted) switch_replaced = true;
 			}
 		}
 
@@ -1031,46 +1032,13 @@ void do_loop()
 					unsigned char order[os.nstations];
 					prog.gen_station_runorder(runcount, order);
 
-					// process all selected stations
-					for(unsigned char oi=0;oi<os.nstations;oi++) {
-						sid=order[oi];
-						bid=sid>>3;
-						s=sid&0x07;
-						// skip if the station is a master station (because master cannot be scheduled independently
-						if (os.is_master_station(sid))
-							continue;
-
-						// TODO: compare with old code
-						uint32_t dur = prog.durations[sid];
-						// if station has non-zero water time and the station is not disabled
-						if (dur && !(os.attrib_dis[bid]&(1<<s))) {
-							// water time is scaled by watering percentage
-							uint32_t water_time = water_time_resolve(dur);
-
-							water_time = water_time_scale(water_time, wl, sensor_adj);
-							if (wl < 20 && water_time < 10) { // if water_percentage is less than 20% and water_time is less than 10 seconds, skip watering
-								water_time = 0;
-							}
-
-							if (water_time) {
-								// check if water time is still valid
-								// because it may end up being zero after scaling
-								q = pd.enqueue();
-								if (q) {
-									q->st = 0;
-									q->dur = water_time;
-									q->sid = sid;
-									q->pid = queue_pid;
-									match_found = true;
-								} else {
-									// queue is full
-								}
-							}// if water_time
-						}// if prog.durations[sid]
-					}// for sid
-					if(match_found) {
+					uint32_t durations[MAX_NUM_STATIONS];
+					prepare_program_run(prog, wl, sensor_adj, true, durations);
+					const auto admission = scheduler_enqueue_run(durations, order, queue_pid, false);
+					if(admission == RunAdmission::Accepted) {
+						match_found = true;
 						notif.add(NOTIFY_PROGRAM_SCHED, notif_pid, prog.use_weather?wl:100, 0, sensor_adj);
-					} else {
+					} else if (admission == RunAdmission::Empty) {
 						// program being skipped e.g. due to 0% watering level
 						notif.add(NOTIFY_PROGRAM_SCHED, notif_pid, -1,
 							weather_response_is_current(monotonic_millis()) ? wt_restricted : 0);
@@ -1092,51 +1060,13 @@ void do_loop()
 		// Check if a program is running currently
 		// If so, do station run-time keeping
 		if (os.status.program_busy){
-			// first, go through run time queue to assign queue elements to stations
-			q = pd.queue;
-			qid=0;
-			for(;q<pd.queue+pd.nqueue;q++,qid++) {
-				sid=q->sid;
-				unsigned char sqi=pd.station_qid[sid];
-				// skip if station is already assigned a queue element
-				// and that queue element has an earlier start time
-				if(sqi<255 && pd.queue[sqi].st<q->st) continue;
-				// otherwise assign the queue element to station
-				pd.station_qid[sid]=qid;
-			}
-			// next, go through the stations and perform time keeping
-			for(bid=0;bid<os.nboards; bid++) {
-				bitvalue = os.station_bits[bid];
-				for(s=0;s<8;s++) {
-					unsigned char sid = bid*8+s;
-
-					// skip master stations and any station that's not in the queue
-					if (os.is_master_station(sid)) continue;
-					if (pd.station_qid[sid]==255) continue;
-
-					q = pd.queue + pd.station_qid[sid];
-
-					// if current station is not running, check if we should turn it on
-					if(!((bitvalue >> s) & 1)) {
-						if (curr_time >= q->st && curr_time < q->st+q->dur) {
-							turn_on_station(sid, q->st+q->dur-curr_time); // the last parameter is expected run time
-						} //if curr_time > scheduled_start_time
-					} // if current station is not running
-
-					// check if this station should be turned off
-					if (q->st > 0) {
-						if (curr_time >= q->st+q->dur) {
-							turn_off_station(sid, curr_time);
-						}
-					}
-				}//end_s
-			}//end_bid
+			scheduler_tick_stations(curr_time);
 
 			// finally, go through the queue again and clear up elements marked for removal
 			int qi;
 			for(qi=pd.nqueue-1;qi>=0;qi--) {
 				q=pd.queue+qi;
-				if(!q->dur || curr_time >= q->deque_time) {
+				if(scheduler_queue_expired(*q, curr_time)) {
 					pd.dequeue(qi);
 				}
 			}
@@ -1144,26 +1074,7 @@ void do_loop()
 			// process dynamic events
 			process_dynamic_events(curr_time);
 
-			// check through runtime queue, calculate the last stop time of sequential stations
-			memset(pd.last_seq_stop_times, 0, sizeof(uint32_t)*NUM_SEQ_GROUPS);
-			time_os_t sst;
-			unsigned char re=os.iopts[IOPT_REMOTE_EXT_MODE];
-			q = pd.queue;
-			for(;q<pd.queue+pd.nqueue;q++) {
-				sid = q->sid;
-				bid = sid>>3;
-				s = sid&0x07;
-				gid = os.get_station_gid(sid);
-				// check if any sequential station has a valid stop time
-				// and the stop time must be larger than curr_time
-				sst = q->st + q->dur;
-				if (sst>curr_time) {
-					// only need to update last_seq_stop_time for sequential stations
-					if (os.is_sequential_station(sid) && !re) {
-						pd.last_seq_stop_times[gid] = (sst > pd.last_seq_stop_times[gid]) ? sst : pd.last_seq_stop_times[gid];
-					}
-				}
-			}
+			scheduler_rebuild_reservations(curr_time);
 
 			// if the runtime queue is empty
 			// reset all stations
@@ -1171,7 +1082,7 @@ void do_loop()
 				// turn off all stations
 				os.clear_all_station_bits();
 				os.apply_all_station_bits();
-				pd.reset_runtime(); // reset runtime
+				pd.reset_runtime(false); // retain station cooldown after the final cycle
 				os.status.program_busy = 0; // reset program busy bit
 				pd.clear_pause(); // TODO: what if pause hasn't expired and a new program is scheduled to run?
 
@@ -1195,30 +1106,7 @@ void do_loop()
 			unsigned char mas_id = os.masters[mas][MASOPT_SID];
 
 			if (mas_id) { // if this master station is set
-				int16_t mas_on_adj = os.get_on_adj(mas);
-				int16_t mas_off_adj = os.get_off_adj(mas);
-
-				unsigned char masbit = 0;
-
-				for(sid = 0; sid < os.nstations; sid++) {
-					// skip if this is the master station
-					if (mas_id == sid + 1) continue;
-
-					if(pd.station_qid[sid]==255) continue; // skip if station is not in the queue
-
-					q = pd.queue + pd.station_qid[sid];
-
-					if (bundle_bound_to_master(q->sid, mas)) {
-						// check if timing is within the acceptable range
-						if (curr_time >= q->st + mas_on_adj &&
-							curr_time <= q->st + q->dur + mas_off_adj) {
-							masbit = 1;
-							break;
-						}
-					}
-				}
-
-				os.set_station_bit(mas_id - 1, masbit);
+				os.set_station_bit(mas_id - 1, scheduler_master_active(mas, curr_time));
 			}
 		}
 
@@ -1228,7 +1116,8 @@ void do_loop()
 			}
 			if (os.pause_timer == 0) {
 				os.clear_all_station_bits();
-				pd.clear_pause();
+				if (scheduler_has_cycles()) pd.resume_stations();
+				else pd.clear_pause();
 			}
 		}
 		// process dynamic events

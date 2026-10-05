@@ -26,8 +26,9 @@
 #define MAX_NUM_PROGRAMS    40  // maximum number of programs
 #define MAX_NUM_STARTTIMES  4
 #define PROGRAM_NAME_SIZE   32
-#define RUNTIME_QUEUE_SIZE  MAX_NUM_STATIONS
 #define PROGRAMSTRUCT_SIZE  sizeof(ProgramStruct)
+#include "core/queue_capacity.h"
+#include "core/cycle_soak.h"
 #include "../OpenSprinkler.h"
 #include "../types.h"
 
@@ -128,6 +129,10 @@ public:
 	unsigned char  sid;
 	unsigned char  pid;
 	time_os_t   deque_time; // deque time, which can be larger than st+dur to allow positive master off adjustment time
+	CycleSoakState cycle;
+	time_os_t cycle_on_time;
+	uint8_t cycle_flags;
+	uint8_t cycle_tail_mask;
 };
 
 class ProgramData {
@@ -138,13 +143,17 @@ public:
 	static unsigned char nprograms;  // number of programs
 	static LogStruct lastrun;
 	static time_os_t last_seq_stop_times[]; // the last stop time of a sequential station (for each sequential group respectively)
+	static time_os_t cooldown_until[];
+	static time_os_t last_off_until[];
+	static bool cycle_config_error;
+	static uint32_t queue_rejections; // saturating count of capacity-rejected invocations
 
 	static void toggle_pause(uint32_t delay);
 	static void set_pause();
 	static void resume_stations();
 	static void clear_pause();
 
-	static void reset_runtime();
+	static void reset_runtime(bool clear_cooldowns=true);
 	static RuntimeQueueStruct* enqueue(); // this returns a pointer to the next available slot in the queue
 	static void dequeue(unsigned char qid);  // this removes an element from the queue
 

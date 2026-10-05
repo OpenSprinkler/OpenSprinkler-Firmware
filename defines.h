@@ -58,6 +58,7 @@
 #define IOPTS_FILENAME        "/iopts.dat"
 #define SOPTS_FILENAME        "/sopts.dat"
 #define STATIONS_FILENAME     "/stns.dat"
+#define STATION_EXTRA_FILENAME "/stnx.dat"
 #define NVCON_FILENAME        "/nvcon.dat"
 #define PROG_FILENAME         "/prog.dat"
 #define DONE_FILENAME         "/done.dat"
@@ -65,6 +66,7 @@
 #define IOPTS_FILENAME        "iopts.dat"   // integer options data file
 #define SOPTS_FILENAME        "sopts.dat"   // string options data file
 #define STATIONS_FILENAME     "stns.dat"    // stations data file
+#define STATION_EXTRA_FILENAME "stnx.dat"   // versioned per-station extra settings
 #define NVCON_FILENAME        "nvcon.dat"   // non-volatile controller data file, see OpenSprinkler.h --> struct NVConData
 #define PROG_FILENAME         "prog.dat"    // program data file
 #define DONE_FILENAME         "done.dat"    // used to indicate the completion of all files

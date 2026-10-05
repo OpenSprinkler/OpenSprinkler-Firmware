@@ -35,10 +35,60 @@ container:
 TEST_HTTP_PORT?=18080
 
 .PHONY: test-api
-test-api: test-board-profiles test-hardware-detection test-storage-files test-sprinkler-log test-firmware-release test-buffer-filler test-string-buffer test-sensor-units test-weather-sensor-cache test-weather-failsafe test-output-sequencer test-bundle-codec test-w5500-frame test-ch390 test-flow-rate-window
+test-api: test-board-profiles test-hardware-detection test-storage-files test-sprinkler-log test-firmware-release test-buffer-filler test-string-buffer test-sensor-units test-weather-sensor-cache test-weather-failsafe test-output-sequencer test-bundle-codec test-w5500-frame test-ch390 test-flow-rate-window test-cycle-soak test-cycle-scheduler test-runtime-queue test-station-extra
 	$(MAKE) clean
 	$(MAKE) VERSION=DEMO EXTRA_CXXFLAGS="-DHTTP_PORT=$(TEST_HTTP_PORT) -DWEATHER_RESPONSE_TEST_MAX_AGE_MS=2000"
 	python3 tests/api_contract.py --port $(TEST_HTTP_PORT)
+
+.PHONY: test-cycle-soak test-runtime-queue test-station-extra
+.PHONY: test-cycle-scheduler
+APP_SOURCE ?= tmp/cycle-soak-app
+.PHONY: test-cycle-preview
+test-cycle-preview:
+	@set -e; output=$$(mktemp); trap 'rm -f "$$output"' EXIT; \
+		$(CXX) -std=gnu++14 -DDEMO -Wall -I. \
+			-Iexternal/TinyWebsockets/tiny_websockets_lib/include \
+			-Iexternal/OpenThings-Framework-Firmware-Library \
+			-ffunction-sections -fdata-sections tests/cycle_scheduler_test.cpp \
+			core/scheduler.cpp core/program.cpp core/cycle_soak.cpp \
+			-Wl,--gc-sections -o "$$output"; \
+		"$$output" --preview-fixtures | node tests/cycle_preview_compare.cjs "$(APP_SOURCE)"
+
+test-cycle-scheduler:
+	@set -e; output=$$(mktemp); trap 'rm -f "$$output"' EXIT; \
+		$(CXX) -std=gnu++14 -DDEMO -Wall -I. \
+			-Iexternal/TinyWebsockets/tiny_websockets_lib/include \
+			-Iexternal/OpenThings-Framework-Firmware-Library \
+			-ffunction-sections -fdata-sections tests/cycle_scheduler_test.cpp \
+			core/scheduler.cpp core/program.cpp core/cycle_soak.cpp \
+			-Wl,--gc-sections -o "$$output"; "$$output"
+
+test-cycle-soak:
+	@set -e; output=$$(mktemp); trap 'rm -f "$$output"' EXIT; \
+		$(CXX) -std=gnu++14 -Wall -Wextra -I. tests/cycle_soak_test.cpp core/cycle_soak.cpp -o "$$output"; \
+		"$$output"
+
+test-runtime-queue:
+	@set -e; output=$$(mktemp); trap 'rm -f "$$output"' EXIT; \
+		for platform in ESP8266 ESP32 DEMO; do \
+			capacity=120; if [ "$$platform" = DEMO ]; then capacity=255; fi; \
+			$(CXX) -std=gnu++14 -Wall -Wextra -I. -D$$platform \
+				-DEXPECTED_QUEUE_CAPACITY=$$capacity tests/queue_capacity_test.cpp -o "$$output"; \
+			"$$output"; \
+		done; \
+		$(CXX) -std=gnu++14 -DDEMO -Wall -I. \
+			-Iexternal/TinyWebsockets/tiny_websockets_lib/include \
+			-Iexternal/OpenThings-Framework-Firmware-Library \
+			-ffunction-sections -fdata-sections tests/runtime_queue_test.cpp core/program.cpp \
+			-Wl,--gc-sections -o "$$output"; \
+		"$$output"
+
+test-station-extra:
+	@set -e; output=$$(mktemp); data=$$(mktemp -d); trap 'rm -f "$$output"; rm -rf "$$data"' EXIT; \
+		$(CXX) -std=gnu++14 -DDEMO -Wall -Wextra -I. tests/station_extra_test.cpp \
+			storage/station_extra.cpp core/cycle_soak.cpp storage/files.cpp \
+			storage/maintenance.cpp storage/sprinkler_log.cpp -o "$$output"; \
+		"$$output" "$$data"
 
 .PHONY: test-board-profiles
 test-board-profiles:

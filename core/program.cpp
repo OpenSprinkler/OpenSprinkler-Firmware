@@ -25,6 +25,7 @@
 #include "program.h"
 #include "../core/scheduler.h"
 #include "../storage/logging.h"
+#include "storage/station_extra.h"
 
 #if !defined(SECS_PER_DAY)
 #define SECS_PER_MIN  (60UL)
@@ -39,18 +40,31 @@ RuntimeQueueStruct ProgramData::queue[RUNTIME_QUEUE_SIZE];
 unsigned char ProgramData::station_qid[MAX_NUM_STATIONS];
 LogStruct ProgramData::lastrun;
 time_os_t ProgramData::last_seq_stop_times[NUM_SEQ_GROUPS];
+time_os_t ProgramData::cooldown_until[MAX_NUM_STATIONS];
+time_os_t ProgramData::last_off_until[MAX_NUM_STATIONS];
+bool ProgramData::cycle_config_error = false;
+uint32_t ProgramData::queue_rejections = 0;
 
 extern char tmp_buffer[];
 
 void ProgramData::init() {
 	reset_runtime();
 	load_count();
+	for (uint16_t sid = 0; sid < os.nstations; sid++) {
+		CycleSoakPolicy policy;
+		const auto result = station_extra_load(sid, MAX_NUM_STATIONS, policy);
+		if (result != StationExtraResult::Ok && result != StationExtraResult::Missing) cycle_config_error = true;
+	}
 }
 
-void ProgramData::reset_runtime() {
+void ProgramData::reset_runtime(bool clear_cooldowns) {
 	memset(station_qid, 0xFF, MAX_NUM_STATIONS);  // reset station qid to 0xFF
 	nqueue = 0;
 	memset(last_seq_stop_times, 0, sizeof(last_seq_stop_times));
+	if (clear_cooldowns) {
+		memset(cooldown_until, 0, sizeof(cooldown_until));
+		memset(last_off_until, 0, sizeof(last_off_until));
+	}
 }
 
 /** Insert a new element to the queue
@@ -59,6 +73,7 @@ void ProgramData::reset_runtime() {
  */
 RuntimeQueueStruct* ProgramData::enqueue() {
 	if (nqueue < RUNTIME_QUEUE_SIZE) {
+		queue[nqueue] = {};
 		nqueue ++;
 		return queue + (nqueue-1);
 	} else {
@@ -74,6 +89,7 @@ RuntimeQueueStruct* ProgramData::enqueue() {
 // this removes an element from the queue
 void ProgramData::dequeue(unsigned char qid) {
 	if (qid>=nqueue)	return;
+	if (station_qid[queue[qid].sid] == qid) station_qid[queue[qid].sid] = 0xFF;
 	if (qid<nqueue-1) {
 		queue[qid] = queue[nqueue-1]; // copy the last element to the dequeud element to fill the space
 		if(station_qid[queue[qid].sid] == nqueue-1) // fix queue index if necessary
@@ -142,21 +158,23 @@ bool ProgramData::moveup(unsigned char pid) {
 void ProgramData::toggle_pause(uint32_t delay) {
 	if (os.status.pause_state) { // was paused
 		resume_stations();
+		os.status.pause_state = 0;
 	} else {
 		//os.clear_all_station_bits(); // TODO: this will affect logging
 		os.pause_timer = delay;
 		set_pause();
+		os.status.pause_state = 1;
 	}
-	os.status.pause_state = !os.status.pause_state;
 }
 
 void ProgramData::set_pause() {
 	RuntimeQueueStruct *q = queue;
 	time_os_t curr_t = os.now_tz();
+	if (scheduler_pause_cycles(curr_t)) return;
 
 	for (; q < queue + nqueue; q++) {
 
-		turn_off_station(q->sid, curr_t);
+		turn_off_station(q->sid, curr_t, 0, StationStopReason::Pause);
 		if (curr_t>=q->st+q->dur) { // already finished running
 			continue;
 		} else if (curr_t>=q->st) { // currently running
@@ -176,6 +194,11 @@ void ProgramData::set_pause() {
 }
 
 void ProgramData::resume_stations() {
+	if (scheduler_resume_cycles(os.now_tz())) {
+		os.status.pause_state = 0;
+		os.pause_timer = 0;
+		return;
+	}
 	RuntimeQueueStruct *q = queue;
 	for (; q < queue + nqueue; q++) {
 		q->st -= os.pause_timer;

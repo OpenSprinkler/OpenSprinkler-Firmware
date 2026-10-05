@@ -34,6 +34,7 @@
 	#endif
 #endif
 #include "core/program.h"
+#include "core/scheduler.h"
 #include "drivers/ch390_raw.h"
 #include "services/weather.h"
 #include "storage/maintenance.h"
@@ -1313,6 +1314,7 @@ void OpenSprinkler::apply_all_station_bits(void (*post_activation_callback)()) {
 #endif
 		hardware_output_initialized = true;
 		last_hardware_output_write_ms = millis();
+		if (transition.rising_sid >= 0) scheduler_output_applied(transition.rising_sid, now_tz());
 		if (transition.rising_sid >= 0 && bundle_is_station(static_cast<unsigned char>(transition.rising_sid))) {
 			bundle_output_dirty = true;
 		}
@@ -1340,9 +1342,11 @@ void OpenSprinkler::apply_all_station_bits(void (*post_activation_callback)()) {
 				uint32_t dur = 0;
 				if(on) {
 					unsigned char sqi=pd.station_qid[next_sid_to_refresh];
-					RuntimeQueueStruct *q=pd.queue+sqi;
-					if(sqi<255 && q->st>0 && q->st+q->dur>curr_time) {
-						dur = q->st+q->dur-curr_time;
+					if (sqi < pd.nqueue) {
+						const RuntimeQueueStruct& q = pd.queue[sqi];
+						if (q.st > 0 && curr_time >= q.st && q.st + q.dur > curr_time) {
+							dur = q.st + q.dur - curr_time;
+						}
 					}
 				}
 				switch_special_station(next_sid_to_refresh, on, dur);
@@ -2225,6 +2229,7 @@ void OpenSprinkler::factory_reset() {
 	remove_file(SENSORS_FILENAME);
 	remove_sensor_log();
 	remove_file(SENADJ_FILENAME);
+	remove_file(STATION_EXTRA_FILENAME);
 
 	// 5. write 'done' file
 	file_write_byte(DONE_FILENAME, 0, 1);

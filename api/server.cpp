@@ -744,7 +744,26 @@ void server_json_controller_main(OTF_PARAMS_DEF) {
 	}
 
 	unsigned char gpioList[] = PIN_FREE_LIST;
-	bfill.emit_p(PSTR(",\"gpio\":["));
+	bfill.emit_p(PSTR(",\"cs\":["));
+	bool cycle_comma = false;
+	for (uint16_t i = 0; i < pd.nqueue; i++) {
+		const auto& q = pd.queue[i];
+		if (!q.cycle.cycle_seconds) continue;
+		uint8_t state = 0; // waiting, watering, soaking, paused, master tail
+		uint32_t segment = q.dur;
+		if (q.cycle_flags & CYCLE_TAIL) { state = 4; segment = 0; }
+		else if (q.cycle_flags & CYCLE_PAUSED) state = 3;
+		else if (q.cycle_flags & CYCLE_APPLIED) {
+			state = 1;
+			segment = curr_time < q.st + q.dur ? q.st + q.dur - curr_time : 0;
+		} else if (curr_time < q.cycle.soak_until) state = 2;
+		if (cycle_comma) bfill.emit_p(PSTR(","));
+		cycle_comma = true;
+		bfill.emit_p(PSTR("[$D,$D,$D,$L,$L,$L,$L,$L]"), q.sid, q.pid, state,
+			q.cycle.remaining + segment, segment, q.cycle.soak_until, q.st, q.cycle.cycles_left);
+	}
+	bfill.emit_p(PSTR("]"));
+	bfill.emit_p(PSTR(",\"cserr\":$D,\"qrej\":$L,\"gpio\":["), pd.cycle_config_error, pd.queue_rejections);
 	for (unsigned char i = 0; i < sizeof(gpioList); ++i)
 	{
 		if(i != sizeof(gpioList) - 1) {
@@ -2632,6 +2651,8 @@ void server_json_debug(OTF_PARAMS_DEF) {
 	bfill.emit_p(PSTR(",\"maxblock\":$L,\"frag\":$D"),
 		(uint32_t)ESP.getMaxFreeBlockSize(),
 		(uint8_t)ESP.getHeapFragmentation());
+	// Core stack watermark: untouched continuation-stack bytes since boot.
+	bfill.emit_p(PSTR(",\"stack_min\":$L"), (uint32_t)ESP.getFreeContStack());
 	bfill.emit_p(PSTR(",\"flash\":$L,\"used\":$L,\"free\":$L,\"pruned\":$L,\"legacy_removed\":$L,\"devip\":\"$S\","),
 		storage.total_bytes, storage.used_bytes, storage.free_bytes, embedded_storage_pruned_files(),
 		embedded_storage_legacy_removed_files(),

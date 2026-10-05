@@ -5,6 +5,7 @@ import argparse
 import http.server
 import json
 import socket
+import struct
 import subprocess
 import tempfile
 import threading
@@ -830,6 +831,132 @@ def check_debug(value):
     assert value["sprlog_mismatch"] == 0
 
 
+def check_cycle_runtime(server):
+    path = Path(server.temp_dir.name) / "stnx.dat"
+    assert server.get_json("cs", {"sid": 0, "cse": 1, "csc": 60, "css": 60})["result"] == 1
+    stations = server.get_json("jn")
+    assert stations["csver"] == 1 and stations["qmax"] == 255
+    assert stations["cs"][0] == [1, 60, 60]
+    original = path.read_bytes()
+    for bad in ("", "60junk", "-1", "59", "14401"):
+        assert server.get_json("cs", {"sid": 0, "csc": bad})["result"] == 0x11
+        assert path.read_bytes() == original
+
+    def wait_status(predicate):
+        deadline = time.monotonic() + 4
+        while time.monotonic() < deadline:
+            value = server.get_json("jc")
+            if predicate(value):
+                return value
+            time.sleep(0.05)
+        raise AssertionError(value)
+
+    def stop():
+        assert server.get_json("cv", {"rsn": 1})["result"] == 1
+        wait_status(lambda value: value["nq"] == 0)
+
+    try:
+        # Run Once consumes the policy. 121 seconds splits into 41+40+40.
+        assert server.get_json("cr", {"t": "[121,0,0,0,0,0,0,0]"})["result"] == 1
+        value = wait_status(lambda value: value["ps"][0][0] != 0)
+        assert 38 <= value["ps"][0][1] <= 41, value
+        assert value["cs"][0][0] == 0 and value["cs"][0][3] >= 118, value
+        assert server.get_json("cs", {"sid": 0, "csc": 120})["result"] == 1
+        assert server.get_json("jc")["cs"][0][4] <= 41  # live chain keeps its snapshot
+        stop()
+        assert server.get_json("cs", {"sid": 0, "csc": 60})["result"] == 1
+
+        # Direct manual control remains a bypass unless explicitly opted in.
+        assert server.get_json("cm", {"sid": 0, "en": 1, "t": 121})["result"] == 1
+        value = wait_status(lambda value: value["ps"][0][0] != 0)
+        assert value["ps"][0][1] > 100, value
+        stop()
+        assert server.get_json("cm", {"sid": 0, "en": 1, "t": 121, "cs": 1})["result"] == 1
+        value = wait_status(lambda value: value["ps"][0][0] != 0)
+        assert 38 <= value["ps"][0][1] <= 41, value
+        stop()
+        assert server.get_json("cm", {"sid": 0, "en": 1, "t": 121, "cs": 2})["result"] == 0x11
+
+        # RE bypasses even the explicit flag. No change to stored policy.
+        assert server.get_json("cv", {"re": 1})["result"] == 1
+        assert server.get_json("cm", {"sid": 0, "en": 1, "t": 121, "cs": 1})["result"] == 1
+        value = wait_status(lambda value: value["ps"][0][0] != 0)
+        assert value["ps"][0][1] > 100, value
+        stop()
+        assert path.read_bytes() == original
+        assert server.get_json("cv", {"re": 0})["result"] == 1
+
+        # A malformed file stays untouched and falls back to ordinary watering.
+        path.write_bytes(b"bad file")
+        assert server.get_json("cm", {"sid": 0, "en": 1, "t": 121, "cs": 1})["result"] == 1
+        value = wait_status(lambda value: value["ps"][0][0] != 0)
+        assert value["ps"][0][1] > 100, value
+        assert path.read_bytes() == b"bad file"
+        assert value["cserr"] == 1, value
+        stop()
+        assert server.get_json("cs", {"csreset": 1})["result"] == 1
+        assert server.get_json("jn")["cs"][0] == [0, 0, 0]
+        assert server.get_json("jc")["cserr"] == 0
+    finally:
+        server.get_json("cv", {"rsn": 1, "re": 0})
+        path.unlink(missing_ok=True)
+    print("PASS cycle/soak runtime admission integration")
+
+
+def check_atomic_admission(server):
+    # Long durations keep this independent of wall-clock progress while filling
+    # the production Linux queue to its 255-slot boundary.
+    program_id = server.get_json("jp")["nprogs"]
+    packed = json.dumps([1, 127, 0, [0, 0, 0, 0], [1200, 1200, 0, 0, 0, 0, 0, 0]], separators=(",", ":"))
+    assert server.get_json("cp", {"pid": -1, "v": packed, "name": "Atomic admission"})["result"] == 1
+    try:
+        for sid in range(8):
+            assert server.get_json("cs", {"sid": sid, "cse": 1, "csc": 1200, "css": 60})["result"] == 1
+        for _ in range(31):
+            assert server.get_json("cr", {"t": "[1200,1200,1200,1200,1200,1200,1200,1200]", "qo": 0})["result"] == 1
+        assert server.get_json("cr", {"t": "[1200,1200,1200,1200,1200,1200,0,0]", "qo": 0})["result"] == 1
+        deadline = time.monotonic() + 3
+        before = server.get_json("jc")
+        while before["ps"][0][0] == 0 and time.monotonic() < deadline:
+            time.sleep(0.05)
+            before = server.get_json("jc")
+        assert before["ps"][0][0] != 0, before
+        assert before["nq"] == 254, before
+        starts = [station[2] for station in before["ps"]]
+        programs_before = server.get_json("jp")
+        # Neither insertion nor the repeat-save side effect can precede admission.
+        assert server.get_json("cr", {
+            "t": "[1200,1200,0,0,0,0,0,0]", "qo": 1, "cnt": 2, "int": 10
+        })["result"] == 0x30
+        result = server.get_json("mp", {"pid": program_id, "qo": 1})
+        assert result["result"] == 0x30, (result, server.get_json("jp"), server.get_json("jc"))
+        after = server.get_json("jc")
+        assert after["nq"] == 254 and after["qrej"] == before["qrej"] + 2, after
+        assert [station[2] for station in after["ps"]] == starts
+        assert server.get_json("jp") == programs_before
+        assert server.get_json("cr", {"t": "[1200,0,0,0,0,0,0,0]", "qo": 0})["result"] == 1
+        assert server.get_json("jc")["nq"] == 255
+        assert len(server.get_json("jc")["cs"]) == 255
+        assert server.get_json("cr", {"t": "[1200,0,0,0,0,0,0,0]", "qo": 0})["result"] == 0x30
+        # Empty or malformed replacements do not discard accepted work.
+        assert server.get_json("cr", {"t": "[0,0,0,0,0,0,0,0]", "qo": 2})["result"] == 0x10
+        assert server.get_json("cr", {"t": "[oops]", "qo": 2})["result"] != 1
+        assert server.get_json("jc")["nq"] == 255
+        assert server.get_json("mp", {"pid": program_id, "qo": 2})["result"] == 1
+        assert server.get_json("jc")["nq"] == 2
+        # A successful repeated Run Once both persists its repeat and replaces the queue.
+        assert server.get_json("cr", {
+            "t": "[1200,0,0,0,0,0,0,0]", "cnt": 2, "int": 10, "qo": 2
+        })["result"] == 1
+        assert server.get_json("jc")["nq"] == 1
+        assert server.get_json("jp")["nprogs"] == programs_before["nprogs"] + 1
+    finally:
+        server.get_json("cv", {"rsn": 1})
+        server.get_json("dp", {"pid": -1})
+        server.get_json("cs", {"csreset": 1})
+    print("PASS atomic program/Run Once admission at queue capacity")
+
+
 def run_contract(server):
     checks = [
         ("jo", check_options),
@@ -865,6 +992,10 @@ def main():
 
     with DemoServer(binary, args.port) as server:
         run_contract(server)
+    with DemoServer(binary, args.port) as server:
+        check_cycle_runtime(server)
+    with DemoServer(binary, args.port) as server:
+        check_atomic_admission(server)
 
 
 if __name__ == "__main__":
