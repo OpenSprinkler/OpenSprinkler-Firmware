@@ -173,9 +173,134 @@ static void test_replace_cooldown() {
 	assert(!ProgramData::last_off_until[0] && !ProgramData::cooldown_until[0]);
 }
 
+static uint32_t random_state = 1;
+static uint32_t random_below(uint32_t limit) {
+	random_state = random_state * 1664525U + 1013904223U;
+	return random_state % limit;
+}
+
+static void test_gap_boundaries() {
+	// Exact fit, or one second too short, including delay on both sides.
+	for (int delay : {0, 5}) for (int short_by : {0, 1}) {
+		reset(); policy(0, 60, 60); station_delay = delay;
+		admit(0, 120); admit(1, 60); schedule_all_stations(clock_now);
+		ProgramData::queue[1].st = 1181 + delay - short_by;
+		ProgramData::queue[1].deque_time = ProgramData::queue[1].st + 60;
+		tick(1001); tick(1061);
+		assert(ProgramData::queue[0].st == (short_by ? 1240U + 2 * delay : 1121U));
+	}
+	// The raw window fits, but the negative master ON lead moves it into a booking.
+	reset(); policy(0, 60, 60); admit(0, 120); admit(1, 60);
+	schedule_all_stations(clock_now); tick(1001);
+	bindings[0] = 1; OpenSprinkler::masters[0][MASOPT_SID] = 8; on_adj[0] = -90;
+	ProgramData::queue[1].st = 1241; ProgramData::queue[1].deque_time = 1301;
+	tick(1061); assert(ProgramData::queue[0].st == 1301);
+
+	// Another station's master tail does not occupy a watering gap.
+	reset(); policy(0, 60, 60); admit(0, 120); auto& tail = admit(1, 1);
+	tail.cycle_flags = CYCLE_TAIL; tail.dur = 0; tail.st = 1000;
+	tail.cycle.prev_end = tail.deque_time = 2000;
+	schedule_all_stations(clock_now); tick(1001); tick(1061);
+	assert(ProgramData::queue[0].st == 1121);
+
+	// Duplicate requests, including paused ones, opt out even if a gap would fit.
+	for (bool paused : {false, true}) {
+		reset(); policy(0, 60, 60); admit(0, 120); admit(1, 60); admit(0, 60);
+		schedule_all_stations(clock_now);
+		ProgramData::queue[1].st = 1401; ProgramData::queue[1].deque_time = 1461;
+		ProgramData::queue[2].st = 1601; ProgramData::queue[2].deque_time = 1661;
+		if (paused) ProgramData::queue[2].cycle_flags |= CYCLE_PAUSED;
+		tick(1001); tick(1061);
+		assert(ProgramData::queue[0].st == (paused ? 1461U : 1721U));
+	}
+	// A missed first window is not a naturally completed cycle: still append.
+	reset(); policy(0, 60, 60); admit(0, 120); admit(1, 60);
+	schedule_all_stations(clock_now);
+	ProgramData::queue[1].st = 1401; ProgramData::queue[1].deque_time = 1461;
+	tick(1061); assert(ProgramData::queue[0].st == 1461);
+
+	// Full-queue fragmented gaps, in either physical queue order. The scan needs
+	// no scratch array and cannot depend on swap-delete's storage order.
+	for (bool reverse : {false, true}) {
+		reset(); policy(0, 60, 60); admit(0, 120); schedule_all_stations(clock_now);
+		for (uint16_t i = 1; i < RUNTIME_QUEUE_SIZE; i++) {
+			auto& reservation = admit(1, 1);
+			const uint16_t slot = reverse ? RUNTIME_QUEUE_SIZE - i - 1 : i - 1;
+			reservation.st = 1121 + 2 * slot;
+			reservation.deque_time = reservation.st + 1;
+		}
+		tick(1001); tick(1061);
+		assert(ProgramData::queue[0].st == 1122U + 2 * (RUNTIME_QUEUE_SIZE - 2));
+	}
+}
+
+static void test_gap_randomized() {
+	for (uint32_t seed = 1; seed <= 400; seed++) {
+		reset(); random_state = seed;
+		station_delay = random_below(11);
+		uint32_t requested[4], last_off[4] = {}, watered[4] = {};
+		for (uint8_t sid = 0; sid < 4; sid++) {
+			policy(sid, 60 + random_below(181), 60 + random_below(541));
+			requested[sid] = 61 + random_below(900);
+			admit(sid, requested[sid]);
+		}
+		schedule_all_stations(clock_now);
+		size_t checked = 0;
+		for (uint32_t now = 1001; ProgramData::nqueue && now < 30000; now++) {
+			tick(now);
+			unsigned running = 0;
+			for (uint8_t sid = 0; sid < 4; sid++) running += bool(OpenSprinkler::is_running(sid));
+			assert(running <= 1);
+			while (checked < events.size()) {
+				const auto& event = events[checked++];
+				if (event.on && last_off[event.sid]) assert(event.time >= last_off[event.sid] + policies[event.sid].soak_seconds);
+				if (!event.on) last_off[event.sid] = event.time;
+			}
+		}
+		assert(!ProgramData::nqueue);
+		for (const auto& log : logs) {
+			assert(log.duration <= policies[log.station].cycle_seconds);
+			watered[log.station] += log.duration;
+		}
+		for (uint8_t sid = 0; sid < 4; sid++) assert(watered[sid] == requested[sid]);
+	}
+}
+
+// Compile this same harness against the pre-gap scheduler to compare complete
+// feature-off output traces, including insertion, replacement and interruption.
+static void feature_off_traces() {
+	for (unsigned mode = 0; mode < 5; mode++) for (unsigned seed = 1; seed <= 100; seed++) {
+		reset(); random_state = seed;
+		station_delay = int16_t(random_below(21)) - 10;
+		for (uint8_t sid = 0; sid < 4; sid++) {
+			groups[sid] = random_below(3);
+			admit(sid, 30 + random_below(180));
+		}
+		schedule_all_stations(clock_now);
+		for (unsigned now = 1001; now < 3000; now++) {
+			clock_now = now;
+			if (now == 1050 || now == 1100 || now == 1200) {
+				if (mode < 3) {
+					if (mode == 2) reset_all_stations_immediate();
+					for (uint8_t sid = 0; sid < 4; sid++) admit(sid, 10 + random_below(120), 2);
+					schedule_all_stations(now, mode == 1 ? QUEUE_OPTION_INSERT_FRONT : QUEUE_OPTION_APPEND);
+				} else if (mode == 3) {
+					turn_off_station(random_below(4), now, 1);
+				} else ProgramData::toggle_pause(20);
+			}
+			if (mode == 4 && (now == 1060 || now == 1110 || now == 1210)) ProgramData::toggle_pause(0);
+			tick(now);
+		}
+		assert(!ProgramData::nqueue);
+		printf("%u:%u", mode, seed);
+		for (const auto& event : events) printf(" %u,%u,%u", event.time, event.sid, event.on);
+		puts("");
+	}
+}
+
 static void preview_fixtures() {
 	puts("[");
-	for (unsigned scenario = 0; scenario < 10; scenario++) {
+	for (unsigned scenario = 0; scenario < 50; scenario++) {
 		reset(); policy(0, 60, 60); policy(1, 60, 60);
 		if (scenario == 2) { policy(0, 600, 1800); policy(1, 300, 600); }
 		if (scenario == 3) station_delay = -10;
@@ -191,8 +316,19 @@ static void preview_fixtures() {
 			bindings[0] = bindings[1] = 1; OpenSprinkler::masters[0][MASOPT_SID] = 8;
 			on_adj[0] = 1000; off_adj[0] = 120;
 		}
-		admit(0, scenario == 0 ? 121 : scenario == 2 ? 1200 : 120);
-		if (scenario != 0) admit(scenario == 1 ? 0 : 1, scenario == 2 ? 600 : 60, 2);
+		if (scenario == 10) { policy(0, 900, 600); policy(1, 60, 60); }
+		if (scenario > 10) {
+			random_state = scenario;
+			policy(0, 60 + random_below(541), 60 + random_below(1801));
+			policy(1, 60 + random_below(181), 60 + random_below(601));
+			station_delay = scenario % 3 ? random_below(31) : -10;
+			if (scenario % 4 == 0) {
+				bindings[0] = bindings[1] = 1; OpenSprinkler::masters[0][MASOPT_SID] = 8;
+				on_adj[0] = -int16_t(random_below(151)); off_adj[0] = random_below(91);
+			}
+		}
+		admit(0, scenario == 10 ? 3600 : scenario > 10 ? 61 + random_below(1800) : scenario == 0 ? 121 : scenario == 2 ? 1200 : 120);
+		if (scenario != 0) admit(scenario == 1 ? 0 : 1, scenario == 10 ? 3600 : scenario > 10 ? 61 + random_below(900) : scenario == 2 ? 600 : 60, 2);
 		printf("%s{\"scenario\":%u,\"delay\":%d,\"remote\":%s,\"policies\":[", scenario ? "," : "", scenario, station_delay,
 			OpenSprinkler::iopts[IOPT_REMOTE_EXT_MODE] ? "true" : "false");
 		for (unsigned sid = 0; sid < 2; sid++) printf("%s[%u,%u,%u]", sid ? "," : "", policies[sid].enabled, policies[sid].cycle_seconds, policies[sid].soak_seconds);
@@ -204,7 +340,7 @@ static void preview_fixtures() {
 			printf("%s{\"sid\":%u,\"pid\":%u,\"gid\":%u,\"dur\":%u}", i ? "," : "", q.sid, q.pid, groups[q.sid], unsigned(q.dur));
 		}
 		schedule_all_stations(clock_now);
-		for (unsigned now = 1001; ProgramData::nqueue && now < 10000; now++) tick(now);
+		for (unsigned now = 1001; ProgramData::nqueue && now < 100000; now++) tick(now);
 		assert(!ProgramData::nqueue);
 		printf("],\"segments\":[");
 		for (unsigned i = 0; i < logs.size(); i++) {
@@ -219,8 +355,11 @@ static void preview_fixtures() {
 
 int main(int argc, char** argv) {
 	if (argc == 2 && !strcmp(argv[1], "--preview-fixtures")) { preview_fixtures(); return 0; }
+	if (argc == 2 && !strcmp(argv[1], "--feature-off-traces")) { feature_off_traces(); return 0; }
 	test_insert_running_duplicate();
 	test_replace_cooldown();
+	test_gap_boundaries();
+	test_gap_randomized();
 	// Waiting on the physical output must not consume the cycle's watering time.
 	reset(); policy(0, 60, 60); delay_output = true;
 	admit(0, 120); schedule_all_stations(clock_now); tick(1001); tick(1010);
@@ -420,11 +559,11 @@ int main(int argc, char** argv) {
 	tick(1001); tick(1031); tick(1100);
 	assert(ProgramData::queue[0].st == 1160 && ProgramData::queue[1].st == 1190);
 
-	// Different timings exercise append's deliberate idle gap in the real scheduler.
+	// A natural re-arm fills an idle gap without moving the longer-soak reservation.
 	reset(); policy(0, 600, 1800); policy(1, 300, 600);
 	admit(0, 1200); admit(1, 600); schedule_all_stations(clock_now);
 	tick(1001); tick(1601); tick(1901);
-	assert(ProgramData::queue[0].st == 3401 && ProgramData::queue[1].st == 4001);
+	assert(ProgramData::queue[0].st == 3401 && ProgramData::queue[1].st == 2501);
 
 	// Bundle minimum changes do not reject the invocation at runtime.
 	reset(); policy(0, 60, 60); bundle_min[0] = 3;

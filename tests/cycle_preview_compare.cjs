@@ -14,7 +14,7 @@ for (const fixture of fixtures) {
   policy:sid=>fixture.policies[sid], masters:()=>fixture.masters, minimum:()=>0
  }, segment=>result.push({...segment}));
  assert(engine.admit(fixture.requests, 1000));
- engine.advance(10000);
+ engine.advance(100000);
  const order = (a,b)=>a.st-b.st || a.sid-b.sid || a.pid-b.pid;
  assert.deepStrictEqual(result.sort(order), fixture.segments.sort(order), `scenario ${fixture.scenario}`);
 }

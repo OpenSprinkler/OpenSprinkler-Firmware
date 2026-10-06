@@ -111,7 +111,7 @@ time_os_t previous_tail_end(const RuntimeQueueStruct& q) {
 	return end;
 }
 
-bool place_cycle(RuntimeQueueStruct& q, time_os_t now, time_os_t earliest = 0);
+bool place_cycle(RuntimeQueueStruct& q, time_os_t now, time_os_t earliest = 0, bool fill_gap = false);
 
 void sort_jobs(uint8_t* order, uint16_t count) {
 	std::sort(order, order + count, [](uint8_t a, uint8_t b) {
@@ -166,7 +166,7 @@ void stop_cycle(uint8_t qid, time_os_t now, StationStopReason reason) {
 	// A completely missed window was never watered: re-place the same segment.
 	q.st = 0;
 	scheduler_rebuild_reservations(now);
-	if (!place_cycle(q, now)) {
+	if (!place_cycle(q, now, 0, delivered)) {
 		cycle_soak_cancel_future(q.cycle);
 		q.dur = 0;
 		q.cycle_flags |= CYCLE_TAIL;
@@ -229,24 +229,32 @@ void shift_remaining_stations(RuntimeQueueStruct* q, unsigned char gid, time_os_
 	pd.last_seq_stop_times[gid] += 1;
 }
 
-void apply_master_adjustments(time_os_t curr_time, RuntimeQueueStruct *q, unsigned char gid, uint32_t *seq_start_times) {
+uint16_t master_lead(const RuntimeQueueStruct& q) {
 	int16_t start_adj = 0;
+	for (uint8_t mas = MASTER_1; mas < NUM_MASTER_ZONES; mas++) {
+		if (os.masters[mas][MASOPT_SID] && bundle_bound_to_master(q.sid, mas)) {
+			start_adj = min(start_adj, os.get_on_adj(mas));
+		}
+	}
+	return abs(start_adj);
+}
+
+void apply_master_adjustments(time_os_t curr_time, RuntimeQueueStruct *q, unsigned char gid, uint32_t *seq_start_times) {
+	const uint16_t lead = master_lead(*q);
 	int16_t dequeue_adj = 0;
 
 	for (unsigned char mas = MASTER_1; mas < NUM_MASTER_ZONES; mas++) {
 		unsigned char masid = os.masters[mas][MASOPT_SID];
 		if (masid && bundle_bound_to_master(q->sid, mas)) {
-			int16_t mas_on_adj = os.get_on_adj(mas);
 			int16_t mas_off_adj = os.get_off_adj(mas);
-			start_adj = min(start_adj, mas_on_adj);
 			dequeue_adj = max(dequeue_adj, mas_off_adj);
 		}
 	}
 
-	if (q->st - curr_time <= abs(start_adj)) {
-		q->st += abs(start_adj);
+	if (q->st - curr_time <= lead) {
+		q->st += lead;
 		if (os.is_sequential_station(q->sid) && gid < NUM_SEQ_GROUPS) {
-			seq_start_times[gid] += abs(start_adj);
+			seq_start_times[gid] += lead;
 		}
 	}
 
@@ -258,13 +266,50 @@ void apply_master_adjustments(time_os_t curr_time, RuntimeQueueStruct *q, unsign
 	}
 }
 
-bool place_cycle(RuntimeQueueStruct& q, time_os_t now, time_os_t earliest) {
+bool cycle_gap_allowed(const RuntimeQueueStruct& q) {
+	for (uint16_t i = 0; i < pd.nqueue; i++) {
+		const auto& other = pd.queue[i];
+		if (&other != &q && other.sid == q.sid && other.dur && !(other.cycle_flags & CYCLE_TAIL)) return false;
+	}
+	return true;
+}
+
+bool first_cycle_gap(const RuntimeQueueStruct& q, time_os_t now, uint8_t gid,
+	uint16_t delay, uint32_t& start) {
+	const uint16_t lead = master_lead(q);
+	// Advance past conflicts until the whole adjusted window fits. Each advance
+	// passes a reservation, so this is bounded by nqueue + 1 scans, without a
+	// queue-sized stack buffer. Queue storage order cannot change the result.
+	for (uint16_t pass = 0; pass <= pd.nqueue; pass++) {
+		const uint64_t adjusted = uint64_t(start) + (start - now <= lead ? lead : 0);
+		if (adjusted + q.dur > UINT32_MAX) return false;
+		bool conflict = false;
+		for (uint16_t i = 0; i < pd.nqueue; i++) {
+			const auto& other = pd.queue[i];
+			if (&other == &q || !other.st || !other.dur ||
+				(other.cycle_flags & (CYCLE_TAIL | CYCLE_PAUSED)) ||
+				!os.is_sequential_station(other.sid) || os.get_station_gid(other.sid) != gid) continue;
+			const uint64_t after = uint64_t(other.st) + other.dur + delay;
+			if (adjusted < after && adjusted + q.dur + delay > other.st) {
+				if (after > UINT32_MAX) return false;
+				start = static_cast<uint32_t>(after);
+				conflict = true;
+				break;
+			}
+		}
+		if (!conflict) return true;
+	}
+	return false;
+}
+
+bool place_cycle(RuntimeQueueStruct& q, time_os_t now, time_os_t earliest, bool fill_gap) {
 	const uint8_t gid = os.get_station_gid(q.sid);
 	const bool sequential = os.is_sequential_station(q.sid) && !os.iopts[IOPT_REMOTE_EXT_MODE];
 	const uint32_t tail = sequential ? pd.last_seq_stop_times[gid] : 0;
+	const int16_t delay = water_time_decode_signed(os.iopts[IOPT_STATION_DELAY_TIME]);
+	const bool gap = fill_gap && governed(q) && sequential && delay >= 0 && cycle_gap_allowed(q);
 	if (!cycle_soak_place(now, q.cycle.soak_until,
-		governed(q) ? pd.cooldown_until[q.sid] : 0, sequential, tail,
-		water_time_decode_signed(os.iopts[IOPT_STATION_DELAY_TIME]), q.st)) return false;
+		governed(q) ? pd.cooldown_until[q.sid] : 0, sequential && !gap, tail, delay, q.st)) return false;
 	q.st = max(q.st, earliest);
 	// V1 keeps one previous master window. Retire it before another segment
 	// can overwrite it, including windows whose ON adjustment is after OFF.
@@ -273,6 +318,7 @@ bool place_cycle(RuntimeQueueStruct& q, time_os_t now, time_os_t earliest) {
 		if (!cycle_soak_deadline(previous_tail_end(q), 1, after_tail)) return false;
 		q.st = max(q.st, after_tail);
 	}
+	if (gap && !first_cycle_gap(q, now, gid, delay, q.st)) return false;
 	uint32_t starts[NUM_SEQ_GROUPS] = {};
 	apply_master_adjustments(now, &q, gid, starts);
 	if (q.cycle.soak_seconds && !cycle_soak_reserve(q.st, q.dur,
