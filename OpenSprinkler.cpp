@@ -3007,6 +3007,8 @@ void OpenSprinkler::lcd_print_screen(char c) {
 	lcd.write(status.network_fails>2?ICON_ETHER_DISCONNECTED:ICON_ETHER_CONNECTED);  // if network failure detection is more than 2, display disconnect icon
 #endif
 
+	// Redraw the whole bottom row, including residue from other button screens.
+	lcd.clear(2, 2);
 	#if defined(ARDUINO)
 	if(useEth || (get_wifi_mode()==OS_WIFI_MODE_STA && WiFi.status()==WL_CONNECTED && WiFi.localIP())) {
 	#else
@@ -3026,22 +3028,16 @@ void OpenSprinkler::lcd_print_screen(char c) {
 		}
 
 	#if defined(ARDUINO)
-		lcd.setCursor(2, 2);
 		if(status.program_busy && !status.pause_state) {
-			//lcd.print(F("Curr: "));
+			lcd.setCursor(2, 2);
 			lcd.print(read_current(true));
-			lcd.print(F(" mA      "));
-		} else {
-	#else
-		{
-	#endif
-			lcd.clear(2, 2);
+			lcd.print(F(" mA"));
 		}
+	#endif
 	}
 
 	// Remote Extension and Rain Delay icons live on the bottom row, freeing
-	// the status-row space for SN3/SN4. Drawn AFTER the current-display block
-	// above so they overwrite that block's trailing spaces / clear.
+	// the status-row space for SN3/SN4. Drawn after the row is cleared above.
 	lcd.setCursor(LCD_CURSOR_REMOTEXT, 2);
 	lcd.write(iopts[IOPT_REMOTE_EXT_MODE]?ICON_REMOTEXT:' ');
 
