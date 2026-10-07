@@ -27,6 +27,7 @@
 #include "core/output_sequencer.h"
 #include "api/server.h"
 #include "platform/gpio.h"
+#include "platform/hostname.h"
 #include "platform/tls_heap_probe.h"
 #include "boards/hardware_detection.h"
 #ifdef __has_include
@@ -351,6 +352,7 @@ const char *OpenSprinkler::sopts[] = {
 	DEFAULT_DEVICE_NAME,
 	DEFAULT_EMPTY_STRING, // SOPT_STA_BSSID_CHL
 	DEFAULT_EMPTY_STRING, // SOPT_EMAIL_OPTS
+	DEFAULT_HOSTNAME,
 };
 
 /** Weekday strings (stored in PROGMEM to reduce RAM usage) */
@@ -418,9 +420,19 @@ bool OpenSprinkler::load_hardware_mac(unsigned char* buffer, bool wired) {
 /** Initialize network with the given mac address and http port */
 
 unsigned char OpenSprinkler::start_network() {
+	uint8_t hostname_mac[6] = {};
+	load_hardware_mac(hostname_mac, false);
+	sopt_load(SOPT_HOSTNAME, tmp_buffer);
+	hostname_init(tmp_buffer, hostname_mac);
+	// Materialize the per-device default once, including upgrades without this
+	// slot. A failed save must not prevent networking with the generated name.
+	if (!tmp_buffer[0] && !sopt_save(SOPT_HOSTNAME, hostname_effective())) {
+		DEBUG_PRINTLN(F("Could not save default hostname"));
+	}
 	#if defined(ESP32)
 	// Initialize lwIP before OTF constructs its local WiFiServer.
 	WiFi.mode(WIFI_STA);
+	hostname_apply_wifi();
 	WiFi.setSleep(false);
 	#endif
 	lcd_print_line_clear_pgm(PSTR("Starting..."), 1);
@@ -2450,8 +2462,7 @@ bool OpenSprinkler::iopts_save() {
 /** Load a string option from file */
 void OpenSprinkler::sopt_load(unsigned char oid, char *buf, uint16_t maxlen) {
 	if(maxlen>MAX_SOPTS_SIZE) maxlen = MAX_SOPTS_SIZE; // cap maxlen
-	file_read_block(SOPTS_FILENAME, buf, MAX_SOPTS_SIZE*oid, maxlen);
-	buf[maxlen]=0;  // ensure the string ends properly
+	file_read_string(SOPTS_FILENAME, buf, MAX_SOPTS_SIZE*oid, maxlen);
 }
 
 /** Load a string option from file, return String */
@@ -3007,13 +3018,14 @@ void OpenSprinkler::lcd_print_screen(char c) {
 	lcd.write(status.network_fails>2?ICON_ETHER_DISCONNECTED:ICON_ETHER_CONNECTED);  // if network failure detection is more than 2, display disconnect icon
 #endif
 
-	// Redraw the whole bottom row, including residue from other button screens.
-	lcd.clear(2, 2);
 	#if defined(ARDUINO)
 	if(useEth || (get_wifi_mode()==OS_WIFI_MODE_STA && WiFi.status()==WL_CONNECTED && WiFi.localIP())) {
 	#else
 	{
 	#endif
+		// Clear stale button-screen text only in normal status mode. During
+		// WiFi setup this row holds the AP IP or the SSID being connected to.
+		lcd.clear(2, 2);
 		lcd.setCursor(0, -1);
 		if(status.overcurrent_sid > 0) {
 			lcd.print(F("<!OVERCURRENT!> "));
@@ -3037,7 +3049,7 @@ void OpenSprinkler::lcd_print_screen(char c) {
 	}
 
 	// Remote Extension and Rain Delay icons live on the bottom row, freeing
-	// the status-row space for SN3/SN4. Drawn after the row is cleared above.
+	// the status-row space for SN3/SN4. Drawn after any row clearing above.
 	lcd.setCursor(LCD_CURSOR_REMOTEXT, 2);
 	lcd.write(iopts[IOPT_REMOTE_EXT_MODE]?ICON_REMOTEXT:' ');
 

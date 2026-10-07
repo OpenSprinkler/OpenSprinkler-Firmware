@@ -35,7 +35,7 @@ container:
 TEST_HTTP_PORT?=18080
 
 .PHONY: test-api
-test-api: test-board-profiles test-hardware-detection test-storage-files test-sprinkler-log test-firmware-release test-buffer-filler test-string-buffer test-sensor-units test-weather-sensor-cache test-weather-failsafe test-output-sequencer test-bundle-codec test-w5500-frame test-ch390 test-flow-rate-window test-cycle-soak test-cycle-scheduler test-runtime-queue test-station-extra
+test-api: test-hostname test-board-profiles test-hardware-detection test-storage-files test-sprinkler-log test-firmware-release test-buffer-filler test-string-buffer test-sensor-units test-weather-sensor-cache test-weather-failsafe test-output-sequencer test-bundle-codec test-w5500-frame test-ch390 test-flow-rate-window test-cycle-soak test-cycle-scheduler test-runtime-queue test-station-extra
 	python3 -B -m unittest tests/test_esp8266_stack_guard.py
 	$(MAKE) clean
 	$(MAKE) VERSION=DEMO EXTRA_CXXFLAGS="-DHTTP_PORT=$(TEST_HTTP_PORT) -DWEATHER_RESPONSE_TEST_MAX_AGE_MS=2000"
@@ -43,7 +43,7 @@ test-api: test-board-profiles test-hardware-detection test-storage-files test-sp
 
 .PHONY: test-cycle-soak test-runtime-queue test-station-extra
 .PHONY: test-cycle-scheduler
-APP_SOURCE ?= tmp/cycle-soak-app
+APP_SOURCE ?= ../OpenSprinkler-App
 .PHONY: test-cycle-preview
 test-cycle-preview:
 	@set -e; output=$$(mktemp); trap 'rm -f "$$output"' EXIT; \
@@ -110,10 +110,25 @@ test-hardware-detection:
 		"$$output"
 
 .PHONY: test-storage-files
+.PHONY: test-hostname
+test-hostname:
+	@set -e; output=$$(mktemp); trap 'rm -f "$$output"' EXIT; \
+		$(CXX) -std=gnu++14 -DDEMO -I. tests/hostname_test.cpp platform/hostname.cpp -o "$$output"; \
+		"$$output"; \
+		for chip in ESP8266 ESP32; do \
+			$(CXX) -std=gnu++14 -DARDUINO -D$$chip -Itests/hostname_stubs -I. \
+				tests/hostname_boot_test.cpp platform/hostname.cpp -o "$$output"; \
+			"$$output" '' os-01a2ff; \
+			"$$output" OS-TEST os-test; \
+			"$$output" invalid_name os-01a2ff; \
+			"$$output" aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa; \
+			"$$output" aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa os-01a2ff; \
+		done
+
 test-storage-files:
 	@set -e; output=$$(mktemp); data=$$(mktemp -d); trap 'rm -f "$$output"; rm -rf "$$data"' EXIT; \
 		$(CXX) -std=gnu++14 -DDEMO -I. tests/storage_files_test.cpp \
-			storage/files.cpp storage/maintenance.cpp storage/sprinkler_log.cpp -o "$$output"; \
+			storage/files.cpp storage/maintenance.cpp storage/sprinkler_log.cpp platform/hostname.cpp -o "$$output"; \
 		"$$output" "$$data"
 
 .PHONY: test-sprinkler-log

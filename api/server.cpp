@@ -38,6 +38,7 @@
 #include "routes.h"
 #include "api/commands.h"
 #include "platform/tls_heap_probe.h"
+#include "platform/hostname.h"
 
 // External variables defined in main ion file
 extern OTF::OpenThingsFramework *otf;
@@ -701,6 +702,16 @@ void server_json_controller_main(OTF_PARAMS_DEF) {
 							 wt_restricted,
 							 SOPT_DEVICE_NAME);
 
+	#if defined(ARDUINO)
+	os.sopt_load(SOPT_HOSTNAME, tmp_buffer);
+	if (!tmp_buffer[0]) {
+		// Still show the device default if its initial persistence failed.
+		uint8_t hostname_mac[6] = {};
+		os.load_hardware_mac(hostname_mac, false);
+		hostname_default(tmp_buffer, hostname_mac);
+	}
+	bfill.emit_p(PSTR("\"hname\":\"$S\","), tmp_buffer);
+	#endif
 	bfill.emit_p(PSTR("\"email\":{$O},"), SOPT_EMAIL_OPTS);
 
 	bfill.emit_p(PSTR("\"wls\":["));
@@ -881,11 +892,35 @@ void server_change_scripturl(OTF_PARAMS_DEF) {
 void server_change_options(OTF_PARAMS_DEF)
 {
 	if(!process_password(OTF_PARAMS)) return;
+	uint8_t hostname_found = 0;
+	// Keep one extra character so overlength input is rejected, not truncated.
+	char hostname[HOSTNAME_MAX_LENGTH + 2] = {};
+	findKeyVal(FKV_SOURCE, hostname, sizeof(hostname), PSTR("hname"), true, &hostname_found);
+	if (hostname_found) {
+		#if defined(ARDUINO)
+		if (!hostname_normalize(hostname)) {
+			otf_send_result(OTF_PARAMS, HTML_DATA_OUTOFBOUND, "hname");
+			return;
+		}
+		if (!hostname[0]) {
+			uint8_t hostname_mac[6] = {};
+			os.load_hardware_mac(hostname_mac, false);
+			hostname_default(hostname, hostname_mac);
+		}
+		#else
+		otf_send_result(OTF_PARAMS, HTML_NOT_PERMITTED, "hname");
+		return;
+		#endif
+	}
 	// temporarily save some old options values
 	bool time_change = false;
 	bool weather_change = false;
 	bool sensor_change = false;
 	bool storage_ok = true;
+	if (hostname_found && !os.sopt_save(SOPT_HOSTNAME, hostname)) {
+		otf_send_result(OTF_PARAMS, HTML_INTERNAL_ERROR, "hname");
+		return;
+	}
 	const unsigned char master_option_ids[NUM_MASTER_ZONES] = {
 		IOPT_MASTER_STATION, IOPT_MASTER_STATION_2,
 		IOPT_MASTER_STATION_3, IOPT_MASTER_STATION_4
@@ -2647,7 +2682,11 @@ void server_json_debug(OTF_PARAMS_DEF) {
 	EmbeddedStorageUsage storage = get_embedded_storage_usage();
 	#endif
 
-	bfill.emit_p(PSTR("{\"date\":\"$S\",\"time\":\"$S\",\"heap\":$L"), __DATE__, __TIME__,
+	bfill.emit_p(PSTR("{"));
+	#if defined(ARDUINO)
+	bfill.emit_p(PSTR("\"hostname\":\"$S\","), hostname_effective());
+	#endif
+	bfill.emit_p(PSTR("\"date\":\"$S\",\"time\":\"$S\",\"heap\":$L"), __DATE__, __TIME__,
 	#if defined(ESP8266)
 	ESP.getFreeHeap());
 	bfill.emit_p(PSTR(",\"maxblock\":$L,\"frag\":$D"),

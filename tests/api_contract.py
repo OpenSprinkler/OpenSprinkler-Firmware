@@ -211,6 +211,7 @@ def check_controller(data):
     )
     assert isinstance(data["lrun"], list) and len(data["lrun"]) == 4
     assert isinstance(data["ps"], list)
+    assert "hname" not in data, "Linux uses the operating-system hostname"
 
 
 def check_stations(data):
@@ -318,6 +319,13 @@ def check_request_bodies(server):
 
 
 def check_nested_option_encodings(server):
+    original_name = server.get_json("jc")["dname"]
+    for hostname in ("os-test", ""):
+        result = server.get_json("co", {"hname": hostname, "dname": "must-not-change"})
+        assert result == {"result": 48, "item": "hname"}, result
+        assert server.get_json("jc")["dname"] == original_name
+    assert "hostname" not in server.get_json("db")
+
     legacy_values = {
         "wto": {"h": 20, "t": 50, "r": 100},
         "otc": {"en": 0, "token": "legacy-token"},

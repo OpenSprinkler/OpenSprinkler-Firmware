@@ -1,6 +1,7 @@
 #include "defines.h"
 #include "storage/files.h"
 #include "storage/maintenance.h"
+#include "platform/hostname.h"
 
 #include <cassert>
 #include <cstdio>
@@ -80,6 +81,53 @@ void test_legacy_log_migration(const char* data_dir) {
 int main(int argc, char** argv) {
 	assert(argc == 2);
 	set_data_dir(argv[1]);
+	// Upgrading a 13-slot file must not reuse stale data for the new slot.
+	const uint32_t hostname_offset = MAX_SOPTS_SIZE * SOPT_HOSTNAME;
+	char slot[MAX_SOPTS_SIZE + 1];
+	memset(slot, 'x', sizeof(slot));
+	file_read_string("missing.dat", slot, 0, MAX_SOPTS_SIZE);
+	assert(slot[0] == 0);
+	assert(file_write_byte("sopts-test.dat", hostname_offset - 1, 0));
+	strcpy(slot, "stale data");
+	file_read_string("sopts-test.dat", slot, hostname_offset, MAX_SOPTS_SIZE);
+	assert(slot[0] == 0);
+	// A missing/empty hostname can be materialized as a concrete, short record
+	// without shifting or damaging the preceding email-options slot.
+	const uint32_t email_offset = MAX_SOPTS_SIZE * SOPT_EMAIL_OPTS;
+	const char email[] = "\"en\":0";
+	assert(file_write_block("sopts-test.dat", email, email_offset, sizeof(email)));
+	const uint8_t mac[] = {0xc4, 0x5b, 0xbe, 0x01, 0xa2, 0xff};
+	hostname_default(slot, mac);
+	assert(file_write_block("sopts-test.dat", slot, hostname_offset, strlen(slot) + 1));
+	file_read_string("sopts-test.dat", slot, hostname_offset, MAX_SOPTS_SIZE);
+	assert(!strcmp(slot, "os-01a2ff"));
+	assert(file_cmp_block("sopts-test.dat", slot, hostname_offset) == 0);
+	file_read_string("sopts-test.dat", slot, email_offset, MAX_SOPTS_SIZE);
+	assert(!strcmp(slot, email));
+	const char hostname[] = "os-test";
+	assert(file_write_block("sopts-test.dat", hostname, hostname_offset, sizeof(hostname)));
+	file_read_string("sopts-test.dat", slot, hostname_offset, MAX_SOPTS_SIZE);
+	assert(!strcmp(slot, hostname));
+	// Boundaries: truncated unterminated data, empty, full and capped reads.
+	assert(truncate_file("sopts-test.dat", hostname_offset + sizeof(hostname) - 1));
+	file_read_string("sopts-test.dat", slot, hostname_offset, MAX_SOPTS_SIZE);
+	assert(slot[0] == 0);
+	assert(file_write_byte("sopts-test.dat", hostname_offset, 0));
+	file_read_string("sopts-test.dat", slot, hostname_offset, MAX_SOPTS_SIZE);
+	assert(slot[0] == 0);
+	hostname_default(slot, mac);
+	assert(file_write_block("sopts-test.dat", slot, hostname_offset, strlen(slot) + 1));
+	file_read_string("sopts-test.dat", slot, hostname_offset, MAX_SOPTS_SIZE);
+	assert(!strcmp(slot, "os-01a2ff"));
+	memset(slot, 'x', MAX_SOPTS_SIZE);
+	assert(file_write_block("sopts-test.dat", slot, hostname_offset, MAX_SOPTS_SIZE));
+	file_read_string("sopts-test.dat", slot, hostname_offset, MAX_SOPTS_SIZE);
+	assert(strlen(slot) == MAX_SOPTS_SIZE);
+	file_read_string("sopts-test.dat", slot, hostname_offset, 3);
+	assert(!strcmp(slot, "xxx"));
+	file_read_string("sopts-test.dat", slot, hostname_offset, 0);
+	assert(slot[0] == 0);
+	assert(remove_file("sopts-test.dat"));
 
 	const char* filename = "storage-test.dat";
 	const char initial[] = "abcdef";

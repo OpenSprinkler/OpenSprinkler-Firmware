@@ -248,6 +248,19 @@ uint32_t file_size(os_file_type file) {
 #endif
 }
 
+void file_read_string(const char* filename, char* destination, uint32_t position, uint32_t max_length) {
+	destination[0] = 0;
+	os_file_type file = file_open(filename, FileOpenMode::Read);
+	if (!file) return;
+	int count = file_seek(file, position) ? file_read(file, destination, max_length) : -1;
+	file_close(file);
+	if (count <= 0) { destination[0] = 0; return; }
+	destination[count] = 0;
+	// A short, terminated final slot is valid: sopt_save writes only strlen+1.
+	// A short unterminated record is corrupt, not a valid partial setting.
+	if (static_cast<uint32_t>(count) < max_length && !memchr(destination, 0, count)) destination[0] = 0;
+}
+
 bool file_read_block(const char* filename, void* destination, uint32_t position, uint32_t length) {
 	os_file_type file = file_open(filename, FileOpenMode::Read);
 	if (!file) return false;

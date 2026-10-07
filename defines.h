@@ -32,7 +32,7 @@
 														// if this number is different from the one stored in non-volatile memory
 														// a device reset will be automatically triggered
 
-#define OS_FW_MINOR      6  // Firmware minor version
+#define OS_FW_MINOR      7  // Firmware minor version
 
 /** Hardware version base numbers */
 #define OS_HW_VERSION_BASE   0x00 // OpenSprinkler
@@ -221,6 +221,7 @@ enum {
 #define FIRMWARE_UPDATE_PORT       8080
 #define DEFAULT_OTC_TOKEN_LENGTH   32
 #define DEFAULT_DEVICE_NAME       "My OpenSprinkler"
+#define DEFAULT_HOSTNAME          ""
 #define DEFAULT_EMPTY_STRING      ""
 #define DEFAULT_UNDERCURRENT_THRESHOLD 100 // in mA
 #define DEFAULT_OVERCURRENT_LIMIT 1200 // in mA
@@ -367,6 +368,7 @@ enum {
 	SOPT_DEVICE_NAME,
 	SOPT_STA_BSSID_CHL, // wifi extra info: bssid and channel
 	SOPT_EMAIL_OPTS,
+	SOPT_HOSTNAME,
 	NUM_SOPTS // total number of string options
 };
 

@@ -20,9 +20,11 @@
 #if defined(ARDUINO)
 
 #include "espconnect.h"
+#include "platform/hostname.h"
 
 String scan_network() {
 	WiFi.mode(WIFI_STA);
+	hostname_apply_wifi();
 	WiFi.disconnect();
 	unsigned char n = WiFi.scanNetworks();
 	String json;
@@ -52,6 +54,7 @@ String scan_network() {
 void start_network_ap(const char *ssid, const char *pass) {
 	if(!ssid) return;
 	WiFi.mode(WIFI_AP_STA); // start in AP_STA mode
+	hostname_apply_wifi();
 	#if defined(ESP32)
 	WiFi.disconnect(false, false);
 	WiFi.setSleep(false);
@@ -65,6 +68,7 @@ void start_network_ap(const char *ssid, const char *pass) {
 void start_network_sta_with_ap(const char *ssid, const char *pass, int32_t channel, const unsigned char *bssid) {
 	if(!ssid || !pass) return;
 	if(WiFi.getMode()!=WIFI_AP_STA) WiFi.mode(WIFI_AP_STA);
+	hostname_apply_wifi();
 	#if defined(ESP32)
 	WiFi.setSleep(false);
 	WiFi.setAutoReconnect(true);
@@ -79,6 +83,7 @@ void start_network_sta(const char *ssid, const char *pass, int32_t channel, cons
 	delay(100);
 	#endif
 	if(WiFi.getMode()!=WIFI_STA) WiFi.mode(WIFI_STA);
+	hostname_apply_wifi();
 	WiFi.setSleep(false); // work-around for ARP issue: disable sleep mode
 	#if defined(ESP8266)
 	WiFi.setOutputPower(20.5);

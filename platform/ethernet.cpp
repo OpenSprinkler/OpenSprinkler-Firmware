@@ -3,6 +3,7 @@
 #if defined(ARDUINO)
 
 #include "defines.h"
+#include "platform/hostname.h"
 
 #if defined(ESP8266)
 
@@ -215,6 +216,10 @@ bool CH390NetworkInterface::begin(SPIClass& spi, int8_t cs, int8_t irq,
 		end();
 		return false;
 	}
+	if (!setHostname(hostname_effective())) {
+		end();
+		return false;
+	}
 	if (esp_eth_start(_handle) != ESP_OK) {
 		end();
 		return false;
@@ -313,10 +318,18 @@ bool WiredEthernet::service_ch390() {
 
 #if defined(ESP8266)
 bool WiredEthernet::begin(const uint8_t* mac_address) {
+	// The core's begin() starts DHCP itself; assign its netif name beforehand.
+	// getNetIf exposes a const view, but these are our mutable driver instances.
 	switch (_controller) {
-	case EthernetController::ENC28J60: return enc28j60.begin(mac_address);
-	case EthernetController::W5500: return w5500.begin(mac_address);
-	case EthernetController::CH390: return ch390.begin(mac_address);
+	case EthernetController::ENC28J60:
+		const_cast<netif*>(enc28j60.getNetIf())->hostname = hostname_effective();
+		return enc28j60.begin(mac_address);
+	case EthernetController::W5500:
+		const_cast<netif*>(w5500.getNetIf())->hostname = hostname_effective();
+		return w5500.begin(mac_address);
+	case EthernetController::CH390:
+		const_cast<netif*>(ch390.getNetIf())->hostname = hostname_effective();
+		return ch390.begin(mac_address);
 	default: return false;
 	}
 }
@@ -346,6 +359,14 @@ void WiredEthernet::set_spi_drive(EthernetController controller) {
 	(void)gpio_set_drive_capability(static_cast<gpio_num_t>(PIN_SPI_MOSI), drive);
 }
 
+static void w5500_hostname_on_start(void*, esp_event_base_t, int32_t, void*) {
+	// Raw ETH events are serialized: START is handled before CONNECTED starts
+	// DHCP. Arduino's forwarded onEvent callback runs on a different task.
+	if (!ETH.setHostname(hostname_effective())) {
+		log_e("Could not set Ethernet hostname");
+	}
+}
+
 bool WiredEthernet::begin(SPIClass& spi, int8_t cs, int8_t irq, int8_t reset,
 	uint32_t spi_clock_hz) {
 	_spi_clock_hz = spi_clock_hz;
@@ -353,6 +374,12 @@ bool WiredEthernet::begin(SPIClass& spi, int8_t cs, int8_t irq, int8_t reset,
 		return ch390.begin(spi, cs, irq, reset, spi_clock_hz);
 	}
 	if (_controller == EthernetController::W5500) {
+		static bool hostname_handler_registered = false;
+		if (!hostname_handler_registered) {
+			if (esp_event_handler_register(ETH_EVENT, ETHERNET_EVENT_START,
+				w5500_hostname_on_start, nullptr) != ESP_OK) return false;
+			hostname_handler_registered = true;
+		}
 		return ETH.begin(ETH_PHY_W5500, 1, cs, irq, reset, spi,
 			(uint8_t)(spi_clock_hz / 1000000UL));
 	}
