@@ -416,8 +416,8 @@ public:
 	static void attribs_load(); // load and repackage attrib bits (backward compatibility)
 	static bool parse_rfstation_code(RFStationData *data, RFStationCode *code); // parse rf code into on/off/time sections
 	static void switch_rfstation(RFStationData *data, bool turnon);  // switch rf station
-	static void switch_remotestation(RemoteIPStationData *data, bool turnon, uint32_t dur=0); // switch remote IP station
-	static void switch_remotestation(RemoteOTCStationData *data, bool turnon, uint32_t dur=0); // switch remote OTC station
+	static void switch_remotestation(uint8_t sid, RemoteIPStationData *data, bool turnon, uint32_t dur=0, bool refresh=false); // switch remote IP station
+	static void switch_remotestation(uint8_t sid, RemoteOTCStationData *data, bool turnon, uint32_t dur=0, bool refresh=false); // switch remote OTC station
 	static void switch_gpiostation(GPIOStationData *data, bool turnon); // switch gpio station
 	static void switch_httpstation(HTTPStationData *data, bool turnon, bool usessl=false); // switch http station
 
@@ -456,13 +456,14 @@ public:
 	static unsigned char get_station_bit(unsigned char sid); // get station bit of one station (sid->station index)
 	static void mark_bundle_dirty();
 	static void set_output_rise_blocked(bool blocked);
-	static void switch_special_station(unsigned char sid, unsigned char value, uint32_t dur=0); // swtich special station
+	static void switch_special_station(unsigned char sid, unsigned char value, uint32_t dur=0, bool refresh=false); // switch special station
+	static void process_remote_station_tasks();
 	static void clear_all_station_bits(); // clear all station bits
 	static void apply_all_station_bits(void (*post_activation_callback)()=NULL); // apply all station bits (activate/deactive values)
 
-	static int8_t send_http_request(uint32_t ip4, uint16_t port, char* p, void(*callback)(char*)=NULL, bool usessl=false, uint16_t timeout=5000);
-	static int8_t send_http_request(const char* server, uint16_t port, char* p, void(*callback)(char*)=NULL, bool usessl=false, uint16_t timeout=5000);
-	static int8_t send_http_request(char* server_with_port, char* p, void(*callback)(char*)=NULL, bool usessl=false, uint16_t timeout=5000);
+	static int8_t send_http_request(uint32_t ip4, uint16_t port, char* p, void(*callback)(char*)=NULL, bool usessl=false, uint16_t timeout=5000, uint8_t connect_tries=3);
+	static int8_t send_http_request(const char* server, uint16_t port, char* p, void(*callback)(char*)=NULL, bool usessl=false, uint16_t timeout=5000, uint8_t connect_tries=3);
+	static int8_t send_http_request(char* server_with_port, char* p, void(*callback)(char*)=NULL, bool usessl=false, uint16_t timeout=5000, uint8_t connect_tries=3);
 
 	static OTCConfig otc;
 

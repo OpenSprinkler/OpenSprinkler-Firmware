@@ -272,16 +272,28 @@ def check_program_adjustments(data):
     assert isinstance(data["maxrt"], int) and data["maxrt"] > 0
 
 
+def check_status(data):
+    require_keys("/js", data, ["sn", "bap", "nstations", "rst"])
+    assert len(data["sn"]) == data["nstations"]
+    assert isinstance(data["rst"], dict)
+
+
 def check_combined(data):
     require_keys(
         "/ja",
         data,
         ["settings", "programs", "options", "status", "stations", "sensors"],
     )
-    require_keys("/ja.status", data["status"], ["sn", "bap", "nstations"])
+    require_keys("/ja.status", data["status"], ["sn", "bap", "nstations", "rst"])
     require_keys("/ja.stations", data["stations"], ["stn_bnd", "bmt"])
     assert data["stations"]["bmt"] == 1
     assert len(data["status"]["sn"]) == data["status"]["nstations"]
+    assert isinstance(data["status"]["rst"], dict)
+    for sid, runtime in data["status"]["rst"].items():
+        assert sid.isdigit() and 0 <= int(sid) < data["status"]["nstations"]
+        assert isinstance(runtime, list) and len(runtime) == 4
+        assert runtime[0] in (1, 2, 3, 4)
+        assert runtime[1] in (0, 1)
 
 
 def check_request_bodies(server):
@@ -839,6 +851,7 @@ def run_contract(server):
         ("jsn", check_sensors),
         ("jsd", check_sensor_definitions),
         ("jpa", check_program_adjustments),
+        ("js", check_status),
         ("ja", check_combined),
         ("db", check_debug),
     ]

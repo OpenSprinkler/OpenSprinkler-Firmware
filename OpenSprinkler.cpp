@@ -25,6 +25,7 @@
 
 #include "core/bundle.h"
 #include "core/output_sequencer.h"
+#include "api/http.h"
 #include "api/server.h"
 #include "platform/gpio.h"
 #include "boards/hardware_detection.h"
@@ -35,6 +36,7 @@
 #endif
 #include "core/program.h"
 #include "services/weather.h"
+#include "services/remote_station.h"
 #include "storage/maintenance.h"
 #include "storage/sprinkler_log.h"
 #include "external/ArduinoJson.hpp"
@@ -1315,7 +1317,7 @@ void OpenSprinkler::apply_all_station_bits(void (*post_activation_callback)()) {
 						dur = q->st+q->dur-curr_time;
 					}
 				}
-				switch_special_station(next_sid_to_refresh, on, dur);
+				switch_special_station(next_sid_to_refresh, on, dur, true);
 			}
 		}
 	}
@@ -1710,7 +1712,7 @@ unsigned char OpenSprinkler::weekday_today() {
 }
 
 /** Switch special station */
-void OpenSprinkler::switch_special_station(unsigned char sid, unsigned char value, uint32_t dur) {
+void OpenSprinkler::switch_special_station(unsigned char sid, unsigned char value, uint32_t dur, bool refresh) {
 	// check if this is a special station
 	unsigned char bid=sid>>3,s=sid&0x07;
 	if(!(os.attrib_spe[bid]&(1<<s))) return; // if this is not a special stations
@@ -1726,11 +1728,11 @@ void OpenSprinkler::switch_special_station(unsigned char sid, unsigned char valu
 			break;
 
 		case STN_TYPE_REMOTE_IP:
-			switch_remotestation((RemoteIPStationData *)pdata->sped, value, dur);
+			switch_remotestation(sid, (RemoteIPStationData *)pdata->sped, value, dur, refresh);
 			break;
 
 		case STN_TYPE_REMOTE_OTC:
-			switch_remotestation((RemoteOTCStationData *)pdata->sped, value, dur);
+			switch_remotestation(sid, (RemoteOTCStationData *)pdata->sped, value, dur, refresh);
 			break;
 
 		case STN_TYPE_GPIO:
@@ -1840,7 +1842,7 @@ void default_http_callback(char* buffer) {
 
 }
 
-int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char* p, void(*callback)(char*), bool usessl, uint16_t timeout) {
+int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char* p, void(*callback)(char*), bool usessl, uint16_t timeout, uint8_t connect_tries) {
 
 	if(server == NULL || server[0]==0 || port==0 ) { // sanity checking
 		DEBUG_PRINTLN("server:port is invalid!");
@@ -1852,6 +1854,7 @@ int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char*
 	if(usessl) {
 		WiFiClientSecure *_c = new WiFiClientSecure();
 		_c->setInsecure();
+		_c->setTimeout(timeout);
 		bool mfln = _c->probeMaxFragmentLength(server, port, 512);
 		DEBUG_PRINTF("MFLN supported: %s\n", mfln ? "yes" : "no");
 		if (mfln) {
@@ -1864,7 +1867,8 @@ int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char*
 		client = new WiFiClient();
 	}
 
-	#define HTTP_CONNECT_NTRIES 3
+	client->setTimeout(timeout);
+	if(connect_tries == 0) connect_tries = 1;
 	unsigned char tries = 0;
 	do {
 		DEBUG_PRINT(server);
@@ -1875,9 +1879,9 @@ int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char*
 		DEBUG_PRINTLN(")");
 		if(client->connect(server, port)==1) break;
 		tries++;
-	} while(tries<HTTP_CONNECT_NTRIES);
+	} while(tries<connect_tries);
 
-	if(tries==HTTP_CONNECT_NTRIES) {
+	if(tries==connect_tries) {
 		DEBUG_PRINTLN(F("failed."));
 		client->stop();
 		delete client;
@@ -1893,13 +1897,14 @@ int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char*
 		client = new NetworkClient();
 	}
 
-	#define HTTP_CONNECT_NTRIES 3
+	client->setTimeout(timeout);
+	if(connect_tries == 0) connect_tries = 1;
 	unsigned char tries = 0;
 	do {
 		if(client->connect(server, port)==1) break;
 		tries++;
-	} while(tries<HTTP_CONNECT_NTRIES);
-	if(tries==HTTP_CONNECT_NTRIES) {
+	} while(tries<connect_tries);
+	if(tries==connect_tries) {
 		client->stop();
 		delete client;
 		return HTTP_RQT_CONNECT_ERR;
@@ -1972,7 +1977,7 @@ int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char*
 	return HTTP_RQT_SUCCESS;
 }
 
-int8_t OpenSprinkler::send_http_request(uint32_t ip4, uint16_t port, char* p, void(*callback)(char*), bool usessl, uint16_t timeout) {
+int8_t OpenSprinkler::send_http_request(uint32_t ip4, uint16_t port, char* p, void(*callback)(char*), bool usessl, uint16_t timeout, uint8_t connect_tries) {
 	char server[20];
 	unsigned char ip[4];
 	ip[0] = ip4>>24;
@@ -1980,106 +1985,172 @@ int8_t OpenSprinkler::send_http_request(uint32_t ip4, uint16_t port, char* p, vo
 	ip[2] = (ip4>>8)&0xff;
 	ip[3] = ip4&0xff;
 	snprintf(server, 20, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
-	return send_http_request(server, port, p, callback, usessl, timeout);
+	return send_http_request(server, port, p, callback, usessl, timeout, connect_tries);
 }
 
-int8_t OpenSprinkler::send_http_request(char* server_with_port, char* p, void(*callback)(char*), bool usessl, uint16_t timeout) {
+int8_t OpenSprinkler::send_http_request(char* server_with_port, char* p, void(*callback)(char*), bool usessl, uint16_t timeout, uint8_t connect_tries) {
 	char * server = strtok(server_with_port, ":");
 	char * port = strtok(NULL, ":");
-	return send_http_request(server, (port==NULL)?80:atoi(port), p, callback, usessl, timeout);
+	return send_http_request(server, (port==NULL)?80:atoi(port), p, callback, usessl, timeout, connect_tries);
 }
 
-/** Switch remote IP station
- * This function takes a remote station code,
- * parses it into remote IP, port, station index,
- * and makes a HTTP GET request.
- * The remote controller is assumed to have the same
- * password as the main controller
- */
-void OpenSprinkler::switch_remotestation(RemoteIPStationData *data, bool turnon, uint32_t dur) {
+/** Queue a confirmed remote-station transition. Network work is deferred so
+ * station scheduling can finish without waiting on a remote controller. */
+void OpenSprinkler::switch_remotestation(uint8_t sid, RemoteIPStationData *data,
+	bool turnon, uint32_t dur, bool refresh) {
+	(void)data;
+	(void)dur;
+	remote_station_schedule(sid, turnon, millis(), refresh);
+}
+
+void OpenSprinkler::switch_remotestation(uint8_t sid, RemoteOTCStationData *data,
+	bool turnon, uint32_t dur, bool refresh) {
+	(void)data;
+	(void)dur;
+	remote_station_schedule(sid, turnon, millis(), refresh);
+}
+
+namespace {
+
+uint32_t remote_station_timer(uint8_t sid) {
+	const RemoteStationRuntime& runtime = remote_station_runtime[sid];
+	if (!runtime.target) return 0;
+
+	const uint8_t qid = pd.station_qid[sid];
+	const time_os_t current = os.now_tz();
+	if (qid < pd.nqueue) {
+		const RuntimeQueueStruct& entry = pd.queue[qid];
+		if (entry.sid == sid && entry.st > 0 && entry.st + entry.dur > current) {
+			uint32_t remaining = entry.st + entry.dur - current;
+			return remaining > MAX_PROGRAMMED_DURATION ? MAX_PROGRAMMED_DURATION : remaining;
+		}
+	}
+	return os.iopts[IOPT_SPE_AUTO_REFRESH] ? 4 * MAX_NUM_STATIONS : MAX_PROGRAMMED_DURATION;
+}
+
+void finish_remote_command(uint8_t sid, int8_t request_result) {
+	uint8_t error = REMOTE_ERROR_NONE;
+	uint8_t result = 0;
+	if (request_result != HTTP_RQT_SUCCESS) {
+		error = REMOTE_ERROR_TRANSPORT;
+	} else if (!remote_station_http_success(ether_buffer)) {
+		error = REMOTE_ERROR_HTTP;
+	} else if (!remote_station_parse_command_response(ether_buffer, &result)) {
+		error = REMOTE_ERROR_RESPONSE;
+	} else if (result != HTML_SUCCESS) {
+		error = REMOTE_ERROR_REJECTED;
+	}
+	remote_station_command_finished(sid, error, millis());
+}
+
+void finish_remote_verification(uint8_t sid, uint8_t remote_sid, int8_t request_result) {
+	bool actual = false;
+	const bool received = request_result == HTTP_RQT_SUCCESS &&
+		remote_station_parse_status_response(ether_buffer, remote_sid, &actual);
+	const uint8_t error = request_result != HTTP_RQT_SUCCESS ? REMOTE_ERROR_TRANSPORT :
+		(remote_station_http_success(ether_buffer) ? REMOTE_ERROR_RESPONSE : REMOTE_ERROR_HTTP);
+	remote_station_verification_finished(sid, received, actual,
+		error, millis());
+}
+
+void process_remote_ip_task(uint8_t sid, const RemoteIPStationData *data) {
 	RemoteIPStationData copy;
-	memcpy((char*)&copy, (char*)data, sizeof(RemoteIPStationData));
+	memcpy(&copy, data, sizeof(copy));
+	const uint32_t ip4 = hex2uint32_t(copy.ip, sizeof(copy.ip));
+	const uint16_t port = static_cast<uint16_t>(hex2uint32_t(copy.port, sizeof(copy.port)));
+	const uint8_t remote_sid = static_cast<uint8_t>(hex2uint32_t(copy.sid, sizeof(copy.sid)));
+	const uint8_t ip[] = {
+		static_cast<uint8_t>(ip4 >> 24), static_cast<uint8_t>(ip4 >> 16),
+		static_cast<uint8_t>(ip4 >> 8), static_cast<uint8_t>(ip4)
+	};
+	char server[20];
+	snprintf(server, sizeof(server), "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
 
-	uint32_t ip4 = hex2uint32_t(copy.ip, sizeof(copy.ip));
-	uint16_t port = (uint16_t)hex2uint32_t(copy.port, sizeof(copy.port));
-
-	unsigned char ip[4];
-	ip[0] = ip4>>24;
-	ip[1] = (ip4>>16)&0xff;
-	ip[2] = (ip4>>8)&0xff;
-	ip[3] = ip4&0xff;
-
-	char *p = tmp_buffer;
-	BufferFiller bf = BufferFiller(p, TMP_BUFFER_ALLOC_SIZE);
-	// if turning on the zone and duration is defined, give duration as the timer value
-	// otherwise:
-	//   if autorefresh is defined, we give a fixed duration each time, and auto refresh will renew it periodically
-	//   if no auto refresh, we will give the maximum allowed duration, and station will be turned off when off command is sent
-	uint32_t timer = 0;
-	if(turnon) {
-		if(dur>0) {
-			timer = dur > MAX_PROGRAMMED_DURATION ? MAX_PROGRAMMED_DURATION : dur;
-		} else {
-			timer = iopts[IOPT_SPE_AUTO_REFRESH]?4*MAX_NUM_STATIONS:MAX_PROGRAMMED_DURATION;
-		}
+	const bool command = remote_station_runtime[sid].phase == REMOTE_PHASE_COMMAND;
+	BufferFiller bf(tmp_buffer, TMP_BUFFER_ALLOC_SIZE);
+	if (command) {
+		bf.emit_p(PSTR("GET /cm?pw=$O&sid=$D&en=$D&t=$L"), SOPT_PASSWORD,
+			remote_sid, remote_station_runtime[sid].target, remote_station_timer(sid));
+	} else {
+		bf.emit_p(PSTR("GET /js?pw=$O"), SOPT_PASSWORD);
 	}
-	bf.emit_p(PSTR("GET /cm?pw=$O&sid=$D&en=$D&t=$L"),
-						SOPT_PASSWORD,
-						(int)hex2uint32_t(copy.sid, sizeof(copy.sid)),
-						turnon, (uint32_t)timer);
-	bf.emit_p(PSTR(" HTTP/1.0\r\nHOST: $D.$D.$D.$D\r\n"),
-						ip[0],ip[1],ip[2],ip[3]);
-
+	bf.emit_p(PSTR(" HTTP/1.0\r\nHOST: $S\r\nConnection:close\r\n"), server);
 	bf.emit_p(PSTR("User-Agent: $S\r\n\r\n"), user_agent_string);
 	if (bf.overflowed()) {
-		DEBUG_PRINTLN(F("remote IP request too large"));
+		if (command) remote_station_command_finished(sid, REMOTE_ERROR_RESPONSE, millis());
+		else remote_station_verification_finished(sid, false, false, REMOTE_ERROR_RESPONSE, millis());
 		return;
 	}
 
-	char server[20];
-	snprintf(server, 20, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
-	send_http_request(server, port, p, default_http_callback);
+	// Remote stations are retried by the state machine. Keep each individual LAN
+	// attempt short so an offline satellite cannot starve this controller's UI.
+	const int8_t request_result = os.send_http_request(server, port, tmp_buffer,
+		nullptr, false, 1000, 1);
+	if (command) finish_remote_command(sid, request_result);
+	else finish_remote_verification(sid, remote_sid, request_result);
 }
 
-/** Switch remote OTC station
- * This function takes a remote station code,
- * parses it into OTC token and station index,
- * and makes a HTTPS GET request.
- * The remote controller is assumed to have the same
- * password as the main controller
- */
-void OpenSprinkler::switch_remotestation(RemoteOTCStationData *data, bool turnon, uint32_t dur) {
+void process_remote_otc_task(uint8_t sid, const RemoteOTCStationData *data) {
 	RemoteOTCStationData copy;
-	memcpy((char*)&copy, (char*)data, sizeof(RemoteOTCStationData));
-	copy.token[sizeof(copy.token)-1] = 0; // ensure the string ends properly
-	char *p = tmp_buffer;
-	BufferFiller bf = BufferFiller(p, TMP_BUFFER_ALLOC_SIZE);
-	// if turning on the zone and duration is defined, give duration as the timer value
-	// otherwise:
-	//   if autorefresh is defined, we give a fixed duration each time, and auto refresh will renew it periodically
-	//   if no auto refresh, we will give the maximum allowed duration, and station will be turned off when off command is sent
-	uint32_t timer = 0;
-	if(turnon) {
-		if(dur>0) {
-			timer = dur > MAX_PROGRAMMED_DURATION ? MAX_PROGRAMMED_DURATION : dur;
-		} else {
-			timer = iopts[IOPT_SPE_AUTO_REFRESH]?4*MAX_NUM_STATIONS:MAX_PROGRAMMED_DURATION;
-		}
+	memcpy(&copy, data, sizeof(copy));
+	copy.token[sizeof(copy.token) - 1] = 0;
+	const uint8_t remote_sid = static_cast<uint8_t>(hex2uint32_t(copy.sid, sizeof(copy.sid)));
+	const bool command = remote_station_runtime[sid].phase == REMOTE_PHASE_COMMAND;
+	BufferFiller bf(tmp_buffer, TMP_BUFFER_ALLOC_SIZE);
+	if (command) {
+		bf.emit_p(PSTR("GET /forward/v1/$S/cm?pw=$O&sid=$D&en=$D&t=$L"), copy.token,
+			SOPT_PASSWORD, remote_sid, remote_station_runtime[sid].target, remote_station_timer(sid));
+	} else {
+		bf.emit_p(PSTR("GET /forward/v1/$S/js?pw=$O"), copy.token, SOPT_PASSWORD);
 	}
-	bf.emit_p(PSTR("GET /forward/v1/$S/cm?pw=$O&sid=$D&en=$D&t=$L"),
-						copy.token,
-						SOPT_PASSWORD,
-						(int)hex2uint32_t(copy.sid, sizeof(copy.sid)),
-						turnon, (uint32_t)timer);
 	bf.emit_p(PSTR(" HTTP/1.0\r\nHOST: $S\r\nConnection:close\r\n"), DEFAULT_OTC_SERVER_APP);
-
 	bf.emit_p(PSTR("User-Agent: $S\r\n\r\n"), user_agent_string);
 	if (bf.overflowed()) {
-		DEBUG_PRINTLN(F("remote OTC request too large"));
+		if (command) remote_station_command_finished(sid, REMOTE_ERROR_RESPONSE, millis());
+		else remote_station_verification_finished(sid, false, false, REMOTE_ERROR_RESPONSE, millis());
 		return;
 	}
 
-	send_http_request(DEFAULT_OTC_SERVER_APP, DEFAULT_OTC_PORT_APP, p, default_http_callback, true);
+	const int8_t request_result = os.send_http_request(DEFAULT_OTC_SERVER_APP,
+		DEFAULT_OTC_PORT_APP, tmp_buffer, nullptr, true, 3000, 1);
+	if (command) finish_remote_command(sid, request_result);
+	else finish_remote_verification(sid, remote_sid, request_result);
+}
+
+} // namespace
+
+void OpenSprinkler::process_remote_station_tasks() {
+	if (!network_connected()) return;
+	static uint8_t next_sid = 0;
+	static uint32_t next_task_ms = 0;
+	const uint32_t now_ms = millis();
+	if (static_cast<int32_t>(now_ms - next_task_ms) < 0) return;
+
+	for (uint8_t count = 0; count < nstations; count++) {
+		const uint8_t sid = static_cast<uint8_t>((next_sid + count) % nstations);
+		if (!remote_station_due(sid, now_ms)) continue;
+		if (attrib_dis[sid >> 3] & (1 << (sid & 7))) {
+			remote_station_clear(sid);
+			continue;
+		}
+
+		const uint8_t station_type = get_station_type(sid);
+		if (station_type != STN_TYPE_REMOTE_IP && station_type != STN_TYPE_REMOTE_OTC) {
+			remote_station_clear(sid);
+			continue;
+		}
+
+		StationData *station = reinterpret_cast<StationData *>(tmp_buffer);
+		get_station_data(sid, station);
+		if (station_type == STN_TYPE_REMOTE_IP) {
+			process_remote_ip_task(sid, reinterpret_cast<RemoteIPStationData *>(station->sped));
+		} else {
+			process_remote_otc_task(sid, reinterpret_cast<RemoteOTCStationData *>(station->sped));
+		}
+		next_sid = static_cast<uint8_t>((sid + 1) % nstations);
+		next_task_ms = millis() + 250;
+		return; // Bound each main-loop pass to one network operation.
+	}
 }
 
 /** Switch http(s) station

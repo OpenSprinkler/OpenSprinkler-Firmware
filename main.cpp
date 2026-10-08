@@ -921,6 +921,7 @@ void do_loop()
 	ui_state_machine();
 #endif
 #endif	// Process Ethernet packets
+	os.process_remote_station_tasks();
 
 	// Start up MQTT when we have a network connection
 	if (os.status.req_mqtt_restart && os.network_connected()) {

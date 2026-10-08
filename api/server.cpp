@@ -27,6 +27,7 @@
 #include "../core/program.h"
 #include "../bfiller.h"
 #include "../services/weather.h"
+#include "../services/remote_station.h"
 #include "../services/mqtt.h"
 #include "../services/firmware_update.h"
 #include "../core/scheduler.h"
@@ -1112,7 +1113,17 @@ void server_json_status_main() {
 		bfill.emit_p(PSTR("$D"), os.applied_station_bits[bid] & os.bundle_station_bits[bid]);
 		if (bid != os.nboards - 1) bfill.emit_p(PSTR(","));
 	}
-	bfill.emit_p(PSTR("],\"nstations\":$D}"), os.nstations);
+	bfill.emit_p(PSTR("],\"nstations\":$D,\"rst\":{"), os.nstations);
+	bool first_remote = true;
+	for (sid = 0; sid < os.nstations; sid++) {
+		const RemoteStationRuntime& runtime = remote_station_runtime[sid];
+		if (runtime.status == REMOTE_STATUS_NONE) continue;
+		if (!first_remote) bfill.emit_p(PSTR(","));
+		bfill.emit_p(PSTR("\"$D\":[$D,$D,$D,$D]"), sid, runtime.status,
+			runtime.target, runtime.attempts, runtime.error);
+		first_remote = false;
+	}
+	bfill.emit_p(PSTR("}}"));
 }
 
 /** Output station status */

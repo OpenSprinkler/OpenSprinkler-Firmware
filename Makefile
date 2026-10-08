@@ -34,7 +34,7 @@ container:
 TEST_HTTP_PORT?=18080
 
 .PHONY: test-api
-test-api: test-board-profiles test-hardware-detection test-storage-files test-sprinkler-log test-firmware-release test-buffer-filler test-string-buffer test-sensor-units test-weather-sensor-cache test-weather-failsafe test-output-sequencer test-bundle-codec test-w5500-frame test-flow-rate-window
+test-api: test-board-profiles test-hardware-detection test-storage-files test-sprinkler-log test-firmware-release test-buffer-filler test-string-buffer test-sensor-units test-weather-sensor-cache test-weather-failsafe test-output-sequencer test-bundle-codec test-remote-station test-w5500-frame test-flow-rate-window
 	$(MAKE) clean
 	$(MAKE) VERSION=DEMO EXTRA_CXXFLAGS="-DHTTP_PORT=$(TEST_HTTP_PORT) -DWEATHER_RESPONSE_TEST_MAX_AGE_MS=2000"
 	python3 tests/api_contract.py --port $(TEST_HTTP_PORT)
@@ -49,6 +49,12 @@ test-board-profiles:
 test-flow-rate-window:
 	@set -e; output=$$(mktemp); trap 'rm -f "$$output"' EXIT; \
 		$(CXX) -std=gnu++14 -I. tests/flow_rate_window_test.cpp -o "$$output"; \
+		"$$output"
+
+.PHONY: test-remote-station
+test-remote-station:
+	@set -e; output=$$(mktemp); trap 'rm -f "$$output"' EXIT; \
+		$(CXX) -std=gnu++14 -I. tests/remote_station_test.cpp services/remote_station.cpp -o "$$output"; \
 		"$$output"
 
 .PHONY: test-hardware-detection
