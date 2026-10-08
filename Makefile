@@ -34,6 +34,10 @@ container:
 
 TEST_HTTP_PORT?=18080
 
+.PHONY: test-updater-notes
+test-updater-notes:
+	node tests/updater_notes_test.cjs
+
 .PHONY: test-api
 test-api: test-hostname test-board-profiles test-hardware-detection test-storage-files test-sprinkler-log test-firmware-release test-buffer-filler test-string-buffer test-sensor-units test-weather-sensor-cache test-weather-failsafe test-output-sequencer test-bundle-codec test-w5500-frame test-ch390 test-flow-rate-window test-cycle-soak test-cycle-scheduler test-runtime-queue test-station-extra
 	python3 -B -m unittest tests/test_esp8266_stack_guard.py

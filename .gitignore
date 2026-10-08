@@ -17,6 +17,7 @@ __pycache__/
 *.json
 !package.json
 !package-lock.json
+!tests/fixtures/updater-release-notes.json
 .DS_Store
 testmode.h
 .agents/review.md
