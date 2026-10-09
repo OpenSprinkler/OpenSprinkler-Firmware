@@ -43,6 +43,26 @@ uint32_t file_size(os_file_type file);
 bool file_read_block(const char* filename, void* destination, uint32_t position, uint32_t length);
 // destination must have room for max_length + 1, including the terminator.
 void file_read_string(const char* filename, char* destination, uint32_t position, uint32_t max_length);
+
+// Reuse one read-only handle within an operation, without caching file contents
+// or retaining handles across requests. A failed open is remembered too.
+// End this scope before writing, replacing or deleting the same file through
+// another handle: LittleFS does not guarantee a live reader sees those changes.
+class FileReader {
+public:
+	explicit FileReader(const char* filename);
+	~FileReader();
+	FileReader(const FileReader&) = delete;
+	FileReader& operator=(const FileReader&) = delete;
+	explicit operator bool() const { return static_cast<bool>(file_); }
+	uint32_t size();
+	bool read_block(void* destination, uint32_t position, uint32_t length);
+	// destination must have room for max_length + 1.
+	void read_string(char* destination, uint32_t position, uint32_t max_length);
+
+private:
+	os_file_type file_ = {};
+};
 bool file_write_block(const char* filename, const void* source, uint32_t position, uint32_t length);
 bool file_copy_block(const char* filename, uint32_t from, uint32_t to, uint32_t length,
 	void* temporary_buffer = nullptr);

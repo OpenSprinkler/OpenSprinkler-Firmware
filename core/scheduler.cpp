@@ -29,11 +29,11 @@ namespace {
 
 bool governed(const RuntimeQueueStruct& q) { return q.cycle_flags & CYCLE_GOVERNED; }
 
-void prepare_cycle(RuntimeQueueStruct& q) {
+void prepare_cycle(RuntimeQueueStruct& q, StationExtraReader& policies) {
 	if (q.cycle_flags & CYCLE_INITIALIZED) return;
 	q.cycle_flags |= CYCLE_INITIALIZED;
 	CycleSoakPolicy policy;
-	const auto result = station_extra_load(q.sid, MAX_NUM_STATIONS, policy);
+	const auto result = policies.load(q.sid, policy);
 	if (result != StationExtraResult::Ok && result != StationExtraResult::Missing) {
 		pd.cycle_config_error = true;
 	}
@@ -514,7 +514,14 @@ void process_dynamic_events(time_os_t curr_time) {
 
 void schedule_all_stations(time_os_t curr_time, unsigned char qo) {
 	for (uint16_t i = 0; i < pd.nqueue; i++) {
-		if (!pd.queue[i].st && pd.queue[i].dur) prepare_cycle(pd.queue[i]);
+		if (pd.queue[i].st || !pd.queue[i].dur || (pd.queue[i].cycle_flags & CYCLE_INITIALIZED)) continue;
+		// Open only when there is new work, and close before scheduling can
+		// interrupt running outputs and send special-station commands.
+		StationExtraReader policies(MAX_NUM_STATIONS);
+		for (; i < pd.nqueue; i++) {
+			if (!pd.queue[i].st && pd.queue[i].dur) prepare_cycle(pd.queue[i], policies);
+		}
+		break;
 	}
 	uint32_t con_start_time = curr_time;
 	if (os.status.pause_state) {

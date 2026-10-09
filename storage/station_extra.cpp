@@ -22,11 +22,11 @@ bool valid_count(uint16_t count) {
 	return count > 0 && count <= MAX_NUM_STATIONS;
 }
 
-StationExtraResult check_header(os_file_type file, uint16_t count) {
+StationExtraResult check_header(FileReader& file, uint16_t count) {
 	uint8_t header[STATION_EXTRA_HEADER_SIZE];
 	const uint32_t expected = STATION_EXTRA_HEADER_SIZE + uint32_t(count) * STATION_EXTRA_RECORD_SIZE;
-	if (file_size(file) != expected) return StationExtraResult::Malformed;
-	if (!file_seek(file, 0) || file_read(file, header, sizeof(header)) != sizeof(header)) {
+	if (file.size() != expected) return StationExtraResult::Malformed;
+	if (!file.read_block(header, 0, sizeof(header))) {
 		return StationExtraResult::IoError;
 	}
 	if (memcmp(header, "SNX1", 4) || header[4] != 1 ||
@@ -40,26 +40,18 @@ StationExtraResult check_header(os_file_type file, uint16_t count) {
 StationExtraResult read_record(uint16_t sid, uint16_t count, uint8_t* record) {
 	if (!valid_count(count) || sid >= count) return StationExtraResult::InvalidArgument;
 	if (!file_exists(STATION_EXTRA_FILENAME)) return StationExtraResult::Missing;
-	os_file_type file = file_open(STATION_EXTRA_FILENAME, FileOpenMode::Read);
+	FileReader file(STATION_EXTRA_FILENAME);
 	if (!file) return StationExtraResult::IoError;
 	StationExtraResult result = check_header(file, count);
 	if (result == StationExtraResult::Ok &&
-		(!file_seek(file, STATION_EXTRA_HEADER_SIZE + uint32_t(sid) * STATION_EXTRA_RECORD_SIZE) ||
-		 file_read(file, record, STATION_EXTRA_RECORD_SIZE) != STATION_EXTRA_RECORD_SIZE)) {
+		!file.read_block(record, STATION_EXTRA_HEADER_SIZE + uint32_t(sid) * STATION_EXTRA_RECORD_SIZE,
+			STATION_EXTRA_RECORD_SIZE)) {
 		result = StationExtraResult::IoError;
 	}
-	file_close(file);
 	return result;
 }
 
-} // namespace
-
-StationExtraResult station_extra_load(uint16_t sid, uint16_t station_count,
-	CycleSoakPolicy& policy) {
-	policy = {};
-	uint8_t record[STATION_EXTRA_RECORD_SIZE];
-	const StationExtraResult result = read_record(sid, station_count, record);
-	if (result != StationExtraResult::Ok) return result;
+StationExtraResult decode_record(const uint8_t* record, CycleSoakPolicy& policy) {
 	CycleSoakPolicy loaded;
 	loaded.enabled = (read_u16(record) & ENABLED_FLAG) != 0;
 	loaded.cycle_seconds = read_u16(record + 2);
@@ -67,6 +59,37 @@ StationExtraResult station_extra_load(uint16_t sid, uint16_t station_count,
 	if (!cycle_soak_policy_valid(loaded)) return StationExtraResult::Malformed;
 	policy = loaded;
 	return StationExtraResult::Ok;
+}
+
+} // namespace
+
+StationExtraReader::StationExtraReader(uint16_t station_count)
+	: file_(valid_count(station_count) ? STATION_EXTRA_FILENAME : nullptr),
+	  count_(station_count), status_(StationExtraResult::InvalidArgument) {
+	if (!valid_count(count_)) return;
+	if (!file_) {
+		status_ = file_exists(STATION_EXTRA_FILENAME) ? StationExtraResult::IoError : StationExtraResult::Missing;
+		return;
+	}
+	status_ = check_header(file_, count_);
+}
+
+StationExtraResult StationExtraReader::load(uint16_t sid, CycleSoakPolicy& policy) {
+	policy = {};
+	if (!valid_count(count_) || sid >= count_) return StationExtraResult::InvalidArgument;
+	if (status_ != StationExtraResult::Ok) return status_;
+	uint8_t record[STATION_EXTRA_RECORD_SIZE];
+	if (!file_.read_block(record, STATION_EXTRA_HEADER_SIZE + uint32_t(sid) * STATION_EXTRA_RECORD_SIZE,
+		STATION_EXTRA_RECORD_SIZE)) return StationExtraResult::IoError;
+	return decode_record(record, policy);
+}
+
+StationExtraResult station_extra_load(uint16_t sid, uint16_t station_count,
+	CycleSoakPolicy& policy) {
+	policy = {};
+	uint8_t record[STATION_EXTRA_RECORD_SIZE];
+	const auto result = read_record(sid, station_count, record);
+	return result == StationExtraResult::Ok ? decode_record(record, policy) : result;
 }
 
 StationExtraResult station_extra_initialize(uint16_t station_count) {

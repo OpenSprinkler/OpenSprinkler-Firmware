@@ -15,6 +15,14 @@ int main(int argc, char** argv) {
 	p.enabled = true;
 	assert(station_extra_load(0, count, p) == StationExtraResult::Missing);
 	assert(!p.enabled && !file_exists(STATION_EXTRA_FILENAME));
+	{
+		StationExtraReader missing(count);
+		for (uint16_t sid = 0; sid < count; sid++) {
+			assert(missing.load(sid, p) == StationExtraResult::Missing && !p.enabled);
+		}
+		assert(station_extra_initialize(count) == StationExtraResult::Ok);
+		assert(missing.load(0, p) == StationExtraResult::Missing); // no per-record reopen
+	}
 	assert(station_extra_initialize(count) == StationExtraResult::Ok);
 	os_file_type file = file_open(STATION_EXTRA_FILENAME, FileOpenMode::Read);
 	assert(file && file_size(file) == 2320);
@@ -36,6 +44,17 @@ int main(int argc, char** argv) {
 	assert(record[6] == 0x5a && record[31] == 0xa5);
 	assert(station_extra_initialize(count) == StationExtraResult::Ok); // never wipe existing values
 	assert(station_extra_load(71, count, p) == StationExtraResult::Ok && p.enabled);
+	{
+		StationExtraReader reader(count);
+		for (uint16_t sid = 0; sid < count; sid++) {
+			CycleSoakPolicy single;
+			assert(reader.load(sid, p) == station_extra_load(sid, count, single));
+			assert(p.enabled == single.enabled && p.cycle_seconds == single.cycle_seconds &&
+				p.soak_seconds == single.soak_seconds);
+		}
+		assert(reader.load(count, p) == StationExtraResult::InvalidArgument && !p.enabled);
+	}
+	assert(station_extra_load(71, count, p) == StationExtraResult::Ok && p.enabled);
 	assert(station_extra_save(71, count, p) == StationExtraResult::Ok); // no change
 	p.enabled = false;
 	assert(station_extra_save(71, count, p) == StationExtraResult::Ok);
@@ -51,6 +70,11 @@ int main(int argc, char** argv) {
 	assert(file_write_block(STATION_EXTRA_FILENAME, invalid, 16, sizeof(invalid)));
 	assert(station_extra_load(0, count, p) == StationExtraResult::Malformed && !p.enabled);
 	assert(station_extra_load(71, count, p) == StationExtraResult::Ok);
+	{
+		StationExtraReader reader(count);
+		assert(reader.load(0, p) == StationExtraResult::Malformed && !p.enabled);
+		assert(reader.load(71, p) == StationExtraResult::Ok && p.cycle_seconds == 300);
+	}
 	uint8_t check[6];
 	assert(file_read_block(STATION_EXTRA_FILENAME, check, 16, sizeof(check)));
 	assert(!memcmp(check, invalid, sizeof(check))); // malformed record untouched
@@ -58,6 +82,12 @@ int main(int argc, char** argv) {
 	assert(station_extra_initialize(count) == StationExtraResult::Malformed);
 	assert(station_extra_load(71, count, p) == StationExtraResult::Malformed && !p.enabled);
 	assert(station_extra_save(71, count, p) == StationExtraResult::Malformed);
+	{
+		StationExtraReader bad_header(count);
+		assert(bad_header.load(71, p) == StationExtraResult::Malformed && !p.enabled);
+		StationExtraReader bad_count(0);
+		assert(bad_count.load(0, p) == StationExtraResult::InvalidArgument);
+	}
 	assert(file_read_byte(STATION_EXTRA_FILENAME, 0) == 'X');
 	assert(truncate_file(STATION_EXTRA_FILENAME, 17));
 	assert(station_extra_initialize(count) == StationExtraResult::Malformed);

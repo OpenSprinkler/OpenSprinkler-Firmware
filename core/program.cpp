@@ -50,9 +50,10 @@ extern char tmp_buffer[];
 void ProgramData::init() {
 	reset_runtime();
 	load_count();
+	StationExtraReader policies(MAX_NUM_STATIONS);
 	for (uint16_t sid = 0; sid < os.nstations; sid++) {
 		CycleSoakPolicy policy;
-		const auto result = station_extra_load(sid, MAX_NUM_STATIONS, policy);
+		const auto result = policies.load(sid, policy);
 		if (result != StationExtraResult::Ok && result != StationExtraResult::Missing) cycle_config_error = true;
 	}
 }

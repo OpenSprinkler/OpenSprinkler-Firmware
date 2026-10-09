@@ -839,6 +839,49 @@ def check_debug(value):
     assert value["sprlog_mismatch"] == 0
 
 
+def check_scoped_file_reads(server):
+    assert server.get_json("co", {"ext": 8})["result"] == 1
+    policy_path = Path(server.temp_dir.name) / "stnx.dat"
+    assert not policy_path.exists()
+    assert server.get_json("jn")["cs"] == [[0, 0, 0]] * 72
+    assert not policy_path.exists(), "reading missing policies must not create the file"
+
+    names = [f"Zone-{sid:02d}-" + "x" * 24 for sid in range(72)]
+    policies = [[sid % 2, (sid + 1) * 60, 120] for sid in range(72)]
+    for sid, (enabled, cycle, soak) in enumerate(policies):
+        assert server.get_json("cs", {
+            f"s{sid}": names[sid], "sid": sid, "cse": enabled,
+            "csc": cycle, "css": soak,
+        })["result"] == 1
+    for endpoint in ("jn", "ja"):
+        data = server.get_json(endpoint)
+        stations = data if endpoint == "jn" else data["stations"]
+        assert stations["snames"] == names
+        assert stations["cs"] == policies
+
+    names[71] = "Updated last zone"
+    policies[71] = [1, 120, 180]
+    assert server.get_json("cs", {
+        "s71": names[71], "sid": 71, "cse": 1, "csc": 120, "css": 180,
+    })["result"] == 1
+    assert server.get_json("jn")["snames"] == names
+    assert server.get_json("jn")["cs"] == policies
+    for name in ("First device name", "Updated device name"):
+        assert server.get_json("co", {"dname": name})["result"] == 1
+        assert server.get_json("jc")["dname"] == name
+        assert server.get_json("ja")["settings"]["dname"] == name
+
+    original = policy_path.read_bytes()
+    policy_path.write_bytes(b"BAD!" + original[4:])
+    assert server.get_json("jn")["cs"] == [[0, 0, 0]] * 72
+    policy_path.write_bytes(original)
+    assert server.get_json("jn")["cs"] == policies
+    policy_path.unlink()
+    assert server.get_json("jn")["cs"] == [[0, 0, 0]] * 72
+    assert not policy_path.exists()
+    print("PASS scoped file reads, 72-zone responses and request-to-request freshness")
+
+
 def check_cycle_runtime(server):
     path = Path(server.temp_dir.name) / "stnx.dat"
     assert server.get_json("cs", {"sid": 0, "cse": 1, "csc": 60, "css": 60})["result"] == 1
@@ -1016,6 +1059,8 @@ def main():
 
     with DemoServer(binary, args.port) as server:
         run_contract(server)
+    with DemoServer(binary, args.port) as server:
+        check_scoped_file_reads(server)
     with DemoServer(binary, args.port) as server:
         check_cycle_runtime(server)
     with DemoServer(binary, args.port) as server:

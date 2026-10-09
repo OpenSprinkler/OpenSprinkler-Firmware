@@ -81,6 +81,41 @@ void test_legacy_log_migration(const char* data_dir) {
 int main(int argc, char** argv) {
 	assert(argc == 2);
 	set_data_dir(argv[1]);
+	{
+		FileReader missing("reader.dat");
+		assert(!missing && missing.size() == 0);
+		char text[16] = "stale";
+		missing.read_string(text, 0, 15);
+		assert(text[0] == 0 && !missing.read_block(text, 0, 1));
+		const char data[] = "first\0second";
+		assert(file_write_block("reader.dat", data, 0, sizeof(data)));
+		assert(!missing.read_block(text, 0, 1)); // failed open is not retried per record
+	}
+	{
+		FileReader reader("reader.dat");
+		assert(reader && reader.size() == 13);
+		char text[16];
+		reader.read_string(text, 6, 15);
+		assert(!strcmp(text, "second")); // short, terminated last record
+		reader.read_string(text, 100, 15);
+		assert(!text[0]);
+		reader.read_string(text, 0, 5);
+		assert(!strcmp(text, "first")); // seek clears EOF from the preceding read
+		assert(reader.read_block(text, 6, 7) && !strcmp(text, "second"));
+		assert(!reader.read_block(text, 6, 8));
+		reader.read_string(text, 0, 0);
+		assert(!text[0]);
+	}
+	// Close the reader before replacing the file, as required by LittleFS.
+	assert(rename_file("reader.dat", "reader-old.dat"));
+	assert(file_write_block("reader.dat", "new", 0, 4));
+	{
+		FileReader next_request("reader.dat");
+		char text[16];
+		next_request.read_string(text, 0, 15);
+		assert(!strcmp(text, "new"));
+	}
+	assert(remove_file("reader.dat") && remove_file("reader-old.dat"));
 	// Upgrading a 13-slot file must not reuse stale data for the new slot.
 	const uint32_t hostname_offset = MAX_SOPTS_SIZE * SOPT_HOSTNAME;
 	char slot[MAX_SOPTS_SIZE + 1];

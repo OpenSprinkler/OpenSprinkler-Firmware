@@ -638,6 +638,7 @@ function rst_wsp() {document.getElementById('wsp').value='$S';}</script>)"),
 }
 
 void server_json_controller_main(OTF_PARAMS_DEF) {
+	BufferFiller::OptionReadScope options(bfill);
 	unsigned char bid, sid;
 	time_os_t curr_time = os.now_tz();
 	bfill.emit_p(PSTR("\"devt\":$L,\"nbrd\":$D,\"en\":$D,\"sn1\":$D,\"sn2\":$D,\"rd\":$D,\"rdst\":$L,"
@@ -703,7 +704,7 @@ void server_json_controller_main(OTF_PARAMS_DEF) {
 							 SOPT_DEVICE_NAME);
 
 	#if defined(ARDUINO)
-	os.sopt_load(SOPT_HOSTNAME, tmp_buffer);
+	options.read_string(SOPT_HOSTNAME, tmp_buffer, MAX_SOPTS_SIZE);
 	if (!tmp_buffer[0]) {
 		// Still show the device default if its initial persistence failed.
 		uint8_t hostname_mac[6] = {};

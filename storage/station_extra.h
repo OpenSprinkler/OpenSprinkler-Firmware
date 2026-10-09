@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/cycle_soak.h"
+#include "storage/files.h"
 
 #include <cstdint>
 
@@ -13,6 +14,18 @@ enum class StationExtraResult {
 	Malformed,
 	IoError,
 	InvalidArgument,
+};
+
+// Validate the header once and reuse the handle for a read-only policy batch.
+class StationExtraReader {
+public:
+	explicit StationExtraReader(uint16_t station_count);
+	StationExtraResult load(uint16_t sid, CycleSoakPolicy& policy);
+
+private:
+	FileReader file_;
+	uint16_t count_;
+	StationExtraResult status_;
 };
 
 // Loading never creates/repairs a file. Non-Ok reads return a disabled policy;

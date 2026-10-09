@@ -160,9 +160,9 @@ test-sensor-units:
 
 .PHONY: test-buffer-filler
 test-buffer-filler:
-	@set -e; output=$$(mktemp); trap 'rm -f "$$output"' EXIT; \
-		$(CXX) -std=gnu++14 -DDEMO -I. tests/bfiller_test.cpp -o "$$output"; \
-		"$$output"
+	@set -e; output=$$(mktemp); data=$$(mktemp -d); trap 'rm -f "$$output"; rm -rf "$$data"' EXIT; \
+		$(CXX) -std=gnu++14 -DDEMO -I. tests/bfiller_test.cpp storage/files.cpp -o "$$output"; \
+		"$$output" "$$data"
 
 .PHONY: test-string-buffer
 test-string-buffer:

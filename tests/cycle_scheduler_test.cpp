@@ -29,6 +29,8 @@ static uint8_t groups[MAX_NUM_STATIONS], bindings[MAX_NUM_STATIONS];
 static uint16_t bundle_min[MAX_NUM_STATIONS];
 static int16_t on_adj[NUM_MASTER_ZONES], off_adj[NUM_MASTER_ZONES], station_delay;
 static CycleSoakPolicy policies[MAX_NUM_STATIONS];
+static unsigned policy_reader_opens = 0, policy_reads = 0, active_readers = 0;
+static StationExtraResult policy_result = StationExtraResult::Ok;
 struct Event { uint32_t time; uint8_t sid; bool on; };
 static std::vector<Event> events;
 static std::vector<LogStruct> logs;
@@ -47,6 +49,7 @@ int16_t OpenSprinkler::get_off_adj(unsigned char m) { return off_adj[m]; }
 unsigned char OpenSprinkler::is_running(unsigned char sid) { return (station_bits[sid >> 3] >> (sid & 7)) & 1; }
 unsigned char OpenSprinkler::get_applied_station_bit(unsigned char sid) { return !delay_output && is_running(sid); }
 unsigned char OpenSprinkler::set_station_bit(unsigned char sid, unsigned char value, uint32_t duration) {
+	assert(active_readers == 0); // policy handles must close before output side effects
 	if (value) commanded_duration = duration;
 	const bool changed = is_running(sid) != value;
 	if (changed) events.push_back({clock_now, sid, value != 0});
@@ -63,11 +66,22 @@ uint16_t bundle_minimum_duration(uint8_t sid) { return bundle_min[sid]; }
 bool bundle_bound_to_master(uint8_t sid, uint8_t master) { return bindings[sid] & (1 << master); }
 bool NotifQueue::add(uint16_t, uint32_t, float, uint8_t, float) { return true; }
 void write_log(unsigned char, time_os_t) { logs.push_back(ProgramData::lastrun); }
-StationExtraResult station_extra_load(uint16_t sid, uint16_t, CycleSoakPolicy& out) {
-	out = policies[sid]; return StationExtraResult::Ok;
+FileReader::FileReader(const char*) { active_readers++; }
+FileReader::~FileReader() { assert(active_readers); active_readers--; }
+StationExtraReader::StationExtraReader(uint16_t count)
+	: file_(nullptr), count_(count), status_(policy_result) { policy_reader_opens++; }
+StationExtraResult StationExtraReader::load(uint16_t sid, CycleSoakPolicy& out) {
+	assert(sid < count_ && active_readers == 1);
+	policy_reads++;
+	out = status_ == StationExtraResult::Ok ? policies[sid] : CycleSoakPolicy{};
+	return status_;
 }
 
 static void reset() {
+	assert(active_readers == 0);
+	policy_reader_opens = policy_reads = 0;
+	policy_result = StationExtraResult::Ok;
+	ProgramData::cycle_config_error = false;
 	ProgramData::reset_runtime();
 	OpenSprinkler::clear_all_station_bits();
 	OpenSprinkler::status = {};
@@ -105,6 +119,39 @@ static void tick(uint32_t now) {
 		if (scheduler_queue_expired(ProgramData::queue[i], now)) ProgramData::dequeue(i);
 	}
 	scheduler_rebuild_reservations(now);
+}
+
+static void test_batched_policy_admission() {
+	reset();
+	schedule_all_stations(clock_now);
+	assert(policy_reader_opens == 0 && policy_reads == 0);
+	for (uint8_t sid = 0; sid < 72; sid++) {
+		policy(sid, 60, 120);
+		admit(sid, 130);
+	}
+	schedule_all_stations(clock_now);
+	assert(policy_reader_opens == 1 && policy_reads == 72 && active_readers == 0);
+	for (uint8_t i = 0; i < 72; i++) {
+		const auto& q = ProgramData::queue[i];
+		assert(q.dur == 44 && q.cycle.remaining == 86 && q.cycle.soak_seconds == 120);
+	}
+	schedule_all_stations(clock_now);
+	assert(policy_reader_opens == 1 && policy_reads == 72); // no new jobs, no lookup
+	policy(0, 120, 180);
+	admit(0, 120, 2);
+	schedule_all_stations(clock_now);
+	assert(policy_reader_opens == 2 && policy_reads == 73 && active_readers == 0);
+	assert(ProgramData::queue[0].cycle.soak_seconds == 120); // admitted snapshot unchanged
+	assert(ProgramData::queue[72].cycle.soak_seconds == 180); // next pass sees edits
+	for (auto result : {StationExtraResult::Missing, StationExtraResult::Malformed}) {
+		reset();
+		policy_result = result;
+		admit(0, 130); admit(1, 130);
+		schedule_all_stations(clock_now);
+		assert(policy_reader_opens == 1 && policy_reads == 2 && active_readers == 0);
+		assert(ProgramData::queue[0].dur == 130 && ProgramData::queue[1].dur == 130);
+		assert(ProgramData::cycle_config_error == (result == StationExtraResult::Malformed));
+	}
 }
 
 static void test_insert_running_duplicate() {
@@ -356,6 +403,7 @@ static void preview_fixtures() {
 int main(int argc, char** argv) {
 	if (argc == 2 && !strcmp(argv[1], "--preview-fixtures")) { preview_fixtures(); return 0; }
 	if (argc == 2 && !strcmp(argv[1], "--feature-off-traces")) { feature_off_traces(); return 0; }
+	test_batched_policy_admission();
 	test_insert_running_duplicate();
 	test_replace_cooldown();
 	test_gap_boundaries();

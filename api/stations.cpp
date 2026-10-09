@@ -65,12 +65,15 @@ bool change_station_groups(const OTF::Request& request) {
 
 void server_json_stations_main(OTF_PARAMS_DEF) {
 	bfill.emit_p(PSTR("\"csver\":1,\"qmax\":$D,\"cs\":["), RUNTIME_QUEUE_SIZE);
-	for (uint16_t sid = 0; sid < os.nstations; sid++) {
-		CycleSoakPolicy policy;
-		const auto result = station_extra_load(sid, MAX_NUM_STATIONS, policy);
-		if (result != StationExtraResult::Ok && result != StationExtraResult::Missing) pd.cycle_config_error = true;
-		bfill.emit_p(PSTR("[$D,$D,$D]"), policy.enabled, policy.cycle_seconds, policy.soak_seconds);
-		if (sid + 1 < os.nstations) bfill.emit_p(PSTR(","));
+	{
+		StationExtraReader policies(MAX_NUM_STATIONS);
+		for (uint16_t sid = 0; sid < os.nstations; sid++) {
+			CycleSoakPolicy policy;
+			const auto result = policies.load(sid, policy);
+			if (result != StationExtraResult::Ok && result != StationExtraResult::Missing) pd.cycle_config_error = true;
+			bfill.emit_p(PSTR("[$D,$D,$D]"), policy.enabled, policy.cycle_seconds, policy.soak_seconds);
+			if (sid + 1 < os.nstations) bfill.emit_p(PSTR(","));
+		}
 	}
 	bfill.emit_p(PSTR("],"));
 	emit_board_attribute(PSTR("masop"), os.attrib_mas);
@@ -91,8 +94,11 @@ void server_json_stations_main(OTF_PARAMS_DEF) {
 	emit_station_attribute(PSTR("stn_grp"), os.attrib_grp);
 
 	bfill.emit_p(PSTR("\"snames\":["));
+	FileReader names(STATIONS_FILENAME);
 	for (unsigned char sid = 0; sid < os.nstations; sid++) {
-		os.get_station_name(sid, tmp_buffer);
+		tmp_buffer[STATION_NAME_SIZE] = 0;
+		if (!names.read_block(tmp_buffer, uint32_t(sid) * sizeof(StationData) + offsetof(StationData, name),
+			STATION_NAME_SIZE)) tmp_buffer[0] = 0;
 		bfill.emit_p(PSTR("\"$S\""), tmp_buffer);
 		if (sid != os.nstations - 1) bfill.emit_p(PSTR(","));
 	}
@@ -277,9 +283,10 @@ void server_change_stations(OTF_PARAMS_DEF) {
 		if (station_extra_initialize(MAX_NUM_STATIONS) != StationExtraResult::Ok ||
 			station_extra_save(cycle_sid, MAX_NUM_STATIONS, cycle_policy) != StationExtraResult::Ok) storage_ok = false;
 		pd.cycle_config_error = !storage_ok;
+		StationExtraReader policies(MAX_NUM_STATIONS);
 		for (uint16_t id = 0; id < os.nstations; id++) {
 			CycleSoakPolicy check;
-			if (station_extra_load(id, MAX_NUM_STATIONS, check) != StationExtraResult::Ok) pd.cycle_config_error = true;
+			if (policies.load(id, check) != StationExtraResult::Ok) pd.cycle_config_error = true;
 		}
 	}
 	handle_return(storage_ok ? HTML_SUCCESS : HTML_INTERNAL_ERROR);
