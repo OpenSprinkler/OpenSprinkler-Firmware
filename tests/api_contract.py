@@ -257,6 +257,14 @@ def check_sensor_definitions(data):
         "Onboard Digital",
     }
     assert expected_names <= sensor_names
+    assert len(data["sensors"]) == 6
+    assert data["sensors"][5] == {"dis": 1}  # Demo has no onboard ADC
+    internal = data["sensors"][3]
+    assert internal["n"] == "System Internal"
+    metrics = internal["as"][0]
+    assert metrics["a"] == "metric" and metrics["d"] == "3"
+    assert [item["id"] for item in metrics["o"]] == [3]  # Linux/Demo
+    assert metrics["o"][0]["l"] == "CPU Temperature"
     weather = next(item for item in data["sensors"] if item.get("n") == "Weather Sensor")
     assert not weather.get("dis")
     assert len(data["enums"]["WeatherAction"]) == 13
@@ -1024,6 +1032,24 @@ def check_atomic_admission(server):
     print("PASS atomic program/Run Once admission at queue capacity")
 
 
+def check_analog_port_contract(server):
+    before = server.get_json("jo")
+    # Unsupported Analog mode must fail before changing another option.
+    result = server.get_json("co", {"sn1t": 4, "wl": 77})
+    assert result["result"] == 0x30 and result["item"] == "sn1t"
+    assert server.get_json("jo")["wl"] == before["wl"]
+    assert server.get_json("jo")["sn1t"] == before["sn1t"]
+    assert server.get_json("co", {"sn1t": before["sn1t"]})["result"] == 1
+    assert server.get_json("csn", {"sid": -1, "type": 5, "input": 0})["result"] == 0x30
+    assert server.get_json("csn", {"sid": -1, "type": 5, "input": 4})["result"] == 17
+    assert server.get_json("csn", {"sid": -1, "type": 4, "input": 3})["result"] == 17
+    # A disabled onboard digital definition is still a stored reference.
+    assert server.get_json("csn", {"sid": -1, "type": 4, "input": 0, "flag": 0})["result"] == 1
+    assert server.get_json("co", {"sn1t": before["sn1t"]})["result"] == 1
+    assert server.get_json("dsn", {"sid": -1})["result"] == 1
+    print("PASS onboard analog capability and transactional mode validation")
+
+
 def run_contract(server):
     checks = [
         ("jo", check_options),
@@ -1045,6 +1071,7 @@ def run_contract(server):
     check_bundle_commands(server)
     check_sprinkler_logs(server)
     check_nested_option_encodings(server)
+    check_analog_port_contract(server)
 
 
 def main():

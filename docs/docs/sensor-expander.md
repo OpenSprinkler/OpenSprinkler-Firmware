@@ -117,7 +117,24 @@ The Edit Sensor interface also allows non-ADS1115 sensors, including:
 
 * **Aggregate:** Combines up to eight **child** sensors and aggregates their data using operations like `Min`, `Max`, `Average`, `Sum`, `Median`, or `Range`. Each child may have its own `scale` and `offset`. This is useful, for example, when you need to average or denoise readings from multiple soil moisture sensors. Aggregate sensors can themselves be children of other aggregate sensors, allowing flexible hierarchies.
 * **System Internal:** Monitor metrics like available Heap size and Flash size. Combined with logging, this lets you track the microcontroller’s resource usage over time.
+
+    Firmware **2.2.1(7) and later** also provides **Chip Temperature** on OpenSprinkler v4. This measures the ESP32 chip, not the surrounding air, over a supported range of -10 to 80 degrees Celsius. Celsius, Fahrenheit, and Kelvin display units are available. A failed or out-of-range hardware reading is reported as an error, not as zero.
+
+    System Internal uses Expanded Sensor type `3`, with the following `metric` IDs. The firmware advertises the supported metrics through `/jsd`:
+
+    | Metric ID | Reading | Supported controllers |
+    |-----------|---------|-----------------------|
+    | `0` | Free Heap | v3 and v4 |
+    | `1` | Free Flash (available filesystem space) | v3 and v4 |
+    | `2` | WiFi RSSI | v3 and v4 while connected through WiFi |
+    | `3` | CPU/Chip Temperature | OSPi; v4 starting with 2.2.1(7) |
+    | `4` | Heap Fragmentation | v3 only |
+
+    New v4 Free Heap sensors default to a 512 KB maximum in 2.2.1(7). Existing sensors keep their configured limits; increase the maximum if an existing reading is being clamped at 50 KB.
 * **Onboard Digital:** Allows you to programmatically link the controller’s built-in digital sensors (e.g., rain, soil) to the Expanded Sensor interface. Normally, built-in sensors affect watering on a per-zone basis (via each zone’s **Ignore Sensor** flag). By routing them through the Expanded Sensor interface, you can use them in program-level adjustments.
+* **Onboard Analog** *(planned for firmware 2.2.1(7), OpenSprinkler v4 only):* Reads a 0-3.3 V signal from SN1-SN4 without a Sensor Expander. First set the Built-in Sensor port to **Analog**, then create an Onboard Analog Expanded Sensor using that input. Linear, piecewise, and named sensor conversions work as with ADS1115. Multiple readings may share an input. Deleting or disabling a reading does not change the port's electrical mode; remove or move conflicting readings before changing between analog and digital use. Disabled readings still count in this check.
+
+    Analog mode disables the external pull-up. Keep the signal within **0-3.3 V** and use a common ground. Sensor power is separate: a 5 V-powered sensor with a 0-3 V output can be suitable. The v4 RF header's middle pin provides 3.3 V for sensors that support that supply voltage and fit its available current budget. A disconnected input may still report a voltage; this is not automatic probe-presence detection. Use the Sensor Expander when higher measurement precision is needed.
 * **Weather Sensor** *(available in firmware 2.2.1(6) and later):* Uses weather data such as current conditions, today's forecast, previous-day observations, and reference evapotranspiration (ETo). Weather Sensor values can be displayed, logged, and used for program-level adjustments like other Expanded Sensors. They require a configured location and weather provider, as well as internet access. Weather data is refreshed at most once every six hours, so a shorter Sensor Interval only logs the same cached value more often. Failed refreshes are retried every 15 minutes, and values are marked stale after 12 hours without a successful refresh.
 
 ---

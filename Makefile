@@ -39,7 +39,7 @@ test-updater-notes:
 	node tests/updater_notes_test.cjs
 
 .PHONY: test-api
-test-api: test-hostname test-board-profiles test-hardware-detection test-storage-files test-sprinkler-log test-firmware-release test-buffer-filler test-string-buffer test-sensor-units test-weather-sensor-cache test-weather-failsafe test-output-sequencer test-bundle-codec test-w5500-frame test-ch390 test-flow-rate-window test-cycle-soak test-cycle-scheduler test-runtime-queue test-station-extra
+test-api: test-hostname test-board-profiles test-hardware-detection test-storage-files test-sprinkler-log test-firmware-release test-buffer-filler test-string-buffer test-sensor-units test-system-internal-sensor test-weather-sensor-cache test-weather-failsafe test-output-sequencer test-bundle-codec test-w5500-frame test-ch390 test-flow-rate-window test-cycle-soak test-cycle-scheduler test-runtime-queue test-station-extra
 	python3 -B -m unittest tests/test_esp8266_stack_guard.py
 	$(MAKE) clean
 	$(MAKE) VERSION=DEMO EXTRA_CXXFLAGS="-DHTTP_PORT=$(TEST_HTTP_PORT) -DWEATHER_RESPONSE_TEST_MAX_AGE_MS=2000"
@@ -148,6 +148,20 @@ test-firmware-release:
 	python3 -B -m unittest tests/test_firmware_release.py
 
 .PHONY: test-sensor-units
+test-api: test-onboard-analog
+
+.PHONY: test-onboard-analog
+test-onboard-analog:
+	@set -e; output=$$(mktemp); data=$$(mktemp -d); trap 'rm -f "$$output"; rm -rf "$$data"' EXIT; \
+		$(CXX) -std=gnu++14 -DDEMO -I. \
+			-Iexternal/TinyWebsockets/tiny_websockets_lib/include \
+			-Iexternal/OpenThings-Framework-Firmware-Library \
+			-ffunction-sections -fdata-sections \
+			tests/onboard_analog_test.cpp sensors/analog_sensor.cpp sensors/ads1115_sensor.cpp \
+			sensors/onboard_analog_sensor.cpp sensors/onboard_digital_sensor.cpp sensors/sensor.cpp \
+			services/sensor_ports.cpp boards/board_profile.cpp storage/files.cpp \
+			-Wl,--gc-sections -o "$$output"; "$$output" "$$data"
+
 test-sensor-units:
 	@set -e; output=$$(mktemp); trap 'rm -f "$$output"' EXIT; \
 		$(CXX) -std=gnu++14 -DDEMO -I. \
@@ -157,6 +171,18 @@ test-sensor-units:
 			tests/sensor_unit_test.cpp sensors/sensor.cpp sensors/weather_sensor.cpp \
 			-Wl,--gc-sections -o "$$output"; \
 		"$$output"
+
+.PHONY: test-system-internal-sensor
+test-system-internal-sensor:
+	@set -e; output=$$(mktemp); trap 'rm -f "$$output"' EXIT; \
+		$(CXX) -std=gnu++14 -DDEMO -I. \
+			-Iexternal/TinyWebsockets/tiny_websockets_lib/include \
+			-Iexternal/OpenThings-Framework-Firmware-Library \
+			-ffunction-sections -fdata-sections \
+			tests/system_internal_sensor_test.cpp sensors/system_internal_sensor.cpp sensors/sensor.cpp storage/files.cpp \
+			-Wl,--gc-sections -o "$$output"; "$$output"; \
+		$(CXX) -std=gnu++14 -DESP32 -Itests/chip_temperature_stubs -I. \
+			tests/chip_temperature_test.cpp platform/chip_temperature.cpp -o "$$output"; "$$output"
 
 .PHONY: test-buffer-filler
 test-buffer-filler:

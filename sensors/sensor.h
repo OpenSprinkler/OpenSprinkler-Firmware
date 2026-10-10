@@ -80,11 +80,13 @@ static_assert(sizeof(SensorLogRecord) == 10, "sensor log record size");
 
 enum class SensorType : uint8_t {
 	Aggregate = 0,
-	ADS1115,
-	Weather,
-	SystemInternal,
-	OnboardDigital,
-	MAX_VALUE,
+	ADS1115 = 1,
+	Weather = 2,
+	SystemInternal = 3,
+	OnboardDigital = 4,
+	OnboardAnalog = 5,
+	// Planned, not implemented: MQTT 6, 1-Wire 7, HTTP JSON 8, Remote OS 9.
+	MAX_VALUE = 6,
 };
 
 // X(id, display_name)

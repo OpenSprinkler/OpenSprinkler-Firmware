@@ -24,6 +24,7 @@
 #include "server.h"
 #include "../types.h"
 #include "../OpenSprinkler.h"
+#include "services/sensor_ports.h"
 #include "../core/program.h"
 #include "../bfiller.h"
 #include "../services/weather.h"
@@ -893,6 +894,41 @@ void server_change_scripturl(OTF_PARAMS_DEF) {
 void server_change_options(OTF_PARAMS_DEF)
 {
 	if(!process_password(OTF_PARAMS)) return;
+	// Validate mode transitions before any option or string-option write. The
+	// App resends unchanged modes, which must not block repairs/unrelated saves.
+	uint8_t requested_modes[NUM_SENSORS];
+	bool mode_change = false;
+	for (uint8_t i = 0; i < NUM_SENSORS; i++) {
+		requested_modes[i] = os.iopts[sensor_iopt_keys[i].type];
+		char key[6];
+		iopt_get_json_name(sensor_iopt_keys[i].type, key);
+		uint8_t found = 0;
+		findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, key, false, &found);
+		if (!found) continue;
+		char *end;
+		long value = strtol(tmp_buffer, &end, 10);
+		if (end == tmp_buffer || *end || value < 0 || value > 255) {
+			otf_send_result(OTF_PARAMS, HTML_DATA_OUTOFBOUND, key);
+			return;
+		}
+		requested_modes[i] = value;
+		mode_change |= value != os.iopts[sensor_iopt_keys[i].type];
+	}
+	if (mode_change) {
+		uint8_t analog_refs, digital_refs;
+		if (!sensor_port_references(analog_refs, digital_refs)) {
+			otf_send_result(OTF_PARAMS, HTML_INTERNAL_ERROR, "sensors");
+			return;
+		}
+		for (uint8_t i = 0; i < NUM_SENSORS; i++) {
+			if (sensor_port_transition_allowed(i, os.iopts[sensor_iopt_keys[i].type],
+				requested_modes[i], analog_refs, digital_refs)) continue;
+			char key[6];
+			iopt_get_json_name(sensor_iopt_keys[i].type, key);
+			otf_send_result(OTF_PARAMS, HTML_NOT_PERMITTED, key);
+			return;
+		}
+	}
 	uint8_t hostname_found = 0;
 	// Keep one extra character so overlength input is rejected, not truncated.
 	char hostname[HOSTNAME_MAX_LENGTH + 2] = {};
@@ -1090,6 +1126,10 @@ void server_change_options(OTF_PARAMS_DEF)
 		RTC.set(t);
 #endif
 	}
+	if (sensor_change) {
+		os.sensor_resetall();
+		sensor_ports_apply();
+	}
 	if (err)	handle_return(HTML_DATA_OUTOFBOUND);
 
 	if (!os.iopts_save()) storage_ok = false;
@@ -1116,10 +1156,6 @@ void server_change_options(OTF_PARAMS_DEF)
 		wt_errCode = HTTP_RQT_NOT_RECEIVED;
 		os.checkwt_lasttime = 0;  // force weather update
 		weather_sensor_reset_cache();
-	}
-
-	if(sensor_change) {
-		os.sensor_resetall();
 	}
 
 	handle_return(HTML_SUCCESS);
@@ -1693,9 +1729,11 @@ void server_change_sensor(OTF_PARAMS_DEF) {
 			result_sensor = new AggregateSensor(interval, min, max, (const char*)&name, unit, flag, os.sensors, children, children_count, action);
 			break;
 		}
-		case SensorType::ADS1115: {
+		case SensorType::ADS1115:
+		case SensorType::OnboardAnalog: {
+			const bool onboard = sensor_type == SensorType::OnboardAnalog;
 			uint32_t sensor_index = 0;
-			uint32_t sensor_pin = 0;
+			uint32_t sensor_pin = onboard ? 255 : 0;
 			float scale = ADS1115_DEFAULT_SCALE;
 			float offset = ADS1115_DEFAULT_OFFSET;
 			ADS1115Subtype subtype = ADS1115Subtype::LINEAR;
@@ -1704,9 +1742,12 @@ void server_change_sensor(OTF_PARAMS_DEF) {
 
 			if (sensor_type == original_sensor_type) {
 				if ((sensor = Sensor::get(sid))) {
-					ADS1115Sensor* e = static_cast<ADS1115Sensor*>(sensor);
-					sensor_index = e->sensor_index;
-					sensor_pin = e->pin;
+					AnalogSensor* e = static_cast<AnalogSensor*>(sensor);
+					if (onboard) sensor_pin = static_cast<OnboardAnalogSensor*>(sensor)->input;
+					else {
+						sensor_index = static_cast<ADS1115Sensor*>(sensor)->sensor_index;
+						sensor_pin = static_cast<ADS1115Sensor*>(sensor)->pin;
+					}
 					scale = e->scale;
 					offset = e->offset;
 					subtype = e->subtype;
@@ -1715,7 +1756,20 @@ void server_change_sensor(OTF_PARAMS_DEF) {
 				}
 			}
 
-			if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("pin"), true)) {
+			if (onboard) {
+				if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("input"), true)) {
+					sensor_pin = strtoul(tmp_buffer, &end, 10);
+					if (end == tmp_buffer || *end) handle_return(HTML_DATA_FORMATERROR);
+					if (sensor_pin >= NUM_SENSORS) handle_return(HTML_DATA_OUTOFBOUND);
+				}
+				if (sensor_pin == 255) handle_return(HTML_DATA_MISSING);
+				if (!sensor_port_analog_capable(sensor_pin) || !sensor_port_is_analog(sensor_pin)) handle_return(HTML_NOT_PERMITTED);
+				if (original_sensor_type != SensorType::OnboardAnalog) {
+					if (!min_set) min = 0;
+					if (!max_set) max = 3.3f;
+					if (!unit_set) unit = SensorUnit::Volt;
+				}
+			} else if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("pin"), true)) {
 				uint32_t raw_sensor_pin = strtoul(tmp_buffer, &end, 10);
 				if (*end != '\0') handle_return(HTML_DATA_FORMATERROR);
 				if (raw_sensor_pin == 0 || raw_sensor_pin > 16) handle_return(HTML_DATA_OUTOFBOUND);
@@ -1783,9 +1837,14 @@ void server_change_sensor(OTF_PARAMS_DEF) {
 				handle_return(HTML_DATA_OUTOFBOUND);
 			}
 
-			result_sensor = new ADS1115Sensor(interval, min, max, (const char*)&name, unit, flag,
-			                                  os.ads1115_devices, sensor_index, sensor_pin,
-			                                  scale, offset, subtype, num_points, points);
+			if (!isfinite(scale) || !isfinite(offset)) handle_return(HTML_DATA_OUTOFBOUND);
+			if (onboard) {
+				result_sensor = new OnboardAnalogSensor(interval, min, max, name, unit, flag,
+					sensor_pin, scale, offset, subtype, num_points, points);
+			} else {
+				result_sensor = new ADS1115Sensor(interval, min, max, name, unit, flag,
+					os.ads1115_devices, sensor_index, sensor_pin, scale, offset, subtype, num_points, points);
+			}
 			break;
 		}
 		case SensorType::Weather: {
@@ -1870,6 +1929,8 @@ void server_change_sensor(OTF_PARAMS_DEF) {
 			}
 
 			if (input == OnboardInput::MAX_VALUE) handle_return(HTML_DATA_MISSING);
+			if (!sensor_available(static_cast<uint8_t>(input))) handle_return(HTML_DATA_OUTOFBOUND);
+			if (sensor_port_is_analog(static_cast<uint8_t>(input))) handle_return(HTML_NOT_PERMITTED);
 
 			result_sensor = new OnboardDigitalSensor(interval, min, max, (const char*)&name, unit, flag, input);
 			break;
@@ -2561,6 +2622,9 @@ void server_json_sensor_description_main(OTF_PARAMS_DEF) {
 				break;
 			case SensorType::OnboardDigital:
 				OnboardDigitalSensor::emit_description_json(&bfill);
+				break;
+			case SensorType::OnboardAnalog:
+				OnboardAnalogSensor::emit_description_json(&bfill);
 				break;
 			case SensorType::MAX_VALUE:
 				break;

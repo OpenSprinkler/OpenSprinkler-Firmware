@@ -22,6 +22,8 @@
  */
 
 #include "OpenSprinkler.h"
+#include "services/sensor_ports.h"
+#include "platform/sensor_input.h"
 
 #include "core/bundle.h"
 #include "core/output_sequencer.h"
@@ -92,20 +94,7 @@ unsigned char sensor_pullup_pin(uint8_t i) {
 }
 
 static void configure_sensor_digital_input(uint8_t i) {
-	const uint8_t input_pin = sensor_pin(i);
-	const uint8_t pullup_pin = sensor_pullup_pin(i);
-#if defined(ARDUINO)
-	if (pullup_pin != osboard::UNUSED_PIN) {
-		pinModeExt(input_pin, INPUT);
-		pinModeExt(pullup_pin, OUTPUT);
-		digitalWriteExt(pullup_pin, HIGH);
-	} else {
-		pinModeExt(input_pin, INPUT_PULLUP);
-	}
-#else
-	(void)pullup_pin;
-	pinMode(input_pin, INPUT_PULLUP);
-#endif
+	if (!sensor_port_is_analog(i)) sensor_input_configure(i, false);
 }
 
 bool sensor_available(uint8_t i) {
@@ -900,9 +889,7 @@ void OpenSprinkler::begin() {
 	apply_all_station_bits();
 
 #if defined(ARDUINO)
-	for (uint8_t i = 0; i < osboard::active().sensor_count; i++) {
-		configure_sensor_digital_input(i);
-	}
+	sensor_ports_initialize();
 
 #else
 	// pull shift register OE low to enable output
@@ -2382,6 +2369,7 @@ void OpenSprinkler::options_setup() {
 	lcd_set_brightness();
 	lcd_set_contrast();
 #endif
+	sensor_ports_apply();
 }
 
 /** Load non-volatile controller status data from file */
@@ -3264,6 +3252,8 @@ void OpenSprinkler::ui_set_options(int oid)
 
 	while(!finished) {
 		button = button_read(BUTTON_WAIT_HOLD);
+		const int previous_option = i;
+		const uint8_t previous_value = iopts[i];
 
 		switch (button & BUTTON_MASK) {
 		case BUTTON_1:
@@ -3313,6 +3303,16 @@ void OpenSprinkler::ui_set_options(int oid)
 			break;
 		}
 
+		if (i == previous_option && iopts[i] != previous_value) {
+			for (uint8_t input = 0; input < NUM_SENSORS; input++) {
+				if (i != sensor_iopt_keys[input].type) continue;
+				uint8_t analog_refs, digital_refs;
+				if (!sensor_port_references(analog_refs, digital_refs) ||
+					!sensor_port_transition_allowed(input, previous_value, iopts[i], analog_refs, digital_refs)) {
+					iopts[i] = previous_value;
+				}
+			}
+		}
 		if (button != BUTTON_NONE) {
 			lcd_print_option(i);
 		}

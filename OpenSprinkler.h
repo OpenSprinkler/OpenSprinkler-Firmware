@@ -78,6 +78,7 @@
 #include "sensors/onboard_digital_sensor.h"
 #include "drivers/ads1115.h"
 #include "sensors/ads1115_sensor.h"
+#include "sensors/onboard_analog_sensor.h"
 
 #if defined(ESP8266)
 	extern ESP8266WebServer *update_server;
@@ -286,6 +287,7 @@ public:
 		WeatherSensor weather;
 		SystemInternalSensor system_internal;
 		OnboardDigitalSensor onboard_digital;
+		OnboardAnalogSensor onboard_analog;
 	};
 	static sensor_memory_t sensors[MAX_SENSORS];
 

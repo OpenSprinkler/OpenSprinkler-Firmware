@@ -139,6 +139,7 @@ enum {
 #define SENSOR_TYPE_RAIN    0x01  // rain sensor
 #define SENSOR_TYPE_FLOW    0x02  // flow sensor
 #define SENSOR_TYPE_SOIL    0x03  // soil moisture sensor
+#define SENSOR_TYPE_ANALOG  0x04  // explicit high-impedance port mode (capable boards only)
 #define SENSOR_TYPE_PSWITCH 0xF0  // program switch sensor
 #define SENSOR_TYPE_OTHER   0xFF
 

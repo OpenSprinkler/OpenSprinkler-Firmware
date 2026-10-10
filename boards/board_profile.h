@@ -40,10 +40,11 @@ struct BoardProfile {
 	BoardPins pins;
 	uint8_t sensor_count;
 	uint8_t capabilities;
+	uint8_t analog_sensor_mask;
 };
 
 static_assert(sizeof(BoardPins) == 19, "BoardPins must remain compact");
-static_assert(sizeof(BoardProfile) == 21, "BoardProfile must remain compact");
+static_assert(sizeof(BoardProfile) == 22, "BoardProfile must remain compact");
 
 const BoardProfile& active();
 void select(ProfileId id);
