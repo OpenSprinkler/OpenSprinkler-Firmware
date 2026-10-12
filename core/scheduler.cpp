@@ -319,6 +319,14 @@ void schedule_all_stations(time_os_t curr_time, unsigned char qo) {
 
 		apply_master_adjustments(curr_time, q, gid, seq_start_times);
 
+		// The main loop only recomputes last_seq_stop_times once per second.
+		// Keep it current here so another enqueue in the same second (/cm, /cr,
+		// /mp, or a program match) is placed after this entry, not on top of it.
+		if (os.is_sequential_station(q->sid) && !re &&
+		    q->st + q->dur > pd.last_seq_stop_times[gid]) {
+			pd.last_seq_stop_times[gid] = q->st + q->dur;
+		}
+
 		if (!os.status.program_busy) {
 			os.status.program_busy = 1;
 			if(os.iopts[IOPT_SENSOR1_TYPE] == SENSOR_TYPE_FLOW) {

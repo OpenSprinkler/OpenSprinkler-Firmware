@@ -830,6 +830,59 @@ def check_debug(value):
     assert value["sprlog_mismatch"] == 0
 
 
+def check_same_second_sequential_enqueue(server):
+    """Back-to-back queue additions in one sequential group must not overlap.
+
+    schedule_all_stations() derives the next sequential start from
+    pd.last_seq_stop_times, which the main loop only recomputes once per
+    second. Without updating it while scheduling, a second /cm, /cr or /mp
+    arriving in the same second got the same start time as the first and both
+    valves opened together.
+    """
+
+    def reset_queue():
+        assert server.get_json("cv", {"rsn": 1})["result"] == 1
+        deadline = time.monotonic() + 3
+        while time.monotonic() < deadline:
+            status = server.get_json("jc")
+            if status["nq"] == 0 and not any(status["sbits"]):
+                return
+            time.sleep(0.05)
+        raise AssertionError(f"queue did not drain: {status}")
+
+    def scheduled(station_ids):
+        deadline = time.monotonic() + 3
+        while time.monotonic() < deadline:
+            ps = server.get_json("jc")["ps"]
+            if all(ps[sid][2] > 0 for sid in station_ids):
+                return ps
+            time.sleep(0.05)
+        raise AssertionError(f"stations {station_ids} not scheduled: {ps}")
+
+    cases = [
+        ("cm+cm", [("cm", {"sid": 1, "en": 1, "t": 600}), ("cm", {"sid": 2, "en": 1, "t": 600})], [1, 2]),
+        ("cm+cr", [("cm", {"sid": 1, "en": 1, "t": 600}), ("cr", {"t": "[0,0,0,600]", "qo": 0})], [1, 3]),
+        ("cr+cm", [("cr", {"t": "[0,600]", "qo": 0}), ("cm", {"sid": 2, "en": 1, "t": 600})], [1, 2]),
+    ]
+    try:
+        for label, calls, (first, second) in cases:
+            reset_queue()
+            for endpoint, params in calls:
+                result = server.get_json(endpoint, params)
+                assert result["result"] == 1, (label, endpoint, result)
+            ps = scheduled([first, second])
+            first_end = ps[first][2] + ps[first][1]
+            assert ps[second][2] >= first_end, (
+                f"{label}: station {second} starts at {ps[second][2]} before "
+                f"station {first} ends at {first_end}: {ps}"
+            )
+            status = server.get_json("jc")
+            assert bin(status["sbits"][0]).count("1") <= 1, (label, status["sbits"])
+    finally:
+        reset_queue()
+    print("PASS same-second sequential enqueue")
+
+
 def run_contract(server):
     checks = [
         ("jo", check_options),
@@ -847,6 +900,7 @@ def run_contract(server):
         print(f"PASS /{endpoint}")
     check_request_bodies(server)
     check_control_commands(server)
+    check_same_second_sequential_enqueue(server)
     check_weather_failsafe(server)
     check_bundle_commands(server)
     check_sprinkler_logs(server)
