@@ -408,6 +408,8 @@ public:
 		return str;
 	}
 	// -- UI and buttons
+	static void led_toggle();
+  	static void led_on();
 	static unsigned char button_read(unsigned char waitmode); // Read button value. options for 'waitmodes' are:
 																					// BUTTON_WAIT_NONE, BUTTON_WAIT_RELEASE, BUTTON_WAIT_HOLD
 																					// return values are 'OR'ed with flags

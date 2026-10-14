@@ -36,7 +36,9 @@ uint8_t I2CRTC::addr = 0;
 
 I2CRTC::I2CRTC()
 {
+#if !defined(SONOFF_4CH_PRO_R3)
 	Wire.begin();
+#endif
 }
 
 bool I2CRTC::exists() {

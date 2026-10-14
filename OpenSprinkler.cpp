@@ -407,9 +407,9 @@ unsigned char OpenSprinkler::iopts[] = {
 	8,
 	0,  // special station auto refresh
 	0,  // notif enable bits
-	0,  // sensor 1 type (see SENSOR_TYPE macro defines)
+	1, //0,  // sensor 1 type (see SENSOR_TYPE macro defines)
 	1,  // sensor 1 option. 0: normally closed; 1: normally open.	default 1.
-	0,  // sensor 2 type
+	2, //0,  // sensor 2 type
 	1,  // sensor 2 option. 0: normally closed; 1: normally open. default 1.
 	0,  // sensor 1 on delay
 	0,  // sensor 1 off delay
@@ -845,9 +845,16 @@ void OpenSprinkler::lcd_start() {
 
 /** Initialize pins, controller variables, LCD */
 void OpenSprinkler::begin() {
+	DEBUG_PRINTLN(F("begin"));
 
 #if defined(ARDUINO)
+	#if defined(SONOFF_4CH_PRO_R3)
+	// Sonoff 4CH Pro R3: remap I2C away from GPIO4/GPIO5 (used by Relay 2 and 3)
+	// Use GPIO2 (unused) and GPIO13 (LED, harmless to flicker)
+	Wire.begin(2, 13);
+	#else
 	Wire.begin(); // init I2C
+	#endif
 #endif
 
 	hw_type = HW_TYPE_UNKNOWN;
@@ -855,6 +862,7 @@ void OpenSprinkler::begin() {
 
 #if defined(ESP8266) // ESP8266 specific initializations
 
+	#if !defined(SONOFF_4CH_PRO_R3)
 	/* detect hardware revision type */
 	if(detect_i2c(MAIN_I2CADDR)) {	// check if main PCF8574 exists
 		/* assign revision 0 pins */
@@ -987,6 +995,7 @@ void OpenSprinkler::begin() {
 	for(unsigned char i=0;i<(MAX_NUM_BOARDS)/2;i++)
 		expanders[i] = NULL;
 	detect_expanders();
+	#endif // !SONOFF_4CH_PRO_R3
 
 #else
 
@@ -1024,11 +1033,27 @@ pinModeExt(PIN_BUTTON_3, INPUT_PULLUP);
 	// Reset all stations
 	clear_all_station_bits();
 	apply_all_station_bits();
+	DEBUG_PRINTLN(F("bfore defined(ESP8266)"));
 
 #if defined(ESP8266)
-	// OS 3.0 has two independent sensors
-	pinModeExt(PIN_SENSOR1, INPUT_PULLUP);
-	pinModeExt(PIN_SENSOR2, INPUT_PULLUP);
+	#if defined(SONOFF_4CH_PRO_R3)
+	pinMode(PIN_RELAY_1, OUTPUT);
+	pinMode(PIN_RELAY_2, OUTPUT);
+	pinMode(PIN_RELAY_3, OUTPUT);
+	pinMode(PIN_RELAY_4, OUTPUT);
+	pinMode(PIN_LED, OUTPUT);
+	digitalWrite(PIN_RELAY_1, LOW);
+	digitalWrite(PIN_RELAY_2, LOW);
+	digitalWrite(PIN_RELAY_3, LOW);
+	digitalWrite(PIN_RELAY_4, LOW);
+	#else
+	// OS 3.x: relay control via I2C IO expander
+	pinMode(PIN_LED, OUTPUT);
+	#endif
+	  /* todo: handle two sensors */
+  	pinMode(PIN_SENSOR1, INPUT_PULLUP);
+  	pinMode(PIN_SENSOR2, INPUT_PULLUP);
+  	//? attachInterrupt(PIN_SENSOR2, flow_isr, FALLING);
 
 #else
 	// pull shift register OE low to enable output
@@ -1052,8 +1077,16 @@ pinModeExt(PIN_BUTTON_3, INPUT_PULLUP);
 	nvdata.sunset_time = 1080;  // 6:00pm default sunset
 	nvdata.reboot_cause = REBOOT_CAUSE_POWERON;
 
+	#if defined(SONOFF_4CH_PRO_R3)
 	nboards = 1;
+	#else
+	//nboards = 1;
+	nboards = 0;
+	#endif
 	nstations = nboards*8;
+	#if defined(SONOFF_4CH_PRO_R3)
+	nstations = 4; // Sonoff 4CH Pro R3: only 4 physical relays
+	#endif
 
 	// set rf data pin, unless it is not being used
 	if(PIN_RFTX != 255) {
@@ -1065,7 +1098,8 @@ pinModeExt(PIN_BUTTON_3, INPUT_PULLUP);
 
 	#if defined(ESP8266)  // OS3.0 specific detections
 
-		status.has_curr_sense = 1;  // OS3.0 has current sensing capacility
+		//status.has_curr_sense = 1;  // OS3.0 has current sensing capacility
+		status.has_curr_sense = 0;  // OS3.0 has current sensing capacility
 		// measure baseline current
 		baseline_current = 80;
 
@@ -1155,13 +1189,32 @@ pinModeExt(PIN_BUTTON_3, INPUT_PULLUP);
 	pinModeExt(PIN_BUTTON_1, INPUT_PULLUP);
 	pinModeExt(PIN_BUTTON_2, INPUT_PULLUP);
 	pinModeExt(PIN_BUTTON_3, INPUT_PULLUP);
+	#if defined(SONOFF_4CH_PRO_R3)
+	pinModeExt(PIN_BUTTON_4, INPUT_PULLUP);
+	#endif
 
 	// detect and check RTC type
+	#if !defined(SONOFF_4CH_PRO_R3)
 	RTC.detect();
+	#endif
 
 #else
 	//DEBUG_PRINTLN(get_runtime_path());
 #endif
+	DEBUG_PRINTLN(F("begin:end"));
+
+	#if defined(SONOFF_4CH_PRO_R3)
+	// Reconfigure GPIO4 and GPIO5 as OUTPUT after all I2C operations
+	// (Wire.begin() from display/RTC init configures them as I2C SDA/SCL)
+	pinMode(PIN_RELAY_2, OUTPUT);
+	pinMode(PIN_RELAY_3, OUTPUT);
+	digitalWrite(PIN_RELAY_2, LOW);
+	digitalWrite(PIN_RELAY_3, LOW);
+	pinMode(PIN_RELAY_1, OUTPUT);
+	pinMode(PIN_RELAY_4, OUTPUT);
+	digitalWrite(PIN_RELAY_1, LOW);
+	digitalWrite(PIN_RELAY_4, LOW);
+	#endif
 }
 
 #if defined(ESP8266)
@@ -1378,6 +1431,7 @@ void OpenSprinkler::apply_all_station_bits(void (*post_activation_callback)()) {
 			engage_booster = 0;
 		}
 
+		#if !defined(SONOFF_4CH_PRO_R3)
 		// Handle driver board (on main controller)
 		if(drio->type==IOEXP_TYPE_9555) {
 			/* revision >= 1 uses PCA9555 with active high logic */
@@ -1399,6 +1453,29 @@ void OpenSprinkler::apply_all_station_bits(void (*post_activation_callback)()) {
 				expanders[i]->i2c_write(NXP_OUTPUT_REG, ~data);
 			}
 		}
+		#endif
+
+		#if defined(SONOFF_4CH_PRO_R3)
+		// Sonoff 4CH Pro R3: drive relay GPIOs directly
+		// I2C operations (e.g. from LCD/SSD1306) may reconfigure GPIO4/GPIO5 as SDA/SCL.
+		// We must reclaim them as OUTPUT and re-drive them here.
+		for(unsigned char sid=0; sid<nstations && sid<4; sid++) {
+			unsigned char bid = sid>>3;
+			unsigned char s = sid&0x07;
+			unsigned char mask = (unsigned char)1<<s;
+			unsigned char val = (station_bits[bid] & mask) ? 1 : 0;
+			unsigned char pin = 255;
+			switch(sid) {
+				case 0: pin = PIN_RELAY_1; break;
+				case 1: pin = PIN_RELAY_2; break;
+				case 2: pin = PIN_RELAY_3; break;
+				case 3: pin = PIN_RELAY_4; break;
+			}
+			if(pin==255) continue;
+			pinMode(pin, OUTPUT);
+			digitalWrite(pin, val);
+		}
+		#endif
 	}
 
 #else
@@ -1928,22 +2005,44 @@ unsigned char OpenSprinkler::set_station_bit(unsigned char sid, unsigned char va
 	unsigned char *data = station_bits+(sid>>3);  // pointer to the station byte
 	unsigned char mask = (unsigned char)1<<(sid&0x07); // mask
 	if (value) {
-		if((*data)&mask) return 0;  // if bit is already set, return no change
+		if((*data)&mask) {
+			return 0;  // if bit is already set, return no change
+		}
 		else {
 			(*data) = (*data) | mask;
 			engage_booster = true; // if bit is changing from 0 to 1, set engage_booster
 			curr_alert_sid = sid+1; // record the zone that's turning on (starting from 1)
 			switch_special_station(sid, 1, dur); // handle special stations
+			#if defined(SONOFF_4CH_PRO_R3)
+			// Reconfigure as OUTPUT before each digitalWrite because I2C (Wire)
+			// may have left GPIO4/GPIO5 in INPUT mode, causing weak pullup only
+			switch (sid) {
+				case 0: pinMode(PIN_RELAY_1, OUTPUT); digitalWrite(PIN_RELAY_1, HIGH); break;
+				case 1: pinMode(PIN_RELAY_2, OUTPUT); digitalWrite(PIN_RELAY_2, HIGH); break;
+				case 2: pinMode(PIN_RELAY_3, OUTPUT); digitalWrite(PIN_RELAY_3, HIGH); break;
+				case 3: pinMode(PIN_RELAY_4, OUTPUT); digitalWrite(PIN_RELAY_4, HIGH); break;
+			}
+			#endif
 			return 1;
 		}
 	} else {
-		if(!((*data)&mask)) return 0; // if bit is already reset, return no change
+		if(!((*data)&mask)) {
+			return 0; // if bit is already reset, return no change
+		}
 		else {
 			(*data) = (*data) & (~mask);
 			if(hw_type == HW_TYPE_LATCH) {
 				engage_booster = true;  // if LATCH controller, engage booster when bit changes
 			}
 			switch_special_station(sid, 0); // handle special stations
+			#if defined(SONOFF_4CH_PRO_R3)
+			switch (sid) {
+				case 0: pinMode(PIN_RELAY_1, OUTPUT); digitalWrite(PIN_RELAY_1, LOW); break;
+				case 1: pinMode(PIN_RELAY_2, OUTPUT); digitalWrite(PIN_RELAY_2, LOW); break;
+				case 2: pinMode(PIN_RELAY_3, OUTPUT); digitalWrite(PIN_RELAY_3, LOW); break;
+				case 3: pinMode(PIN_RELAY_4, OUTPUT); digitalWrite(PIN_RELAY_4, LOW); break;
+			}
+			#endif
 			return 255;
 		}
 	}
@@ -1976,10 +2075,10 @@ void OpenSprinkler::switch_rfstation(RFStationData *data, bool turnon) {
 
 	if(PIN_RFTX == 255) return; // ignore RF station if RF pin disabled
 
-	rfswitch.enableTransmit(PIN_RFTX);
-	rfswitch.setProtocol(code.protocol);
-	rfswitch.setPulseLength(code.timing);
-	rfswitch.send(turnon ? code.on : code.off, code.bitlength);
+	// rfswitch.enableTransmit(PIN_RFTX);
+	// rfswitch.setProtocol(code.protocol);
+	// rfswitch.setPulseLength(code.timing);
+	// rfswitch.send(turnon ? code.on : code.off, code.bitlength);
 }
 
 /** Switch GPIO station
@@ -2250,8 +2349,10 @@ void OpenSprinkler::switch_httpstation(HTTPStationData *data, bool turnon, bool 
 void OpenSprinkler::pre_factory_reset() {
 	// for ESP8266: wipe out flash
 	#if defined(ESP8266)
+	#if !defined(SONOFF_4CH_PRO_R3)
 	lcd_print_line_clear_pgm(PSTR("Wiping flash.."), 0);
 	lcd_print_line_clear_pgm(PSTR("Please Wait..."), 1);
+	#endif
 	LittleFS.format();
 	#else
 	// remove 'done' file as an indicator for reset
@@ -2302,6 +2403,15 @@ void OpenSprinkler::factory_reset() {
 			pdata->name[2]='0'+((sid%100)/10);
 			pdata->name[3]='0'+(sid%10);
 		}
+		#if defined(SONOFF_4CH_PRO_R3)
+		// Sonoff 4CH Pro R3: only 4 physical relays; disable stations 5-8 by default
+		if (i >= 4) {
+			StationAttrib at_dis;
+			memset(&at_dis, 0, sizeof(StationAttrib));
+			at_dis.dis = 1;
+			pdata->attrib = at_dis;
+		}
+		#endif
 		file_write_block(STATIONS_FILENAME, pdata, sizeof(StationData)*i, sizeof(StationData));
 	}
 
@@ -2399,7 +2509,48 @@ void OpenSprinkler::options_setup() {
 	}
 
 #if defined(ARDUINO)	// handle AVR buttons
-	unsigned char button = button_read(BUTTON_WAIT_NONE);
+	unsigned char button = BUTTON_NONE; // = button_read(BUTTON_WAIT_NONE);
+
+	#if defined(SONOFF_4CH_PRO_R3)
+	// Sonoff 4CH Pro R3: factory reset via physical Button 4 (GPIO14, logical Button 1)
+	// Procedure: hold Button 4 during power-on for 2+ seconds, then release.
+	// Relay 4 blinks while listening (on for 200ms, off for 200ms) so you can see the countdown.
+	// After release, all 4 relays flash for 1 second to confirm, then the device resets and
+	// reboots into AP mode.
+	if (digitalRead(PIN_BUTTON_1) == 0) {
+		pinMode(PIN_RELAY_4, OUTPUT);
+		unsigned long start = millis();
+		// Countdown: blink Relay 4 for 2 seconds while button is held
+		while(digitalRead(PIN_BUTTON_1) == 0 && (millis() - start) < 2000) {
+			digitalWrite(PIN_RELAY_4, HIGH);
+			delay(200);
+			digitalWrite(PIN_RELAY_4, LOW);
+			delay(200);
+		}
+		if(digitalRead(PIN_BUTTON_1) == 0) {
+			// Held for 2 seconds. Now WAIT for release to avoid boot loop.
+			while(digitalRead(PIN_BUTTON_1) == 0) { delay(50); }
+			// Visual confirmation: flash all 4 relays for 1 second
+			pinMode(PIN_RELAY_1, OUTPUT); digitalWrite(PIN_RELAY_1, HIGH);
+			pinMode(PIN_RELAY_2, OUTPUT); digitalWrite(PIN_RELAY_2, HIGH);
+			pinMode(PIN_RELAY_3, OUTPUT); digitalWrite(PIN_RELAY_3, HIGH);
+			pinMode(PIN_RELAY_4, OUTPUT); digitalWrite(PIN_RELAY_4, HIGH);
+			delay(1000);
+			digitalWrite(PIN_RELAY_1, LOW);
+			digitalWrite(PIN_RELAY_2, LOW);
+			digitalWrite(PIN_RELAY_3, LOW);
+			digitalWrite(PIN_RELAY_4, LOW);
+			// Format filesystem (wipes all settings) and reboot
+			pre_factory_reset();
+			// Use ESP.restart() directly — reboot_dev() hangs on lcd_print_line_clear_pgm()
+			// because there is no LCD display on Sonoff.
+			ESP.restart();
+		} else {
+			// Released early - cancel, ensure Relay 4 is off
+			digitalWrite(PIN_RELAY_4, LOW);
+		}
+	}
+	#endif
 
 	switch(button & BUTTON_MASK) {
 
@@ -2518,6 +2669,9 @@ void OpenSprinkler::iopts_load() {
 	file_read_block(IOPTS_FILENAME, iopts, 0, NUM_IOPTS);
 	nboards = iopts[IOPT_EXT_BOARDS]+1;
 	nstations = nboards * 8;
+	#if defined(SONOFF_4CH_PRO_R3)
+	nstations = 4; // Sonoff 4CH Pro R3: only 4 physical relays
+	#endif
 	status.enabled = iopts[IOPT_DEVICE_ENABLE];
 	iopts[IOPT_FW_VERSION] = OS_FW_VERSION;
 	iopts[IOPT_FW_MINOR] = OS_FW_MINOR;
@@ -2554,6 +2708,9 @@ void OpenSprinkler::iopts_save() {
 	file_write_block(IOPTS_FILENAME, iopts, 0, NUM_IOPTS);
 	nboards = iopts[IOPT_EXT_BOARDS]+1;
 	nstations = nboards * 8;
+	#if defined(SONOFF_4CH_PRO_R3)
+	nstations = 4; // Sonoff 4CH Pro R3: only 4 physical relays
+	#endif
 	status.enabled = iopts[IOPT_DEVICE_ENABLE];
 }
 
@@ -3055,6 +3212,31 @@ unsigned char OpenSprinkler::button_read(unsigned char waitmode)
 
 	delay(BUTTON_DELAY_MS);
 
+	#if defined(SONOFF_4CH_PRO_R3)
+	// Sonoff 4CH Pro R3 button matrix:
+	// All buttons share GPIO14 as common line.
+	// Each button also grounds a second GPIO:
+	//   Button 1 (physical): GPIO14 + GPIO0
+	//   Button 2 (physical): GPIO14 + GPIO9
+	//   Button 3 (physical): GPIO14 + GPIO10
+	//   Button 4 (physical): GPIO14 only (per Tasmota template)
+	unsigned char b14 = digitalRead(14);
+	unsigned char b9  = digitalRead(9);
+	unsigned char b10 = digitalRead(10);
+	unsigned char b0  = digitalRead(0);
+	if (b14 == 0) {
+		if (b0 == 0) {
+			curr = button_read_busy(PIN_BUTTON_1, waitmode, BUTTON_1, is_holding);
+		} else if (b9 == 0) {
+			curr = button_read_busy(PIN_BUTTON_2, waitmode, BUTTON_2, is_holding);
+		} else if (b10 == 0) {
+			curr = button_read_busy(PIN_BUTTON_3, waitmode, BUTTON_3, is_holding);
+		} else {
+			// Only GPIO14 is low — Button 4 per Tasmota template
+			curr = button_read_busy(PIN_BUTTON_4, waitmode, BUTTON_4, is_holding);
+		}
+	}
+	#else
 	if (digitalReadExt(PIN_BUTTON_1) == 0) {
 		curr = button_read_busy(PIN_BUTTON_1, waitmode, BUTTON_1, is_holding);
 	} else if (digitalReadExt(PIN_BUTTON_2) == 0) {
@@ -3062,6 +3244,7 @@ unsigned char OpenSprinkler::button_read(unsigned char waitmode)
 	} else if (digitalReadExt(PIN_BUTTON_3) == 0) {
 		curr = button_read_busy(PIN_BUTTON_3, waitmode, BUTTON_3, is_holding);
 	}
+	#endif
 
 	// set flags in return value
 	unsigned char ret = curr;
@@ -3276,5 +3459,12 @@ void OpenSprinkler::detect_expanders() {
 			expanders[i] = new IOEXP(address);
 		}
 	}
+}
+void OpenSprinkler::led_toggle() {
+		digitalWrite(PIN_LED,!digitalRead(PIN_LED));
+}
+
+void OpenSprinkler::led_on() {
+		digitalWrite(PIN_LED, 0);
 }
 #endif

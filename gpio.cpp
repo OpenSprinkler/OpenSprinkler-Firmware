@@ -154,6 +154,10 @@ void pinModeExt(unsigned char pin, unsigned char mode) {
 }
 
 void digitalWriteExt(unsigned char pin, unsigned char value) {
+	//
+	//digitalWrite(pin, value);
+	//return;
+	//
 	if(pin==255) return;
 	if(pin>=IOEXP_PIN) {
 
@@ -164,6 +168,9 @@ void digitalWriteExt(unsigned char pin, unsigned char value) {
 }
 
 unsigned char digitalReadExt(unsigned char pin) {
+	//
+	return digitalRead(pin);
+	//
 	if(pin==255) return HIGH;
 	if(pin>=IOEXP_PIN) {
 		return os.mainio->digitalRead(pin-IOEXP_PIN);
@@ -266,6 +273,8 @@ unsigned char digitalRead(int pin) {
 
 /** Write digital value */
 void digitalWrite(int pin, unsigned char value) {
+			DEBUG_PRINTLN(F("Real digitalWrite"));
+
 	if (lgpio_handle < 0) {
 		DEBUG_PRINT("tried to write to uninitialized lgpio handle for pin ");
 		DEBUG_PRINTLN(pin);
@@ -282,7 +291,10 @@ void digitalWrite(int pin, unsigned char value) {
 #else
 
 void pinMode(int pin, unsigned char mode) {}
-void digitalWrite(int pin, unsigned char value) {}
+void digitalWrite(int pin, unsigned char value) {
+		DEBUG_PRINTLN(F("Empty digitalWrite"));
+
+}
 unsigned char digitalRead(int pin) {return 0;}
 
 #endif
