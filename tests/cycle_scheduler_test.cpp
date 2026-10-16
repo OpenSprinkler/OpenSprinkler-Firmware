@@ -121,6 +121,56 @@ static void tick(uint32_t now) {
 	scheduler_rebuild_reservations(now);
 }
 
+static void test_same_second_sequential_enqueue_without_cycles() {
+	// PR #440 / issue #243: separate requests must see reservations immediately,
+	// even with no cycle policies and no scheduler tick between the requests.
+	const uint8_t batches[][2] = {{1, 1}, {1, 2}, {2, 1}};
+	for (const auto& batch : batches) {
+		for (int16_t delay : {-10, 0, 10}) {
+			for (int16_t lead : {0, -15}) {
+				reset();
+				station_delay = delay;
+				if (lead) {
+					OpenSprinkler::masters[0][MASOPT_SID] = 8;
+					on_adj[0] = lead;
+					off_adj[0] = 20;
+					memset(bindings, 1, sizeof(bindings));
+				}
+				uint8_t sid = 0;
+				for (uint8_t count : batch) {
+					for (uint8_t i = 0; i < count; i++) admit(sid++, 60);
+					schedule_all_stations(clock_now, QUEUE_OPTION_APPEND);
+					assert(clock_now == 1000 && events.empty());
+					assert(!scheduler_has_cycles());
+					const auto& last = ProgramData::queue[sid - 1];
+					assert(ProgramData::last_seq_stop_times[0] == last.st + last.dur);
+				}
+				const uint32_t first_start = 1001 + uint32_t(-lead);
+				for (uint8_t i = 0; i < sid; i++) {
+					const auto& q = ProgramData::queue[i];
+					assert(!(q.cycle_flags & CYCLE_GOVERNED));
+					assert(q.dur == 60);
+					assert(q.st == first_start + uint32_t(i) * (60 + delay));
+				}
+				// Negative delay intentionally overlaps; otherwise verify actual
+				// output transitions as well as the precomputed start times.
+				if (delay >= 0) {
+					for (uint32_t now = 1001; now <= first_start + 240; now++) {
+						tick(now);
+						unsigned running = 0;
+						for (uint8_t i = 0; i < sid; i++) running += OpenSprinkler::is_running(i);
+						assert(running <= 1);
+					}
+					assert(ProgramData::nqueue == 0 && logs.size() == sid);
+					for (uint8_t i = 0; i < sid; i++) {
+						assert(logs[i].station == i && logs[i].duration == 60);
+					}
+				}
+			}
+		}
+	}
+}
+
 static void test_batched_policy_admission() {
 	reset();
 	schedule_all_stations(clock_now);
@@ -403,6 +453,7 @@ static void preview_fixtures() {
 int main(int argc, char** argv) {
 	if (argc == 2 && !strcmp(argv[1], "--preview-fixtures")) { preview_fixtures(); return 0; }
 	if (argc == 2 && !strcmp(argv[1], "--feature-off-traces")) { feature_off_traces(); return 0; }
+	test_same_second_sequential_enqueue_without_cycles();
 	test_batched_policy_admission();
 	test_insert_running_duplicate();
 	test_replace_cooldown();

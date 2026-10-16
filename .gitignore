@@ -3,6 +3,9 @@ OpenSprinkler
 wtopts.txt
 *.dat
 *.sh
+!tools/flash-os4-n8.sh
+!tools/flash-os4-n8-factory-erase.sh
+tools/.firmware-cache/
 build-1284/*
 .vscode
 .pio
