@@ -25,3 +25,10 @@ __pycache__/
 testmode.h
 .agents/review.md
 tmp/*
+
+# Local planning, bench automation, and hardware test records.
+/planning/
+/tests/hardware/*
+!/tests/hardware/testDigitalAnalogToggle.ino
+/tests/ch390_hardware.md
+/tests/manual/updater-release-notes.md

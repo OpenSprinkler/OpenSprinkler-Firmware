@@ -1,4 +1,5 @@
-// Run with Playwright on NODE_PATH; see tests/manual/updater-release-notes.md.
+// Run make test-updater-notes with Playwright on NODE_PATH.
+// BROWSER_PATH may select an installed Chromium browser; all requests are mocked.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
