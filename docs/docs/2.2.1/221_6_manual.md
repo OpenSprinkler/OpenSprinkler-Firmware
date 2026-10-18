@@ -1,4 +1,4 @@
-# Firmware 2.2.1(6) User Manual
+# Firmware 2.2.1(6) User Manual [Sep 24, 2026]
 
 ## Introduction
 

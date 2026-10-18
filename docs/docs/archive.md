@@ -1,11 +1,12 @@
 # Archived Manuals and API References
 
-These documents are for older versions of the OpenSprinkler firmware. Recent versions are available within this site; earlier versions are provided in their original PDF format. For the latest documentation, use the versioned navigation at the top of the page.
+These documents cover released versions of the OpenSprinkler firmware. Recent versions are available within this site; earlier versions are provided in their original PDF format. Firmware 2.2.1(6) remains the current release while the 2.2.1(7) documentation in the navigation is a development draft.
 
 <div class="archive-table"></div>
 
 | Fw. Ver. | Documentation |
 |:-----------------|:--------------|
+| **2.2.1(6)** | [User Manual](2.2.1/221_6_manual.md) · [API Reference](2.2.1/221_6_api.md) |
 | **2.2.1(5)** | [User Manual](2.2.1/221_5_manual.md) · [API Reference](2.2.1/221_5_api.md) |
 | **2.2.1(4)** | [User Manual](2.2.1/221_4_manual.md) · [API Reference](2.2.1/221_4_api.md) |
 | **2.2.1(3)** | [User Manual (PDF)](https://raysfiles.com/os_compiled_firmware/docs/2.2.1/OSUserManual221_3.pdf) · [API Reference (PDF)](https://raysfiles.com/os_compiled_firmware/docs/2.2.1/OSAPI2.2.1_3.pdf) |
