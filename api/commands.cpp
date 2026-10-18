@@ -258,6 +258,7 @@ static __attribute__((noinline)) uint8_t prepare_runonce(const ParamSource& para
 		long repeat_count = atol(tmp_buffer);
 		if (repeat_count < 0 || repeat_count > 32768) return HTML_DATA_OUTOFBOUND;
 		if (repeat_count > 0) {
+			if (os.iopts[IOPT_REMOTE_EXT_MODE]) return HTML_NOT_PERMITTED;
 			if (!params.get(tmp_buffer, TMP_BUFFER_SIZE, PSTR("int"), true)) {
 				return HTML_DATA_MISSING;
 			}
@@ -292,7 +293,7 @@ static __attribute__((noinline)) uint8_t prepare_runonce(const ParamSource& para
 	}
 
 	uint8_t watering_level = 100;
-	if (params.get(tmp_buffer, TMP_BUFFER_SIZE, PSTR("uwt"), true) && tmp_buffer[0] == '1') {
+	if (!os.iopts[IOPT_REMOTE_EXT_MODE] && params.get(tmp_buffer, TMP_BUFFER_SIZE, PSTR("uwt"), true) && tmp_buffer[0] == '1') {
 		watering_level = effective_weather_water_percent(
 			weather_response_is_current(monotonic_millis()));
 	}

@@ -34,6 +34,8 @@ static StationExtraResult policy_result = StationExtraResult::Ok;
 struct Event { uint32_t time; uint8_t sid; bool on; };
 static std::vector<Event> events;
 static std::vector<LogStruct> logs;
+static std::vector<NotifNodeStruct> notifications;
+static unsigned flow_logs = 0;
 static bool delay_output = false;
 static uint32_t commanded_duration = 0;
 
@@ -64,8 +66,14 @@ bool sensor_available(uint8_t) { return false; }
 bool bundle_is_station(uint8_t sid) { return bundle_min[sid] != 0; }
 uint16_t bundle_minimum_duration(uint8_t sid) { return bundle_min[sid]; }
 bool bundle_bound_to_master(uint8_t sid, uint8_t master) { return bindings[sid] & (1 << master); }
-bool NotifQueue::add(uint16_t, uint32_t, float, uint8_t, float) { return true; }
-void write_log(unsigned char, time_os_t) { logs.push_back(ProgramData::lastrun); }
+bool NotifQueue::add(uint16_t t, uint32_t l, float f, uint8_t b, float f2) {
+	notifications.emplace_back(t, l, f, b, f2);
+	return true;
+}
+void write_log(unsigned char type, time_os_t) {
+	if (type == LOGDATA_FLOWSENSE) flow_logs++;
+	else logs.push_back(ProgramData::lastrun);
+}
 FileReader::FileReader(const char*) { active_readers++; }
 FileReader::~FileReader() { assert(active_readers); active_readers--; }
 StationExtraReader::StationExtraReader(uint16_t count)
@@ -99,6 +107,7 @@ static void reset() {
 	OpenSprinkler::pause_timer = 0;
 	clock_now = 1000;
 	events.clear(); logs.clear();
+	notifications.clear(); flow_logs = 0;
 	delay_output = false;
 	commanded_duration = 0;
 }
@@ -526,6 +535,15 @@ int main(int argc, char** argv) {
 	schedule_all_stations(clock_now); tick(1001); tick(1061);
 	OpenSprinkler::status.enabled = 0; tick(1062);
 	assert(ProgramData::nqueue == 1); // Existing manual-run inhibit bypass remains.
+	// /mp and /cr use RUNONCE_PID, not the saved program ID. Disable has
+	// always exempted these manual requests, both outside and inside RE mode.
+	for (uint8_t re = 0; re <= 1; re++) {
+		reset(); OpenSprinkler::iopts[IOPT_REMOTE_EXT_MODE] = re;
+		admit(0, 120, RUNONCE_PID); schedule_all_stations(clock_now); tick(1001);
+		OpenSprinkler::status.enabled = 0;
+		process_dynamic_events(1002);
+		assert(ProgramData::nqueue == 1 && OpenSprinkler::is_running(0));
+	}
 
 	// Same SID requests reserve distinct segments, including across re-arms.
 	reset(); policy(0, 60, 60); admit(0, 120); admit(0, 60); schedule_all_stations(clock_now);
@@ -598,15 +616,32 @@ int main(int argc, char** argv) {
 	clock_now = 1130; ProgramData::toggle_pause(0);
 	assert(ProgramData::queue[0].st == 1131);
 
-	// RE transition cancels sleeping work; active work finishes once.
+	// RE transition clears sleeping and active work immediately.
 	reset(); policy(0, 60, 60); policy(1, 60, 60); groups[1] = PARALLEL_GROUP_ID;
 	admit(0, 120); admit(1, 120); schedule_all_stations(clock_now);
 	tick(1001); tick(1061); OpenSprinkler::iopts[IOPT_REMOTE_EXT_MODE] = 1;
 	scheduler_enter_remote_extension(1062); assert(!ProgramData::nqueue);
 	reset(); policy(0, 60, 60); admit(0, 120); schedule_all_stations(clock_now);
-	tick(1001); OpenSprinkler::iopts[IOPT_REMOTE_EXT_MODE] = 1; scheduler_enter_remote_extension(1020);
-	assert(OpenSprinkler::is_running(0) && !ProgramData::queue[0].cycle.remaining);
+	tick(1001); clock_now = 1020;
+	OpenSprinkler::iopts[IOPT_REMOTE_EXT_MODE] = 1; scheduler_enter_remote_extension(clock_now);
+	assert(!OpenSprinkler::is_running(0) && !ProgramData::nqueue);
+	assert(!OpenSprinkler::status.program_busy);
+	assert(logs.size() == 1 && logs[0].duration == 19);
 	tick(1061); tick(1062); assert(!ProgramData::nqueue);
+	assert(logs.size() == 1);
+	// Ordinary running jobs also log once; waiting duplicates must not log.
+	reset(); admit(0, 120); admit(0, 30); admit(1, 120);
+	schedule_all_stations(clock_now); tick(1001); clock_now = 1020;
+	OpenSprinkler::iopts[IOPT_SENSOR1_TYPE] = SENSOR_TYPE_FLOW;
+	OpenSprinkler::iopts[IOPT_REMOTE_EXT_MODE] = 1;
+	notifications.clear(); scheduler_enter_remote_extension(clock_now);
+	assert(logs.size() == 1 && logs[0].station == 0 && logs[0].duration == 19);
+	assert(flow_logs == 1 && !ProgramData::nqueue);
+	unsigned off_notifications = 0;
+	for (const auto& n : notifications) if (n.type == NOTIFY_STATION_OFF) off_notifications++;
+	assert(off_notifications == 1);
+	scheduler_enter_remote_extension(clock_now);
+	assert(logs.size() == 1 && flow_logs == 1);
 
 	// Ordinary runs retain their initial timetable and duration.
 	reset(); admit(0, 30); admit(1, 45); schedule_all_stations(clock_now);
@@ -627,6 +662,15 @@ int main(int argc, char** argv) {
 	reset(); policy(0, 60, 60); OpenSprinkler::iopts[IOPT_REMOTE_EXT_MODE] = 1;
 	auto& remote = admit(0, 120); schedule_all_stations(clock_now);
 	assert(remote.dur == 120 && !(remote.cycle_flags & CYCLE_GOVERNED));
+	OpenSprinkler::status.rain_delayed = 1;
+	OpenSprinkler::iopts[IOPT_SENSOR1_TYPE] = SENSOR_TYPE_RAIN;
+	OpenSprinkler::sn_sensors[0].active = 1;
+	tick(1001); tick(1002);
+	assert(OpenSprinkler::is_running(0) && ProgramData::nqueue == 1);
+	OpenSprinkler::sn_sensors[0].active = 0;
+	OpenSprinkler::status.overcurrent_sid = 255;
+	scheduler_enter_remote_extension(1003);
+	assert(OpenSprinkler::status.overcurrent_sid == 255); // mode entry must not clear faults
 
 	// Cancelling while soaking cannot log a phantom run or re-arm later.
 	reset(); policy(0, 60, 60); admit(0, 120); schedule_all_stations(clock_now);
@@ -638,7 +682,7 @@ int main(int argc, char** argv) {
 	ProgramData::reset_runtime(false); assert(ProgramData::last_off_until[0] == 1121);
 	ProgramData::reset_runtime(); assert(!ProgramData::last_off_until[0]);
 
-	// Master tails survive the final cycle and the RE cancellation of a soak.
+	// Master tails survive normal completion, but not an RE mode transition.
 	reset(); policy(0, 60, 60); bindings[0] = 1;
 	OpenSprinkler::masters[0][MASOPT_SID] = 8; off_adj[0] = 90;
 	admit(0, 60); schedule_all_stations(clock_now); tick(1001); tick(1061);
@@ -648,8 +692,7 @@ int main(int argc, char** argv) {
 	OpenSprinkler::masters[0][MASOPT_SID] = 8; off_adj[0] = 90;
 	admit(0, 120); schedule_all_stations(clock_now); tick(1001); tick(1061);
 	OpenSprinkler::iopts[IOPT_REMOTE_EXT_MODE] = 1; scheduler_enter_remote_extension(1062);
-	assert(ProgramData::nqueue == 1 && !ProgramData::queue[0].dur);
-	assert(scheduler_master_active(0, 1100)); tick(1152); assert(!ProgramData::nqueue);
+	assert(!ProgramData::nqueue && !scheduler_master_active(0, 1100));
 
 	// Late completions in the same pass publish group tails immediately.
 	reset(); policy(0, 60, 60); policy(1, 60, 60); station_delay = -30;
@@ -680,15 +723,15 @@ int main(int argc, char** argv) {
 	clock_now = 1021; OpenSprinkler::pause_timer = 50; ProgramData::toggle_pause(0);
 	assert(!OpenSprinkler::status.pause_state);
 
-	// RE may remove the last cycling job while an ordinary job is still paused.
+	// RE clears mixed ordinary/cycling work, pause state and cooldown history.
 	reset(); policy(0, 60, 60); admit(0, 120); admit(1, 30);
 	schedule_all_stations(clock_now); tick(1001);
 	clock_now = 1011; ProgramData::toggle_pause(60);
 	OpenSprinkler::iopts[IOPT_REMOTE_EXT_MODE] = 1; scheduler_enter_remote_extension(1012);
-	clock_now = 1020; ProgramData::toggle_pause(0);
-	assert(ProgramData::nqueue == 1 && ProgramData::queue[0].sid == 1);
-	assert(!(ProgramData::queue[0].cycle_flags & CYCLE_PAUSED));
-	tick(1021); assert(OpenSprinkler::is_running(1));
+	assert(!ProgramData::nqueue && !OpenSprinkler::status.pause_state);
+	assert(!ProgramData::cooldown_until[0] && !ProgramData::last_off_until[0]);
+	OpenSprinkler::iopts[IOPT_REMOTE_EXT_MODE] = 0;
+	tick(1021); assert(!OpenSprinkler::is_running(1));
 
 	// Insert-front interrupts the ON segment, not its future water, and respects soak.
 	reset(); policy(0, 60, 60); admit(0, 120); admit(1, 30);

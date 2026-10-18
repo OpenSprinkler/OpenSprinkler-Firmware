@@ -1003,7 +1003,7 @@ void do_loop()
 		unsigned char pswitch = os.detect_programswitch_status(curr_time);
 		bool switch_replaced = false;
 		for (uint8_t i = 0; i < NUM_SENSORS; i++) {
-			if ((pswitch & (1 << i)) && pd.nprograms > i) {
+			if (!os.iopts[IOPT_REMOTE_EXT_MODE] && (pswitch & (1 << i)) && pd.nprograms > i) {
 				const auto result = manual_start_program(i + 1, 0,
 					switch_replaced ? QUEUE_OPTION_INSERT_FRONT : QUEUE_OPTION_REPLACE);
 				if (result == RunAdmission::Accepted) switch_replaced = true;
@@ -1022,7 +1022,7 @@ void do_loop()
 			apply_monthly_adjustment(curr_time); // check and apply monthly adjustment here, if it's selected
 
 			// check through all programs
-			for(pid=0; pid<pd.nprograms; pid++) {
+			for(pid=0; !os.iopts[IOPT_REMOTE_EXT_MODE] && pid<pd.nprograms; pid++) {
 				pd.read(pid, &prog);	// todo future: reduce load time
 				bool will_delete = false;
 				unsigned char runcount = prog.check_match(curr_time, &will_delete);

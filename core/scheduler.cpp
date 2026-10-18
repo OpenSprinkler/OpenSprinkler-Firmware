@@ -468,6 +468,8 @@ void turn_off_station(unsigned char sid, time_os_t curr_time, unsigned char shif
 }
 
 void process_dynamic_events(time_os_t curr_time) {
+	// Defensive: RE clears existing work and never admits scheduled starts.
+	if (os.iopts[IOPT_REMOTE_EXT_MODE]) return;
 	bool rd = os.status.rain_delayed;
 	bool en = os.status.enabled;
 
@@ -858,18 +860,27 @@ bool scheduler_resume_cycles(time_os_t now) {
 }
 
 void scheduler_enter_remote_extension(time_os_t now) {
-	for (int i = pd.nqueue; i-- > 0;) {
-		auto& q = pd.queue[i];
-		if (!governed(q)) continue;
-		cycle_soak_cancel_future(q.cycle);
-		if (q.cycle_flags & CYCLE_STARTED) continue;
-		q.dur = 0;
-		q.cycle_flags = CYCLE_INITIALIZED | CYCLE_TAIL;
-		retain_tail(q);
-		if (now > q.deque_time) pd.dequeue(i);
-	}
-	scheduler_rebuild_reservations(now);
+	// A mode change must not carry autonomous work into the passive controller.
+	// Use normal stops before clearing the queue so delivered water is logged.
 	scheduler_select_jobs();
+	for (int qi = pd.nqueue; qi-- > 0;) {
+		auto& q = pd.queue[qi];
+		if (governed(q)) {
+			if (q.cycle_flags & CYCLE_STARTED) stop_cycle(qi, now, StationStopReason::Cancelled);
+		} else if (pd.station_qid[q.sid] == qi && os.is_running(q.sid)) {
+			q.deque_time = now;
+			turn_off_station(q.sid, now);
+		}
+	}
+	os.clear_all_station_bits();
+	os.apply_all_station_bits();
+	if (os.status.program_busy && os.iopts[IOPT_SENSOR1_TYPE] == SENSOR_TYPE_FLOW) {
+		write_log(LOGDATA_FLOWSENSE, now);
+		notif.add(NOTIFY_FLOWSENSOR, flow_pulses_since(os.flowcount_log_start, flow_count));
+	}
+	pd.reset_runtime();
+	pd.clear_pause();
+	os.status.program_busy = 0;
 }
 
 void reset_all_stations_immediate(bool running_ones_only) {
@@ -996,8 +1007,8 @@ static __attribute__((noinline)) RunAdmission prepare_manual_program(unsigned ch
 	unsigned char wl = 100;
 	if ((pid>0)&&(pid<255)) {
 		pd.read(pid-1, &prog);
-		if(usa) sensor_adj = get_program_sensor_adj(pid-1);
-		if(uwt) wl = get_program_water_percent(prog);
+		if(usa && !os.iopts[IOPT_REMOTE_EXT_MODE]) sensor_adj = get_program_sensor_adj(pid-1);
+		if(uwt && !os.iopts[IOPT_REMOTE_EXT_MODE]) wl = get_program_water_percent(prog);
 		// get station ordering from program name
 		prog.gen_station_runorder(1, order);
 	}

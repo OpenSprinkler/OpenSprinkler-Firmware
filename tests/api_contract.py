@@ -1032,6 +1032,50 @@ def check_atomic_admission(server):
     print("PASS atomic program/Run Once admission at queue capacity")
 
 
+def check_remote_extension_policy(server):
+    options = server.get_json("jo")
+    program_id = server.get_json("jp")["nprogs"]
+    target = (server.get_json("jc")["devt"] // 60 + 1) * 60
+    packed = json.dumps([3, 127, 0, [target // 60 % 1440, 0, 0, 0],
+                         [120, 0, 0, 0, 0, 0, 0, 0]], separators=(",", ":"))
+    assert server.get_json("cp", {"pid": -1, "v": packed, "name": "RE policy"})["result"] == 1
+    def wait_status(predicate, timeout=4):
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            status = server.get_json("jc")
+            if predicate(status):
+                return status
+            time.sleep(0.1)
+        raise AssertionError(status)
+
+    try:
+        assert server.get_json("cm", {"sid": 0, "en": 1, "t": 120})["result"] == 1
+        assert server.get_json("pq", {"repl": 120})["result"] == 1
+        assert server.get_json("cv", {"re": 1})["result"] == 1
+        status = server.get_json("jc")
+        assert status["nq"] == 0 and status["pq"] == 0 and not any(status["sbits"]), status
+        # Crossing an automatic start minute in RE must not enqueue the program.
+        assert server.get_json("co", {"uwt": 0, "wl": 25})["result"] == 1
+        # DEMO uses the host clock; wait for the real minute boundary.
+        wait_status(lambda value: value["devt"] >= target + 1, timeout=65)
+        assert server.get_json("jc")["nq"] == 0
+        assert server.get_json("mp", {"pid": program_id, "uwt": 1, "usa": 1})["result"] == 1
+        status = wait_status(lambda value: value["ps"][0][0] != 0)
+        assert status["ps"][0][1] >= 118, status
+        assert server.get_json("cr", {"t": "[120,0,0,0,0,0,0,0]", "uwt": 1})["result"] == 1
+        status = wait_status(lambda value: value["ps"][0][0] != 0)
+        assert status["ps"][0][1] >= 118, status
+        before = server.get_json("jp")["nprogs"]
+        assert server.get_json("cr", {"t": "[120]", "cnt": 2, "int": 10})["result"] == 48
+        assert server.get_json("jp")["nprogs"] == before
+        assert server.get_json("jc")["nq"] == 1  # rejection does not replace live work
+    finally:
+        server.get_json("dp", {"pid": program_id})
+        server.get_json("cv", {"rsn": 1, "re": 0})
+        server.get_json("co", {key: options[key] for key in ("uwt", "wl")})
+    print("PASS passive Remote Extension policy")
+
+
 def check_analog_port_contract(server):
     before = server.get_json("jo")
     # Unsupported Analog mode must fail before changing another option.
@@ -1072,6 +1116,7 @@ def run_contract(server):
     check_sprinkler_logs(server)
     check_nested_option_encodings(server)
     check_analog_port_contract(server)
+    check_remote_extension_policy(server)
 
 
 def main():
