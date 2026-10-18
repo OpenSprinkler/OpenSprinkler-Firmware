@@ -123,6 +123,10 @@ ul > li {
   margin-top: 1rem;
   margin-bottom: 1.5rem;
 }
+.img-full-width {
+  width: 100%;
+  box-sizing: border-box;
+}
 /* You could also make a class for a shadow, which often looks nicer */
 .img-shadow {
   box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2);
