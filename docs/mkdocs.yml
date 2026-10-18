@@ -12,6 +12,9 @@ nav:
   - 'Firmware v2.2.1(7) [NEW]':
     - 'User Manual': '2.2.1/221_7_manual.md'
     - 'API Reference': '2.2.1/221_7_api.md'
+  - 'Firmware v2.2.1(6)':
+    - 'User Manual': '2.2.1/221_6_manual.md'
+    - 'API Reference': '2.2.1/221_6_api.md'
   - 'Zone Expander':
     - 'User Manual': 'zone-expander.md'
   - 'Sensor Expander':

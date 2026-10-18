@@ -1022,11 +1022,14 @@ void do_loop()
 			apply_monthly_adjustment(curr_time); // check and apply monthly adjustment here, if it's selected
 
 			// check through all programs
-			for(pid=0; !os.iopts[IOPT_REMOTE_EXT_MODE] && pid<pd.nprograms; pid++) {
+			for(pid=0; pid<pd.nprograms; pid++) {
 				pd.read(pid, &prog);	// todo future: reduce load time
 				bool will_delete = false;
 				unsigned char runcount = prog.check_match(curr_time, &will_delete);
 				if(runcount>0) {
+					// RE suppresses automatic watering, not scheduled maintenance.
+					if(process_special_program_command(prog.name, curr_time)) continue;
+					if(os.iopts[IOPT_REMOTE_EXT_MODE]) continue;
 					const bool repeated_runonce =
 						strncmp_P(prog.name, PSTR(RUNONCE_REPEAT_PREFIX), sizeof(RUNONCE_REPEAT_PREFIX) - 1) == 0;
 					const unsigned char queue_pid = repeated_runonce ? RUNONCE_PID : pid + 1;
@@ -1034,9 +1037,6 @@ void do_loop()
 					// program match found
 					unsigned char wl = get_program_water_percent(prog);
 					float sensor_adj = get_program_sensor_adj(pid);
-
-					// check and process special program command
-					if(process_special_program_command(prog.name, curr_time))	continue;
 
 					// get station ordering
 					unsigned char order[os.nstations];
@@ -1168,7 +1168,8 @@ void do_loop()
 				// and if no program is scheduled to run in the next minute
 				bool willrun = false;
 				bool will_delete = false;
-				for(pid=0; pid<pd.nprograms; pid++) {
+				// Suppressed watering schedules must not postpone an RE reboot.
+				for(pid=0; !os.iopts[IOPT_REMOTE_EXT_MODE] && pid<pd.nprograms; pid++) {
 					pd.read(pid, &prog);
 					if(prog.check_match(curr_time+60, &will_delete)) {
 						willrun = true;
