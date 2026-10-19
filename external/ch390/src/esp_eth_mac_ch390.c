@@ -97,6 +97,9 @@ typedef struct {
     bool                    active;
     bool                    peer_flow_ctrl;
     uint8_t                 receive_mode;
+#if defined(OS_ETH_DIAGNOSTICS)
+    CH390TrafficDiag        traffic;
+#endif
 } emac_ch390_t;
 
 static inline bool CH390_SPI_LOCK(eth_spi_info_t *spi)
@@ -502,6 +505,7 @@ static esp_err_t emac_ch390_start(esp_eth_mac_t *mac)
 {
     esp_err_t ret = ESP_OK;
     emac_ch390_t *emac = __containerof(mac, emac_ch390_t, parent);
+    ch390_rx_progress(&emac->health);
     /* reset rx memory pointer */
     ESP_GOTO_ON_ERROR(ch390_io_register_write(emac, CH390_MPTRCR, MPTRCR_RST_RX), err, TAG, "write MPTRCR failed");
     /* clear interrupt status */
@@ -764,7 +768,12 @@ static esp_err_t emac_ch390_transmit(esp_eth_mac_t *mac, uint8_t *buf, uint32_t 
     esp_err_t ret = ESP_OK;
     emac_ch390_t *emac = __containerof(mac, emac_ch390_t, parent);
     uint8_t tcr = 0;
-    if (!emac->active || emac->health.diag.pending) return ESP_ERR_INVALID_STATE;
+    if (!emac->active || emac->health.diag.pending) {
+#if defined(OS_ETH_DIAGNOSTICS)
+        ++emac->traffic.tx_rejected;
+#endif
+        return ESP_ERR_INVALID_STATE;
+    }
 
     ESP_GOTO_ON_FALSE(length <= ETH_MAX_PACKET_SIZE, ESP_ERR_INVALID_ARG, err,
                       TAG, "frame size is too big (actual %lu, maximum %u)",
@@ -790,6 +799,12 @@ static esp_err_t emac_ch390_transmit(esp_eth_mac_t *mac, uint8_t *buf, uint32_t 
 
     // Do not advance the write pointer while the previous transmit is busy.
     emac->health.tx_busy = false;
+#if defined(OS_ETH_DIAGNOSTICS)
+    // Status of the previous, now completed, transmit.
+    ch390_io_register_read(emac, CH390_TSRA, &emac->traffic.last_tsra);
+    ch390_io_register_read(emac, CH390_TSRB, &emac->traffic.last_tsrb);
+    emac->traffic.tsr_or |= emac->traffic.last_tsra | emac->traffic.last_tsrb;
+#endif
     ESP_GOTO_ON_ERROR(ch390_io_memory_write(emac, buf, length), err, TAG,
                       "write memory failed");
 
@@ -800,6 +815,10 @@ static esp_err_t emac_ch390_transmit(esp_eth_mac_t *mac, uint8_t *buf, uint32_t 
     /* issue tx polling command */
     ESP_GOTO_ON_ERROR(ch390_io_register_read(emac, CH390_TCR, &tcr), err, TAG, "read TCR failed");
     ESP_GOTO_ON_ERROR(ch390_io_register_write(emac, CH390_TCR, tcr | TCR_TXREQ), err, TAG, "write TCR failed");
+#if defined(OS_ETH_DIAGNOSTICS)
+    ++emac->traffic.tx_ok;
+    emac->traffic.tx_last_ms = (uint32_t)(esp_timer_get_time() / 1000);
+#endif
     return ESP_OK;
 err:
     return ret;
@@ -807,6 +826,7 @@ err:
 
 static esp_err_t ch390_reset_rx(emac_ch390_t *emac)
 {
+    ch390_rx_progress(&emac->health);
     if (!ch390_allow_rx_reset(&emac->health, (uint32_t)(esp_timer_get_time() / 1000))) {
         return ESP_ERR_INVALID_STATE;
     }
@@ -823,6 +843,35 @@ static esp_err_t ch390_reset_rx(emac_ch390_t *emac)
     return result;
 }
 
+// MRR is software-owned under operation_lock. RWPA is hardware-owned: retry
+// if its high byte changes across the low-byte read, including ring wrap.
+static esp_err_t ch390_rx_pointers(emac_ch390_t *emac, uint16_t *read, uint16_t *write)
+{
+    uint8_t high, low, check;
+    ESP_RETURN_ON_ERROR(ch390_io_register_read(emac, CH390_MRRH, &high), TAG, "MRRH failed");
+    ESP_RETURN_ON_ERROR(ch390_io_register_read(emac, CH390_MRRL, &low), TAG, "MRRL failed");
+    *read = ((uint16_t)high << 8) | low;
+    for (unsigned attempt = 0; attempt < 3; ++attempt) {
+        ESP_RETURN_ON_ERROR(ch390_io_register_read(emac, CH390_RWPAH, &high), TAG, "RWPAH failed");
+        ESP_RETURN_ON_ERROR(ch390_io_register_read(emac, CH390_RWPAL, &low), TAG, "RWPAL failed");
+        ESP_RETURN_ON_ERROR(ch390_io_register_read(emac, CH390_RWPAH, &check), TAG, "RWPAH failed");
+        if (high == check) {
+            *write = ((uint16_t)high << 8) | low;
+            return ESP_OK;
+        }
+    }
+    return ESP_ERR_NOT_FINISHED;
+}
+
+static void ch390_defer_rx(emac_ch390_t *emac, uint16_t read, uint16_t write, uint8_t ready)
+{
+    uint32_t now = (uint32_t)(esp_timer_get_time() / 1000);
+    if (ch390_rx_defer(&emac->health, read, write, ready, now)) {
+        ch390_fault(&emac->health, 5, now);
+        ch390_reset_rx(emac);
+    }
+}
+
 static esp_err_t emac_ch390_receive(esp_eth_mac_t *mac, uint8_t *buf, uint32_t *length)
 {
     esp_err_t ret = ESP_OK;
@@ -830,11 +879,34 @@ static esp_err_t emac_ch390_receive(esp_eth_mac_t *mac, uint8_t *buf, uint32_t *
     *length = 0;
     if (!emac->active || emac->health.diag.pending) return ESP_ERR_INVALID_STATE;
 
+    uint16_t read, write;
+    ret = ch390_rx_pointers(emac, &read, &write);
+    if (ret == ESP_ERR_NOT_FINISHED) {
+        ++emac->health.diag.rx_deferred;
+        ch390_rx_progress(&emac->health);
+        return ESP_OK;
+    }
+    if (ret != ESP_OK) return ret;
+    if (!ch390_rx_pointer_valid(read) || !ch390_rx_pointer_valid(write)) {
+        ch390_fault(&emac->health, 5, (uint32_t)(esp_timer_get_time() / 1000));
+        ch390_reset_rx(emac);
+        return ESP_ERR_INVALID_RESPONSE;
+    }
+    uint16_t available = ch390_rx_available(read, write);
     uint8_t ready;
     /* dummy read, get the most updated data */
     ESP_GOTO_ON_ERROR(ch390_io_register_read(emac, CH390_MRCMDX, &ready), err, TAG, "read MRCMDX failed");
     ESP_GOTO_ON_ERROR(ch390_io_register_read(emac, CH390_MRCMDX, &ready), err, TAG, "read MRCMDX failed");
 
+    if (!available) {
+        if (ready == 1) ++emac->health.diag.empty_ready;
+        ch390_rx_progress(&emac->health);
+        return ESP_OK;
+    }
+    if (available < sizeof(ch390_rx_header_t) || ready == 0) {
+        ch390_defer_rx(emac, read, write, ready);
+        return ESP_OK;
+    }
     // if ready != 1 or 0 reset device
     if (ready & CH390_PKT_ERR) {
         ++emac->health.diag.bad_ready;
@@ -858,7 +930,19 @@ static esp_err_t emac_ch390_receive(esp_eth_mac_t *mac, uint8_t *buf, uint32_t *
                 ch390_reset_rx(emac);
                 *length = 0;
                 return ESP_ERR_INVALID_RESPONSE;
-            } else if (rx_header.status & RSR_ERR_MASK) {
+            }
+            if (!ch390_rx_frame_fits(available, *length)) {
+                // Roll back the consumed header before deferring. Never discard
+                // an error frame beyond the same hardware write-pointer bound.
+                ESP_GOTO_ON_ERROR(ch390_io_register_write(emac, CH390_MRRH, read >> 8), err, TAG, "restore MRRH failed");
+                ESP_GOTO_ON_ERROR(ch390_io_register_write(emac, CH390_MRRL, read & 0xff), err, TAG, "restore MRRL failed");
+                ++emac->health.diag.rx_incomplete;
+                ch390_defer_rx(emac, read, write, ready);
+                *length = 0;
+                return ESP_OK;
+            }
+            ch390_rx_progress(&emac->health);
+            if (rx_header.status & RSR_ERR_MASK) {
                 ++emac->health.diag.rx_errors;
                 ch390_drop_frame(emac, *length);
                 *length = 0;
@@ -992,6 +1076,84 @@ esp_err_t esp_eth_mac_ch390_diagnostics(esp_eth_mac_t *mac, CH390Diagnostics *ou
     return ESP_OK;
 }
 
+#if defined(OS_ETH_DIAGNOSTICS)
+static void ch390_count_rx(emac_ch390_t *emac)
+{
+    const uint8_t *f = emac->rx_buffer;
+    uint32_t n = emac->rx_len;
+    CH390TrafficDiag *t = &emac->traffic;
+    ++t->rx_frames;
+    t->rx_last_ms = (uint32_t)(esp_timer_get_time() / 1000);
+    if (n < 14 || (f[0] & f[1] & f[2] & f[3] & f[4] & f[5]) != 0xff) return;
+    ++t->rx_bcast;
+    // Observer probe: IPv4/UDP broadcast to CH390_DIAG_PROBE_PORT, payload "OSDG" + seq.
+    if (n < 34 || f[12] != 0x08 || f[13] != 0x00 || f[23] != 17) return;
+    uint32_t udp = 14 + (f[14] & 0x0f) * 4;
+    if (n < udp + 16 || ((f[udp + 2] << 8) | f[udp + 3]) != CH390_DIAG_PROBE_PORT ||
+            memcmp(f + udp + 8, "OSDG", 4)) return;
+    uint32_t seq = ((uint32_t)f[udp + 12] << 24) | ((uint32_t)f[udp + 13] << 16) |
+                   ((uint32_t)f[udp + 14] << 8) | f[udp + 15];
+    // Extended probes carry a monotonically increasing sender-session number.
+    // A sender restart is not replay; an older session or sequence is.
+    if (n >= udp + 20 && (((uint16_t)f[udp + 4] << 8) | f[udp + 5]) >= 20) {
+        uint32_t session = ((uint32_t)f[udp + 16] << 24) | ((uint32_t)f[udp + 17] << 16) |
+                           ((uint32_t)f[udp + 18] << 8) | f[udp + 19];
+        if (t->rx_probe_session && ((int32_t)(session - t->rx_probe_session) < 0 ||
+                (session == t->rx_probe_session && (int32_t)(seq - t->rx_probe_seq) < 0))) {
+            ++t->rx_probe_backwards;
+        } else {
+            t->rx_probe_session = session;
+            t->rx_probe_seq = seq;
+        }
+    } else if (!t->rx_probe_session) {
+        t->rx_probe_seq = seq; // Legacy probes have no restart identity.
+    }
+    ++t->rx_probe;
+}
+
+esp_err_t esp_eth_mac_ch390_traffic(esp_eth_mac_t *mac, CH390TrafficDiag *out)
+{
+    if (!mac || !out) return ESP_ERR_INVALID_ARG;
+    emac_ch390_t *emac = __containerof(mac, emac_ch390_t, parent);
+    if (xSemaphoreTakeRecursive(emac->operation_lock, pdMS_TO_TICKS(50)) != pdTRUE) return ESP_ERR_TIMEOUT;
+    *out = emac->traffic;
+    out->active = emac->active;
+    out->initialized = emac->initialized;
+    xSemaphoreGiveRecursive(emac->operation_lock);
+    return ESP_OK;
+}
+
+esp_err_t esp_eth_mac_ch390_read_regs(esp_eth_mac_t *mac, const uint8_t *addrs, uint8_t *values, size_t count)
+{
+    if (!mac || !addrs || !values) return ESP_ERR_INVALID_ARG;
+    emac_ch390_t *emac = __containerof(mac, emac_ch390_t, parent);
+    if (xSemaphoreTakeRecursive(emac->operation_lock, pdMS_TO_TICKS(50)) != pdTRUE) return ESP_ERR_TIMEOUT;
+    esp_err_t result = ESP_OK;
+    for (size_t i = 0; i < count && result == ESP_OK; ++i) {
+        result = ch390_io_register_read(emac, addrs[i], &values[i]);
+    }
+    xSemaphoreGiveRecursive(emac->operation_lock);
+    return result;
+}
+
+esp_err_t esp_eth_mac_ch390_restart_rx(esp_eth_mac_t *mac)
+{
+    if (!mac) return ESP_ERR_INVALID_ARG;
+    emac_ch390_t *emac = __containerof(mac, emac_ch390_t, parent);
+    if (xSemaphoreTakeRecursive(emac->operation_lock, pdMS_TO_TICKS(50)) != pdTRUE) return ESP_ERR_TIMEOUT;
+    esp_err_t result = ESP_ERR_INVALID_STATE;
+    if (emac->initialized && emac->active) {
+        result = emac_ch390_stop(mac);
+        if (result == ESP_OK) {
+            esp_rom_delay_us(1000);
+            result = emac_ch390_start(mac);
+        }
+    }
+    xSemaphoreGiveRecursive(emac->operation_lock);
+    return result;
+}
+#endif
+
 static void emac_ch390_task(void *arg)
 {
     emac_ch390_t *emac = (emac_ch390_t *)arg;
@@ -1022,6 +1184,9 @@ static void emac_ch390_task(void *arg)
                         break;
                     } else {
                         ESP_LOGD(TAG, "receive len=%lu", emac->rx_len);
+#if defined(OS_ETH_DIAGNOSTICS)
+                        ch390_count_rx(emac);
+#endif
 
                         /* allocate memory and check whether allocation failed */
                         buffer = malloc(emac->rx_len);
@@ -1062,12 +1227,21 @@ static esp_err_t emac_ch390_del(esp_eth_mac_t *mac)
     return ESP_OK;
 }
 
+#if defined(OS_ETH_DIAGNOSTICS)
+#define CH390_COUNT_LOCK_TIMEOUT(emac) (++(emac)->traffic.lock_timeouts)
+#else
+#define CH390_COUNT_LOCK_TIMEOUT(emac) ((void)0)
+#endif
+
 // The SPI transaction mutex alone cannot protect multi-transaction MAC/PHY
 // operations against recovery. Serialize all externally callable MAC operations.
 #define CH390_LOCKED(name, signature, arguments) \
     static esp_err_t locked_##name signature { \
         emac_ch390_t *emac = __containerof(mac, emac_ch390_t, parent); \
-        if (xSemaphoreTakeRecursive(emac->operation_lock, pdMS_TO_TICKS(50)) != pdTRUE) return ESP_ERR_TIMEOUT; \
+        if (xSemaphoreTakeRecursive(emac->operation_lock, pdMS_TO_TICKS(50)) != pdTRUE) { \
+            CH390_COUNT_LOCK_TIMEOUT(emac); \
+            return ESP_ERR_TIMEOUT; \
+        } \
         esp_err_t result = emac_ch390_##name arguments; \
         xSemaphoreGiveRecursive(emac->operation_lock); \
         return result; \

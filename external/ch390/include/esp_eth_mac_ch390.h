@@ -61,6 +61,22 @@ esp_eth_mac_t *esp_eth_mac_new_ch390(const eth_ch390_config_t *ch390_config, con
 // OpenSprinkler local extension; snapshots are serialized with MAC operations.
 esp_err_t esp_eth_mac_ch390_diagnostics(esp_eth_mac_t *mac, CH390Diagnostics *out);
 
+#if defined(OS_ETH_DIAGNOSTICS)
+// Bench-only traffic counters and register access; never in production builds.
+#define CH390_DIAG_PROBE_PORT 40001
+typedef struct {
+    uint32_t rx_frames, rx_bcast, rx_probe, rx_probe_seq, rx_last_ms;
+    uint32_t rx_probe_session, rx_probe_backwards;
+    uint32_t tx_ok, tx_rejected, tx_last_ms, lock_timeouts;
+    uint8_t tsr_or, last_tsra, last_tsrb;
+    bool active, initialized;
+} CH390TrafficDiag;
+esp_err_t esp_eth_mac_ch390_traffic(esp_eth_mac_t *mac, CH390TrafficDiag *out);
+esp_err_t esp_eth_mac_ch390_read_regs(esp_eth_mac_t *mac, const uint8_t *addrs, uint8_t *values, size_t count);
+// MAC-only receive restart (stop, settle, start); no PHY or netif action.
+esp_err_t esp_eth_mac_ch390_restart_rx(esp_eth_mac_t *mac);
+#endif
+
 #ifdef __cplusplus
 }
 #endif

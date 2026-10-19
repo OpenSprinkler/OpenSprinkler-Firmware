@@ -55,6 +55,7 @@ int main() {
     assert(driver.diagnostics().rx_errors == 1);
 
     fake_us += 11000000;
+    bus.frame(64);
     bus.regs[0x70] = 0xff;
     assert(driver.readFrameSize() == 0);
     assert(driver.diagnostics().bad_ready == 1);
@@ -62,6 +63,71 @@ int main() {
     assert(driver.readFrameSize() == 1518);
     uint8_t maximum_frame[1518];
     assert(driver.readFrameData(maximum_frame, sizeof(maximum_frame)) == sizeof(maximum_frame));
+
+    // Pointer reset leaves a valid old frame in SRAM. Equal pointers forbid
+    // consuming it, even when MRCMDX still advertises ready=1.
+    bus.frame(64); bus.setWrite(bus.readPointer());
+    auto reads = bus.memory_reads;
+    auto empty = driver.diagnostics().empty_ready;
+    assert(driver.readFrameSize() == 0 && bus.memory_reads == reads);
+    assert(driver.diagnostics().empty_ready == empty + 1);
+    bus.regs[0x70] = 0;
+    assert(driver.readFrameSize() == 0);
+    assert(driver.diagnostics().empty_ready == empty + 1);
+
+    // Header and payload wrap; an incomplete snapshot restores the header.
+    for (uint16_t start : {uint16_t(0x3ffe), uint16_t(0x3fe0)}) {
+        bus.frame(64, 0, 1, start);
+        bus.setWrite(SPIClass::advance(start, 2));
+        reads = bus.memory_reads;
+        assert(driver.readFrameSize() == 0 && bus.memory_reads == reads);
+        bus.setWrite(SPIClass::advance(start, 10));
+        assert(driver.readFrameSize() == 0 && bus.readPointer() == start);
+        bus.setWrite(SPIClass::advance(start, 68));
+        assert(driver.readFrameSize() == 60);
+        uint8_t payload[60];
+        assert(driver.readFrameData(payload, 60) == 60);
+        for (unsigned i = 0; i < 60; ++i) assert(payload[i] == i);
+        assert(driver.readFrameSize() == 0);
+    }
+    bus.frame(64, 0x02); bus.setWrite(0x0c08);
+    auto errors = driver.diagnostics().rx_errors;
+    assert(driver.readFrameSize() == 0 && bus.readPointer() == 0x0c00);
+    assert(driver.diagnostics().rx_errors == errors); // Not discarded prematurely.
+    bus.setWrite(0x0c44);
+    assert(driver.readFrameSize() == 0 && driver.diagnostics().rx_errors == errors + 1);
+
+    // Unstable hardware pointer snapshots defer without consuming or resetting.
+    bus.frame(64);
+    bus.write_high_samples = {0x0c, 0x0d, 0x0d, 0x0e, 0x0e, 0x0f};
+    reads = bus.memory_reads;
+    auto resets = driver.diagnostics().rx_resets;
+    assert(driver.readFrameSize() == 0 && bus.memory_reads == reads);
+    assert(driver.diagnostics().rx_resets == resets);
+
+    // Persistent data-with-ready-zero, unlike a changing arrival, recovers.
+    bus.regs[0x70] = 0;
+    assert(driver.readFrameSize() == 0);
+    fake_us += 1000000; assert(driver.readFrameSize() == 0);
+    fake_us += 1000000; assert(driver.readFrameSize() == 0);
+    assert(driver.diagnostics().rx_resets == resets + 1);
+    reads = bus.memory_reads;
+    assert(driver.readFrameSize() == 0 && bus.memory_reads == reads);
+
+    fake_us += 11000000;
+    bus.frame(64); bus.setWrite(0x0c08);
+    resets = driver.diagnostics().rx_resets;
+    assert(driver.readFrameSize() == 0 && bus.readPointer() == 0x0c00);
+    fake_us += 1000000; assert(driver.readFrameSize() == 0);
+    fake_us += 1000000; assert(driver.readFrameSize() == 0);
+    assert(driver.diagnostics().rx_resets == resets + 1);
+    assert(driver.diagnostics().rx_incomplete >= 3);
+
+    fake_us += 11000000;
+    bus.setRead(0x0100);
+    reads = bus.memory_reads;
+    assert(driver.readFrameSize() == 0 && bus.memory_reads == reads);
+    assert(bus.readPointer() == 0x0c00);
 
     // Link down alone never requests recovery.
     auto count = driver.diagnostics().recoveries;

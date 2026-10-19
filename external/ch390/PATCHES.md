@@ -33,6 +33,22 @@ hardening extends it as follows:
   was lost. Limit each receive batch to 16 frames before yielding. A full batch
   self-notifies the worker to continue after one RTOS tick, rather than waiting
   another second. This is not a 16-frames-per-second cap.
+- Bound every receive by a coherent hardware RX write-pointer snapshot and the
+  software read pointer, using the 0x0c00-0x3fff circular buffer. Equal pointers
+  mean empty even if SRAM still contains a ready byte. Validate header plus wire
+  length before reading or discarding data; restore the header pointer when a
+  frame is incomplete. Unstable snapshots defer without resetting. An unchanged
+  incomplete/ready-zero state across at least three polls and two seconds uses
+  the existing throttled RX reset and escalation policy. Old overflow flags alone
+  do not request recovery. Both platforms share the ring arithmetic and policy.
+  This fixes a regression introduced by our ungated polling in `33f3759`, not a
+  demonstrated upstream defect: upstream gated receive on ISR.PR. Pointer resets
+  do not erase SRAM, so ungated reads could replay stale frames and strand RX.
+- Expose `ch_rx_deferred`, `ch_empty_ready` (equal pointers and ready byte 01),
+  and `ch_rx_incomplete` (header present, frame exceeds snapshot) in `/db`.
+  These count observations, not necessarily faults; arrivals can race snapshots.
+  Diagnostic builds additionally count backwards probe sequences with a sender
+  session identifier, so sender restarts and sequence wrap are distinguished.
 
 The shared C-compatible policy is in `include/ch390_health.h`; the ESP8266 raw
 adapter uses the same thresholds. Neither path reboots the controller, changes

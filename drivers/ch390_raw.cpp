@@ -28,6 +28,8 @@ constexpr uint8_t kWcr = 0x0F;
 constexpr uint8_t kPar = 0x10;
 constexpr uint8_t kMar = 0x16;
 constexpr uint8_t kGpr = 0x1F;
+constexpr uint8_t kRxWriteLow = 0x24;
+constexpr uint8_t kRxWriteHigh = 0x25;
 constexpr uint8_t kVidLow = 0x28;
 constexpr uint8_t kVidHigh = 0x29;
 constexpr uint8_t kPidLow = 0x2A;
@@ -42,6 +44,8 @@ constexpr uint8_t kInterruptClockControl = 0x54;
 constexpr uint8_t kMemoryPointerControl = 0x55;
 constexpr uint8_t kMemoryReadNoIncrement = 0x70;
 constexpr uint8_t kMemoryRead = 0x72;
+constexpr uint8_t kRxReadLow = 0x74;
+constexpr uint8_t kRxReadHigh = 0x75;
 constexpr uint8_t kMemoryWrite = 0x78;
 constexpr uint8_t kTxLengthLow = 0x7C;
 constexpr uint8_t kTxLengthHigh = 0x7D;
@@ -262,6 +266,7 @@ bool CH390Raw::begin(const uint8_t* macAddress) {
 }
 
 bool CH390Raw::initialize() {
+  ch390_rx_progress(&_health);
   _pendingWireLength = 0;
   pinMode(_cs, OUTPUT);
   digitalWrite(_cs, HIGH);
@@ -383,14 +388,38 @@ uint16_t CH390Raw::sendFrame(const uint8_t* data, uint16_t length) {
 }
 
 void CH390Raw::resetReceivePath() {
+  ch390_rx_progress(&_health);
   _pendingWireLength = 0;
   if (!ch390_allow_rx_reset(&_health, millis())) return;
   const uint8_t rcr = readRegister(kRcr);
   writeRegister(kRcr, rcr & ~kRcrReceiveEnable);
+  delayMicroseconds(1000);
   writeRegister(kMemoryPointerControl, kPointerResetRx);
   writeRegister(kInterruptStatus, kClearInterruptStatus);
   writeRegister(kRcr, rcr | kRcrReceiveEnable);
   _pendingWireLength = 0;
+}
+
+bool CH390Raw::receivePointers(uint16_t& read, uint16_t& write) {
+  read = (uint16_t(readRegister(kRxReadHigh)) << 8) | readRegister(kRxReadLow);
+  for (unsigned attempt = 0; attempt < 3; ++attempt) {
+    uint8_t high = readRegister(kRxWriteHigh);
+    uint8_t low = readRegister(kRxWriteLow);
+    if (high == readRegister(kRxWriteHigh)) {
+      write = (uint16_t(high) << 8) | low;
+      return true;
+    }
+  }
+  ++_health.diag.rx_deferred;
+  ch390_rx_progress(&_health);
+  return false;
+}
+
+void CH390Raw::deferReceive(uint16_t read, uint16_t write, uint8_t ready) {
+  if (ch390_rx_defer(&_health, read, write, ready, millis())) {
+    ch390_fault(&_health, 5, millis());
+    resetReceivePath();
+  }
 }
 
 uint16_t CH390Raw::readFrameSize() {
@@ -399,9 +428,26 @@ uint16_t CH390Raw::readFrameSize() {
     return _pendingWireLength - kEthernetCrcLength;
   }
 
+  uint16_t read, write;
+  if (!receivePointers(read, write)) return 0;
+  if (!ch390_rx_pointer_valid(read) || !ch390_rx_pointer_valid(write)) {
+    ch390_fault(&_health, 5, millis());
+    resetReceivePath();
+    return 0;
+  }
+  const uint16_t available = ch390_rx_available(read, write);
   // The first MRCMDX read initiates prefetch; the second returns fresh state.
   (void)readRegister(kMemoryReadNoIncrement);
   const uint8_t ready = readRegister(kMemoryReadNoIncrement);
+  if (!available) {
+    if (ready == 1) ++_health.diag.empty_ready;
+    ch390_rx_progress(&_health);
+    return 0;
+  }
+  if (available < sizeof(RxHeader) || ready == 0) {
+    deferReceive(read, write, ready);
+    return 0;
+  }
   if ((ready & 0xFE) != 0) {
     DEBUG_PRINTF("CH390 invalid RX-ready value 0x%02X\n", ready);
     ++_health.diag.bad_ready;
@@ -424,6 +470,15 @@ uint16_t CH390Raw::readFrameSize() {
     resetReceivePath();
     return 0;
   }
+  if (!ch390_rx_frame_fits(available, wireLength)) {
+    // Header reads advance MRR. Roll back before waiting for the full frame.
+    writeRegister(kRxReadHigh, read >> 8);
+    writeRegister(kRxReadLow, read & 0xff);
+    ++_health.diag.rx_incomplete;
+    deferReceive(read, write, ready);
+    return 0;
+  }
+  ch390_rx_progress(&_health);
   if ((header.status & kReceiveErrorMask) != 0) {
     ++_health.diag.rx_errors;
     DEBUG_PRINTF("CH390 dropping RX frame: status=0x%02X length=%u\n",

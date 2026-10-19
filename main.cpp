@@ -753,6 +753,9 @@ void do_loop()
 	service_w5500_recovery();
 	if (useEth && eth.service_ch390()) os.status.req_mqtt_restart = true;
 	#endif
+	#if defined(ESP32) && defined(OS_ETH_DIAGNOSTICS)
+	eth.diagnostic_poll();
+	#endif
 
 	// ====== Process Ethernet packets ======
 	#if defined(ARDUINO)	// Process Ethernet packets for Arduino

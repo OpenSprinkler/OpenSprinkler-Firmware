@@ -9,12 +9,15 @@ typedef struct {
     uint32_t bad_header;
     uint32_t rx_errors;
     uint32_t rx_resets;
+    uint32_t rx_deferred;
+    uint32_t empty_ready;
+    uint32_t rx_incomplete;
     uint32_t tx_timeouts;
     uint32_t health_failures;
     uint32_t recoveries;
     uint32_t recovery_failures;
     uint32_t last_fault_ms;
-    uint8_t last_fault; // 1 ready, 2 header, 3 TX timeout, 4 register check
+    uint8_t last_fault; // 1 ready, 2 header, 3 TX timeout, 4 register check, 5 RX ring
     bool pending;
 } CH390Diagnostics;
 
@@ -30,7 +33,44 @@ typedef struct {
     bool attempted;
     bool rx_reset_done;
     bool tx_busy;
+    uint32_t rx_wait_since;
+    uint16_t rx_wait_read, rx_wait_write;
+    uint8_t rx_wait_ready, rx_wait_polls;
 } CH390Health;
+
+static inline bool ch390_rx_pointer_valid(uint16_t p) {
+    return p >= 0x0c00 && p < 0x4000;
+}
+
+static inline uint16_t ch390_rx_available(uint16_t read, uint16_t write) {
+    return write >= read ? write - read : 0x3400 - (read - write);
+}
+
+static inline bool ch390_rx_frame_fits(uint16_t available, uint32_t wire_length) {
+    return available >= 4 && wire_length <= (uint32_t)(available - 4);
+}
+
+static inline void ch390_rx_progress(CH390Health* h) {
+    h->rx_wait_polls = 0;
+}
+
+// A changing pointer or ready byte restarts the observation; slow arrivals are
+// not faults. Time subtraction deliberately supports millis() rollover.
+static inline bool ch390_rx_defer(CH390Health* h, uint16_t read, uint16_t write,
+                                  uint8_t ready, uint32_t now) {
+    ++h->diag.rx_deferred;
+    if (!h->rx_wait_polls || h->rx_wait_read != read ||
+            h->rx_wait_write != write || h->rx_wait_ready != ready) {
+        h->rx_wait_since = now;
+        h->rx_wait_read = read;
+        h->rx_wait_write = write;
+        h->rx_wait_ready = ready;
+        h->rx_wait_polls = 1;
+        return false;
+    }
+    if (h->rx_wait_polls < 3) ++h->rx_wait_polls;
+    return h->rx_wait_polls >= 3 && (uint32_t)(now - h->rx_wait_since) >= 2000;
+}
 
 static inline bool ch390_valid_wire_length(uint32_t length, uint32_t maximum) {
     // Four CRC bytes alone are not a frame. In LwipIntfDev, zero means no frame.

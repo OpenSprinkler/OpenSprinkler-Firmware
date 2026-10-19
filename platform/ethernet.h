@@ -36,6 +36,9 @@ public:
 	bool raw_reinit();
 #elif defined(ESP32)
 	void end();
+#if defined(OS_ETH_DIAGNOSTICS)
+	void diagnostic_poll();
+#endif
 	void set_spi_drive(EthernetController controller);
 	bool begin(SPIClass& spi, int8_t cs, int8_t irq, int8_t reset,
 		uint32_t spi_clock_hz);

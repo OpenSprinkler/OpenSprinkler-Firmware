@@ -48,6 +48,8 @@ class CH390Raw {
   bool writePhy(uint8_t reg, uint16_t value);
   bool waitPhyReady(uint32_t timeoutUs);
   void resetReceivePath();
+  bool receivePointers(uint16_t& read, uint16_t& write);
+  void deferReceive(uint16_t read, uint16_t write, uint8_t ready);
   bool initialize();
   bool healthy();
 

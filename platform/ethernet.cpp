@@ -37,6 +37,12 @@ CH390lwIP ch390(PIN_ETHER_CS);
 #include <esp_mac.h>
 #include <esp_netif.h>
 #include <esp_netif_defaults.h>
+#if defined(OS_ETH_DIAGNOSTICS)
+#include <esp_netif_net_stack.h>
+#include <lwip/dhcp.h>
+#include <lwip/tcpip.h>
+#include <lwip/priv/tcpip_priv.h>
+#endif
 
 namespace {
 
@@ -45,6 +51,29 @@ public:
 	bool begin(SPIClass& spi, int8_t cs, int8_t irq, int8_t reset,
 		uint32_t spi_clock_hz);
 	void end();
+#if defined(OS_ETH_DIAGNOSTICS)
+	esp_err_t diagnostic_set_running(bool running) {
+		if (!_handle) return ESP_ERR_INVALID_STATE;
+		return running ? esp_eth_start(_handle) : esp_eth_stop(_handle);
+	}
+	bool diagnostic_traffic(CH390TrafficDiag& out) const {
+		return _mac && esp_eth_mac_ch390_traffic(_mac, &out) == ESP_OK;
+	}
+	esp_err_t diagnostic_regs(const uint8_t* addrs, uint8_t* values, size_t count) const {
+		return _mac ? esp_eth_mac_ch390_read_regs(_mac, addrs, values, count) : ESP_ERR_INVALID_STATE;
+	}
+	esp_err_t diagnostic_restart_rx() {
+		return _mac ? esp_eth_mac_ch390_restart_rx(_mac) : ESP_ERR_INVALID_STATE;
+	}
+	esp_err_t diagnostic_phy(uint32_t reg, uint32_t* value, bool write) {
+		if (!_handle) return ESP_ERR_INVALID_STATE;
+		esp_eth_phy_reg_rw_data_t data = { .reg_addr = reg, .reg_value_p = value };
+		return esp_eth_ioctl(_handle, write ? ETH_CMD_WRITE_PHY_REG : ETH_CMD_READ_PHY_REG, &data);
+	}
+	esp_err_t diagnostic_transmit(uint8_t* frame, size_t length) {
+		return _handle ? esp_eth_transmit(_handle, frame, length) : ESP_ERR_INVALID_STATE;
+	}
+#endif
 	bool diagnostics(CH390Diagnostics& out) const {
 		return _mac && esp_eth_mac_ch390_diagnostics(_mac, &out) == ESP_OK;
 	}
@@ -346,6 +375,213 @@ bool WiredEthernet::raw_reinit() {
 	return is_w5500() && w5500.reinitialize();
 }
 #elif defined(ESP32)
+#if defined(OS_ETH_DIAGNOSTICS)
+namespace {
+struct DhcpSnapshot {
+	tcpip_api_call_data call;
+	struct netif* interface;
+	uint32_t ip, offered, server, xid;
+	unsigned flags, state, tries, timeout;
+};
+
+// Inspect lwIP only on its own thread; printing happens back in the main loop.
+static err_t snapshot_dhcp(tcpip_api_call_data* call) {
+	auto* s = reinterpret_cast<DhcpSnapshot*>(call);
+	s->ip = ip4_addr_get_u32(netif_ip4_addr(s->interface));
+	s->flags = s->interface->flags;
+	auto* d = netif_dhcp_data(s->interface);
+	if (d) {
+		s->state = d->state;
+		s->tries = d->tries;
+		s->timeout = d->request_timeout;
+		s->xid = d->xid;
+		s->offered = ip4_addr_get_u32(&d->offered_ip_addr);
+		s->server = ip4_addr_get_u32(ip_2_ip4(&d->server_ip_addr));
+	}
+	return ERR_OK;
+}
+
+static volatile bool dump_requested = true;
+
+static void diagnostic_event(void*, esp_event_base_t base, int32_t id, void*) {
+	Serial.printf("[ETHDIAG %lu] event %s id=%ld\n",
+		(unsigned long)millis(), base == ETH_EVENT ? "ETH" : "IP", (long)id);
+	dump_requested = true;
+}
+
+// MAC registers worth comparing between healthy and stuck states. ROCR (0x07)
+// is read-to-clear: each dump shows overflows since the previous dump.
+const uint8_t kDumpRegs[] = {
+	0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0F,
+	0x16, 0x17, 0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F,
+	0x22, 0x23, 0x24, 0x25, 0x2D, 0x31, 0x32, 0x39, 0x4A, 0x50, 0x52, 0x53,
+	0x55, 0x57, 0x74, 0x75, 0x7A, 0x7B, 0x7E, 0x7F, 0x70, 0x70,
+};
+
+static void dump_registers(const char* reason) {
+	uint8_t v[sizeof(kDumpRegs)] = {};
+	esp_err_t rc = ch390.diagnostic_regs(kDumpRegs, v, sizeof(v));
+	Serial.printf("[ETHDIAG %lu] regs(%s) rc=%d", (unsigned long)millis(), reason, rc);
+	for (size_t i = 0; i < sizeof(v); ++i) Serial.printf(" %02x=%02x", kDumpRegs[i], v[i]);
+	Serial.println();
+	Serial.printf("[ETHDIAG %lu] phy", (unsigned long)millis());
+	for (uint32_t r = 0; r < 32; ++r) {
+		if (r == 7) r = 16;
+		uint32_t value = 0;
+		esp_err_t e = ch390.diagnostic_phy(r, &value, false);
+		if (e == ESP_OK) Serial.printf(" %02lx=%04lx", (unsigned long)r, (unsigned long)value);
+		else Serial.printf(" %02lx=err%d", (unsigned long)r, e);
+	}
+	Serial.println();
+}
+
+static void put32(uint8_t* p, uint32_t v) {
+	p[0] = v >> 24; p[1] = v >> 16; p[2] = v >> 8; p[3] = v;
+}
+
+// Raw IPv4/UDP broadcast 0.0.0.0:40002 -> 255.255.255.255:40002, independent of
+// netif/DHCP state, so an observer can tell whether frames leave the module.
+static esp_err_t send_probe(const uint8_t* mac, uint32_t seq, const CH390TrafficDiag& t) {
+	uint8_t f[14 + 20 + 8 + 20] = {};
+	memset(f, 0xff, 6);
+	memcpy(f + 6, mac, 6);
+	f[12] = 0x08;
+	uint8_t* ip = f + 14;
+	ip[0] = 0x45; ip[2] = 0; ip[3] = 48; ip[8] = 64; ip[9] = 17;
+	memset(ip + 16, 0xff, 4);
+	uint32_t sum = 0;
+	for (int i = 0; i < 20; i += 2) sum += (ip[i] << 8) | ip[i + 1];
+	while (sum >> 16) sum = (sum & 0xffff) + (sum >> 16);
+	ip[10] = ~sum >> 8; ip[11] = ~sum & 0xff;
+	uint8_t* udp = ip + 20;
+	udp[0] = udp[2] = 40002 >> 8; udp[1] = udp[3] = 40002 & 0xff; udp[5] = 28;
+	uint8_t* payload = udp + 8;
+	memcpy(payload, "OSDG", 4);
+	put32(payload + 4, seq);
+	put32(payload + 8, millis());
+	put32(payload + 12, t.rx_frames);
+	put32(payload + 16, t.rx_probe);
+	return ch390.diagnostic_transmit(f, sizeof(f));
+}
+}
+
+void WiredEthernet::diagnostic_poll() {
+	static bool initialized = false;
+	static uint32_t last = 0, last_dump = 0, probe_seq = 0;
+	static char command[24];
+	static size_t command_length = 0;
+	static bool overflow = false;
+	static bool restart_pending = false;
+	static uint32_t stopped_at = 0;
+	if (!initialized) {
+		Serial.begin(115200);
+		esp_err_t e = esp_event_handler_register(ETH_EVENT, ESP_EVENT_ANY_ID, diagnostic_event, nullptr);
+		esp_err_t i = esp_event_handler_register(IP_EVENT, ESP_EVENT_ANY_ID, diagnostic_event, nullptr);
+		Serial.printf("[ETHDIAG] enabled; event registration eth=%d ip=%d\n", e, i);
+		initialized = true;
+	}
+	if (restart_pending && (uint32_t)(millis() - stopped_at) >= 1000) {
+		restart_pending = false;
+		Serial.printf("[ETHDIAG %lu] eth-start rc=%d\n",
+			(unsigned long)millis(), ch390.diagnostic_set_running(true));
+	}
+	// Exact USB-only commands, excluded from production builds. Never auto-recover.
+	for (unsigned count = 0; count < 64 && Serial.available(); ++count) {
+		char c = (char)Serial.read();
+		if (c == '\r') continue;
+		if (c != '\n') {
+			if (command_length < sizeof(command) - 1) command[command_length++] = c;
+			else overflow = true;
+			continue;
+		}
+		command[command_length] = 0;
+		bool ch = !overflow && !restart_pending && is_ch390();
+		if (!overflow && !restart_pending && !strcmp(command, "diag-dhcp")) {
+			auto* netif = is_ch390() ? ch390.netif() : is_w5500() ? ETH.netif() : nullptr;
+			if (netif) {
+				esp_err_t stop = esp_netif_dhcpc_stop(netif);
+				esp_err_t start = (stop == ESP_OK || stop == ESP_ERR_ESP_NETIF_DHCP_ALREADY_STOPPED)
+					? esp_netif_dhcpc_start(netif) : ESP_ERR_INVALID_STATE;
+				Serial.printf("[ETHDIAG %lu] dhcp-restart stop=%d start=%d\n",
+					(unsigned long)millis(), stop, start);
+			}
+		} else if (ch && !strcmp(command, "diag-eth")) {
+			esp_err_t result = ch390.diagnostic_set_running(false);
+			Serial.printf("[ETHDIAG %lu] eth-stop rc=%d\n", (unsigned long)millis(), result);
+			if (result == ESP_OK) {
+				stopped_at = millis();
+				restart_pending = true;
+			}
+		} else if (ch && !strcmp(command, "diag-regs")) {
+			dump_requested = true;
+		} else if (ch && !strcmp(command, "diag-rx")) {
+			// MAC only: RX disable, RX pointer reset, ISR clear, RX enable.
+			Serial.printf("[ETHDIAG %lu] rx-restart rc=%d\n",
+				(unsigned long)millis(), ch390.diagnostic_restart_rx());
+			dump_requested = true;
+		} else if (ch && !strcmp(command, "diag-aneg")) {
+			// PHY only: restart auto-negotiation; driver link events follow.
+			uint32_t bmcr = 0;
+			esp_err_t r = ch390.diagnostic_phy(0, &bmcr, false);
+			uint32_t next = bmcr | 0x1200;
+			esp_err_t w = r == ESP_OK ? ch390.diagnostic_phy(0, &next, true) : r;
+			Serial.printf("[ETHDIAG %lu] aneg-restart bmcr=%04lx read=%d write=%d\n",
+				(unsigned long)millis(), (unsigned long)bmcr, r, w);
+		} else {
+			Serial.println("[ETHDIAG] rejected command; use diag-dhcp, diag-eth, diag-regs, diag-rx or diag-aneg");
+		}
+		command_length = 0;
+		overflow = false;
+	}
+	if (is_ch390() && (dump_requested || (uint32_t)(millis() - last_dump) >= 30000)) {
+		dump_requested = false;
+		last_dump = millis();
+		dump_registers("auto");
+	}
+	if ((uint32_t)(millis() - last) < 5000) return;
+	last = millis();
+	auto* n = is_ch390() ? ch390.netif() : is_w5500() ? ETH.netif() : nullptr;
+	if (!n) return;
+	DhcpSnapshot s = {};
+	s.state = 255;
+	s.interface = static_cast<struct netif*>(esp_netif_get_netif_impl(n));
+	if (!s.interface) return;
+	esp_netif_dhcp_status_t status = ESP_NETIF_DHCP_INIT;
+	esp_err_t status_result = esp_netif_dhcpc_get_status(n, &status);
+	err_t snapshot_result = tcpip_api_call(snapshot_dhcp, &s.call);
+	CH390Diagnostics d = {};
+	bool valid = ch390_diagnostics(d);
+	Serial.printf("[ETHDIAG %lu] %s link=%u up=%u ip=%s flags=0x%x dhcp_status=%d status_rc=%d state=%u tries=%u timeout=%u xid=%08lx offered=%s server=%s snapshot_rc=%d\n",
+		(unsigned long)last, controller_name(), linkUp(), esp_netif_is_netif_up(n),
+		IPAddress(s.ip).toString().c_str(), s.flags, status, status_result,
+		s.state, s.tries, s.timeout, (unsigned long)s.xid,
+		IPAddress(s.offered).toString().c_str(), IPAddress(s.server).toString().c_str(), snapshot_result);
+	if (valid) Serial.printf("[ETHDIAG] bad_ready=%lu bad_header=%lu rx_errors=%lu rx_resets=%lu tx_timeouts=%lu health_failures=%lu recoveries=%lu recovery_failures=%lu fault=%u pending=%u\n",
+		(unsigned long)d.bad_ready, (unsigned long)d.bad_header,
+		(unsigned long)d.rx_errors, (unsigned long)d.rx_resets,
+		(unsigned long)d.tx_timeouts, (unsigned long)d.health_failures,
+		(unsigned long)d.recoveries, (unsigned long)d.recovery_failures,
+		d.last_fault, d.pending);
+	CH390TrafficDiag t = {};
+	if (is_ch390() && ch390.diagnostic_traffic(t)) {
+		uint8_t mac[6] = {};
+		macAddress(mac);
+		esp_err_t probe = send_probe(mac, ++probe_seq, t);
+		uint32_t now = millis();
+		Serial.printf("[ETHDIAG] traffic rx=%lu bcast=%lu probe=%lu probe_seq=%lu rx_age=%lu tx_ok=%lu tx_rejected=%lu tx_age=%lu tsr_or=%02x tsra=%02x tsrb=%02x lock_timeouts=%lu active=%u init=%u tx_probe=%lu rc=%d\n",
+			(unsigned long)t.rx_frames, (unsigned long)t.rx_bcast, (unsigned long)t.rx_probe,
+			(unsigned long)t.rx_probe_seq, (unsigned long)(now - t.rx_last_ms),
+			(unsigned long)t.tx_ok, (unsigned long)t.tx_rejected, (unsigned long)(now - t.tx_last_ms),
+			t.tsr_or, t.last_tsra, t.last_tsrb, (unsigned long)t.lock_timeouts,
+			t.active, t.initialized, (unsigned long)probe_seq, probe);
+		Serial.printf("[ETHDIAG] rx_deferred=%lu empty_ready=%lu rx_incomplete=%lu probe_backwards=%lu probe_session=%lu\n",
+			(unsigned long)d.rx_deferred, (unsigned long)d.empty_ready,
+			(unsigned long)d.rx_incomplete, (unsigned long)t.rx_probe_backwards,
+			(unsigned long)t.rx_probe_session);
+	}
+}
+#endif
+
 void WiredEthernet::end() {
 	if (is_ch390()) ch390.end();
 	else if (is_w5500()) ETH.end();

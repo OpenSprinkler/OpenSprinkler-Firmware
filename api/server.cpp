@@ -2737,6 +2737,8 @@ static void emit_ethernet_health() {
 		d.bad_ready, d.bad_header, d.rx_errors, d.rx_resets, d.tx_timeouts,
 		d.health_failures, d.recoveries, d.recovery_failures, d.last_fault,
 		d.last_fault_ms, d.pending);
+	bfill.emit_p(PSTR(",\"ch_rx_deferred\":$L,\"ch_empty_ready\":$L,\"ch_rx_incomplete\":$L"),
+		d.rx_deferred, d.empty_ready, d.rx_incomplete);
 }
 #endif
 

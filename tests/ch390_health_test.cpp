@@ -3,6 +3,21 @@
 #include <cstdio>
 
 int main() {
+    assert(ch390_rx_available(0x0c00, 0x0c00) == 0);
+    assert(ch390_rx_available(0x0f30, 0x0c00) == 0x30d0);
+    assert(ch390_rx_available(0x3ffe, 0x0c42) == 68);
+    assert(ch390_rx_frame_fits(68, 64));
+    assert(!ch390_rx_frame_fits(67, 64));
+    assert(!ch390_rx_frame_fits(3, 0));
+    assert(!ch390_rx_pointer_valid(0x0bff) && !ch390_rx_pointer_valid(0x4000));
+    CH390Health wait = {};
+    assert(!ch390_rx_defer(&wait, 0xc00, 0xc44, 0, 0xffffff00U));
+    assert(!ch390_rx_defer(&wait, 0xc00, 0xc44, 0, 500));
+    assert(ch390_rx_defer(&wait, 0xc00, 0xc44, 0, 1744));
+    assert(!ch390_rx_defer(&wait, 0xc00, 0xc45, 0, 2000));
+    assert(!ch390_rx_defer(&wait, 0xc00, 0xc45, 1, 5000));
+    ch390_rx_progress(&wait);
+    assert(!ch390_rx_defer(&wait, 0xc00, 0xc45, 1, 8000));
     for (unsigned n = 0; n <= 4; ++n) assert(!ch390_valid_wire_length(n, 1522));
     assert(ch390_valid_wire_length(5, 1522));
     assert(ch390_valid_wire_length(64, 1522));
