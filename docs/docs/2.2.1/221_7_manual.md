@@ -23,7 +23,7 @@ In addition, OpenSprinkler v3 is available in three power models (*v4 is current
 
 * **Cycle and Soak:** Automatically splits a zone's watering time into cycles with soak periods, helping water absorb into the soil and reducing runoff. The maximum cycle time and minimum soak time can be individually configured for each zone.
 * [**Onboard Analog Sensors (v4 only):**](../sensor-expander.md#configure-other-sensor-types) Reads analog sensors directly through SN1–SN4, without a Sensor Expander. Readings can be displayed, logged, and used for program adjustments.
-* **CH390 Wired Ethernet Support:** Adds support for CH390 wired Ethernet modules for OpenSprinkler v3 and v4.
+* **CH390 Wired Ethernet Support:** Adds support for CH390 wired Ethernet modules for OpenSprinkler v3.3–3.4 and v4.
 * **Hostname:** Lets you access an OpenSprinkler v3 or v4 controller by an easy-to-remember name instead of its IP address, even when the IP changes.
 
 <hr class="double">
@@ -302,7 +302,7 @@ The homepage provides an overview of all zones, current system status, and weath
 * **About:** Shows app version, firmware version, and hardware version.
 * **Localization:** Change the display language.
 * **OpenSprinkler.com Login:** (Optional) Log in with your [OpenSprinkler.com](https://opensprinkler.com) account credentials to enable [**cloud-synced features**](#cloud-synced-features) such as station photos, notes, and site configurations.
-* **Disable Operation:** Disable zone operations. Use it when the system will be idle for an extended period.
+* **Disable Operation:** Disable automatic watering; manual runs remain available. Use it when the system will be idle for an extended period.
 * **Change Password:** Change the device password.
 * **Reboot OpenSprinkler:** Perform a software reboot.
 * **Update Firmware:** Opens the Firmware Update page (available on OpenSprinkler v3 and v4).
@@ -330,36 +330,31 @@ The footer may also display:
 
 ### Station Cards
 
-Each zone (station) is shown as a card. Tap the gear ⚙️ icon next to a zone name to open its **Attributes** dialog.
+Each zone (station) is shown as a card. Tap the circular icon showing the station's sequential group next to its name to open its **Attributes** dialog.
 
-![Station Attributes](images/station_attributes_types.jpg){: .img-shadow}
+![Station cards and the Basic and Output attribute tabs](images/station_attributes_types_2217.jpg){: .img-shadow}
 
 **Basic Tab:**
 
 * **Station Name:** A custom name (up to 32 characters).<br>
 **Annotation:** If a flow sensor is enabled (see [Sensor Setup](#built-in-sensors)) and the last 5 characters represent a numerical value, a **Flow Alert** notification will trigger when the flow rate exceeds this value after the zone finishes. Example: station name is **Front Yard 1.357**, a flow alert will trigger if the flow rate `>1.357` after the zone finishes.
-* **Use Masters:** Select which configured Masters should activate when this zone runs. If Master 1 is configured, Use Master 1 is checked by default; additional masters are unchecked by default.
 * **Ignore Rain/SN1-SN4:** Each option lets the zone bypass rain delay or the corresponding built-in sensor. Unchecked by default. (*SN3/SN4 are available only on OpenSprinkler v3.4 and v4*).
 * **Disable:** Disable and hide this zone. To unhide, use the [Footer Menu](#footer-menu).
+* **Image & Notes:** Add a station photo and notes (see [Cloud-Synced Features](#cloud-synced-features)).
 
-**Advanced Tab:**
+**Output Tab:**
 
-* **Sequential Group:** Assign the zone to a **Sequential** group (`A-D`) or the **Parallel** (`P`) group. The zone's group label appears next to its name on the homepage.
-    * By default, all zones belong to **group A**.
-    * Zones in the same sequential group are **automatically serialized** – no two zones run simultaneously.
-    * Zones in different groups can run simultaneously.
-    * Parallel (P) zones can run alongside any other zones.
-    * The sequential group attribute replaces the old per-zone **Sequential** flag, providing more flexible concurrency control.
-
-* <span id="station-type"></span>**Station Type:** Configure special properties for a zone. **Bundle Station** is a new station type introduced in this firmware.
+* **Use Masters:** Select which configured Masters should activate when this zone runs. If Master 1 is configured, Use Master 1 is checked by default; additional masters are unchecked by default.
+* <span id="station-type"></span>**Station Type:** Configure special properties for a zone.
     * <span class="hllight">**Standard**</span> (default): Regular sprinkler zone.
     * <span class="hllight">**RF:**</span> Controls remote RF (Radio Frequency) power sockets via an external transmitter (requires [RFToy](https://opensprinkler.com/product/rftoy/) for code learning), allowing you to switch powerline devices such as Christmas lights, heaters, pumps.
     * <span class="hllight">**Remote Station (IP):**</span> Triggers a zone on another OpenSprinkler using its **IP, port, and zone index** (both controllers must **share the same device password**).
+        * Saving a Remote Station (IP or OTC) makes the app enable **Remote Extension** mode on the remote controller. In firmware 2.2.1(7), this stops the remote controller's current runs and suppresses its automatic watering and program-switch starts. Manual runs and scheduled reboots remain available. Local watering adjustments and Cycle and Soak are bypassed; sensor monitoring and overcurrent protection remain active, but weather queries stop. To exit, tap **Configured as Extender** in that controller's footer.
     * <span class="hllight">**Remote Station (OTC):**</span> Same as above but identifies the remote controller by its **OpenThings Cloud token**, ideal for managing devices across different networks. Again, both controllers must share the same password.
     * <span class="hllight">**GPIO:**</span> Directly toggles an available GPIO pin on the controller (Active High/Low configurable). This type is disabled for controllers that do not have any available GPIO pins.
     * <span class="hllight">**HTTP:**</span> Sends an HTTP GET request upon zone activity. Provide a `server` (either domain name or IP), `port`, and the `on`/`off` command (excluding the leading slash `/`). Upon zone activation, it sends `server:port/on_command`, and upon deactivation `server:port/off_command`.
     * <span class="hllight">**HTTPS:**</span> Same as HTTP, but using a secure connection.
-    * <span class="hllight">**Bundle Station:**</span> A leader zone that, when activated, turns on its own physical output together with its selected bundle members. This makes it easy to define groups of simultaneously running zones. See details below for behavior and restrictions.
+    * **Bundle Station:** A leader zone that, when activated, turns on its own physical output together with its selected bundle members. This makes it easy to define groups of simultaneously running zones. See details below for behavior and restrictions.
 
     The homepage displays a badge on each special-station card:
 
@@ -372,9 +367,17 @@ Each zone (station) is shown as a card. Tap the gear ⚙️ icon next to a zone 
     * **SP:** Fallback for an unrecognized special-station type
     * **No badge:** Standard station (neither a special station nor a bundle member)
 
+**Watering Tab:**
+
+* **Sequential Group:** Assign the zone to a **Sequential** group (`A-D`) or the **Parallel** (`P`) group. The zone's group label appears next to its name on the homepage.
+    * By default, all zones belong to **group A**.
+    * Zones in the same sequential group run in sequence; zones in different groups can run simultaneously.
+    * Parallel (P) zones can run alongside any other zones.
+* **Cycle and Soak:** Enable cycling and set the **Maximum cycle** and **Minimum soak**, in minutes. See [Cycle and Soak](#cycle-and-soak) below.
+
 <hr>
 
-#### Bundle Stations {: .hltitle}
+#### Bundle Stations
 
 A **Bundle Station** behaves like several physical zone wires bundled together into one logical zone. Starting the bundle leader activates its own output and every selected member in its configuration.
 
@@ -388,6 +391,21 @@ A **Bundle Station** behaves like several physical zone wires bundled together i
 * A disabled member remains configured but will not run while disabled.
 
 To reduce simultaneous solenoid inrush current, new physical outputs are activated one at a time using a short stagger interval (`250 ms`). A very short bundle run is automatically extended enough for an isolated bundle's selected members to activate and remain on briefly. Multiple unusually short bundles started concurrently share the same transition sequence, so a heavily contended late member may not activate before its leader's run ends.
+
+---
+
+#### Cycle and Soak {: .hltitle}
+
+![Cycle and Soak settings in the Watering tab and circular-arrow indicators on station cards](images/cycle_and_soak_2217.jpg){ .img-center .img-shadow .img-two-thirds }
+
+**Cycle and Soak** splits a zone's water time into balanced cycles, each no longer than its **Maximum cycle**, separated by at least its **Minimum soak**. For example, 17 minutes total with a 5-minute maximum cycle becomes 4 cycles, each 4 minutes 15 seconds. Both settings accept **1–240 minutes**. You can enable it for each station individually via its **Watering** tab. Enabled zones show a circular arrow around their group indicator on the homepage (see the right image above).
+
+
+* Other zones can run during a soak. Scheduling may make the gap longer than the minimum.
+* Enabled settings apply to program and Run-Once watering. For a manually started individual zone, select **Apply Cycle and Soak** to use them.
+* A bundle follows its leader's cycle and soak settings; member settings apply only when those zones run independently.
+* Paused time counts toward soaking. Stopping a run cancels its remaining cycles, but does not clear the zone's soak cooldown.
+* Changing these settings affects new runs, not runs already queued. Cycle and Soak is bypassed in Remote Extension mode.
 
 ---
 
@@ -429,9 +447,13 @@ The Footer Menu is available on all pages by tapping the grid icon #️⃣ at th
 
 To **start** a zone manually, click its station card and enter a run time. If another zone in the **same sequential group** is currently running, a **"Run immediately"** checkbox appears to let you choose if you want this zone to run now (and pause other zones in the group), or queue this zone to run after the others finish.
 
+If the zone has **Cycle and Soak** enabled, an **"Apply Cycle and Soak"** checkbox is available. Select it to use the zone's cycle and soak settings for this run; manual zone runs bypass them by default.
+
 ![Stop Zone](images/manually_stop_zone.png){ .img-border .img-shadow width="150" style="float: right; margin: 5px 5px 5px 5px;"}
 To **stop** a zone that's running or queued, click its zone card and confirm.
-If there are other queued zones in the **same sequential group**, a **"Move up remaining stations"** checkbox appears to let you choose if you want all remaining zones in that group to shift up, so the next one starts immediately instead of waiting for its original scheduled time.
+If there are other queued zones in the **same sequential group**, a **"Move up remaining stations"** checkbox lets them start earlier instead of waiting for their original scheduled times, while still observing any required soak time.
+
+Stopping a Cycle and Soak run cancels all its remaining cycles, including while it is soaking. The zone's soak cooldown remains in effect for subsequent runs that apply Cycle and Soak.
 
 ---
 
@@ -460,6 +482,8 @@ To **modify or cancel** an active pause:
 ### Stop All Zones
 
 Immediately terminate all zones and clear the running queue.
+
+For Cycle and Soak zones, all remaining cycles are cancelled. Soak cooldowns remain in effect for subsequent runs that apply Cycle and Soak.
 
 <hr class="double">
 
@@ -543,15 +567,17 @@ When associated zones overlap, master demand uses OR logic: the master remains a
 ### Built-in Sensors
 
 !!! note "Built-in vs. Expanded Sensors"
-    This section covers the controller's **built-in** sensor ports. For **analog sensors** connected via the **Sensor Expander** (such as temperature, soil moisture, light, etc.) and sensor-based program adjustment, see the dedicated [**Sensor Expander User Manual**](../sensor-expander.md).
+    This section covers the controller's **built-in** sensor ports. For analog readings through v4's built-in ports or the external **Sensor Expander**, and sensor-based program adjustment, see the [**Sensor Expander User Manual**](../sensor-expander.md).
 
-All supported controllers provide two independent built-in sensor ports (`SN1/SN2`). OpenSprinkler v3.4 and v4 provide two additional ports (`SN3/SN4`). Each port can be configured as **Rain**, **Soil** (binary output only), or **Program Switch**; and **Flow** is supported only on `SN1`.
+All supported controllers provide two independent built-in sensor ports (`SN1/SN2`). OpenSprinkler v3.4 and v4 provide two additional ports (`SN3/SN4`). Each port can be configured as **Rain**, **Soil** (binary output only), or **Program Switch**; and **Flow** is supported only on `SN1`. On **v4**, all four ports also support **Analog** mode.
 
 * **Connections:**
     * Connect the sensor's **two signal wires** to **GND** and an available sensor port of your choice (**SN1**–**SN4**).
     * Do **<u>NOT</u>** connect any signal wire to **COM** as it may damage the controller.
-    * **If a sensor needs +5V** (e.g. certain flow sensors), use **+5V** (VIN) port to supply it.
-    * **If a sensor needs 24VAC** power (e.g. wireless sensors), connect its **power wires** to **COM** and **GND** (AC-powered model only; DC/Latch models cannot provide 24VAC).
+    * **Sensor Power:**
+        * **If a sensor needs +5V**, use the **+5V** (VIN) terminal to provide it.
+        * **On v4 only: to get 3.3V supply voltage**, use the **middle pin of the RF transmitter header**, shown in [Hardware Interface](#hardware-interface).
+        * **On AC-powered model only: if the sensor needs 24VAC** (e.g. certain wireless sensors), connect its **power wires** to **COM** and **GND** (NOT applicable on DC/Latch models).
 
 * **Rain / Soil Sensors:** Automatically stop zone runs when rain or high soil moisture is detected.
     * Choose **Normally Open** or **Normally Closed**; Normally Closed is the most common type.
@@ -580,6 +606,10 @@ All supported controllers provide two independent built-in sensor ports (`SN1/SN
         * If higher precision is needed, scale the rate by a factor of `10`.
         * We recommend keeping `L/pulse` as the unit (even if the datasheet specifies gallons/pulse); the unit is for display only.
     * Due to software implementation, the flow **click frequency** should **NOT** exceed `50 Hz`, as higher frequencies may lead to inaccuracies.
+* <span class="hl">**Analog (v4 only):**</span> Set the port to **Analog**, then add an **Expanded Sensor** with the type **Onboard Analog** under **Edit Sensors**.
+    * No Sensor Expander is required.
+    * The built-in port can read **0–3.3 V**.
+    * A port cannot serve analog and digital sensors at the same time. Before changing an Analog port to another mode (including None), delete the conflicting Expanded Sensor configurations first, including disabled ones. See [Analog Sensor Setup](../sensor-expander.md#configure-other-sensor-types).
 
 ---
 
@@ -607,10 +637,24 @@ All supported controllers provide two independent built-in sensor ports (`SN1/SN
 
 ---
 
-### Advanced Settings
+### Network
 
 * **HTTP Port:** Change the device's HTTP port. Changing the port requires a restart. Default: `80` on OpenSprinkler v3 and v4, and `8080` on OSPi.
     * On OpenSprinkler v3 and v4, do **NOT** use `8080` as it's reserved for OTA firmware update.
+* **Hostname (v3/v4):** Set an easy-to-remember network name, such as `garden-os`, to access the controller at `http://garden-os`. Use up to 32 letters, digits, or hyphens, with no leading or trailing hyphen or all-numeric name. Leave empty to restore the default `os-xxxxxx`, where `xxxxxx` is the last six hexadecimal digits of the controller's Wi-Fi MAC address. A restart is required.
+* **Use DHCP:** Automatically obtains IP from your router using DHCP. Changing this option requires a restart.
+    * **Recommend keeping this option enabled**.
+    * If **fixed IP assignment** is preferred, use your router’s **DHCP reservation** (IP-to-Mac binding). Disable DHCP only if your router doesn't support DHCP reservation.
+    * If disabled, you MUST manually enter a **Static IP**, along with **Gateway, Subnet, DNS**. **All must be set correctly** for the controller to function properly.
+* **NTP Sync:** Automatically synchronizes the controller clock with an NTP server.
+    * To **manually adjust time**, disable this option, then the Device Time becomes editable.
+* **NTP IP Address:** Custom NTP server for time sync. Set to `0.0.0.0` to use system defaults.
+* **Device ID (where available):** Modifies the last byte of the controller's MAC address. A restart is required.
+
+---
+
+### Advanced Settings
+
 * **Undercurrent Threshold:** Triggers Undercurrent notification if a zone’s current draw (`mA`) falls below this threshold at the end of its run (e.g. due to broken wire or faulty solenoid). Default: `100 mA`.
     * The ideal value is half the typical holding current of your solenoid.
     * Set to `0` to disable this detection.
@@ -631,16 +675,9 @@ All supported controllers provide two independent built-in sensor ports (`SN1/SN
     * This option is shown only when the power supply supports PD, PPS, or AVS.
     * The **Actual Voltage** (shown beneath the option name) is the closest supported voltage your adapter can provide to match the target value.
 * **Latch On/Off Voltages (Latch model only):** Customize boost voltages (up to `24V`) for activating and deactivating latching solenoids. Default: `9V`.
-* **NTP IP Address:** Custom NTP server for time sync. Set to `0.0.0.0` to use system defaults.
 * **Ignore Password:** When enabled, accepts any device password (i.e. bypass password).
 * **Special Station Auto-Refresh:** Periodically resends commands to Virtual Stations (RF/Remote/HTTP) to keep them synchronized with the main controller.
     * Enable this when using Remote IP/OTC stations. Weather- and sensor-adjusted program runtimes may exceed 18 hours, but each remote `/cm` command remains capped at 18 hours for compatibility with older firmware. Without auto-refresh, the remote station will stop when that command expires even though the primary controller's schedule continues.
-* **NTP Sync:** Automatically synchronizes the controller clock with an NTP server.
-    * To **manually adjust time**, disable this option, then the Device Time becomes editable.
-* **Use DHCP:** Automatically obtains IP from your router using DHCP.
-    * **Recommend keeping this option enabled**.
-    * If **fixed IP assignment** is preferred, use your router’s **DHCP reservation** (IP-to-Mac binding). Disable DHCP only if your router doesn't support DHCP reservation.
-    * If disabled, you MUST manually enter a **Static IP**, along with **Gateway, Subnet, DNS**. **All must be set correctly** for the controller to function properly.
 
 
 ---
@@ -662,6 +699,7 @@ All supported controllers provide two independent built-in sensor ports (`SN1/SN
 Use Footer Menu → **Run-Once** (`Alt+R`) to manually start a **one-time** program. You can load preset run times from an existing program, quickly build a test program, or manually enter the run time of each station.
 
 * All relevant station attributes are applied (e.g. **Use Master**, **Sequential Group**, **Station Delay**, **Master On/Off Adjust**).
+* Each station's **Cycle and Soak** settings are applied when enabled.
 * If you set the program to **Repeat**, the system auto-creates a [**Single-Run Program**](#programs).
 * **Adjustment Option:**
     * **No Adjustment:** Use the entered run times as is.
@@ -713,13 +751,12 @@ Click **Add** ➕ in the upper-right corner to create a new program. Each progra
     * **Odd-day:** Run only on odd-numbered days (skips the 31st and Feb 29th).
     * **Even-day:** Run only on even-numbered days.
 
-<span class="hllight">**Station Water Times:**</span> Set run time per station, from `1` second to `64800` seconds (18 hours).<br>Also supports using **sunrise-to-sunset** or **sunset-to-sunrise** duration as the run time.
+<span class="hllight">**Station Water Times:**</span> Set run time per station, from `1` second to `64800` seconds (18 hours).<br>Also supports using **sunrise-to-sunset** or **sunset-to-sunrise** duration as the run time. When **Cycle and Soak** is enabled, the total water time (after adjustments) is split into cycles according to the station's settings.
 
 <span class="hllight">**Additional Start Times:**</span> Two options for extra start times / cycles:
 
 * **Fixed:** Up to 3 extra cycles at any specified times of the day.
-* **Repeating:** Repeat at regular intervals (e.g. every 45 minutes for 8 extra cycles).<br>Useful for splitting long watering durations into shorter cycles (*cycle and soak*).<br>
-Repeating start times may also extend overnight into the next day.
+* **Repeating:** Repeat at regular intervals (e.g. every 45 minutes for 8 extra cycles). Each repeat runs the program again; this is separate from per-station **Cycle and Soak**. Repeating start times may also extend overnight into the next day.
 
 ---
 
@@ -744,10 +781,10 @@ The [**Program Preview**](#program-preview) reflects all name annotations, allow
 
 <span class="hllight">**Reboot Annotation:**</span> Special program names to trigger automatic reboots at regular intervals:
 
-* `:>reboot`: Reboot when the controller becomes idle (no zones running).
+* `:>reboot`: Reboot when the controller becomes idle, after all queued watering finishes, including remaining Cycle and Soak cycles.
 * `:>reboot_now`: Immediate reboot, regardless of zone activity.
 
-Both actions are **delayed by one minute** from the scheduled start time to prevent immediate retriggering right after the reboot. At least one zone with a non-zero duration must be included when creating the program, though it will not actually run any zones. Example: a program named `:>reboot` starting daily at `2:00 AM` will reboot the controller at that time each day.
+Both actions are **delayed by one minute** from the scheduled start time to prevent immediate retriggering right after the reboot. At least one zone with a non-zero duration must be included when creating the program, though it will not actually run any zones. Example: a program named `:>reboot` starting daily at `2:00 AM` will reboot the controller shortly after `2:00 AM`, once idle.
 
 ---
 
@@ -760,6 +797,7 @@ To verify all programs are set correctly, use Footer Menu → **Preview Programs
 * **Today’s schedule** is shown by default; use the arrows ⬅️ / ➡️ to browse other days.
 * **Current time** is shown as a pink vertical line. You can **zoom** or **drag** the plot to view different time windows.
 * **Colored bars** represent each station's runtime and program name; clicking a bar opens the corresponding program editor.
+* Each zone's **Cycle and Soak** settings, when enabled, are reflected in the preview as separate watering cycles with soak gaps.
 * For a Bundle Station, only the bundle leader appears in the preview; its members do not appear as separate bars.
 
 
@@ -806,8 +844,9 @@ OpenSprinkler logs **Zone Activity**, **Rain Delays**, **Built-in Sensor Events*
 * Use the **Options** tab to select a start and end date (default: last 7 days).
     * For large datasets or slow loading, limit the range to a single day.
 * Click **Table** at the top to switch to a tabular view.
+* With **Cycle and Soak**, each watering cycle is logged individually.
 
-**NOTE:** Firmware 2.2.1(6) stores Sprinkler Logs in a compact, bounded binary ring.
+**NOTE:** Starting with firmware 2.2.1(6), Sprinkler Logs are stored in a compact, bounded binary ring.
 
 For details on the log data format and example scripts to export logs (e.g. as spreadsheets), refer to the [OpenSprinkler API documentation](221_7_api.md#get-sprinkler-log-data-jl).
 
