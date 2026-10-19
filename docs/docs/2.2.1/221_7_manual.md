@@ -1,15 +1,12 @@
 # Firmware 2.2.1(7) User Manual [Oct 30, 2026]
 
-!!! warning "Development Draft"
-    Firmware 2.2.1(7) is not yet released. This draft is copied from the 2.2.1(6) manual; feature descriptions, screenshots, and instructions have not yet been revised for (7). For the current released firmware, see the [2.2.1(6) User Manual](221_6_manual.md).
-
 ## Introduction
 
 **OpenSprinkler** is an open-source, web-based sprinkler/irrigation controller designed as a drop-in replacement for conventional sprinkler controllers that lack web connectivity. Its key benefits include an intuitive user interface, remote access, and smart weather-based watering control. It is ideal for homeowners and businesses in applications such as lawn and garden watering, plant irrigation, drip irrigation, hydroponics, etc.
 
 The OpenSprinkler hardware comes in two product families:
 
-* **OpenSprinkler v3 and v4** – Fully assembled controllers pre-loaded with firmware. Both feature built-in WiFi and support an optional wired Ethernet module. OpenSprinkler v3 is powered by an ESP8266 microcontroller, while v4 is powered by an ESP32-C6. OpenSprinkler v3.0-3.3 provides two independent sensor ports; v3.4 and v4 provide four.
+* **OpenSprinkler v3 and v4** – Fully assembled controllers pre-loaded with firmware. Both feature built-in WiFi and support an optional wired Ethernet module. OpenSprinkler v3 is powered by an ESP8266 microcontroller, while v4 is powered by an ESP32-C6. OpenSprinkler v3.0-3.3 provides two independent sensor ports; v3.4 and v4 provide four. On v4, these ports also support analog readings.
 * **OpenSprinkler Pi (OSPi)** – Powered by a Raspberry Pi (RPi), requiring some assembly (such as connecting the RPi) and firmware installation.
 
 Each controller provides 8 zones, with expansion possible via Zone Expanders (each adding 16 zones): **OpenSprinkler v3 and v4** support up to **72** zones, and **OSPi** supports up to **200** zones.
@@ -22,21 +19,20 @@ In addition, OpenSprinkler v3 is available in three power models (*v4 is current
 
 <hr class="double">
 
-## Features Introduced in Firmware 2.2.1(6)
+## Features Introduced in Firmware 2.2.1(7)
 
-* **OpenSprinkler v4 Support:** Adds support for the new v4 hardware, built around the ESP32-C6.
-* [**Bundle Stations:**](#station-type) A physical zone can act as a Bundle Station and activate any selected set of additional Standard zones together. This makes it easier to run several valves at the same time while scheduling multiple bundles in sequence.
-* [**Weather Sensor:**](../sensor-expander.md#configure-other-sensor-types) Expanded Sensors can now use weather values such as current conditions, today's forecast, previous-day observations, and reference evapotranspiration (ETo). These values can be displayed, logged, and used to adjust program watering.
-* [**Bounded Sprinkler Log Storage:**](#sprinkler-logs) Sprinkler Logs now use a compact, fixed-size storage area, preventing them from gradually consuming all available storage.
-* [**One-Click Firmware Updates:**](../firmware-update.md#one-click-firmware-update) Firmware 2.2.1(6) introduces one-click updates for OpenSprinkler v3 and v4. The controller can check for compatible releases and install them from its local update page, while manual firmware upload remains available when needed.
+* **Cycle and Soak:** Automatically splits a zone's watering time into cycles with soak periods, helping water absorb into the soil and reducing runoff. The maximum cycle time and minimum soak time can be individually configured for each zone.
+* [**Onboard Analog Sensors (v4 only):**](../sensor-expander.md#configure-other-sensor-types) Reads analog sensors directly through SN1–SN4, without a Sensor Expander. Readings can be displayed, logged, and used for program adjustments.
+* **CH390 Wired Ethernet Support:** Adds support for CH390 wired Ethernet modules for OpenSprinkler v3 and v4.
+* **Hostname:** Lets you access an OpenSprinkler v3 or v4 controller by an easy-to-remember name instead of its IP address, even when the IP changes.
 
 <hr class="double">
 
 ## Hardware Interface
 
-### OpenSprinkler v3.4 and v4 {: .hltitle}
+### OpenSprinkler v4 and v3.4 {: .hltitle}
 
-![OpenSprinkler v3.4 and v4](images/os34_hardware_interface_new.jpg)
+![OpenSprinkler v4 and v3.4](images/os34_hardware_interface_new.jpg)
 
 <hr>
 
@@ -95,7 +91,7 @@ Carefully label and remove wires from your existing sprinkler controller as you 
 * A **COM (common) wire**
 * One or more **Zone wires**
 * (Optionally) A **Master Zone / Pump Start Relay** wire
-* (Optionally) Wires for digital sensors such as **Rain / Soil / Flow Sensor**
+* (Optionally) Wires for **Rain / Soil / Flow Sensors**, or analog sensors on v4
 
 ---
 
@@ -115,10 +111,9 @@ OpenSprinkler uses **removable terminal blocks** for easy wiring. To detach a bl
 * **OpenSprinkler v3.0-3.3 DC and Latch:** Insert the DC adapter into the **Black** barrel jack.
     * Note the **COM** terminal is <span class="hl_red">**positive(+)**</span>. If your valve wires are polarized, positive goes to COM, and negative goes to a zone.
 
-
 **Built-in Sensor Ports:**
 
-These instructions apply to digital sensors connected directly to the main controller's built-in sensor ports. For analog sensors, refer to the [**Sensor Expander User Manual**](../sensor-expander.md).
+The built-in ports (SN1–SN4) support digital sensors such as rain, soil, and flow sensors. **On v4**, they also support **analog readings** (0–3.3 V). Instructions for setting up analog sensors, including using the external Sensor Expander, can be found in the [**Sensor Expander User Manual**](../sensor-expander.md).
 
 * Connect each sensor's signal wire to an available sensor port and its ground wire to **GND**. All supported controllers provide **SN1** and **SN2**; OpenSprinkler v3.4 and v4 additionally provide **SN3** and **SN4**.
     * OpenSprinkler uses **GND** (NOT COM) as the common terminal for sensor inputs. **DO NOT** connect sensor signal wires to **COM**.
@@ -162,13 +157,13 @@ Detailed compatibility, wiring, and software configuration instructions are avai
 
 **Wired Ethernet (OpenSprinkler v3.2-3.4 and v4)**
 
+Use a compatible module: **ENC28J60** for **v3.2**; and **W5500** or **CH390** for **v3.3-3.4 and v4**.
+
 * **Power off** the main controller.
 * **OpenSprinkler v3.4 and v4:** Firmly plug the ribbon cable connector into the port on the controller marked **Ether** (it's on the **right** side of the controller).
     * Do **NOT** plug into the port marked **Expander** — that's for expanders ONLY!
     ![Wired Ether](images/os33_wired_ether.png){ .img-shadow style="float: right; margin: 5px 5px 5px 5px;"}
-
-<span class="vsp2"></span>
-
+    * The connector is **keyed**: its raised bump should match the notch in the receptacle. Do **NOT** force it in backwards.
 * **OpenSprinkler v3.2-3.3:** Firmly plug the ribbon cable connector into the Ethernet module as shown on the right (keyed; only one way to fit).
 * Plug an RJ45 Ethernet cable from your network to the module.
 * Power on the controller. It will detect the network and connect automatically.
@@ -219,12 +214,12 @@ All settings will be cleared and returned to factory defaults.
 * When no zones are running, a `(System Idle)` message is shown at the top.
 * When the controller is in **Remote Extension** mode, a radar icon 📡 is shown.
 * When **Pause Queue** or **Rain Delay** is active, a clock icon 🕒 is shown.
-* If a **Built-in Sensor** is configured, a letter is shown to indicate its type. All supported controllers display **SN1** and **SN2**; OpenSprinkler v3.4 and v4 additionally display **SN3** and **SN4**.
-    * `r`: Rain sensor
-    * `s`: Soil sensor
-    * `p`: Program switch
-    * `f`: Flow sensor (SN1 only)
-    * An activated rain sensor is shown as 🌧️, and active soil sensor as 💧.
+* If a **Built-in Sensor** is configured, a letter or icon is shown to indicate its type. All supported controllers display **SN1** and **SN2**; OpenSprinkler v3.4 and v4 additionally display **SN3** and **SN4**.
+    * `r`: rain sensor; changes to a rain icon 🌧️ when activated.
+    * `s`: soil sensor; changes to a moisture icon 💧 when activated.
+    * `p`: program switch
+    * `f`: flow sensor (SN1 only); changes to a wave icon ≋ when flow pulses are detected.
+    * `a`: analog input (v4 only).
 
 **While the controller is running, buttons perform the following functions:**
 
@@ -271,6 +266,7 @@ OpenSprinkler’s web interface works on phones, tablets, and computers, enablin
 * <span class="hl">The default device password is **opendoor**</span>. For security, change it upon first use.
 * When using the OpenSprinkler mobile app, choose **Manually Add a Device**. Type in a custom name, and enter the device IP and password.
 * Using the IP to access the controller works as long as you are on the same local network.
+* On **OpenSprinkler v3 and v4**, set a custom **hostname** under **Edit Options → Network → Hostname**, such as `garden-os`. You can then access the controller at `http://garden-os` instead of using its IP address.
 
 ---
 

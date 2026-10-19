@@ -936,6 +936,7 @@ void OpenSprinkler::begin() {
 	lcd.createChar(ICON_RAINDELAY, _iconimage_raindelay);
 	lcd.createChar(ICON_RAIN, _iconimage_rain);
 	lcd.createChar(ICON_SOIL, _iconimage_soil);
+	lcd.createChar(ICON_FLOW, _iconimage_flow);
 #endif
 
 #if defined(ARDUINO)
@@ -2983,10 +2984,13 @@ void OpenSprinkler::lcd_print_screen(char c) {
 				lcd.write(sn_sensors[i].active?ICON_SOIL:(sn_sensors[i].raw?'S':'s'));
 				break;
 			case SENSOR_TYPE_FLOW:
-				lcd.write(flowcount_rt>0?'F':'f');
+				lcd.write(flowcount_rt>0?ICON_FLOW:'f');
 				break;
 			case SENSOR_TYPE_PSWITCH:
 				lcd.write(sn_sensors[i].raw?'P':'p');
+				break;
+			case SENSOR_TYPE_ANALOG:
+				lcd.write('a');
 				break;
 			default:
 				lcd.write(' ');
