@@ -25,17 +25,18 @@ public:
 	bool is_ch390() const { return _controller == EthernetController::CH390; }
 	bool ch390_diagnostics(CH390Diagnostics& diagnostics) const;
 	bool service_ch390();
+	void end();
 
 	bool config(const IPAddress& local_ip, const IPAddress& gateway,
 		const IPAddress& subnet, const IPAddress& dns);
 
 #if defined(ESP8266)
+	bool raw_begin(const uint8_t* mac_address);
 	bool begin(const uint8_t* mac_address);
 	bool fault_pending() const;
 	bool health_check();
 	bool raw_reinit();
 #elif defined(ESP32)
-	void end();
 #if defined(OS_ETH_DIAGNOSTICS)
 	void diagnostic_poll();
 #endif

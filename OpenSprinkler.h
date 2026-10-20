@@ -486,7 +486,7 @@ public:
 	static String wifi_ssid, wifi_pass;
 	static unsigned char wifi_bssid[6], wifi_channel;
 	static void config_ip();
-	static void save_wifi_ip();
+	static void save_network_ip();
 	static void reset_to_ap();
 	static unsigned char state;
 	static void setup_pd_voltage();

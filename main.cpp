@@ -773,7 +773,7 @@ void do_loop()
 			led_blink_ms = 0;
 			os.set_screen_led(LOW);
 			os.lcd.clear();
-			os.save_wifi_ip();
+			os.save_network_ip();
 			start_server_client();
 			os.state = OS_STATE_CONNECTED;
 			connecting_timeout = 0;
@@ -837,7 +837,7 @@ void do_loop()
 			led_blink_ms = 0;
 			os.set_screen_led(LOW);
 			os.lcd.clear();
-			os.save_wifi_ip();
+			os.save_network_ip();
 			start_server_client();
 			os.state = OS_STATE_CONNECTED;
 			connecting_timeout = 0;
@@ -941,6 +941,11 @@ void do_loop()
 
 	// The main control loop runs once every second
 	if (curr_time != last_time) {
+		#if defined(ARDUINO)
+		// DHCP renewal need not disconnect either interface. Save only changes,
+		// here in the main loop rather than in a network-stack event callback.
+		os.save_network_ip();
+		#endif
 
 		#if defined(ESP8266)
 		if(os.hw_rev>=2) {

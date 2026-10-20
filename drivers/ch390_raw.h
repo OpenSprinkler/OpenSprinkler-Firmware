@@ -63,8 +63,8 @@ class CH390Raw {
   CH390Health _health = {};
 };
 
-#include <LwipIntfDev.h>
-using CH390lwIP = LwipIntfDev<CH390Raw>;
+#include "drivers/ethernet_lifecycle.h"
+using CH390lwIP = ManagedEthernet<CH390Raw>;
 
 #endif // ESP8266
 #endif // ARDUINO

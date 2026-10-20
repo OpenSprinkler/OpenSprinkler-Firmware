@@ -677,7 +677,7 @@ void server_json_controller_main(OTF_PARAMS_DEF) {
 	}
 
 #if defined(ARDUINO)
-	bfill.emit_p(PSTR("\"RSSI\":$D,"), (int16_t)WiFi.RSSI());
+	if (!useEth) bfill.emit_p(PSTR("\"RSSI\":$D,"), (int16_t)WiFi.RSSI());
 	bfill.emit_p(PSTR("\"apdv\":$D,"), os.actual_pd_voltage);
 #endif
 

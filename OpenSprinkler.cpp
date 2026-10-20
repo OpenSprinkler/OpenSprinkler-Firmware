@@ -511,13 +511,6 @@ unsigned char OpenSprinkler::start_ether() {
 	lcd_print_line_clear_pgm(PSTR(""), 2);
 	if (eth.connected()) {
 		eth.setDefault();
-		if (iopts[IOPT_USE_DHCP]) {
-			memcpy(iopts + IOPT_STATIC_IP1, &(eth.localIP()[0]), 4);
-			memcpy(iopts + IOPT_GATEWAY_IP1, &(eth.gatewayIP()[0]), 4);
-			memcpy(iopts + IOPT_DNS_IP1, &(eth.dnsIP()[0]), 4);
-			memcpy(iopts + IOPT_SUBNET_MASK1, &(eth.subnetMask()[0]), 4);
-			iopts_save();
-		}
 		return 1;
 	}
 	if (iopts[IOPT_FORCE_WIRED]) return 1;
@@ -598,18 +591,49 @@ unsigned char OpenSprinkler::start_ether() {
 	}
 
 	load_hardware_mac((uint8_t*)tmp_buffer, true);
+	// Test the PHY before registering an lwIP interface.
+	// Otherwise an unplugged module leaves a live DHCP client after Wi-Fi fallback.
+	if (!eth.raw_begin((uint8_t*)tmp_buffer)) {
+		eth.end();
+		return 0;
+	}
+	lcd_print_line_clear_pgm(PSTR("Start wired link"), 1);
+	lcd_print_line_clear_pgm(eth.is_ch390() ? PSTR("  [ch390]    ") :
+		eth.is_w5500() ? PSTR("  [w5500]    ") : PSTR(" [enc28j60]  "), 2);
+	uint32_t link_timeout = millis() + 10000UL;
+	uint32_t next_link_count = millis();
+	uint8_t link_timecount = 1;
+	while (!eth.linkUp() && (int32_t)(millis() - link_timeout) < 0) {
+		if ((int32_t)(millis() - next_link_count) >= 0) {
+			lcd.setCursor(13, 2);
+			lcd.print(link_timecount++);
+			next_link_count += 1000UL;
+		}
+		delay(100);
+	}
+	lcd.setCursor(13, 2);
+	lcd.print(F("   "));
+	if (!eth.linkUp() && !iopts[IOPT_FORCE_WIRED]) {
+		eth.end();
+		return 0;
+	}
+	// Full begin reinitializes the chip. Keep the existing DHCP timeout to
+	// accommodate renegotiation, including forced wired boots without a cable.
 	if (iopts[IOPT_USE_DHCP]==0) { // config static IP before calling eth.begin
 		IPAddress staticip(iopts+IOPT_STATIC_IP1);
 		IPAddress gateway(iopts+IOPT_GATEWAY_IP1);
 		IPAddress dns(iopts+IOPT_DNS_IP1);
 		IPAddress subn(iopts+IOPT_SUBNET_MASK1);
-		eth.config(staticip, gateway, subn, dns);
+		if (!eth.config(staticip, gateway, subn, dns)) {
+			eth.end();
+			return 0;
+		}
 	}
 	eth.setDefault();
-	if(!eth.begin((uint8_t*)tmp_buffer))	return 0;
-	lcd_print_line_clear_pgm(PSTR("Start wired link"), 1);
-	lcd_print_line_clear_pgm(eth.is_ch390() ? PSTR("  [ch390]    ") :
-		eth.is_w5500() ? PSTR("  [w5500]    ") : PSTR(" [enc28j60]  "), 2);
+	if (!eth.begin((uint8_t*)tmp_buffer)) {
+		eth.end();
+		return 0;
+	}
 
 	uint32_t timeout = millis()+60000; // 60 seconds time out
 	unsigned char timecount = 1;
@@ -621,20 +645,9 @@ unsigned char OpenSprinkler::start_ether() {
 		timecount++;
 	}
 	lcd_print_line_clear_pgm(PSTR(""), 2);
-	if(eth.connected()) {
-		// if wired connection is successful at this point, copy the network ips to config
-		if (iopts[IOPT_USE_DHCP]) {
-			memcpy(iopts+IOPT_STATIC_IP1, &(eth.localIP()[0]), 4);
-			memcpy(iopts+IOPT_GATEWAY_IP1, &(eth.gatewayIP()[0]),4);
-			memcpy(iopts+IOPT_DNS_IP1, &(eth.dnsIP()[0]), 4);
-			memcpy(iopts+IOPT_SUBNET_MASK1, &(eth.subnetMask()[0]), 4);
-			iopts_save();
-		}
-		return 1;
-	} else {
-		// if wired connection has failed at this point, return depending on whether the user wants to force wired
-		return (iopts[IOPT_FORCE_WIRED] ? 1 : 0);
-	}
+	if (eth.connected() || iopts[IOPT_FORCE_WIRED]) return 1;
+	eth.end();
+	return 0;
 	#endif
 }
 
@@ -3447,15 +3460,23 @@ void OpenSprinkler::config_ip() {
 	}
 }
 
-void OpenSprinkler::save_wifi_ip() {
-	// todo: handle wired ethernet
-	if(iopts[IOPT_USE_DHCP] && WiFi.status() == WL_CONNECTED) {
-		memcpy(iopts+IOPT_STATIC_IP1, &(WiFi.localIP()[0]), 4);
-		memcpy(iopts+IOPT_GATEWAY_IP1, &(WiFi.gatewayIP()[0]),4);
-		memcpy(iopts+IOPT_DNS_IP1, &(WiFi.dnsIP()[0]), 4);
-		memcpy(iopts+IOPT_SUBNET_MASK1, &(WiFi.subnetMask()[0]), 4);
-		iopts_save();
-	}
+void OpenSprinkler::save_network_ip() {
+	if (!iopts[IOPT_USE_DHCP]) return;
+	if (useEth ? !eth.connected() : WiFi.status() != WL_CONNECTED) return;
+	IPAddress ip = useEth ? eth.localIP() : WiFi.localIP();
+	if ((uint32_t)ip == 0 || (ip[0] == 169 && ip[1] == 254)) return; // Skip outages and AutoIP.
+	IPAddress gateway = useEth ? eth.gatewayIP() : WiFi.gatewayIP();
+	IPAddress dns_ip = useEth ? eth.dnsIP() : WiFi.dnsIP();
+	IPAddress subnet = useEth ? eth.subnetMask() : WiFi.subnetMask();
+	if (!memcmp(iopts + IOPT_STATIC_IP1, &ip[0], 4) &&
+		!memcmp(iopts + IOPT_GATEWAY_IP1, &gateway[0], 4) &&
+		!memcmp(iopts + IOPT_DNS_IP1, &dns_ip[0], 4) &&
+		!memcmp(iopts + IOPT_SUBNET_MASK1, &subnet[0], 4)) return;
+	memcpy(iopts + IOPT_STATIC_IP1, &ip[0], 4);
+	memcpy(iopts + IOPT_GATEWAY_IP1, &gateway[0], 4);
+	memcpy(iopts + IOPT_DNS_IP1, &dns_ip[0], 4);
+	memcpy(iopts + IOPT_SUBNET_MASK1, &subnet[0], 4);
+	iopts_save();
 }
 
 void OpenSprinkler::detect_expanders() {

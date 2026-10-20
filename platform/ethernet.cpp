@@ -17,7 +17,26 @@ OSWiznet5500lwIP w5500(PIN_ETHER_CS);
 
 namespace {
 
-ENC28J60lwIP enc28j60(PIN_ETHER_CS);
+// The core ENC28J60 driver has no end(). ECON1 is common to all banks;
+// clear RXEN using Bit Field Clear without changing the driver's bank cache.
+class StoppableENC28J60 : public ENC28J60 {
+public:
+	StoppableENC28J60(int8_t cs, SPIClass& spi = SPI, int8_t intr = -1)
+		: ENC28J60(cs, spi, intr), cs_(cs), spi_(spi) {}
+	void end() {
+		spi_.beginTransaction(SPISettings(20000000, MSBFIRST, SPI_MODE0));
+		digitalWrite(cs_, LOW);
+		spi_.transfer(0xa0 | 0x1f);
+		spi_.transfer(0x04);
+		digitalWrite(cs_, HIGH);
+		spi_.endTransaction();
+	}
+private:
+	int8_t cs_;
+	SPIClass& spi_;
+};
+
+ManagedEthernet<StoppableENC28J60> enc28j60(PIN_ETHER_CS);
 CH390lwIP ch390(PIN_ETHER_CS);
 
 } // namespace
@@ -339,13 +358,31 @@ bool WiredEthernet::ch390_diagnostics(CH390Diagnostics& out) const {
 
 bool WiredEthernet::service_ch390() {
 #if defined(ESP8266)
-	return is_ch390() && ch390.service();
+	return is_ch390() && ch390.active() && ch390.service();
 #else
 	return false; // ESP32 services recovery inside the serialized MAC worker.
 #endif
 }
 
 #if defined(ESP8266)
+bool WiredEthernet::raw_begin(const uint8_t* mac_address) {
+	switch (_controller) {
+	case EthernetController::ENC28J60: return enc28j60.raw_begin(mac_address);
+	case EthernetController::W5500: return w5500.raw_begin(mac_address);
+	case EthernetController::CH390: return ch390.raw_begin(mac_address);
+	default: return false;
+	}
+}
+
+void WiredEthernet::end() {
+	switch (_controller) {
+	case EthernetController::ENC28J60: enc28j60.end(); break;
+	case EthernetController::W5500: w5500.end(); break;
+	case EthernetController::CH390: ch390.end(); break;
+	default: break;
+	}
+}
+
 bool WiredEthernet::begin(const uint8_t* mac_address) {
 	// The core's begin() starts DHCP itself; assign its netif name beforehand.
 	// getNetIf exposes a const view, but these are our mutable driver instances.
@@ -364,15 +401,15 @@ bool WiredEthernet::begin(const uint8_t* mac_address) {
 }
 
 bool WiredEthernet::fault_pending() const {
-	return is_w5500() && w5500.faultPending();
+	return is_w5500() && w5500.active() && w5500.faultPending();
 }
 
 bool WiredEthernet::health_check() {
-	return !is_w5500() || w5500.healthCheck();
+	return !is_w5500() || (w5500.active() && w5500.healthCheck());
 }
 
 bool WiredEthernet::raw_reinit() {
-	return is_w5500() && w5500.reinitialize();
+	return is_w5500() && w5500.active() && w5500.reinitialize();
 }
 #elif defined(ESP32)
 #if defined(OS_ETH_DIAGNOSTICS)
