@@ -607,7 +607,7 @@ All supported controllers provide two independent built-in sensor ports (`SN1/SN
         * Used to convert flow pulse count to actual water volume.
         * Precision is limited to **2 decimal places** (additional decimals discarded).
         * If higher precision is needed, scale the rate by a factor of `10`.
-        * We recommend keeping `L/pulse` as the unit (even if the datasheet specifies gallons/pulse); the unit is for display only.
+        * We recommend keeping `L/pulse` as the unit (even if the datasheet specifies gallons/pulse).
     * Due to software implementation, the flow **click frequency** should **NOT** exceed `50 Hz`, as higher frequencies may lead to inaccuracies.
 * <span class="hl">**Analog (v4 only):**</span> Set the port to **Analog**, then add an **Expanded Sensor** with the type **Onboard Analog** under **Edit Sensors**.
     * No Sensor Expander is required.
