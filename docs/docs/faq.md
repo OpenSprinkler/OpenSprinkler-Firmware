@@ -293,7 +293,7 @@ Typically you connect the controller to a router (WiFi or Ethernet). However, wi
 
 **Q: How do I access OpenSprinkler?**
 <br>
-OpenSprinkler has a built-in web interface that works with any modern desktop or mobile browser. Simply type the controller's IP address into your browser. On v3/v4, you can also use a hostname configured under **Edit Options → Network → Hostname**, such as `http://garden-os`. We also provide a free OpenSprinkler mobile app (for iOS, Android, and macOS).
+OpenSprinkler has a built-in web interface that works with any modern desktop or mobile browser. Simply type the controller's IP address into your browser. On v3/v4, you can also use a hostname configured under **Edit Options → Network → Hostname**, such as `http://garden-os` (some routers require `http://garden-os.lan/`). We also provide a free OpenSprinkler mobile app (for iOS, Android, and macOS).
 
 For remote access, configure an **OTC (OpenThings Cloud)** token in the settings.
 

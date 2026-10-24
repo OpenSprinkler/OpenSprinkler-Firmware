@@ -266,7 +266,7 @@ OpenSprinkler’s web interface works on phones, tablets, and computers, enablin
 * <span class="hl">The default device password is **opendoor**</span>. For security, change it upon first use.
 * When using the OpenSprinkler mobile app, choose **Manually Add a Device**. Type in a custom name, and enter the device IP and password.
 * Using the IP to access the controller works as long as you are on the same local network.
-* On **OpenSprinkler v3 and v4**, set a custom **hostname** under **Edit Options → Network → Hostname**, such as `garden-os`. You can then access the controller at `http://garden-os` instead of using its IP address.
+* On **OpenSprinkler v3 and v4**, set a custom **hostname** under **Edit Options → Network → Hostname**, such as `garden-os`. You can then access the controller at `http://garden-os` instead of using its IP address. Some routers require the `.lan` suffix, for example `http://garden-os.lan/`.
 
 ---
 
@@ -332,19 +332,28 @@ The footer may also display:
 
 Each zone (station) is shown as a card. Tap the circular icon showing the station's sequential group next to its name to open its **Attributes** dialog.
 
-![Station cards and the Basic and Output attribute tabs](images/station_attributes_types_2217.jpg){: .img-shadow}
+![Station cards and the Basic and Options attribute tabs](images/station_attributes_types_2217.jpg){: .img-shadow}
 
 **Basic Tab:**
 
 * **Station Name:** A custom name (up to 32 characters).<br>
 **Annotation:** If a flow sensor is enabled (see [Sensor Setup](#built-in-sensors)) and the last 5 characters represent a numerical value, a **Flow Alert** notification will trigger when the flow rate exceeds this value after the zone finishes. Example: station name is **Front Yard 1.357**, a flow alert will trigger if the flow rate `>1.357` after the zone finishes.
+* **Cycle and Soak:** Enable cycling and set the **Maximum cycle** and **Minimum soak**, in minutes. See [Cycle and Soak](#cycle-and-soak) below.
+* **Sequential Group:** Assign the zone to a **Sequential** group (`A-D`) or the **Parallel** (`P`) group. The zone's group label appears next to its name on the homepage.
+    * By default, all zones belong to **group A**.
+    * Zones in the same sequential group run in sequence; zones in different groups can run simultaneously.
+    * Parallel (P) zones can run alongside any other zones.
+* **Station Notes & Image:** Add station notes and a photo (see [Cloud-Synced Features](#cloud-synced-features)).
+
+**Options Tab:**
+
+* **Use Masters:** Select which configured Masters should activate when this zone runs. If Master 1 is configured, Use Master 1 is checked by default; additional masters are unchecked by default.
+* **Activate Relay:** Activate the controller's relay when this zone runs (if supported).
 * **Ignore Rain/SN1-SN4:** Each option lets the zone bypass rain delay or the corresponding built-in sensor. Unchecked by default. (*SN3/SN4 are available only on OpenSprinkler v3.4 and v4*).
 * **Disable:** Disable and hide this zone. To unhide, use the [Footer Menu](#footer-menu).
-* **Image & Notes:** Add a station photo and notes (see [Cloud-Synced Features](#cloud-synced-features)).
 
 **Output Tab:**
 
-* **Use Masters:** Select which configured Masters should activate when this zone runs. If Master 1 is configured, Use Master 1 is checked by default; additional masters are unchecked by default.
 * <span id="station-type"></span>**Station Type:** Configure special properties for a zone.
     * <span class="hllight">**Standard**</span> (default): Regular sprinkler zone.
     * <span class="hllight">**RF:**</span> Controls remote RF (Radio Frequency) power sockets via an external transmitter (requires [RFToy](https://opensprinkler.com/product/rftoy/) for code learning), allowing you to switch powerline devices such as Christmas lights, heaters, pumps.
@@ -367,17 +376,11 @@ Each zone (station) is shown as a card. Tap the circular icon showing the statio
     * **SP:** Fallback for an unrecognized special-station type
     * **No badge:** Standard station (neither a special station nor a bundle member)
 
-**Watering Tab:**
-
-* **Sequential Group:** Assign the zone to a **Sequential** group (`A-D`) or the **Parallel** (`P`) group. The zone's group label appears next to its name on the homepage.
-    * By default, all zones belong to **group A**.
-    * Zones in the same sequential group run in sequence; zones in different groups can run simultaneously.
-    * Parallel (P) zones can run alongside any other zones.
-* **Cycle and Soak:** Enable cycling and set the **Maximum cycle** and **Minimum soak**, in minutes. See [Cycle and Soak](#cycle-and-soak) below.
-
 <hr>
 
 #### Bundle Stations
+
+![Bundle Station configuration in the Output tab](images/bundle_station_2217.jpg){ .img-center .img-shadow width="250" }
 
 A **Bundle Station** behaves like several physical zone wires bundled together into one logical zone. Starting the bundle leader activates its own output and every selected member in its configuration.
 
@@ -396,9 +399,9 @@ To reduce simultaneous solenoid inrush current, new physical outputs are activat
 
 #### Cycle and Soak {: .hltitle}
 
-![Cycle and Soak settings in the Watering tab and circular-arrow indicators on station cards](images/cycle_and_soak_2217.jpg){ .img-center .img-shadow .img-two-thirds }
+![Cycle and Soak settings in the Basic tab and circular-arrow indicators on station cards](images/cycle_and_soak_2217.jpg){ .img-center .img-shadow .img-two-thirds }
 
-**Cycle and Soak** splits a zone's water time into balanced cycles, each no longer than its **Maximum cycle**, separated by at least its **Minimum soak**. For example, 17 minutes total with a 5-minute maximum cycle becomes 4 cycles, each 4 minutes 15 seconds. Both settings accept **1–240 minutes**. You can enable it for each station individually via its **Watering** tab. Enabled zones show a circular arrow around their group indicator on the homepage (see the right image above).
+**Cycle and Soak** splits a zone's water time into balanced cycles, each no longer than its **Maximum cycle**, separated by at least its **Minimum soak**. For example, 17 minutes total with a 5-minute maximum cycle becomes 4 cycles, each 4 minutes 15 seconds. Both settings accept **1–240 minutes**. You can enable it for each station individually via its **Basic** tab. Enabled zones show a circular arrow around their group indicator on the homepage (see the right image above).
 
 
 * Other zones can run during a soak. Scheduling may make the gap longer than the minimum.
@@ -641,7 +644,7 @@ All supported controllers provide two independent built-in sensor ports (`SN1/SN
 
 * **HTTP Port:** Change the device's HTTP port. Changing the port requires a restart. Default: `80` on OpenSprinkler v3 and v4, and `8080` on OSPi.
     * On OpenSprinkler v3 and v4, do **NOT** use `8080` as it's reserved for OTA firmware update.
-* **Hostname (v3/v4):** Set an easy-to-remember network name, such as `garden-os`, to access the controller at `http://garden-os`. Use up to 32 letters, digits, or hyphens, with no leading or trailing hyphen or all-numeric name. Leave empty to restore the default `os-xxxxxx`, where `xxxxxx` is the last six hexadecimal digits of the controller's Wi-Fi MAC address. A restart is required.
+* **Hostname (v3/v4):** Set an easy-to-remember network name, such as `garden-os`, to access the controller at `http://garden-os` (some routers require `http://garden-os.lan/`). Enter only the hostname, without `.lan`. Use up to 32 letters, digits, or hyphens, with no leading or trailing hyphen or all-numeric name. Leave empty to restore the default `os-xxxxxx`, where `xxxxxx` is the last six hexadecimal digits of the controller's Wi-Fi MAC address. A restart is required.
 * **Use DHCP:** Automatically obtains IP from your router using DHCP. Changing this option requires a restart.
     * **Recommend keeping this option enabled**.
     * If **fixed IP assignment** is preferred, use your router’s **DHCP reservation** (IP-to-Mac binding). Disable DHCP only if your router doesn't support DHCP reservation.
