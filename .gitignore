@@ -20,6 +20,7 @@ __pycache__/
 *.json
 !package.json
 !package-lock.json
+!external/ch390/library.json
 !tests/fixtures/updater-release-notes.json
 .DS_Store
 testmode.h
