@@ -978,6 +978,31 @@ def check_cycle_runtime(server):
     print("PASS cycle/soak runtime admission integration")
 
 
+def check_program_daterange_defaults(server):
+    # /cp reuses one program buffer; a request without from/to must get the
+    # default date range, not the previous request's dates.
+    packed = json.dumps([0, 127, 0, [0, 0, 0, 0], [60, 0, 0, 0, 0, 0, 0, 0]], separators=(",", ":"))
+    first = server.get_json("jp")["nprogs"]
+    try:
+        assert server.get_json("cp", {"pid": -1, "v": packed, "name": "Range default"})["result"] == 1
+        assert server.get_json("cp", {"pid": -1, "v": packed, "name": "Range set",
+                                      "from": 2 * 32 + 5, "to": 11 * 32 + 20})["result"] == 1
+        assert server.get_json("cp", {"pid": -1, "v": packed, "name": "Range after"})["result"] == 1
+        assert server.get_json("cp", {"pid": first + 1, "v": packed, "name": "Range set",
+                                      "from": 3 * 32 + 1, "to": 4 * 32 + 1})["result"] == 1
+        assert server.get_json("cp", {"pid": first, "v": packed, "name": "Range modified"})["result"] == 1
+        programs = server.get_json("jp")["pd"]
+        default_range = programs[first][6][1:]
+        assert programs[first + 1][6][1:] == [3 * 32 + 1, 4 * 32 + 1], programs[first + 1]
+        assert programs[first + 2][6][1:] == default_range, programs[first + 2]
+        assert programs[first][6][1:] == default_range, programs[first]
+        assert default_range != [3 * 32 + 1, 4 * 32 + 1], default_range
+    finally:
+        while server.get_json("jp")["nprogs"] > first:
+            server.get_json("dp", {"pid": first})
+    print("PASS /cp date range defaults")
+
+
 def check_atomic_admission(server):
     # Long durations keep this independent of wall-clock progress while filling
     # the production Linux queue to its 255-slot boundary.
@@ -1137,6 +1162,8 @@ def main():
         check_cycle_runtime(server)
     with DemoServer(binary, args.port) as server:
         check_atomic_admission(server)
+    with DemoServer(binary, args.port) as server:
+        check_program_daterange_defaults(server)
 
 
 if __name__ == "__main__":

@@ -40,6 +40,7 @@
 #include "api/commands.h"
 #include "platform/tls_heap_probe.h"
 #include "platform/hostname.h"
+#include <new>
 
 // External variables defined in main ion file
 extern OTF::OpenThingsFramework *otf;
@@ -317,7 +318,13 @@ void server_change_program(OTF_PARAMS_DEF) {
 
 	unsigned char i;
 
-	ProgramStruct prog;
+	// Static keeps this ~200-byte struct off the ESP8266 loop stack, which is
+	// tightest under this handler's flash writes. Handlers never run
+	// concurrently. Reset it every request so omitted fields (e.g. daterange)
+	// take their defaults instead of the previous request's values; construct
+	// in place, since assigning ProgramStruct() puts a temporary on the stack.
+	static ProgramStruct prog;
+	new (&prog) ProgramStruct();
 
 	// parse program index
 	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("pid"), true)) handle_return(HTML_DATA_MISSING);
