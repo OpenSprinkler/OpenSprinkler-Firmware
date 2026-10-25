@@ -12,6 +12,7 @@ static void check_sensor_pins(ProfileId id, uint8_t count, uint8_t sn1,
 	assert(active().pins.sensors[1] == sn2);
 	assert(active().pins.sensors[2] == sn3);
 	assert(active().pins.sensors[3] == sn4);
+	assert(active().analog_sensor_mask == (id == PROFILE_OS_40 ? 0x0F : 0));
 }
 
 int main() {

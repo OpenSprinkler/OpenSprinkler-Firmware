@@ -87,10 +87,30 @@
       display:flex; align-items:center; gap:12px; padding:12px 16px;
       background:var(--head-bg); border-bottom:1px solid var(--border);
     }
-    .modal-header h2{ flex:1; margin:0; font-size:17px; }
+    .modal-header h2{ flex:1; min-width:0; margin:0; font-size:17px; overflow-wrap:anywhere; }
     .modal-close{ width:auto; padding:5px 9px; color:var(--fg); background:transparent; font-size:20px; }
     .modal-close:hover:not(:disabled){ background:var(--focus); }
-    .release-notes{ margin:0; padding:18px; overflow:auto; white-space:pre-wrap; font:14px/1.5 inherit; }
+    .release-notes{ min-height:0; margin:0; padding:18px; overflow:auto; overflow-wrap:anywhere; font-size:14px; line-height:1.55; }
+    .release-notes.plain{ white-space:pre-wrap; }
+    .release-notes h1,.release-notes h2{ font-size:18px; }
+    .release-notes h3,.release-notes h4,.release-notes h5,.release-notes h6{ font-size:16px; }
+    .release-notes h1,.release-notes h2,.release-notes h3,.release-notes h4,.release-notes h5,.release-notes h6{ text-align:left; margin:1.2em 0 .5em; line-height:1.3; }
+    .release-notes p,.release-notes ul,.release-notes ol,.release-notes pre,.release-notes blockquote,.notes-table{ margin:0 0 1em; }
+    .release-notes > :first-child{ margin-top:0; }
+    .release-notes > :last-child{ margin-bottom:0; }
+    .release-notes ul,.release-notes ol{ padding-left:1.6em; }
+    .release-notes li{ margin:.35em 0; }
+    .release-notes li > ul,.release-notes li > ol{ margin-bottom:0; }
+    .release-notes a{ color:var(--accent); }
+    .release-notes code,.release-notes tt{ font-family:monospace; background:var(--head-bg); }
+    .release-notes pre{ max-width:100%; padding:10px; overflow:auto; white-space:pre; background:var(--head-bg); }
+    .release-notes blockquote{ padding-left:12px; border-left:3px solid var(--border); }
+    .release-notes hr{ border:0; border-top:1px solid var(--border); margin:1em 0; }
+    .notes-table{ max-width:100%; overflow:auto; }
+    .release-notes table{ border-collapse:collapse; overflow-wrap:normal; }
+    .release-notes th,.release-notes td{ border:1px solid var(--border); padding:6px 10px; text-align:left; }
+    .release-notes th{ background:var(--head-bg); }
+    .modal-header,.modal-footer{ flex-shrink:0; }
     .modal-footer{ padding:12px 16px; border-top:1px solid var(--border); }
     .status-panel{
       position:sticky; top:8px; z-index:5; padding:12px 16px; margin-bottom:16px;
@@ -154,9 +174,9 @@
 			<h2 id="notes_title">Release Notes</h2>
 			<button type="button" class="modal-close" id="btn_notes_close" aria-label="Close">&times;</button>
 		</div>
-		<pre class="release-notes" id="notes_body">Loading...</pre>
+		<div class="release-notes plain" id="notes_body" tabindex="0" role="region" aria-label="Release notes content">Loading...</div>
 		<div class="modal-footer">
-			<a class="button-link secondary" id="notes_github" href="https://github.com/OpenSprinkler/OpenSprinkler-Firmware/releases" target="_blank" rel="noopener">Open on GitHub</a>
+			<a class="button-link secondary" id="notes_github" href="https://github.com/OpenSprinkler/OpenSprinkler-Firmware/releases" target="_blank" rel="noopener noreferrer">Open on GitHub</a>
 		</div>
 	</div>
 </div>
@@ -565,9 +585,104 @@
         return /^\d{3}$/.test(version) ? version.split('').join('.') + '(' + release.build + ')' : release.id;
     }
 
+	// Never attach parsed nodes to the page. Rebuild a small HTML subset without
+	// copying source attributes, custom elements, styles or resource-bearing nodes.
+	function render_release_notes(container, data) {
+		const limit = 65536;
+		const fallback = typeof data.body_text === 'string' && data.body_text.trim() ? data.body_text : data.body;
+		const text = typeof fallback === 'string' && fallback.trim() ? fallback : 'No release notes were provided for this version.';
+		container.classList.add('plain');
+		container.textContent = text.slice(0, limit) + (text.length > limit ? '\n[Notes truncated. Open on GitHub to read the full release.]' : '');
+		if (typeof data.body_html !== 'string' || !data.body_html.trim() || data.body_html.length > limit) return;
+		try {
+			// A detached template keeps scripts AND image/iframe requests inert during
+			// parsing. DOMParser HTML documents can load passive external resources.
+			const template = document.implementation.createHTMLDocument('').createElement('template');
+			template.innerHTML = data.body_html;
+			const allowed = new Set('h1 h2 h3 h4 h5 h6 p br hr strong b em i del code tt pre blockquote ul ol li a table thead tbody tfoot tr th td caption'.split(' '));
+			const blocked = new Set('script style iframe object embed svg math form input template base meta link head audio video source noscript'.split(' '));
+			let count = 0;
+			function copy(node, parent, depth) {
+				if (++count > 4096 || depth > 32) throw new Error('Notes structure exceeds limits');
+				if (node.nodeType === 3) {
+					parent.appendChild(document.createTextNode(node.textContent));
+					return;
+				}
+				if (node.nodeType !== 1 || node.namespaceURI !== 'http://www.w3.org/1999/xhtml') return;
+				const tag = node.localName;
+				if (tag === 'img' || (tag === 'input' && node.getAttribute('type') === 'checkbox')) {
+					parent.appendChild(document.createTextNode(tag === 'img' ? (node.getAttribute('alt') || '') :
+						(node.hasAttribute('checked') ? '[x] ' : '[ ] ')));
+					return;
+				}
+				if (blocked.has(tag)) return;
+				let element = allowed.has(tag) ? document.createElement(tag) : document.createDocumentFragment();
+				if (tag === 'a') {
+					let url;
+					const href = node.getAttribute('href') || '';
+					try { url = new URL(href); } catch (error) {}
+					if (url && /^https:\/\//i.test(href) && !/[\u0000-\u0020\u007f]/.test(href) &&
+						url.protocol === 'https:' && !url.username && !url.password) {
+						element.href = url.href;
+						element.target = '_blank';
+						element.rel = 'noopener noreferrer';
+					} else element = document.createDocumentFragment();
+				}
+				if (tag === 'ol' && /^-?\d{1,6}$/.test(node.getAttribute('start') || ''))
+					element.setAttribute('start', node.getAttribute('start'));
+				if (tag === 'pre') element.tabIndex = 0;
+				for (const child of node.childNodes) copy(child, element, depth + 1);
+				if (tag === 'a' && !element.textContent.trim()) return;
+				if (tag === 'table') {
+					const wrapper = document.createElement('div');
+					wrapper.className = 'notes-table';
+					wrapper.tabIndex = 0;
+					wrapper.setAttribute('role', 'region');
+					wrapper.setAttribute('aria-label', 'Release notes table');
+					wrapper.appendChild(element);
+					element = wrapper;
+				}
+				parent.appendChild(element);
+			}
+			const content = document.createDocumentFragment();
+			for (const child of template.content.childNodes) copy(child, content, 0);
+			if (!content.textContent.trim()) return;
+			container.replaceChildren(content);
+			container.classList.remove('plain');
+		} catch (error) {
+			// The already-installed plain-text fallback is safe even for malformed HTML.
+		}
+	}
+
+	const notes_cache = new Map();
+	let notes_request = 0;
+	let notes_return_focus = null;
+
+	async function fetch_release_notes(tag) {
+		if (notes_cache.has(tag)) return notes_cache.get(tag);
+		const response = await fetch_with_timeout(
+			'https://api.github.com/repos/OpenSprinkler/OpenSprinkler-Firmware/releases/tags/' + encodeURIComponent(tag),
+			{cache: 'no-store', headers: {'Accept': 'application/vnd.github.full+json'}}, 20000);
+		if (response.status === 404) return null;
+		if (!response.ok) throw new Error('GitHub returned HTTP ' + response.status + '.');
+		const data = await response.json();
+		if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('Invalid release notes response.');
+		// Bound both retained text and the number of releases cached in this tab.
+		const notes = {};
+		for (const key of ['name', 'html_url', 'body_html', 'body_text', 'body']) {
+			if (typeof data[key] === 'string') notes[key] = data[key].slice(0, 65537);
+		}
+		if (notes_cache.size >= 8) notes_cache.delete(notes_cache.keys().next().value);
+		notes_cache.set(tag, notes);
+		return notes;
+	}
+
 	function close_release_notes() {
+		++notes_request;
 		id('notes_modal').hidden = true;
+		document.querySelector('main').inert = false;
 		document.body.style.overflow = '';
+		if (notes_return_focus && notes_return_focus.isConnected) notes_return_focus.focus();
 	}
 
 	async function open_release_notes() {
@@ -576,33 +691,35 @@
 		const modal = id('notes_modal');
 		const notes = id('notes_body');
 		const github = id('notes_github');
+		const request = ++notes_request;
+		if (modal.hidden) notes_return_focus = document.activeElement;
 		modal.hidden = false;
+		document.querySelector('main').inert = true;
 		document.body.style.overflow = 'hidden';
 		id('notes_title').textContent = 'Release Notes';
+		notes.classList.add('plain');
 		notes.textContent = 'Loading...';
+		notes.scrollTop = 0;
 		github.href = 'https://github.com/OpenSprinkler/OpenSprinkler-Firmware/releases';
 		id('btn_notes_close').focus();
 		try {
 			await load_release_descriptor(release);
 			const tag = String(release.version) + '(' + release.build + ')';
-			const response = await fetch_with_timeout(
-				'https://api.github.com/repos/OpenSprinkler/OpenSprinkler-Firmware/releases/tags/' +
-				encodeURIComponent(tag),
-				{cache: 'no-store', headers: {'Accept': 'application/vnd.github+json'}}, 20000);
+			if (request !== notes_request) return;
+			const data = await fetch_release_notes(tag);
+			if (request !== notes_request) return;
 			id('notes_title').textContent = 'Release Notes - ' + release.label;
-			if (response.status === 404) {
+			if (!data) {
 				notes.textContent = 'Release notes for ' + release.label + ' have not been published yet.';
 				return;
 			}
-			if (!response.ok) throw new Error('GitHub returned HTTP ' + response.status + '.');
-			const data = await response.json();
 			id('notes_title').textContent = 'Release Notes - ' + (data.name || tag);
-			notes.textContent = data.body || 'No release notes were provided for this version.';
+			render_release_notes(notes, data);
 			if (typeof data.html_url === 'string' &&
 				data.html_url.startsWith('https://github.com/OpenSprinkler/OpenSprinkler-Firmware/releases/'))
 				github.href = data.html_url;
 		} catch (error) {
-			notes.textContent = 'Unable to load release notes: ' + error.message;
+			if (request === notes_request) notes.textContent = 'Unable to load release notes: ' + error.message;
 		}
 	}
 
@@ -758,7 +875,17 @@
 		if (event.target === id('notes_modal')) close_release_notes();
 	});
 	document.addEventListener('keydown', function(event) {
-		if (event.key === 'Escape' && !id('notes_modal').hidden) close_release_notes();
+		if (id('notes_modal').hidden) return;
+		if (event.key === 'Escape') close_release_notes();
+		if (event.key === 'Tab') {
+			const controls = id('notes_modal').querySelectorAll('button,a[href],[tabindex="0"]');
+			const first = controls[0], last = controls[controls.length - 1];
+			if (event.shiftKey && document.activeElement === first) {
+				event.preventDefault(); last.focus();
+			} else if (!event.shiftKey && document.activeElement === last) {
+				event.preventDefault(); first.focus();
+			}
+		}
 	});
 	id('btn_install').addEventListener('click', async function() {
 		const release = selected_release();

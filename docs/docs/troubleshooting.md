@@ -243,6 +243,7 @@ If your OpenSprinkler v3 or v4 fails to join or stay connected to your WiFi netw
 If your controller can't connect or stay connected via wired Ethernet, try these steps: 
 
 1. **Update firmware:** Firmware 2.2.1(6) adds automatic fault detection and recovery. Update before relying on reboot workarounds.
+    * **CH390 modules** require firmware **2.2.1(7) or later** and are supported on **OpenSprinkler v3.3–3.4 and v4**.
 2. **Check the LEDs:** On your controller's RJ-45 jack, one LED should be solid (link), and the other should blink with traffic. If not, try a known-good cable and a different router/switch port.
 3. **Disable PoE** (Power-over-Ethernet) on that port: OpenSprinkler’s wired module is **not PoE-compatible**. A PoE-enabled port can cause it to malfunction.
 4. **DHCP setting:** Leave the controller on DHCP, and set a **DHCP reservation** (IP-to-MAC) on your router to assign it a fixed IP. If you must use a static IP, verify that **Gateway IP, DNS, and Subnet Mask** are correct and compatible with your router settings.
@@ -255,7 +256,7 @@ If your controller can't connect or stay connected via wired Ethernet, try these
 
 **I can access the controller on my local network, but not when I am away.**
 <span class="vsp1"></span>
-Remote access requires using an **OpenThings Cloud (OTC) token**. To check OTC status, from the homepage, swipe left to right to open the side menu, tap **System Diagnostics**. Make sure OTC status is **Connected**. In the OpenSprinkler mobile app, use the OTC token (instead of the controller's IP address) for remote access.
+Remote access requires using an **OpenThings Cloud (OTC) token**, available from [opensprinkler.com → My Account](https://opensprinkler.com/my-account/) → **My OTC Tokens**. To check OTC status, from the homepage, swipe left to right to open the side menu, tap **System Diagnostics**. Make sure OTC status is **Connected**. In the OpenSprinkler mobile app, use the OTC token (instead of the controller's IP address) for remote access. See [Remote Access with OTC](guides/remote-access-otc.md) for setup instructions.
 
 <hr class="double">
 
@@ -316,10 +317,10 @@ OpenSprinkler sets time automatically from two data sources: **your location** (
     * An incorrect time zone is often caused by failed weather queries, and should be fixed by re-checking Location and Internet connection first.
     * To set time zone manually, click the ✖️ icon next to **Location** to clear it. The **Timezone** dropdown is now editable - select the correct timezone and save.
 3. **Check NTP Settings**
-    * Homepage → **Edit Options** → **Advanced**: ensure **NTP Sync** is enabled.
+    * Homepage → **Edit Options** → **Network**: ensure **NTP Sync** is enabled.
     * **NTP server:** The recommended default setting is `0.0.0.0` (auto-selects public NTP servers). If using a custom server, confirm it’s valid/reachable.
 4. **No Internet? Set Time Manually**
-    * If using the controller without Internet, go to **Edit Options** → **Advanced**: **uncheck NTP Sync**.
+    * If using the controller without Internet, go to **Edit Options** → **Network**: **uncheck NTP Sync**.
     * **Device Time** is now editable. Set it, and Save. Note that time will drift without NTP sync.
 
 **<u>For OSPi</u>:** only Steps 1 & 2 apply, as NTP is managed by Raspbian, not by OpenSprinkler firmware.
@@ -334,7 +335,7 @@ Refer to the steps above to verify the controller's time is correct.
 
 **A zone runs even though Rain Delay or Rain Sensor is active.**
 <span class="vsp1"></span>
-This is usually caused by that zone being set to `Ignore Rain` or `Ignore Sensor`. These attributes can be found by clicking the ⚙️ icon next to the zone to open its attribute dialog. 
+This is usually caused by that zone being set to `Ignore Rain` or `Ignore Sensor`. These attributes can be found by clicking the circular station-group icon next to the zone to open its attribute dialog.
 
 ---
 
@@ -344,9 +345,22 @@ This is expected when the member was activated by a Bundle Station. The bundle l
 
 ---
 
+**A Cycle and Soak zone waits before starting.**
+<span class="vsp1"></span>
+Stopping a run, including through **Stop All**, does not clear the zone's soak cooldown. A subsequent run that applies Cycle and Soak must wait until that cooldown expires; other queued zones may delay it further. See [Cycle and Soak](2.2.1/221_7_manual.md#cycle-and-soak).
+
+---
+
+**I can't change a Built-in Sensor port to or from Analog.**
+<span class="vsp1"></span>
+Before changing an Analog port to another mode (including None), delete any **Onboard Analog** Expanded Sensor configurations using that port. Conversely, before switching a port to Analog, delete any **Onboard Digital** configurations using it. Disabled configurations still count; disabling them is not enough. See [Analog Sensor Setup](sensor-expander.md#configure-other-sensor-types).
+
+---
+
 **My program didn't run as scheduled.**
 
 * Check if the program's **Enabled** flag is on.
+* Check whether the footer shows **Configured as Extender**. Starting with firmware **2.2.1(7)**, Remote Extension mode suppresses automatic watering starts. Tap that message to exit the mode if this controller should run its own watering schedules.
 * Check if the controller's **time is correct**.
 * Check for any active **Rain Delay** or **Rain Sensor**.
 * If the program's **Use Weather** flag is on, check if the current **Watering Level** is 0%, or there is any active **Watering Restriction**.

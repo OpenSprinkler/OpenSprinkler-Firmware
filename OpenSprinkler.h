@@ -27,6 +27,7 @@
 #include "defines.h"
 #include "util/utils.h"
 #include "platform/gpio.h"
+#include "platform/ethernet.h"
 #include "drivers/images.h"
 #include "services/mqtt.h"
 #include "drivers/rf_switch.h"
@@ -47,13 +48,11 @@
 	#include "drivers/ch224.h"
 	#if defined(ESP8266)
 		#include <ESP8266WebServer.h>
-		#include <ENC28J60lwIP.h>
 		#include "drivers/os_w5500.h"
 		#include <Ticker.h>
 		#include "services/EMailSender.h"
 	#elif defined(ESP32)
 		#include <WiFi.h>
-		#include <ETH.h>
 	#endif
 
 #else // headers for RPI/LINUX
@@ -79,51 +78,11 @@
 #include "sensors/onboard_digital_sensor.h"
 #include "drivers/ads1115.h"
 #include "sensors/ads1115_sensor.h"
+#include "sensors/onboard_analog_sensor.h"
 
 #if defined(ESP8266)
 	extern ESP8266WebServer *update_server;
-	extern ENC28J60lwIP enc28j60;
 	extern OSWiznet5500lwIP w5500;
-	struct lwipEth {
-		bool isW5500 = false;
-		inline boolean config(const IPAddress& local_ip, const IPAddress& arg1, const IPAddress& arg2, const IPAddress& arg3 = IPADDR_NONE, const IPAddress& dns2 = IPADDR_NONE) {
-			return (isW5500)?w5500.config(local_ip, arg1, arg2, arg3, dns2) : enc28j60.config(local_ip, arg1, arg2, arg3, dns2);
-		}
-		inline boolean begin(const uint8_t *macAddress = nullptr) {
-			return (isW5500)?w5500.begin(macAddress):enc28j60.begin(macAddress);
-		}
-		inline bool raw_reinit() {
-			return isW5500 && w5500.reinitialize();
-		}
-		inline bool fault_pending() const {
-			return isW5500 && w5500.faultPending();
-		}
-		inline bool health_check() {
-			return !isW5500 || w5500.healthCheck();
-		}
-		inline IPAddress localIP() {
-			return (isW5500)?w5500.localIP():enc28j60.localIP();
-		}
-		inline IPAddress subnetMask() {
-			return (isW5500)?w5500.subnetMask():enc28j60.subnetMask();
-		}
-		inline IPAddress gatewayIP() {
-			return (isW5500)?w5500.gatewayIP():enc28j60.gatewayIP();
-		}
-		inline IPAddress dnsIP() {
-			return IPAddress(dns_getserver(0));
-		}
-		inline void setDefault() {
-			(isW5500)?w5500.setDefault():enc28j60.setDefault();
-		}
-		inline bool connected() {
-			return (isW5500)?w5500.connected():enc28j60.connected();
-		}
-		inline wl_status_t status() {
-			return (isW5500)?w5500.status():enc28j60.status();
-		}
-	};
-	extern lwipEth eth;
 	extern bool useEth;
 #elif defined(ESP32)
 	class WebServer;
@@ -328,6 +287,7 @@ public:
 		WeatherSensor weather;
 		SystemInternalSensor system_internal;
 		OnboardDigitalSensor onboard_digital;
+		OnboardAnalogSensor onboard_analog;
 	};
 	static sensor_memory_t sensors[MAX_SENSORS];
 
@@ -526,7 +486,7 @@ public:
 	static String wifi_ssid, wifi_pass;
 	static unsigned char wifi_bssid[6], wifi_channel;
 	static void config_ip();
-	static void save_wifi_ip();
+	static void save_network_ip();
 	static void reset_to_ap();
 	static unsigned char state;
 	static void setup_pd_voltage();

@@ -33,6 +33,7 @@
  */
 
 #include "EMailSender.h"
+#include "platform/tls_heap_probe.h"
 #include <stdio.h>
 #if defined(ESP32)
 #include <mbedtls/base64.h>
@@ -489,7 +490,7 @@ EMailSender::Response EMailSender::send(const char* to[], byte sizeOfTo,  byte s
 			#ifndef ARDUINO_ESP8266_RELEASE_2_4_2
 			  if (this->isSecure == false){
 				  client.setInsecure();
-				  bool mfln = client.probeMaxFragmentLength(this->smtp_server, this->smtp_port, 512);
+				  bool mfln = OS_TLS_MEASURE(SmtpProbe, client.probeMaxFragmentLength(this->smtp_server, this->smtp_port, 512));
 
 				  EMAIL_DEBUG_PRINT("MFLN supported: ");
 				  EMAIL_DEBUG_PRINTLN(mfln?"yes":"no");
@@ -526,7 +527,7 @@ EMailSender::Response EMailSender::send(const char* to[], byte sizeOfTo,  byte s
   EMAIL_DEBUG_PRINTLN(this->smtp_server);
   EMAIL_DEBUG_PRINTLN(this->smtp_port);
 
-  if(!client.connect(this->smtp_server, this->smtp_port)) {
+  if(!OS_TLS_MEASURE(SmtpConnect, client.connect(this->smtp_server, this->smtp_port))) {
 	  response.desc = F("Could not connect to mail server");
 	  response.code = F("2");
 	  response.status = false;

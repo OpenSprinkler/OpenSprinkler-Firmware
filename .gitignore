@@ -3,6 +3,9 @@ OpenSprinkler
 wtopts.txt
 *.dat
 *.sh
+!tools/flash-os4-n8.sh
+!tools/flash-os4-n8-factory-erase.sh
+tools/.firmware-cache/
 build-1284/*
 .vscode
 .pio
@@ -17,7 +20,16 @@ __pycache__/
 *.json
 !package.json
 !package-lock.json
+!external/ch390/library.json
+!tests/fixtures/updater-release-notes.json
 .DS_Store
 testmode.h
 .agents/review.md
 tmp/*
+
+# Local planning, bench automation, and hardware test records.
+/planning/
+/tests/hardware/*
+!/tests/hardware/testDigitalAnalogToggle.ino
+/tests/ch390_hardware.md
+/tests/manual/updater-release-notes.md

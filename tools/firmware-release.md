@@ -1,5 +1,9 @@
 # Firmware Release Workflow
 
+For production USB flashing of OS4 N8, use the
+[pinned production scripts](production/README.md). They deliberately do not
+use this release builder or artifacts from the current development checkout.
+
 `firmware_release.py` builds, signs, publishes, and verifies browser-mediated
 firmware updates. Keep the private P-256 key outside this repository and back it
 up offline. The script verifies that it matches the public key compiled into the

@@ -24,6 +24,7 @@
 #include "server.h"
 #include "../types.h"
 #include "../OpenSprinkler.h"
+#include "services/sensor_ports.h"
 #include "../core/program.h"
 #include "../bfiller.h"
 #include "../services/weather.h"
@@ -37,6 +38,9 @@
 #include "handlers.h"
 #include "routes.h"
 #include "api/commands.h"
+#include "platform/tls_heap_probe.h"
+#include "platform/hostname.h"
+#include <new>
 
 // External variables defined in main ion file
 extern OTF::OpenThingsFramework *otf;
@@ -55,9 +59,6 @@ extern OTF::OpenThingsFramework *otf;
 	#include "../services/espconnect.h"
 	#if defined(ESP8266)
 	extern ESP8266WebServer *update_server;
-	extern ENC28J60lwIP enc28j60;
-	extern OSWiznet5500lwIP w5500;
-	extern lwipEth eth;
 	#elif defined(ESP32)
 	#include <WebServer.h>
 	#include <Update.h>
@@ -317,7 +318,13 @@ void server_change_program(OTF_PARAMS_DEF) {
 
 	unsigned char i;
 
-	ProgramStruct prog;
+	// Static keeps this ~200-byte struct off the ESP8266 loop stack, which is
+	// tightest under this handler's flash writes. Handlers never run
+	// concurrently. Reset it every request so omitted fields (e.g. daterange)
+	// take their defaults instead of the previous request's values; construct
+	// in place, since assigning ProgramStruct() puts a temporary on the stack.
+	static ProgramStruct prog;
+	new (&prog) ProgramStruct();
 
 	// parse program index
 	if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("pid"), true)) handle_return(HTML_DATA_MISSING);
@@ -639,6 +646,7 @@ function rst_wsp() {document.getElementById('wsp').value='$S';}</script>)"),
 }
 
 void server_json_controller_main(OTF_PARAMS_DEF) {
+	BufferFiller::OptionReadScope options(bfill);
 	unsigned char bid, sid;
 	time_os_t curr_time = os.now_tz();
 	bfill.emit_p(PSTR("\"devt\":$L,\"nbrd\":$D,\"en\":$D,\"sn1\":$D,\"sn2\":$D,\"rd\":$D,\"rdst\":$L,"
@@ -676,7 +684,7 @@ void server_json_controller_main(OTF_PARAMS_DEF) {
 	}
 
 #if defined(ARDUINO)
-	bfill.emit_p(PSTR("\"RSSI\":$D,"), (int16_t)WiFi.RSSI());
+	if (!useEth) bfill.emit_p(PSTR("\"RSSI\":$D,"), (int16_t)WiFi.RSSI());
 	bfill.emit_p(PSTR("\"apdv\":$D,"), os.actual_pd_voltage);
 #endif
 
@@ -703,6 +711,16 @@ void server_json_controller_main(OTF_PARAMS_DEF) {
 							 wt_restricted,
 							 SOPT_DEVICE_NAME);
 
+	#if defined(ARDUINO)
+	options.read_string(SOPT_HOSTNAME, tmp_buffer, MAX_SOPTS_SIZE);
+	if (!tmp_buffer[0]) {
+		// Still show the device default if its initial persistence failed.
+		uint8_t hostname_mac[6] = {};
+		os.load_hardware_mac(hostname_mac, false);
+		hostname_default(tmp_buffer, hostname_mac);
+	}
+	bfill.emit_p(PSTR("\"hname\":\"$S\","), tmp_buffer);
+	#endif
 	bfill.emit_p(PSTR("\"email\":{$O},"), SOPT_EMAIL_OPTS);
 
 	bfill.emit_p(PSTR("\"wls\":["));
@@ -747,7 +765,26 @@ void server_json_controller_main(OTF_PARAMS_DEF) {
 	}
 
 	unsigned char gpioList[] = PIN_FREE_LIST;
-	bfill.emit_p(PSTR(",\"gpio\":["));
+	bfill.emit_p(PSTR(",\"cs\":["));
+	bool cycle_comma = false;
+	for (uint16_t i = 0; i < pd.nqueue; i++) {
+		const auto& q = pd.queue[i];
+		if (!(q.cycle_flags & CYCLE_GOVERNED)) continue;
+		uint8_t state = 0; // waiting, watering, soaking, paused, master tail
+		uint32_t segment = q.dur;
+		if (q.cycle_flags & CYCLE_TAIL) { state = 4; segment = 0; }
+		else if (q.cycle_flags & CYCLE_PAUSED) state = 3;
+		else if (q.cycle_flags & CYCLE_APPLIED) {
+			state = 1;
+			segment = curr_time < q.st + q.dur ? q.st + q.dur - curr_time : 0;
+		} else if (curr_time < q.cycle.soak_until) state = 2;
+		if (cycle_comma) bfill.emit_p(PSTR(","));
+		cycle_comma = true;
+		bfill.emit_p(PSTR("[$D,$D,$D,$L,$L,$L,$L,$L]"), q.sid, q.pid, state,
+			q.cycle.remaining + segment, segment, q.cycle.soak_until, q.st, q.cycle.cycles_left);
+	}
+	bfill.emit_p(PSTR("]"));
+	bfill.emit_p(PSTR(",\"cserr\":$D,\"qrej\":$L,\"gpio\":["), pd.cycle_config_error, pd.queue_rejections);
 	for (unsigned char i = 0; i < sizeof(gpioList); ++i)
 	{
 		if(i != sizeof(gpioList) - 1) {
@@ -864,11 +901,70 @@ void server_change_scripturl(OTF_PARAMS_DEF) {
 void server_change_options(OTF_PARAMS_DEF)
 {
 	if(!process_password(OTF_PARAMS)) return;
+	// Validate mode transitions before any option or string-option write. The
+	// App resends unchanged modes, which must not block repairs/unrelated saves.
+	uint8_t requested_modes[NUM_SENSORS];
+	bool mode_change = false;
+	for (uint8_t i = 0; i < NUM_SENSORS; i++) {
+		requested_modes[i] = os.iopts[sensor_iopt_keys[i].type];
+		char key[6];
+		iopt_get_json_name(sensor_iopt_keys[i].type, key);
+		uint8_t found = 0;
+		findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, key, false, &found);
+		if (!found) continue;
+		char *end;
+		long value = strtol(tmp_buffer, &end, 10);
+		if (end == tmp_buffer || *end || value < 0 || value > 255) {
+			otf_send_result(OTF_PARAMS, HTML_DATA_OUTOFBOUND, key);
+			return;
+		}
+		requested_modes[i] = value;
+		mode_change |= value != os.iopts[sensor_iopt_keys[i].type];
+	}
+	if (mode_change) {
+		uint8_t analog_refs, digital_refs;
+		if (!sensor_port_references(analog_refs, digital_refs)) {
+			otf_send_result(OTF_PARAMS, HTML_INTERNAL_ERROR, "sensors");
+			return;
+		}
+		for (uint8_t i = 0; i < NUM_SENSORS; i++) {
+			if (sensor_port_transition_allowed(i, os.iopts[sensor_iopt_keys[i].type],
+				requested_modes[i], analog_refs, digital_refs)) continue;
+			char key[6];
+			iopt_get_json_name(sensor_iopt_keys[i].type, key);
+			otf_send_result(OTF_PARAMS, HTML_NOT_PERMITTED, key);
+			return;
+		}
+	}
+	uint8_t hostname_found = 0;
+	// Keep one extra character so overlength input is rejected, not truncated.
+	char hostname[HOSTNAME_MAX_LENGTH + 2] = {};
+	findKeyVal(FKV_SOURCE, hostname, sizeof(hostname), PSTR("hname"), true, &hostname_found);
+	if (hostname_found) {
+		#if defined(ARDUINO)
+		if (!hostname_normalize(hostname)) {
+			otf_send_result(OTF_PARAMS, HTML_DATA_OUTOFBOUND, "hname");
+			return;
+		}
+		if (!hostname[0]) {
+			uint8_t hostname_mac[6] = {};
+			os.load_hardware_mac(hostname_mac, false);
+			hostname_default(hostname, hostname_mac);
+		}
+		#else
+		otf_send_result(OTF_PARAMS, HTML_NOT_PERMITTED, "hname");
+		return;
+		#endif
+	}
 	// temporarily save some old options values
 	bool time_change = false;
 	bool weather_change = false;
 	bool sensor_change = false;
 	bool storage_ok = true;
+	if (hostname_found && !os.sopt_save(SOPT_HOSTNAME, hostname)) {
+		otf_send_result(OTF_PARAMS, HTML_INTERNAL_ERROR, "hname");
+		return;
+	}
 	const unsigned char master_option_ids[NUM_MASTER_ZONES] = {
 		IOPT_MASTER_STATION, IOPT_MASTER_STATION_2,
 		IOPT_MASTER_STATION_3, IOPT_MASTER_STATION_4
@@ -1029,12 +1125,17 @@ void server_change_options(OTF_PARAMS_DEF)
 		uint32_t t;
 		t = strtoul(tmp_buffer, NULL, 0);
 #endif
-		// before chaging time, reset all stations to avoid messing up with timing
+		// A clock change invalidates both queued times and station soak deadlines.
 		reset_all_stations_immediate();
+		pd.reset_runtime();
 #if defined(ARDUINO)
 		setTime(t);
 		RTC.set(t);
 #endif
+	}
+	if (sensor_change) {
+		os.sensor_resetall();
+		sensor_ports_apply();
 	}
 	if (err)	handle_return(HTML_DATA_OUTOFBOUND);
 
@@ -1062,10 +1163,6 @@ void server_change_options(OTF_PARAMS_DEF)
 		wt_errCode = HTTP_RQT_NOT_RECEIVED;
 		os.checkwt_lasttime = 0;  // force weather update
 		weather_sensor_reset_cache();
-	}
-
-	if(sensor_change) {
-		os.sensor_resetall();
 	}
 
 	handle_return(HTML_SUCCESS);
@@ -1639,9 +1736,11 @@ void server_change_sensor(OTF_PARAMS_DEF) {
 			result_sensor = new AggregateSensor(interval, min, max, (const char*)&name, unit, flag, os.sensors, children, children_count, action);
 			break;
 		}
-		case SensorType::ADS1115: {
+		case SensorType::ADS1115:
+		case SensorType::OnboardAnalog: {
+			const bool onboard = sensor_type == SensorType::OnboardAnalog;
 			uint32_t sensor_index = 0;
-			uint32_t sensor_pin = 0;
+			uint32_t sensor_pin = onboard ? 255 : 0;
 			float scale = ADS1115_DEFAULT_SCALE;
 			float offset = ADS1115_DEFAULT_OFFSET;
 			ADS1115Subtype subtype = ADS1115Subtype::LINEAR;
@@ -1650,9 +1749,12 @@ void server_change_sensor(OTF_PARAMS_DEF) {
 
 			if (sensor_type == original_sensor_type) {
 				if ((sensor = Sensor::get(sid))) {
-					ADS1115Sensor* e = static_cast<ADS1115Sensor*>(sensor);
-					sensor_index = e->sensor_index;
-					sensor_pin = e->pin;
+					AnalogSensor* e = static_cast<AnalogSensor*>(sensor);
+					if (onboard) sensor_pin = static_cast<OnboardAnalogSensor*>(sensor)->input;
+					else {
+						sensor_index = static_cast<ADS1115Sensor*>(sensor)->sensor_index;
+						sensor_pin = static_cast<ADS1115Sensor*>(sensor)->pin;
+					}
 					scale = e->scale;
 					offset = e->offset;
 					subtype = e->subtype;
@@ -1661,7 +1763,20 @@ void server_change_sensor(OTF_PARAMS_DEF) {
 				}
 			}
 
-			if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("pin"), true)) {
+			if (onboard) {
+				if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("input"), true)) {
+					sensor_pin = strtoul(tmp_buffer, &end, 10);
+					if (end == tmp_buffer || *end) handle_return(HTML_DATA_FORMATERROR);
+					if (sensor_pin >= NUM_SENSORS) handle_return(HTML_DATA_OUTOFBOUND);
+				}
+				if (sensor_pin == 255) handle_return(HTML_DATA_MISSING);
+				if (!sensor_port_analog_capable(sensor_pin) || !sensor_port_is_analog(sensor_pin)) handle_return(HTML_NOT_PERMITTED);
+				if (original_sensor_type != SensorType::OnboardAnalog) {
+					if (!min_set) min = 0;
+					if (!max_set) max = 3.3f;
+					if (!unit_set) unit = SensorUnit::Volt;
+				}
+			} else if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("pin"), true)) {
 				uint32_t raw_sensor_pin = strtoul(tmp_buffer, &end, 10);
 				if (*end != '\0') handle_return(HTML_DATA_FORMATERROR);
 				if (raw_sensor_pin == 0 || raw_sensor_pin > 16) handle_return(HTML_DATA_OUTOFBOUND);
@@ -1729,9 +1844,14 @@ void server_change_sensor(OTF_PARAMS_DEF) {
 				handle_return(HTML_DATA_OUTOFBOUND);
 			}
 
-			result_sensor = new ADS1115Sensor(interval, min, max, (const char*)&name, unit, flag,
-			                                  os.ads1115_devices, sensor_index, sensor_pin,
-			                                  scale, offset, subtype, num_points, points);
+			if (!isfinite(scale) || !isfinite(offset)) handle_return(HTML_DATA_OUTOFBOUND);
+			if (onboard) {
+				result_sensor = new OnboardAnalogSensor(interval, min, max, name, unit, flag,
+					sensor_pin, scale, offset, subtype, num_points, points);
+			} else {
+				result_sensor = new ADS1115Sensor(interval, min, max, name, unit, flag,
+					os.ads1115_devices, sensor_index, sensor_pin, scale, offset, subtype, num_points, points);
+			}
 			break;
 		}
 		case SensorType::Weather: {
@@ -1816,6 +1936,8 @@ void server_change_sensor(OTF_PARAMS_DEF) {
 			}
 
 			if (input == OnboardInput::MAX_VALUE) handle_return(HTML_DATA_MISSING);
+			if (!sensor_available(static_cast<uint8_t>(input))) handle_return(HTML_DATA_OUTOFBOUND);
+			if (sensor_port_is_analog(static_cast<uint8_t>(input))) handle_return(HTML_NOT_PERMITTED);
 
 			result_sensor = new OnboardDigitalSensor(interval, min, max, (const char*)&name, unit, flag, input);
 			break;
@@ -2508,6 +2630,9 @@ void server_json_sensor_description_main(OTF_PARAMS_DEF) {
 			case SensorType::OnboardDigital:
 				OnboardDigitalSensor::emit_description_json(&bfill);
 				break;
+			case SensorType::OnboardAnalog:
+				OnboardAnalogSensor::emit_description_json(&bfill);
+				break;
 			case SensorType::MAX_VALUE:
 				break;
 		}
@@ -2603,6 +2728,27 @@ static uint32_t freeHeap() {
 }
 #endif
 
+#if defined(ARDUINO)
+static void emit_ethernet_health() {
+	bfill.emit_p(PSTR(",\"eth_link\":$D,\"eth_has_ip\":$D"),
+		eth.linkUp(), (uint32_t)eth.localIP() != 0);
+	if (!eth.is_ch390()) return;
+	CH390Diagnostics d = {};
+	const bool valid = eth.ch390_diagnostics(d);
+	bfill.emit_p(PSTR(",\"ch_diag_valid\":$D"), valid);
+	if (!valid) return;
+	bfill.emit_p(PSTR(",\"ch_bad_ready\":$L,\"ch_bad_header\":$L,\"ch_rx_errors\":$L,"
+		"\"ch_rx_resets\":$L,\"ch_tx_timeouts\":$L,\"ch_health_failures\":$L,"
+		"\"ch_recoveries\":$L,\"ch_recovery_failures\":$L,\"ch_fault\":$D,"
+		"\"ch_fault_ms\":$L,\"ch_pending\":$D"),
+		d.bad_ready, d.bad_header, d.rx_errors, d.rx_resets, d.tx_timeouts,
+		d.health_failures, d.recoveries, d.recovery_failures, d.last_fault,
+		d.last_fault_ms, d.pending);
+	bfill.emit_p(PSTR(",\"ch_rx_deferred\":$L,\"ch_empty_ready\":$L,\"ch_rx_incomplete\":$L"),
+		d.rx_deferred, d.empty_ready, d.rx_incomplete);
+}
+#endif
+
 void server_json_debug(OTF_PARAMS_DEF) {
 	begin_response(res);
 	print_header(OTF_PARAMS);
@@ -2610,12 +2756,28 @@ void server_json_debug(OTF_PARAMS_DEF) {
 	EmbeddedStorageUsage storage = get_embedded_storage_usage();
 	#endif
 
-	bfill.emit_p(PSTR("{\"date\":\"$S\",\"time\":\"$S\",\"heap\":$L"), __DATE__, __TIME__,
+	bfill.emit_p(PSTR("{"));
+	#if defined(ARDUINO)
+	bfill.emit_p(PSTR("\"hostname\":\"$S\","), hostname_effective());
+	#endif
+	bfill.emit_p(PSTR("\"date\":\"$S\",\"time\":\"$S\",\"heap\":$L"), __DATE__, __TIME__,
 	#if defined(ESP8266)
 	ESP.getFreeHeap());
 	bfill.emit_p(PSTR(",\"maxblock\":$L,\"frag\":$D"),
 		(uint32_t)ESP.getMaxFreeBlockSize(),
 		(uint8_t)ESP.getHeapFragmentation());
+	// Core stack watermark: untouched continuation-stack bytes since boot.
+	bfill.emit_p(PSTR(",\"stack_min\":$L"), (uint32_t)ESP.getFreeContStack());
+	#if defined(OS_TLS_HEAP_PROBE)
+	bfill.emit_p(PSTR(",\"tls_heap\":["));
+	for (unsigned i = 0; i < static_cast<unsigned>(TlsHeapPhase::Count); ++i) {
+		const auto& sample = tls_heap_sample(static_cast<TlsHeapPhase>(i));
+		if (i) bfill.emit_p(PSTR(","));
+		bfill.emit_p(PSTR("{\"calls\":$L,\"successes\":$L,\"before\":$L,\"min\":$L,\"lowest\":$L,\"after\":$L,\"oom\":$L}"),
+			sample.calls, sample.successes, sample.before, sample.minimum, sample.lowest, sample.after, sample.oom);
+	}
+	bfill.emit_p(PSTR("]"));
+	#endif
 	bfill.emit_p(PSTR(",\"flash\":$L,\"used\":$L,\"free\":$L,\"pruned\":$L,\"legacy_removed\":$L,\"devip\":\"$S\","),
 		storage.total_bytes, storage.used_bytes, storage.free_bytes, embedded_storage_pruned_files(),
 		embedded_storage_legacy_removed_files(),
@@ -2623,9 +2785,10 @@ void server_json_debug(OTF_PARAMS_DEF) {
 	bfill.emit_p(PSTR("\"sprlog_fail\":$L,\"sprlog_mismatch\":$L,"),
 		sprinkler_log_failures, sprinkler_log_mismatches);
 	if(useEth) {
-		bfill.emit_p(PSTR("\"isW5500\":$D,\"spi_clock\":$L,\"arp_size\":$D"),
-			eth.isW5500, ETHER_SPI_CLOCK, ARP_TABLE_SIZE);
-		if (eth.isW5500) {
+		bfill.emit_p(PSTR("\"eth_controller\":\"$S\",\"isW5500\":$D,\"spi_clock\":$L,\"arp_size\":$D"),
+			eth.controller_name(), eth.is_w5500(), eth.spi_clock(), ARP_TABLE_SIZE);
+		emit_ethernet_health();
+		if (eth.is_w5500()) {
 			const W5500Diagnostics& diag = w5500.diagnostics();
 			W5500LiveState live;
 			// eth_live_valid distinguishes "the operation guard refused the
@@ -2683,11 +2846,14 @@ void server_json_debug(OTF_PARAMS_DEF) {
 	bfill.emit_p(PSTR(",\"flash\":$L,\"used\":$L,\"free\":$L,\"pruned\":$L,\"legacy_removed\":$L,\"devip\":\"$S\","),
 		storage.total_bytes, storage.used_bytes, storage.free_bytes, embedded_storage_pruned_files(),
 		embedded_storage_legacy_removed_files(),
-		(useEth ? ETH.localIP() : WiFi.localIP()).toString().c_str());
+		(useEth ? eth.localIP() : WiFi.localIP()).toString().c_str());
 	bfill.emit_p(PSTR("\"sprlog_fail\":$L,\"sprlog_mismatch\":$L,"),
 		sprinkler_log_failures, sprinkler_log_mismatches);
 	if (useEth) {
-		bfill.emit_p(PSTR("\"isW5500\":1,\"spi_clock\":$L}"), (uint32_t)ETHER_SPI_CLOCK);
+		bfill.emit_p(PSTR("\"eth_controller\":\"$S\",\"isW5500\":$D,\"spi_clock\":$L"),
+			eth.controller_name(), eth.is_w5500(), eth.spi_clock());
+		emit_ethernet_health();
+		bfill.emit_p(PSTR("}"));
 	} else {
 		bfill.emit_p(PSTR("\"rssi\":$D,\"bssid\":\"$S\",\"bssidchl\":\"$O\"}"),
 			WiFi.RSSI(), WiFi.BSSIDstr().c_str(), SOPT_STA_BSSID_CHL);

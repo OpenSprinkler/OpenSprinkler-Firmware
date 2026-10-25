@@ -183,6 +183,7 @@ private:
 	void completePendingFrame(bool read_data, uint8_t *buffer);
 };
 
-using OSWiznet5500lwIP = LwipIntfDev<OSWiznet5500>;
+#include "drivers/ethernet_lifecycle.h"
+using OSWiznet5500lwIP = ManagedEthernet<OSWiznet5500>;
 
 #endif // ESP8266

@@ -22,11 +22,15 @@
  */
 
 #include "OpenSprinkler.h"
+#include "services/sensor_ports.h"
+#include "platform/sensor_input.h"
 
 #include "core/bundle.h"
 #include "core/output_sequencer.h"
 #include "api/server.h"
 #include "platform/gpio.h"
+#include "platform/hostname.h"
+#include "platform/tls_heap_probe.h"
 #include "boards/hardware_detection.h"
 #ifdef __has_include
 	#if __has_include("testmode.h")
@@ -34,6 +38,8 @@
 	#endif
 #endif
 #include "core/program.h"
+#include "core/scheduler.h"
+#include "drivers/ch390_raw.h"
 #include "services/weather.h"
 #include "storage/maintenance.h"
 #include "storage/sprinkler_log.h"
@@ -88,20 +94,7 @@ unsigned char sensor_pullup_pin(uint8_t i) {
 }
 
 static void configure_sensor_digital_input(uint8_t i) {
-	const uint8_t input_pin = sensor_pin(i);
-	const uint8_t pullup_pin = sensor_pullup_pin(i);
-#if defined(ARDUINO)
-	if (pullup_pin != osboard::UNUSED_PIN) {
-		pinModeExt(input_pin, INPUT);
-		pinModeExt(pullup_pin, OUTPUT);
-		digitalWriteExt(pullup_pin, HIGH);
-	} else {
-		pinModeExt(input_pin, INPUT_PULLUP);
-	}
-#else
-	(void)pullup_pin;
-	pinMode(input_pin, INPUT_PULLUP);
-#endif
+	if (!sensor_port_is_analog(i)) sensor_input_configure(i, false);
 }
 
 bool sensor_available(uint8_t i) {
@@ -348,6 +341,7 @@ const char *OpenSprinkler::sopts[] = {
 	DEFAULT_DEVICE_NAME,
 	DEFAULT_EMPTY_STRING, // SOPT_STA_BSSID_CHL
 	DEFAULT_EMPTY_STRING, // SOPT_EMAIL_OPTS
+	DEFAULT_HOSTNAME,
 };
 
 /** Weekday strings (stored in PROGMEM to reduce RAM usage) */
@@ -399,7 +393,7 @@ bool OpenSprinkler::load_hardware_mac(unsigned char* buffer, bool wired) {
 	#if defined(ESP32)
 	if (wired) {
 		// Report the address assigned to the active Ethernet interface.
-		if (ETH.macAddress(buffer)) return true;
+		if (eth.macAddress(buffer)) return true;
 		return esp_read_mac(buffer, ESP_MAC_ETH) == ESP_OK;
 	}
 	// Reading the eFuse-derived STA address does not require WiFi to be enabled.
@@ -415,9 +409,19 @@ bool OpenSprinkler::load_hardware_mac(unsigned char* buffer, bool wired) {
 /** Initialize network with the given mac address and http port */
 
 unsigned char OpenSprinkler::start_network() {
+	uint8_t hostname_mac[6] = {};
+	load_hardware_mac(hostname_mac, false);
+	sopt_load(SOPT_HOSTNAME, tmp_buffer);
+	hostname_init(tmp_buffer, hostname_mac);
+	// Materialize the per-device default once, including upgrades without this
+	// slot. A failed save must not prevent networking with the generated name.
+	if (!tmp_buffer[0] && !sopt_save(SOPT_HOSTNAME, hostname_effective())) {
+		DEBUG_PRINTLN(F("Could not save default hostname"));
+	}
 	#if defined(ESP32)
 	// Initialize lwIP before OTF constructs its local WiFiServer.
 	WiFi.mode(WIFI_STA);
+	hostname_apply_wifi();
 	WiFi.setSleep(false);
 	#endif
 	lcd_print_line_clear_pgm(PSTR("Starting..."), 1);
@@ -457,22 +461,45 @@ unsigned char OpenSprinkler::start_network() {
 unsigned char OpenSprinkler::start_ether() {
 	if(!osboard::has(osboard::CAP_ETHERNET)) return 0;
 	#if defined(ESP32)
+	pinMode(PIN_FLASH_CS, OUTPUT);
+	digitalWrite(PIN_FLASH_CS, HIGH);
+	pinMode(PIN_ETHER_CS, OUTPUT);
+	digitalWrite(PIN_ETHER_CS, HIGH);
 	SPI.begin(PIN_SPI_SCK, PIN_SPI_MISO, PIN_SPI_MOSI, PIN_ETHER_CS);
+	pinMode(PIN_ETHER_RESET, OUTPUT);
+	digitalWrite(PIN_ETHER_RESET, LOW);
+	delay(2);
+	digitalWrite(PIN_ETHER_RESET, HIGH);
+	delay(25);
+
+	eth.set_spi_drive(EthernetController::CH390);
+	const bool has_ch390 = ch390_probe(SPI, PIN_ETHER_CS,
+		osboard::CH390_PROBE_SPI_CLOCK_HZ);
+	eth.set_spi_drive(has_ch390 ?
+		EthernetController::CH390 : EthernetController::W5500);
+	eth.select(has_ch390 ? EthernetController::CH390 : EthernetController::W5500);
+	const uint32_t spi_clock = has_ch390 ? osboard::CH390_SPI_CLOCK_HZ : ETHER_SPI_CLOCK;
+	if (!eth.begin(SPI, PIN_ETHER_CS, PIN_ETHER_IRQ, PIN_ETHER_RESET,
+		spi_clock)) {
+		eth.end();
+		return 0;
+	}
 	if (iopts[IOPT_USE_DHCP] == 0) {
 		IPAddress staticip(iopts + IOPT_STATIC_IP1);
 		IPAddress gateway(iopts + IOPT_GATEWAY_IP1);
 		IPAddress dns(iopts + IOPT_DNS_IP1);
 		IPAddress subnet(iopts + IOPT_SUBNET_MASK1);
-		ETH.config(staticip, gateway, subnet, dns);
+		if (!eth.config(staticip, gateway, subnet, dns)) {
+			eth.end();
+			return 0;
+		}
 	}
-	if (!ETH.begin(ETH_PHY_W5500, 1, PIN_ETHER_CS, PIN_ETHER_IRQ,
-		PIN_ETHER_RESET, SPI, ETHER_SPI_CLOCK / 1000000UL)) return 0;
 	lcd_print_line_clear_pgm(PSTR("Start wired link"), 1);
-	lcd_print_line_clear_pgm(PSTR("  [w5500]    "), 2);
+	lcd_print_line_clear_pgm(has_ch390 ? PSTR("  [ch390]    ") : PSTR("  [w5500]    "), 2);
 	uint32_t timeout = millis() + 10000UL;
 	uint32_t next_count = millis();
 	uint8_t timecount = 1;
-	while ((!ETH.linkUp() || (uint32_t)ETH.localIP() == 0) &&
+	while (!eth.connected() &&
 		(int32_t)((uint32_t)millis() - timeout) < 0) {
 		if ((int32_t)((uint32_t)millis() - next_count) >= 0) {
 			lcd.setCursor(13, 2);
@@ -482,27 +509,29 @@ unsigned char OpenSprinkler::start_ether() {
 		delay(200);
 	}
 	lcd_print_line_clear_pgm(PSTR(""), 2);
-	if (ETH.linkUp() && (uint32_t)ETH.localIP() != 0) {
-		ETH.setDefault();
-		if (iopts[IOPT_USE_DHCP]) {
-			memcpy(iopts + IOPT_STATIC_IP1, &(ETH.localIP()[0]), 4);
-			memcpy(iopts + IOPT_GATEWAY_IP1, &(ETH.gatewayIP()[0]), 4);
-			memcpy(iopts + IOPT_DNS_IP1, &(ETH.dnsIP()[0]), 4);
-			memcpy(iopts + IOPT_SUBNET_MASK1, &(ETH.subnetMask()[0]), 4);
-			iopts_save();
-		}
+	if (eth.connected()) {
+		eth.setDefault();
 		return 1;
 	}
-	return iopts[IOPT_FORCE_WIRED] ? 1 : 0;
+	if (iopts[IOPT_FORCE_WIRED]) return 1;
+	eth.end(); // WiFi fallback must not leave a second interface/DHCP client running.
+	return 0;
 	#else
-	eth.isW5500 = (hw_rev==2)?false:true; // os 3.2 uses enc28j60 and 3.3 uses w5500
+	eth.select(hw_rev == 2 ? EthernetController::ENC28J60 : EthernetController::None);
 
 	SPI.begin();
 	SPI.setBitOrder(MSBFIRST);
 	SPI.setDataMode(SPI_MODE0);
 	SPI.setFrequency(ETHER_SPI_CLOCK); // set SPI frequency
 
-	if(eth.isW5500) {
+	if (hw_rev != 2 && ch390_probe(SPI, PIN_ETHER_CS,
+		osboard::CH390_PROBE_SPI_CLOCK_HZ)) {
+		eth.select(EthernetController::CH390);
+		DEBUG_PRINTLN(F("detected CH390"));
+	} else if (hw_rev != 2) {
+		// ESP8266 endTransaction() does not restore the previous bus settings.
+		SPI.setFrequency(ETHER_SPI_CLOCK);
+		eth.select(EthernetController::W5500);
 		DEBUG_PRINTLN(F("detect existence of W5500"));
 		/* this is copied from w5500.cpp wizchip_sw_reset
 		 * perform a software reset and see if we get a correct response
@@ -562,17 +591,49 @@ unsigned char OpenSprinkler::start_ether() {
 	}
 
 	load_hardware_mac((uint8_t*)tmp_buffer, true);
+	// Test the PHY before registering an lwIP interface.
+	// Otherwise an unplugged module leaves a live DHCP client after Wi-Fi fallback.
+	if (!eth.raw_begin((uint8_t*)tmp_buffer)) {
+		eth.end();
+		return 0;
+	}
+	lcd_print_line_clear_pgm(PSTR("Start wired link"), 1);
+	lcd_print_line_clear_pgm(eth.is_ch390() ? PSTR("  [ch390]    ") :
+		eth.is_w5500() ? PSTR("  [w5500]    ") : PSTR(" [enc28j60]  "), 2);
+	uint32_t link_timeout = millis() + 10000UL;
+	uint32_t next_link_count = millis();
+	uint8_t link_timecount = 1;
+	while (!eth.linkUp() && (int32_t)(millis() - link_timeout) < 0) {
+		if ((int32_t)(millis() - next_link_count) >= 0) {
+			lcd.setCursor(13, 2);
+			lcd.print(link_timecount++);
+			next_link_count += 1000UL;
+		}
+		delay(100);
+	}
+	lcd.setCursor(13, 2);
+	lcd.print(F("   "));
+	if (!eth.linkUp() && !iopts[IOPT_FORCE_WIRED]) {
+		eth.end();
+		return 0;
+	}
+	// Full begin reinitializes the chip. Keep the existing DHCP timeout to
+	// accommodate renegotiation, including forced wired boots without a cable.
 	if (iopts[IOPT_USE_DHCP]==0) { // config static IP before calling eth.begin
 		IPAddress staticip(iopts+IOPT_STATIC_IP1);
 		IPAddress gateway(iopts+IOPT_GATEWAY_IP1);
 		IPAddress dns(iopts+IOPT_DNS_IP1);
 		IPAddress subn(iopts+IOPT_SUBNET_MASK1);
-		eth.config(staticip, gateway, subn, dns);
+		if (!eth.config(staticip, gateway, subn, dns)) {
+			eth.end();
+			return 0;
+		}
 	}
 	eth.setDefault();
-	if(!eth.begin((uint8_t*)tmp_buffer))	return 0;
-	lcd_print_line_clear_pgm(PSTR("Start wired link"), 1);
-	lcd_print_line_clear_pgm(eth.isW5500 ? PSTR("  [w5500]    ") : PSTR(" [enc28j60]  "), 2);
+	if (!eth.begin((uint8_t*)tmp_buffer)) {
+		eth.end();
+		return 0;
+	}
 
 	uint32_t timeout = millis()+60000; // 60 seconds time out
 	unsigned char timecount = 1;
@@ -584,30 +645,15 @@ unsigned char OpenSprinkler::start_ether() {
 		timecount++;
 	}
 	lcd_print_line_clear_pgm(PSTR(""), 2);
-	if(eth.connected()) {
-		// if wired connection is successful at this point, copy the network ips to config
-		if (iopts[IOPT_USE_DHCP]) {
-			memcpy(iopts+IOPT_STATIC_IP1, &(eth.localIP()[0]), 4);
-			memcpy(iopts+IOPT_GATEWAY_IP1, &(eth.gatewayIP()[0]),4);
-			memcpy(iopts+IOPT_DNS_IP1, &(eth.dnsIP()[0]), 4);
-			memcpy(iopts+IOPT_SUBNET_MASK1, &(eth.subnetMask()[0]), 4);
-			iopts_save();
-		}
-		return 1;
-	} else {
-		// if wired connection has failed at this point, return depending on whether the user wants to force wired
-		return (iopts[IOPT_FORCE_WIRED] ? 1 : 0);
-	}
+	if (eth.connected() || iopts[IOPT_FORCE_WIRED]) return 1;
+	eth.end();
+	return 0;
 	#endif
 }
 
 bool OpenSprinkler::network_connected(void) {
 	if(useEth)
-		#if defined(ESP32)
-		return ETH.linkUp() && (uint32_t)ETH.localIP() != 0;
-		#else
 		return eth.connected();
-		#endif
 	else
 		return (get_wifi_mode()==OS_WIFI_MODE_STA && WiFi.status()==WL_CONNECTED && state==OS_STATE_CONNECTED);
 }
@@ -856,9 +902,7 @@ void OpenSprinkler::begin() {
 	apply_all_station_bits();
 
 #if defined(ARDUINO)
-	for (uint8_t i = 0; i < osboard::active().sensor_count; i++) {
-		configure_sensor_digital_input(i);
-	}
+	sensor_ports_initialize();
 
 #else
 	// pull shift register OE low to enable output
@@ -905,6 +949,7 @@ void OpenSprinkler::begin() {
 	lcd.createChar(ICON_RAINDELAY, _iconimage_raindelay);
 	lcd.createChar(ICON_RAIN, _iconimage_rain);
 	lcd.createChar(ICON_SOIL, _iconimage_soil);
+	lcd.createChar(ICON_FLOW, _iconimage_flow);
 #endif
 
 #if defined(ARDUINO)
@@ -1283,6 +1328,7 @@ void OpenSprinkler::apply_all_station_bits(void (*post_activation_callback)()) {
 #endif
 		hardware_output_initialized = true;
 		last_hardware_output_write_ms = millis();
+		if (transition.rising_sid >= 0) scheduler_output_applied(transition.rising_sid, now_tz());
 		if (transition.rising_sid >= 0 && bundle_is_station(static_cast<unsigned char>(transition.rising_sid))) {
 			bundle_output_dirty = true;
 		}
@@ -1310,9 +1356,11 @@ void OpenSprinkler::apply_all_station_bits(void (*post_activation_callback)()) {
 				uint32_t dur = 0;
 				if(on) {
 					unsigned char sqi=pd.station_qid[next_sid_to_refresh];
-					RuntimeQueueStruct *q=pd.queue+sqi;
-					if(sqi<255 && q->st>0 && q->st+q->dur>curr_time) {
-						dur = q->st+q->dur-curr_time;
+					if (sqi < pd.nqueue) {
+						const RuntimeQueueStruct& q = pd.queue[sqi];
+						if (q.st > 0 && curr_time >= q.st && q.st + q.dur > curr_time) {
+							dur = q.st + q.dur - curr_time;
+						}
 					}
 				}
 				switch_special_station(next_sid_to_refresh, on, dur);
@@ -1852,7 +1900,7 @@ int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char*
 	if(usessl) {
 		WiFiClientSecure *_c = new WiFiClientSecure();
 		_c->setInsecure();
-		bool mfln = _c->probeMaxFragmentLength(server, port, 512);
+		bool mfln = OS_TLS_MEASURE(HttpProbe, _c->probeMaxFragmentLength(server, port, 512));
 		DEBUG_PRINTF("MFLN supported: %s\n", mfln ? "yes" : "no");
 		if (mfln) {
 			_c->setBufferSizes(512, 512);
@@ -1873,7 +1921,8 @@ int8_t OpenSprinkler::send_http_request(const char* server, uint16_t port, char*
 		DEBUG_PRINT("(");
 		DEBUG_PRINT(tries);
 		DEBUG_PRINTLN(")");
-		if(client->connect(server, port)==1) break;
+		if((usessl ? OS_TLS_MEASURE(HttpConnect, client->connect(server, port))
+			: client->connect(server, port))==1) break;
 		tries++;
 	} while(tries<HTTP_CONNECT_NTRIES);
 
@@ -2195,6 +2244,7 @@ void OpenSprinkler::factory_reset() {
 	remove_file(SENSORS_FILENAME);
 	remove_sensor_log();
 	remove_file(SENADJ_FILENAME);
+	remove_file(STATION_EXTRA_FILENAME);
 
 	// 5. write 'done' file
 	file_write_byte(DONE_FILENAME, 0, 1);
@@ -2333,6 +2383,7 @@ void OpenSprinkler::options_setup() {
 	lcd_set_brightness();
 	lcd_set_contrast();
 #endif
+	sensor_ports_apply();
 }
 
 /** Load non-volatile controller status data from file */
@@ -2413,8 +2464,7 @@ bool OpenSprinkler::iopts_save() {
 /** Load a string option from file */
 void OpenSprinkler::sopt_load(unsigned char oid, char *buf, uint16_t maxlen) {
 	if(maxlen>MAX_SOPTS_SIZE) maxlen = MAX_SOPTS_SIZE; // cap maxlen
-	file_read_block(SOPTS_FILENAME, buf, MAX_SOPTS_SIZE*oid, maxlen);
-	buf[maxlen]=0;  // ensure the string ends properly
+	file_read_string(SOPTS_FILENAME, buf, MAX_SOPTS_SIZE*oid, maxlen);
 }
 
 /** Load a string option from file, return String */
@@ -2947,10 +2997,13 @@ void OpenSprinkler::lcd_print_screen(char c) {
 				lcd.write(sn_sensors[i].active?ICON_SOIL:(sn_sensors[i].raw?'S':'s'));
 				break;
 			case SENSOR_TYPE_FLOW:
-				lcd.write(flowcount_rt>0?'F':'f');
+				lcd.write(flowcount_rt>0?ICON_FLOW:'f');
 				break;
 			case SENSOR_TYPE_PSWITCH:
 				lcd.write(sn_sensors[i].raw?'P':'p');
+				break;
+			case SENSOR_TYPE_ANALOG:
+				lcd.write('a');
 				break;
 			default:
 				lcd.write(' ');
@@ -2961,11 +3014,7 @@ void OpenSprinkler::lcd_print_screen(char c) {
 	lcd.setCursor(LCD_CURSOR_NETWORK, 1);
 #if defined(ARDUINO)
 	if(useEth) {
-		#if defined(ESP8266)
 		lcd.write(eth.connected()?ICON_ETHER_CONNECTED:ICON_ETHER_DISCONNECTED);
-		#else
-		lcd.write(ETH.linkUp()?ICON_ETHER_CONNECTED:ICON_ETHER_DISCONNECTED);
-		#endif
 	}
 	else {
 		lcd.write(WiFi.status()==WL_CONNECTED?ICON_WIFI_CONNECTED:ICON_WIFI_DISCONNECTED);
@@ -2979,6 +3028,9 @@ void OpenSprinkler::lcd_print_screen(char c) {
 	#else
 	{
 	#endif
+		// Clear stale button-screen text only in normal status mode. During
+		// WiFi setup this row holds the AP IP or the SSID being connected to.
+		lcd.clear(2, 2);
 		lcd.setCursor(0, -1);
 		if(status.overcurrent_sid > 0) {
 			lcd.print(F("<!OVERCURRENT!> "));
@@ -2993,22 +3045,16 @@ void OpenSprinkler::lcd_print_screen(char c) {
 		}
 
 	#if defined(ARDUINO)
-		lcd.setCursor(2, 2);
 		if(status.program_busy && !status.pause_state) {
-			//lcd.print(F("Curr: "));
+			lcd.setCursor(2, 2);
 			lcd.print(read_current(true));
-			lcd.print(F(" mA      "));
-		} else {
-	#else
-		{
-	#endif
-			lcd.clear(2, 2);
+			lcd.print(F(" mA"));
 		}
+	#endif
 	}
 
 	// Remote Extension and Rain Delay icons live on the bottom row, freeing
-	// the status-row space for SN3/SN4. Drawn AFTER the current-display block
-	// above so they overwrite that block's trailing spaces / clear.
+	// the status-row space for SN3/SN4. Drawn after any row clearing above.
 	lcd.setCursor(LCD_CURSOR_REMOTEXT, 2);
 	lcd.write(iopts[IOPT_REMOTE_EXT_MODE]?ICON_REMOTEXT:' ');
 
@@ -3223,6 +3269,8 @@ void OpenSprinkler::ui_set_options(int oid)
 
 	while(!finished) {
 		button = button_read(BUTTON_WAIT_HOLD);
+		const int previous_option = i;
+		const uint8_t previous_value = iopts[i];
 
 		switch (button & BUTTON_MASK) {
 		case BUTTON_1:
@@ -3272,6 +3320,16 @@ void OpenSprinkler::ui_set_options(int oid)
 			break;
 		}
 
+		if (i == previous_option && iopts[i] != previous_value) {
+			for (uint8_t input = 0; input < NUM_SENSORS; input++) {
+				if (i != sensor_iopt_keys[input].type) continue;
+				uint8_t analog_refs, digital_refs;
+				if (!sensor_port_references(analog_refs, digital_refs) ||
+					!sensor_port_transition_allowed(input, previous_value, iopts[i], analog_refs, digital_refs)) {
+					iopts[i] = previous_value;
+				}
+			}
+		}
 		if (button != BUTTON_NONE) {
 			lcd_print_option(i);
 		}
@@ -3402,15 +3460,23 @@ void OpenSprinkler::config_ip() {
 	}
 }
 
-void OpenSprinkler::save_wifi_ip() {
-	// todo: handle wired ethernet
-	if(iopts[IOPT_USE_DHCP] && WiFi.status() == WL_CONNECTED) {
-		memcpy(iopts+IOPT_STATIC_IP1, &(WiFi.localIP()[0]), 4);
-		memcpy(iopts+IOPT_GATEWAY_IP1, &(WiFi.gatewayIP()[0]),4);
-		memcpy(iopts+IOPT_DNS_IP1, &(WiFi.dnsIP()[0]), 4);
-		memcpy(iopts+IOPT_SUBNET_MASK1, &(WiFi.subnetMask()[0]), 4);
-		iopts_save();
-	}
+void OpenSprinkler::save_network_ip() {
+	if (!iopts[IOPT_USE_DHCP]) return;
+	if (useEth ? !eth.connected() : WiFi.status() != WL_CONNECTED) return;
+	IPAddress ip = useEth ? eth.localIP() : WiFi.localIP();
+	if ((uint32_t)ip == 0 || (ip[0] == 169 && ip[1] == 254)) return; // Skip outages and AutoIP.
+	IPAddress gateway = useEth ? eth.gatewayIP() : WiFi.gatewayIP();
+	IPAddress dns_ip = useEth ? eth.dnsIP() : WiFi.dnsIP();
+	IPAddress subnet = useEth ? eth.subnetMask() : WiFi.subnetMask();
+	if (!memcmp(iopts + IOPT_STATIC_IP1, &ip[0], 4) &&
+		!memcmp(iopts + IOPT_GATEWAY_IP1, &gateway[0], 4) &&
+		!memcmp(iopts + IOPT_DNS_IP1, &dns_ip[0], 4) &&
+		!memcmp(iopts + IOPT_SUBNET_MASK1, &subnet[0], 4)) return;
+	memcpy(iopts + IOPT_STATIC_IP1, &ip[0], 4);
+	memcpy(iopts + IOPT_GATEWAY_IP1, &gateway[0], 4);
+	memcpy(iopts + IOPT_DNS_IP1, &dns_ip[0], 4);
+	memcpy(iopts + IOPT_SUBNET_MASK1, &subnet[0], 4);
+	iopts_save();
 }
 
 void OpenSprinkler::detect_expanders() {

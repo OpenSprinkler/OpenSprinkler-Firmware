@@ -1,0 +1,14 @@
+name: opensprinkler
+
+services:
+  opensprinkler:
+    build: .
+    image: opensprinkler
+    # OSPI hardware access, matching the documented docker run setup.
+    privileged: true
+    volumes:
+      - ${HOME}/opensprinkler:/data
+      - /dev:/dev
+    ports:
+      - "8080:8080"
+    restart: unless-stopped

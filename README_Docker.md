@@ -6,6 +6,29 @@ You can do it via:
 git submodule update --recursive --init
 ```
 
+## Using Docker Compose
+
+With Docker Compose v2 installed, run from this directory:
+
+```sh
+mkdir -p ~/opensprinkler
+docker compose up -d --build
+```
+
+This builds the OSPI image, publishes port 8080, and stores configuration and
+logs in `~/opensprinkler`, the same directory as the manual setup below. It
+uses privileged access and mounts `/dev` for GPIO and I2C, so run it only on a
+trusted controller host. Do not run it alongside another OpenSprinkler instance
+controlling the same hardware.
+
+```sh
+docker compose logs -f
+docker compose down
+```
+
+`down` leaves the configuration and logs in `~/opensprinkler` intact. Run these
+commands as the same user so `${HOME}` points to the same data directory.
+
 ## Building the container
 From this directory, create the image:
 

@@ -538,7 +538,7 @@ OpenSprinkler supports **two independent sensors** (`SN1`, `SN2`) with configura
 
 #### Integration
 
-* **OTC:** Configure **OpenThings Cloud (OTC)** token for remote access. See [**Remote Access with OTC**](../guides/remote-access-otc.md).
+* **OTC:** Configure **OpenThings Cloud (OTC)** token for remote access. Create or copy your token from [opensprinkler.com → My Account](https://opensprinkler.com/my-account/) → **My OTC Tokens**. See [**Remote Access with OTC**](../guides/remote-access-otc.md).
 * **MQTT:** Configure MQTT parameters. See [**Using MQTT**](../guides/mqtt.md).
 * **Email Notifications:** Configure Email settings. See [**Setting Up Email Notifications**](../guides/email-notifications.md).
 * **IFTTT:** Configure IFTTT Webhooks key. See [**Setting Up IFTTT Notifications**](../guides/ifttt-notifications.md).

@@ -139,6 +139,7 @@ uint8_t execute_change_values(const ParamSource& params, uint16_t allowed_action
 				os.iopts[IOPT_REMOTE_EXT_MODE] = 0;
 				return HTML_INTERNAL_ERROR;
 			}
+			scheduler_enter_remote_extension(os.now_tz());
 		} else if (tmp_buffer[0] == '0' && os.iopts[IOPT_REMOTE_EXT_MODE]) {
 			os.iopts[IOPT_REMOTE_EXT_MODE] = 0;
 			if (!os.iopts_save()) {
@@ -180,6 +181,13 @@ uint8_t execute_manual_station(const ParamSource& params) {
 		if (params.get(tmp_buffer, TMP_BUFFER_SIZE, PSTR("qo"), true)) {
 			queue_option = static_cast<uint8_t>(atoi(tmp_buffer));
 		}
+		bool cycle_opt_in = false;
+		uint8_t cs_found = 0;
+		params.get(tmp_buffer, TMP_BUFFER_SIZE, PSTR("cs"), true, &cs_found);
+		if (cs_found) {
+			if (strcmp(tmp_buffer, "0") && strcmp(tmp_buffer, "1")) return HTML_DATA_OUTOFBOUND;
+			cycle_opt_in = tmp_buffer[0] == '1';
+		}
 
 		RuntimeQueueStruct* entry = pd.enqueue();
 		if (!entry) return HTML_NOT_PERMITTED;
@@ -187,6 +195,7 @@ uint8_t execute_manual_station(const ParamSource& params) {
 		entry->dur = duration;
 		entry->sid = static_cast<uint8_t>(sid);
 		entry->pid = MANUAL_PID;
+		if (cycle_opt_in) entry->cycle_flags |= CYCLE_MANUAL_OPT_IN;
 		schedule_all_stations(curr_time, queue_option);
 	} else {
 		uint8_t shift = 0;
@@ -223,34 +232,33 @@ uint8_t execute_manual_program(const ParamSource& params) {
 	if (params.get(tmp_buffer, TMP_BUFFER_SIZE, PSTR("qo"), true)) {
 		queue_option = static_cast<uint8_t>(atoi(tmp_buffer));
 	}
-	if (queue_option == QUEUE_OPTION_REPLACE) reset_all_stations_immediate();
-
-	manual_start_program(static_cast<uint8_t>(pid + 1), use_weather, queue_option,
-		use_sensor_adjustment);
-	return HTML_SUCCESS;
+	const auto result = manual_start_program(static_cast<uint8_t>(pid + 1), use_weather,
+		queue_option, use_sensor_adjustment);
+	return result == RunAdmission::Full ? HTML_NOT_PERMITTED : HTML_SUCCESS;
 }
 
-uint8_t execute_runonce(const ParamSource& params) {
+// Release request scratch arrays before entering the filesystem-heavy scheduler.
+static __attribute__((noinline)) uint8_t prepare_runonce(const ParamSource& params, uint8_t& queue_option) {
 	if (!params.get(tmp_buffer, TMP_BUFFER_SIZE, "t", false)) return HTML_DATA_MISSING;
 
 	ProgramStruct program{};
-	ProgramStruct annotation_program{};
 	uint8_t station_count = os.nstations;
 	if (!parse_duration_list(tmp_buffer, program.durations, station_count)) {
 		return HTML_DATA_FORMATERROR;
 	}
 
 	uint8_t order[MAX_NUM_STATIONS];
-	annotation_program.name[0] = 0;
-	params.get(annotation_program.name, sizeof(annotation_program.name), PSTR("anno"), true);
-	annotation_program.gen_station_runorder(1, order);
+	params.get(program.name, sizeof(program.name), PSTR("anno"), true);
+	program.gen_station_runorder(1, order);
 
 	uint8_t count_found = 0;
+	bool save_repeats = false;
 	params.get(tmp_buffer, TMP_BUFFER_SIZE, PSTR("cnt"), true, &count_found);
 	if (count_found) {
 		long repeat_count = atol(tmp_buffer);
 		if (repeat_count < 0 || repeat_count > 32768) return HTML_DATA_OUTOFBOUND;
 		if (repeat_count > 0) {
+			if (os.iopts[IOPT_REMOTE_EXT_MODE]) return HTML_NOT_PERMITTED;
 			if (!params.get(tmp_buffer, TMP_BUFFER_SIZE, PSTR("int"), true)) {
 				return HTML_DATA_MISSING;
 			}
@@ -273,46 +281,42 @@ uint8_t execute_runonce(const ParamSource& params) {
 			program.starttimes[0] = start_minute % 1440;
 			program.starttimes[1] = static_cast<int16_t>(repeat_count - 1);
 			program.starttimes[2] = repeat_count == 1 ? 0 : static_cast<int16_t>(interval);
+			char annotation[PROGRAM_NAME_SIZE];
+			memcpy(annotation, program.name, sizeof(annotation));
 			strcpy_P(program.name, PSTR(RUNONCE_REPEAT_PREFIX));
-			strncat(program.name, annotation_program.name,
+			strncat(program.name, annotation,
 				PROGRAM_NAME_SIZE - strlen(program.name) - 1);
 			program.name[PROGRAM_NAME_SIZE - 1] = 0;
 			if (pd.nprograms >= MAX_NUM_PROGRAMS) return HTML_DATA_OUTOFBOUND;
-			if (!pd.add(&program)) return HTML_INTERNAL_ERROR;
+			save_repeats = true;
 		}
 	}
 
 	uint8_t watering_level = 100;
-	if (params.get(tmp_buffer, TMP_BUFFER_SIZE, PSTR("uwt"), true) && tmp_buffer[0] == '1') {
+	if (!os.iopts[IOPT_REMOTE_EXT_MODE] && params.get(tmp_buffer, TMP_BUFFER_SIZE, PSTR("uwt"), true) && tmp_buffer[0] == '1') {
 		watering_level = effective_weather_water_percent(
 			weather_response_is_current(monotonic_millis()));
 	}
 
-	uint8_t queue_option = QUEUE_OPTION_REPLACE;
+	queue_option = QUEUE_OPTION_REPLACE;
 	if (params.get(tmp_buffer, TMP_BUFFER_SIZE, PSTR("qo"), true)) {
 		queue_option = static_cast<uint8_t>(atoi(tmp_buffer));
 	}
-	if (queue_option == QUEUE_OPTION_REPLACE) reset_all_stations_immediate();
-
-	bool match_found = false;
-	for (uint8_t order_index = 0; order_index < station_count; order_index++) {
-		uint8_t sid = order[order_index];
-		uint32_t duration = water_time_scale(water_time_resolve(program.durations[sid]),
-			watering_level, 1.0f);
-		uint8_t board = sid >> 3;
-		uint8_t station = sid & 0x07;
-		if (duration == 0 || (os.attrib_dis[board] & (1 << station))) continue;
-
-		RuntimeQueueStruct* entry = pd.enqueue();
-		if (!entry) continue;
-		entry->st = 0;
-		entry->dur = duration;
-		entry->pid = RUNONCE_PID;
-		entry->sid = sid;
-		match_found = true;
-	}
-
-	if (!match_found) return HTML_DATA_MISSING;
-	schedule_all_stations(os.now_tz(), queue_option);
+	uint32_t durations[MAX_NUM_STATIONS];
+	prepare_program_run(program, watering_level, 1.0f, false, durations);
+	const bool replace = queue_option == QUEUE_OPTION_REPLACE;
+	const auto admission = scheduler_check_admission(durations, replace);
+	if (admission == RunAdmission::Full) return HTML_NOT_PERMITTED;
+	if (admission == RunAdmission::Empty) return HTML_DATA_MISSING;
+	// A rejected request must neither stop current watering nor create repeats.
+	if (save_repeats && !pd.add(&program)) return HTML_INTERNAL_ERROR;
+	scheduler_enqueue_run(durations, order, RUNONCE_PID, replace);
 	return HTML_SUCCESS;
+}
+
+uint8_t execute_runonce(const ParamSource& params) {
+	uint8_t queue_option;
+	const uint8_t result = prepare_runonce(params, queue_option);
+	if (result == HTML_SUCCESS) schedule_all_stations(os.now_tz(), queue_option);
+	return result;
 }

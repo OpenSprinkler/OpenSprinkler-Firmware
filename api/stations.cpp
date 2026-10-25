@@ -2,6 +2,8 @@
 #include "handlers.h"
 
 #include "core/bundle.h"
+#include "core/output_sequencer.h"
+#include "storage/station_extra.h"
 
 #include <cstddef>
 #include <cstdio>
@@ -62,6 +64,18 @@ bool change_station_groups(const OTF::Request& request) {
 } // namespace
 
 void server_json_stations_main(OTF_PARAMS_DEF) {
+	bfill.emit_p(PSTR("\"csver\":1,\"qmax\":$D,\"cs\":["), RUNTIME_QUEUE_SIZE);
+	{
+		StationExtraReader policies(MAX_NUM_STATIONS);
+		for (uint16_t sid = 0; sid < os.nstations; sid++) {
+			CycleSoakPolicy policy;
+			const auto result = policies.load(sid, policy);
+			if (result != StationExtraResult::Ok && result != StationExtraResult::Missing) pd.cycle_config_error = true;
+			bfill.emit_p(PSTR("[$D,$D,$D]"), policy.enabled, policy.cycle_seconds, policy.soak_seconds);
+			if (sid + 1 < os.nstations) bfill.emit_p(PSTR(","));
+		}
+	}
+	bfill.emit_p(PSTR("],"));
 	emit_board_attribute(PSTR("masop"), os.attrib_mas);
 	emit_board_attribute(PSTR("masop2"), os.attrib_mas2);
 	emit_board_attribute(PSTR("masop3"), os.attrib_mas3);
@@ -80,8 +94,11 @@ void server_json_stations_main(OTF_PARAMS_DEF) {
 	emit_station_attribute(PSTR("stn_grp"), os.attrib_grp);
 
 	bfill.emit_p(PSTR("\"snames\":["));
+	FileReader names(STATIONS_FILENAME);
 	for (unsigned char sid = 0; sid < os.nstations; sid++) {
-		os.get_station_name(sid, tmp_buffer);
+		tmp_buffer[STATION_NAME_SIZE] = 0;
+		if (!names.read_block(tmp_buffer, uint32_t(sid) * sizeof(StationData) + offsetof(StationData, name),
+			STATION_NAME_SIZE)) tmp_buffer[0] = 0;
 		bfill.emit_p(PSTR("\"$S\""), tmp_buffer);
 		if (sid != os.nstations - 1) bfill.emit_p(PSTR(","));
 	}
@@ -121,6 +138,64 @@ void server_json_station_special(OTF_PARAMS_DEF) {
 
 void server_change_stations(OTF_PARAMS_DEF) {
 	if (!process_password(OTF_PARAMS)) return;
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("csreset"), true)) {
+		if (strcmp(tmp_buffer, "1")) handle_return(HTML_DATA_OUTOFBOUND);
+		if (file_exists(STATION_EXTRA_FILENAME) && !remove_file(STATION_EXTRA_FILENAME)) handle_return(HTML_INTERNAL_ERROR);
+		const auto result = station_extra_initialize(MAX_NUM_STATIONS);
+		pd.cycle_config_error = result != StationExtraResult::Ok;
+		handle_return(pd.cycle_config_error ? HTML_INTERNAL_ERROR : HTML_SUCCESS);
+	}
+	CycleSoakPolicy cycle_policy;
+	bool change_cycle = false;
+	long cycle_sid = -1;
+	const char* cycle_keys[] = {"cse", "csc", "css"};
+	uint16_t cycle_values[3] = {};
+	bool cycle_present[3] = {};
+	for (uint8_t i = 0; i < 3; i++) {
+		uint8_t found = 0;
+		findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, cycle_keys[i], false, &found);
+		if (!found) continue;
+		char* end;
+		long value = strtol(tmp_buffer, &end, 10);
+		if (!tmp_buffer[0] || *end || value < 0 || value > (i ? CYCLE_SOAK_MAX_SECONDS : 1)) handle_return(HTML_DATA_OUTOFBOUND);
+		cycle_values[i] = value;
+		cycle_present[i] = change_cycle = true;
+	}
+	if (change_cycle) {
+		if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("sid"), true)) handle_return(HTML_DATA_MISSING);
+		char* end;
+		cycle_sid = strtol(tmp_buffer, &end, 10);
+		if (!tmp_buffer[0] || *end || cycle_sid < 0 || cycle_sid >= os.nstations) handle_return(HTML_DATA_OUTOFBOUND);
+		const auto loaded = station_extra_load(cycle_sid, MAX_NUM_STATIONS, cycle_policy);
+		if (loaded != StationExtraResult::Ok && loaded != StationExtraResult::Missing &&
+			!(cycle_present[0] && cycle_present[1] && cycle_present[2])) handle_return(HTML_INTERNAL_ERROR);
+		if (cycle_present[0]) cycle_policy.enabled = cycle_values[0];
+		if (cycle_present[1]) cycle_policy.cycle_seconds = cycle_values[1];
+		if (cycle_present[2]) cycle_policy.soak_seconds = cycle_values[2];
+		const bool changing_type = findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("st"), true);
+		if (!cycle_soak_policy_valid(cycle_policy, !changing_type && bundle_is_station(cycle_sid) ? bundle_minimum_duration(cycle_sid) : 0)) handle_return(HTML_DATA_OUTOFBOUND);
+	}
+	uint8_t has_type = 0, has_data = 0;
+	findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("st"), true, &has_type);
+	findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("sd"), true, &has_data);
+	if (has_type != has_data) handle_return(HTML_DATA_MISSING);
+	// Validate a changed Bundle definition before any station writes. Count all
+	// selected members, conservatively including temporarily ineligible members.
+	if (findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("st"), true) && !strcmp(tmp_buffer, "7")) {
+		if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("sid"), true)) handle_return(HTML_DATA_MISSING);
+		char* end;
+		long leader = strtol(tmp_buffer, &end, 10);
+		if (!tmp_buffer[0] || *end || leader < 0 || leader >= os.nstations) handle_return(HTML_DATA_OUTOFBOUND);
+		CycleSoakPolicy policy = cycle_policy;
+		if (!change_cycle) station_extra_load(leader, MAX_NUM_STATIONS, policy);
+		if (!findKeyVal(FKV_SOURCE, tmp_buffer, TMP_BUFFER_SIZE, PSTR("sd"), true)) handle_return(HTML_DATA_MISSING);
+		uint8_t members[MAX_NUM_BOARDS] = {};
+		if (!bundle_validate_definition(leader, tmp_buffer) || !bundle_decode_hex(tmp_buffer, strlen(tmp_buffer), members, os.nboards)) handle_return(HTML_DATA_OUTOFBOUND);
+		uint16_t count = 0;
+		for (uint16_t sid = 0; sid < MAX_NUM_STATIONS; sid++) count += (members[sid >> 3] >> (sid & 7)) & 1;
+		const uint16_t minimum = (count * OUTPUT_STAGGER_MS + 999) / 1000 + 1;
+		if (!cycle_soak_policy_valid(policy, minimum)) handle_return(HTML_DATA_OUTOFBOUND);
+	}
 
 	bool storage_ok = true;
 	unsigned char sid;
@@ -193,7 +268,7 @@ void server_change_stations(OTF_PARAMS_DEF) {
 				os.attrib_bundle[sid >> 3] &= ~mask;
 				if (station_type == STN_TYPE_STANDARD) os.attrib_spe[sid >> 3] &= ~mask;
 			}
-		} else {
+		} else if (!change_cycle) {
 			handle_return(HTML_DATA_MISSING);
 		}
 	}
@@ -204,5 +279,15 @@ void server_change_stations(OTF_PARAMS_DEF) {
 	}
 	bundle_invalidate();
 	if (!os.attribs_save()) storage_ok = false;
+	if (change_cycle) {
+		if (station_extra_initialize(MAX_NUM_STATIONS) != StationExtraResult::Ok ||
+			station_extra_save(cycle_sid, MAX_NUM_STATIONS, cycle_policy) != StationExtraResult::Ok) storage_ok = false;
+		pd.cycle_config_error = !storage_ok;
+		StationExtraReader policies(MAX_NUM_STATIONS);
+		for (uint16_t id = 0; id < os.nstations; id++) {
+			CycleSoakPolicy check;
+			if (policies.load(id, check) != StationExtraResult::Ok) pd.cycle_config_error = true;
+		}
+	}
 	handle_return(storage_ok ? HTML_SUCCESS : HTML_INTERNAL_ERROR);
 }

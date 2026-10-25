@@ -32,7 +32,7 @@
 														// if this number is different from the one stored in non-volatile memory
 														// a device reset will be automatically triggered
 
-#define OS_FW_MINOR      6  // Firmware minor version
+#define OS_FW_MINOR      7  // Firmware minor version
 
 /** Hardware version base numbers */
 #define OS_HW_VERSION_BASE   0x00 // OpenSprinkler
@@ -58,6 +58,7 @@
 #define IOPTS_FILENAME        "/iopts.dat"
 #define SOPTS_FILENAME        "/sopts.dat"
 #define STATIONS_FILENAME     "/stns.dat"
+#define STATION_EXTRA_FILENAME "/stnx.dat"
 #define NVCON_FILENAME        "/nvcon.dat"
 #define PROG_FILENAME         "/prog.dat"
 #define DONE_FILENAME         "/done.dat"
@@ -65,6 +66,7 @@
 #define IOPTS_FILENAME        "iopts.dat"   // integer options data file
 #define SOPTS_FILENAME        "sopts.dat"   // string options data file
 #define STATIONS_FILENAME     "stns.dat"    // stations data file
+#define STATION_EXTRA_FILENAME "stnx.dat"   // versioned per-station extra settings
 #define NVCON_FILENAME        "nvcon.dat"   // non-volatile controller data file, see OpenSprinkler.h --> struct NVConData
 #define PROG_FILENAME         "prog.dat"    // program data file
 #define DONE_FILENAME         "done.dat"    // used to indicate the completion of all files
@@ -137,6 +139,7 @@ enum {
 #define SENSOR_TYPE_RAIN    0x01  // rain sensor
 #define SENSOR_TYPE_FLOW    0x02  // flow sensor
 #define SENSOR_TYPE_SOIL    0x03  // soil moisture sensor
+#define SENSOR_TYPE_ANALOG  0x04  // explicit high-impedance port mode (capable boards only)
 #define SENSOR_TYPE_PSWITCH 0xF0  // program switch sensor
 #define SENSOR_TYPE_OTHER   0xFF
 
@@ -219,6 +222,7 @@ enum {
 #define FIRMWARE_UPDATE_PORT       8080
 #define DEFAULT_OTC_TOKEN_LENGTH   32
 #define DEFAULT_DEVICE_NAME       "My OpenSprinkler"
+#define DEFAULT_HOSTNAME          ""
 #define DEFAULT_EMPTY_STRING      ""
 #define DEFAULT_UNDERCURRENT_THRESHOLD 100 // in mA
 #define DEFAULT_OVERCURRENT_LIMIT 1200 // in mA
@@ -365,6 +369,7 @@ enum {
 	SOPT_DEVICE_NAME,
 	SOPT_STA_BSSID_CHL, // wifi extra info: bssid and channel
 	SOPT_EMAIL_OPTS,
+	SOPT_HOSTNAME,
 	NUM_SOPTS // total number of string options
 };
 

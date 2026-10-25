@@ -11,10 +11,10 @@ OpenSprinkler is an open-source, web-based sprinkler and irrigation controller. 
 
 * **Intuitive User Interface (UI):** No more messing with buttons and knobs. Use web browsers and our free mobile apps to access OpenSprinkler.
 * **Remote Access:** Access your OpenSprinkler from anywhere, whether you are at home, at the office, or traveling.
-* **Smart Control:** OpenSprinkler can connect to the Internet and use current, historical, and forecast weather data to automatically adjust watering times. It not only stops watering when it rains but also scales watering time up or down based on your local temperature and humidity.
+* **Smart Control:** OpenSprinkler can connect to the Internet and use current, historical, and forecast weather data to automatically adjust watering times. It not only stops watering when it rains but also scales watering time up or down based on your local temperature and humidity. OpenSprinkler can also read analog sensors, such as soil moisture and temperature sensors, and automatically adjust program watering times based on those readings.
 * **Connectivity Options:** OpenSprinkler supports both WiFi and wired Ethernet. It follows a **local-first approach** — it works directly on your local network without Internet access, while optional cloud access enables remote control. Its built-in WiFi can also function as an Access Point (AP) when no external router is available.
 * **Expandable:** The main controller handles 8 zones and is expandable up to 72 zones with expanders. Our app can also manage multiple OpenSprinkler systems for limitless expansion.
-* **Advanced Features:** OpenSprinkler supports features rarely seen on competing products, such as simultaneous zone runs, MQTT, remote zones, HTTP(S) zones, email notifications, radio frequency (RF) stations, multiple sensor types including flow and analog sensors, four independent master stations, repeating program start times, and multi-language support.
+* **Advanced Features:** OpenSprinkler supports features rarely seen on competing products, such as simultaneous zone runs, MQTT, remote zones, HTTP(S) zones, email notifications, radio frequency (RF) stations, multiple sensor types including flow and analog sensors, four independent master stations, repeating program start times, Cycle and Soak with per-zone settings, and multi-language support.
 
 ---
 
@@ -66,6 +66,12 @@ Up to `40` programs. Each program supports per-station durations (`0–18` h, **
 
 ---
 
+**Q: Does OpenSprinkler support Cycle and Soak?**
+<br>
+Yes, starting with firmware **2.2.1(7)**. Set a maximum watering cycle and minimum soak time for each zone. OpenSprinkler automatically divides the total watering time into balanced cycles, giving water time to soak in and helping reduce runoff on slopes or slow-draining soil. Other zones can run during the soak periods. See [Cycle and Soak](2.2.1/221_7_manual.md#cycle-and-soak).
+
+---
+
 **Q: Does the weather feature work outside North America?**
 <br>
 Yes. You can choose among a variety of [weather data providers](guides/weather-adjustments.md), including Apple Weather, Open-Meteo, AccuWeather, and Weather Underground, most of which are available worldwide.
@@ -93,7 +99,7 @@ OS v3 and v4 are compatible with 2.4GHz WiFi. They do **NOT** currently support 
 **Q: How is OpenSprinkler different from competitors?**
 
 * **Local-first Control:** Its built-in web interface provides direct local access, and it runs programs on its own without requiring an Internet connection or cloud service.
-* **Advanced Features:** Second-precision watering times, simultaneous zone runs, multiple onboard sensors and master zones, pause, support for flow and analog sensors, email notifications, and special station types (Remote, RF, HTTP(S), and Bundle Station).
+* **Advanced Features:** Second-precision watering times, simultaneous zone runs, Cycle and Soak with individual zone settings, multiple onboard sensors and master zones, pause, support for flow and analog sensors (including built-in analog inputs on v4), email notifications, and special station types (Remote, RF, HTTP(S), and Bundle Station).
 * **Flexible Connectivity:** Supports both WiFi and wired Ethernet options.
 * **Easy Expansion:** Expand to `72` zones (or `200` with OSPi) at low cost.
 * **Open Source:** Hardware designs and the source code for the firmware, app, and weather service are public, allowing for customization and extension.
@@ -196,17 +202,20 @@ Yes, but keep in mind that those two zones will always operate together.
 OpenSprinkler v3.0-3.3 has two built-in sensor ports; v3.4 and v4 have four. Each port can be independently configured as a:
 
 * **Rain** sensor (normally open or normally closed)
-* **Flow** sensor (two-wire dry-contact; and some three-wire types)
+* **Flow** sensor (SN1 only; two-wire dry-contact and some three-wire types)
 * **Digital soil moisture** sensor (outputs binary signal)
 * **Program start button**
+* **Analog** sensor (v4 only)
 
-[Expanded Sensors](sensor-expander.md) additionally include analog sensors and Weather Sensors, along with options to combine readings or monitor system information. Their values can be displayed, logged, and used to adjust program watering.
+The [Expanded Sensors](sensor-expander.md) interface supports analog sensors connected through the **Sensor Expander hardware** or v4's built-in inputs, as well as **virtual sensors**: Weather Sensors use weather data, System Internal sensors monitor controller information, and Aggregate Sensors combine other sensors' readings. Their values can be displayed, logged, and used to adjust program watering.
 
 ---
 
 **Q: Do you support analog soil sensors?**
 <br>
-Yes. OpenSprinkler v3 and v4 can use the [Sensor Expander](sensor-expander.md), which provides 16 analog input channels. Recent OSPi versions include eight analog inputs through two onboard ADS1115 chips. You can also use our [Analog-to-Digital (A2D) adapter](https://opensprinkler.com/product/a2dadapter/) to convert an analog sensor output into a digital on/off signal.
+Yes. With firmware **2.2.1(7)** and later, **OpenSprinkler v4** can read analog soil sensors directly through its four built-in ports (SN1–SN4, 0–3.3 V), **without a Sensor Expander**. These values can be displayed, logged, and used to adjust watering. OpenSprinkler v3 and v4 can also use the [Sensor Expander](sensor-expander.md), which provides 16 analog input channels; recent OSPi versions include eight through two onboard ADS1115 chips. See [Analog Sensor Setup](sensor-expander.md#configure-other-sensor-types).
+
+For simple on/off control instead of numeric measurements, our [Analog-to-Digital (A2D) adapter](https://opensprinkler.com/product/a2dadapter/) converts an analog sensor output into a digital signal using an adjustable threshold.
 
 ---
 
@@ -284,9 +293,9 @@ Typically you connect the controller to a router (WiFi or Ethernet). However, wi
 
 **Q: How do I access OpenSprinkler?**
 <br>
-OpenSprinkler has a built-in web interface that works with any modern desktop or mobile browser. Simply type the controller's IP address into your browser. We also provide a free OpenSprinkler mobile app (for iOS, Android, and macOS).
+OpenSprinkler has a built-in web interface that works with any modern desktop or mobile browser. Simply type the controller's IP address into your browser. On v3/v4, you can also use a hostname configured under **Edit Options → Network → Hostname**, such as `http://garden-os` (some routers require `http://garden-os.lan/`). We also provide a free OpenSprinkler mobile app (for iOS, Android, and macOS).
 
-For remote access, configure an **OTC (OpenThings Cloud)** token in the settings.
+For remote access, get an **OTC (OpenThings Cloud)** token from [opensprinkler.com → My Account](https://opensprinkler.com/my-account/) → **My OTC Tokens**, then configure it in the controller's settings. See [Remote Access with OTC](guides/remote-access-otc.md).
 
 ---
 
