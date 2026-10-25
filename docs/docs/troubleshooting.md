@@ -256,7 +256,7 @@ If your controller can't connect or stay connected via wired Ethernet, try these
 
 **I can access the controller on my local network, but not when I am away.**
 <span class="vsp1"></span>
-Remote access requires using an **OpenThings Cloud (OTC) token**. To check OTC status, from the homepage, swipe left to right to open the side menu, tap **System Diagnostics**. Make sure OTC status is **Connected**. In the OpenSprinkler mobile app, use the OTC token (instead of the controller's IP address) for remote access.
+Remote access requires using an **OpenThings Cloud (OTC) token**, available from [opensprinkler.com → My Account](https://opensprinkler.com/my-account/) → **My OTC Tokens**. To check OTC status, from the homepage, swipe left to right to open the side menu, tap **System Diagnostics**. Make sure OTC status is **Connected**. In the OpenSprinkler mobile app, use the OTC token (instead of the controller's IP address) for remote access. See [Remote Access with OTC](guides/remote-access-otc.md) for setup instructions.
 
 <hr class="double">
 

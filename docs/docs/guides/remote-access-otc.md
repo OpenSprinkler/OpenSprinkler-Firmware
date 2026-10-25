@@ -9,17 +9,12 @@ OTC is supported on OpenSprinkler v3, v4, OpenSprinkler Pi, and Linux.
 
 ## Create an OTC Token
 
-1. If you don't yet have an account, go to [opensprinkler.com](https://www.opensprinkler.com) and click **My Account** at the top to register.
-2. Navigate to [openthings.io](https://www.openthings.io) and sign in using your opensprinkler.com account. The two websites use the same account credentials.
-3. Select **My OpenThings Devices**. *Do **not** select **My OpenThings Blynk Devices**.*
+1. Sign in at [opensprinkler.com → My Account](https://opensprinkler.com/my-account/). If you don't yet have an account, register there.
+2. Select **My OTC Tokens** in the menu on the left.
+3. Enter a **Device description**, select **OpenSprinkler** as the **Device type**, and click **Add new device**.
+4. Click **Copy** beside the generated 32-character OTC token.
 
-    ![My OpenThings Devices menu](images/otc-device-menu.png){ .img-border .img-center }
-
-4. Enter a **Description** for the controller and select **OpenSprinkler** as the device type.
-5. Select **Add New Device**.
-6. **Copy** the generated 32-character OTC token.
-
-    ![Create an OpenSprinkler device and obtain its OTC token](images/otc-create-device.png){ .img-border .img-center }
+![OpenSprinkler account: My OTC Tokens, Device description, and Device type](images/otc-account-tokens.jpg){ .img-border .img-center }
 
 ---
 
