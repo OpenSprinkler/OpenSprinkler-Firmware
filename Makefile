@@ -34,10 +34,22 @@ container:
 TEST_HTTP_PORT?=18080
 
 .PHONY: test-api
-test-api: test-board-profiles test-hardware-detection test-storage-files test-sprinkler-log test-firmware-release test-buffer-filler test-string-buffer test-sensor-units test-weather-sensor-cache test-weather-failsafe test-output-sequencer test-bundle-codec test-w5500-frame test-flow-rate-window
+test-api: test-board-profiles test-hardware-detection test-storage-files test-sprinkler-log test-firmware-release test-buffer-filler test-string-buffer test-sensor-units test-weather-sensor-cache test-weather-failsafe test-output-sequencer test-bundle-codec test-w5500-frame test-flow-rate-window test-sitemap-relay
 	$(MAKE) clean
 	$(MAKE) VERSION=DEMO EXTRA_CXXFLAGS="-DHTTP_PORT=$(TEST_HTTP_PORT) -DWEATHER_RESPONSE_TEST_MAX_AGE_MS=2000"
 	python3 tests/api_contract.py --port $(TEST_HTTP_PORT)
+
+# The site map as OpenSprinkler v3/v4 store it: the apps keep the image and the controller its fingerprint.
+# Short relay leases and a small window keep the relay checks quick.
+.PHONY: test-api-sitemap-device-image
+test-api-sitemap-device-image: test-sitemap-relay
+	$(MAKE) clean
+	$(MAKE) VERSION=DEMO EXTRA_CXXFLAGS="-DHTTP_PORT=$(TEST_HTTP_PORT) -DWEATHER_RESPONSE_TEST_MAX_AGE_MS=2000 -DSITEMAP_DEVICE_IMAGE -DSITEMAP_RELAY_SENDER_LEASE_MS=1000 -DSITEMAP_RELAY_RECEIVER_LEASE_MS=2000 -DSITEMAP_RELAY_MAX_WINDOW=8192"
+	python3 tests/api_contract.py --port $(TEST_HTTP_PORT)
+
+.PHONY: test-sitemap-relay
+test-sitemap-relay:
+	@set -e; output=$$(mktemp); trap 'rm -f "$$output"' EXIT; 		$(CXX) -std=gnu++14 -Wall -I. tests/sitemap_relay_test.cpp api/sitemap_relay.cpp -o "$$output"; 		"$$output"
 
 .PHONY: test-board-profiles
 test-board-profiles:

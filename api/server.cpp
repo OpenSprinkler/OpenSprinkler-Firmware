@@ -37,6 +37,7 @@
 #include "handlers.h"
 #include "routes.h"
 #include "api/commands.h"
+#include "api/sitemap.h"
 
 // External variables defined in main ion file
 extern OTF::OpenThingsFramework *otf;
@@ -519,6 +520,12 @@ void server_json_options_main() {
 	}
 
 	bfill.emit_p(PSTR(",\"dexp\":$D,\"mexp\":$D,\"hwt\":$D,"), os.detect_exp(), MAX_EXT_BOARDS, os.hw_type);
+
+	// site map revision; its presence tells apps the controller can store a site map
+	bfill.emit_p(PSTR("\"smap\":$L,"), sitemap_revision());
+#if defined(SITEMAP_DEVICE_IMAGE)
+	bfill.emit_p(PSTR("\"smx\":$D,"), sitemap_relay_summary());
+#endif
 
 	// print master array
 	unsigned char masid, optidx;
