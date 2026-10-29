@@ -78,6 +78,54 @@
 #define SENSORS_FILENAME      "sens.dat"    // external sensor definitions
 #define SENADJ_FILENAME       "senadj.dat"  // external sensor adjustment data for programs
 #endif
+// Site map: station pin positions and a background image, stored for the apps.
+#if defined(ESP32)
+#define SITEMAP_FILENAME            "/smap.dat"
+#define SITEMAP_TEMP_FILENAME       "/smap.tmp"
+#define SITEMAP_IMAGE_FILENAME      "/smapimg.dat"
+#define SITEMAP_IMAGE_TEMP_FILENAME "/smapimg.tmp"
+#define SITEMAP_DRAWINGS_FILENAME   "/smapdrw.dat"
+#define SITEMAP_DRAWINGS_TEMP_FILENAME "/smapdrw.tmp"
+#define SITEMAP_FINGERPRINT_FILENAME "/smapfp.dat"
+#define SITEMAP_RELAY_FILENAME      "/smapxfr.tmp"
+#else
+#define SITEMAP_FILENAME            "smap.dat"     // site map header and station pins
+#define SITEMAP_TEMP_FILENAME       "smap.tmp"     // site map header and pins being rewritten
+#define SITEMAP_IMAGE_FILENAME      "smapimg.dat"  // site map JPEG image
+#define SITEMAP_IMAGE_TEMP_FILENAME "smapimg.tmp"  // site map image upload in progress
+#define SITEMAP_DRAWINGS_FILENAME   "smapdrw.dat"  // site map head runs and drip lines (text)
+#define SITEMAP_DRAWINGS_TEMP_FILENAME "smapdrw.tmp" // site map drawings upload in progress
+#define SITEMAP_FINGERPRINT_FILENAME "smapfp.dat"  // site map image fingerprint
+#define SITEMAP_RELAY_FILENAME      "smapxfr.tmp"  // site map image being relayed between apps
+#endif
+// Embedded flash has no room for the image, so the apps keep it and the controller stores its fingerprint
+#if defined(ARDUINO) && !defined(SITEMAP_DEVICE_IMAGE)
+#define SITEMAP_DEVICE_IMAGE
+#endif
+#if defined(SITEMAP_DEVICE_IMAGE)
+#define SITEMAP_MAX_IMAGE_BYTES     (16UL*1024*1024) // largest image size the apps may report
+#else
+#define SITEMAP_MAX_IMAGE_BYTES     (1024UL*1024)
+#endif
+#if defined(ARDUINO)
+#define SITEMAP_MAX_DRAWING_BYTES   (32UL*1024)    // embedded flash is shared with logs
+#else
+#define SITEMAP_MAX_DRAWING_BYTES   (128UL*1024)
+#endif
+// Relaying the image between apps (SITEMAP_DEVICE_IMAGE): image bytes per upload request (6 KB is 8 KB of base64,
+// the request body limit), the largest batch kept in flash, and how long a quiet sender or receiver keeps its place
+#ifndef SITEMAP_RELAY_REQUEST_BYTES
+#define SITEMAP_RELAY_REQUEST_BYTES 6144
+#endif
+#ifndef SITEMAP_RELAY_MAX_WINDOW
+#define SITEMAP_RELAY_MAX_WINDOW    (64UL*1024)
+#endif
+#ifndef SITEMAP_RELAY_SENDER_LEASE_MS
+#define SITEMAP_RELAY_SENDER_LEASE_MS 30000
+#endif
+#ifndef SITEMAP_RELAY_RECEIVER_LEASE_MS
+#define SITEMAP_RELAY_RECEIVER_LEASE_MS 60000
+#endif
 #if defined(ARDUINO)
 #define LOG_DIR                     "/logs/"   // absolute path on LittleFS; writers must ensure parent exists
 #else

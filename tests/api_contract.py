@@ -2,6 +2,8 @@
 """Smoke-test the public JSON contract against a fresh Demo instance."""
 
 import argparse
+import base64
+import hashlib
 import http.server
 import json
 import socket
@@ -44,6 +46,20 @@ class DemoServer:
         self.temp_dir = tempfile.TemporaryDirectory(prefix="opensprinkler-api-")
         log_path = Path(self.temp_dir.name) / "server.log"
         self.log_file = log_path.open("w+")
+        self._start()
+        return self
+
+    def restart(self):
+        """Stops the firmware and starts it again on the same data directory, as after a power cut."""
+        self.process.terminate()
+        try:
+            self.process.wait(timeout=3)
+        except subprocess.TimeoutExpired:
+            self.process.kill()
+            self.process.wait()
+        self._start()
+
+    def _start(self):
         self.process = subprocess.Popen(
             [str(self.binary), "-d", self.temp_dir.name],
             stdout=self.log_file,
@@ -56,7 +72,7 @@ class DemoServer:
                 break
             try:
                 self.get_json("jo")
-                return self
+                return
             except (OSError, urllib.error.URLError, json.JSONDecodeError):
                 time.sleep(0.1)
 
@@ -121,6 +137,24 @@ class DemoServer:
                     break
                 response.extend(chunk)
             return bytes(response)
+
+    def post_json(self, endpoint, params=None, body=b""):
+        query_params = {"pw": PASSWORD_HASH}
+        if params:
+            query_params.update(params)
+        query = urllib.parse.urlencode(query_params)
+        response = self.raw_http(
+            (
+                f"POST /{endpoint}?{query} HTTP/1.1\r\n"
+                f"Host: 127.0.0.1\r\n"
+                f"Content-Type: text/plain\r\n"
+                f"Content-Length: {len(body)}\r\n"
+                f"Connection: close\r\n\r\n"
+            ).encode(),
+            [(0, body)] if body else (),
+        )
+        assert response.startswith(b"HTTP/1.1 200"), response[:80]
+        return json.loads(response.split(b"\r\n\r\n", 1)[1])
 
     def set_string_option(self, option_id, value):
         encoded = value.encode("ascii")
@@ -190,7 +224,7 @@ def check_options(data):
             "den", "ipas", "devid", "dim", "uwt", "ntp1", "ntp2", "ntp3",
             "ntp4", "lg", "fpr0", "fpr1", "re", "sar", "ife", "ife2",
             "sn1t", "sn1o", "sn2t", "sn2o", "sn1on", "sn1of", "sn2on",
-            "sn2of", "wimod", "reset", "dexp", "mexp", "ms",
+            "sn2of", "wimod", "reset", "dexp", "mexp", "ms", "smap",
         ],
     )
     assert isinstance(data["ms"], list) and len(data["ms"]) == 12
@@ -824,6 +858,417 @@ def check_sprinkler_logs(server):
     print("PASS sprinkler log API")
 
 
+def check_sitemap(server):
+    def revision():
+        return server.get_json("jo")["smap"]
+
+    # OpenSprinkler v3/v4 leave the image to the apps ("loc":1); every controller reports its fingerprint
+    device_image = "loc" in server.get_json("jm")
+
+    def mapped(**values):
+        expected = {"fp": ""}
+        if device_image:
+            expected["loc"] = 1
+        expected.update(values)
+        return expected
+
+    assert server.get_json("jm") == mapped(rev=0, img=0, drw=0, pins=[])
+    assert revision() == 0
+
+    # Pins in the request body replace the stored set
+    assert server.post_json("cmp", body=b"0,0,0;2,10000,5000;1,25,75")["result"] == 1
+    assert server.get_json("jm") == mapped(rev=1, img=0, drw=0, pins=[[0, 0, 0], [2, 10000, 5000], [1, 25, 75]])
+    assert revision() == 1
+    assert server.post_json("cmp", body=b"0,10001,0")["result"] == 0x11
+    assert server.post_json("cmp", body=b"250,1,1")["result"] == 0x11
+    assert server.post_json("cmp", body=b"0,1")["result"] == 0x12
+    assert server.post_json("cmp", body=b"0,1,1;0,2,2")["result"] == 0x12
+    assert server.post_json("cmp")["result"] == 0x10
+    assert server.get_json("jm")["rev"] == 1
+
+    # Small maps can use the query string; an empty value clears the pins
+    assert server.get_json("cmp", {"p": "3,1,2"})["result"] == 1
+    assert server.get_json("jm")["pins"] == [[3, 1, 2]]
+
+    if device_image:
+        check_sitemap_device_image(server, revision)
+        check_sitemap_relay(server)
+    else:
+        check_sitemap_controller_image(server)
+
+    # Drawings are app-defined text, uploaded in ordered chunks
+    drawings = "".join(f"h,{n % 3},{n},{n * 2},{n + 5},{n * 2 + 5}\n" for n in range(600)).encode()
+    assert len(drawings) > 8192
+    before = revision()
+    chunk = 6000
+    for offset in range(0, len(drawings), chunk):
+        part = drawings[offset:offset + chunk]
+        assert server.post_json("umd", {"off": offset, "tot": len(drawings)}, part)["result"] == 1
+        if offset + len(part) < len(drawings):
+            assert server.get_json("jm")["drw"] == 0
+    assert server.get_json("jm")["drw"] == len(drawings)
+    assert revision() == before + 1
+    status, headers, body = server.get_response("jmd")
+    assert status == 200 and headers.get_content_type() == "text/plain"
+    assert body == drawings
+    assert server.post_json("umd", {"off": 0, "tot": 4}, b"h\x01,1")["result"] == 0x12
+    assert server.post_json("umd", {"off": 0, "tot": 4}, "h,é".encode())["result"] == 0x12
+    assert server.post_json("umd", {"off": 5, "tot": 10}, b"h,1,1")["result"] == 0x11
+    assert server.post_json("umd", {"off": 0, "tot": 999999}, b"h")["result"] == 0x11
+    assert server.post_json("umd", {"off": 0, "tot": 3})["result"] == 0x10
+    assert server.get_response("jmd")[2] == drawings
+    assert server.post_json("umd", {"off": 0, "tot": 0})["result"] == 1
+    assert server.get_json("jm")["drw"] == 0
+    assert server.get_json("jmd")["result"] == 0x10
+
+    # OpenThings Cloud doesn't pass on POST requests with a body, so chunks may arrive in the d parameter instead
+    cloud_drawings = "".join(f"d,{n % 3},{n},1,2,3\n" for n in range(40)).encode()
+    for offset in range(0, len(cloud_drawings), 200):
+        part = cloud_drawings[offset:offset + 200].decode()
+        assert server.get_json("umd", {"off": offset, "tot": len(cloud_drawings), "d": part})["result"] == 1
+    assert server.get_response("jmd")[2] == cloud_drawings
+    assert server.get_json("umd", {"off": 0, "tot": 3, "d": "h,\x01"})["result"] == 0x12
+
+    small = b"d,1,10,20,30,40\n"
+    assert server.post_json("umd", {"off": 0, "tot": len(small)}, small)["result"] == 1
+    before = revision()
+    assert server.get_json("dm")["result"] == 1
+    assert server.get_json("jm") == mapped(rev=before + 1, img=0, drw=0, pins=[])
+    if not device_image:
+        assert server.get_json("jmi")["result"] == 0x10
+    assert server.get_json("jmd")["result"] == 0x10
+    print("PASS site map API" + (" (image kept by the apps)" if device_image else ""))
+
+
+def image_fingerprint(image):
+    return hashlib.sha256(image).hexdigest()[:32]
+
+
+def check_sitemap_controller_image(server):
+    # Image uploads arrive in ordered chunks and only replace the image when complete
+    image = b"\xff\xd8" + bytes(range(256)) * 60 + b"\xff\xd9"
+    chunk = 6000
+    for offset in range(0, len(image), chunk):
+        part = image[offset:offset + chunk]
+        result = server.post_json("um", {"off": offset, "tot": len(image)}, base64.b64encode(part))
+        assert result["result"] == 1, (offset, result)
+        if offset + len(part) < len(image):
+            assert server.get_json("jm")["img"] == 0
+    mapped = server.get_json("jm")
+    assert mapped["img"] == len(image) and mapped["pins"] == [[3, 1, 2]]
+    status, headers, body = server.get_response("jmi")
+    assert status == 200 and headers.get_content_type() == "image/jpeg"
+    assert body == image
+
+    # The controller fingerprints the image, so apps can tell whether the copy they have is still current
+    assert mapped["fp"] == image_fingerprint(image)
+    fingerprint_file = Path(server.temp_dir.name) / "smapfp.dat"
+    assert fingerprint_file.read_text() == image_fingerprint(image)
+
+    # An image stored before fingerprints existed gets one when the map is next read
+    fingerprint_file.unlink()
+    assert server.get_json("jm")["fp"] == image_fingerprint(image)
+    assert fingerprint_file.read_text() == image_fingerprint(image)
+
+    def encoded(data):
+        return base64.b64encode(data)
+
+    assert server.post_json("um", {"off": 10, "tot": 100}, encoded(b"abc"))["result"] == 0x11
+    assert server.post_json("um", {"off": 0, "tot": 2}, encoded(b"abc"))["result"] == 0x11
+    assert server.post_json("um", {"off": 0, "tot": 2 * 1024 * 1024}, encoded(b"ab"))["result"] == 0x11
+    assert server.post_json("um", {"off": 0, "tot": 3})["result"] == 0x10
+    assert server.post_json("um", {"off": 0, "tot": 3}, b"not base64!")["result"] == 0x12
+    assert server.post_json("um", {"off": 0, "tot": 3}, encoded(b"GIF"))["result"] == 0x12
+    assert server.get_response("jmi")[2] == image
+    assert server.get_json("jm")["fp"] == image_fingerprint(image)
+
+    # Through OpenThings Cloud the chunks arrive in the d parameter
+    cloud_image = b"\xff\xd8" + bytes(range(256)) * 3 + b"\xff\xd9"
+    for offset in range(0, len(cloud_image), 300):
+        part = base64.b64encode(cloud_image[offset:offset + 300]).decode()
+        assert server.get_json("um", {"off": offset, "tot": len(cloud_image), "d": part})["result"] == 1
+    assert server.get_response("jmi")[2] == cloud_image
+    assert server.get_json("jm")["fp"] == image_fingerprint(cloud_image)
+    assert server.get_json("um", {"off": 0, "tot": 3})["result"] == 0x10
+
+    # Setting a fingerprint and relaying the image are only for controllers that leave the image to the apps
+    for endpoint in ("cmi", "mxr", "mxs", "mxu", "mxd", "mxa", "mxc"):
+        assert route_status(server, endpoint, {"cid": "0000a001"}) == 404, endpoint
+
+
+def check_sitemap_device_image(server, revision):
+    # The controller has no room for the image, so it only stores the fingerprint and size the apps send
+    fingerprint = "0123456789abcdef" * 2
+    before = revision()
+    assert server.get_json("cmi", {"fp": fingerprint, "sz": 123456})["result"] == 1
+    assert server.get_json("jm") == {"loc": 1, "fp": fingerprint, "rev": before + 1, "img": 123456, "drw": 0,
+        "pins": [[3, 1, 2]]}
+    assert revision() == before + 1
+
+    assert server.get_json("cmi", {"fp": "0123456789ABCDEF" * 2, "sz": 5})["result"] == 0x12
+    assert server.get_json("cmi", {"fp": "0" * 31, "sz": 5})["result"] == 0x12
+    assert server.get_json("cmi", {"fp": "g" * 32, "sz": 5})["result"] == 0x12
+    assert server.get_json("cmi", {"fp": fingerprint, "sz": 0})["result"] == 0x12
+    assert server.get_json("cmi", {"fp": "", "sz": 5})["result"] == 0x12
+    assert server.get_json("cmi", {"fp": fingerprint, "sz": 64 * 1024 * 1024})["result"] == 0x11
+    assert server.get_json("cmi", {"fp": fingerprint})["result"] == 0x11
+    assert server.get_json("cmi", {"sz": 5})["result"] == 0x10
+    assert server.get_json("jm")["fp"] == fingerprint and server.get_json("jm")["rev"] == before + 1
+
+    # The image itself can't be uploaded or downloaded
+    assert route_status(server, "um", {"off": 0, "tot": 3}) == 404
+    assert route_status(server, "jmi") == 404
+
+    # An empty fingerprint removes the image, keeping the pins
+    assert server.get_json("cmi", {"fp": "", "sz": 0})["result"] == 1
+    assert server.get_json("jm") == {"loc": 1, "fp": "", "rev": before + 2, "img": 0, "drw": 0, "pins": [[3, 1, 2]]}
+
+
+# Built with short leases and an 8 KB window cap (see the test-api-sitemap-device-image make target)
+RELAY_SENDER_LEASE = 1.0
+RELAY_RECEIVER_LEASE = 2.0
+RELAY_WINDOW = 6144
+
+
+def check_sitemap_relay(server):
+    image = bytes((n * 7 + 3) % 256 for n in range(20000))
+    fingerprint = image_fingerprint(image)
+    assert server.get_json("cmi", {"fp": fingerprint, "sz": len(image)})["result"] == 1
+    receiver, second_receiver = "0000b001", "0000b002"
+    sender, second_sender = "0000a001", "0000a002"
+
+    def relay(endpoint, client, **params):
+        return server.get_json(endpoint, dict(params, cid=client))
+
+    def summary():
+        return server.get_json("jo")["smx"]
+
+    def fill(client, in_url=False):
+        claimed = relay("mxs", client, fp=fingerprint)
+        assert claimed["result"] == 1 and claimed["st"] == 2, claimed
+        position = claimed["off"] + claimed["len"]
+        end = min(claimed["off"] + claimed["win"], len(image))
+        # The local web server limits the URL to 1 KB, so pieces sent the OpenThings Cloud way are kept small here
+        size = 300 if in_url else claimed["req"]
+        while position < end:
+            piece = image[position:min(end, position + size)]
+            encoded = base64.b64encode(piece)
+            params = {"cid": client, "off": position}
+            if in_url:
+                result = server.get_json("mxu", dict(params, d=encoded.decode()))
+            else:
+                result = server.post_json("mxu", params, encoded)
+            assert result["result"] == 1, result
+            position += len(piece)
+        assert relay("mxs", client, fp=fingerprint)["st"] == 3
+
+    def drain(client, received):
+        ready = relay("mxr", client, fp=fingerprint)
+        assert ready["result"] == 1 and ready["st"] == 3 and ready["pos"] == 0, ready
+        assert ready["off"] == len(received)
+        status, headers, body = server.get_response("mxd", {"cid": client})
+        assert status == 200 and headers.get_content_type() == "application/octet-stream"
+        assert len(body) == ready["len"]
+        received.extend(body)
+        assert relay("mxa", client, off=ready["off"] + ready["len"])["result"] == 1
+
+    # Nobody is waiting, so there's nothing to send
+    assert summary() == 0
+    assert relay("mxs", sender, fp=fingerprint)["result"] == 0x10
+
+    # Receivers queue up
+    assert relay("mxr", receiver, fp=fingerprint) == {"result": 1, "st": 1, "pos": 0, "off": 0, "len": 0,
+        "tot": len(image)}
+    assert summary() == 1
+    assert relay("mxr", second_receiver, fp=fingerprint)["pos"] == 1
+    assert relay("mxr", receiver, fp="0" * 32)["result"] == 0x03
+    assert relay("mxd", receiver)["result"] == 0x11
+
+    # The first app with the image to claim the transfer sends it; others are turned away
+    claimed = relay("mxs", sender, fp=fingerprint)
+    assert claimed == {"result": 1, "st": 2, "off": 0, "len": 0, "win": RELAY_WINDOW, "req": 6144, "tot": len(image)}
+    assert summary() == 2
+    assert relay("mxs", second_sender, fp=fingerprint)["result"] == 0x30
+    assert relay("mxs", second_sender, fp="0" * 32)["result"] == 0x03
+    assert server.post_json("mxu", {"cid": second_sender, "off": 0}, base64.b64encode(image[:3]))["result"] == 0x30
+    assert server.post_json("mxu", {"cid": sender, "off": 3}, base64.b64encode(image[:3]))["result"] == 0x11
+    assert server.post_json("mxu", {"cid": sender, "off": 0}, b"not base64!")["result"] == 0x12
+    assert server.post_json("mxu", {"cid": sender, "off": 0})["result"] == 0x10
+    assert relay("mxd", second_receiver)["result"] == 0x30
+
+    received = bytearray()
+    while len(received) < len(image):
+        fill(sender, in_url=len(received) % 2 == 0)
+        drain(receiver, received)
+    assert bytes(received) == image
+
+    # The next receiver is served from the start; its sender stops partway and another app carries on
+    assert relay("mxr", second_receiver, fp=fingerprint)["pos"] == 0
+    received = bytearray()
+    fill(sender)
+    drain(second_receiver, received)
+    time.sleep(RELAY_SENDER_LEASE + 0.3)
+    waiting = relay("mxr", second_receiver, fp=fingerprint)
+    assert waiting["st"] == 1 and waiting["off"] == RELAY_WINDOW and summary() == 1
+    assert relay("mxs", second_sender, fp=fingerprint)["off"] == RELAY_WINDOW
+    while len(received) < len(image):
+        fill(second_sender)
+        drain(second_receiver, received)
+    assert bytes(received) == image
+    assert summary() == 0
+    assert relay("mxs", second_sender, fp=fingerprint)["result"] == 0x10
+
+    # A receiver that cancels, or stops asking, gives up its place
+    relay("mxr", receiver, fp=fingerprint)
+    assert relay("mxc", receiver)["result"] == 1 and summary() == 0
+    relay("mxr", receiver, fp=fingerprint)
+    time.sleep(RELAY_RECEIVER_LEASE + 0.3)
+    assert summary() == 0
+
+    # Changing the image ends the transfer
+    relay("mxr", receiver, fp=fingerprint)
+    fill(sender)
+    other = image[::-1]
+    assert server.get_json("cmi", {"fp": image_fingerprint(other), "sz": len(other)})["result"] == 1
+    assert summary() == 0
+    assert relay("mxr", receiver, fp=fingerprint)["result"] == 0x03
+    assert relay("mxs", sender, fp=fingerprint)["result"] == 0x03
+    assert relay("mxd", receiver)["result"] == 0x30
+
+    # Requests need a client id (DEMO builds don't check the password)
+    assert server.get_json("mxr", {"fp": image_fingerprint(other)})["result"] == 0x10
+    assert relay("mxr", "xyz", fp=image_fingerprint(other))["result"] == 0x12
+    assert relay("mxr", "123456789", fp=image_fingerprint(other))["result"] == 0x12
+    assert relay("mxr", "00000000", fp=image_fingerprint(other))["result"] == 0x12
+    print("PASS site map image relay")
+
+
+def check_sitemap_relay_restart(server):
+    # A transfer interrupted by a restart doesn't leave its window on flash
+    data = Path(server.temp_dir.name)
+    image = bytes(range(256)) * 40
+    fingerprint = image_fingerprint(image)
+    assert server.get_json("cmi", {"fp": fingerprint, "sz": len(image)})["result"] == 1
+    assert server.get_json("mxr", {"cid": "0000b001", "fp": fingerprint})["result"] == 1
+    assert server.get_json("mxs", {"cid": "0000a001", "fp": fingerprint})["result"] == 1
+    assert server.post_json("mxu", {"cid": "0000a001", "off": 0}, base64.b64encode(image[:3000]))["result"] == 1
+    assert (data / "smapxfr.tmp").exists()
+
+    server.restart()
+    assert not (data / "smapxfr.tmp").exists()
+    assert server.get_json("jo")["smx"] == 0
+    assert server.get_json("jm")["fp"] == fingerprint
+    print("PASS site map relay restart")
+
+
+def route_status(server, endpoint, params=None):
+    try:
+        return server.get_response(endpoint, params)[0]
+    except urllib.error.HTTPError as error:
+        return error.code
+
+
+def check_sitemap_resent_chunks(server):
+    # A chunk is resent when its reply was lost; the controller accepts it again instead of failing the upload
+    def revision():
+        return server.get_json("jo")["smap"]
+
+    image = b"\xff\xd8" + bytes(range(256)) * 20 + b"\xff\xd9"
+    parts = [(offset, image[offset:offset + 2000]) for offset in range(0, len(image), 2000)]
+    assert len(parts) == 3
+
+    def upload(offset, part):
+        return server.post_json("um", {"off": offset, "tot": len(image)}, base64.b64encode(part))["result"]
+
+    before = revision()
+    assert upload(*parts[0]) == 1
+    assert upload(*parts[1]) == 1
+    assert upload(*parts[1]) == 1
+    assert upload(parts[1][0], b"x" * len(parts[1][1])) == 0x11
+    assert upload(parts[2][0] + 1, parts[2][1][1:]) == 0x11
+
+    # Chunks out of order are still rejected
+    assert upload(*parts[0]) == 1
+    assert upload(*parts[2]) == 0x11
+    assert upload(*parts[1]) == 1
+    assert server.get_json("jm")["img"] == 0
+    assert upload(*parts[2]) == 1
+    assert revision() == before + 1
+
+    # The last chunk again, after the upload completed, doesn't count as another change
+    assert upload(*parts[2]) == 1
+    assert revision() == before + 1
+    assert server.get_json("jm")["img"] == len(image)
+    assert server.get_response("jmi")[2] == image
+    assert upload(parts[2][0], b"x" * len(parts[2][1])) == 0x11
+    assert upload(*parts[1]) == 0x11
+    assert revision() == before + 1
+
+    drawings = "".join(f"d,{n % 3},{n},1,2,3\n" for n in range(300)).encode()
+    pieces = [(offset, drawings[offset:offset + 1500]) for offset in range(0, len(drawings), 1500)]
+    assert len(pieces) > 2
+    before = revision()
+    for index, (offset, piece) in enumerate(pieces):
+        params = {"off": offset, "tot": len(drawings)}
+        assert server.post_json("umd", params, piece)["result"] == 1
+        assert server.post_json("umd", params, piece)["result"] == 1, index
+        assert revision() == before + (1 if index == len(pieces) - 1 else 0)
+    assert server.get_response("jmd")[2] == drawings
+    last_offset, last_piece = pieces[-1]
+    assert server.get_json("umd", {"off": last_offset, "tot": len(drawings), "d": last_piece.decode()})["result"] == 1
+    assert revision() == before + 1
+    print("PASS site map resent chunks")
+
+
+def check_sitemap_drawings_removal(server):
+    # tot=0 removes the drawings only without data; with data it is out of range like any chunk past tot
+    drawings = b"h,1,10,20,30,40\n"
+    assert server.post_json("umd", {"off": 0, "tot": len(drawings)}, drawings)["result"] == 1
+    before = server.get_json("jo")["smap"]
+    assert server.post_json("umd", {"off": 0, "tot": 0}, b"h,1,2,3")["result"] == 0x11
+    assert server.get_json("umd", {"off": 0, "tot": 0, "d": "h,1,2,3"})["result"] == 0x11
+    assert server.get_response("jmd")[2] == drawings
+    assert server.get_json("jo")["smap"] == before
+    assert server.get_json("umd", {"off": 0, "tot": 0})["result"] == 1
+    assert server.get_json("jmd")["result"] == 0x10
+    print("PASS site map drawings removal")
+
+
+def check_sitemap_unreadable_files(server):
+    # Files that are gone answer with a result code instead of an empty response
+    data = Path(server.temp_dir.name)
+    image = b"\xff\xd8" + bytes(range(256)) + b"\xff\xd9"
+    drawings = b"d,0,1,2,3,4\n"
+    assert server.post_json("um", {"off": 0, "tot": len(image)}, base64.b64encode(image))["result"] == 1
+    assert server.post_json("umd", {"off": 0, "tot": len(drawings)}, drawings)["result"] == 1
+    (data / "smapimg.dat").unlink()
+    (data / "smapdrw.dat").unlink()
+    assert server.get_json("jmi")["result"] == 0x10
+    assert server.get_json("jmd")["result"] == 0x10
+    assert server.get_json("dm")["result"] == 1
+    print("PASS site map unreadable files")
+
+
+def check_sitemap_restart(server):
+    # Uploads abandoned by a restart don't leave their temporary files on flash
+    data = Path(server.temp_dir.name)
+    assert server.post_json("cmp", body=b"1,20,30")["result"] == 1
+    assert not (data / "smap.tmp").exists()
+    image = b"\xff\xd8" + bytes(range(256)) * 4
+    assert server.post_json("um", {"off": 0, "tot": len(image) + 100}, base64.b64encode(image))["result"] == 1
+    assert server.post_json("umd", {"off": 0, "tot": 100}, b"h,1,2,3")["result"] == 1
+    assert (data / "smapimg.tmp").exists() and (data / "smapdrw.tmp").exists()
+    (data / "smap.tmp").write_bytes(b"\0" * 10)
+    mapped = server.get_json("jm")
+
+    server.restart()
+    for name in ("smapimg.tmp", "smapdrw.tmp", "smap.tmp"):
+        assert not (data / name).exists(), name
+    assert server.get_json("jm") == mapped
+    assert server.post_json("umd", {"off": 7, "tot": 100}, b"h,1,2,3")["result"] == 0x11
+    print("PASS site map restart")
+
+
 def check_debug(value):
     require_keys("db", value, ["sprlog_fail", "sprlog_mismatch"])
     assert value["sprlog_fail"] == 0
@@ -850,7 +1295,18 @@ def run_contract(server):
     check_weather_failsafe(server)
     check_bundle_commands(server)
     check_sprinkler_logs(server)
+    check_sitemap(server)
+    device_image = "loc" in server.get_json("jm")
+    if not device_image:
+        check_sitemap_resent_chunks(server)
+    check_sitemap_drawings_removal(server)
+    if not device_image:
+        check_sitemap_unreadable_files(server)
     check_nested_option_encodings(server)
+    if device_image:
+        check_sitemap_relay_restart(server)
+    else:
+        check_sitemap_restart(server)
 
 
 def main():

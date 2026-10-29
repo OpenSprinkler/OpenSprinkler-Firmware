@@ -26,6 +26,7 @@
 #include "core/bundle.h"
 #include "core/output_sequencer.h"
 #include "api/server.h"
+#include "api/sitemap.h"
 #include "platform/gpio.h"
 #include "boards/hardware_detection.h"
 #ifdef __has_include
@@ -933,6 +934,7 @@ void OpenSprinkler::begin() {
 		}
 		maintain_embedded_storage();
 		sprinkler_log_prepare();
+		sitemap_remove_temp_files();
 	}
 
 	state = OS_STATE_INITIAL;
@@ -948,6 +950,7 @@ void OpenSprinkler::begin() {
 
 #else
 	sprinkler_log_prepare();
+	sitemap_remove_temp_files();
 #endif
 
 	for (size_t i = 0; i < 4; i++) {
@@ -2195,6 +2198,16 @@ void OpenSprinkler::factory_reset() {
 	remove_file(SENSORS_FILENAME);
 	remove_sensor_log();
 	remove_file(SENADJ_FILENAME);
+
+	// remove the site map stored for the apps
+	remove_file(SITEMAP_FILENAME);
+	remove_file(SITEMAP_TEMP_FILENAME);
+	remove_file(SITEMAP_IMAGE_FILENAME);
+	remove_file(SITEMAP_IMAGE_TEMP_FILENAME);
+	remove_file(SITEMAP_DRAWINGS_FILENAME);
+	remove_file(SITEMAP_DRAWINGS_TEMP_FILENAME);
+	remove_file(SITEMAP_FINGERPRINT_FILENAME);
+	remove_file(SITEMAP_RELAY_FILENAME);
 
 	// 5. write 'done' file
 	file_write_byte(DONE_FILENAME, 0, 1);

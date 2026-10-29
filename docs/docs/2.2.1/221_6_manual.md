@@ -24,6 +24,7 @@ In addition, OpenSprinkler v3 is available in three power models (*v4 is current
 * **OpenSprinkler v4 Support:** Adds support for the new v4 hardware, built around the ESP32-C6.
 * [**Bundle Stations:**](#station-type) A physical zone can act as a Bundle Station and activate any selected set of additional Standard zones together. This makes it easier to run several valves at the same time while scheduling multiple bundles in sequence.
 * [**Weather Sensor:**](../sensor-expander.md#configure-other-sensor-types) Expanded Sensors can now use weather values such as current conditions, today's forecast, previous-day observations, and reference evapotranspiration (ETo). These values can be displayed, logged, and used to adjust program watering.
+* [**Site Map:**](#site-map) The homepage can show your zones on a photo or drawing of your property, with the sprinkler heads and drip lines each valve feeds. Tap a valve to start or stop its zone. The map is stored on the controller, so every app and browser connected to it shows the same map.
 * [**Bounded Sprinkler Log Storage:**](#sprinkler-logs) Sprinkler Logs now use a compact, fixed-size storage area, preventing them from gradually consuming all available storage.
 * [**One-Click Firmware Updates:**](../firmware-update.md#one-click-firmware-update) Firmware 2.2.1(6) introduces one-click updates for OpenSprinkler v3 and v4. The controller can check for compatible releases and install them from its local update page, while manual firmware upload remains available when needed.
 
@@ -389,6 +390,44 @@ A **Bundle Station** behaves like several physical zone wires bundled together i
 * A disabled member remains configured but will not run while disabled.
 
 To reduce simultaneous solenoid inrush current, new physical outputs are activated one at a time using a short stagger interval (`250 ms`). A very short bundle run is automatically extended enough for an isolated bundle's selected members to activate and remain on briefly. Multiple unusually short bundles started concurrently share the same transition sequence, so a heavily contended late member may not activate before its leader's run ends.
+
+---
+
+### Site Map
+
+The site map shows your zones on a photo or drawing of your property. Switch between the station cards and the map with the round button just above the footer menu's grid icon #️⃣ (keyboard shortcut `Alt+A` opens the map).
+
+**Setting up the map**
+
+1. Tap **Edit** ✏️ at the top right of the map, then the camera icon to choose an image of your property. Large images are scaled down before they are saved.
+2. Tap the map where a zone's valve is, then choose the zone from the list. Repeat for each zone.
+3. Tap a valve to draw what it waters:
+    * **Add heads:** tap where each sprinkler head is. The heads are joined by a pipe, and a pipe runs from the valve to the first head.
+    * **Add drip line:** tap points along the drip line. A single tap draws a straight drip line from the valve.
+
+    While drawing, use the bar at the top left to undo the last point, finish ✔, or cancel ✖. You can still drag to pan and pinch to zoom; only taps add points.
+4. Tap the green ✔ to save, or the red ✖ to discard your changes. Leaving the page while editing also discards them. The curved arrow clears the whole map.
+
+While editing, drag a valve or a point to move it. Tap a valve for **Move valve** or **Delete** (which also removes its heads and drip lines), or tap a line to add points to it, undo its last point, or delete it. Tap a point or head and choose **Delete** to remove just that one (the whole line is removed if too few points would be left). To branch a line, tap it where the branch should start and choose **Add heads** or **Add drip line**; the branch is drawn from a small dot on the line.
+
+**Using the map**
+
+* Each valve is colored by its zone's state: blue when idle, green while running, orange when queued, and grey when disabled. A running zone shows its time remaining, and its heads and lines turn green while the others fade.
+* Tap a valve, head, or line to start the zone, or to stop it if it's running or queued, just like tapping a [station card](#manually-start-stop-a-zone).
+* Valves close together on screen are grouped into one marker with a count. Tap it to zoom in until they separate; valves placed at exactly the same spot show a list instead.
+* The map fills the screen, so when the image's shape doesn't match the screen (such as a wide photo on a phone) its edges are cut off at first. Drag to pan, and zoom out to see the whole image. **Reset Zoom** returns to filling the screen.
+* Pinch, scroll, or use the **+**/**−** buttons to zoom. On a computer you can also use the `+`, `-`, and `0` keys to zoom in, zoom out, and reset, and the arrow keys to pan.
+
+!!! info "Where the map is stored"
+    With this firmware the map is stored on the controller, so changes made on one phone or browser appear on the others. If someone else changes the map while you're editing it, you're asked before your changes overwrite theirs. **Export Configuration** includes the map (an emailed backup leaves out the image), and **Factory Reset** removes it. With older firmware, the map is saved only on the device where you made it.
+
+!!! info "The map image on OpenSprinkler v3/v4"
+    OpenSprinkler v3 and v4 don't have room for the image, so each phone or browser keeps its own copy; the valves, heads and drip lines are still stored on the controller. On a device without the image, the map asks for it:
+
+    * **Get from another device:** open the app on a phone or browser that has the image. Within a few seconds it starts sending the image through the controller, showing its progress with a **Cancel** button, and the map fills in as it arrives. Both need to stay open until it's done.
+    * **Load image file:** on the device that has the image, tap **Share image** at the top right of the map and send the file to yourself (by AirDrop, email, or a cloud drive), then load that file. Send it as a file rather than a photo, since messaging apps may shrink photos and the map won't recognize the image.
+
+    Choosing a different image replaces the map image on every device.
 
 ---
 

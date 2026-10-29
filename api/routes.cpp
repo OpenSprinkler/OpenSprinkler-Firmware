@@ -20,6 +20,13 @@ const char* route_uris[] PROGMEM = {
 #endif
 #endif
 	"jsn", "csn", "dsn", "jsl", "dsl", "jsd",
+	"jm", "cmp",
+#if defined(SITEMAP_DEVICE_IMAGE)
+	"cmi", "mxr", "mxs", "mxu", "mxd", "mxa", "mxc",
+#else
+	"um", "jmi",
+#endif
+	"dm", "umd", "jmd",
 };
 
 ApiHandler route_handlers[] = {
@@ -59,6 +66,23 @@ ApiHandler route_handlers[] = {
 	server_json_sensor_log,
 	server_delete_sensor_log,
 	server_json_sensor_desc,
+	server_json_sitemap,
+	server_change_sitemap_pins,
+#if defined(SITEMAP_DEVICE_IMAGE)
+	server_change_sitemap_image,
+	server_relay_join,
+	server_relay_claim,
+	server_relay_upload,
+	server_relay_download,
+	server_relay_confirm,
+	server_relay_leave,
+#else
+	server_upload_sitemap_image,
+	server_json_sitemap_image,
+#endif
+	server_delete_sitemap,
+	server_upload_sitemap_drawings,
+	server_json_sitemap_drawings,
 };
 
 static_assert(sizeof(route_uris) / sizeof(route_uris[0]) ==
