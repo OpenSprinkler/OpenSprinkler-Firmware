@@ -1,5 +1,7 @@
 # Firmware Compilation
 
+**<u>NOTE</u>:** Modern AI coding agents such as **Codex** or **Claude Code** can manage firmware build tools, compile and upload firmware, and make code changes on your behalf given high-level instructions. If you prefer to compile or modify the code manually, follow the VS Code workflow below.
+
 The firmware compilation instructions below are for OpenSprinkler **v3 and v4** only.
 <br>For RPi and Linux-based OpenSprinkler (OSPi), follow the [OSPi installation instructions](ospi/firmware-installation.md).
 
