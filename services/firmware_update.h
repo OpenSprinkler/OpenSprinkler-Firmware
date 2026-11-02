@@ -22,6 +22,7 @@ public:
 	const char *base_url() const;
 
 	bool authenticate(const char *password) const;
+	bool token_valid(const char *token) const;
 
 	bool prepare_verified(const uint8_t *descriptor, size_t descriptor_length,
 		const char *signature_hex, const char *release_id, bool allow_downgrade,

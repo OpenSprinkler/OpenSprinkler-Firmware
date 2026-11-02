@@ -46,7 +46,7 @@
 	uint32_t getNtpTime();
 #elif defined(ESP32)
 	#include <Arduino.h>
-	#include <WebServer.h>
+	#include "platform/update_server.h"
 	WebServer *update_server = NULL;
 	DNSServer *dns = NULL;
 	bool useEth = false;

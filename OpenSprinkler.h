@@ -47,12 +47,13 @@
 	#include "services/espconnect.h"
 	#include "drivers/ch224.h"
 	#if defined(ESP8266)
-		#include <ESP8266WebServer.h>
+		#include "platform/update_server.h"
 		#include "drivers/os_w5500.h"
 		#include <Ticker.h>
 		#include "services/EMailSender.h"
 	#elif defined(ESP32)
 		#include <WiFi.h>
+		#include "platform/update_server.h"
 	#endif
 
 #else // headers for RPI/LINUX

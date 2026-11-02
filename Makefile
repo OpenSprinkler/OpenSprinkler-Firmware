@@ -38,7 +38,20 @@ TEST_HTTP_PORT?=18080
 test-updater-notes:
 	node tests/updater_notes_test.cjs
 
+.PHONY: test-updater-security test-updater-page
+test-updater-security:
+	@set -e; output=$$(mktemp); trap 'rm -f "$$output"' EXIT; \
+		$(CXX) -std=gnu++14 -Wall -Wextra -Werror -I. tests/update_http_reader_test.cpp -o "$$output"; \
+		"$$output"
+	python3 tests/test_updater_admission.py
+	python3 tests/test_updater_multipart.py
+	python3 tests/test_updater_service.py
+
+test-updater-page:
+	node tests/updater_upload_test.cjs
+
 .PHONY: test-api
+test-api: test-updater-security
 test-api: test-hostname test-board-profiles test-hardware-detection test-storage-files test-sprinkler-log test-firmware-release test-buffer-filler test-string-buffer test-sensor-units test-system-internal-sensor test-weather-sensor-cache test-weather-failsafe test-output-sequencer test-bundle-codec test-w5500-frame test-ch390 test-ethernet-lifecycle test-flow-rate-window test-cycle-soak test-cycle-scheduler test-runtime-queue test-station-extra
 	python3 -B -m unittest tests/test_esp8266_stack_guard.py
 	$(MAKE) clean

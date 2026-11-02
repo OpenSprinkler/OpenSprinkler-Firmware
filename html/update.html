@@ -454,6 +454,8 @@
     let deviceInfo = null;
     let firmwareBase = '';
     let releases = [];
+	let uploadPending = false;
+	let updateFinished = false;
 
 	function clear_firmware_file() {
 		id('file').value = '';
@@ -470,6 +472,7 @@
     }
 
     function set_busy(busy) {
+		busy = busy || uploadPending || updateFinished;
 		if (busy) {
 			id('progress').hidden = true;
 			id('progress').value = 0;
@@ -478,6 +481,8 @@
         id('btn_refresh').disabled = busy;
 		id('btn_notes').disabled = busy || !releases.length;
         id('btn_submit').disabled = busy;
+		id('pw').disabled = busy;
+		id('file').disabled = busy;
 		id('release').disabled = busy || !releases.length;
     }
 
@@ -827,7 +832,17 @@
         return result.upload_token;
     }
 
-	function upload_firmware(file, filename, credential, verified, sha256) {
+	async function upload_firmware(file, filename, credential, verified, sha256) {
+        if (uploadPending || updateFinished) return Promise.reject(new Error('An update is already pending.'));
+		// A large rejected body can hide its early 401 behind a TCP reset in browsers.
+		const checkQuery = new URLSearchParams();
+		checkQuery.set(verified ? 'token' : 'pw', credential);
+		const check = await fetch_with_timeout(apiBase + '/check?' + checkQuery, {cache: 'no-store'});
+		if (check.status === 401) throw new Error('Authentication failed. Check the device password.');
+		if (check.status === 409) throw new Error('The updater is busy. Wait before trying again.');
+		if (!check.ok || (await check.json()).result !== 1)
+			throw new Error('Unable to authorize the upload. No firmware was sent. Reload the updater and try again.');
+		if (uploadPending || updateFinished) throw new Error('An update is already pending.');
         return new Promise(function(resolve, reject) {
             const data = new FormData();
             data.append('file', file, filename);
@@ -845,12 +860,21 @@
             xhr.timeout = 300000;
             xhr.onreadystatechange = function() {
                 if (xhr.readyState !== 4) return;
+				if (xhr.status === 401 || xhr.status === 409) {
+					uploadPending = false;
+					return reject(new Error(xhr.status === 401 ?
+						'Authentication failed. Check the device password.' :
+						'The updater is busy. Wait before trying again.'));
+				}
                 if (xhr.status !== 200) return reject(new Error('Could not connect to the update server.'));
                 try {
                     const result = JSON.parse(xhr.responseText);
+					if (typeof result.result !== 'number') throw new Error('Invalid response');
+					uploadPending = false;
 					if (result.result === 2)
 						return reject(new Error('Authentication failed. Check the device password.'));
                     if (result.result !== 1) return reject(new Error(result.item || 'Firmware upload failed.'));
+					updateFinished = true;
                     resolve();
                 } catch (error) { reject(new Error('The device returned an invalid response.')); }
             };
@@ -863,6 +887,7 @@
             };
             xhr.onerror = function() { reject(new Error('A network error occurred during upload.')); };
             xhr.ontimeout = function() { reject(new Error('Firmware upload timed out.')); };
+			uploadPending = true;
             xhr.send(data);
         });
     }
@@ -888,6 +913,7 @@
 		}
 	});
 	id('btn_install').addEventListener('click', async function() {
+		if (uploadPending || updateFinished) return;
 		const release = selected_release();
 		if (!release) return;
 		try {
@@ -913,13 +939,15 @@
             show_msg('Update successful. The controller is rebooting.', 'green');
             id('pw').value = '';
         } catch (error) {
-            if (error.message !== 'Cancelled') show_msg(error.message, 'red');
+            if (error.message !== 'Cancelled') show_msg(uploadPending ?
+					'Update outcome is uncertain. Check the controller before retrying; no retry was sent.' : error.message, 'red');
         } finally {
-            set_busy(false);
+            set_busy(uploadPending || updateFinished);
         }
     });
 
     id('btn_submit').addEventListener('click', async function() {
+		if (uploadPending || updateFinished) return;
         const files = id('file').files;
         if (!files.length) {
             show_msg('Please select a firmware file.', 'red');
@@ -938,9 +966,10 @@
             id('pw').value = '';
 			clear_firmware_file();
         } catch (error) {
-            if (error.message !== 'Cancelled') show_msg(error.message, 'red');
+            if (error.message !== 'Cancelled') show_msg(uploadPending ?
+					'Update outcome is uncertain. Check the controller before retrying; no retry was sent.' : error.message, 'red');
         } finally {
-            set_busy(false);
+            set_busy(uploadPending || updateFinished);
         }
     });
 

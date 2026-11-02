@@ -60,7 +60,7 @@ extern OTF::OpenThingsFramework *otf;
 	#if defined(ESP8266)
 	extern ESP8266WebServer *update_server;
 	#elif defined(ESP32)
-	#include <WebServer.h>
+	#include "platform/update_server.h"
 	#include <Update.h>
 	extern WebServer *update_server;
 	#endif
@@ -2993,6 +2993,60 @@ static bool firmware_upload_authorized = false;
 static bool firmware_upload_failed = false;
 static bool firmware_upload_auth_failed = false;
 static bool firmware_upload_legacy = false;
+static bool firmware_upload_seen = false;
+
+static int updater_access_status(bool verified) {
+	if (verified ? !firmware_update.token_valid(update_server->arg("token").c_str()) :
+		!firmware_update.authenticate(update_server->arg("pw").c_str())) return 401;
+	if (firmware_update.busy() || firmware_update.phase() == FirmwareUpdatePhase::Success) return 409;
+	return 0;
+}
+
+static void updater_send_refusal(int status, const char *message) {
+	String json = F("{\"result\":");
+	json += status == 401 ? HTML_UNAUTHORIZED : HTML_NOT_PERMITTED;
+	json += F(",\"item\":\""); json += message; json += F("\"}");
+	update_server->sendHeader("Access-Control-Allow-Origin", "*");
+	update_server->sendHeader("Cache-Control", "no-store");
+	update_server->sendHeader("Connection", "close");
+	update_server->send(status, "application/json", json);
+}
+
+static const char *updater_access_message(int status) {
+	return status == 401 ? "Authentication failed; reload the updater and check the password" :
+		"Firmware update is busy; wait before trying again";
+}
+
+void on_update_check() {
+	int status = updater_access_status(update_server->hasArg("token"));
+	if (status) updater_send_refusal(status, updater_access_message(status));
+	else update_server_send_result(HTML_SUCCESS);
+}
+
+static bool updater_body_authorized(bool multipart, size_t length) {
+	const String &path = update_server->uri();
+	bool verified = path == "/update/upload";
+	bool prepare = path == "/update/prepare";
+	int status = 0;
+	const char *message = "";
+	if (update_server->method() != HTTP_POST ||
+		(!verified && !prepare && path != "/update")) {
+		status = 404; message = "Unknown updater request";
+	} else if ((status = updater_access_status(verified)) != 0) {
+		message = updater_access_message(status);
+	} else if ((prepare && (multipart || length > 1024)) || (!prepare && !multipart)) {
+		status = 415; message = "Unsupported updater body";
+	}
+	if (status) {
+		updater_send_refusal(status, message);
+		return false;
+	}
+	if (!prepare) {
+		firmware_upload_seen = firmware_upload_authorized = firmware_upload_failed = false;
+		firmware_upload_auth_failed = firmware_upload_legacy = false;
+	}
+	return true;
+}
 
 void on_update_page() {
 	update_server->sendHeader("Content-Encoding", "gzip");
@@ -3023,7 +3077,7 @@ void on_update_info() {
 }
 
 void on_update_prepare() {
-	if (firmware_update.busy()) {
+	if (firmware_update.busy() || firmware_update.phase() == FirmwareUpdatePhase::Success) {
 		update_server_send_result(HTML_NOT_PERMITTED, "update busy");
 		return;
 	}
@@ -3071,7 +3125,7 @@ void on_update_status() {
 }
 
 static void finish_firmware_upload(bool verified) {
-	if (!verified && firmware_upload_legacy &&
+	if (!verified &&
 		!firmware_update.authenticate(update_server->arg("pw").c_str())) {
 		if (firmware_upload_authorized) firmware_update.abort_upload();
 		firmware_upload_authorized = false;
@@ -3125,6 +3179,14 @@ void on_update_options() {
 static void receive_firmware_upload(bool verified) {
 	HTTPUpload& upload = update_server->upload();
 	if(upload.status == UPLOAD_FILE_START){
+		if (firmware_upload_seen) {
+			if (firmware_upload_authorized) firmware_update.abort_upload();
+			firmware_upload_authorized = false;
+			firmware_upload_failed = true;
+			update_server->client().stop();
+			return;
+		}
+		firmware_upload_seen = true;
 		firmware_upload_authorized = false;
 		firmware_upload_failed = false;
 		firmware_upload_auth_failed = false;
@@ -3135,18 +3197,15 @@ static void receive_firmware_upload(bool verified) {
 			firmware_upload_auth_failed = !firmware_upload_authorized;
 		} else {
 			bool modern = update_server->hasArg("size") || update_server->hasArg("sha256");
-			if (modern) {
-				if (!firmware_update.authenticate(update_server->arg("pw").c_str())) {
-					firmware_upload_auth_failed = true;
-				} else {
-					uint32_t upload_size = (uint32_t)update_server->arg("size").toInt();
-					firmware_upload_authorized = firmware_update.begin_manual(
-						upload.filename.c_str(), upload_size,
-						update_server->arg("sha256").c_str());
-				}
+			if (!firmware_update.authenticate(update_server->arg("pw").c_str())) {
+				firmware_upload_auth_failed = true;
+			} else if (modern) {
+				uint32_t upload_size = (uint32_t)update_server->arg("size").toInt();
+				firmware_upload_authorized = firmware_update.begin_manual(
+					upload.filename.c_str(), upload_size,
+					update_server->arg("sha256").c_str());
 			} else {
-				// Legacy pages send the file before the multipart password field, so
-				// authentication must be deferred until the upload-finished callback.
+				// Unsized manual images remain supported, with query authentication.
 				firmware_upload_legacy = true;
 				firmware_upload_authorized =
 					firmware_update.begin_legacy_manual(upload.filename.c_str());
@@ -3165,6 +3224,7 @@ static void receive_firmware_upload(bool verified) {
 		DEBUG_PRINTLN(F("completed"));
 	} else if(upload.status == UPLOAD_FILE_ABORTED){
 		if (firmware_upload_authorized) firmware_update.abort_upload();
+		firmware_upload_authorized = false;
 		firmware_upload_failed = true;
 		DEBUG_PRINTLN(F("aborted"));
 	}
@@ -3183,11 +3243,14 @@ static void register_update_routes() {
 	static decltype(update_server) registered_server = nullptr;
 	if (registered_server == update_server) return;
 	registered_server = update_server;
+	update_server->onBodyAuthorization(updater_body_authorized);
 	update_server->on("/update", HTTP_GET, on_update_page);
 	update_server->on("/update", HTTP_POST, on_firmware_upload_fin, on_firmware_upload);
 	update_server->on("/update", HTTP_OPTIONS, on_update_options);
 	update_server->on("/update/info", HTTP_GET, on_update_info);
 	update_server->on("/update/info", HTTP_OPTIONS, on_update_options);
+	update_server->on("/update/check", HTTP_GET, on_update_check);
+	update_server->on("/update/check", HTTP_OPTIONS, on_update_options);
 	update_server->on("/update/prepare", HTTP_POST, on_update_prepare);
 	update_server->on("/update/prepare", HTTP_OPTIONS, on_update_options);
 	update_server->on("/update/upload", HTTP_POST, on_verified_upload_fin, on_verified_upload);
