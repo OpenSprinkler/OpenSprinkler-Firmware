@@ -94,7 +94,7 @@ With these configurations, OpenSprinkler can effectively **integrate with MQTT**
 
 ---
 
-## Topics Published by Firmware 2.2.1(6)
+## Topics Published by Firmware 2.2.1(7)
 
 OpenSprinkler publishes messages to the MQTT broker in a format similar to IFTTT and email notifications.
 
@@ -103,7 +103,7 @@ OpenSprinkler publishes messages to the MQTT broker in a format similar to IFTTT
 * Due to the firmware storage limit, the **maximum topic length is 24 characters**.
 * Below we use `publish_topic` to denote this name.
 
-Here is the list of topics that firmware 2.2.1(6) publishes:
+Here is the list of topics that firmware 2.2.1(7) publishes:
 
 * **Reboot**: `publish_topic/system` sends `{"state":"started","cause":cc}` when the controller boots, where `cc` is the [reboot-cause code](../api.md#reboot-cause-codes).
 * **Program Start**: `publish_topic/program/x`, where `x` is the program index (starting from 0 for the first program).

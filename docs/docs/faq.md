@@ -326,7 +326,7 @@ OpenSprinkler v3 and v4 are fully assembled and work out of the box. OpenSprinkl
 |     | OS v3 and v4 | OSPi | OSBee |
 |:----|:-------------------|:------------------------|:--------------------------|
 |*Valve Compatibility*|**AC/DC** models both operate 24VAC valves. **DC** additionally supports DC non-latching valves. **Latch** supports only DC latching valves.|24VAC valves only.|DC latching valves only.|
-|*Power Source*|**AC** works with a 24VAC adapter; **DC/Latch** work with a DC (6-24V) adapter.|24VAC only|microUSB or USB-C|
+|*Power Source*|**AC:** 24VAC adapter<br>**v3.4 DC:** USB-C power supply<br>**Other DC/Latch models:** DC (6-24V) adapter.|24VAC only|microUSB or USB-C|
 |*Number of Stations*|`8` on main controller, expandable to `72` by linking expanders.|`8` on main controller, expandable to `200`.|`3`, not expandable.|
 |*Processor*|**v3:** ESP8266<br>**v4:** ESP32-C6|RPi (user-supplied)|ESP8266|
 |*Connectivity*|WiFi 2.4GHz (and optional wired Ethernet)|RPi's connectivity|WiFi 2.4GHz only|
