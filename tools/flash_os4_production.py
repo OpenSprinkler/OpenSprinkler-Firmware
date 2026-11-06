@@ -21,18 +21,18 @@ import uuid
 
 
 TOOLS = Path(__file__).resolve().parent
-VERSION = "2.2.1(6)"
+VERSION = "2.2.1(7)"
 APP_URL = (
-    "https://firmware.opensprinkler.com/v1/releases/2.2.1-6/"
-    "opensprinkler-2.2.1-6-esp32c6.bin32n8"
+    "https://firmware.opensprinkler.com/v1/releases/2.2.1-7/"
+    "opensprinkler-2.2.1-7-esp32c6.bin32n8"
 )
-APP_SIZE = 1719472
-APP_SHA256 = "103c56103e317ca3851c86372855a86657f2062e084525083994d70ed42f52e5"
+APP_SIZE = 1786864
+APP_SHA256 = "d041f038aa56ad64c0728014d3fd21cb52969e951d500ec20b7d23306a1c6e00"
 BOOT_SIZE = 0x10000
-BOOT_SHA256 = "168ef8880c9a3f704cdcfa7cbe73f21ce3c2c9f7cb32479a655edb059eb65c73"
-FACTORY_SHA256 = "95f9c59c6396fb5cceb9fb701c7eb2f472b0bd0af7420675d70ca41a3d707575"
-BOOT_PATH = TOOLS / "production" / "os4-2.2.1-6-boot.bin"
-FACTORY_NAME = "os4-2.2.1-6.factory.bin"
+BOOT_SHA256 = "15b4a74f85942d9d700c19cd4c796fd4bc3954fdd8d726dedb10f13e1ccea526"
+FACTORY_SHA256 = "31128b564d9bdfd6120df1c6e55689794785f2f2f3ceb70aa7dc92d9bf273f70"
+BOOT_PATH = TOOLS / "production" / "os4-2.2.1-7-boot.bin"
+FACTORY_NAME = "os4-2.2.1-7.factory.bin"
 TARGET = "os4-esp32c6-n8"
 
 
@@ -77,7 +77,7 @@ def flash_ota(ip, artifact, dry_run=False):
     verify(app, APP_SIZE, APP_SHA256, "OTA application")
     base = f"http://{ip}:8080/update"
     print(f"OTA: {base}; application only ({APP_SIZE} bytes), SHA-256 {APP_SHA256}", flush=True)
-    print("Settings/logs are preserved. Use W5500, not CH390D, for wired recovery.", flush=True)
+    print("Settings/logs are preserved. Use an interface supported by the currently running firmware.", flush=True)
     if dry_run:
         print("Dry run: no controller contact, upload or reboot.")
         return 0
@@ -92,7 +92,7 @@ def flash_ota(ip, artifact, dry_run=False):
     boundary = "os4-" + uuid.uuid4().hex
     body = (
         f"--{boundary}\r\nContent-Disposition: form-data; name=\"file\"; "
-        'filename="os_221_rev6.bin32n8"\r\nContent-Type: application/octet-stream\r\n\r\n'
+        'filename="os_221_rev7.bin32n8"\r\nContent-Type: application/octet-stream\r\n\r\n'
     ).encode("ascii") + app + f"\r\n--{boundary}--\r\n".encode("ascii")
     print(f"Uploading pinned {VERSION}; keep power connected...", flush=True)
     try:
@@ -114,10 +114,10 @@ def flash_ota(ip, artifact, dry_run=False):
         except ValueError:
             continue
         if (info.get("target") == TARGET and info.get("current_version") == 221
-                and info.get("current_build") == 6):
+                and info.get("current_build") == 7):
             print(f"Verified: {ip} is running {VERSION}.", flush=True)
             return 0
-    raise ValueError("Upload accepted, but running 2.2.1(6) was not confirmed. Check the LCD and DHCP address; do not assume failure or reflash blindly.")
+    raise ValueError(f"Upload accepted, but running {VERSION} was not confirmed. Check the LCD and DHCP address; do not assume failure or reflash blindly.")
 
 
 def verify(data, size, digest, label):
