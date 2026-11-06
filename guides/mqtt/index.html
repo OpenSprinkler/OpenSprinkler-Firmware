@@ -56,18 +56,18 @@
                 <li class="toctree-l1"><a class="reference internal" href="../../firmware-update/">Firmware Update</a>
                 </li>
               </ul>
-              <p class="caption"><span class="caption-text">Firmware v2.2.1(6) [NEW]</span></p>
+              <p class="caption"><span class="caption-text">Firmware v2.2.1(7) [NEW]</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../2.2.1/221_7_manual/">User Manual</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../2.2.1/221_7_api/">API Reference</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Firmware v2.2.1(6)</span></p>
               <ul>
                   <li class="toctree-l1"><a class="reference internal" href="../../2.2.1/221_6_manual/">User Manual</a>
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../../2.2.1/221_6_api/">API Reference</a>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Firmware v2.2.1(5)</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../2.2.1/221_5_manual/">User Manual</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../2.2.1/221_5_api/">API Reference</a>
                   </li>
               </ul>
               <p class="caption"><span class="caption-text">Zone Expander</span></p>
@@ -75,7 +75,7 @@
                   <li class="toctree-l1"><a class="reference internal" href="../../zone-expander/">User Manual</a>
                   </li>
               </ul>
-              <p class="caption"><span class="caption-text">Sensor Expander [NEW]</span></p>
+              <p class="caption"><span class="caption-text">Sensor Expander</span></p>
               <ul>
                   <li class="toctree-l1"><a class="reference internal" href="../../sensor-expander/">User Manual</a>
                   </li>
@@ -112,7 +112,7 @@
     </li>
         </ul>
     </li>
-    <li class="toctree-l3"><a class="reference internal" href="#topics-published-by-firmware-2216">Topics Published by Firmware 2.2.1(6)</a>
+    <li class="toctree-l3"><a class="reference internal" href="#topics-published-by-firmware-2217">Topics Published by Firmware 2.2.1(7)</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#topics-subscribed-by-firmware-221">Topics Subscribed by Firmware 2.2.1</a>
     </li>
@@ -130,7 +130,35 @@
               </ul>
               <p class="caption"><span class="caption-text">Archived</span></p>
               <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../archive/">Previous Manuals and API docs</a>
+                  <li class="toctree-l1"><a class="reference internal" >Previous Manuals and API docs</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../archive/">Overview</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" >Firmware v2.2.1(6)</a>
+    <ul>
+                <li class="toctree-l3"><a class="reference internal" href="../../2.2.1/221_6_manual/">User Manual</a>
+                </li>
+                <li class="toctree-l3"><a class="reference internal" href="../../2.2.1/221_6_api/">API Reference</a>
+                </li>
+    </ul>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" >Firmware v2.2.1(5)</a>
+    <ul>
+                <li class="toctree-l3"><a class="reference internal" href="../../2.2.1/221_5_manual/">User Manual</a>
+                </li>
+                <li class="toctree-l3"><a class="reference internal" href="../../2.2.1/221_5_api/">API Reference</a>
+                </li>
+    </ul>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" >Firmware v2.2.1(4)</a>
+    <ul>
+                <li class="toctree-l3"><a class="reference internal" href="../../2.2.1/221_4_manual/">User Manual</a>
+                </li>
+                <li class="toctree-l3"><a class="reference internal" href="../../2.2.1/221_4_api/">API Reference</a>
+                </li>
+    </ul>
+                </li>
+    </ul>
                   </li>
               </ul>
       </div>
@@ -253,7 +281,7 @@
 </ul>
 <p>With these configurations, OpenSprinkler can effectively <strong>integrate with MQTT</strong> enabling seamless automation and real-time updates.</p>
 <hr />
-<h2 id="topics-published-by-firmware-2216">Topics Published by Firmware 2.2.1(6)</h2>
+<h2 id="topics-published-by-firmware-2217">Topics Published by Firmware 2.2.1(7)</h2>
 <p>OpenSprinkler publishes messages to the MQTT broker in a format similar to IFTTT and email notifications.</p>
 <ul>
 <li>The <strong>default root topic</strong> is <code>opensprinkler</code>, but can be customized in the settings.</li>
@@ -261,7 +289,7 @@
 <li>Due to the firmware storage limit, the <strong>maximum topic length is 24 characters</strong>.</li>
 <li>Below we use <code>publish_topic</code> to denote this name.</li>
 </ul>
-<p>Here is the list of topics that firmware 2.2.1(6) publishes:</p>
+<p>Here is the list of topics that firmware 2.2.1(7) publishes:</p>
 <ul>
 <li><strong>Reboot</strong>: <code>publish_topic/system</code> sends <code>{"state":"started","cause":cc}</code> when the controller boots, where <code>cc</code> is the <a href="../../api/#reboot-cause-codes">reboot-cause code</a>.</li>
 <li><strong>Program Start</strong>: <code>publish_topic/program/x</code>, where <code>x</code> is the program index (starting from 0 for the first program).<ul>

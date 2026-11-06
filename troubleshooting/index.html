@@ -72,18 +72,18 @@
                 <li class="toctree-l1"><a class="reference internal" href="../firmware-update/">Firmware Update</a>
                 </li>
               </ul>
-              <p class="caption"><span class="caption-text">Firmware v2.2.1(6) [NEW]</span></p>
+              <p class="caption"><span class="caption-text">Firmware v2.2.1(7) [NEW]</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../2.2.1/221_7_manual/">User Manual</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../2.2.1/221_7_api/">API Reference</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Firmware v2.2.1(6)</span></p>
               <ul>
                   <li class="toctree-l1"><a class="reference internal" href="../2.2.1/221_6_manual/">User Manual</a>
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../2.2.1/221_6_api/">API Reference</a>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Firmware v2.2.1(5)</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../2.2.1/221_5_manual/">User Manual</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../2.2.1/221_5_api/">API Reference</a>
                   </li>
               </ul>
               <p class="caption"><span class="caption-text">Zone Expander</span></p>
@@ -91,7 +91,7 @@
                   <li class="toctree-l1"><a class="reference internal" href="../zone-expander/">User Manual</a>
                   </li>
               </ul>
-              <p class="caption"><span class="caption-text">Sensor Expander [NEW]</span></p>
+              <p class="caption"><span class="caption-text">Sensor Expander</span></p>
               <ul>
                   <li class="toctree-l1"><a class="reference internal" href="../sensor-expander/">User Manual</a>
                   </li>
@@ -126,7 +126,35 @@
               </ul>
               <p class="caption"><span class="caption-text">Archived</span></p>
               <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../archive/">Previous Manuals and API docs</a>
+                  <li class="toctree-l1"><a class="reference internal" >Previous Manuals and API docs</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../archive/">Overview</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" >Firmware v2.2.1(6)</a>
+    <ul>
+                <li class="toctree-l3"><a class="reference internal" href="../2.2.1/221_6_manual/">User Manual</a>
+                </li>
+                <li class="toctree-l3"><a class="reference internal" href="../2.2.1/221_6_api/">API Reference</a>
+                </li>
+    </ul>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" >Firmware v2.2.1(5)</a>
+    <ul>
+                <li class="toctree-l3"><a class="reference internal" href="../2.2.1/221_5_manual/">User Manual</a>
+                </li>
+                <li class="toctree-l3"><a class="reference internal" href="../2.2.1/221_5_api/">API Reference</a>
+                </li>
+    </ul>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" >Firmware v2.2.1(4)</a>
+    <ul>
+                <li class="toctree-l3"><a class="reference internal" href="../2.2.1/221_4_manual/">User Manual</a>
+                </li>
+                <li class="toctree-l3"><a class="reference internal" href="../2.2.1/221_4_api/">API Reference</a>
+                </li>
+    </ul>
+                </li>
+    </ul>
                   </li>
               </ul>
       </div>
@@ -364,7 +392,10 @@ If your OpenSprinkler v3 or v4 fails to join or stay connected to your WiFi netw
 <span class="vsp1"></span>
 If your controller can't connect or stay connected via wired Ethernet, try these steps: </p>
 <ol>
-<li><strong>Update firmware:</strong> Firmware 2.2.1(6) adds automatic fault detection and recovery. Update before relying on reboot workarounds.</li>
+<li><strong>Update firmware:</strong> Firmware 2.2.1(6) adds automatic fault detection and recovery. Update before relying on reboot workarounds.<ul>
+<li><strong>CH390 modules</strong> require firmware <strong>2.2.1(7) or later</strong> and are supported on <strong>OpenSprinkler v3.3–3.4 and v4</strong>.</li>
+</ul>
+</li>
 <li><strong>Check the LEDs:</strong> On your controller's RJ-45 jack, one LED should be solid (link), and the other should blink with traffic. If not, try a known-good cable and a different router/switch port.</li>
 <li><strong>Disable PoE</strong> (Power-over-Ethernet) on that port: OpenSprinkler’s wired module is <strong>not PoE-compatible</strong>. A PoE-enabled port can cause it to malfunction.</li>
 <li><strong>DHCP setting:</strong> Leave the controller on DHCP, and set a <strong>DHCP reservation</strong> (IP-to-MAC) on your router to assign it a fixed IP. If you must use a static IP, verify that <strong>Gateway IP, DNS, and Subnet Mask</strong> are correct and compatible with your router settings.</li>
@@ -375,7 +406,7 @@ If your controller can't connect or stay connected via wired Ethernet, try these
 <hr />
 <p><strong>I can access the controller on my local network, but not when I am away.</strong>
 <span class="vsp1"></span>
-Remote access requires using an <strong>OpenThings Cloud (OTC) token</strong>. To check OTC status, from the homepage, swipe left to right to open the side menu, tap <strong>System Diagnostics</strong>. Make sure OTC status is <strong>Connected</strong>. In the OpenSprinkler mobile app, use the OTC token (instead of the controller's IP address) for remote access.</p>
+Remote access requires using an <strong>OpenThings Cloud (OTC) token</strong>, available from <a href="https://opensprinkler.com/my-account/">opensprinkler.com → My Account</a> → <strong>My OTC Tokens</strong>. To check OTC status, from the homepage, swipe left to right to open the side menu, tap <strong>System Diagnostics</strong>. Make sure OTC status is <strong>Connected</strong>. In the OpenSprinkler mobile app, use the OTC token (instead of the controller's IP address) for remote access. See <a href="../guides/remote-access-otc/">Remote Access with OTC</a> for setup instructions.</p>
 <hr class="double">
 
 <h3 id="ui-app-time-and-lcd">UI, App, Time, and LCD</h3>
@@ -430,12 +461,12 @@ OpenSprinkler sets time automatically from two data sources: <strong>your locati
 </ul>
 </li>
 <li><strong>Check NTP Settings</strong><ul>
-<li>Homepage → <strong>Edit Options</strong> → <strong>Advanced</strong>: ensure <strong>NTP Sync</strong> is enabled.</li>
+<li>Homepage → <strong>Edit Options</strong> → <strong>Network</strong>: ensure <strong>NTP Sync</strong> is enabled.</li>
 <li><strong>NTP server:</strong> The recommended default setting is <code>0.0.0.0</code> (auto-selects public NTP servers). If using a custom server, confirm it’s valid/reachable.</li>
 </ul>
 </li>
 <li><strong>No Internet? Set Time Manually</strong><ul>
-<li>If using the controller without Internet, go to <strong>Edit Options</strong> → <strong>Advanced</strong>: <strong>uncheck NTP Sync</strong>.</li>
+<li>If using the controller without Internet, go to <strong>Edit Options</strong> → <strong>Network</strong>: <strong>uncheck NTP Sync</strong>.</li>
 <li><strong>Device Time</strong> is now editable. Set it, and Save. Note that time will drift without NTP sync.</li>
 </ul>
 </li>
@@ -448,15 +479,24 @@ Refer to the steps above to verify the controller's time is correct.</p>
 <hr />
 <p><strong>A zone runs even though Rain Delay or Rain Sensor is active.</strong>
 <span class="vsp1"></span>
-This is usually caused by that zone being set to <code>Ignore Rain</code> or <code>Ignore Sensor</code>. These attributes can be found by clicking the ⚙️ icon next to the zone to open its attribute dialog. </p>
+This is usually caused by that zone being set to <code>Ignore Rain</code> or <code>Ignore Sensor</code>. These attributes can be found by clicking the circular station-group icon next to the zone to open its attribute dialog.</p>
 <hr />
 <p><strong>A Bundle Station member is active but has no countdown, or cannot be turned off individually.</strong>
 <span class="vsp1"></span>
 This is expected when the member was activated by a Bundle Station. The bundle leader owns the queue entry and runtime, so derived member activity has no separate countdown. Stop the bundle leader to release its members. If a member is also running directly or belongs to another active bundle, it remains on until every run that requires it has ended.</p>
 <hr />
+<p><strong>A Cycle and Soak zone waits before starting.</strong>
+<span class="vsp1"></span>
+Stopping a run, including through <strong>Stop All</strong>, does not clear the zone's soak cooldown. A subsequent run that applies Cycle and Soak must wait until that cooldown expires; other queued zones may delay it further. See <a href="../2.2.1/221_7_manual/#cycle-and-soak">Cycle and Soak</a>.</p>
+<hr />
+<p><strong>I can't change a Built-in Sensor port to or from Analog.</strong>
+<span class="vsp1"></span>
+Before changing an Analog port to another mode (including None), delete any <strong>Onboard Analog</strong> Expanded Sensor configurations using that port. Conversely, before switching a port to Analog, delete any <strong>Onboard Digital</strong> configurations using it. Disabled configurations still count; disabling them is not enough. See <a href="../sensor-expander/#configure-other-sensor-types">Analog Sensor Setup</a>.</p>
+<hr />
 <p><strong>My program didn't run as scheduled.</strong></p>
 <ul>
 <li>Check if the program's <strong>Enabled</strong> flag is on.</li>
+<li>Check whether the footer shows <strong>Configured as Extender</strong>. Starting with firmware <strong>2.2.1(7)</strong>, Remote Extension mode suppresses automatic watering starts. Tap that message to exit the mode if this controller should run its own watering schedules.</li>
 <li>Check if the controller's <strong>time is correct</strong>.</li>
 <li>Check for any active <strong>Rain Delay</strong> or <strong>Rain Sensor</strong>.</li>
 <li>If the program's <strong>Use Weather</strong> flag is on, check if the current <strong>Watering Level</strong> is 0%, or there is any active <strong>Watering Restriction</strong>.</li>

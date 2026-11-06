@@ -68,18 +68,18 @@
                 <li class="toctree-l1"><a class="reference internal" href="../firmware-update/">Firmware Update</a>
                 </li>
               </ul>
-              <p class="caption"><span class="caption-text">Firmware v2.2.1(6) [NEW]</span></p>
+              <p class="caption"><span class="caption-text">Firmware v2.2.1(7) [NEW]</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../2.2.1/221_7_manual/">User Manual</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../2.2.1/221_7_api/">API Reference</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Firmware v2.2.1(6)</span></p>
               <ul>
                   <li class="toctree-l1"><a class="reference internal" href="../2.2.1/221_6_manual/">User Manual</a>
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../2.2.1/221_6_api/">API Reference</a>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Firmware v2.2.1(5)</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../2.2.1/221_5_manual/">User Manual</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../2.2.1/221_5_api/">API Reference</a>
                   </li>
               </ul>
               <p class="caption"><span class="caption-text">Zone Expander</span></p>
@@ -87,7 +87,7 @@
                   <li class="toctree-l1"><a class="reference internal" href="../zone-expander/">User Manual</a>
                   </li>
               </ul>
-              <p class="caption"><span class="caption-text">Sensor Expander [NEW]</span></p>
+              <p class="caption"><span class="caption-text">Sensor Expander</span></p>
               <ul>
                   <li class="toctree-l1"><a class="reference internal" href="../sensor-expander/">User Manual</a>
                   </li>
@@ -122,7 +122,35 @@
               </ul>
               <p class="caption"><span class="caption-text">Archived</span></p>
               <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../archive/">Previous Manuals and API docs</a>
+                  <li class="toctree-l1"><a class="reference internal" >Previous Manuals and API docs</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../archive/">Overview</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" >Firmware v2.2.1(6)</a>
+    <ul>
+                <li class="toctree-l3"><a class="reference internal" href="../2.2.1/221_6_manual/">User Manual</a>
+                </li>
+                <li class="toctree-l3"><a class="reference internal" href="../2.2.1/221_6_api/">API Reference</a>
+                </li>
+    </ul>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" >Firmware v2.2.1(5)</a>
+    <ul>
+                <li class="toctree-l3"><a class="reference internal" href="../2.2.1/221_5_manual/">User Manual</a>
+                </li>
+                <li class="toctree-l3"><a class="reference internal" href="../2.2.1/221_5_api/">API Reference</a>
+                </li>
+    </ul>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" >Firmware v2.2.1(4)</a>
+    <ul>
+                <li class="toctree-l3"><a class="reference internal" href="../2.2.1/221_4_manual/">User Manual</a>
+                </li>
+                <li class="toctree-l3"><a class="reference internal" href="../2.2.1/221_4_api/">API Reference</a>
+                </li>
+    </ul>
+                </li>
+    </ul>
                   </li>
               </ul>
       </div>
@@ -161,10 +189,10 @@ OpenSprinkler is an open-source, web-based sprinkler and irrigation controller. 
 <ul>
 <li><strong>Intuitive User Interface (UI):</strong> No more messing with buttons and knobs. Use web browsers and our free mobile apps to access OpenSprinkler.</li>
 <li><strong>Remote Access:</strong> Access your OpenSprinkler from anywhere, whether you are at home, at the office, or traveling.</li>
-<li><strong>Smart Control:</strong> OpenSprinkler can connect to the Internet and use current, historical, and forecast weather data to automatically adjust watering times. It not only stops watering when it rains but also scales watering time up or down based on your local temperature and humidity.</li>
+<li><strong>Smart Control:</strong> OpenSprinkler can connect to the Internet and use current, historical, and forecast weather data to automatically adjust watering times. It not only stops watering when it rains but also scales watering time up or down based on your local temperature and humidity. OpenSprinkler can also read analog sensors, such as soil moisture and temperature sensors, and automatically adjust program watering times based on those readings.</li>
 <li><strong>Connectivity Options:</strong> OpenSprinkler supports both WiFi and wired Ethernet. It follows a <strong>local-first approach</strong> — it works directly on your local network without Internet access, while optional cloud access enables remote control. Its built-in WiFi can also function as an Access Point (AP) when no external router is available.</li>
 <li><strong>Expandable:</strong> The main controller handles 8 zones and is expandable up to 72 zones with expanders. Our app can also manage multiple OpenSprinkler systems for limitless expansion.</li>
-<li><strong>Advanced Features:</strong> OpenSprinkler supports features rarely seen on competing products, such as simultaneous zone runs, MQTT, remote zones, HTTP(S) zones, email notifications, radio frequency (RF) stations, multiple sensor types including flow and analog sensors, four independent master stations, repeating program start times, and multi-language support.</li>
+<li><strong>Advanced Features:</strong> OpenSprinkler supports features rarely seen on competing products, such as simultaneous zone runs, MQTT, remote zones, HTTP(S) zones, email notifications, radio frequency (RF) stations, multiple sensor types including flow and analog sensors, four independent master stations, repeating program start times, Cycle and Soak with per-zone settings, and multi-language support.</li>
 </ul>
 <hr />
 <p><strong>Q: Who is OpenSprinkler for?</strong>
@@ -210,6 +238,10 @@ One main controller (<code>8</code> zones) and one expander (<code>16</code> add
 <br>
 Up to <code>40</code> programs. Each program supports per-station durations (<code>0–18</code> h, <strong>one-second precision</strong>); weekly, monthly, single-run, or interval schedule dates (e.g. every <code>n</code> days); and either up to <code>4</code> arbitrary fixed start times, or repeating start times with any number of repeats (e.g., start <code>8:30 AM</code>, repeat every <code>8</code> min for <code>55</code> times).</p>
 <hr />
+<p><strong>Q: Does OpenSprinkler support Cycle and Soak?</strong>
+<br>
+Yes, starting with firmware <strong>2.2.1(7)</strong>. Set a maximum watering cycle and minimum soak time for each zone. OpenSprinkler automatically divides the total watering time into balanced cycles, giving water time to soak in and helping reduce runoff on slopes or slow-draining soil. Other zones can run during the soak periods. See <a href="../2.2.1/221_7_manual/#cycle-and-soak">Cycle and Soak</a>.</p>
+<hr />
 <p><strong>Q: Does the weather feature work outside North America?</strong>
 <br>
 Yes. You can choose among a variety of <a href="../guides/weather-adjustments/">weather data providers</a>, including Apple Weather, Open-Meteo, AccuWeather, and Weather Underground, most of which are available worldwide.</p>
@@ -229,7 +261,7 @@ OS v3 and v4 are compatible with 2.4GHz WiFi. They do <strong>NOT</strong> curre
 <p><strong>Q: How is OpenSprinkler different from competitors?</strong></p>
 <ul>
 <li><strong>Local-first Control:</strong> Its built-in web interface provides direct local access, and it runs programs on its own without requiring an Internet connection or cloud service.</li>
-<li><strong>Advanced Features:</strong> Second-precision watering times, simultaneous zone runs, multiple onboard sensors and master zones, pause, support for flow and analog sensors, email notifications, and special station types (Remote, RF, HTTP(S), and Bundle Station).</li>
+<li><strong>Advanced Features:</strong> Second-precision watering times, simultaneous zone runs, Cycle and Soak with individual zone settings, multiple onboard sensors and master zones, pause, support for flow and analog sensors (including built-in analog inputs on v4), email notifications, and special station types (Remote, RF, HTTP(S), and Bundle Station).</li>
 <li><strong>Flexible Connectivity:</strong> Supports both WiFi and wired Ethernet options.</li>
 <li><strong>Easy Expansion:</strong> Expand to <code>72</code> zones (or <code>200</code> with OSPi) at low cost.</li>
 <li><strong>Open Source:</strong> Hardware designs and the source code for the firmware, app, and weather service are public, allowing for customization and extension.</li>
@@ -310,15 +342,17 @@ Yes, but keep in mind that those two zones will always operate together.</p>
 OpenSprinkler v3.0-3.3 has two built-in sensor ports; v3.4 and v4 have four. Each port can be independently configured as a:</p>
 <ul>
 <li><strong>Rain</strong> sensor (normally open or normally closed)</li>
-<li><strong>Flow</strong> sensor (two-wire dry-contact; and some three-wire types)</li>
+<li><strong>Flow</strong> sensor (SN1 only; two-wire dry-contact and some three-wire types)</li>
 <li><strong>Digital soil moisture</strong> sensor (outputs binary signal)</li>
 <li><strong>Program start button</strong></li>
+<li><strong>Analog</strong> sensor (v4 only)</li>
 </ul>
-<p><a href="../sensor-expander/">Expanded Sensors</a> additionally include analog sensors and Weather Sensors, along with options to combine readings or monitor system information. Their values can be displayed, logged, and used to adjust program watering.</p>
+<p>The <a href="../sensor-expander/">Expanded Sensors</a> interface supports analog sensors connected through the <strong>Sensor Expander hardware</strong> or v4's built-in inputs, as well as <strong>virtual sensors</strong>: Weather Sensors use weather data, System Internal sensors monitor controller information, and Aggregate Sensors combine other sensors' readings. Their values can be displayed, logged, and used to adjust program watering.</p>
 <hr />
 <p><strong>Q: Do you support analog soil sensors?</strong>
 <br>
-Yes. OpenSprinkler v3 and v4 can use the <a href="../sensor-expander/">Sensor Expander</a>, which provides 16 analog input channels. Recent OSPi versions include eight analog inputs through two onboard ADS1115 chips. You can also use our <a href="https://opensprinkler.com/product/a2dadapter/">Analog-to-Digital (A2D) adapter</a> to convert an analog sensor output into a digital on/off signal.</p>
+Yes. With firmware <strong>2.2.1(7)</strong> and later, <strong>OpenSprinkler v4</strong> can read analog soil sensors directly through its four built-in ports (SN1–SN4, 0–3.3 V), <strong>without a Sensor Expander</strong>. These values can be displayed, logged, and used to adjust watering. OpenSprinkler v3 and v4 can also use the <a href="../sensor-expander/">Sensor Expander</a>, which provides 16 analog input channels; recent OSPi versions include eight through two onboard ADS1115 chips. See <a href="../sensor-expander/#configure-other-sensor-types">Analog Sensor Setup</a>.</p>
+<p>For simple on/off control instead of numeric measurements, our <a href="https://opensprinkler.com/product/a2dadapter/">Analog-to-Digital (A2D) adapter</a> converts an analog sensor output into a digital signal using an adjustable threshold.</p>
 <hr />
 <p><strong>Q: What is the maximum distance between the controller and valves?</strong>
 <br>
@@ -373,8 +407,8 @@ Typically you connect the controller to a router (WiFi or Ethernet). However, wi
 <hr />
 <p><strong>Q: How do I access OpenSprinkler?</strong>
 <br>
-OpenSprinkler has a built-in web interface that works with any modern desktop or mobile browser. Simply type the controller's IP address into your browser. We also provide a free OpenSprinkler mobile app (for iOS, Android, and macOS).</p>
-<p>For remote access, configure an <strong>OTC (OpenThings Cloud)</strong> token in the settings.</p>
+OpenSprinkler has a built-in web interface that works with any modern desktop or mobile browser. Simply type the controller's IP address into your browser. On v3/v4, you can also use a hostname configured under <strong>Edit Options → Network → Hostname</strong>, such as <code>http://garden-os</code> (some routers require <code>http://garden-os.lan/</code>). We also provide a free OpenSprinkler mobile app (for iOS, Android, and macOS).</p>
+<p>For remote access, get an <strong>OTC (OpenThings Cloud)</strong> token from <a href="https://opensprinkler.com/my-account/">opensprinkler.com → My Account</a> → <strong>My OTC Tokens</strong>, then configure it in the controller's settings. See <a href="../guides/remote-access-otc/">Remote Access with OTC</a>.</p>
 <hr />
 <p><strong>Q: Can OpenSprinkler run offline without Internet?</strong>
 <br>
@@ -406,14 +440,14 @@ OpenSprinkler v3 and v4 are fully assembled and work out of the box. OpenSprinkl
 <tr>
 <td style="text-align: left;"><em>Valve Compatibility</em></td>
 <td style="text-align: left;"><strong>AC/DC</strong> models both operate 24VAC valves. <strong>DC</strong> additionally supports DC non-latching valves. <strong>Latch</strong> supports only DC latching valves.</td>
-<td style="text-align: left;"></td>
-<td style="text-align: left;"></td>
+<td style="text-align: left;">24VAC valves only.</td>
+<td style="text-align: left;">DC latching valves only.</td>
 </tr>
 <tr>
 <td style="text-align: left;"><em>Power Source</em></td>
-<td style="text-align: left;"><strong>AC</strong> works with a 24VAC adapter; <strong>DC/Latch</strong> work with a DC (6-24V) adapter.</td>
+<td style="text-align: left;"><strong>AC:</strong> 24VAC adapter<br><strong>v3.4 DC:</strong> USB-C power supply<br><strong>Other DC/Latch models:</strong> DC (6-24V) adapter.</td>
 <td style="text-align: left;">24VAC only</td>
-<td style="text-align: left;">USB</td>
+<td style="text-align: left;">microUSB or USB-C</td>
 </tr>
 <tr>
 <td style="text-align: left;"><em>Number of Stations</em></td>

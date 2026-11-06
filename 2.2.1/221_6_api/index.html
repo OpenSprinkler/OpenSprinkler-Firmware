@@ -56,8 +56,15 @@
                 <li class="toctree-l1"><a class="reference internal" href="../../firmware-update/">Firmware Update</a>
                 </li>
               </ul>
-              <p class="caption"><span class="caption-text">Firmware v2.2.1(6) [NEW]</span></p>
-              <ul class="current">
+              <p class="caption"><span class="caption-text">Firmware v2.2.1(7) [NEW]</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../221_7_manual/">User Manual</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../221_7_api/">API Reference</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Firmware v2.2.1(6)</span></p>
+              <ul>
                   <li class="toctree-l1"><a class="reference internal" href="../221_6_manual/">User Manual</a>
                   </li>
                   <li class="toctree-l1 current"><a class="reference internal current" href="#">API Reference</a>
@@ -167,19 +174,12 @@
     </ul>
                   </li>
               </ul>
-              <p class="caption"><span class="caption-text">Firmware v2.2.1(5)</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../221_5_manual/">User Manual</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../221_5_api/">API Reference</a>
-                  </li>
-              </ul>
               <p class="caption"><span class="caption-text">Zone Expander</span></p>
               <ul>
                   <li class="toctree-l1"><a class="reference internal" href="../../zone-expander/">User Manual</a>
                   </li>
               </ul>
-              <p class="caption"><span class="caption-text">Sensor Expander [NEW]</span></p>
+              <p class="caption"><span class="caption-text">Sensor Expander</span></p>
               <ul>
                   <li class="toctree-l1"><a class="reference internal" href="../../sensor-expander/">User Manual</a>
                   </li>
@@ -213,8 +213,56 @@
                   </li>
               </ul>
               <p class="caption"><span class="caption-text">Archived</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../archive/">Previous Manuals and API docs</a>
+              <ul class="current">
+                  <li class="toctree-l1 current"><a class="reference internal current" >Previous Manuals and API docs</a>
+    <ul class="current">
+                <li class="toctree-l2"><a class="reference internal" href="../../archive/">Overview</a>
+                </li>
+                <li class="toctree-l2 current"><a class="reference internal current" >Firmware v2.2.1(6)</a>
+    <ul class="current">
+                <li class="toctree-l3"><a class="reference internal" href="../221_6_manual/">User Manual</a>
+                </li>
+                <li class="toctree-l3 current"><a class="reference internal current" href="#">API Reference</a>
+    <ul class="current">
+    <li class="toctree-l4"><a class="reference internal" href="#introduction">Introduction</a>
+    </li>
+    <li class="toctree-l4"><a class="reference internal" href="#controller-status-configuration">Controller Status &amp; Configuration</a>
+    </li>
+    <li class="toctree-l4"><a class="reference internal" href="#stations-manual-control">Stations &amp; Manual Control</a>
+    </li>
+    <li class="toctree-l4"><a class="reference internal" href="#expanded-sensors-sensor-logs">Expanded Sensors &amp; Sensor Logs</a>
+    </li>
+    <li class="toctree-l4"><a class="reference internal" href="#programs-scheduling">Programs &amp; Scheduling</a>
+    </li>
+    <li class="toctree-l4"><a class="reference internal" href="#sprinkler-logs">Sprinkler Logs</a>
+    </li>
+    <li class="toctree-l4"><a class="reference internal" href="#combined-data-diagnostics">Combined Data &amp; Diagnostics</a>
+    </li>
+    <li class="toctree-l4"><a class="reference internal" href="#mqtt-command-subscriptions">MQTT Command Subscriptions</a>
+    </li>
+    <li class="toctree-l4"><a class="reference internal" href="#reference-tables">Reference Tables</a>
+    </li>
+    </ul>
+                </li>
+    </ul>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" >Firmware v2.2.1(5)</a>
+    <ul>
+                <li class="toctree-l3"><a class="reference internal" href="../221_5_manual/">User Manual</a>
+                </li>
+                <li class="toctree-l3"><a class="reference internal" href="../221_5_api/">API Reference</a>
+                </li>
+    </ul>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" >Firmware v2.2.1(4)</a>
+    <ul>
+                <li class="toctree-l3"><a class="reference internal" href="../221_4_manual/">User Manual</a>
+                </li>
+                <li class="toctree-l3"><a class="reference internal" href="../221_4_api/">API Reference</a>
+                </li>
+    </ul>
+                </li>
+    </ul>
                   </li>
               </ul>
       </div>
@@ -231,7 +279,9 @@
         <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
   <ul class="wy-breadcrumbs">
     <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
-          <li class="breadcrumb-item">Firmware v2.2.1(6) [NEW]</li>
+          <li class="breadcrumb-item">Archived</li>
+          <li class="breadcrumb-item">Previous Manuals and API docs</li>
+          <li class="breadcrumb-item">Firmware v2.2.1(6)</li>
       <li class="breadcrumb-item active">API Reference</li>
     <li class="wy-breadcrumbs-aside">
           <a href="https://github.com/OpenSprinkler/OpenSprinkler-Firmware/edit/master/docs/2.2.1/221_6_api.md" class="icon icon-github"> Edit on GitHub</a>
@@ -242,14 +292,14 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
             <div class="section" itemprop="articleBody">
               
-                <h1 id="firmware-2216-api-reference">Firmware 2.2.1(6) API Reference</h1>
+                <h1 id="firmware-2216-api-reference-sep-24-2026">Firmware 2.2.1(6) API Reference [Sep 24, 2026]</h1>
 <h2 id="introduction">Introduction</h2>
 <h3 id="overview">Overview</h3>
 <ul>
 <li><strong>Authentication</strong> (<code>pw</code>): All API calls require the device password via the <code>pw</code> parameter. The value must be provided as a lowercase MD5 hash. The OpenSprinkler app and web interfaces handle this hashing automatically. If you are making direct API calls, you must hash your plaintext password before sending the request. You can use any standard <a href="https://www.md5hashgenerator.com/">MD5 generation tool</a> for this.</li>
 <li><strong>Device IP</strong>: Throughout this document, <code>os-ip</code> denotes the controller's IP address or hostname.</li>
 <li><strong>Command Parameters</strong>: Parameters can be sent in any order. You do NOT need to include every parameter in a request - any omitted parameter will retain its current value on the device.</li>
-<li><strong>Return values</strong> are all formatted in JSON, for example: <code>{"fwv":221}</code>, <code>{"result":1}</code>. Below is the list of error codes:</li>
+<li><strong>Return values</strong> are all formatted in JSON, for example: <code>{"fwv":221}</code>, <code>{"result":1}</code>. An error response may also include an <code>item</code> field identifying the offending parameter. This field may be absent or empty when no specific parameter is identified. Below is the list of error codes:</li>
 </ul>
 <table>
 <thead>
@@ -298,6 +348,10 @@
 <tr>
 <td style="text-align: left;"><code>64</code></td>
 <td style="text-align: left;">Upload failed (e.g. OTA firmware update failed)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>80</code></td>
+<td style="text-align: left;">Internal Error (e.g. a storage or write operation failed)</td>
 </tr>
 </tbody>
 </table>

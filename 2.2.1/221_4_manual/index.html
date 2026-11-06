@@ -5,7 +5,7 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://OpenSprinkler.github.io/OpenSprinkler-Firmware/2.2.1/221_4_manual/" />
       <link rel="shortcut icon" href="../../img/favicon.ico" />
-    <title>221 4 manual - OpenSprinkler Documentation</title>
+    <title>User Manual - OpenSprinkler Documentation</title>
     <link rel="stylesheet" href="../../css/theme.css" />
     <link rel="stylesheet" href="../../css/theme_extra.css" />
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
@@ -13,7 +13,7 @@
     
       <script>
         // Current page data
-        var mkdocs_page_name = "221 4 manual";
+        var mkdocs_page_name = "User Manual";
         var mkdocs_page_input_path = "2.2.1/221_4_manual.md";
         var mkdocs_page_url = "/OpenSprinkler-Firmware/2.2.1/221_4_manual/";
       </script>
@@ -56,18 +56,18 @@
                 <li class="toctree-l1"><a class="reference internal" href="../../firmware-update/">Firmware Update</a>
                 </li>
               </ul>
-              <p class="caption"><span class="caption-text">Firmware v2.2.1(6) [NEW]</span></p>
+              <p class="caption"><span class="caption-text">Firmware v2.2.1(7) [NEW]</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../221_7_manual/">User Manual</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../221_7_api/">API Reference</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Firmware v2.2.1(6)</span></p>
               <ul>
                   <li class="toctree-l1"><a class="reference internal" href="../221_6_manual/">User Manual</a>
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../221_6_api/">API Reference</a>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Firmware v2.2.1(5)</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../221_5_manual/">User Manual</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../221_5_api/">API Reference</a>
                   </li>
               </ul>
               <p class="caption"><span class="caption-text">Zone Expander</span></p>
@@ -75,7 +75,7 @@
                   <li class="toctree-l1"><a class="reference internal" href="../../zone-expander/">User Manual</a>
                   </li>
               </ul>
-              <p class="caption"><span class="caption-text">Sensor Expander [NEW]</span></p>
+              <p class="caption"><span class="caption-text">Sensor Expander</span></p>
               <ul>
                   <li class="toctree-l1"><a class="reference internal" href="../../sensor-expander/">User Manual</a>
                   </li>
@@ -109,8 +109,72 @@
                   </li>
               </ul>
               <p class="caption"><span class="caption-text">Archived</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../archive/">Previous Manuals and API docs</a>
+              <ul class="current">
+                  <li class="toctree-l1 current"><a class="reference internal current" >Previous Manuals and API docs</a>
+    <ul class="current">
+                <li class="toctree-l2"><a class="reference internal" href="../../archive/">Overview</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" >Firmware v2.2.1(6)</a>
+    <ul>
+                <li class="toctree-l3"><a class="reference internal" href="../221_6_manual/">User Manual</a>
+                </li>
+                <li class="toctree-l3"><a class="reference internal" href="../221_6_api/">API Reference</a>
+                </li>
+    </ul>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" >Firmware v2.2.1(5)</a>
+    <ul>
+                <li class="toctree-l3"><a class="reference internal" href="../221_5_manual/">User Manual</a>
+                </li>
+                <li class="toctree-l3"><a class="reference internal" href="../221_5_api/">API Reference</a>
+                </li>
+    </ul>
+                </li>
+                <li class="toctree-l2 current"><a class="reference internal current" >Firmware v2.2.1(4)</a>
+    <ul class="current">
+                <li class="toctree-l3 current"><a class="reference internal current" href="#">User Manual</a>
+    <ul class="current">
+    <li class="toctree-l4"><a class="reference internal" href="#introduction">Introduction</a>
+    </li>
+    <li class="toctree-l4"><a class="reference internal" href="#whats-new-in-this-firmware">What's New in this Firmware?</a>
+    </li>
+    <li class="toctree-l4"><a class="reference internal" href="#hardware-interface">Hardware Interface</a>
+    </li>
+    <li class="toctree-l4"><a class="reference internal" href="#zone-wiring-diagram">Zone Wiring Diagram</a>
+    </li>
+    <li class="toctree-l4"><a class="reference internal" href="#installation">Installation</a>
+    </li>
+    <li class="toctree-l4"><a class="reference internal" href="#lcd-display-and-buttons">LCD Display and Buttons</a>
+    </li>
+    <li class="toctree-l4"><a class="reference internal" href="#web-interface-overview">Web Interface Overview</a>
+    </li>
+    <li class="toctree-l4"><a class="reference internal" href="#homepage">Homepage</a>
+    </li>
+    <li class="toctree-l4"><a class="reference internal" href="#footer-menu">Footer Menu</a>
+    </li>
+    <li class="toctree-l4"><a class="reference internal" href="#edit-options">Edit Options</a>
+    </li>
+    <li class="toctree-l4"><a class="reference internal" href="#run-once-program">Run-Once Program</a>
+    </li>
+    <li class="toctree-l4"><a class="reference internal" href="#programs">Programs</a>
+    </li>
+    <li class="toctree-l4"><a class="reference internal" href="#logs">Logs</a>
+    </li>
+    <li class="toctree-l4"><a class="reference internal" href="#firmware-update">Firmware Update</a>
+    </li>
+    <li class="toctree-l4"><a class="reference internal" href="#links-and-resources">Links and Resources</a>
+    </li>
+    <li class="toctree-l4"><a class="reference internal" href="#specifications">Specifications</a>
+    </li>
+    <li class="toctree-l4"><a class="reference internal" href="#advanced-topics">Advanced Topics</a>
+    </li>
+    </ul>
+                </li>
+                <li class="toctree-l3"><a class="reference internal" href="../221_4_api/">API Reference</a>
+                </li>
+    </ul>
+                </li>
+    </ul>
                   </li>
               </ul>
       </div>
@@ -127,7 +191,10 @@
         <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
   <ul class="wy-breadcrumbs">
     <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
-      <li class="breadcrumb-item active">221 4 manual</li>
+          <li class="breadcrumb-item">Archived</li>
+          <li class="breadcrumb-item">Previous Manuals and API docs</li>
+          <li class="breadcrumb-item">Firmware v2.2.1(4)</li>
+      <li class="breadcrumb-item active">User Manual</li>
     <li class="wy-breadcrumbs-aside">
           <a href="https://github.com/OpenSprinkler/OpenSprinkler-Firmware/edit/master/docs/2.2.1/221_4_manual.md" class="icon icon-github"> Edit on GitHub</a>
     </li>
@@ -723,7 +790,7 @@ If there are other queued zones in the <strong>same sequential group</strong>, a
 <hr />
 <h4 id="integration">Integration</h4>
 <ul>
-<li><strong>OTC:</strong> Configure <strong>OpenThings Cloud (OTC)</strong> token for remote access. See <a href="../../guides/remote-access-otc/"><strong>Remote Access with OTC</strong></a>.</li>
+<li><strong>OTC:</strong> Configure <strong>OpenThings Cloud (OTC)</strong> token for remote access. Create or copy your token from <a href="https://opensprinkler.com/my-account/">opensprinkler.com → My Account</a> → <strong>My OTC Tokens</strong>. See <a href="../../guides/remote-access-otc/"><strong>Remote Access with OTC</strong></a>.</li>
 <li><strong>MQTT:</strong> Configure MQTT parameters. See <a href="../../guides/mqtt/"><strong>Using MQTT</strong></a>.</li>
 <li><strong>Email Notifications:</strong> Configure Email settings. See <a href="../../guides/email-notifications/"><strong>Setting Up Email Notifications</strong></a>.</li>
 <li><strong>IFTTT:</strong> Configure IFTTT Webhooks key. See <a href="../../guides/ifttt-notifications/"><strong>Setting Up IFTTT Notifications</strong></a>.</li>
@@ -1020,6 +1087,10 @@ Example: If Zones 1–3 are in Group <code>A</code>, and 4–6 in Group <code>B<
               
             </div>
           </div><footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
+        <a href="../221_5_api/" class="btn btn-neutral float-left" title="API Reference"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+        <a href="../221_4_api/" class="btn btn-neutral float-right" title="API Reference">Next <span class="icon icon-circle-arrow-right"></span></a>
+    </div>
 
   <hr/>
 
@@ -1045,6 +1116,10 @@ Example: If Zones 1–3 are in Group <code>A</code>, and 4–6 in Group <code>B<
         </span>
     
     
+      <span><a href="../221_5_api/" style="color: #fcfcfc">&laquo; Previous</a></span>
+    
+    
+      <span><a href="../221_4_api/" style="color: #fcfcfc">Next &raquo;</a></span>
     
   </span>
 </div>

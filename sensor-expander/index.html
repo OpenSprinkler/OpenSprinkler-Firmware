@@ -56,18 +56,18 @@
                 <li class="toctree-l1"><a class="reference internal" href="../firmware-update/">Firmware Update</a>
                 </li>
               </ul>
-              <p class="caption"><span class="caption-text">Firmware v2.2.1(6) [NEW]</span></p>
+              <p class="caption"><span class="caption-text">Firmware v2.2.1(7) [NEW]</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../2.2.1/221_7_manual/">User Manual</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../2.2.1/221_7_api/">API Reference</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Firmware v2.2.1(6)</span></p>
               <ul>
                   <li class="toctree-l1"><a class="reference internal" href="../2.2.1/221_6_manual/">User Manual</a>
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../2.2.1/221_6_api/">API Reference</a>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Firmware v2.2.1(5)</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../2.2.1/221_5_manual/">User Manual</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../2.2.1/221_5_api/">API Reference</a>
                   </li>
               </ul>
               <p class="caption"><span class="caption-text">Zone Expander</span></p>
@@ -75,7 +75,7 @@
                   <li class="toctree-l1"><a class="reference internal" href="../zone-expander/">User Manual</a>
                   </li>
               </ul>
-              <p class="caption"><span class="caption-text">Sensor Expander [NEW]</span></p>
+              <p class="caption"><span class="caption-text">Sensor Expander</span></p>
               <ul class="current">
                   <li class="toctree-l1 current"><a class="reference internal current" href="#">User Manual</a>
     <ul class="current">
@@ -152,7 +152,35 @@
               </ul>
               <p class="caption"><span class="caption-text">Archived</span></p>
               <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../archive/">Previous Manuals and API docs</a>
+                  <li class="toctree-l1"><a class="reference internal" >Previous Manuals and API docs</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../archive/">Overview</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" >Firmware v2.2.1(6)</a>
+    <ul>
+                <li class="toctree-l3"><a class="reference internal" href="../2.2.1/221_6_manual/">User Manual</a>
+                </li>
+                <li class="toctree-l3"><a class="reference internal" href="../2.2.1/221_6_api/">API Reference</a>
+                </li>
+    </ul>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" >Firmware v2.2.1(5)</a>
+    <ul>
+                <li class="toctree-l3"><a class="reference internal" href="../2.2.1/221_5_manual/">User Manual</a>
+                </li>
+                <li class="toctree-l3"><a class="reference internal" href="../2.2.1/221_5_api/">API Reference</a>
+                </li>
+    </ul>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" >Firmware v2.2.1(4)</a>
+    <ul>
+                <li class="toctree-l3"><a class="reference internal" href="../2.2.1/221_4_manual/">User Manual</a>
+                </li>
+                <li class="toctree-l3"><a class="reference internal" href="../2.2.1/221_4_api/">API Reference</a>
+                </li>
+    </ul>
+                </li>
+    </ul>
                   </li>
               </ul>
       </div>
@@ -169,7 +197,7 @@
         <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
   <ul class="wy-breadcrumbs">
     <li><a href=".." class="icon icon-home" aria-label="Docs"></a></li>
-          <li class="breadcrumb-item">Sensor Expander [NEW]</li>
+          <li class="breadcrumb-item">Sensor Expander</li>
       <li class="breadcrumb-item active">User Manual</li>
     <li class="wy-breadcrumbs-aside">
           <a href="https://github.com/OpenSprinkler/OpenSprinkler-Firmware/edit/master/docs/sensor-expander.md" class="icon icon-github"> Edit on GitHub</a>
@@ -195,8 +223,8 @@
 <p>The Sensor Expander is <strong>NOT</strong> compatible with OpenSprinkler v2.3 or OpenSprinkler Pi (OSPi). However, <strong>recent versions of OSPi</strong> (v1.5 and v2.0) feature two on-board ADS1115 chips, providing 8 channels of analog inputs out of the box when updated to firmware 2.2.1(5).</p>
 <p><strong>Sensor Terminology</strong>:</p>
 <ul>
-<li><strong>Built-in Sensors</strong> refer to sensor ports on the main controller, identified by <code>SN1</code>–<code>SN4</code> where available. They support <strong>digital</strong> sensors such as rain, flow, and program switch.</li>
-<li><strong>Expanded Sensors</strong> are managed through <strong>Edit Sensors</strong>. They include <strong>analog</strong> sensors connected to the Sensor Expander and <strong>virtual</strong> sensors such as Aggregate and System Internal sensors. Expanded Sensors can be used for program adjustment.</li>
+<li><strong>Built-in Sensors</strong> refer to sensor ports on the main controller, identified by <code>SN1</code>–<code>SN4</code> where available. They support <strong>Digital</strong> sensors such as rain, flow, and program switch. On v4 with firmware 2.2.1(7) or later, these ports also support <strong>Analog</strong> mode.</li>
+<li><strong>Expanded Sensors</strong> are managed through <strong>Edit Sensors</strong>. They include <strong>Analog</strong> sensors connected to the Sensor Expander or v4's built-in ports, and <strong>Virtual</strong> sensors such as Aggregate, Weather, and System Internal sensors. Expanded Sensors can be used for program adjustment.</li>
 </ul>
 <hr class="double">
 
@@ -246,7 +274,7 @@
 <hr class="double">
 
 <h2 id="edit-sensors-sensor-logs">Edit Sensors &amp; Sensor Logs</h2>
-<p>The instructions below describe <strong>Firmware 2.2.1(5)</strong> and <strong>App/UI 2.4.96</strong>. The firmware supplies sensor metadata to the UI, so later releases may display additional types, fields, or units.</p>
+<p>The instructions below describe <strong>Firmware 2.2.1(7)</strong> and <strong>App/UI 2.4.105</strong>. The firmware supplies sensor metadata to the UI, so later releases may display additional types, fields, or units.</p>
 <h3 id="add-or-edit-a-sensor">Add or Edit a Sensor</h3>
 <p><img alt="Add and configure an Expanded Sensor" src="../assets/images/senexp_addsensor.jpg" /></p>
 <p>Open <strong>Edit Sensors</strong>, then add a new sensor or modify an existing sensor. Every sensor has the following common settings:</p>
@@ -271,12 +299,12 @@
 <td style="text-align: left;">Enable logging of this sensor.</td>
 </tr>
 <tr>
-<td style="text-align: left;"><code>Show on Home</code></td>
+<td style="text-align: left;"><code>On Home</code></td>
 <td style="text-align: left;">Display the latest reading on the homepage.</td>
 </tr>
 <tr>
 <td style="text-align: left;"><code>Type</code></td>
-<td style="text-align: left;">ADS1115, Aggregate, Weather Sensor, System Internal, or Onboard Digital.</td>
+<td style="text-align: left;">ADS1115, Aggregate, Weather Sensor, System Internal, Onboard Digital or Analog.</td>
 </tr>
 <tr>
 <td style="text-align: left;"><code>Interval</code></td>
@@ -311,9 +339,18 @@
 <p>The Edit Sensor interface also allows non-ADS1115 sensors, including:</p>
 <ul>
 <li><strong>Aggregate:</strong> Combines up to eight <strong>child</strong> sensors and aggregates their data using operations like <code>Min</code>, <code>Max</code>, <code>Average</code>, <code>Sum</code>, <code>Median</code>, or <code>Range</code>. Each child may have its own <code>scale</code> and <code>offset</code>. This is useful, for example, when you need to average or denoise readings from multiple soil moisture sensors. Aggregate sensors can themselves be children of other aggregate sensors, allowing flexible hierarchies.</li>
-<li><strong>System Internal:</strong> Monitor metrics like available Heap size and Flash size. Combined with logging, this lets you track the microcontroller’s resource usage over time.</li>
+<li><strong>System Internal:</strong> Monitor available Heap and Flash space, Heap Fragmentation, WiFi signal strength (RSSI), and CPU/Chip Temperature (not air temperature), subject to hardware availability. Combined with logging, this lets you track the controller's resource usage and operating conditions over time.</li>
 <li><strong>Onboard Digital:</strong> Allows you to programmatically link the controller’s built-in digital sensors (e.g., rain, soil) to the Expanded Sensor interface. Normally, built-in sensors affect watering on a per-zone basis (via each zone’s <strong>Ignore Sensor</strong> flag). By routing them through the Expanded Sensor interface, you can use them in program-level adjustments.</li>
-<li><strong>Weather Sensor</strong> <em>(available in firmware 2.2.1(6) and later):</em> Uses weather data such as current conditions, today's forecast, previous-day observations, and reference evapotranspiration (ETo). Weather Sensor values can be displayed, logged, and used for program-level adjustments like other Expanded Sensors. They require a configured location and weather provider, as well as internet access. Weather data is refreshed at most once every six hours, so a shorter Sensor Interval only logs the same cached value more often. Failed refreshes are retried every 15 minutes, and values are marked stale after 12 hours without a successful refresh.</li>
+<li>
+<p><strong>Onboard Analog</strong> <em>(available in firmware 2.2.1(7) and later, OpenSprinkler v4 only):</em> Reads analog signals from built-in ports SN1–SN4 (does <strong>NOT</strong> require a Sensor Expander). First, set the Built-in Sensor port to <strong>Analog</strong> (from <strong>Edit Options → Built-in Sensors</strong>), then create an Onboard Analog Expanded Sensor using that input. It supports the same Linear, Piecewise Linear, and Baked-in subtypes as <a href="#configure-an-ads1115-sensor">ADS1115</a>. Keep the input signal within <strong>0–3.3 V</strong> and connect the sensor and controller grounds together.</p>
+<ul>
+<li><strong>Sensor power:</strong> For sensors that accept 5 V, use the controller's <strong>+5V</strong> pin. If 3.3 V is needed, use the <strong>middle pin of the RF transmitter header</strong>. Regardless of supply voltage, the built-in port can only read <strong>0–3.3 V</strong>.</li>
+</ul>
+<p><img alt="Set Sensor 1 to Analog under Edit Options, then select Onboard Analog and SN1 in Edit Sensors" class="img-center img-border img-full-width" src="../assets/images/senexp_onboard_analog_setup.jpg" /></p>
+</li>
+<li>
+<p><strong>Weather Sensor</strong> <em>(available in firmware 2.2.1(6) and later):</em> Uses weather data such as current conditions, today's forecast, previous-day observations, and reference evapotranspiration (ETo). Weather Sensor values can be displayed, logged, and used for program-level adjustments like other Expanded Sensors. They require a configured location and weather provider, as well as internet access. Weather data is refreshed at most once every six hours, so a shorter Sensor Interval only logs the same cached value more often. Failed refreshes are retried every 15 minutes, and values are marked stale after 12 hours without a successful refresh.</p>
+</li>
 </ul>
 <hr />
 <h3 id="display-sensor-readings">Display Sensor Readings</h3>
