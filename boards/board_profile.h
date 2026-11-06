@@ -40,10 +40,11 @@ struct BoardProfile {
 	BoardPins pins;
 	uint8_t sensor_count;
 	uint8_t capabilities;
+	uint8_t analog_sensor_mask;
 };
 
 static_assert(sizeof(BoardPins) == 19, "BoardPins must remain compact");
-static_assert(sizeof(BoardProfile) == 21, "BoardProfile must remain compact");
+static_assert(sizeof(BoardProfile) == 22, "BoardProfile must remain compact");
 
 const BoardProfile& active();
 void select(ProfileId id);
@@ -63,6 +64,8 @@ constexpr uint8_t RTC_ADDRESS = 0x51;
 constexpr uint8_t REVISION1_DETECT_PIN = 16;
 constexpr uint8_t ETHERNET_CS_PIN = 16;
 constexpr uint32_t ETHERNET_SPI_CLOCK_HZ = 20000000UL;
+constexpr uint32_t CH390_PROBE_SPI_CLOCK_HZ = 1000000UL;
+constexpr uint32_t CH390_SPI_CLOCK_HZ = 10000000UL;
 
 constexpr uint8_t OS30_POWER_RX_PIN = IO_EXPANDER_PIN_BASE + 0;
 constexpr uint8_t OS30_POWER_TX_PIN = IO_EXPANDER_PIN_BASE + 2;

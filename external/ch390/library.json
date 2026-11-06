@@ -1,0 +1,12 @@
+{
+  "name": "espressif-ch390",
+  "version": "0.4.1",
+  "description": "Espressif CH390 Ethernet driver",
+  "license": "Apache-2.0",
+  "frameworks": "espidf, arduino",
+  "platforms": "espressif32",
+  "build": {
+    "includeDir": "include",
+    "srcDir": "src"
+  }
+}

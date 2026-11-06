@@ -30,7 +30,7 @@ A controller running firmware older than 2.2.1(6) must first install a current c
 
 If one-click update is unavailable or does not work, use the **Manual Firmware Upload** panel shown near the bottom of the screenshot above:
 
-1. Download the latest compatible image from the OpenSprinkler Compiled Firmware Archive. The latest release is currently firmware 2.2.1(6):
+1. Download the latest compatible image from the OpenSprinkler Compiled Firmware Archive. The latest release is **2.2.1(7)**:
     * [OpenSprinkler v3 (ESP8266)](https://raysfiles.com/os_compiled_firmware/v3.x/) uses a `.bin` file.
     * [OpenSprinkler v4 (ESP32-C6-N8)](https://raysfiles.com/os_compiled_firmware/v4.0/) uses a `.bin32n8` file.
 2. Under **Manual Firmware Upload**, choose the downloaded file, enter the controller's Device Password, and tap **Upload Selected Firmware**.

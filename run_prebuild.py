@@ -2,6 +2,7 @@
 import subprocess
 import os
 import shutil
+import sys
 
 # Import the PlatformIO environment
 Import("env")
@@ -52,6 +53,18 @@ def create_esp32_n8_release_artifact(source, target, env):
     release_path = env.subst("$BUILD_DIR/${PROGNAME}.bin32n8")
     shutil.copy2(source_path, release_path)
     print(f"Created ESP32-C6-N8 release artifact: {release_path}")
+
+
+def check_esp8266_stack(source, target, env):
+    return subprocess.call([
+        sys.executable,
+        env.subst("$PROJECT_DIR/tests/check_esp8266_stack.py"),
+        env.subst("$BUILD_DIR/src/main.cpp.su"),
+    ])
+
+
+if env.get("PIOENV") == "os3x_esp8266":
+    env.AddPostAction("$BUILD_DIR/${PROGNAME}.elf", check_esp8266_stack)
 
 
 # PlatformIO expects firmware.bin for its upload pipeline. Keep that internal

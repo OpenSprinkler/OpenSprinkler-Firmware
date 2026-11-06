@@ -1,5 +1,6 @@
 #include "onboard_digital_sensor.h"
 #include "../OpenSprinkler.h"
+#include "services/sensor_ports.h"
 
 #include <cmath>
 
@@ -58,6 +59,7 @@ void OnboardDigitalSensor::emit_description_json(BufferFiller* bfill) {
 
 
 float OnboardDigitalSensor::_get_raw_value() {
+	if (!sensor_available(static_cast<uint8_t>(input)) || sensor_port_is_analog(static_cast<uint8_t>(input))) return NAN;
 	switch (this->input) {
 		case OnboardInput::SN1:
 			return os.sn_sensors[0].active ? 1.0f : 0.0f;

@@ -22,6 +22,7 @@ class BufferFiller {
 	size_t len = 0;
 	bfill_flush_fn flush_fn = nullptr;
 	bool overflow = false;
+	FileReader* option_reader = nullptr;
 
 	void mid_flush() {
 		if (flush_fn && start && ptr && ptr > start) {
@@ -88,6 +89,24 @@ class BufferFiller {
 	}
 
 public:
+	class OptionReadScope {
+	public:
+		explicit OptionReadScope(BufferFiller& filler)
+			: filler_(filler), file_(SOPTS_FILENAME), previous_(filler.option_reader) {
+			filler_.option_reader = &file_;
+		}
+		~OptionReadScope() { filler_.option_reader = previous_; }
+		OptionReadScope(const OptionReadScope&) = delete;
+		OptionReadScope& operator=(const OptionReadScope&) = delete;
+		void read_string(uint16_t oid, char* destination, uint32_t max_length) {
+			file_.read_string(destination, uint32_t(oid) * MAX_SOPTS_SIZE, max_length);
+		}
+	private:
+		BufferFiller& filler_;
+		FileReader file_;
+		FileReader* previous_;
+	};
+
 	BufferFiller() {}
 
 	BufferFiller(char *buf, size_t buffer_len) :
@@ -158,7 +177,8 @@ public:
 					break;
 				}
 				memset(ptr, 0, read_length + 1);
-				file_read_block(SOPTS_FILENAME, ptr, oid * MAX_SOPTS_SIZE, read_length);
+				if (option_reader) option_reader->read_block(ptr, oid * MAX_SOPTS_SIZE, read_length);
+				else file_read_block(SOPTS_FILENAME, ptr, oid * MAX_SOPTS_SIZE, read_length);
 				char *terminator = static_cast<char*>(memchr(ptr, 0, read_length));
 				if (!terminator) {
 					if (read_length < MAX_SOPTS_SIZE) {

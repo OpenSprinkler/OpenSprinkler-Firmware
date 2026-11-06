@@ -15,8 +15,8 @@ The Sensor Expander is **NOT** compatible with OpenSprinkler v2.3 or OpenSprinkl
 
 **Sensor Terminology**:
 
-* **Built-in Sensors** refer to sensor ports on the main controller, identified by `SN1`–`SN4` where available. They support **digital** sensors such as rain, flow, and program switch.
-* **Expanded Sensors** are managed through **Edit Sensors**. They include **analog** sensors connected to the Sensor Expander and **virtual** sensors such as Aggregate and System Internal sensors. Expanded Sensors can be used for program adjustment.
+* **Built-in Sensors** refer to sensor ports on the main controller, identified by `SN1`–`SN4` where available. They support **Digital** sensors such as rain, flow, and program switch. On v4 with firmware 2.2.1(7) or later, these ports also support **Analog** mode.
+* **Expanded Sensors** are managed through **Edit Sensors**. They include **Analog** sensors connected to the Sensor Expander or v4's built-in ports, and **Virtual** sensors such as Aggregate, Weather, and System Internal sensors. Expanded Sensors can be used for program adjustment.
 
 <hr class="double">
 
@@ -72,7 +72,7 @@ For additional diagnostic guidance, see [Troubleshooting](troubleshooting.md).
 
 ## Edit Sensors & Sensor Logs
 
-The instructions below describe **Firmware 2.2.1(5)** and **App/UI 2.4.96**. The firmware supplies sensor metadata to the UI, so later releases may display additional types, fields, or units.
+The instructions below describe **Firmware 2.2.1(7)** and **App/UI 2.4.105**. The firmware supplies sensor metadata to the UI, so later releases may display additional types, fields, or units.
 
 ### Add or Edit a Sensor
 
@@ -85,8 +85,8 @@ Open **Edit Sensors**, then add a new sensor or modify an existing sensor. Every
 | `Name` | User-defined sensor name (up to 32 characters). |
 | `Enabled` | Sensor enable flag. |
 | `Logging` | Enable logging of this sensor. |
-| `Show on Home` | Display the latest reading on the homepage. |
-| `Type` | ADS1115, Aggregate, Weather Sensor, System Internal, or Onboard Digital. |
+| `On Home` | Display the latest reading on the homepage. |
+| `Type` | ADS1115, Aggregate, Weather Sensor, System Internal, Onboard Digital or Analog. |
 | `Interval` | Time between sensor readings and logging, in minutes. See note below. |
 | `Unit` | Physical unit for this sensor. |
 | `Min/Max` | Output limits. Values outside this range are clamped<br>and marked in the sensor status. |
@@ -116,8 +116,14 @@ The Sensor Expander is only detected during controller startup. If the expander 
 The Edit Sensor interface also allows non-ADS1115 sensors, including:
 
 * **Aggregate:** Combines up to eight **child** sensors and aggregates their data using operations like `Min`, `Max`, `Average`, `Sum`, `Median`, or `Range`. Each child may have its own `scale` and `offset`. This is useful, for example, when you need to average or denoise readings from multiple soil moisture sensors. Aggregate sensors can themselves be children of other aggregate sensors, allowing flexible hierarchies.
-* **System Internal:** Monitor metrics like available Heap size and Flash size. Combined with logging, this lets you track the microcontroller’s resource usage over time.
+* **System Internal:** Monitor available Heap and Flash space, Heap Fragmentation, WiFi signal strength (RSSI), and CPU/Chip Temperature (not air temperature), subject to hardware availability. Combined with logging, this lets you track the controller's resource usage and operating conditions over time.
 * **Onboard Digital:** Allows you to programmatically link the controller’s built-in digital sensors (e.g., rain, soil) to the Expanded Sensor interface. Normally, built-in sensors affect watering on a per-zone basis (via each zone’s **Ignore Sensor** flag). By routing them through the Expanded Sensor interface, you can use them in program-level adjustments.
+* **Onboard Analog** *(available in firmware 2.2.1(7) and later, OpenSprinkler v4 only):* Reads analog signals from built-in ports SN1–SN4 (does **NOT** require a Sensor Expander). First, set the Built-in Sensor port to **Analog** (from **Edit Options → Built-in Sensors**), then create an Onboard Analog Expanded Sensor using that input. It supports the same Linear, Piecewise Linear, and Baked-in subtypes as [ADS1115](#configure-an-ads1115-sensor). Keep the input signal within **0–3.3 V** and connect the sensor and controller grounds together.
+
+    * **Sensor power:** For sensors that accept 5 V, use the controller's **+5V** pin. If 3.3 V is needed, use the **middle pin of the RF transmitter header**. Regardless of supply voltage, the built-in port can only read **0–3.3 V**.
+
+    ![Set Sensor 1 to Analog under Edit Options, then select Onboard Analog and SN1 in Edit Sensors](assets/images/senexp_onboard_analog_setup.jpg){ .img-center .img-border .img-full-width }
+
 * **Weather Sensor** *(available in firmware 2.2.1(6) and later):* Uses weather data such as current conditions, today's forecast, previous-day observations, and reference evapotranspiration (ETo). Weather Sensor values can be displayed, logged, and used for program-level adjustments like other Expanded Sensors. They require a configured location and weather provider, as well as internet access. Weather data is refreshed at most once every six hours, so a shorter Sensor Interval only logs the same cached value more often. Failed refreshes are retried every 15 minutes, and values are marked stale after 12 hours without a successful refresh.
 
 ---

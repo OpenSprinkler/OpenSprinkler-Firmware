@@ -1,4 +1,5 @@
 #include "system_internal_sensor.h"
+#include "platform/chip_temperature.h"
 
 #include <cmath>
 
@@ -10,42 +11,68 @@
 	#endif
 #include <LittleFS.h>
 extern bool useEth;   // declared in OpenSprinkler.h; for the RSSI guard
-#else
-#include <cstdio>
 #endif
 
-bool system_metric_is_supported(SystemMetric metric) {
-	switch (metric) {
-	#if defined(ARDUINO)
-			case SystemMetric::FREE_HEAP:
-			case SystemMetric::FREE_FLASH:
-			case SystemMetric::WIFI_RSSI:
-			#if defined(ESP8266)
-			case SystemMetric::HEAP_FRAGMENTATION:
-			#endif
-			return true;
+namespace {
+
+struct MetricDescription {
+	SystemMetric id;
+	const char* label;
+	SensorUnit unit;
+	int min;
+	int max;
+	bool supported;
+};
+
+#if defined(ARDUINO)
+constexpr bool embedded = true;
 #else
-		case SystemMetric::CPU_TEMPERATURE:
-			return true;
+constexpr bool embedded = false;
 #endif
-		default:
-			return false;
+
+const MetricDescription* metric_description(SystemMetric metric) {
+	static const MetricDescription descriptions[] = {
+		{SystemMetric::FREE_HEAP, PSTR("Free Heap"), SensorUnit::Kilobyte, 0,
+#if defined(ESP32)
+			512,
+#else
+			50,
+#endif
+			embedded},
+		{SystemMetric::FREE_FLASH, PSTR("Free Flash"), SensorUnit::Kilobyte, 0, 2000, embedded},
+		// dBm is not yet a SensorUnit; retain the existing unitless RSSI contract.
+		{SystemMetric::WIFI_RSSI, PSTR("WiFi RSSI"), SensorUnit::None, -100, -30, embedded},
+#if defined(ESP32)
+		{SystemMetric::CPU_TEMPERATURE, PSTR("Chip Temperature"), SensorUnit::Celsius,
+			CHIP_TEMPERATURE_MIN_C, CHIP_TEMPERATURE_MAX_C, true},
+#else
+		{SystemMetric::CPU_TEMPERATURE, PSTR("CPU Temperature"), SensorUnit::Celsius, -40, 185, !embedded},
+#endif
+		{SystemMetric::HEAP_FRAGMENTATION, PSTR("Heap Fragmentation"), SensorUnit::Percent, 0, 100,
+#if defined(ESP8266)
+			true},
+#else
+			false},
+#endif
+	};
+	static_assert(sizeof(descriptions) / sizeof(descriptions[0]) == static_cast<uint8_t>(SystemMetric::MAX_VALUE),
+		"Every system metric needs a description");
+	for (const auto& description : descriptions) {
+		if (description.id == metric) return &description;
 	}
+	return nullptr;
+}
+
+} // namespace
+
+bool system_metric_is_supported(SystemMetric metric) {
+	const auto* description = metric_description(metric);
+	return description && description->supported;
 }
 
 SensorUnit system_metric_native_unit(SystemMetric metric) {
-	switch (metric) {
-		case SystemMetric::CPU_TEMPERATURE:
-			return SensorUnit::Celsius;
-		case SystemMetric::FREE_HEAP:
-		case SystemMetric::FREE_FLASH:
-			return SensorUnit::Kilobyte;
-		case SystemMetric::HEAP_FRAGMENTATION:
-			return SensorUnit::Percent;
-		// WIFI_RSSI is in dBm — no SensorUnit fits, reported as unitless.
-		default:
-			return SensorUnit::None;
-	}
+	const auto* description = metric_description(metric);
+	return description ? description->unit : SensorUnit::None;
 }
 
 SystemInternalSensor::SystemInternalSensor(uint32_t interval, float min, float max, const char* name, SensorUnit unit, uint8_t flag,
@@ -73,32 +100,20 @@ void SystemInternalSensor::emit_description_json(BufferFiller* bfill) {
 			 "\"o\":["
 	));
 
-#if defined(ARDUINO)
-	bfill->emit_p(PSTR("{\"id\":0,\"l\":\"Free Heap\","
-	                    "\"dfl\":{\"unit\":$D,\"max\":\"50\"},"
-	                    "\"lk\":[\"unit\"]}"),
-	              static_cast<uint8_t>(SensorUnit::Kilobyte));
-	bfill->emit_p(PSTR(",{\"id\":1,\"l\":\"Free Flash\","
-	                    "\"dfl\":{\"unit\":$D,\"max\":\"2000\"},"
-	                    "\"lk\":[\"unit\"]}"),
-	              static_cast<uint8_t>(SensorUnit::Kilobyte));
-	bfill->emit_p(PSTR(",{\"id\":2,\"l\":\"WiFi RSSI\","
-	                    "\"dfl\":{\"unit\":$D,\"min\":\"-100\",\"max\":\"-30\"},"
-	                    "\"lk\":[\"unit\"]}"),
-	              static_cast<uint8_t>(SensorUnit::None));
-	#if defined(ESP8266)
-	bfill->emit_p(PSTR(",{\"id\":4,\"l\":\"Heap Fragmentation\","
-	                    "\"dfl\":{\"unit\":$D,\"max\":\"100\"},"
-	                    "\"lk\":[\"unit\"]}"),
-	              static_cast<uint8_t>(SensorUnit::Percent));
-	#endif
-#else
-	bfill->emit_p(PSTR("{\"id\":3,\"l\":\"CPU Temperature\","
-	                    "\"dfl\":{\"unit\":$D,\"min\":\"-40\",\"max\":\"185\"},"
-	                    "\"ug\":$D}"),
-	              static_cast<uint8_t>(SensorUnit::Celsius),
-	              static_cast<uint8_t>(SensorUnitGroup::Temperature));
-#endif
+	bool comma = false;
+	for (uint8_t id = 0; id < static_cast<uint8_t>(SystemMetric::MAX_VALUE); id++) {
+		const auto* description = metric_description(static_cast<SystemMetric>(id));
+		if (!description || !description->supported) continue;
+		if (comma) bfill->emit_p(PSTR(","));
+		comma = true;
+		bfill->emit_p(PSTR("{\"id\":$D,\"l\":\"$F\",\"dfl\":{\"unit\":$D,\"min\":\"$D\",\"max\":\"$D\"}"),
+			id, description->label, static_cast<uint8_t>(description->unit), description->min, description->max);
+		if (description->unit == SensorUnit::Celsius) {
+			bfill->emit_p(PSTR(",\"ug\":$D}"), static_cast<uint8_t>(SensorUnitGroup::Temperature));
+		} else {
+			bfill->emit_p(PSTR(",\"lk\":[\"unit\"]}"));
+		}
+	}
 
 	bfill->emit_p(PSTR("]}"
 		"]}"
@@ -141,22 +156,19 @@ float SystemInternalSensor::_get_raw_value() {
 			raw = (float)ESP.getHeapFragmentation();
 		#endif
 			break;
+		case SystemMetric::CPU_TEMPERATURE:
+		#if defined(ESP32)
+			raw = chip_temperature_celsius();
+		#endif
+			break;
 		default:
 			break;
 	}
 #else
 	switch (this->metric) {
-		case SystemMetric::CPU_TEMPERATURE: {
-			// /sys/class/thermal/thermal_zone0/temp returns millidegrees Celsius.
-			// Path exists on Pi and most x86 Linux; absent in some containers/VMs.
-			FILE *f = fopen("/sys/class/thermal/thermal_zone0/temp", "r");
-			if (!f) break;
-			int millidegrees = 0;
-			int n = fscanf(f, "%d", &millidegrees);
-			fclose(f);
-			if (n == 1) raw = millidegrees / 1000.0f;
+		case SystemMetric::CPU_TEMPERATURE:
+			raw = chip_temperature_celsius();
 			break;
-		}
 		default:
 			break;
 	}

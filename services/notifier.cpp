@@ -484,7 +484,7 @@ static void format_notification(uint16_t type, uint32_t lval, float fval,
 				#elif defined(ESP32)
 					snprintf_P(bufs.body + strlen(bufs.body), bufs.body_cap - strlen(bufs.body),
 					           PSTR("rebooted. Cause: %d. Device IP: "), os.last_reboot_cause);
-					IPAddress _ip = useEth ? ETH.localIP() : WiFi.localIP();
+					IPAddress _ip = useEth ? eth.localIP() : WiFi.localIP();
 					unsigned char ip[4] = {_ip[0], _ip[1], _ip[2], _ip[3]};
 					ip2string(bufs.body, bufs.body_cap, ip);
 			#else

@@ -11,6 +11,7 @@
 	#include <Updater.h>
 	#include <StackThunk.h>
 	#include <bearssl/bearssl.h>
+	#include <umm_malloc/umm_heap_select.h>
 #else
 	#include <Update.h>
 	#include <esp_system.h>
@@ -96,6 +97,8 @@ extern "C" uint32_t thunk_firmware_update_verify_signature(const uint8_t *digest
 
 static bool verify_release_signature(const uint8_t digest[32], const uint8_t *signature, size_t length) {
 #if defined(ESP8266)
+	HeapSelectDram dram;
+	if (!stack_thunk_get_refcnt() && ESP.getMaxFreeBlockSize() < 8192) return false;
 	stack_thunk_add_ref();
 	bool valid = thunk_firmware_update_verify_signature(digest, signature, length) == 1;
 	stack_thunk_del_ref();
@@ -184,10 +187,16 @@ bool FirmwareUpdateService::authenticate(const char *password) const {
 		(password && os.password_verify(password));
 }
 
+bool FirmwareUpdateService::token_valid(const char *token) const {
+	return _phase == FirmwareUpdatePhase::Prepared && token && _upload_token[0] &&
+		strcmp(token, _upload_token) == 0 &&
+		(int32_t)((uint32_t)millis() - _upload_token_expires) < 0;
+}
+
 bool FirmwareUpdateService::prepare_verified(const uint8_t *descriptor, size_t descriptor_length,
 	const char *signature_hex, const char *release_id, bool allow_downgrade,
 	char upload_token_out[17]) {
-	if (busy()) return false;
+	if (busy() || _phase == FirmwareUpdatePhase::Success) return false;
 	reset_transfer();
 	if (!configured()) {
 		fail("Online updates are not configured");
@@ -199,6 +208,15 @@ bool FirmwareUpdateService::prepare_verified(const uint8_t *descriptor, size_t d
 		return false;
 	}
 
+#if defined(ESP8266)
+	{
+		HeapSelectDram dram;
+		if (!stack_thunk_get_refcnt() && ESP.getMaxFreeBlockSize() < 8192) {
+			fail("Not enough contiguous memory to verify release; retry later");
+			return false;
+		}
+	}
+#endif
 	uint8_t signature[72];
 	size_t signature_length = 0;
 	uint8_t digest[32];
@@ -307,20 +325,14 @@ bool FirmwareUpdateService::begin_upload(const char *filename, bool verified, ui
 }
 
 bool FirmwareUpdateService::begin_verified(const char *filename, const char *upload_token) {
-	bool authorized = _phase == FirmwareUpdatePhase::Prepared && upload_token && _upload_token[0] &&
-		strcmp(upload_token, _upload_token) == 0 &&
-		(int32_t)((uint32_t)millis() - _upload_token_expires) < 0;
+	if (!token_valid(upload_token)) return false;
 	_upload_token[0] = 0;
 	_upload_token_expires = 0;
-	if (!authorized) {
-		fail("Verified firmware upload is not authorized");
-		return false;
-	}
 	return begin_upload(filename, true);
 }
 
 bool FirmwareUpdateService::begin_manual(const char *filename, uint32_t size, const char *sha256_hex) {
-	if (busy()) return false;
+	if (busy() || _phase == FirmwareUpdatePhase::Success) return false;
 	reset_transfer();
 	if (!size || !parse_sha256(sha256_hex, _expected_sha256)) {
 		fail("Firmware upload size or checksum is invalid");
@@ -330,7 +342,7 @@ bool FirmwareUpdateService::begin_manual(const char *filename, uint32_t size, co
 }
 
 bool FirmwareUpdateService::begin_legacy_manual(const char *filename) {
-	if (busy()) return false;
+	if (busy() || _phase == FirmwareUpdatePhase::Success) return false;
 	reset_transfer();
 	return begin_upload(filename, false, 0, true);
 }
