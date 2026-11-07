@@ -33,9 +33,10 @@ static uint8_t _addrs[] = {DS1307_ADDR, MCP7940_ADDR, PCF8563_ADDR};
 
 uint8_t I2CRTC::addr = 0;
 
+// Wire is started by OpenSprinkler::begin() before the RTC is used. Starting it here could run before Wire
+// itself is constructed, since the order of global constructors across files is unspecified.
 I2CRTC::I2CRTC()
 {
-	Wire.begin();
 }
 
 bool I2CRTC::exists() {
