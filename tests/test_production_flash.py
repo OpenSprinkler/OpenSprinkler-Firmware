@@ -61,12 +61,21 @@ class ProductionFlashTests(unittest.TestCase):
 
     def test_development_override_rejected(self):
         path = self.directory / "firmware.factory.bin"
-        path.write_bytes(b"2.2.1(7)" + b"\xff" * 100)
+        path.write_bytes(b"2.2.1(8)" + b"\xff" * 100)
         with mock.patch.dict(os.environ, {"OS4_FIRMWARE": str(path)}):
             with self.assertRaisesRegex(ValueError, "mismatch"):
                 flash.main(["--erase-all", "/dev/test"])
         self.run.assert_not_called()
         self.download.assert_not_called()
+
+    def test_previous_release_cache_is_not_selected(self):
+        old = self.directory / "os4-2.2.1-6.factory.bin"
+        old.write_bytes(b"previous production image")
+        self.assertEqual(flash.main(["--prepare-only"]), 0)
+        self.download.assert_called_once()
+        self.assertEqual((self.directory / flash.FACTORY_NAME).read_bytes(), self.factory)
+        self.assertEqual(old.read_bytes(), b"previous production image")
+        self.run.assert_not_called()
 
     def test_pinned_override_is_allowed_offline(self):
         path = self.directory / "offline.bin"
@@ -126,12 +135,12 @@ class ProductionFlashTests(unittest.TestCase):
                     flash.select_port(None)
             self.assertEqual(flash.select_port("/dev/explicit"), "/dev/explicit")
 
-    def ota_info(self, build=7):
+    def ota_info(self, build=6):
         return {"target": flash.TARGET, "extension": ".bin32n8", "current_version": 221, "current_build": build}
 
     def test_ota_uploads_only_pinned_application_and_checks_version(self):
         for target in (["192.168.1.50"], ["--ip", "192.168.1.50"]):
-            with mock.patch.object(flash, "device_json", side_effect=[self.ota_info(), {"result": 1}, self.ota_info(), self.ota_info(6)]) as request, \
+            with mock.patch.object(flash, "device_json", side_effect=[self.ota_info(), {"result": 1}, self.ota_info(), self.ota_info(7)]) as request, \
                     mock.patch.object(flash, "ota_password_hash", return_value="a" * 32), \
                     mock.patch.object(flash.time, "sleep"), \
                     mock.patch.dict(os.environ, {"ESPTOOL": "/not/installed"}):
@@ -140,7 +149,7 @@ class ProductionFlashTests(unittest.TestCase):
             query = urllib.parse.parse_qs(urllib.parse.urlsplit(upload.args[1]).query)
             self.assertEqual(query, {"pw": ["a" * 32], "size": [str(len(self.app))], "sha256": [flash.APP_SHA256]})
             body = upload.kwargs["data"]
-            self.assertIn(b'name="file"; filename="os_221_rev6.bin32n8"', body)
+            self.assertIn(b'name="file"; filename="os_221_rev7.bin32n8"', body)
             self.assertEqual(body.split(b"\r\n\r\n", 1)[1].rsplit(b"\r\n--", 1)[0], self.app)
             self.assertEqual(request.call_count, 4)
         self.run.assert_not_called()
@@ -223,10 +232,13 @@ class ProductionFlashTests(unittest.TestCase):
 
 class ReleasePinTests(unittest.TestCase):
     def test_pins_are_fixed_not_working_tree_version(self):
-        self.assertEqual(flash.VERSION, "2.2.1(6)")
-        self.assertEqual(flash.APP_SIZE, 1719472)
-        self.assertEqual(flash.APP_SHA256, "103c56103e317ca3851c86372855a86657f2062e084525083994d70ed42f52e5")
-        self.assertEqual(flash.FACTORY_SHA256, "95f9c59c6396fb5cceb9fb701c7eb2f472b0bd0af7420675d70ca41a3d707575")
+        self.assertEqual(flash.VERSION, "2.2.1(7)")
+        self.assertEqual(flash.APP_SIZE, 1786864)
+        self.assertEqual(flash.APP_SHA256, "d041f038aa56ad64c0728014d3fd21cb52969e951d500ec20b7d23306a1c6e00")
+        self.assertEqual(flash.BOOT_SHA256, "15b4a74f85942d9d700c19cd4c796fd4bc3954fdd8d726dedb10f13e1ccea526")
+        self.assertEqual(flash.BOOT_PATH.name, "os4-2.2.1-7-boot.bin")
+        self.assertEqual(flash.FACTORY_NAME, "os4-2.2.1-7.factory.bin")
+        self.assertEqual(flash.FACTORY_SHA256, "31128b564d9bdfd6120df1c6e55689794785f2f2f3ceb70aa7dc92d9bf273f70")
 
     def test_download_checks_exact_hash(self):
         response = mock.MagicMock()
